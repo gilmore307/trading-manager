@@ -1,10 +1,21 @@
 # trading-main
 
-`trading-main` is the system-level documentation and contract repository for the trading project.
+`trading-main` is the system-level platform repository for the trading project.
 
-It owns global architecture, cross-repository workflow, shared contracts, system-level decisions, and global planning context. It does not own runtime trading code, market data, generated artifacts, secrets, or component-local implementation details.
+It owns global architecture, cross-repository workflow, shared contracts, field/status registries, project templates, shared helper code, system-level decisions, and global planning context.
+
+It does not own component runtime implementations, market data, generated artifacts, secrets, or component-local task state.
 
 This repository also anchors the shared local trading development environment at `.venv/`. The `.venv/` directory is local runtime infrastructure and must remain ignored by Git.
+
+## Top-Level Structure
+
+```text
+docs/        System-level docs spine and numbered contracts.
+registry/    Trading-wide registered fields, identifiers, statuses, artifact types, and request types.
+templates/   Trading-wide project, contract, task, and implementation templates.
+helpers/     Shared helper code used across trading repositories.
+```
 
 ## Docs Spine
 
@@ -23,4 +34,4 @@ docs/
   10_request.md
 ```
 
-Component repositories keep their own docs spine. `trading-main` records only system-level facts and contracts.
+Component repositories keep their own docs spine. `trading-main` records system-level facts, contracts, registries, templates, and shared helper boundaries.

@@ -22,3 +22,10 @@ data/
 artifacts/
 logs/
 notebooks/
+
+# Python package/build outputs
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/

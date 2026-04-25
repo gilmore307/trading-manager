@@ -84,3 +84,32 @@ This gives all trading repositories a single predictable environment location wh
 - Component repositories should not create independent virtual environments unless an exception is documented.
 - `trading-main` remains documentation/contract-only except for the local gitignored `.venv/` anchor.
 - The `.venv/` directory is not reviewable repository content.
+
+## D007 - Expand `trading-main` into the trading platform main repository
+
+Date: 2026-04-25
+
+### Context
+
+The server's project work is centered on the trading system. The owner wants one canonical home for global planning, field registration, templates, and shared helpers instead of splitting small shared pieces across additional repositories.
+
+### Decision
+
+`trading-main` will own:
+
+- trading-wide planning and architecture;
+- trading-wide registered fields, identifiers, statuses, artifact types, request types, and related names;
+- trading-wide templates;
+- shared helper code used by component repositories;
+- the shared local `.venv/` anchor.
+
+### Rationale
+
+Keeping these shared assets together reduces repository sprawl and gives the trading system one obvious coordination point.
+
+### Consequences
+
+- `trading-main` is no longer docs-only.
+- Component runtime implementations still remain outside `trading-main`.
+- Shared helpers in `trading-main` must stay generic and reusable.
+- Trading-specific registry responsibilities move from `universal-catalog` into `trading-main/registry/`.

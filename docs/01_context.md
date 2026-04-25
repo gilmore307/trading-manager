@@ -6,7 +6,7 @@ The trading project is a core multi-repository system for building, evaluating, 
 
 The system needs a stable global coordination layer because its responsibilities are intentionally split across multiple repositories. Without a shared architecture and contract repository, each component could invent incompatible artifact layouts, request formats, manifest schemas, ready-signal conventions, and responsibility boundaries.
 
-`trading-main` exists to keep those global relationships explicit and reviewable.
+`trading-main` exists to keep those global relationships explicit and reviewable, and to provide the trading-wide registry, templates, and shared helpers that all component repositories can use.
 
 ## Related Systems
 
@@ -14,7 +14,7 @@ The system needs a stable global coordination layer because its responsibilities
 
 | Repository | System-Level Role | Summary |
 |---|---|---|
-| `trading-main` | Global documentation and contract layer | Owns system architecture, global workflow, shared contracts, system-level decisions, and cross-repository planning. It does not store data or runtime code. |
+| `trading-main` | Global platform layer | Owns system architecture, global workflow, shared contracts, registries, templates, shared helpers, system-level decisions, and cross-repository planning. It does not store data, generated artifacts, secrets, or component runtime implementations. |
 | `trading-manager` | Control plane | Coordinates workflow sequencing, schedules, queues, readiness checks, retries, recovery, manual override, lifecycle policy, request generation, and watchlist coordination. |
 | `trading-data` | Data upstream | Connects to data sources, fetches market/regime/options data, normalizes rows, writes data outputs, and emits ready signals. |
 | `trading-storage` | Shared persistence contract | Defines persistent storage layout, artifact placement, partitioning, retention, archive, rehydrate, backup, and restore expectations. |
@@ -33,7 +33,7 @@ Current expected external interfaces include:
 - macroeconomic and calendar data sources;
 - broker or exchange APIs, including OKX or Alpaca;
 - local or shared filesystem storage used by the trading repositories;
-- `universal-catalog` for shared registered names, status vocabularies, and registrable fields;
+- `trading-main/registry/` for trading-wide registered names, status vocabularies, and registrable fields;
 - OpenClaw/Codex execution surfaces for planning, implementation, review, and acceptance.
 
 Specific providers, credentials, quotas, and environments are not defined in this file unless they become system-level assumptions.
@@ -66,6 +66,16 @@ The shared environment contract should define:
 
 `trading-main` may document and anchor the shared environment, but it must not become a runtime implementation repository.
 
+## Trading Registry, Templates, and Helpers
+
+Because this server's project work is centered on the trading system, `trading-main` is the canonical home for trading-wide shared assets:
+
+- `registry/` maintains trading-wide fields, identifiers, statuses, artifact types, request types, and other registered names.
+- `templates/` stores reusable trading project, contract, task, and implementation templates.
+- `helpers/` stores shared helper code used by component repositories.
+
+Shared helpers are allowed in `trading-main`, but they must remain generic trading infrastructure. Component-specific runtime behavior still belongs in the owning component repository.
+
 ## Environment
 
 Current assumed environment:
@@ -82,7 +92,7 @@ Runtime deployment environments, production hosts, storage volumes, broker crede
 
 System-level dependencies currently assumed:
 
-- `universal-catalog` for registered names, shared status vocabularies, and registrable fields;
+- `trading-main/registry/` for registered names, shared status vocabularies, and registrable fields;
 - OpenClaw project-development process for docs spine, task boundaries, acceptance, and review;
 - component repositories for concrete implementation;
 - shared storage accessible to the trading repositories;
@@ -113,10 +123,10 @@ For `trading-main`, Codex should normally not be needed unless there is a bulk d
 
 ## Important Constraints
 
-- `trading-main` must remain documentation-only and contract-only, except for the gitignored shared environment anchor.
+- `trading-main` owns docs, contracts, registries, templates, shared helpers, and the gitignored shared environment anchor.
 - Cross-repository behavior must be described through explicit contracts before implementation depends on it.
 - Component repositories must not silently fork global contracts.
-- Shared status vocabularies and registrable fields belong in `universal-catalog`.
+- Trading-wide status vocabularies and registrable fields belong in `trading-main/registry/`.
 - Component-specific details belong in the component repository docs, not in `trading-main`.
 - Market-state discovery must not be contaminated by strategy performance.
 - Execution-related code must treat broker and exchange operations as safety-sensitive external actions.

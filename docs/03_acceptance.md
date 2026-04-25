@@ -10,8 +10,10 @@ Acceptance for this repository focuses on:
 - repository boundary clarity;
 - cross-repository workflow clarity;
 - shared contract clarity;
-- alignment with `universal-catalog`;
-- absence of runtime code, data, artifacts, and secrets;
+- registry clarity;
+- template clarity;
+- shared helper boundary clarity;
+- absence of component runtime code, data, artifacts, and secrets;
 - evidence that component repositories can use these documents without conflicting interpretations.
 
 This repository does not accept trading runtime behavior. Runtime behavior is accepted in the relevant component repository.
@@ -25,11 +27,11 @@ A change to `trading-main` can be accepted only if:
 - the docs spine remains complete;
 - numbered contract files remain clearly owned and cross-repository in scope;
 - `README.md` accurately describes the repository boundary;
-- repository purpose remains documentation, contracts, and shared environment anchoring only;
+- repository purpose remains system docs, contracts, registries, templates, shared helpers, and shared environment anchoring;
 - `.venv/`, if present, is ignored by Git and treated as local runtime infrastructure;
-- no runtime trading source code is introduced;
+- no component runtime trading source code is introduced;
 - no market data, generated artifacts, logs, notebooks, credentials, or secrets are introduced;
-- shared statuses and registrable fields are referenced from `universal-catalog` rather than duplicated as a competing source of truth;
+- trading-wide statuses and registrable fields are maintained under `registry/` rather than duplicated elsewhere;
 - component-specific scope, implementation details, and task state are routed to the owning component repository.
 
 ### For documentation-only changes
@@ -58,6 +60,26 @@ Contract changes are acceptable when they:
 - include enough examples for implementation without making examples the only definition;
 - document migration or compatibility impact when changing an existing contract;
 - update affected workflow and decision docs when contract shape changes.
+
+### For registry and template changes
+
+Registry and template changes are acceptable when they:
+
+- keep trading-wide registered names in `registry/`;
+- avoid scattering field/status definitions across docs;
+- document compatibility impact when renaming or removing registered fields;
+- keep templates reusable and not tied to one component unless clearly labeled;
+- update affected docs and contracts when registry meaning changes.
+
+### For shared helper changes
+
+Shared helper changes are acceptable when they:
+
+- provide reusable trading infrastructure rather than component-specific runtime behavior;
+- include or declare appropriate tests once helper behavior exists;
+- avoid embedding secrets, provider credentials, or local-only paths;
+- keep public interfaces explicit and stable enough for component repositories;
+- update templates or contracts when helper behavior encodes a shared convention.
 
 ### For shared environment changes
 
@@ -102,7 +124,7 @@ OpenClaw acceptance requires:
 - list of changed files;
 - summary of boundary impact;
 - summary of contract impact;
-- summary of `universal-catalog` impact;
+- summary of registry impact;
 - confirmation that no runtime code/data/secrets were added;
 - confirmation that `.venv/` is ignored if present;
 - confirmation that component-specific details were not incorrectly centralized;
@@ -113,11 +135,11 @@ OpenClaw acceptance requires:
 
 A change must be rejected or returned for revision if it:
 
-- adds runtime trading code to `trading-main`;
+- adds component runtime trading code to `trading-main`;
 - adds market data, generated artifacts, logs, notebooks, or research outputs to `trading-main`;
 - adds secrets or credentials;
 - tracks `.venv/` contents in Git;
-- duplicates `universal-catalog` status vocabularies or registrable fields as a competing source of truth;
+- duplicates registry status vocabularies or registrable fields as a competing source of truth outside `registry/`;
 - moves component-local implementation details into global docs;
 - changes repository responsibilities without a decision record;
 - changes cross-repository contracts without updating affected docs;

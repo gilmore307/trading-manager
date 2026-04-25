@@ -12,7 +12,10 @@
 - Draft `docs/09_ready_signal.md`.
 - Draft `docs/10_request.md`.
 - Define shared environment runtime version and package manager.
-- Register required shared names, fields, and statuses in `universal-catalog`.
+- Migrate existing relevant `universal-catalog` trading entries into `trading-main/registry/`.
+- Define initial `registry/` files.
+- Define initial `templates/` files.
+- Define initial `helpers/` package boundary.
 - Create component repository docs spines.
 
 ## Open Gaps
