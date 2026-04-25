@@ -12,7 +12,6 @@
 - Draft `docs/09_ready_signal.md`.
 - Draft `docs/10_request.md`.
 - Define shared environment runtime version and package manager.
-- Migrate existing relevant `universal-catalog` trading entries into `trading-main/registry/`.
 - Define initial `registry/` files.
 - Define initial `templates/` files.
 - Define initial `helpers/` package boundary.
@@ -29,6 +28,8 @@
 - GitHub repository visibility policy after initial private creation.
 
 ## Recently Accepted
+
+- Migrated former standalone registry entries into one Markdown file per registry kind under `trading-main/registry/`.
 
 - Initial repository list approved:
   - `trading-main`

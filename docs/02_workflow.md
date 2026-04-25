@@ -51,7 +51,7 @@ The trading system collaboration model has these layers:
 - Manifests provide run evidence.
 - Ready signals provide downstream consumability markers.
 - Artifact references provide stable handoff points.
-- Shared statuses and registrable fields are maintained in `universal-catalog`.
+- Shared statuses and registrable fields are maintained in `trading-main/registry/`.
 - `trading-main` defines global collaboration contracts but does not execute workflows.
 - Component-local workflow detail belongs in the owning component repository.
 - Execution consumes promoted decisions only; it must not choose strategies or train models.
@@ -196,5 +196,5 @@ The following collaboration details still need definition before implementation 
 - exact manifest schema;
 - exact ready-signal schema;
 - exact shared storage root;
-- exact registered status vocabulary and field names in `universal-catalog`;
+- exact registered status vocabulary and field names in `trading-main/registry/`;
 - exact shared environment runtime version and dependency policy.

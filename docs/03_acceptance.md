@@ -56,7 +56,7 @@ Contract changes are acceptable when they:
 - identify producing and consuming repositories;
 - describe lifecycle expectations;
 - describe compatibility expectations;
-- reference `universal-catalog` for registered fields, identifiers, and status vocabularies;
+- reference `trading-main/registry/` for registered fields, identifiers, and status vocabularies;
 - include enough examples for implementation without making examples the only definition;
 - document migration or compatibility impact when changing an existing contract;
 - update affected workflow and decision docs when contract shape changes.
