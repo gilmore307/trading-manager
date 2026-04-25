@@ -1,0 +1,24 @@
+# Local shared trading environment anchor
+.venv/
+
+# Python/cache/runtime
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Local/editor
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+.DS_Store
+
+# Trading outputs must not live in trading-main
+data/
+artifacts/
+logs/
+notebooks/
