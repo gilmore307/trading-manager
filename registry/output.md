@@ -6,9 +6,10 @@ Reusable output/template identifiers. Use only for stable output shapes that mul
 
 ## Range
 
-Use for reusable output identifiers/templates only. Do not use for runtime artifact instances.
+Register reusable output identifiers/templates only. Do not use this kind for runtime artifact files or one-off report instances.
 
-## Entries
+## Concrete Entries
 
-| id | key | payload_format | payload | note | source_migration |
-|---|---|---|---|---|---|
+Concrete registry entries for this kind live in the SQL-backed registry, not in this Markdown file.
+
+Use this file to define what the kind means, what belongs here, and what must be rejected or re-scoped. Do not duplicate active item rows here.

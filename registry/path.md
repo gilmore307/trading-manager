@@ -6,11 +6,10 @@ Canonical filesystem path values. Use only for stable reviewed paths that should
 
 ## Range
 
-Use for reviewed path values only. Do not store secrets or disposable artifact paths.
+Register stable reviewed paths only. Do not register disposable generated paths, secrets paths that expose sensitive structure, or artifact instance paths.
 
-## Entries
+## Concrete Entries
 
-| id | key | payload_format | payload | note | source_migration |
-|---|---|---|---|---|---|
-| `pth_R6V1C9TE` | `NETWORK_FRAMEWORK_ROOT_PATH` | `text` | `/root/projects/network-framework` | repository root path for the network-framework checkout | `002_bootstrap_universal_catalog.sql` |
-| `pth_C4X8N2ME` | `TRADING_MAIN_ROOT_PATH` | `text` | `/root/projects/trading-main` | repository root path for the trading-main checkout | `002_bootstrap_universal_catalog.sql` |
+Concrete registry entries for this kind live in the SQL-backed registry, not in this Markdown file.
+
+Use this file to define what the kind means, what belongs here, and what must be rejected or re-scoped. Do not duplicate active item rows here.

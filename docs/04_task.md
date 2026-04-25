@@ -12,7 +12,6 @@
 - Draft `docs/09_ready_signal.md`.
 - Draft `docs/10_request.md`.
 - Define shared environment runtime version and package manager.
-- Define initial `registry/` files.
 - Define initial `templates/` files.
 - Define initial `helpers/` package boundary.
 - Create component repository docs spines.
@@ -29,6 +28,7 @@
 
 ## Recently Accepted
 
+- Corrected registry shape so Markdown kind files define kind boundaries while SQL migrations own concrete entries.
 - Migrated former standalone registry entries into one Markdown file per registry kind under `trading-main/registry/`.
 
 - Initial repository list approved:

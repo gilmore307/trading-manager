@@ -113,3 +113,26 @@ Keeping these shared assets together reduces repository sprawl and gives the tra
 - Component runtime implementations still remain outside `trading-main`.
 - Shared helpers in `trading-main` must stay generic and reusable.
 - Trading-specific registry responsibilities move from `universal-catalog` into `trading-main/registry/`.
+
+## D008 - Registry Markdown defines kind boundaries while SQL owns concrete entries
+
+Date: 2026-04-25
+
+### Context
+
+The initial registry migration converted active SQL rows into Markdown tables. That made the kind files too noisy and blurred their purpose.
+
+### Decision
+
+`registry/<kind>.md` files define kind boundaries, ranges, and rejection rules only. Concrete registered items live in the SQL-backed `trading_registry` table and append-only migrations under `registry/sql/schema_migrations/`.
+
+### Rationale
+
+Kind documentation should explain what belongs in a registry kind. Concrete entries need database semantics, uniqueness, migration history, and helper access rather than large Markdown inventories.
+
+### Consequences
+
+- Do not list active registry rows in Markdown kind files.
+- Add one Markdown file per formal kind.
+- Add or update SQL migrations for concrete item changes.
+- If a new kind is introduced, update both the SQL kind constraint and the Markdown boundary file.

@@ -2,21 +2,27 @@
 
 `registry/` is the canonical home for trading-wide registered names and shared vocabulary.
 
-The registry uses one Markdown file per `kind`. Each file owns exactly one registration kind and must define the kind boundary before listing entries.
+The registry has two layers:
 
-## Schema
+1. **Kind boundary docs** — one Markdown file per `kind`, defining what that kind means and what belongs in it.
+2. **SQL-backed entries** — concrete registered items live in the active `trading_registry` table and its migrations under `registry/sql/schema_migrations/`.
 
-Each entry has:
+Markdown kind files must not list concrete active rows. They define scope, range, and rejection boundaries only.
+
+## SQL Entry Schema
+
+Concrete entries use this shape:
 
 | Field | Meaning |
 |---|---|
 | `id` | Stable random identifier. |
-| `kind` | Registry kind. Must match the owning file. |
+| `kind` | Registry kind. Must match one kind boundary file. |
 | `key` | Stable symbolic key. |
 | `payload_format` | Payload storage format, currently `text` or `file`. |
 | `payload` | Registered value or file reference. |
 | `note` | Human-readable review note. |
-| `source_migration` | Historical migration file this entry came from during universal-catalog migration. |
+| `created_at` | Database insertion timestamp. |
+| `updated_at` | Database update timestamp. |
 
 ## Kind Files
 
@@ -36,7 +42,9 @@ Each entry has:
 
 ## Rules
 
-- Do not define the same kind in multiple files.
+- Do not define the same kind in multiple Markdown files.
+- Do not store concrete active row lists in Markdown kind files.
 - Do not store secrets. Store secret aliases only.
 - Do not mix component-local implementation details into trading-wide registry entries.
-- New fields, statuses, config keys, script locators, and stable names should be registered here before component repositories depend on them.
+- New fields, statuses, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
+- If a new kind is needed, add its Markdown boundary file and update the SQL kind check in the same reviewed change.
