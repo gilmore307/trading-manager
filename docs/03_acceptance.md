@@ -25,7 +25,6 @@ This repository does not accept trading runtime behavior. Runtime behavior is ac
 A change to `trading-main` can be accepted only if:
 
 - the docs spine remains complete;
-- numbered contract files remain clearly owned and cross-repository in scope;
 - `README.md` accurately describes the repository boundary;
 - repository purpose remains system docs, contracts, registries, templates, shared helpers, and shared environment anchoring;
 - `.venv/`, if present, is ignored by Git and treated as local runtime infrastructure;
@@ -109,7 +108,7 @@ find . -maxdepth 2 -type f | sort
 Manual review must confirm:
 
 - required docs files exist;
-- numbered contract files exist when introduced;
+- contract drafting templates live under `templates/contracts/`, not `docs/`;
 - registry kind Markdown files do not list concrete active rows;
 - `registry/current.csv` is present and generated from SQL when registry entries changed;
 - `.venv/` is not tracked;

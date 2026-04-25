@@ -187,3 +187,47 @@ The apparent overlap is mostly semantic. Keeping specific kinds improves query c
 - Use `repo` for repository names and `path` for filesystem locations.
 - Use `script` for source-file entrypoint locators.
 - Use `config` for machine-consumed settings and `term` for human-facing definitions.
+
+## D011 - Keep contract drafting templates out of the docs spine
+
+Date: 2026-04-25
+
+### Context
+
+The initial artifact, manifest, ready-signal, and request contract placeholders were drafting surfaces for future contract shapes, not stable system docs.
+
+### Decision
+
+Move artifact, manifest, ready-signal, and request drafting surfaces to `templates/contracts/`. Keep `docs/` focused on the 00-06 docs spine.
+
+### Rationale
+
+The docs spine should contain ratified project context and governance. Drafting templates belong under `templates/`. Registry type vocabularies belong under `registry/`.
+
+### Consequences
+
+- Do not add numbered docs beyond `06_memory.md` for templates or registries.
+- Use `templates/contracts/` for reusable contract drafting surfaces.
+- Use `registry/*_type.md` and SQL migrations for registered type vocabularies.
+
+## D012 - Remove canceled-project registry entries
+
+Date: 2026-04-25
+
+### Context
+
+The trading project is now the central project boundary for this server. Old project-specific registry entries should not remain active when they are no longer useful.
+
+### Decision
+
+Remove active registry entries for canceled project-specific defaults from the trading registry.
+
+### Rationale
+
+The registry should reflect active trading-system vocabulary and shared infrastructure. Stale project-specific defaults create noise and increase the chance of reusing invalid names.
+
+### Consequences
+
+- GitHub history remains the restore path if old entries are ever needed again.
+- Active `registry/current.csv` should contain only current registry entries.
+- Future registry entries should be trading-relevant or generally useful to the active server project boundary.

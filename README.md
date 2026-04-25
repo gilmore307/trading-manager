@@ -13,7 +13,7 @@ This repository also anchors the shared local trading development environment at
 ```text
 docs/        System-level docs spine and numbered contracts.
 registry/    Trading-wide registry kind boundaries, SQL migrations, and generated current.csv snapshot.
-templates/   Trading-wide project, contract, task, and implementation templates.
+templates/   Trading-wide project, contract, task, and implementation templates, including contract drafting templates.
 helpers/     Shared helper code used across trading repositories.
 ```
 
@@ -28,10 +28,6 @@ docs/
   04_task.md
   05_decision.md
   06_memory.md
-  07_artifact.md
-  08_manifest.md
-  09_ready_signal.md
-  10_request.md
 ```
 
 Component repositories keep their own docs spine. `trading-main` records system-level facts, contracts, registries, templates, and shared helper boundaries.

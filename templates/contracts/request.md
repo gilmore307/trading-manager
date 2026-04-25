@@ -2,11 +2,11 @@
 
 ## Purpose
 
-This file will define the system-level cross-repository request contract.
+This template is used to draft the system-level cross-repository request contract.
 
 A request records intended work from `trading-manager`, a human, or an approved Agent into a component repository.
 
-## Initial Contract Boundary
+## Template Boundary
 
 This file should define:
 
@@ -22,6 +22,6 @@ This file should define:
 - retry/cancellation/supersession expectations;
 - manual override fields.
 
-## Open Gap
+## Drafting Gap
 
 The exact request schema is not yet defined.

@@ -51,13 +51,17 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 ## Kind Files
 
 - [`acceptance_outcome`](./acceptance_outcome.md) — Default acceptance outcome values for OpenClaw acceptance records.
+- [`artifact_type`](./artifact_type.md) — Registered artifact type values used to classify durable outputs produced and consumed across trading repositories.
 - [`config`](./config.md) — Non-secret configuration keys and secret-alias references. Payloads may contain secret aliases but must never contain secret values.
 - [`docs_status`](./docs_status.md) — Default documentation alignment status values.
 - [`field`](./field.md) — Canonical shared field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
 - [`maintenance_status`](./maintenance_status.md) — Default maintenance pass status values.
+- [`manifest_type`](./manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
 - [`output`](./output.md) — Reusable output/template identifiers. Use only for stable output shapes that multiple workflows may reference.
 - [`path`](./path.md) — Canonical filesystem path values. Use only for stable reviewed paths that should be referenced consistently.
+- [`ready_signal_type`](./ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
 - [`repo`](./repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
+- [`request_type`](./request_type.md) — Registered request type values used to classify cross-repository work requests.
 - [`review_readiness`](./review_readiness.md) — Default review-readiness values for completion receipts and review queues.
 - [`script`](./script.md) — Canonical source-file locators for helper or automation entry points.
 - [`task_lifecycle_state`](./task_lifecycle_state.md) — Default task lifecycle state values for planning and execution records.
@@ -73,4 +77,4 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - New fields, statuses, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
-- If a new kind is needed, add its Markdown boundary file and update the SQL kind check in the same reviewed change.
+- If a new kind is needed, add its Markdown boundary file, update helper kind lists, update the SQL kind check, and regenerate `registry/current.csv` in the same reviewed change.

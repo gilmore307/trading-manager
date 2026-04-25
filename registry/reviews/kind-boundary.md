@@ -17,13 +17,16 @@ The current kind set is acceptable, but several pairs are easy to confuse. Keep 
 | `path` vs `script` | A script locator is also a path. | `script` is for executable/source entrypoint locators; `path` is for general stable filesystem paths. | Keep separate. |
 | `config` vs `path` | Some config values are paths. | Use `config` when the value is a tunable setting; use `path` when the path itself is the stable referenced object. | Keep separate; document intent in the entry note. |
 | `config` vs `term` | Config keys can look like named concepts. | Use `config` for machine-consumed values; use `term` for human-facing definitions. | Keep separate. |
-| `output` vs future artifact kinds | Outputs and artifacts can both name produced things. | `output` is for reusable output shapes/templates; future artifact kinds should name durable trading artifact classes or instances only if explicitly introduced. | Keep `output`; do not add artifact kinds until `docs/07_artifact.md` needs them. |
+| `artifact_type` vs `output` | Artifact types and output templates can sound similar. | `artifact_type` classifies durable system artifacts; `output` names reusable output/template shapes. | Keep separate. |
+| `manifest_type` vs `artifact_type` | Manifests can be stored as artifacts. | `manifest_type` classifies evidence documents; `artifact_type` classifies durable output payloads. | Keep separate. |
+| `ready_signal_type` vs status kinds | Signals often contain readiness/status values. | `ready_signal_type` classifies the signal; status kinds classify allowed state values. | Keep separate. |
+| `request_type` vs task lifecycle state | Requests initiate work; task states track lifecycle. | `request_type` classifies requested work; `task_lifecycle_state` tracks execution state. | Keep separate. |
 | status kinds vs generic status | Many status kinds share values like `blocked` or `accepted`. | Keep separate status kinds when lifecycle semantics differ. Do not merge just because payload strings overlap. | Keep separate. |
 | `term` vs every other kind | Any registered key may also need a definition. | `term` defines vocabulary; other kinds register machine-consumed values. Use `term` only when no machine-consumed registry kind fits. | Keep separate. |
 
 ## Recommendation
 
-Keep the current kind set. The apparent overlap is mostly semantic, not structural.
+Keep the current kind set with the added contract type kinds. The apparent overlap is mostly semantic, not structural.
 
 The most important rule is:
 
@@ -41,7 +44,7 @@ if code consumes it as a setting, use `config`; if humans consume it as a defini
 
 Revisit the kind set if any of these happen:
 
-- `output` starts carrying concrete trading artifact classes;
+- `output` starts carrying concrete trading artifact classes that should be `artifact_type`;
 - more than one script/path/config entry is created for the same value;
 - status vocabularies multiply beyond task/review/acceptance/test/maintenance/docs;
 - component repositories start adding local registries because the central kind set is unclear.

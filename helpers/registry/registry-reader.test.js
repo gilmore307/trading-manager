@@ -29,10 +29,32 @@ function createRow(overrides) {
 }
 
 test('registry kinds stay fixed to the documented set', () => {
-  assert.deepEqual(REGISTRY_KINDS, ['field', 'output', 'repo', 'path', 'config', 'term', 'script', 'task_lifecycle_state', 'review_readiness', 'acceptance_outcome', 'test_status', 'maintenance_status', 'docs_status']);
+  assert.deepEqual(REGISTRY_KINDS, [
+    'field',
+    'output',
+    'repo',
+    'path',
+    'config',
+    'term',
+    'script',
+    'artifact_type',
+    'manifest_type',
+    'ready_signal_type',
+    'request_type',
+    'task_lifecycle_state',
+    'review_readiness',
+    'acceptance_outcome',
+    'test_status',
+    'maintenance_status',
+    'docs_status',
+  ]);
   assert.equal(isRegistryKind('repo'), true);
   assert.equal(isRegistryKind('term'), true);
   assert.equal(isRegistryKind('script'), true);
+  assert.equal(isRegistryKind('artifact_type'), true);
+  assert.equal(isRegistryKind('manifest_type'), true);
+  assert.equal(isRegistryKind('ready_signal_type'), true);
+  assert.equal(isRegistryKind('request_type'), true);
   assert.equal(isRegistryKind('task_lifecycle_state'), true);
   assert.equal(isRegistryKind('review_readiness'), true);
   assert.equal(isRegistryKind('acceptance_outcome'), true);
@@ -147,11 +169,11 @@ test('parseRegistry rejects invalid JSON and returns object registries', () => {
   );
 
   assert.deepEqual(
-    parseRegistry('{"network-framework":{"companion-token":{"path":"/root/secrets/network-framework/companion-token","kind":"token"}}}', '/root/secrets/registry.json'),
+    parseRegistry('{"example-service":{"token":{"path":"/root/secrets/example-service/token","kind":"token"}}}', '/root/secrets/registry.json'),
     {
-      'network-framework': {
-        'companion-token': {
-          path: '/root/secrets/network-framework/companion-token',
+      'example-service': {
+        'token': {
+          path: '/root/secrets/example-service/token',
           kind: 'token',
         },
       },
@@ -182,15 +204,15 @@ test('createSecretResolver resolves registered secret aliases and loads secret t
   const readCalls = [];
   const resolver = createSecretResolver(async (sql, params) => {
     assert.match(sql, /WHERE key = \$1/);
-    assert.deepEqual(params, ['NETWORK_FRAMEWORK_COMPANION_TOKEN_SECRET_ALIAS']);
+    assert.deepEqual(params, ['EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS']);
 
     return {
       rows: [
         createRow({
           id: 'cfg_P4R8T2LM',
           kind: 'config',
-          key: 'NETWORK_FRAMEWORK_COMPANION_TOKEN_SECRET_ALIAS',
-          payload: 'network-framework/companion-token',
+          key: 'EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS',
+          payload: 'example-service/token',
           note: 'registered companion token secret alias',
         }),
       ],
@@ -202,17 +224,17 @@ test('createSecretResolver resolves registered secret aliases and loads secret t
 
       if (path === '/root/secrets/registry.json') {
         return JSON.stringify({
-          'network-framework': {
-            'companion-token': {
-              path: '/root/secrets/network-framework/companion-token',
+          'example-service': {
+            'token': {
+              path: '/root/secrets/example-service/token',
               kind: 'token',
-              use: 'network-framework phase-1 status companion bearer token',
+              use: 'example service bearer token',
             },
           },
         });
       }
 
-      if (path === '/root/secrets/network-framework/companion-token') {
+      if (path === '/root/secrets/example-service/token') {
         return 'secret-value\n';
       }
 
@@ -221,15 +243,15 @@ test('createSecretResolver resolves registered secret aliases and loads secret t
   });
 
   assert.equal(
-    await resolver.getSecretAliasByConfigKey('NETWORK_FRAMEWORK_COMPANION_TOKEN_SECRET_ALIAS'),
-    'network-framework/companion-token'
+    await resolver.getSecretAliasByConfigKey('EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS'),
+    'example-service/token'
   );
   assert.equal(
-    await resolver.getSecretPathByConfigKey('NETWORK_FRAMEWORK_COMPANION_TOKEN_SECRET_ALIAS'),
-    '/root/secrets/network-framework/companion-token'
+    await resolver.getSecretPathByConfigKey('EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS'),
+    '/root/secrets/example-service/token'
   );
   assert.equal(
-    await resolver.loadSecretTextByConfigKey('NETWORK_FRAMEWORK_COMPANION_TOKEN_SECRET_ALIAS'),
+    await resolver.loadSecretTextByConfigKey('EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS'),
     'secret-value'
   );
   assert.equal(readCalls[0].path, '/root/secrets/registry.json');

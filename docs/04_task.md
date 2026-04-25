@@ -6,10 +6,7 @@
 
 ## Queued Tasks
 
-- Draft `docs/07_artifact.md`.
-- Draft `docs/08_manifest.md`.
-- Draft `docs/09_ready_signal.md`.
-- Draft `docs/10_request.md`.
+- Define concrete artifact, manifest, ready-signal, and request schemas from `templates/contracts/`.
 - Define shared environment runtime version and package manager.
 - Define initial `templates/` files.
 - Define initial `helpers/` package boundary.
@@ -27,6 +24,9 @@
 
 ## Recently Accepted
 
+- Moved artifact/manifest/ready-signal/request contract placeholders from `docs/` to `templates/contracts/`.
+- Added registry kind boundaries for `artifact_type`, `manifest_type`, `ready_signal_type`, and `request_type`.
+- Removed canceled-project registry entries and regenerated `registry/current.csv`.
 - Corrected registry shape so Markdown kind files define kind boundaries while SQL migrations own concrete entries.
 - Added SQL-to-CSV registry snapshot generation at `registry/current.csv`.
 - Added registry kind boundary overlap review.
