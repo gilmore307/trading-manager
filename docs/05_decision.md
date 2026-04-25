@@ -136,3 +136,54 @@ Kind documentation should explain what belongs in a registry kind. Concrete entr
 - Add one Markdown file per formal kind.
 - Add or update SQL migrations for concrete item changes.
 - If a new kind is introduced, update both the SQL kind constraint and the Markdown boundary file.
+
+## D009 - Export the active SQL registry as a CSV snapshot
+
+Date: 2026-04-25
+
+### Context
+
+Concrete registry entries belong in SQL for queryability, constraints, and helper access. The owner still wants GitHub to show the current registry contents without requiring a database query.
+
+### Decision
+
+After SQL registry updates, `registry/sql/apply-migrations.py` exports the active `trading_registry` table to:
+
+```text
+registry/current.csv
+```
+
+The CSV is a generated snapshot and must not be edited by hand.
+
+### Rationale
+
+This keeps SQL as the source of truth while preserving a simple GitHub-readable view of the active registry.
+
+### Consequences
+
+- Registry data changes require SQL migration review.
+- Registry CSV changes are expected after SQL registry changes.
+- Markdown kind files remain boundary documentation only.
+
+## D010 - Keep current registry kinds with documented tie-breakers
+
+Date: 2026-04-25
+
+### Context
+
+Some registry kinds are easy to confuse, especially `field` vs status-value kinds, `repo` vs `path`, `path` vs `script`, and `config` vs `term`.
+
+### Decision
+
+Keep the current kind set and document tie-breaker rules in `registry/reviews/kind-boundary.md`.
+
+### Rationale
+
+The apparent overlap is mostly semantic. Keeping specific kinds improves query convenience and validation clarity.
+
+### Consequences
+
+- Use `field` for slot names and specific status kinds for allowed values.
+- Use `repo` for repository names and `path` for filesystem locations.
+- Use `script` for source-file entrypoint locators.
+- Use `config` for machine-consumed settings and `term` for human-facing definitions.

@@ -65,7 +65,9 @@ Contract changes are acceptable when they:
 
 Registry and template changes are acceptable when they:
 
-- keep trading-wide registered names in `registry/`;
+- keep trading-wide registered names in the SQL-backed `trading_registry`;
+- keep kind boundary/range rules in `registry/<kind>.md`;
+- regenerate `registry/current.csv` after SQL registry changes;
 - avoid scattering field/status definitions across docs;
 - document compatibility impact when renaming or removing registered fields;
 - keep templates reusable and not tied to one component unless clearly labeled;
@@ -108,6 +110,8 @@ Manual review must confirm:
 
 - required docs files exist;
 - numbered contract files exist when introduced;
+- registry kind Markdown files do not list concrete active rows;
+- `registry/current.csv` is present and generated from SQL when registry entries changed;
 - `.venv/` is not tracked;
 - no source-code directories were introduced;
 - no data/artifact/log/notebook directories were introduced unless explicitly documented as ignored local infrastructure;

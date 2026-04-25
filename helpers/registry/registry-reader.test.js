@@ -4,13 +4,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  CATALOG_KINDS,
-  assertCatalogKind,
-  createCatalogReader,
+  REGISTRY_KINDS,
+  assertRegistryKind,
+  createRegistryReader,
   createSecretResolver,
   getSecretEntryFromRegistry,
-  isCatalogKind,
-  mapCatalogItemRow,
+  isRegistryKind,
+  mapRegistryItemRow,
   parseRegistry,
 } = require('./index');
 
@@ -18,7 +18,7 @@ function createRow(overrides) {
   return {
     id: 'fld_A7K3P2Q9',
     kind: 'field',
-    key: 'CATALOG_ITEM_ID',
+    key: 'REGISTRY_ITEM_ID',
     payload_format: 'text',
     payload: 'id',
     note: 'canonical column name for trading_registry.id',
@@ -28,27 +28,27 @@ function createRow(overrides) {
   };
 }
 
-test('catalog kinds stay fixed to the documented set', () => {
-  assert.deepEqual(CATALOG_KINDS, ['field', 'output', 'repo', 'path', 'config', 'term', 'script', 'task_lifecycle_state', 'review_readiness', 'acceptance_outcome', 'test_status', 'maintenance_status', 'docs_status']);
-  assert.equal(isCatalogKind('repo'), true);
-  assert.equal(isCatalogKind('term'), true);
-  assert.equal(isCatalogKind('script'), true);
-  assert.equal(isCatalogKind('task_lifecycle_state'), true);
-  assert.equal(isCatalogKind('review_readiness'), true);
-  assert.equal(isCatalogKind('acceptance_outcome'), true);
-  assert.equal(isCatalogKind('test_status'), true);
-  assert.equal(isCatalogKind('maintenance_status'), true);
-  assert.equal(isCatalogKind('docs_status'), true);
-  assert.equal(isCatalogKind('unknown'), false);
-  assert.equal(assertCatalogKind('config'), 'config');
-  assert.throws(() => assertCatalogKind('unknown'), /Invalid catalog kind: unknown/);
+test('registry kinds stay fixed to the documented set', () => {
+  assert.deepEqual(REGISTRY_KINDS, ['field', 'output', 'repo', 'path', 'config', 'term', 'script', 'task_lifecycle_state', 'review_readiness', 'acceptance_outcome', 'test_status', 'maintenance_status', 'docs_status']);
+  assert.equal(isRegistryKind('repo'), true);
+  assert.equal(isRegistryKind('term'), true);
+  assert.equal(isRegistryKind('script'), true);
+  assert.equal(isRegistryKind('task_lifecycle_state'), true);
+  assert.equal(isRegistryKind('review_readiness'), true);
+  assert.equal(isRegistryKind('acceptance_outcome'), true);
+  assert.equal(isRegistryKind('test_status'), true);
+  assert.equal(isRegistryKind('maintenance_status'), true);
+  assert.equal(isRegistryKind('docs_status'), true);
+  assert.equal(isRegistryKind('unknown'), false);
+  assert.equal(assertRegistryKind('config'), 'config');
+  assert.throws(() => assertRegistryKind('unknown'), /Invalid registry kind: unknown/);
 });
 
-test('mapCatalogItemRow converts snake_case columns into readable JS keys', () => {
-  assert.deepEqual(mapCatalogItemRow(createRow()), {
+test('mapRegistryItemRow converts snake_case columns into readable JS keys', () => {
+  assert.deepEqual(mapRegistryItemRow(createRow()), {
     id: 'fld_A7K3P2Q9',
     kind: 'field',
-    key: 'CATALOG_ITEM_ID',
+    key: 'REGISTRY_ITEM_ID',
     payloadFormat: 'text',
     payload: 'id',
     note: 'canonical column name for trading_registry.id',
@@ -59,7 +59,7 @@ test('mapCatalogItemRow converts snake_case columns into readable JS keys', () =
 
 test('getItemById uses a read-only trading_registry query', async () => {
   const calls = [];
-  const reader = createCatalogReader(async (sql, params) => {
+  const reader = createRegistryReader(async (sql, params) => {
     calls.push({ sql, params });
     return { rows: [createRow()] };
   });
@@ -73,7 +73,7 @@ test('getItemById uses a read-only trading_registry query', async () => {
 });
 
 test('getItemByKey returns null when no row matches', async () => {
-  const reader = createCatalogReader(async () => []);
+  const reader = createRegistryReader(async () => []);
 
   const item = await reader.getItemByKey('MISSING_KEY');
 
@@ -81,21 +81,21 @@ test('getItemByKey returns null when no row matches', async () => {
 });
 
 test('require item helpers throw clear errors when the item is missing', async () => {
-  const reader = createCatalogReader(async () => ({ rows: [] }));
+  const reader = createRegistryReader(async () => ({ rows: [] }));
 
-  await assert.rejects(() => reader.requireItemById('fld_missing'), /Catalog item not found for id: fld_missing/);
-  await assert.rejects(() => reader.requireItemByKey('MISSING_KEY'), /Catalog item not found for key: MISSING_KEY/);
+  await assert.rejects(() => reader.requireItemById('fld_missing'), /Registry item not found for id: fld_missing/);
+  await assert.rejects(() => reader.requireItemByKey('MISSING_KEY'), /Registry item not found for key: MISSING_KEY/);
 });
 
 test('lookup helpers reject blank id and key inputs', async () => {
-  const reader = createCatalogReader(async () => ({ rows: [] }));
+  const reader = createRegistryReader(async () => ({ rows: [] }));
 
   await assert.rejects(() => reader.getItemById(''), /id must be a non-empty string/);
   await assert.rejects(() => reader.getItemByKey('   '), /key must be a non-empty string/);
 });
 
 test('require helpers still work when destructured from the reader object', async () => {
-  const requireItemById = createCatalogReader(async () => ({ rows: [createRow()] })).requireItemById;
+  const requireItemById = createRegistryReader(async () => ({ rows: [createRow()] })).requireItemById;
 
   const item = await requireItemById('fld_A7K3P2Q9');
 
@@ -103,7 +103,7 @@ test('require helpers still work when destructured from the reader object', asyn
 });
 
 test('listItemsByKind validates kind and returns mapped items', async () => {
-  const reader = createCatalogReader(async (sql, params) => {
+  const reader = createRegistryReader(async (sql, params) => {
     assert.match(sql, /WHERE kind = \$1/);
     assert.match(sql, /ORDER BY key ASC/);
     assert.deepEqual(params, ['path']);
@@ -127,16 +127,16 @@ test('listItemsByKind validates kind and returns mapped items', async () => {
   assert.equal(items[0].payloadFormat, 'text');
   await assert.rejects(
     async () => reader.listItemsByKind('workflow'),
-    /Invalid catalog kind: workflow/
+    /Invalid registry kind: workflow/
   );
 });
 
-test('createCatalogReader rejects unsupported query result shapes', async () => {
-  const reader = createCatalogReader(async () => ({ value: [] }));
+test('createRegistryReader rejects unsupported query result shapes', async () => {
+  const reader = createRegistryReader(async () => ({ value: [] }));
 
   await assert.rejects(
     () => reader.getItemById('fld_A7K3P2Q9'),
-    /Invalid catalog query result: expected an array of rows or an object with a rows array/
+    /Invalid registry query result: expected an array of rows or an object with a rows array/
   );
 });
 

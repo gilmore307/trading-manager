@@ -8,8 +8,11 @@ Canonical shared field names used in task records, receipts, manifests, requests
 
 Register field names only. Do not use this kind for status values, repository names, config values, artifact instances, or free-form documentation labels.
 
-## Concrete Entries
+## Reject Or Re-scope
 
-Concrete registry entries for this kind live in the SQL-backed registry, not in this Markdown file.
+Reject or re-scope entries that are actually:
 
-Use this file to define what the kind means, what belongs here, and what must be rejected or re-scoped. Do not duplicate active item rows here.
+- status values;
+- repository names;
+- filesystem paths;
+- config defaults;

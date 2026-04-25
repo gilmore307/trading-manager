@@ -8,8 +8,10 @@ Canonical filesystem path values. Use only for stable reviewed paths that should
 
 Register stable reviewed paths only. Do not register disposable generated paths, secrets paths that expose sensitive structure, or artifact instance paths.
 
-## Concrete Entries
+## Reject Or Re-scope
 
-Concrete registry entries for this kind live in the SQL-backed registry, not in this Markdown file.
+Reject or re-scope entries that are actually:
 
-Use this file to define what the kind means, what belongs here, and what must be rejected or re-scoped. Do not duplicate active item rows here.
+- generated artifact paths;
+- secret file paths unless explicitly approved as aliases elsewhere;
+- repo names without paths;

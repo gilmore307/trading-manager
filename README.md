@@ -12,7 +12,7 @@ This repository also anchors the shared local trading development environment at
 
 ```text
 docs/        System-level docs spine and numbered contracts.
-registry/    Trading-wide registered fields, identifiers, statuses, artifact types, and request types.
+registry/    Trading-wide registry kind boundaries, SQL migrations, and generated current.csv snapshot.
 templates/   Trading-wide project, contract, task, and implementation templates.
 helpers/     Shared helper code used across trading repositories.
 ```
@@ -35,3 +35,11 @@ docs/
 ```
 
 Component repositories keep their own docs spine. `trading-main` records system-level facts, contracts, registries, templates, and shared helper boundaries.
+
+## Registry Rule
+
+Concrete registry entries live in the SQL-backed `trading_registry` table.
+
+- Kind Markdown files define kind boundaries and rejection rules only.
+- SQL migrations under `registry/sql/schema_migrations/` define concrete entries.
+- `registry/current.csv` is generated from SQL for GitHub visibility and must not be edited by hand.

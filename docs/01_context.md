@@ -70,7 +70,7 @@ The shared environment contract should define:
 
 Because this server's project work is centered on the trading system, `trading-main` is the canonical home for trading-wide shared assets:
 
-- `registry/` maintains trading-wide fields, identifiers, statuses, artifact types, request types, and other registered names.
+- `registry/` maintains trading-wide kind boundaries, SQL-backed registered entries, and the generated `registry/current.csv` snapshot.
 - `templates/` stores reusable trading project, contract, task, and implementation templates.
 - `helpers/` stores shared helper code used by component repositories.
 

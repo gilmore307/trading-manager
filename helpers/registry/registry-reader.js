@@ -1,6 +1,6 @@
 'use strict';
 
-const { assertCatalogKind } = require('./catalog-types');
+const { assertRegistryKind } = require('./registry-types');
 
 const SELECT_COLUMNS = `
 SELECT
@@ -15,7 +15,7 @@ SELECT
 FROM trading_registry
 `;
 
-function mapCatalogItemRow(row) {
+function mapRegistryItemRow(row) {
   if (!row || typeof row !== 'object') {
     throw new Error('Cannot map trading_registry row: expected an object row');
   }
@@ -42,7 +42,7 @@ function normalizeQueryResult(result) {
   }
 
   throw new Error(
-    'Invalid catalog query result: expected an array of rows or an object with a rows array'
+    'Invalid registry query result: expected an array of rows or an object with a rows array'
   );
 }
 
@@ -54,19 +54,19 @@ function assertLookupValue(label, value) {
   return value;
 }
 
-function createCatalogReader(query) {
+function createRegistryReader(query) {
   if (typeof query !== 'function') {
-    throw new TypeError('createCatalogReader requires an async query function');
+    throw new TypeError('createRegistryReader requires an async query function');
   }
 
   async function fetchOne(sql, params) {
     const rows = normalizeQueryResult(await query(sql, params));
-    return rows[0] ? mapCatalogItemRow(rows[0]) : null;
+    return rows[0] ? mapRegistryItemRow(rows[0]) : null;
   }
 
   async function fetchMany(sql, params) {
     const rows = normalizeQueryResult(await query(sql, params));
-    return rows.map(mapCatalogItemRow);
+    return rows.map(mapRegistryItemRow);
   }
 
   async function getItemById(id) {
@@ -81,7 +81,7 @@ function createCatalogReader(query) {
     const item = await getItemById(id);
 
     if (!item) {
-      throw new Error(`Catalog item not found for id: ${id}`);
+      throw new Error(`Registry item not found for id: ${id}`);
     }
 
     return item;
@@ -91,19 +91,19 @@ function createCatalogReader(query) {
     const item = await getItemByKey(key);
 
     if (!item) {
-      throw new Error(`Catalog item not found for key: ${key}`);
+      throw new Error(`Registry item not found for key: ${key}`);
     }
 
     return item;
   }
 
   async function listItemsByKind(kind) {
-    assertCatalogKind(kind);
+    assertRegistryKind(kind);
     return fetchMany(`${SELECT_COLUMNS} WHERE kind = $1 ORDER BY key ASC`, [kind]);
   }
 
   return {
-    mapCatalogItemRow,
+    mapRegistryItemRow,
     getItemById,
     getItemByKey,
     requireItemById,
@@ -113,6 +113,6 @@ function createCatalogReader(query) {
 }
 
 module.exports = {
-  createCatalogReader,
-  mapCatalogItemRow,
+  createRegistryReader,
+  mapRegistryItemRow,
 };

@@ -2,8 +2,7 @@
 
 ## Active Tasks
 
-- Define initial `trading-main` docs spine and repository structure.
-- Push initial trading repositories to GitHub.
+- None.
 
 ## Queued Tasks
 
@@ -29,8 +28,11 @@
 ## Recently Accepted
 
 - Corrected registry shape so Markdown kind files define kind boundaries while SQL migrations own concrete entries.
-- Migrated former standalone registry entries into one Markdown file per registry kind under `trading-main/registry/`.
+- Added SQL-to-CSV registry snapshot generation at `registry/current.csv`.
+- Added registry kind boundary overlap review.
+- Migrated former standalone registry into `trading-main`: SQL migrations own concrete entries, Markdown kind files own boundaries.
 
+- Defined initial `trading-main` docs spine and pushed initial trading repositories to GitHub.
 - Initial repository list approved:
   - `trading-main`
   - `trading-manager`

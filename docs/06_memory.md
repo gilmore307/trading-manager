@@ -6,3 +6,5 @@
 - Do not let `trading-main` become a dumping ground for component-local implementation detail.
 - Keep trading statuses and registrable fields in `trading-main/registry/`, not scattered through docs.
 - The market-state contamination rule is a core system invariant.
+
+- Registry Markdown kind files define boundaries only; concrete entries live in SQL and GitHub visibility comes from generated `registry/current.csv`.

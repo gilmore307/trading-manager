@@ -2,7 +2,7 @@
 
 const fs = require('node:fs/promises');
 
-const { createCatalogReader } = require('./catalog-reader');
+const { createRegistryReader } = require('./registry-reader');
 
 function assertNonEmptyString(label, value) {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -66,7 +66,7 @@ function createSecretResolver(query, options = {}) {
     throw new TypeError('createSecretResolver requires an async query function');
   }
 
-  const catalogReader = createCatalogReader(query);
+  const registryReader = createRegistryReader(query);
   const registryPath = options.registryPath ?? '/root/secrets/registry.json';
   const readFile = options.readFile ?? fs.readFile;
 
@@ -80,13 +80,13 @@ function createSecretResolver(query, options = {}) {
   }
 
   async function getSecretAliasByConfigKey(configKey) {
-    const item = await catalogReader.requireItemByKey(assertNonEmptyString('configKey', configKey));
+    const item = await registryReader.requireItemByKey(assertNonEmptyString('configKey', configKey));
 
     if (item.kind !== 'config') {
-      throw new Error(`Catalog item ${configKey} must be kind=config to resolve a secret alias`);
+      throw new Error(`Registry item ${configKey} must be kind=config to resolve a secret alias`);
     }
 
-    return assertNonEmptyString(`catalog config payload for ${configKey}`, item.payload);
+    return assertNonEmptyString(`registry config payload for ${configKey}`, item.payload);
   }
 
   async function getSecretEntryByAlias(alias) {

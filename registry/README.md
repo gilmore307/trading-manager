@@ -9,6 +9,8 @@ The registry has two layers:
 
 Markdown kind files must not list concrete active rows. They define scope, range, and rejection boundaries only.
 
+`registry/current.csv` is the GitHub-visible snapshot of the active SQL table. It is generated from the database and must not be edited by hand.
+
 ## SQL Entry Schema
 
 Concrete entries use this shape:
@@ -23,6 +25,28 @@ Concrete entries use this shape:
 | `note` | Human-readable review note. |
 | `created_at` | Database insertion timestamp. |
 | `updated_at` | Database update timestamp. |
+
+## CSV Snapshot
+
+The current registry table is exported to:
+
+```text
+registry/current.csv
+```
+
+Run this after SQL registry updates:
+
+```bash
+registry/sql/apply-migrations.py
+```
+
+For export only:
+
+```bash
+registry/sql/apply-migrations.py --export-only
+```
+
+The migration helper applies pending SQL migrations and exports `registry/current.csv` after every non-dry-run migration pass unless `--no-export` is used.
 
 ## Kind Files
 
@@ -47,4 +71,6 @@ Concrete entries use this shape:
 - Do not store secrets. Store secret aliases only.
 - Do not mix component-local implementation details into trading-wide registry entries.
 - New fields, statuses, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
+- `registry/current.csv` must be regenerated after SQL registry changes.
+- `registry/current.csv` is a generated snapshot; do not hand-edit it.
 - If a new kind is needed, add its Markdown boundary file and update the SQL kind check in the same reviewed change.

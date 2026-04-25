@@ -8,8 +8,10 @@ Reusable output/template identifiers. Use only for stable output shapes that mul
 
 Register reusable output identifiers/templates only. Do not use this kind for runtime artifact files or one-off report instances.
 
-## Concrete Entries
+## Reject Or Re-scope
 
-Concrete registry entries for this kind live in the SQL-backed registry, not in this Markdown file.
+Reject or re-scope entries that are actually:
 
-Use this file to define what the kind means, what belongs here, and what must be rejected or re-scoped. Do not duplicate active item rows here.
+- runtime artifact instances;
+- temporary report files;
+- dashboard-rendered views;

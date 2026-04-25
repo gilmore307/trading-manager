@@ -8,8 +8,10 @@ Default documentation alignment status values.
 
 Register documentation alignment vocabulary only.
 
-## Concrete Entries
+## Reject Or Re-scope
 
-Concrete registry entries for this kind live in the SQL-backed registry, not in this Markdown file.
+Reject or re-scope entries that are actually:
 
-Use this file to define what the kind means, what belongs here, and what must be rejected or re-scoped. Do not duplicate active item rows here.
+- maintenance status;
+- test status;
+- acceptance outcomes;
