@@ -979,3 +979,25 @@ This preserves clean databases during development while keeping a shared, regist
 - Default development tasks must not write to SQL.
 - Generated contents under `data/storage/` remain ignored by Git.
 - Durable SQL table/partition and receipt storage contracts remain future `trading-storage` work.
+
+## D046 - Data task API templates live in trading-main templates
+
+Date: 2026-04-26
+
+### Context
+
+The user approved designing templates around provider/API requirements for `trading-data` bundles. These shapes affect `trading-manager` task keys, `trading-data` bundle implementation, and later `trading-storage` receipt/output contracts.
+
+### Decision
+
+Create reusable draft data task templates under `templates/data_tasks/` in `trading-main`. Cover task keys, per-bundle README documentation, fetch requirements, clean/normalization requirements, save/output requirements, completion receipts, and fixture/live-call policy.
+
+### Rationale
+
+The template shapes are cross-repository planning surfaces, so they belong in `trading-main/templates/` rather than being hidden as component-local docs or implementation files.
+
+### Consequences
+
+- `trading-data` can reference these templates when designing API-specific bundles.
+- The templates remain drafts until schemas are accepted through docs, registry, and tests.
+- Stable fields/type/status values discovered while filling templates must be routed through registry migrations.

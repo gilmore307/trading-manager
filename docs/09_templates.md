@@ -39,6 +39,7 @@ Templates must not own:
 templates/
   README.md                 Template boundary summary.
   contracts/                Contract drafting templates.
+  data_tasks/               Historical data task drafting templates.
 ```
 
 Current contract drafting templates:
@@ -47,6 +48,16 @@ Current contract drafting templates:
 - `templates/contracts/manifest.md`
 - `templates/contracts/ready_signal.md`
 - `templates/contracts/request.md`
+
+Current data task drafting templates:
+
+- `templates/data_tasks/task_key.json`
+- `templates/data_tasks/bundle_readme.md`
+- `templates/data_tasks/fetch_spec.md`
+- `templates/data_tasks/clean_spec.md`
+- `templates/data_tasks/save_spec.md`
+- `templates/data_tasks/completion_receipt.json`
+- `templates/data_tasks/fixture_policy.md`
 
 ## Draft vs Contract
 
@@ -72,6 +83,18 @@ Normal flow for a shared contract shape:
 4. Regenerate `registry/current.csv`.
 5. Update workflow and acceptance docs if the contract becomes binding.
 6. Route implementation work to the owning component repositories.
+
+## Data Task Template Flow
+
+Normal flow for a historical data acquisition bundle:
+
+1. Start from `templates/data_tasks/task_key.json` for manager/data handoff shape.
+2. Start from `templates/data_tasks/bundle_readme.md` for the bundle boundary.
+3. Fill API-specific requirements using `fetch_spec.md`, `clean_spec.md`, `save_spec.md`, and `fixture_policy.md`.
+4. Use `completion_receipt.json` as the draft evidence shape for development receipts under `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT`.
+5. Register any stable field/type/status names before implementation treats them as contracts.
+
+These data task templates are draft surfaces. They do not by themselves create accepted task-key, receipt, storage, or API schemas.
 
 ## Recording Duty
 

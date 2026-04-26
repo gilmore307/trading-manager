@@ -1,0 +1,47 @@
+{
+  "schema_version": "draft-0",
+  "receipt_id": "<receipt-id>",
+  "task_id": "<manager-assigned-task-id>",
+  "idempotency_key": "<stable-replay-key>",
+  "status": "<succeeded|failed|partial|cancelled>",
+  "producer": {
+    "repository": "trading-data",
+    "acquisition_bundle": "<bundle-name>",
+    "code_version": "<git-sha-or-version>",
+    "started_at": "<iso-datetime>",
+    "completed_at": "<iso-datetime>"
+  },
+  "source_evidence": {
+    "provider_key": "<registered-provider-or-source-term>",
+    "documentation_url": "<provider-doc-url-or-null>",
+    "source_urls": [],
+    "credential_config_id": "<registry-config-id-or-null>",
+    "credential_values_exposed": false,
+    "retrieved_at": "<iso-datetime>"
+  },
+  "request_parameters": {},
+  "outputs": {
+    "development_run_dir": "data/storage/<task-id-or-run-id>",
+    "raw_references": [],
+    "cleaned_references": [],
+    "saved_references": [],
+    "future_durable_references": []
+  },
+  "validation": {
+    "status": "<passed|failed|skipped>",
+    "row_counts": {},
+    "checks": [],
+    "warnings": []
+  },
+  "rate_limit_and_retry": {
+    "attempt_count": 1,
+    "rate_limit_events": [],
+    "retry_events": []
+  },
+  "failure": {
+    "error_type": null,
+    "message": null,
+    "recoverable": null
+  },
+  "notes": []
+}

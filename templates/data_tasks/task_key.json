@@ -1,0 +1,57 @@
+{
+  "schema_version": "draft-0",
+  "task_id": "<manager-assigned-task-id>",
+  "idempotency_key": "<stable-replay-key>",
+  "created_at": "<iso-datetime>",
+  "created_by": "trading-manager",
+  "target_repository": "trading-data",
+  "historical_only": true,
+  "mode": "development",
+  "data_domain": "<market_board_data|instrument_data|option_data>",
+  "acquisition_bundle": "<bundle-name>",
+  "source": {
+    "provider_key": "<registered-provider-or-source-term>",
+    "documentation_url": "<provider-doc-url-or-null>",
+    "credential_config_id": "<registry-config-id-or-null>",
+    "credential_required": false,
+    "source_url": "<official-source-url-when-web-sourced-or-null>"
+  },
+  "request": {
+    "symbols": [],
+    "underlyings": [],
+    "etfs": [],
+    "macro_release_key": null,
+    "calendar_scope": null,
+    "time_range": {
+      "start": "<iso-date-or-datetime>",
+      "end": "<iso-date-or-datetime>",
+      "timezone": "UTC"
+    },
+    "snapshot_timestamp": null,
+    "granularity": "<provider-granularity-or-null>",
+    "provider_parameters": {}
+  },
+  "output": {
+    "development_storage_config_key": "TRADING_DATA_DEVELOPMENT_STORAGE_ROOT",
+    "development_run_subdir": "<task-id-or-run-id>",
+    "raw_subdir": "raw",
+    "cleaned_subdir": "cleaned",
+    "saved_subdir": "saved",
+    "future_durable_target": null,
+    "overwrite_policy": "fail_if_exists"
+  },
+  "validation": {
+    "required_checks": [],
+    "allow_partial": false,
+    "expected_min_rows": null
+  },
+  "receipt": {
+    "development_receipt_path": "data/storage/<task-id-or-run-id>/receipt.json",
+    "future_durable_receipt_reference": null
+  },
+  "retry": {
+    "max_attempts": 1,
+    "backoff_policy": null
+  },
+  "notes": []
+}

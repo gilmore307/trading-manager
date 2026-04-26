@@ -5,3 +5,8 @@
 Templates should remain reusable across repositories unless explicitly labeled as component-specific.
 
 See `../docs/09_templates.md` for the docs-level template operating guide.
+
+## Template Sets
+
+- `contracts/` — reusable contract drafting templates.
+- `data_tasks/` — reusable draft templates for manager-driven historical `trading-data` acquisition tasks.

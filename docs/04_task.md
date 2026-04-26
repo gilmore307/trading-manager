@@ -26,6 +26,7 @@
 
 ## Recently Accepted
 
+- Added data task templates for task keys, bundle docs, fetch/clean/save specs, completion receipts, and fixture policy.
 - Registered `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` and clarified that development receipts/data use local `data/storage/` rather than SQL.
 - Registered manager-driven historical data task workflow terms for task key files and completion receipts.
 - Registered FOMC calendar, official macro release calendar discovery, and ETF issuer holdings source terms.
