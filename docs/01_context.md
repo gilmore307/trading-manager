@@ -52,17 +52,15 @@ The `.venv/` directory is local runtime infrastructure. It must be ignored by Gi
 
 Component repositories should not create independent virtual environments unless a documented exception is approved.
 
-The shared environment contract should define:
+The accepted shared environment baseline is:
 
-- Python/runtime versions;
-- package manager;
-- dependency installation policy;
-- test/lint/format command conventions;
-- CPU/GPU assumptions;
-- timezone and timestamp conventions;
-- local secrets policy;
-- how component repositories declare additional dependencies;
-- when a component repository may request an environment exception.
+- Python runtime: Python 3.12.
+- Environment anchor: `/root/projects/trading-main/.venv`.
+- Package installer: `python -m pip` inside the shared environment.
+- Dependency ledger: `requirements.txt` at the `trading-main` root.
+- Installation command: `/root/projects/trading-main/.venv/bin/python -m pip install -r /root/projects/trading-main/requirements.txt`.
+- Component repositories should not create independent virtual environments unless a documented exception is accepted.
+- Dependencies are added only through reviewed commits; no ad hoc package installs become project state.
 
 `trading-main` may document and anchor the shared environment, but it must not become a runtime implementation repository.
 
@@ -93,6 +91,7 @@ Runtime deployment environments, production hosts, storage volumes, broker crede
 System-level dependencies currently assumed:
 
 - `trading-main/registry/` and `docs/08_registry.md` for registered names, shared status vocabularies, and registrable fields;
+- `requirements.txt` in `trading-main` for reviewed shared Python dependencies;
 - OpenClaw project-development process for docs spine, task boundaries, acceptance, and review;
 - component repositories for concrete implementation;
 - shared storage accessible to the trading repositories;

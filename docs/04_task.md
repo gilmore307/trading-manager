@@ -6,11 +6,13 @@
 
 ## Queued Tasks
 
+- None that can be completed safely without cross-repository contract coordination.
+
+## Waiting On Cross-Repository Coordination
+
 - Define concrete artifact, manifest, ready-signal, and request schemas from `templates/contracts/`.
-- Define shared environment runtime version and package manager.
-- Define formal helper package/distribution strategy before any component repository imports helper code at runtime.
 - Promote concrete template schemas after artifact, manifest, ready-signal, and request contracts are accepted.
-- Create remaining component repository docs spines.
+- Define shared storage root with `trading-storage`.
 
 ## Open Gaps
 
@@ -19,11 +21,13 @@
 - Exact ready-signal schema.
 - Exact request schema.
 - Exact shared storage root.
-- Exact shared environment dependency policy.
-- GitHub repository visibility policy after initial private creation.
 
 ## Recently Accepted
 
+- Created initial docs spines for remaining component repositories: manager, storage, strategy, model, execution, and dashboard.
+- Defined repository visibility policy: trading repositories stay private unless the owner explicitly approves a visibility change.
+- Defined helper distribution boundary: current JS helpers are internal-only; cross-repository runtime helpers need an accepted package strategy.
+- Defined shared environment baseline: Python 3.12, `.venv`, `pip`, and reviewed `requirements.txt`.
 - Clarified that current JS registry helpers are internal `trading-main` maintenance/test helpers, not a formal cross-repository runtime package.
 - Split `trading-main` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
 - Added registry/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.

@@ -556,3 +556,70 @@ A tested helper file is not enough to be a stable package interface. Components 
 - If the helper becomes a Node package, add package metadata, Node engine, version policy, test command, install method, and import examples.
 - If the helper becomes a Python package, align it with the shared `.venv` environment and define package metadata, tests, install method, and import examples.
 - If the helper stays internal-only, keep docs explicit so component repositories do not rely on it.
+
+## D027 - Shared environment baseline uses Python 3.12 pip and requirements.txt
+
+Date: 2026-04-25
+
+### Context
+
+`trading-main` anchors the shared local trading development environment, but the runtime and dependency policy needed to be explicit before component repositories start adding dependencies.
+
+### Decision
+
+Use Python 3.12 in `/root/projects/trading-main/.venv` as the shared environment baseline. Use `python -m pip` as the installer and `requirements.txt` at the `trading-main` root as the reviewed dependency ledger.
+
+### Rationale
+
+This matches the current working environment and gives component repositories one simple, reviewable dependency path while the platform is still early.
+
+### Consequences
+
+- Component repositories should use `/root/projects/trading-main/.venv` by default.
+- Dependencies must be added to `requirements.txt` through reviewed commits before installation.
+- Component-local virtual environments require an explicit exception.
+- The baseline can be revisited if packaging, GPU, or dependency isolation needs become real.
+
+## D028 - Helper distribution strategy is internal-only until a package is accepted
+
+Date: 2026-04-25
+
+### Context
+
+The existing JavaScript registry helpers are useful for `trading-main` maintenance and tests, but there is still no formal package metadata, version policy, runtime engine contract, installation command, or import contract for component repositories.
+
+### Decision
+
+The current helper distribution strategy is internal-only. Cross-repository runtime helper consumption is prohibited until a package strategy is accepted. If runtime helper consumption becomes necessary, prefer a Python package aligned with the shared `.venv` unless there is a concrete reason to package a Node helper.
+
+### Rationale
+
+This resolves the ambiguity now without forcing premature packaging. It also aligns future component runtime helpers with the current Python-centered environment unless a different runtime is justified.
+
+### Consequences
+
+- Components must not import loose files from `trading-main/helpers/`.
+- Current JavaScript helper tests may continue to run inside `trading-main`.
+- A future package decision must define runtime version, package metadata, version policy, install method, tests, and import/call examples.
+
+## D029 - Trading repositories remain private by default
+
+Date: 2026-04-25
+
+### Context
+
+The initial GitHub repositories were created for private project work. Visibility changes can expose project structure, future provider choices, operational assumptions, or accidental sensitive material.
+
+### Decision
+
+Keep all trading repositories private by default. Do not change repository visibility without explicit owner approval and a brief pre-change review for secrets, generated artifacts, credentials, and local operational assumptions.
+
+### Rationale
+
+Private-by-default avoids accidental disclosure while the platform is still forming. A deliberate visibility review is cheap compared with exposing sensitive or unstable project material.
+
+### Consequences
+
+- Visibility changes are external/public actions and require explicit approval.
+- Before public release, review tracked files for secrets, generated data, local paths, and incomplete boundary docs.
+- GitHub history remains the restore path; no separate docs archive is needed for visibility policy.

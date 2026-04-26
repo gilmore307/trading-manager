@@ -93,8 +93,9 @@ Shared environment changes are acceptable when they:
 
 - keep the environment anchored at the documented location unless a decision changes it;
 - keep `.venv/` out of Git;
-- document runtime version and package-management expectations;
+- preserve Python 3.12, `.venv`, `pip`, and `requirements.txt` as the accepted shared environment baseline unless a decision changes them;
 - document how component repositories should use the shared environment;
+- add dependency changes to `requirements.txt` through reviewed commits;
 - document exceptions explicitly instead of allowing silent local environment drift;
 - avoid storing secrets, credentials, dependency caches, or generated artifacts as repository content.
 
@@ -138,6 +139,7 @@ OpenClaw acceptance requires:
 - confirmation that no runtime code/data/secrets were added;
 - confirmation that `.venv/` is ignored if present;
 - confirmation that component-specific details were not incorrectly centralized;
+- confirmation that repository visibility is not changed without explicit owner approval;
 - decision record references for architectural or contract-changing choices;
 - explicit unresolved gaps routed to `docs/04_task.md`.
 

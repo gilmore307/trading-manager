@@ -56,10 +56,12 @@ Current facts:
 
 Therefore, current JavaScript registry helpers are internal `trading-main` maintenance/test helpers. Component repositories must not treat them as a runtime dependency or import them directly until a formal helper distribution decision is accepted.
 
-Before any helper becomes a cross-repository runtime dependency, choose and document one of these strategies:
+Accepted current strategy: internal-only. Component repositories must not import loose helper files from `trading-main/helpers/`.
+
+Before any helper becomes a cross-repository runtime dependency, replace or extend the internal-only strategy with one of these accepted package strategies:
 
 1. **Node package** — add `package.json`, package/version policy, Node version/engine requirement, test command, install method, and import examples.
-2. **Python package** — add Python package metadata, `.venv` installation policy, test command, and import examples.
+2. **Python package** — preferred default for component runtime helpers while the shared environment is Python-centered; add Python package metadata, `.venv` installation policy, test command, and import examples.
 3. **Internal-only tool** — document that the helper is for `trading-main` maintenance/automation only and expose no component runtime dependency.
 
 Registry `script` rows may record approved helper method surfaces and source paths, but they are not package installation contracts by themselves.
