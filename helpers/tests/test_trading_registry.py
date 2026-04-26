@@ -70,6 +70,7 @@ class RegistryHelperTests(unittest.TestCase):
             "THETADATA_OPTION_SNAPSHOT_BUNDLE": "thetadata_option_snapshot_bundle",
             "OKX_BARS": "okx_bars",
             "MACRO_RELEASE_BUNDLE_PATTERN": "macro_release_<release_key>",
+            "TREASURY_FISCAL_DATA": "treasury_fiscal_data",
             "CALENDAR_DISCOVERY": "calendar_discovery",
             "ETF_HOLDINGS": "etf_holdings",
             "SEC_COMPANY_FINANCIALS": "sec_company_financials",
