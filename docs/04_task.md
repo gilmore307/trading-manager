@@ -26,6 +26,7 @@
 
 ## Recently Accepted
 
+- Simplified `task_key.json` and `completion_receipt.json` to minimal operational fields.
 - Updated data task templates so bundles default to one `pipeline.py` with fetch/clean/save/receipt step functions.
 - Added data task templates for task keys, bundle docs, fetch/clean/save specs, completion receipts, and fixture policy.
 - Registered `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` and clarified that development receipts/data use local `data/storage/` rather than SQL.

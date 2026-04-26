@@ -39,15 +39,14 @@ class StepResult:
     details: dict[str, Any] = field(default_factory=dict)
 
 
-def build_context(task_key: dict[str, Any], base_dir: Path) -> BundleContext:
+def build_context(task_key: dict[str, Any]) -> BundleContext:
     """Build development output paths from the task key.
 
-    `base_dir` should resolve to TRADING_DATA_DEVELOPMENT_STORAGE_ROOT during
-    development, normally `data/storage`.
+    `output_dir` should normally be a path under TRADING_DATA_DEVELOPMENT_STORAGE_ROOT,
+    such as `data/storage/<task-id>`.
     """
 
-    run_subdir = task_key["output"]["development_run_subdir"]
-    run_dir = base_dir / run_subdir
+    run_dir = Path(task_key["output_dir"])
     return BundleContext(
         task_key=task_key,
         run_dir=run_dir,
@@ -103,10 +102,10 @@ def write_receipt(
     raise NotImplementedError("Implement bundle-specific receipt step")
 
 
-def run(task_key: dict[str, Any], *, development_storage_root: Path) -> StepResult:
+def run(task_key: dict[str, Any]) -> StepResult:
     """Run the bundle from one manager-issued task key."""
 
-    context = build_context(task_key, development_storage_root)
+    context = build_context(task_key)
     context.raw_dir.mkdir(parents=True, exist_ok=True)
     context.cleaned_dir.mkdir(parents=True, exist_ok=True)
     context.saved_dir.mkdir(parents=True, exist_ok=True)

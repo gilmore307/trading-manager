@@ -30,20 +30,15 @@ This bundle excludes:
 Required task key fields:
 
 - `task_id`
-- `idempotency_key`
-- `data_domain`
-- `acquisition_bundle`
-- source/provider identifiers
-- historical time range or snapshot timestamp
-- provider-specific parameters
-- development output destination under `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT`
-- completion receipt destination
+- `bundle`
+- `params`
+- `output_dir`
 
 Optional task key fields:
 
-- symbols / underlyings / ETF ids / macro release key / calendar scope
-- validation expectations
-- retry expectations
+- `credential_config_id` when the bundle needs a registered credential alias
+
+Put API-specific inputs such as symbols, underlyings, ETF ids, macro release keys, calendar scope, time ranges, snapshot timestamps, granularity, source URLs, and provider parameters inside `params`. Do not put provider documentation URLs in the task key; those belong in registry/provider docs or this README.
 
 ## Pipeline Module
 

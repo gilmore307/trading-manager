@@ -1023,3 +1023,25 @@ This keeps manager invocation simple and avoids premature file sprawl while pres
 - `templates/data_tasks/pipeline.py` is the default implementation template.
 - Bundle READMEs own bundle-specific API details.
 - Existing fetch/clean/save/receipt spec templates remain design documents, not required separate code files.
+
+## D048 - Data task JSON templates stay minimal
+
+Date: 2026-04-26
+
+### Context
+
+The initial `task_key.json` and `completion_receipt.json` templates included metadata such as provider documentation URLs and future durable references. The user pushed back that templates should serve real usage instead of accumulating fields that will not be consumed.
+
+### Decision
+
+Keep data task key and completion receipt JSON templates minimal. Include only fields used by manager handoff, bundle execution, development output location, and completion evidence. Put provider documentation URLs and other lookup metadata in registry/provider docs or bundle READMEs instead of runtime JSON.
+
+### Rationale
+
+Smaller runtime templates are easier for manager to generate, easier for data pipelines to validate, and less likely to ossify unused conventions.
+
+### Consequences
+
+- `task_key.json` now contains only `task_id`, `bundle`, optional `credential_config_id`, `params`, and `output_dir`.
+- `completion_receipt.json` now contains only task identity, bundle, status/timestamps, output directory, output references, row counts, and error.
+- Additional fields require a demonstrated consumer or execution need.

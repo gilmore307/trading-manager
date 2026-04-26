@@ -21,6 +21,10 @@ Development-stage outputs should target `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` 
 - `completion_receipt.json` — draft task completion receipt shape.
 - `fixture_policy.md` — per-bundle fixture and live-call guardrail template.
 
+## Minimalism Rule
+
+Task key and completion receipt templates should contain only fields the runner, bundle, manager, or development evidence path will actually use. Do not add lookup/reference metadata such as provider documentation URLs when those values already live in the registry or bundle README.
+
 ## Boundary
 
 These are templates, not accepted concrete schemas. Stable schema fields, status values, request types, artifact types, and storage contracts still require registry/docs review before implementation treats them as durable contracts.
