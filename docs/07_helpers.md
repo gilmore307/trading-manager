@@ -39,30 +39,36 @@ Helpers must not own:
 ```text
 helpers/
   README.md                 Helper boundary summary.
-  registry/                 Registry reader, type, test, and secret-resolution helpers.
+  python/                   Formal Python helper package source and tests.
+  registry/                 Internal JavaScript registry maintenance/test helpers.
 ```
 
-Future helper packages should live under a named subdirectory with a clear README when the boundary is more than trivial.
+Python helper packages live under `helpers/python/` with root package metadata in `pyproject.toml`. Future helper packages should use a named package/subdirectory with a clear README when the boundary is more than trivial.
 
 ## Current Package Status
 
-There is no formal shared helper package yet.
+The formal cross-repository helper runtime surface is now Python.
 
-Current facts:
+Current package facts:
 
-- `helpers/registry/` contains JavaScript helper code and tests.
-- There is no `package.json`, package name, version policy, Node engine declaration, install command, or cross-repository import contract.
-- The shared development environment is currently anchored by the Python `.venv` in `trading-main`, but no Python helper package exists yet.
+- Package metadata lives in root `pyproject.toml`.
+- Python package name: `trading-main-helpers`.
+- Import package: `trading_registry`.
+- Requires Python 3.12 or newer.
+- Shared environment install command:
 
-Therefore, current JavaScript registry helpers are internal `trading-main` maintenance/test helpers. Component repositories must not treat them as a runtime dependency or import them directly until a formal helper distribution decision is accepted.
+  ```bash
+  /root/projects/trading-main/.venv/bin/python -m pip install -r /root/projects/trading-main/requirements.txt
+  /root/projects/trading-main/.venv/bin/python -m pip install -e /root/projects/trading-main
+  ```
 
-Accepted current strategy: internal-only. Component repositories must not import loose helper files from `trading-main/helpers/`.
+- Python helper test command:
 
-Before any helper becomes a cross-repository runtime dependency, replace or extend the internal-only strategy with one of these accepted package strategies:
+  ```bash
+  /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/python/tests
+  ```
 
-1. **Node package** — add `package.json`, package/version policy, Node version/engine requirement, test command, install method, and import examples.
-2. **Python package** — preferred default for component runtime helpers while the shared environment is Python-centered; add Python package metadata, `.venv` installation policy, test command, and import examples.
-3. **Internal-only tool** — document that the helper is for `trading-main` maintenance/automation only and expose no component runtime dependency.
+The JavaScript files under `helpers/registry/` remain internal `trading-main` maintenance/test code. Component repositories should consume the Python package, not loose JavaScript helper files.
 
 Registry `script` rows may record approved helper method surfaces and source paths, but they are not package installation contracts by themselves.
 
@@ -82,14 +88,14 @@ Rules:
 
 ## Registry Helpers
 
-Current registry helper surface is id-input only:
+Current official Python registry helper surface is id-input only:
 
-- `getKeyById(id)`
-- `getPayloadById(id)`
-- `getPathById(id)`
-- `loadSecretTextByConfigId(configId)`
+- `RegistryReader.get_key_by_id(id)`
+- `RegistryReader.get_payload_by_id(id)`
+- `RegistryReader.get_path_by_id(id)`
+- `SecretResolver.load_secret_text_by_config_id(config_id)`
 
-The helper source lives under `helpers/registry/`.
+The official Python helper source lives under `helpers/python/trading_registry/`. The older JavaScript helper source under `helpers/registry/` is internal maintenance/test code.
 
 Registry maintenance commands, such as regenerating `registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
 
@@ -108,7 +114,7 @@ A helper change is acceptable when:
 
 - the helper remains shared infrastructure, not component runtime code;
 - public API shape is documented or obvious from tests;
-- distribution status is explicit: packaged runtime dependency or internal-only maintenance helper;
+- distribution status is explicit: Python package for runtime dependency or internal-only maintenance helper;
 - packaged helpers declare runtime version, version policy, install method, and import/call examples;
 - relevant tests pass;
 - no secrets or credentials are stored;

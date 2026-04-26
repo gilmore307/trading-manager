@@ -19,7 +19,7 @@
 
 - `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` are platform-function guides for `trading-main`; `00_scope.md` through `06_memory.md` remain project-wide.
 - Future global helpers, reusable templates, and shared fields/status/type values discovered in component work must be recorded through `trading-main` before they become cross-repository contracts.
-- Current JavaScript registry helpers are internal `trading-main` maintenance/test helpers until a formal Node package, Python package, or internal-only distribution decision is accepted.
+- Official registry helper runtime surface is now the Python `trading_registry` package under `helpers/python/`; JavaScript helpers under `helpers/registry/` remain internal maintenance/test code.
 - Shared environment baseline is Python 3.12 at `/root/projects/trading-main/.venv`, installed with `pip` from root `requirements.txt`.
 - Trading repositories are private by default; visibility changes need explicit owner approval and a pre-change review.
-- Current helper distribution strategy is internal-only until a formal package strategy is accepted; future component runtime helpers should normally align with the Python `.venv` unless Node is justified.
+- Component runtime helpers should normally align with the Python `.venv`; JavaScript helpers are not cross-repository runtime dependencies unless a future Node package decision is accepted.

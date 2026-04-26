@@ -274,7 +274,7 @@ Using ids avoids silent breakage when a key is renamed for clarity.
 
 ### Consequences
 
-- Prefer id-input helpers such as `getKeyById`, `getPayloadById`, `getPathById`, and `loadSecretTextByConfigId`.
+- Prefer id-input helpers such as `RegistryReader.get_key_by_id`, `RegistryReader.get_payload_by_id`, `RegistryReader.get_path_by_id`, and `SecretResolver.load_secret_text_by_config_id`.
 - Do not add key-input helper APIs to the public helper surface.
 - Documentation should warn against storing keys as stable automation references.
 
@@ -353,7 +353,7 @@ Secret resolver helpers previously used config keys, but registry keys are renam
 
 ### Decision
 
-Expose `loadSecretTextByConfigId` as the id-first config secret helper.
+Expose `SecretResolver.load_secret_text_by_config_id` as the id-first config secret helper in the official Python runtime helper surface.
 
 ### Rationale
 
@@ -361,7 +361,7 @@ Secrets are sensitive enough that automation should not depend on renameable reg
 
 ### Consequences
 
-- Prefer `loadSecretTextByConfigId`.
+- Prefer `SecretResolver.load_secret_text_by_config_id`.
 - Do not add key-input config secret helpers to the public helper surface.
 
 ## D019 - Every field registry entry requires `applies_to`
@@ -396,12 +396,12 @@ Registry keys are useful labels but are renameable. The helper surface briefly i
 
 ### Decision
 
-Register only four id-input helper methods as the public registry helper surface:
+Register only four id-input helper methods as the public registry helper surface. The originally drafted JavaScript method names were superseded by the official Python helper surface in D030:
 
-- `getKeyById`
-- `getPayloadById`
-- `getPathById`
-- `loadSecretTextByConfigId`
+- `RegistryReader.get_key_by_id`
+- `RegistryReader.get_payload_by_id`
+- `RegistryReader.get_path_by_id`
+- `SecretResolver.load_secret_text_by_config_id`
 
 Do not register key-input helper APIs. Do not register generic helper files as script entries when method-level helper entries are the intended public surface.
 
@@ -590,7 +590,7 @@ The existing JavaScript registry helpers are useful for `trading-main` maintenan
 
 ### Decision
 
-The current helper distribution strategy is internal-only. Cross-repository runtime helper consumption is prohibited until a package strategy is accepted. If runtime helper consumption becomes necessary, prefer a Python package aligned with the shared `.venv` unless there is a concrete reason to package a Node helper.
+The helper distribution strategy was internal-only until a package strategy was accepted. Future runtime helper consumption should prefer a Python package aligned with the shared `.venv` unless there is a concrete reason to package a Node helper.
 
 ### Rationale
 
@@ -598,9 +598,9 @@ This resolves the ambiguity now without forcing premature packaging. It also ali
 
 ### Consequences
 
-- Components must not import loose files from `trading-main/helpers/`.
+- Components must not import loose JavaScript files from `trading-main/helpers/registry/`.
 - Current JavaScript helper tests may continue to run inside `trading-main`.
-- A future package decision must define runtime version, package metadata, version policy, install method, tests, and import/call examples.
+- Any package decision must define runtime version, package metadata, version policy, install method, tests, and import/call examples.
 
 ## D029 - Trading repositories remain private by default
 
@@ -623,3 +623,26 @@ Private-by-default avoids accidental disclosure while the platform is still form
 - Visibility changes are external/public actions and require explicit approval.
 - Before public release, review tracked files for secrets, generated data, local paths, and incomplete boundary docs.
 - GitHub history remains the restore path; no separate docs archive is needed for visibility policy.
+
+## D030 - Official registry helper runtime surface is Python
+
+Date: 2026-04-25
+
+### Context
+
+Future trading component repositories are expected to use Python through the shared `.venv` environment. Keeping the registry helper surface as JavaScript would force Python components to depend on Node, npm packaging, or subprocess calls for a simple registry lookup path.
+
+### Decision
+
+Make the official cross-repository registry helper runtime surface a Python package. Package metadata lives in root `pyproject.toml`, source lives under `helpers/python/trading_registry/`, and the install path is editable installation into `/root/projects/trading-main/.venv`. The existing JavaScript helpers remain internal `trading-main` maintenance/test code.
+
+### Rationale
+
+Python aligns with the shared environment and avoids a second runtime dependency for component repositories. Keeping the JavaScript helpers internal preserves existing tests and maintenance utility without making them a runtime contract.
+
+### Consequences
+
+- Component repositories should import `trading_registry` from the Python package after the shared environment installs `trading-main` editable.
+- Registry script rows point to the Python helper method surfaces and source files.
+- JavaScript helper files under `helpers/registry/` are not component runtime dependencies.
+- Python helper package changes must include `unittest` coverage and update helper docs.

@@ -121,12 +121,12 @@ Do not hand-edit `registry/current.csv`.
 
 ## Helper Surface
 
-The registered id-only lookup and secret helper surface is:
+The registered official Python id-only lookup and secret helper surface is:
 
-- `getKeyById(id)`
-- `getPayloadById(id)`
-- `getPathById(id)`
-- `loadSecretTextByConfigId(configId)`
+- `RegistryReader.get_key_by_id(id)`
+- `RegistryReader.get_payload_by_id(id)`
+- `RegistryReader.get_path_by_id(id)`
+- `SecretResolver.load_secret_text_by_config_id(config_id)`
 
 The CSV export maintenance helper is separate from lookup helpers:
 
@@ -134,7 +134,7 @@ The CSV export maintenance helper is separate from lookup helpers:
 
 Registry `script` rows identify approved helper/automation surfaces and source locators; they do not by themselves define package installation or cross-repository runtime dependency contracts.
 
-Key-input helper APIs are intentionally not part of the public helper surface. If a human needs key-based debugging, use direct SQL inspection instead of adding key-input helpers.
+Key-input helper APIs are intentionally not part of the public helper surface. Component runtime code should consume the Python helper package (`trading_registry`), not the internal JavaScript helper files. If a human needs key-based debugging, use direct SQL inspection instead of adding key-input helpers.
 
 ## Registration Rules
 

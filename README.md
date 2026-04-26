@@ -15,7 +15,8 @@ docs/             System-level docs spine: 00-06 project-wide docs plus 07-09 pl
 helpers/          Shared helper code used across trading repositories.
 registry/         Trading-wide registry kind boundaries, SQL migrations, and generated current.csv snapshot.
 templates/        Trading-wide project, contract, task, and implementation templates, including contract drafting templates.
-requirements.txt Shared Python environment dependency ledger. Currently contains no runtime packages.
+pyproject.toml    Python helper package metadata for `trading-main-helpers`.
+requirements.txt  Shared Python environment dependency ledger.
 ```
 
 ## Docs Spine
@@ -52,4 +53,4 @@ See `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` for 
 
 The shared trading Python environment is anchored at `/root/projects/trading-main/.venv` and currently uses Python 3.12 with `pip`. Dependencies must be added to `requirements.txt` through reviewed commits before installation into the shared environment.
 
-Current JavaScript registry helpers are internal maintenance/test helpers only. Component repositories must not import helper files from `trading-main` at runtime until a formal package/distribution decision is accepted.
+The formal runtime helper package is Python (`trading-main-helpers`, import package `trading_registry`). Current JavaScript registry helpers are internal maintenance/test helpers only; component repositories must not import those JavaScript files at runtime.

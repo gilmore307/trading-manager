@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=69,<76"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-main-helpers"
+version = "0.1.0"
+description = "Shared Python helper package for trading-main platform helpers."
+requires-python = ">=3.12"
+readme = "README.md"
+
+[tool.setuptools]
+package-dir = {"" = "helpers/python"}
+
+[tool.setuptools.packages.find]
+where = ["helpers/python"]

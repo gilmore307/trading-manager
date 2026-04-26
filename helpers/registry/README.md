@@ -1,18 +1,16 @@
 # Registry Helpers
 
-These helpers provide the starting point for trading registry access.
+These JavaScript helpers are internal `trading-main` maintenance/test code for trading registry access.
 
-They should read from the SQL-backed `trading_registry` table and support CSV snapshot generation/inspection helpers where appropriate.
+The formal cross-repository runtime helper surface is the Python package under `helpers/python/trading_registry/`.
 
-Do not treat registry helpers as a place for component runtime behavior.
+Do not treat this JavaScript directory as a component runtime dependency.
 
 ## Package Status
 
-These JavaScript helpers are not currently a formal package interface for component repositories.
+These JavaScript helpers are not the formal package interface for component repositories. There is no `package.json`, package version, Node engine requirement, install command, or cross-repository import contract.
 
-There is no `package.json`, package version, Node engine requirement, install command, or cross-repository import contract. Treat this directory as internal `trading-main` maintenance/test code until a helper distribution decision is accepted.
-
-Run tests directly from `trading-main` when changing this helper code:
+Run tests directly from `trading-main` when changing this internal helper code:
 
 ```bash
 node --test helpers/registry/registry-reader.test.js
@@ -20,12 +18,14 @@ node --test helpers/registry/registry-reader.test.js
 
 ## Public Helper Surface
 
-The registered public helper surface is id-only:
+The official registered Python helper surface is id-only:
 
-- `getKeyById(id)` returns a registry item key or `null`.
-- `getPayloadById(id)` returns a registry item payload or `null`.
-- `getPathById(id)` returns a registry item path or `null`.
-- `loadSecretTextByConfigId(id)` resolves a config item payload as a secret alias and returns trimmed secret text.
+- `RegistryReader.get_key_by_id(id)` returns a registry item key or `None`.
+- `RegistryReader.get_payload_by_id(id)` returns a registry item payload or `None`.
+- `RegistryReader.get_path_by_id(id)` returns a registry item path or `None`.
+- `SecretResolver.load_secret_text_by_config_id(id)` resolves a config item payload as a secret alias and returns trimmed secret text.
+
+This JavaScript directory retains analogous internal helper behavior for maintenance/tests only.
 
 Registry keys are output/display values, not helper inputs. If a human needs key-based debugging, query SQL directly instead of adding key-input helper APIs.
 

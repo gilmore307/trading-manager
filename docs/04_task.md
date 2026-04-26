@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Added formal Python registry helper package and pointed registry script rows at Python helper methods.
 - Created initial docs spines for remaining component repositories: manager, storage, strategy, model, execution, and dashboard.
 - Defined repository visibility policy: trading repositories stay private unless the owner explicitly approves a visibility change.
 - Defined helper distribution boundary: current JS helpers are internal-only; cross-repository runtime helpers need an accepted package strategy.

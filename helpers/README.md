@@ -25,6 +25,13 @@ See `../docs/07_helpers.md` for the docs-level helper operating guide.
 
 ## Package Status
 
-`helpers/` is not currently a formal cross-repository runtime package. There is no package metadata, version policy, runtime engine declaration, installation command, or import contract.
+The formal cross-repository helper runtime surface is Python. Package metadata lives in root `pyproject.toml` and source lives under `helpers/python/`.
 
-Current JavaScript helpers under `helpers/registry/` are internal `trading-main` maintenance/test helpers until a Node package, Python package, or internal-only strategy is explicitly accepted in `docs/07_helpers.md` and `docs/05_decision.md`.
+Install from the shared environment:
+
+```bash
+/root/projects/trading-main/.venv/bin/python -m pip install -r /root/projects/trading-main/requirements.txt
+/root/projects/trading-main/.venv/bin/python -m pip install -e /root/projects/trading-main
+```
+
+Current JavaScript helpers under `helpers/registry/` are internal `trading-main` maintenance/test helpers and should not be imported by component repositories at runtime.

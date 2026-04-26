@@ -85,6 +85,7 @@ Shared helper changes are acceptable when they:
 - keep public interfaces explicit and stable enough for component repositories;
 - state whether the helper is internal-only or a packaged runtime dependency;
 - for packaged helpers, define package metadata, version policy, runtime version, installation method, and import/call examples;
+- for Python runtime helpers, keep package source under `helpers/python/`, package metadata in `pyproject.toml`, and tests under `helpers/python/tests/`;
 - update `docs/07_helpers.md`, templates, registry, or contracts when helper behavior encodes a shared convention.
 
 ### For shared environment changes

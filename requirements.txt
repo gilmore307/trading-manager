@@ -6,3 +6,6 @@
 #
 # Add dependencies only through reviewed changes. Keep this file empty until a
 # component has an accepted dependency need.
+
+# Packaging backend for editable installs of trading-main helper package.
+setuptools>=69,<76
