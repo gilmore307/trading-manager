@@ -157,11 +157,7 @@ The registered official Python id-only lookup and secret helper surface is:
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
 
-The payload-format validation helper exports are separate from registry item lookups:
-
-- `PAYLOAD_FORMATS`
-- `is_payload_format(value)`
-- `assert_payload_format(value)`
+Payload-format validation utilities live in the Python package to mirror the SQL constraint. They are not registered registry `script` rows.
 
 The CSV export maintenance helper is separate from lookup helpers:
 
@@ -183,7 +179,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 - Use nullable `path` for direct locators; do not create a `path` kind.
 - Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.
-- Script rows should represent stable helper/automation exports, not every helper source file.
+- Script rows should represent stable callable helper/automation exports, not every helper source file or package constant.
 - Record review rationale in `note` or `registry/reviews/` when a boundary choice could be confused.
 
 ## Acceptance Checklist

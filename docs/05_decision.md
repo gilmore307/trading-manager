@@ -331,15 +331,15 @@ The shared registry helper surface should expose stable method or constant expor
 
 ### Decision
 
-Register stable helper exports as `script` entries with the exported name in `payload` and source locators in `path`. Most entries are callable helper methods; stable constants may be registered when automation should share the exact vocabulary.
+Register stable callable helper exports as `script` entries with the exported name in `payload` and source locators in `path`. Constants and passive vocabularies should stay in docs, SQL constraints, or package internals unless a dedicated registry contract is accepted.
 
 ### Rationale
 
-The registry should expose reusable helper surfaces, not every helper source file. Export-level entries make the approved helper API visible in `registry/current.csv`.
+The registry should expose reusable callable helper surfaces, not every helper source file or package constant. Export-level entries make the approved helper API visible in `registry/current.csv`.
 
 ### Consequences
 
-- Registered helper rows represent stable helper exports.
+- Registered helper rows represent stable callable helper exports.
 - Registry item lookup and secret helper methods use registry id as input.
 - Multiple helper rows may share the same source path when they live in the same file.
 
@@ -685,6 +685,6 @@ A more precise payload format makes registry review and automation safer without
 ### Consequences
 
 - Current rows are backfilled to narrower formats where obvious: `field_name`, `status_value`, `repo_name`, `timezone`, `secret_alias`, `command`, and `python_symbol`.
-- Payload-format validation helper exports are registered as script rows.
+- Payload-format validation utilities mirror the SQL constraint in the Python package, but are not registered registry `script` rows.
 - Future rows should use the narrowest accepted payload format.
 - New payload formats require SQL constraint, Python helper validation, docs, and CSV updates in the same reviewed change.

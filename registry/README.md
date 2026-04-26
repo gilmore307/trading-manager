@@ -118,6 +118,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
 - Registered registry item lookup APIs must take registry ids as input, not keys.
+- `script` rows are for stable callable helper/automation exports, not package constants.
 - Repository rows should include the repository name in `payload` and the local checkout root in `path` when the checkout path is an approved shared fact.
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos and scripts.
 - Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes.

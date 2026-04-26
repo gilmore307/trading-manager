@@ -94,11 +94,7 @@ Current official Python registry item lookup and secret helper surface is id-inp
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
 
-Payload-format validation exports are also official helper surfaces:
-
-- `PAYLOAD_FORMATS`
-- `is_payload_format(value)`
-- `assert_payload_format(value)`
+Payload-format validation utilities (`PAYLOAD_FORMATS`, `is_payload_format(value)`, and `assert_payload_format(value)`) are Python package utilities, not registered registry `script` surfaces. They mirror the SQL constraint so package code can validate rows consistently.
 
 The official Python helper source lives under `helpers/trading_registry/`.
 
