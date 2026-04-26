@@ -711,3 +711,26 @@ Legal registry vocabulary belongs in the registry. Runtime helpers should stay f
 - Legal payload-format values are visible in `registry/current.csv`.
 - The Python package no longer exports payload-format validator helpers.
 - Tests compare registered payload-format rows with the SQL check constraint.
+
+## D034 - Registry kind vocabulary is not a runtime helper export
+
+Date: 2026-04-25
+
+### Context
+
+After moving payload-format vocabulary out of runtime helper exports, the Python package still exposed `REGISTRY_KINDS`, `is_registry_kind`, and `assert_registry_kind`. That repeated the same passive-vocabulary problem in a different file.
+
+### Decision
+
+Remove registry kind vocabulary validators from the runtime helper package. Treat legal registry kinds as a schema and registry-docs boundary: the SQL kind constraint and `registry/kinds/*.md` files must stay aligned, and tests enforce that alignment.
+
+### Rationale
+
+Runtime helpers should expose behavior needed by component consumers, not passive copies of registry/schema vocabulary. Keeping the vocabulary in SQL and boundary docs avoids drift and makes review happen in the registry surfaces.
+
+### Consequences
+
+- `helpers/trading_registry/registry_types.py` is removed.
+- The Python package no longer exports `REGISTRY_KINDS`, `is_registry_kind`, or `assert_registry_kind`.
+- `RegistryReader.list_items_by_kind` only validates that kind input is non-empty; SQL/current-registry tests own legal-kind alignment.
+- Tests compare the latest SQL kind constraint with `registry/kinds/*.md` and ensure current rows use constrained kinds.

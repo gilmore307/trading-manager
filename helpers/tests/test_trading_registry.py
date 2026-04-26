@@ -5,12 +5,9 @@ import unittest
 from pathlib import Path
 
 from trading_registry import (
-    REGISTRY_KINDS,
     RegistryReader,
     SecretResolver,
-    assert_registry_kind,
     get_secret_entry_from_registry,
-    is_registry_kind,
     map_registry_item_row,
     parse_registry,
 )
@@ -34,34 +31,27 @@ def create_row(**overrides):
 
 
 class RegistryHelperTests(unittest.TestCase):
-    def test_registry_kinds_stay_fixed(self):
-        self.assertEqual(
-            REGISTRY_KINDS,
-            (
-                "field",
-                "output",
-                "repo",
-                "config",
-                "term",
-                "script",
-                "payload_format",
-                "artifact_type",
-                "manifest_type",
-                "ready_signal_type",
-                "request_type",
-                "task_lifecycle_state",
-                "review_readiness",
-                "acceptance_outcome",
-                "test_status",
-                "maintenance_status",
-                "docs_status",
-            ),
+    def test_registry_kind_files_match_sql_constraint_and_current_rows(self):
+        constraint_blocks = []
+        for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
+            text = migration.read_text()
+            if "CHECK (kind IN (" in text:
+                constraint_blocks.append(text.split("CHECK (kind IN (", 1)[1].split("));", 1)[0])
+        self.assertTrue(constraint_blocks)
+        constrained_kinds = sorted(re.findall(r"'([^']+)'", constraint_blocks[-1]))
+
+        kind_files = sorted(
+            path.stem
+            for path in Path("registry/kinds").glob("*.md")
+            if path.name != "README.md"
         )
-        self.assertTrue(is_registry_kind("repo"))
-        self.assertFalse(is_registry_kind("unknown"))
-        self.assertEqual(assert_registry_kind("config"), "config")
-        with self.assertRaisesRegex(ValueError, "Invalid registry kind: unknown"):
-            assert_registry_kind("unknown")
+
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            current_kinds = {row["kind"] for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(kind_files, constrained_kinds)
+        self.assertLessEqual(current_kinds, set(constrained_kinds))
+        self.assertIn("payload_format", constrained_kinds)
 
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
@@ -131,7 +121,7 @@ class RegistryHelperTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "id must be a non-empty string"):
             reader.get_key_by_id("   ")
 
-    def test_list_items_by_kind_validates_kind(self):
+    def test_list_items_by_kind_filters_by_kind(self):
         def query(sql, params):
             self.assertIn("WHERE kind = %s", sql)
             self.assertIn("ORDER BY key ASC", sql)
@@ -142,8 +132,8 @@ class RegistryHelperTests(unittest.TestCase):
         items = reader.list_items_by_kind("repo")
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].kind, "repo")
-        with self.assertRaisesRegex(ValueError, "Invalid registry kind: workflow"):
-            reader.list_items_by_kind("workflow")
+        with self.assertRaisesRegex(TypeError, "kind must be a non-empty string"):
+            reader.list_items_by_kind("   ")
 
     def test_parse_registry_rejects_invalid_json_and_returns_objects(self):
         with self.assertRaisesRegex(ValueError, "is not valid JSON"):

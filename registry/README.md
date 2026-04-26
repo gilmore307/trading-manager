@@ -11,6 +11,8 @@ The registry has two layers:
 
 `registry/kinds/*.md` files must not list concrete active rows. They define scope, range, and rejection boundaries only.
 
+The SQL `trading_registry.kind` constraint and `registry/kinds/*.md` files must stay aligned. Tests compare those two sources directly.
+
 `registry/current.csv` is the GitHub-visible snapshot of the active SQL table. It is generated from the database and must not be edited by hand.
 
 Registry `id` is the stable automation reference. Registry `key` is a human-readable output/display label and may be renamed by reviewed migration. Helper APIs must not take key as input.

@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Removed registry kind vocabulary validators from the runtime helper package; tests now compare SQL kind constraints with `registry/kinds/*.md`.
 - Registered legal `payload_format` values as `payload_format` registry rows and removed payload-format validators from the runtime helper surface.
 - Expanded registry `payload_format` beyond `text`/`file` and backfilled current rows with narrower formats.
 - Removed the old non-Python registry helper implementation; helper code is now Python-only.

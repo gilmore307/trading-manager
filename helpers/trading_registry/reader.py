@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
 
-from .registry_types import assert_registry_kind
-
 SELECT_COLUMNS = """
 SELECT
   id,
@@ -129,8 +127,10 @@ class RegistryReader:
         return item.path if item else None
 
     def list_items_by_kind(self, kind: str) -> list[RegistryItem]:
-        assert_registry_kind(kind)
-        return self._fetch_many(f"{SELECT_COLUMNS} WHERE kind = %s ORDER BY key ASC", [kind])
+        return self._fetch_many(
+            f"{SELECT_COLUMNS} WHERE kind = %s ORDER BY key ASC",
+            [_non_empty_string("kind", kind)],
+        )
 
 
 def create_registry_reader(query: QueryFn) -> RegistryReader:

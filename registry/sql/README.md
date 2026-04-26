@@ -21,7 +21,7 @@ registry/sql/
 - Treat migrations as append-only after commit.
 - Do not list concrete row inventories in kind Markdown files.
 - Do not store secrets in SQL payloads. Use secret aliases for `config` entries.
-- If a new `kind` is introduced, update both the SQL kind check and the corresponding `registry/kinds/<kind>.md` boundary file.
+- If a new `kind` is introduced, update both the SQL kind check and the corresponding `registry/kinds/<kind>.md` boundary file. The SQL kind check must stay aligned with `registry/kinds/*.md`; tests enforce this.
 
 ## CSV Snapshot
 

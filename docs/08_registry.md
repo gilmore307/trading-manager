@@ -90,6 +90,8 @@ Each kind file defines:
 
 Kind files must not list concrete active rows. Concrete rows belong in SQL migrations and `registry/current.csv`.
 
+The SQL `trading_registry.kind` constraint and `registry/kinds/*.md` files must stay aligned. Tests compare those two sources directly.
+
 `registry/reviews/` is for review records and boundary assessments, not normative kind definitions.
 
 ## SQL And Snapshot Workflow
@@ -139,7 +141,7 @@ The registered official Python id-only lookup and secret helper surface is:
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
 
-Payload-format vocabulary lives in `kind = payload_format` registry rows and is checked against the SQL constraint by tests, not by public runtime helper exports.
+Registry kind and payload-format vocabularies are checked against SQL constraints by tests, not by public runtime helper exports.
 
 The CSV export maintenance helper is separate from lookup helpers:
 
