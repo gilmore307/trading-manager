@@ -84,10 +84,11 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 69)
+        self.assertEqual(len(data_kinds), 70)
         expected_payloads = {
             "EQUITY_BAR": "equity_bar",
             "EQUITY_LIQUIDITY_BAR": "equity_liquidity_bar",
+            "CRYPTO_LIQUIDITY_BAR": "crypto_liquidity_bar",
             "OPTION_GREEKS_FIRST_ORDER": "option_greeks_first_order",
             "SEC_COMPANY_FACT": "sec_company_fact",
             "ETF_HOLDINGS_SNAPSHOT": "etf_holdings_snapshot",
