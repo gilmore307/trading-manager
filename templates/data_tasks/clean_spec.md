@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define how `clean.py` converts raw provider/source data into normalized development outputs.
+Define how `pipeline.py::clean` converts raw provider/source data into normalized development outputs.
 
 ## Inputs
 

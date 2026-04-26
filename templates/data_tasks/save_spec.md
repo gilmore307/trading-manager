@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define how `save.py` writes cleaned outputs during development and how it will later map to durable storage contracts.
+Define how `pipeline.py::save` writes cleaned outputs during development and how it will later map to durable storage contracts.
 
 ## Development Save Rule
 
@@ -37,7 +37,7 @@ Document intended future durable target, without implementing it yet:
 
 ## Save Evidence
 
-`save.py` should produce evidence for receipt generation:
+`pipeline.py::save` should produce evidence for receipt generation:
 
 - saved file paths;
 - row counts;

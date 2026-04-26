@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define exactly how `fetch.py` retrieves historical source data for this bundle.
+Define exactly how `pipeline.py::fetch` retrieves historical source data for this bundle.
 
 ## Source And Authentication
 
@@ -49,7 +49,7 @@ Record:
 
 ## Failure Behavior
 
-Fetch failures should still allow `receipt.py` to emit a failed completion receipt.
+Fetch failures should still allow `pipeline.py::write_receipt` to emit a failed completion receipt.
 
 ## Default Test Policy
 

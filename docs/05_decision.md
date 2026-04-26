@@ -1001,3 +1001,25 @@ The template shapes are cross-repository planning surfaces, so they belong in `t
 - `trading-data` can reference these templates when designing API-specific bundles.
 - The templates remain drafts until schemas are accepted through docs, registry, and tests.
 - Stable fields/type/status values discovered while filling templates must be routed through registry migrations.
+
+## D047 - Data source bundles default to one pipeline module
+
+Date: 2026-04-26
+
+### Context
+
+The earlier data task template shape described separate `fetch.py`, `clean.py`, `save.py`, and `receipt.py` modules. The user asked why those steps could not be combined, and approved a simpler default shape.
+
+### Decision
+
+Default each data source bundle to one `pipeline.py` file with one public `run(...)` entry point and internal `fetch`, `clean`, `save`, and `write_receipt` step functions. Keep API-specific details in the bundle README and spec templates. Split step functions into separate files only when bundle complexity justifies it.
+
+### Rationale
+
+This keeps manager invocation simple and avoids premature file sprawl while preserving testable/replayable boundaries inside the pipeline.
+
+### Consequences
+
+- `templates/data_tasks/pipeline.py` is the default implementation template.
+- Bundle READMEs own bundle-specific API details.
+- Existing fetch/clean/save/receipt spec templates remain design documents, not required separate code files.

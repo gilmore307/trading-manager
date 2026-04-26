@@ -53,6 +53,7 @@ Current data task drafting templates:
 
 - `templates/data_tasks/task_key.json`
 - `templates/data_tasks/bundle_readme.md`
+- `templates/data_tasks/pipeline.py`
 - `templates/data_tasks/fetch_spec.md`
 - `templates/data_tasks/clean_spec.md`
 - `templates/data_tasks/save_spec.md`
@@ -90,8 +91,9 @@ Normal flow for a historical data acquisition bundle:
 
 1. Start from `templates/data_tasks/task_key.json` for manager/data handoff shape.
 2. Start from `templates/data_tasks/bundle_readme.md` for the bundle boundary.
-3. Fill API-specific requirements using `fetch_spec.md`, `clean_spec.md`, `save_spec.md`, and `fixture_policy.md`.
-4. Use `completion_receipt.json` as the draft evidence shape for development receipts under `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT`.
+3. Use `pipeline.py` as the default single-file implementation shape with internal `fetch`, `clean`, `save`, and `write_receipt` step functions.
+4. Fill API-specific requirements using `fetch_spec.md`, `clean_spec.md`, `save_spec.md`, and `fixture_policy.md`.
+5. Use `completion_receipt.json` as the draft evidence shape for development receipts under `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT`.
 5. Register any stable field/type/status names before implementation treats them as contracts.
 
 These data task templates are draft surfaces. They do not by themselves create accepted task-key, receipt, storage, or API schemas.

@@ -45,14 +45,16 @@ Optional task key fields:
 - validation expectations
 - retry expectations
 
-## Step Modules
+## Pipeline Module
 
-| Step | File | Responsibility |
-|---|---|---|
-| Fetch | `fetch.py` | Retrieve source data and write raw development files. |
-| Clean | `clean.py` | Normalize provider data into bundle output shapes. |
-| Save | `save.py` | Save cleaned development files under `data/storage/`; durable SQL waits for contracts. |
-| Receipt | `receipt.py` | Emit success/failure completion receipt. |
+Default implementation should start as one `pipeline.py` file with one public `run(...)` entry point and four internal step functions. Split into separate modules only when complexity makes a single file hard to maintain.
+
+| Step function | Responsibility |
+|---|---|
+| `fetch(...)` | Retrieve source data and write raw development files. |
+| `clean(...)` | Normalize provider data into bundle output shapes. |
+| `save(...)` | Save cleaned development files under `data/storage/`; durable SQL waits for contracts. |
+| `write_receipt(...)` | Emit success/failure completion receipt. |
 
 ## Outputs
 
