@@ -161,7 +161,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 - Treat `key` values as renameable labels.
 - Store secret aliases only; never store secret values.
 
-Source-level secret JSON config rows should use `payload_format=secret_alias`, store the source alias in `payload`, and may mirror the JSON file path in `path`. JSON field names such as `api_key`, `secret_key`, `passphrase`, and `pat` are registered as `field` rows with `applies_to=source_secret_json`.
+Source-level secret JSON config rows should use `payload_format=secret_alias`, store the source alias in `payload`, and may mirror the JSON file path in `path`. JSON field names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, and `pat` are registered as `field` rows with `applies_to=source_secret_json`.
 - Use nullable `path` for direct locators; do not create a `path` kind.
 - Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.

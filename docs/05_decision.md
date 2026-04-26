@@ -767,7 +767,7 @@ OKX credentials were initially split into separate aliases/files for API key, se
 
 ### Decision
 
-Use one JSON secret file per source/provider under `/root/secrets/<source>.json`. Registry config rows should point to the source-level alias, such as `okx` or `github`, and may mirror the JSON file path in `path`. Register reusable JSON key names, such as `api_key`, `secret_key`, `passphrase`, `allowed_ip_address`, `api_key_remark_name`, and `pat`, as `field` rows with `applies_to=source_secret_json`.
+Use one JSON secret file per source/provider under `/root/secrets/<source>.json`. Registry config rows should point to the source-level alias, such as `okx` or `github`, and may mirror the JSON file path in `path`. Register reusable JSON key names, such as `api_key`, `secret_key`, `passphrase`, `endpoint`, `allowed_ip_address`, `api_key_remark_name`, and `pat`, as `field` rows with `applies_to=source_secret_json`.
 
 ### Rationale
 
@@ -802,3 +802,25 @@ The registry should expose one source-level alias for OKX, not split credential 
 - `OKX_SECRET_ALIAS` remains the single OKX credential/config entry.
 - JSON keys now include `api_key`, `secret_key`, `passphrase`, `allowed_ip_address`, and `api_key_remark_name`.
 - `SOURCE_SECRET_ALLOWED_IP_ADDRESS` and `SOURCE_SECRET_API_KEY_REMARK_NAME` are registered field rows with `applies_to=source_secret_json`.
+
+## D038 - Alpaca is a registered stock and ETF data provider config surface
+
+Date: 2026-04-26
+
+### Context
+
+The user provided Alpaca paper API credentials and endpoint for acquiring stock and ETF bars, quotes, trades, and news. Source credentials now use one JSON file per source.
+
+### Decision
+
+Register Alpaca as a provider term and add `ALPACA_SECRET_ALIAS` pointing to source alias `alpaca` and `/root/secrets/alpaca.json`. Register `endpoint` as a reusable source-secret JSON field.
+
+### Rationale
+
+Alpaca is a data-source connector dependency for `trading-data`; credentials and endpoint should be available through the same source-level JSON secret pattern as OKX and GitHub.
+
+### Consequences
+
+- Alpaca JSON fields are `api_key`, `secret_key`, and `endpoint`.
+- `trading-data` may plan an Alpaca source connector using `ALPACA_SECRET_ALIAS` once implementation begins.
+- Default tests still must not require live Alpaca credentials or network calls.

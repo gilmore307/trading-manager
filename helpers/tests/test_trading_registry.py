@@ -210,6 +210,7 @@ class RegistryHelperTests(unittest.TestCase):
                             "fields": {
                                 "allowed_ip_address": "example allowlisted IPv4 address",
                                 "api_key": "example service API key",
+                                "endpoint": "example service API endpoint",
                             },
                         }
                     }
@@ -219,6 +220,7 @@ class RegistryHelperTests(unittest.TestCase):
                     {
                         "allowed_ip_address": "203.0.113.10",
                         "api_key": "secret-value",
+                        "endpoint": "https://example.test/v1",
                         "secret_key": "other-secret",
                     }
                 )
@@ -234,6 +236,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(
             resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET", "allowed_ip_address"),
             "203.0.113.10",
+        )
+        self.assertEqual(
+            resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET", "endpoint"),
+            "https://example.test/v1",
         )
         with self.assertRaisesRegex(KeyError, "Secret JSON field not found"):
             resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET", "missing")
