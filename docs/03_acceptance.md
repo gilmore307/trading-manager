@@ -65,7 +65,7 @@ Contract changes are acceptable when they:
 Registry and template changes are acceptable when they:
 
 - keep trading-wide registered names in the SQL-backed `trading_registry`;
-- keep kind boundary/range rules in `registry/<kind>.md`;
+- keep kind boundary/range rules in `registry/kinds/<kind>.md`;
 - regenerate `registry/current.csv` after SQL registry changes;
 - prefer id-based registry dereferencing for automation;
 - ensure every field entry has non-empty `applies_to`;

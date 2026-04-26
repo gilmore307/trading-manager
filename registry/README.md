@@ -4,10 +4,10 @@
 
 The registry has two layers:
 
-1. **Kind boundary docs** — one Markdown file per `kind`, defining what that kind means and what belongs in it.
+1. **Kind boundary docs** — one Markdown file per `kind` under `registry/kinds/`, defining what that kind means and what belongs in it.
 2. **SQL-backed entries** — concrete registered items live in the active `trading_registry` table and its migrations under `registry/sql/schema_migrations/`.
 
-Markdown kind files must not list concrete active rows. They define scope, range, and rejection boundaries only.
+`registry/kinds/*.md` files must not list concrete active rows. They define scope, range, and rejection boundaries only.
 
 `registry/current.csv` is the GitHub-visible snapshot of the active SQL table. It is generated from the database and must not be edited by hand.
 
@@ -56,27 +56,31 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 
 ## Kind Files
 
-- [`acceptance_outcome`](./acceptance_outcome.md) — Default acceptance outcome values for OpenClaw acceptance records.
-- [`artifact_type`](./artifact_type.md) — Registered artifact type values used to classify durable outputs produced and consumed across trading repositories.
-- [`config`](./config.md) — Non-secret configuration keys and secret-alias references. Payloads may contain secret aliases but must never contain secret values.
-- [`docs_status`](./docs_status.md) — Default documentation alignment status values.
-- [`field`](./field.md) — Canonical shared field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
-- [`maintenance_status`](./maintenance_status.md) — Default maintenance pass status values.
-- [`manifest_type`](./manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
-- [`output`](./output.md) — Reusable output/template identifiers. Use only for stable output shapes that multiple workflows may reference.
-- [`ready_signal_type`](./ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
-- [`repo`](./repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
-- [`request_type`](./request_type.md) — Registered request type values used to classify cross-repository work requests.
-- [`review_readiness`](./review_readiness.md) — Default review-readiness values for completion receipts and review queues.
-- [`script`](./script.md) — Canonical helper or automation method/entrypoint records, with source locators in `path`.
-- [`task_lifecycle_state`](./task_lifecycle_state.md) — Default task lifecycle state values for planning and execution records.
-- [`term`](./term.md) — Approved shared terminology and definitions.
-- [`test_status`](./test_status.md) — Default test/verification status values.
+- [`acceptance_outcome`](./kinds/acceptance_outcome.md) — Default acceptance outcome values for OpenClaw acceptance records.
+- [`artifact_type`](./kinds/artifact_type.md) — Registered artifact type values used to classify durable outputs produced and consumed across trading repositories.
+- [`config`](./kinds/config.md) — Non-secret configuration keys and secret-alias references. Payloads may contain secret aliases but must never contain secret values.
+- [`docs_status`](./kinds/docs_status.md) — Default documentation alignment status values.
+- [`field`](./kinds/field.md) — Canonical shared field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
+- [`maintenance_status`](./kinds/maintenance_status.md) — Default maintenance pass status values.
+- [`manifest_type`](./kinds/manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
+- [`output`](./kinds/output.md) — Reusable output/template identifiers. Use only for stable output shapes that multiple workflows may reference.
+- [`ready_signal_type`](./kinds/ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
+- [`repo`](./kinds/repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
+- [`request_type`](./kinds/request_type.md) — Registered request type values used to classify cross-repository work requests.
+- [`review_readiness`](./kinds/review_readiness.md) — Default review-readiness values for completion receipts and review queues.
+- [`script`](./kinds/script.md) — Canonical helper or automation method/entrypoint records, with source locators in `path`.
+- [`task_lifecycle_state`](./kinds/task_lifecycle_state.md) — Default task lifecycle state values for planning and execution records.
+- [`term`](./kinds/term.md) — Approved shared terminology and definitions.
+- [`test_status`](./kinds/test_status.md) — Default test/verification status values.
+
+## Review Files
+
+`registry/reviews/` holds review notes and boundary assessments, not kind source-of-truth files.
 
 ## Rules
 
 - Do not define the same kind in multiple Markdown files.
-- Do not store concrete active row lists in Markdown kind files.
+- Do not store concrete active row lists in `registry/kinds/*.md`.
 - Do not store secrets. Store secret aliases only.
 - Do not mix component-local implementation details into trading-wide registry entries.
 - New fields, statuses, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
@@ -87,4 +91,4 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos and scripts.
 - Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.
-- If a new kind is needed, add its Markdown boundary file, update helper kind lists, update the SQL kind check, and regenerate `registry/current.csv` in the same reviewed change.
+- If a new kind is needed, add its `registry/kinds/<kind>.md` boundary file, update helper kind lists, update the SQL kind check, and regenerate `registry/current.csv` in the same reviewed change.

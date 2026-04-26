@@ -7,7 +7,7 @@
 - Keep trading statuses and registrable fields in `trading-main/registry/`, not scattered through docs.
 - The market-state contamination rule is a core system invariant.
 
-- Registry Markdown kind files define boundaries only; concrete entries live in SQL and GitHub visibility comes from generated `registry/current.csv`.
+- Registry Markdown kind files under `registry/kinds/` define boundaries only; concrete entries live in SQL and GitHub visibility comes from generated `registry/current.csv`.
 - Contract drafting templates belong under `templates/contracts/`, not as numbered docs after `06_memory.md`.
 - Stale canceled-project registry entries were removed because GitHub history is the restore path.
 - Registry ids are stable automation references; keys are human-readable and unsafe for durable automation dereferencing.

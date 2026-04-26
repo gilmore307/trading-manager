@@ -124,7 +124,7 @@ The initial registry migration converted active SQL rows into Markdown tables. T
 
 ### Decision
 
-`registry/<kind>.md` files define kind boundaries, ranges, and rejection rules only. Concrete registered items live in the SQL-backed `trading_registry` table and append-only migrations under `registry/sql/schema_migrations/`.
+`registry/kinds/<kind>.md` files define kind boundaries, ranges, and rejection rules only. Concrete registered items live in the SQL-backed `trading_registry` table and append-only migrations under `registry/sql/schema_migrations/`.
 
 ### Rationale
 
@@ -208,7 +208,7 @@ The docs spine should contain ratified project context and governance. Drafting 
 
 - Do not add numbered docs beyond `06_memory.md` for templates or registries.
 - Use `templates/contracts/` for reusable contract drafting surfaces.
-- Use `registry/*_type.md` and SQL migrations for registered type vocabularies.
+- Use `registry/kinds/*_type.md` and SQL migrations for registered type vocabularies.
 
 ## D012 - Remove canceled-project registry entries
 
@@ -457,3 +457,25 @@ The registry is the shared naming authority. Component repository names and chec
 - All eight trading repositories are visible in `registry/current.csv`.
 - Automation should use repo row ids to retrieve repository names and paths.
 - Repository remotes are recorded in repo-row notes for review visibility.
+
+## D023 - Registry kind boundaries live under registry/kinds
+
+Date: 2026-04-25
+
+### Context
+
+Registry root was mixing generated snapshots, SQL tooling, review notes, and kind boundary files such as `acceptance_outcome.md`. Moving those files into `registry/reviews/` would confuse source-of-truth definitions with review artifacts.
+
+### Decision
+
+Move all registry kind boundary files into `registry/kinds/`. Keep `registry/reviews/` for review notes and boundary assessments only.
+
+### Rationale
+
+Kind files are normative boundary documentation. Review files are commentary and assessment records. Separating the directories keeps authority clear while reducing root clutter.
+
+### Consequences
+
+- New registry kinds must add `registry/kinds/<kind>.md`.
+- `registry/reviews/` must not own kind source-of-truth files.
+- `registry/README.md` remains the index for both SQL entries and kind boundary files.

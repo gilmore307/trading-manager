@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Moved registry kind boundary files into `registry/kinds/`; `registry/reviews/` remains for review artifacts.
 - Registered all eight trading repositories as `repo` rows in `registry/current.csv`.
 - Registered `REGISTRY_EXPORT_CURRENT_CSV_HELPER` for regenerating `registry/current.csv`.
 - Standardized registered helper surface to four id-only helpers: key, payload, path, and secret text by config id.
