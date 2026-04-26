@@ -78,6 +78,30 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "data_bundle")
             self.assertEqual(rows[key]["payload"], payload)
 
+    def test_initial_data_kinds_are_registered(self):
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+        by_key = {row["key"]: row for row in rows}
+        data_kinds = [row for row in rows if row["kind"] == "data_kind"]
+
+        self.assertEqual(len(data_kinds), 68)
+        expected_payloads = {
+            "EQUITY_BAR": "equity_bar",
+            "OPTION_GREEKS_FIRST_ORDER": "option_greeks_first_order",
+            "SEC_COMPANY_FACT": "sec_company_fact",
+            "ETF_HOLDINGS_SNAPSHOT": "etf_holdings_snapshot",
+            "FOMC_MEETING": "fomc_meeting",
+            "MACRO_BLS_CPI": "macro_bls_cpi",
+            "MACRO_BEA_NIPA": "macro_bea_nipa",
+            "MACRO_TREASURY_DTS": "macro_treasury_dts",
+            "MACRO_FRED_NATIVE": "macro_fred_native",
+            "MACRO_ALFRED_VINTAGE": "macro_alfred_vintage",
+        }
+        for key, payload in expected_payloads.items():
+            self.assertEqual(by_key[key]["kind"], "data_kind")
+            self.assertEqual(by_key[key]["payload"], payload)
+        self.assertIn("must not duplicate official", by_key["FRED"]["note"])
+
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
         for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
