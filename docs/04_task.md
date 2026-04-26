@@ -6,6 +6,7 @@
 
 ## Queued Tasks
 
+- Define data task key file and completion receipt schemas across manager/data/storage.
 - None that can be completed safely without cross-repository contract coordination.
 
 ## Waiting On Cross-Repository Coordination
@@ -24,6 +25,7 @@
 
 ## Recently Accepted
 
+- Registered manager-driven historical data task workflow terms for task key files and completion receipts.
 - Registered FOMC calendar, official macro release calendar discovery, and ETF issuer holdings source terms.
 - Registered U.S. Treasury Fiscal Data as an open/no-key provider term with official documentation path.
 - Added official documentation URLs to registered provider term paths while keeping secret config paths pointed at local JSON files.

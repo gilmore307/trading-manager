@@ -934,3 +934,26 @@ These source-of-truth rules should be explicit before connector or scraper work 
 - Third-party macro calendars and ETF aggregators are not source of truth unless explicitly approved as secondary references.
 - Connectors must preserve source URL, retrieval timestamp, and publication/effective date where available.
 - Default tests must use fixtures or mocks, not live web calls.
+
+## D044 - Data acquisition is manager-driven and historical-only
+
+Date: 2026-04-26
+
+### Context
+
+The user clarified that current `trading-data` acquisition work concerns historical data. Realtime data and execution-time feeds belong to `trading-execution` later. Data tasks should be initiated by `trading-manager` and completed by `trading-data` with durable evidence in `trading-storage`.
+
+### Decision
+
+Register shared workflow terms for historical data acquisition, manager-issued data task key files, and storage-resident data task completion receipts. Treat the exact schema and storage placement as pending cross-repository contract work.
+
+### Rationale
+
+The boundary keeps orchestration, data acquisition, storage, and execution responsibilities separate while preserving a named contract surface for implementation planning.
+
+### Consequences
+
+- `trading-data` remains historical-only for now.
+- `trading-manager` owns task-key creation and lifecycle orchestration.
+- `trading-storage` owns durable SQL output placement and completion receipt storage once schemas are accepted.
+- Registry terms exist before component implementation depends on the names.
