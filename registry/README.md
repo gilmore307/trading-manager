@@ -74,6 +74,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`acceptance_outcome`](./kinds/acceptance_outcome.md) — Default acceptance outcome values for OpenClaw acceptance records.
 - [`artifact_type`](./kinds/artifact_type.md) — Registered artifact type values used to classify durable outputs produced and consumed across trading repositories.
 - [`config`](./kinds/config.md) — Non-secret configuration keys and secret-alias references. Payloads may contain secret aliases but must never contain secret values.
+- [`data_bundle`](./kinds/data_bundle.md) — Historical data acquisition bundle keys accepted for `trading-data` task routing and receipts.
 - [`docs_status`](./kinds/docs_status.md) — Default documentation alignment status values.
 - [`field`](./kinds/field.md) — Canonical shared field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
 - [`maintenance_status`](./kinds/maintenance_status.md) — Default maintenance pass status values.
@@ -99,7 +100,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Do not store concrete active row lists in `registry/kinds/*.md`.
 - Do not store secrets. Store source-level secret aliases only; one provider/source should normally map to one JSON secret file.
 - Do not mix component-local implementation details into trading-wide registry entries.
-- New fields, statuses, payload formats, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
+- New fields, statuses, payload formats, config keys, data bundles, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
 - Test scripts must stay out of registry `script` rows and be documented in their test-directory README.

@@ -53,7 +53,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
-    def test_data_bundle_terms_are_registered(self):
+    def test_data_bundle_rows_are_registered_as_data_bundle_kind(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
@@ -62,12 +62,21 @@ class RegistryHelperTests(unittest.TestCase):
             rows["SEC_EDGAR"]["path"],
             "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
         )
-        self.assertEqual(rows["SEC_COMPANY_FINANCIALS"]["kind"], "term")
-        self.assertIn("sec_company_financials", rows["SEC_COMPANY_FINANCIALS"]["note"])
-        self.assertEqual(rows["ALPACA_QUOTES_TRADES"]["kind"], "term")
-        self.assertIn("alpaca_quotes_trades", rows["ALPACA_QUOTES_TRADES"]["note"])
-        self.assertEqual(rows["ALPACA_NEWS"]["kind"], "term")
-        self.assertIn("alpaca_news", rows["ALPACA_NEWS"]["note"])
+        expected_bundles = {
+            "ALPACA_BARS": "alpaca_bars",
+            "ALPACA_QUOTES_TRADES": "alpaca_quotes_trades",
+            "ALPACA_NEWS": "alpaca_news",
+            "THETADATA_OPTION_1M_BUNDLE": "thetadata_option_1m_bundle",
+            "THETADATA_OPTION_SNAPSHOT_BUNDLE": "thetadata_option_snapshot_bundle",
+            "OKX_BARS": "okx_bars",
+            "MACRO_RELEASE_BUNDLE_PATTERN": "macro_release_<release_key>",
+            "CALENDAR_DISCOVERY": "calendar_discovery",
+            "ETF_HOLDINGS": "etf_holdings",
+            "SEC_COMPANY_FINANCIALS": "sec_company_financials",
+        }
+        for key, payload in expected_bundles.items():
+            self.assertEqual(rows[key]["kind"], "data_bundle")
+            self.assertEqual(rows[key]["payload"], payload)
 
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
