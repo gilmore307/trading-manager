@@ -70,6 +70,7 @@ VALUES
   ('rrd_V9H5C2KR', 'review_readiness', 'REVIEW_READINESS_BLOCKED', 'text', 'blocked', NULL, NULL, 'default shared review readiness value for work that is blocked from review'),
   ('rrd_W6P3N1TX', 'review_readiness', 'REVIEW_READINESS_NOT_READY', 'text', 'not_ready', NULL, NULL, 'default shared review readiness value for work that is not ready for review'),
   ('rrd_L2F8Q4MA', 'review_readiness', 'REVIEW_READINESS_READY', 'text', 'ready', NULL, NULL, 'default shared review readiness value for work that is ready for review'),
+  ('scr_CV8R2M5J', 'script', 'REGISTRY_EXPORT_CURRENT_CSV_HELPER', 'text', 'registry/sql/apply-migrations.py --export-only', '/root/projects/trading-main/registry/sql/apply-migrations.py', 'registry/current.csv', 'maintenance helper command that exports the active trading_registry table to registry/current.csv'),
   ('scr_GK1D8P4Q', 'script', 'REGISTRY_GET_KEY_BY_ID_HELPER', 'text', 'getKeyById', '/root/projects/trading-main/helpers/registry/registry-reader.js', 'helpers/registry', 'id-based helper that returns a registry item key or null'),
   ('scr_GH6V3T8N', 'script', 'REGISTRY_GET_PATH_BY_ID_HELPER', 'text', 'getPathById', '/root/projects/trading-main/helpers/registry/registry-reader.js', 'helpers/registry', 'id-based helper that returns a registry item path or null'),
   ('scr_GP2L7M9A', 'script', 'REGISTRY_GET_PAYLOAD_BY_ID_HELPER', 'text', 'getPayloadById', '/root/projects/trading-main/helpers/registry/registry-reader.js', 'helpers/registry', 'id-based helper that returns a registry item payload or null'),

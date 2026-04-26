@@ -16,3 +16,9 @@ The registered public helper surface is id-only:
 - `loadSecretTextByConfigId(id)` resolves a config item payload as a secret alias and returns trimmed secret text.
 
 Registry keys are output/display values, not helper inputs. If a human needs key-based debugging, query SQL directly instead of adding key-input helper APIs.
+
+## CSV Snapshot Helper
+
+`registry/sql/apply-migrations.py --export-only` regenerates `registry/current.csv` from the active SQL table.
+
+This is a registry maintenance helper, not a lookup helper. It is registered separately as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.

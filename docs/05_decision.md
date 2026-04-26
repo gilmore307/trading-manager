@@ -413,3 +413,25 @@ This keeps registry automation stable and simple: id in, approved value out. Key
 - Key-based helper APIs are removed from the public helper surface.
 - Script registry rows represent callable helper methods, not every helper source file.
 - Human debugging can use SQL queries directly instead of key-input helper APIs.
+
+## D021 - Current CSV export is a registered maintenance helper
+
+Date: 2026-04-25
+
+### Context
+
+`registry/current.csv` is generated from SQL and should be refreshed after registry changes. The helper command itself should be discoverable from the registry.
+
+### Decision
+
+Register `registry/sql/apply-migrations.py --export-only` as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.
+
+### Rationale
+
+This keeps the CSV generation command visible without mixing it into the id-only lookup helper surface.
+
+### Consequences
+
+- Lookup helpers remain id-only.
+- CSV generation is registered as a maintenance helper.
+- The helper row points to `registry/sql/apply-migrations.py` and applies to `registry/current.csv`.

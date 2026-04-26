@@ -50,6 +50,8 @@ For export only:
 registry/sql/apply-migrations.py --export-only
 ```
 
+This export-only command is registered as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.
+
 The migration helper applies pending SQL migrations and exports `registry/current.csv` after every non-dry-run migration pass unless `--no-export` is used.
 
 ## Kind Files
