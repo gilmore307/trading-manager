@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Registered ThetaData provider terminology for options data; credentials/JAR placement deferred.
 - Registered Alpaca source-level secret alias for stock/ETF bars, quotes, trades, and news data acquisition.
 - Consolidated OKX and GitHub secret handling to one JSON secret file per source and registered source-secret JSON field names.
 - Moved OKX allowlisted IPv4 and API key remark into the source-level OKX JSON secret file contract.

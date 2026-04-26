@@ -824,3 +824,25 @@ Alpaca is a data-source connector dependency for `trading-data`; credentials and
 - Alpaca JSON fields are `api_key`, `secret_key`, and `endpoint`.
 - `trading-data` may plan an Alpaca source connector using `ALPACA_SECRET_ALIAS` once implementation begins.
 - Default tests still must not require live Alpaca credentials or network calls.
+
+## D039 - ThetaData is registered as options-data provider terminology only
+
+Date: 2026-04-26
+
+### Context
+
+The user identified ThetaData as the intended options-data provider for chain timeline, quote, trade, OHLC, Greeks, and related options datasets. ThetaData credential handling is special: credentials must be stored in a `creds.txt` file beside `ThetaTerminalv3.jar`.
+
+### Decision
+
+Register ThetaData as provider terminology now, but do not create secret aliases or source connector paths yet. Defer `creds.txt` and ThetaTerminal JAR placement until the source connector boundary is designed.
+
+### Rationale
+
+ThetaData is relevant to the options data domain, but its runtime credential/JAR layout needs a deliberate local-source design rather than being forced into the generic source JSON pattern prematurely.
+
+### Consequences
+
+- `THETADATA` is registered as a `term` row.
+- No ThetaData secret alias is registered yet.
+- `trading-data` may document ThetaData as the intended options-data provider, with implementation blocked on connector/JAR/credential layout decisions.
