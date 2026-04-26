@@ -21,9 +21,9 @@ function createRow(overrides) {
     key: 'REGISTRY_ITEM_ID',
     payload_format: 'text',
     payload: 'id',
-    note: 'canonical column name for trading_registry.id',
     path: null,
-    applies_to: null,
+    applies_to: 'trading_registry',
+    note: 'canonical column name for trading_registry.id',
     created_at: '2026-04-23T00:00:00.000Z',
     updated_at: '2026-04-23T00:00:00.000Z',
     ...overrides,
@@ -50,18 +50,8 @@ test('registry kinds stay fixed to the documented set', () => {
     'docs_status',
   ]);
   assert.equal(isRegistryKind('repo'), true);
-  assert.equal(isRegistryKind('term'), true);
-  assert.equal(isRegistryKind('script'), true);
   assert.equal(isRegistryKind('artifact_type'), true);
-  assert.equal(isRegistryKind('manifest_type'), true);
-  assert.equal(isRegistryKind('ready_signal_type'), true);
   assert.equal(isRegistryKind('request_type'), true);
-  assert.equal(isRegistryKind('task_lifecycle_state'), true);
-  assert.equal(isRegistryKind('review_readiness'), true);
-  assert.equal(isRegistryKind('acceptance_outcome'), true);
-  assert.equal(isRegistryKind('test_status'), true);
-  assert.equal(isRegistryKind('maintenance_status'), true);
-  assert.equal(isRegistryKind('docs_status'), true);
   assert.equal(isRegistryKind('unknown'), false);
   assert.equal(assertRegistryKind('config'), 'config');
   assert.throws(() => assertRegistryKind('unknown'), /Invalid registry kind: unknown/);
@@ -74,75 +64,56 @@ test('mapRegistryItemRow converts snake_case columns into readable JS keys', () 
     key: 'REGISTRY_ITEM_ID',
     payloadFormat: 'text',
     payload: 'id',
-    note: 'canonical column name for trading_registry.id',
     path: null,
-    appliesTo: null,
+    appliesTo: 'trading_registry',
+    note: 'canonical column name for trading_registry.id',
     createdAt: '2026-04-23T00:00:00.000Z',
     updatedAt: '2026-04-23T00:00:00.000Z',
   });
 });
 
-test('getItemById uses a read-only trading_registry query', async () => {
+test('id-only registry helpers return key, payload, and path', async () => {
   const calls = [];
   const reader = createRegistryReader(async (sql, params) => {
     calls.push({ sql, params });
-    return { rows: [createRow()] };
-  });
-
-  const item = await reader.getItemById('fld_A7K3P2Q9');
-
-  assert.equal(item.id, 'fld_A7K3P2Q9');
-  assert.match(calls[0].sql, /FROM trading_registry/);
-  assert.match(calls[0].sql, /WHERE id = \$1/);
-  assert.deepEqual(calls[0].params, ['fld_A7K3P2Q9']);
-});
-
-test('path helpers prefer stable ids and expose key lookup as unsafe', async () => {
-  const reader = createRegistryReader(async (sql, params) => {
-    if (params[0] === 'missing_path') {
-      return { rows: [createRow({ id: 'missing_path', path: null })] };
+    if (params[0] === 'missing') {
+      return { rows: [] };
     }
-
-    return { rows: [createRow({
-      id: 'rep_H6S3V8LA',
-      kind: 'repo',
-      key: 'TRADING_MAIN_REPO',
-      payload: 'trading-main',
-      path: '/root/projects/trading-main',
-    })] };
+    return {
+      rows: [createRow({
+        id: 'rep_H6S3V8LA',
+        kind: 'repo',
+        key: 'TRADING_MAIN_REPO',
+        payload: 'trading-main',
+        path: '/root/projects/trading-main',
+        applies_to: null,
+      })],
+    };
   });
 
-  assert.equal(await reader.getItemPathById('rep_H6S3V8LA'), '/root/projects/trading-main');
-  assert.equal(await reader.requireItemPathById('rep_H6S3V8LA'), '/root/projects/trading-main');
-  assert.equal(await reader.getItemPathByKeyUnsafe('TRADING_MAIN_REPO'), '/root/projects/trading-main');
-  assert.equal(await reader.requireItemPathByKeyUnsafe('TRADING_MAIN_REPO'), '/root/projects/trading-main');
-  assert.equal(await reader.getItemPathById('missing_path'), null);
-  await assert.rejects(
-    () => reader.requireItemPathById('missing_path'),
-    /Registry item has no path for id: missing_path/
-  );
+  assert.equal(await reader.getKeyById('rep_H6S3V8LA'), 'TRADING_MAIN_REPO');
+  assert.equal(await reader.getPayloadById('rep_H6S3V8LA'), 'trading-main');
+  assert.equal(await reader.getPathById('rep_H6S3V8LA'), '/root/projects/trading-main');
+  assert.equal(await reader.getKeyById('missing'), null);
+  assert.equal(await reader.getPayloadById('missing'), null);
+  assert.equal(await reader.getPathById('missing'), null);
+
+  for (const call of calls) {
+    assert.match(call.sql, /WHERE id = \$1/);
+  }
 });
 
-test('getItemByKeyUnsafe returns null when no row matches', async () => {
-  const reader = createRegistryReader(async () => []);
-
-  const item = await reader.getItemByKeyUnsafe('MISSING_KEY');
-
-  assert.equal(item, null);
-});
-
-test('require item helpers throw clear errors when the item is missing', async () => {
+test('requireItemById throws clear errors when item is missing', async () => {
   const reader = createRegistryReader(async () => ({ rows: [] }));
 
   await assert.rejects(() => reader.requireItemById('fld_missing'), /Registry item not found for id: fld_missing/);
-  await assert.rejects(() => reader.requireItemByKeyUnsafe('MISSING_KEY'), /Registry item not found for key: MISSING_KEY/);
 });
 
-test('lookup helpers reject blank id and key inputs', async () => {
+test('id lookup rejects blank id inputs', async () => {
   const reader = createRegistryReader(async () => ({ rows: [] }));
 
   await assert.rejects(() => reader.getItemById(''), /id must be a non-empty string/);
-  await assert.rejects(() => reader.getItemByKeyUnsafe('   '), /key must be a non-empty string/);
+  await assert.rejects(() => reader.getKeyById('   '), /id must be a non-empty string/);
 });
 
 test('require helpers still work when destructured from the reader object', async () => {
@@ -167,6 +138,7 @@ test('listItemsByKind validates kind and returns mapped items', async () => {
           key: 'TRADING_MAIN_REPO',
           payload: 'trading-main',
           path: '/root/projects/trading-main',
+          applies_to: null,
         }),
       ],
     };
@@ -230,15 +202,11 @@ test('getSecretEntryFromRegistry resolves slash-delimited aliases', () => {
   });
 });
 
-test('createSecretResolver resolves registered secret aliases by stable config id and unsafe key', async () => {
+test('createSecretResolver loads secret text by stable config id', async () => {
   const readCalls = [];
   const resolver = createSecretResolver(async (sql, params) => {
-    if (params[0] === 'cfg_EXAMPLETOKEN') {
-      assert.match(sql, /WHERE id = \$1/);
-    } else {
-      assert.match(sql, /WHERE key = \$1/);
-      assert.deepEqual(params, ['EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS']);
-    }
+    assert.match(sql, /WHERE id = \$1/);
+    assert.deepEqual(params, ['cfg_EXAMPLETOKEN']);
 
     return {
       rows: [
@@ -247,7 +215,8 @@ test('createSecretResolver resolves registered secret aliases by stable config i
           kind: 'config',
           key: 'EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS',
           payload: 'example-service/token',
-          note: 'registered companion token secret alias',
+          note: 'registered token secret alias',
+          applies_to: null,
         }),
       ],
     };
@@ -277,18 +246,6 @@ test('createSecretResolver resolves registered secret aliases by stable config i
   });
 
   assert.equal(
-    await resolver.getSecretAliasByConfigId('cfg_EXAMPLETOKEN'),
-    'example-service/token'
-  );
-  assert.equal(
-    await resolver.getSecretAliasByConfigKeyUnsafe('EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS'),
-    'example-service/token'
-  );
-  assert.equal(
-    await resolver.getSecretPathByConfigId('cfg_EXAMPLETOKEN'),
-    '/root/secrets/example-service/token'
-  );
-  assert.equal(
     await resolver.loadSecretTextByConfigId('cfg_EXAMPLETOKEN'),
     'secret-value'
   );
@@ -309,7 +266,7 @@ test('createSecretResolver rejects non-config items for secret lookup', async ()
   });
 
   await assert.rejects(
-    () => resolver.getSecretAliasByConfigKeyUnsafe('OPENCLAW'),
+    () => resolver.loadSecretTextByConfigId('trm_OPENCLAW'),
     /must be kind=config/
   );
 });

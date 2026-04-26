@@ -32,9 +32,12 @@ CREATE TABLE IF NOT EXISTS trading_registry (
   payload_format TEXT NOT NULL CHECK (payload_format IN ('text', 'file')),
   payload TEXT NOT NULL,
   path TEXT,
+  applies_to TEXT,
   note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT trading_registry_field_applies_to_check
+    CHECK (kind <> 'field' OR (applies_to IS NOT NULL AND BTRIM(applies_to) <> ''))
 );
 
 CREATE INDEX IF NOT EXISTS idx_trading_registry_kind
@@ -46,9 +49,9 @@ ON trading_registry(updated_at);
 CREATE OR REPLACE FUNCTION set_trading_registry_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF ROW(NEW.kind, NEW.key, NEW.payload_format, NEW.payload, NEW.path, NEW.note)
+  IF ROW(NEW.kind, NEW.key, NEW.payload_format, NEW.payload, NEW.path, NEW.applies_to, NEW.note)
      IS DISTINCT FROM
-     ROW(OLD.kind, OLD.key, OLD.payload_format, OLD.payload, OLD.path, OLD.note) THEN
+     ROW(OLD.kind, OLD.key, OLD.payload_format, OLD.payload, OLD.path, OLD.applies_to, OLD.note) THEN
     NEW.updated_at = NOW();
   END IF;
 

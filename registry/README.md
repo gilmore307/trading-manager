@@ -11,7 +11,7 @@ Markdown kind files must not list concrete active rows. They define scope, range
 
 `registry/current.csv` is the GitHub-visible snapshot of the active SQL table. It is generated from the database and must not be edited by hand.
 
-Registry `id` is the stable automation reference. Registry `key` is a human-readable label and may be renamed by reviewed migration. Automation should store and dereference ids, not keys.
+Registry `id` is the stable automation reference. Registry `key` is a human-readable output/display label and may be renamed by reviewed migration. Helper APIs must not take key as input.
 
 ## SQL Entry Schema
 
@@ -66,7 +66,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`repo`](./repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
 - [`request_type`](./request_type.md) — Registered request type values used to classify cross-repository work requests.
 - [`review_readiness`](./review_readiness.md) — Default review-readiness values for completion receipts and review queues.
-- [`script`](./script.md) — Canonical source-file locators for helper or automation entry points.
+- [`script`](./script.md) — Canonical helper or automation method/entrypoint records, with source locators in `path`.
 - [`task_lifecycle_state`](./task_lifecycle_state.md) — Default task lifecycle state values for planning and execution records.
 - [`term`](./term.md) — Approved shared terminology and definitions.
 - [`test_status`](./test_status.md) — Default test/verification status values.
@@ -80,6 +80,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - New fields, statuses, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
+- Registered helper APIs must take registry ids as input, not keys.
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos and scripts.
 - Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.

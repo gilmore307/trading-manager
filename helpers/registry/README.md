@@ -6,19 +6,13 @@ They should read from the SQL-backed `trading_registry` table and support CSV sn
 
 Do not treat registry helpers as a place for component runtime behavior.
 
-## Stable Lookup Rule
+## Public Helper Surface
 
-Use registry `id` for automation. Registry `key` is a human-readable label and may be renamed by reviewed migration.
+The registered public helper surface is id-only:
 
-Path helpers follow that rule:
+- `getKeyById(id)` returns a registry item key or `null`.
+- `getPayloadById(id)` returns a registry item payload or `null`.
+- `getPathById(id)` returns a registry item path or `null`.
+- `loadSecretTextByConfigId(id)` resolves a config item payload as a secret alias and returns trimmed secret text.
 
-- `getItemPathById(id)` returns a path or `null`.
-- `requireItemPathById(id)` returns a path or throws.
-- `getItemPathByKeyUnsafe(key)` is for human/debug convenience and returns a path or `null`.
-- `requireItemPathByKeyUnsafe(key)` is for human/debug convenience and returns a path or throws.
-
-The `Unsafe` suffix means the lookup uses a renameable key rather than a stable id.
-
-## Secret Resolver Helpers
-
-Use config-id helpers for automation. Key-based config helpers carry the `Unsafe` suffix because registry keys are renameable.
+Registry keys are output/display values, not helper inputs. If a human needs key-based debugging, query SQL directly instead of adding key-input helper APIs.

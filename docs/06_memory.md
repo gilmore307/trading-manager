@@ -14,3 +14,5 @@
 - Registry `path` is a nullable column for direct locators, not a registry kind.
 - Every field registry entry must have non-empty `applies_to`; multiple scopes use semicolon-separated values.
 - Path helper methods are individually registered as script entries even though they share `registry-reader.js`.
+- Registered helper APIs are id-only: get key, payload, path, or secret text by stable registry id.
+- Registry keys are output/display labels, not helper inputs.

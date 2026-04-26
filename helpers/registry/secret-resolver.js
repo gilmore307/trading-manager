@@ -79,73 +79,21 @@ function createSecretResolver(query, options = {}) {
     return parseRegistry(jsonText, registryPath);
   }
 
-  function assertConfigItem(item, label, value) {
+  async function loadSecretTextByConfigId(configId) {
+    const normalized = assertNonEmptyString('configId', configId);
+    const item = await registryReader.requireItemById(normalized);
+
     if (item.kind !== 'config') {
-      throw new Error(`Registry item ${value} must be kind=config to resolve a secret alias by ${label}`);
+      throw new Error(`Registry item ${normalized} must be kind=config to resolve a secret alias by id`);
     }
 
-    return assertNonEmptyString(`registry config payload for ${value}`, item.payload);
-  }
-
-  async function getSecretAliasByConfigId(configId) {
-    const normalized = assertNonEmptyString('configId', configId);
-    return assertConfigItem(await registryReader.requireItemById(normalized), 'id', normalized);
-  }
-
-  async function getSecretAliasByConfigKeyUnsafe(configKey) {
-    const normalized = assertNonEmptyString('configKey', configKey);
-    return assertConfigItem(await registryReader.requireItemByKeyUnsafe(normalized), 'key', normalized);
-  }
-
-  async function getSecretEntryByAlias(alias) {
-    return getSecretEntryFromRegistry(await loadRegistry(), alias, registryPath);
-  }
-
-  async function getSecretEntryByConfigId(configId) {
-    return getSecretEntryByAlias(await getSecretAliasByConfigId(configId));
-  }
-
-  async function getSecretEntryByConfigKeyUnsafe(configKey) {
-    return getSecretEntryByAlias(await getSecretAliasByConfigKeyUnsafe(configKey));
-  }
-
-  async function getSecretPathByAlias(alias) {
-    return (await getSecretEntryByAlias(alias)).path;
-  }
-
-  async function getSecretPathByConfigId(configId) {
-    return (await getSecretEntryByConfigId(configId)).path;
-  }
-
-  async function getSecretPathByConfigKeyUnsafe(configKey) {
-    return (await getSecretEntryByConfigKeyUnsafe(configKey)).path;
-  }
-
-  async function loadSecretTextByAlias(alias) {
-    const entry = await getSecretEntryByAlias(alias);
+    const alias = assertNonEmptyString(`registry config payload for ${normalized}`, item.payload);
+    const entry = getSecretEntryFromRegistry(await loadRegistry(), alias, registryPath);
     return String(await readFile(entry.path, 'utf8')).trim();
   }
 
-  async function loadSecretTextByConfigId(configId) {
-    return loadSecretTextByAlias(await getSecretAliasByConfigId(configId));
-  }
-
-  async function loadSecretTextByConfigKeyUnsafe(configKey) {
-    return loadSecretTextByAlias(await getSecretAliasByConfigKeyUnsafe(configKey));
-  }
-
   return {
-    getSecretAliasByConfigId,
-    getSecretAliasByConfigKeyUnsafe,
-    getSecretEntryByAlias,
-    getSecretEntryByConfigId,
-    getSecretEntryByConfigKeyUnsafe,
-    getSecretPathByAlias,
-    getSecretPathByConfigId,
-    getSecretPathByConfigKeyUnsafe,
-    loadSecretTextByAlias,
     loadSecretTextByConfigId,
-    loadSecretTextByConfigKeyUnsafe,
   };
 }
 

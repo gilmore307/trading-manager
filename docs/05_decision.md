@@ -265,7 +265,7 @@ Registry `key` values are human-readable labels and may be renamed by reviewed m
 
 ### Decision
 
-Automation should dereference registry entries by `id`. Key-based helper functions must be marked unsafe and reserved for human/debug convenience or explicitly accepted rename-risk scenarios.
+Automation should dereference registry entries by `id`. Registered helper APIs must not take registry key as input; key is an output/display label only.
 
 ### Rationale
 
@@ -273,8 +273,8 @@ Using ids avoids silent breakage when a key is renamed for clarity.
 
 ### Consequences
 
-- Prefer `getItemPathById` and `requireItemPathById`.
-- Key-based path helpers use the `Unsafe` suffix.
+- Prefer id-input helpers such as `getKeyById`, `getPayloadById`, `getPathById`, and `loadSecretTextByConfigId`.
+- Do not add key-input helper APIs to the public helper surface.
 - Documentation should warn against storing keys as stable automation references.
 
 ## D015 - Tailscale and SMB remain infrastructure terms
@@ -320,27 +320,27 @@ This avoids overloading `note` and makes field usage visible in `registry/curren
 - Empty `applies_to` means broad, unsettled, or not-yet-reviewed usage.
 - `applies_to` is especially important for fields tied to SQL tables, file schemas, manifests, requests, signals, templates, or task receipts.
 
-## D017 - Path helper methods are registered helper surfaces
+## D017 - Helper methods are registered method-level surfaces
 
 Date: 2026-04-25
 
 ### Context
 
-The id-first path helper methods are part of the shared registry helper surface, but initially only their source file was registered.
+The shared registry helper surface should expose callable methods, not generic helper source files.
 
 ### Decision
 
-Register the id-first and unsafe key-based path helper methods as `script` entries pointing to `helpers/registry/registry-reader.js`.
+Register callable helper methods as `script` entries with method names in `payload` and source locators in `path`.
 
 ### Rationale
 
-The registry should expose reusable helper surfaces, not only files. Keeping method-level entries makes the approved helper API visible in `registry/current.csv`.
+The registry should expose reusable helper surfaces, not every helper source file. Method-level entries make the approved helper API visible in `registry/current.csv`.
 
 ### Consequences
 
-- `getItemPathById` and `requireItemPathById` are the preferred automation path helpers.
-- `getItemPathByKeyUnsafe` and `requireItemPathByKeyUnsafe` remain human/debug convenience helpers.
-- All four methods share the same source path because they live in `registry-reader.js`.
+- Registered helper rows represent callable methods.
+- Helper methods use registry id as input.
+- Multiple helper rows may share the same source path when they live in the same file.
 
 ## D018 - Secret resolver config lookup is id-first
 
@@ -352,7 +352,7 @@ Secret resolver helpers previously used config keys, but registry keys are renam
 
 ### Decision
 
-Expose id-first config secret helpers and mark key-based config lookup helpers unsafe.
+Expose `loadSecretTextByConfigId` as the id-first config secret helper.
 
 ### Rationale
 
@@ -360,8 +360,8 @@ Secrets are sensitive enough that automation should not depend on renameable reg
 
 ### Consequences
 
-- Prefer `getSecretAliasByConfigId`, `getSecretEntryByConfigId`, `getSecretPathByConfigId`, and `loadSecretTextByConfigId`.
-- Key-based config lookup helpers carry the `Unsafe` suffix.
+- Prefer `loadSecretTextByConfigId`.
+- Do not add key-input config secret helpers to the public helper surface.
 
 ## D019 - Every field registry entry requires `applies_to`
 
@@ -384,3 +384,32 @@ Field names are only useful if their valid usage surface is visible. A required 
 - New `field` rows must include `applies_to` at registration time.
 - A SQL check constraint rejects blank `applies_to` for `kind = field`.
 - If a field belongs to multiple surfaces, use a semicolon-separated list.
+
+## D020 - Registered helper surface is id-only
+
+Date: 2026-04-25
+
+### Context
+
+Registry keys are useful labels but are renameable. The helper surface briefly included key-input helpers and both file-level and method-level script entries, which made the registry noisy and risked normalizing key-based automation.
+
+### Decision
+
+Register only four id-input helper methods as the public registry helper surface:
+
+- `getKeyById`
+- `getPayloadById`
+- `getPathById`
+- `loadSecretTextByConfigId`
+
+Do not register key-input helper APIs. Do not register generic helper files as script entries when method-level helper entries are the intended public surface.
+
+### Rationale
+
+This keeps registry automation stable and simple: id in, approved value out. Key remains an output/display value, not an input contract.
+
+### Consequences
+
+- Key-based helper APIs are removed from the public helper surface.
+- Script registry rows represent callable helper methods, not every helper source file.
+- Human debugging can use SQL queries directly instead of key-input helper APIs.

@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Standardized registered helper surface to four id-only helpers: key, payload, path, and secret text by config id.
 - Backfilled `applies_to` for every active field registry entry and added a SQL check constraint to prevent blank field scopes.
 - Registered id-first path helper methods in the SQL registry.
 - Added nullable registry `applies_to` column for field usage/source scope.
