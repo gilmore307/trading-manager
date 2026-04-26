@@ -7,6 +7,7 @@ REGISTRY_KINDS = (
     "config",
     "term",
     "script",
+    "payload_format",
     "artifact_type",
     "manifest_type",
     "ready_signal_type",

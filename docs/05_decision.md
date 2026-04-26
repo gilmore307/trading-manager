@@ -685,6 +685,29 @@ A more precise payload format makes registry review and automation safer without
 ### Consequences
 
 - Current rows are backfilled to narrower formats where obvious: `field_name`, `status_value`, `repo_name`, `timezone`, `secret_alias`, `command`, and `python_symbol`.
-- Payload-format validation utilities mirror the SQL constraint in the Python package, but are not registered registry `script` rows.
-- Future rows should use the narrowest accepted payload format.
-- New payload formats require SQL constraint, Python helper validation, docs, and CSV updates in the same reviewed change.
+- Payload-format values should be registered as registry rows, not hidden only in helper code or SQL constraints.
+- Future rows should use the narrowest registered payload format.
+- New payload formats require SQL constraint, `kind=payload_format` row, docs/tests, and CSV updates in the same reviewed change.
+
+## D033 - Payload formats are registered vocabulary rows
+
+Date: 2026-04-25
+
+### Context
+
+After expanding `payload_format`, the legal values were constrained in SQL and mirrored by Python package validation helpers. That made the vocabulary less reviewable than other shared names and put passive validation helpers in the runtime helper surface without a real component-consumer need.
+
+### Decision
+
+Register every legal `payload_format` value as a concrete row with `kind = payload_format`. Keep SQL constraint values and registered rows aligned. Do not expose `is_payload_format`, `assert_payload_format`, or `PAYLOAD_FORMATS` from the runtime helper package; tests may inspect SQL and CSV directly.
+
+### Rationale
+
+Legal registry vocabulary belongs in the registry. Runtime helpers should stay focused on id-based registry lookup and secret resolution instead of exporting passive vocabulary constants.
+
+### Consequences
+
+- `payload_format` is now a registry kind with a boundary file.
+- Legal payload-format values are visible in `registry/current.csv`.
+- The Python package no longer exports payload-format validator helpers.
+- Tests compare registered payload-format rows with the SQL check constraint.

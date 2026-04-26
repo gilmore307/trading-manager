@@ -8,7 +8,6 @@ Python registry helper package for `trading-main`.
 - `RegistryReader.get_payload_by_id(id)`
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
-- `PAYLOAD_FORMATS`, `is_payload_format`, and `assert_payload_format`
 - `REGISTRY_KINDS`, `is_registry_kind`, and `assert_registry_kind`
 
 Registry lookup helpers use stable registry ids as inputs. Registry keys are output/display labels only.

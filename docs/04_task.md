@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Registered legal `payload_format` values as `payload_format` registry rows and removed payload-format validators from the runtime helper surface.
 - Expanded registry `payload_format` beyond `text`/`file` and backfilled current rows with narrower formats.
 - Removed the old non-Python registry helper implementation; helper code is now Python-only.
 - Added formal Python registry helper package and pointed registry script rows at Python helper methods.

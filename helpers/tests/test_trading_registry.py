@@ -1,17 +1,15 @@
+import csv
 import json
 import re
 import unittest
 from pathlib import Path
 
 from trading_registry import (
-    PAYLOAD_FORMATS,
     REGISTRY_KINDS,
     RegistryReader,
     SecretResolver,
-    assert_payload_format,
     assert_registry_kind,
     get_secret_entry_from_registry,
-    is_payload_format,
     is_registry_kind,
     map_registry_item_row,
     parse_registry,
@@ -46,6 +44,7 @@ class RegistryHelperTests(unittest.TestCase):
                 "config",
                 "term",
                 "script",
+                "payload_format",
                 "artifact_type",
                 "manifest_type",
                 "ready_signal_type",
@@ -64,24 +63,26 @@ class RegistryHelperTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid registry kind: unknown"):
             assert_registry_kind("unknown")
 
-    def test_payload_formats_match_sql_constraint(self):
-        migration = Path("registry/sql/schema_migrations/004_expand_payload_formats.sql").read_text()
-        constraint = migration.split("CHECK (payload_format IN (", 1)[1].split("));", 1)[0]
-        quoted_formats = re.findall(r"'([^']+)'", constraint)
-        self.assertEqual(tuple(quoted_formats), PAYLOAD_FORMATS)
+    def test_registered_payload_formats_match_sql_constraint(self):
+        constraint_blocks = []
+        for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
+            text = migration.read_text()
+            if "CHECK (payload_format IN (" in text:
+                constraint_blocks.append(text.split("CHECK (payload_format IN (", 1)[1].split("));", 1)[0])
+        self.assertTrue(constraint_blocks)
+        constrained_formats = tuple(re.findall(r"'([^']+)'", constraint_blocks[-1]))
 
-    def test_payload_formats_include_structured_values(self):
-        self.assertIn("iso_time", PAYLOAD_FORMATS)
-        self.assertIn("iso_datetime", PAYLOAD_FORMATS)
-        self.assertIn("secret_alias", PAYLOAD_FORMATS)
-        self.assertTrue(is_payload_format("field_name"))
-        self.assertEqual(assert_payload_format("timezone"), "timezone")
-        with self.assertRaisesRegex(ValueError, "Invalid registry payload_format: yaml"):
-            assert_payload_format("yaml")
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            registered_formats = tuple(
+                row["payload"]
+                for row in csv.DictReader(csv_file)
+                if row["kind"] == "payload_format"
+            )
 
-    def test_map_registry_item_row_rejects_invalid_payload_format(self):
-        with self.assertRaisesRegex(ValueError, "Invalid registry payload_format: yaml"):
-            map_registry_item_row(create_row(payload_format="yaml"))
+        self.assertEqual(sorted(registered_formats), sorted(constrained_formats))
+        self.assertIn("iso_time", registered_formats)
+        self.assertIn("iso_datetime", registered_formats)
+        self.assertIn("secret_alias", registered_formats)
 
     def test_map_registry_item_row(self):
         item = map_registry_item_row(create_row(payload_format="field_name"))

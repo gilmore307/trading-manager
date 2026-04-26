@@ -39,4 +39,4 @@ Do not create a separate `path` kind. Registry id remains the stable automation 
 
 ## Payload Format Constraint
 
-`trading_registry.payload_format` is constrained to accepted value-format markers. When adding a new payload format, update the SQL check constraint, Python helper validation, registry docs, and `registry/current.csv` together.
+`trading_registry.payload_format` is constrained to registered value-format markers. When adding a new payload format, update the SQL check constraint, add the matching `kind=payload_format` registry row, update docs/tests, and regenerate `registry/current.csv` together.

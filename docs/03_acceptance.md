@@ -69,7 +69,7 @@ Registry and template changes are acceptable when they:
 - regenerate `registry/current.csv` after SQL registry changes;
 - prefer id-based registry dereferencing for automation;
 - ensure every field entry has non-empty `applies_to`;
-- choose the narrowest accepted `payload_format` for registry payloads;
+- choose the narrowest registered `payload_format` for registry payloads;
 - do not add key-input helper APIs to the public helper surface;
 - avoid scattering field/status definitions across docs;
 - document compatibility impact when renaming or removing registered fields;

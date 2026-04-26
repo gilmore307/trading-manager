@@ -70,31 +70,13 @@ Helper APIs must not take registry `key` as input.
 
 ## Payload Formats
 
-`payload_format` describes how to interpret the string stored in `payload`. It is not a registry kind. Use the narrowest accepted format that matches the value.
+`payload_format` describes how to interpret the string stored in `payload`. Legal values are first-class registry entries with `kind = payload_format`; `registry/current.csv` is the reviewable snapshot.
 
-Accepted formats:
+The SQL `trading_registry_payload_format_check` constraint and the registered `payload_format` rows must stay aligned. Tests compare those two sources directly.
 
-| Format | Meaning |
-|---|---|
-| `text` | General text fallback when no narrower format applies. |
-| `file` | File reference stored in `payload`. |
-| `json` | JSON-encoded value. |
-| `integer` | Base-10 integer encoded as text. |
-| `decimal` | Decimal numeric value encoded as text. |
-| `boolean` | Boolean encoded as `true` or `false`. |
-| `iso_date` | ISO 8601 calendar date, such as `2026-04-25`. |
-| `iso_time` | ISO 8601 time-of-day value. |
-| `iso_datetime` | ISO 8601 date-time value; include timezone when the value is absolute. |
-| `iso_duration` | ISO 8601 duration value. |
-| `timezone` | IANA timezone name. |
-| `secret_alias` | Local secret alias reference, never the secret value. |
-| `repo_name` | Git repository name. |
-| `field_name` | Canonical field name. |
-| `status_value` | Registered status/outcome value. |
-| `command` | Command or command fragment. |
-| `python_symbol` | Python import/member symbol. |
+Use the narrowest registered format that matches the value. Keep `text` as the fallback only when no narrower registered format applies.
 
-Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL check constraint, Python helper validation, registry docs, and generated CSV in one reviewed change.
+Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL constraint, add the `payload_format` row, update registry docs/tests, and regenerate `registry/current.csv` in one reviewed change.
 
 ## Kind Boundaries
 
@@ -157,7 +139,7 @@ The registered official Python id-only lookup and secret helper surface is:
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
 
-Payload-format validation utilities live in the Python package to mirror the SQL constraint. They are not registered registry `script` rows.
+Payload-format vocabulary lives in `kind = payload_format` registry rows and is checked against the SQL constraint by tests, not by public runtime helper exports.
 
 The CSV export maintenance helper is separate from lookup helpers:
 

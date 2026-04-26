@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
-from .payload_formats import assert_payload_format
 from .registry_types import assert_registry_kind
 
 SELECT_COLUMNS = """
@@ -64,7 +63,7 @@ def map_registry_item_row(row: Mapping[str, Any]) -> RegistryItem:
         id=row["id"],
         kind=row["kind"],
         key=row["key"],
-        payload_format=assert_payload_format(row["payload_format"]),
+        payload_format=row["payload_format"],
         payload=row["payload"],
         path=_optional_non_empty(row.get("path")),
         applies_to=_optional_non_empty(row.get("applies_to")),

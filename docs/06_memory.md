@@ -23,4 +23,4 @@
 - Shared environment baseline is Python 3.12 at `/root/projects/trading-main/.venv`, installed with `pip` from root `requirements.txt`.
 - Trading repositories are private by default; visibility changes need explicit owner approval and a pre-change review.
 - Component runtime helpers should align with the Python `.venv` unless a future explicit decision accepts another runtime.
-- Registry `payload_format` is a value-format marker, not just text/file storage; use the narrowest accepted format such as `field_name`, `status_value`, `repo_name`, `secret_alias`, `timezone`, `command`, `python_symbol`, or ISO date/time formats.
+- Registry `payload_format` is a registered value-format vocabulary, not just text/file storage; use the narrowest registered format and keep SQL constraint values aligned with `kind=payload_format` rows.
