@@ -7,6 +7,7 @@
 ## Queued Tasks
 
 - Define data task key file and completion receipt schemas across manager/data/storage.
+- Define migration criteria from `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` local files to durable `trading-storage` SQL/artifact contracts.
 - None that can be completed safely without cross-repository contract coordination.
 
 ## Waiting On Cross-Repository Coordination
@@ -25,6 +26,7 @@
 
 ## Recently Accepted
 
+- Registered `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` and clarified that development receipts/data use local `data/storage/` rather than SQL.
 - Registered manager-driven historical data task workflow terms for task key files and completion receipts.
 - Registered FOMC calendar, official macro release calendar discovery, and ETF issuer holdings source terms.
 - Registered U.S. Treasury Fiscal Data as an open/no-key provider term with official documentation path.
