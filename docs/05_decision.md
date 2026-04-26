@@ -396,7 +396,7 @@ Registry keys are useful labels but are renameable. The helper surface briefly i
 
 ### Decision
 
-Register only four id-input helper methods as the public registry helper surface. The originally drafted JavaScript method names were superseded by the official Python helper surface in D030:
+Register only four id-input helper methods as the public registry helper surface. Earlier camelCase helper names were superseded by the official Python helper surface in D030:
 
 - `RegistryReader.get_key_by_id`
 - `RegistryReader.get_payload_by_id`
@@ -533,17 +533,17 @@ This mirrors the actual top-level structure of `trading-main` and gives each own
 - Template drafts still live under `templates/`.
 - Helper code still lives under `helpers/`.
 
-## D026 - Current JavaScript registry helpers are internal until packaging is accepted
+## D026 - Loose helper files are not package contracts
 
 Date: 2026-04-25
 
 ### Context
 
-`helpers/registry/` contains tested JavaScript helper code for id-based registry lookups and config-id secret loading. However, `trading-main` does not yet define a formal helper package: there is no `package.json`, version policy, Node engine requirement, installation command, or cross-repository import contract. At the same time, the shared development environment is currently Python-centered through the `.venv` anchor.
+`helpers/` can contain tested helper code before it is safe for component repositories to consume that code at runtime. A helper file alone does not define package metadata, version policy, runtime version, installation method, or import/call examples.
 
 ### Decision
 
-Treat the current JavaScript registry helpers as internal `trading-main` maintenance/test helpers, not as component-repository runtime dependencies. Before any component imports shared helper code at runtime, make an explicit distribution decision: Node package, Python package, or internal-only tool.
+Component repositories must not depend on loose helper files from `trading-main/helpers/`. Cross-repository runtime helper consumption requires an accepted package strategy.
 
 ### Rationale
 
@@ -551,11 +551,9 @@ A tested helper file is not enough to be a stable package interface. Components 
 
 ### Consequences
 
-- Component repositories must not directly import `helpers/registry/` as a runtime dependency yet.
+- Helper implementation and package readiness are separate acceptance concerns.
 - Registry `script` entries remain useful as approved helper/automation surface records, but they are not package contracts.
-- If the helper becomes a Node package, add package metadata, Node engine, version policy, test command, install method, and import examples.
-- If the helper becomes a Python package, align it with the shared `.venv` environment and define package metadata, tests, install method, and import examples.
-- If the helper stays internal-only, keep docs explicit so component repositories do not rely on it.
+- Packaged helpers must define runtime version, package metadata, version policy, install method, tests, and import/call examples.
 
 ## D027 - Shared environment baseline uses Python 3.12 pip and requirements.txt
 
@@ -580,27 +578,27 @@ This matches the current working environment and gives component repositories on
 - Component-local virtual environments require an explicit exception.
 - The baseline can be revisited if packaging, GPU, or dependency isolation needs become real.
 
-## D028 - Helper distribution strategy is internal-only until a package is accepted
+## D028 - Runtime helper distribution uses the Python package
 
 Date: 2026-04-25
 
 ### Context
 
-The existing JavaScript registry helpers are useful for `trading-main` maintenance and tests, but there is still no formal package metadata, version policy, runtime engine contract, installation command, or import contract for component repositories.
+Trading component repositories are expected to use Python through the shared `.venv` environment. Registry helper lookups are simple runtime infrastructure and should not require a separate helper runtime.
 
 ### Decision
 
-The helper distribution strategy was internal-only until a package strategy was accepted. Future runtime helper consumption should prefer a Python package aligned with the shared `.venv` unless there is a concrete reason to package a Node helper.
+Use the Python package in `helpers/python/` as the cross-repository runtime helper distribution strategy. Component repositories should consume the installed `trading_registry` package rather than loose source files.
 
 ### Rationale
 
-This resolves the ambiguity now without forcing premature packaging. It also aligns future component runtime helpers with the current Python-centered environment unless a different runtime is justified.
+This aligns helper consumption with the shared environment and gives component repositories a normal Python import path.
 
 ### Consequences
 
-- Components must not import loose JavaScript files from `trading-main/helpers/registry/`.
-- Current JavaScript helper tests may continue to run inside `trading-main`.
-- Any package decision must define runtime version, package metadata, version policy, install method, tests, and import/call examples.
+- Components should import from `trading_registry` after installing `trading-main` editable into the shared environment.
+- Loose files under `trading-main/helpers/` are not runtime dependency contracts.
+- New runtime helpers should normally be added to the Python helper package with tests and docs.
 
 ## D029 - Trading repositories remain private by default
 
@@ -630,19 +628,40 @@ Date: 2026-04-25
 
 ### Context
 
-Future trading component repositories are expected to use Python through the shared `.venv` environment. Keeping the registry helper surface as JavaScript would force Python components to depend on Node, npm packaging, or subprocess calls for a simple registry lookup path.
+Future trading component repositories are expected to use Python through the shared `.venv` environment. Registry helper calls should be available through a normal Python import path.
 
 ### Decision
 
-Make the official cross-repository registry helper runtime surface a Python package. Package metadata lives in root `pyproject.toml`, source lives under `helpers/python/trading_registry/`, and the install path is editable installation into `/root/projects/trading-main/.venv`. The existing JavaScript helpers remain internal `trading-main` maintenance/test code.
+Make the official cross-repository registry helper runtime surface a Python package. Package metadata lives in root `pyproject.toml`, source lives under `helpers/python/trading_registry/`, and the install path is editable installation into `/root/projects/trading-main/.venv`.
 
 ### Rationale
 
-Python aligns with the shared environment and avoids a second runtime dependency for component repositories. Keeping the JavaScript helpers internal preserves existing tests and maintenance utility without making them a runtime contract.
+Python aligns with the shared environment and avoids adding another runtime dependency for component repositories.
 
 ### Consequences
 
 - Component repositories should import `trading_registry` from the Python package after the shared environment installs `trading-main` editable.
 - Registry script rows point to the Python helper method surfaces and source files.
-- JavaScript helper files under `helpers/registry/` are not component runtime dependencies.
 - Python helper package changes must include `unittest` coverage and update helper docs.
+
+## D031 - Registry helpers are Python-only
+
+Date: 2026-04-25
+
+### Context
+
+After the official Python registry helper package was added, keeping a parallel non-Python registry helper implementation would create drift and make future reviewers wonder which helper surface was authoritative.
+
+### Decision
+
+Remove the older non-Python registry helper implementation and keep registry helper implementation Python-only.
+
+### Rationale
+
+One implementation is easier to test, document, package, and consume. Since component repositories will use Python, the Python package is the correct single runtime surface.
+
+### Consequences
+
+- `helpers/python/trading_registry/` is the only registry helper implementation.
+- The registry helper test command is `/root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/python/tests`.
+- Registry script rows remain pointed at Python helper methods and source files.

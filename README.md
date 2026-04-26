@@ -53,4 +53,4 @@ See `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` for 
 
 The shared trading Python environment is anchored at `/root/projects/trading-main/.venv` and currently uses Python 3.12 with `pip`. Dependencies must be added to `requirements.txt` through reviewed commits before installation into the shared environment.
 
-The formal runtime helper package is Python (`trading-main-helpers`, import package `trading_registry`). Current JavaScript registry helpers are internal maintenance/test helpers only; component repositories must not import those JavaScript files at runtime.
+The formal runtime helper package is Python (`trading-main-helpers`, import package `trading_registry`). Component repositories should use this Python package for shared helper access.

@@ -40,7 +40,7 @@ registry/
 Supporting helper code lives outside `registry/`:
 
 ```text
-helpers/registry/           Shared registry reader and secret-resolution helpers.
+helpers/python/trading_registry/    Shared Python registry reader and secret-resolution helpers.
 ```
 
 ## Entry Model
@@ -106,7 +106,7 @@ Normal registry update flow:
 7. Run registry helper tests when helper behavior or registry reader behavior changed:
 
    ```bash
-   node --test helpers/registry/registry-reader.test.js
+   /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/python/tests
    ```
 
 For snapshot export only:
@@ -134,7 +134,7 @@ The CSV export maintenance helper is separate from lookup helpers:
 
 Registry `script` rows identify approved helper/automation surfaces and source locators; they do not by themselves define package installation or cross-repository runtime dependency contracts.
 
-Key-input helper APIs are intentionally not part of the public helper surface. Component runtime code should consume the Python helper package (`trading_registry`), not the internal JavaScript helper files. If a human needs key-based debugging, use direct SQL inspection instead of adding key-input helpers.
+Key-input helper APIs are intentionally not part of the public helper surface. Component runtime code should consume the Python helper package (`trading_registry`). If a human needs key-based debugging, use direct SQL inspection instead of adding key-input helpers.
 
 ## Registration Rules
 

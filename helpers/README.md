@@ -33,5 +33,3 @@ Install from the shared environment:
 /root/projects/trading-main/.venv/bin/python -m pip install -r /root/projects/trading-main/requirements.txt
 /root/projects/trading-main/.venv/bin/python -m pip install -e /root/projects/trading-main
 ```
-
-Current JavaScript helpers under `helpers/registry/` are internal `trading-main` maintenance/test helpers and should not be imported by component repositories at runtime.

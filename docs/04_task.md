@@ -24,12 +24,12 @@
 
 ## Recently Accepted
 
+- Removed the old non-Python registry helper implementation; helper code is now Python-only.
 - Added formal Python registry helper package and pointed registry script rows at Python helper methods.
 - Created initial docs spines for remaining component repositories: manager, storage, strategy, model, execution, and dashboard.
 - Defined repository visibility policy: trading repositories stay private unless the owner explicitly approves a visibility change.
-- Defined helper distribution boundary: current JS helpers are internal-only; cross-repository runtime helpers need an accepted package strategy.
+- Defined helper distribution boundary: cross-repository runtime helpers use the Python helper package.
 - Defined shared environment baseline: Python 3.12, `.venv`, `pip`, and reviewed `requirements.txt`.
-- Clarified that current JS registry helpers are internal `trading-main` maintenance/test helpers, not a formal cross-repository runtime package.
 - Split `trading-main` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
 - Added registry/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
 - Moved registry kind boundary files into `registry/kinds/`; `registry/reviews/` remains for review artifacts.

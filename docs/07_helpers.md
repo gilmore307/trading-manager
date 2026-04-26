@@ -40,7 +40,6 @@ Helpers must not own:
 helpers/
   README.md                 Helper boundary summary.
   python/                   Formal Python helper package source and tests.
-  registry/                 Internal JavaScript registry maintenance/test helpers.
 ```
 
 Python helper packages live under `helpers/python/` with root package metadata in `pyproject.toml`. Future helper packages should use a named package/subdirectory with a clear README when the boundary is more than trivial.
@@ -68,7 +67,7 @@ Current package facts:
   /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/python/tests
   ```
 
-The JavaScript files under `helpers/registry/` remain internal `trading-main` maintenance/test code. Component repositories should consume the Python package, not loose JavaScript helper files.
+Component repositories should consume the Python package.
 
 Registry `script` rows may record approved helper method surfaces and source paths, but they are not package installation contracts by themselves.
 
@@ -95,7 +94,7 @@ Current official Python registry helper surface is id-input only:
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
 
-The official Python helper source lives under `helpers/python/trading_registry/`. The older JavaScript helper source under `helpers/registry/` is internal maintenance/test code.
+The official Python helper source lives under `helpers/python/trading_registry/`.
 
 Registry maintenance commands, such as regenerating `registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
 
