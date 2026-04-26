@@ -71,6 +71,15 @@ The helper source lives under `helpers/registry/`.
 
 Registry maintenance commands, such as regenerating `registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
 
+## Recording Duty
+
+When any component work discovers or creates a helper that should be global, record it in `trading-main` instead of leaving it in the component repository.
+
+- Shared helper code belongs under `helpers/`.
+- Public helper surfaces that automation may call should be registered as `script` rows when stable.
+- Helper-facing fields, config keys, statuses, and type values must be routed through the registry before cross-repository use.
+- Temporary helper names from implementation work must be reported during review if they may become shared.
+
 ## Acceptance Checklist
 
 A helper change is acceptable when:

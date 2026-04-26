@@ -137,6 +137,8 @@ Key-input helper APIs are intentionally not part of the public helper surface. I
 ## Registration Rules
 
 - Register shared names before component repositories depend on them.
+- New shared fields discovered in component work must be registered here before other repositories depend on them.
+- New global helper surfaces and reusable templates must be recorded in `trading-main` and linked to registry entries when they expose stable automation names.
 - Prefer existing entries over inventing near-duplicates.
 - Use stable `id` values for automation and durable references.
 - Treat `key` values as renameable labels.

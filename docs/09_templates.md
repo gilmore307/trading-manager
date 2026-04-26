@@ -73,6 +73,14 @@ Normal flow for a shared contract shape:
 5. Update workflow and acceptance docs if the contract becomes binding.
 6. Route implementation work to the owning component repositories.
 
+## Recording Duty
+
+When component work creates a reusable template shape, move or copy the reusable version into `trading-main/templates/` before other repositories depend on it.
+
+If a template introduces shared fields, statuses, artifact types, manifest types, ready-signal types, request types, or config keys, route those names through the SQL registry and regenerate `registry/current.csv`.
+
+Temporary template fields must be called out during review instead of silently becoming local conventions.
+
 ## Acceptance Checklist
 
 A template change is acceptable when:
