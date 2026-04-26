@@ -767,7 +767,7 @@ OKX credentials were initially split into separate aliases/files for API key, se
 
 ### Decision
 
-Use one JSON secret file per source/provider under `/root/secrets/<source>.json`. Registry config rows should point to the source-level alias, such as `okx` or `github`, and may mirror the JSON file path in `path`. Register reusable JSON key names, such as `api_key`, `secret_key`, `passphrase`, and `pat`, as `field` rows with `applies_to=source_secret_json`.
+Use one JSON secret file per source/provider under `/root/secrets/<source>.json`. Registry config rows should point to the source-level alias, such as `okx` or `github`, and may mirror the JSON file path in `path`. Register reusable JSON key names, such as `api_key`, `secret_key`, `passphrase`, `allowed_ip_address`, `api_key_remark_name`, and `pat`, as `field` rows with `applies_to=source_secret_json`.
 
 ### Rationale
 
@@ -778,4 +778,27 @@ A source-level JSON file keeps related credentials together, prevents config-row
 - Replace split OKX credential config rows with `OKX_SECRET_ALIAS`.
 - Add `GITHUB_SECRET_ALIAS` for the GitHub source-level JSON file.
 - `SecretResolver.load_secret_text_by_config_id(config_id, field_name=None)` returns raw JSON text or one named string field.
+- Credential metadata that belongs to the source credential, such as allowlisted IP and key remark/name, stays in the source JSON rather than separate config rows.
 - Secret values remain outside Git and outside registry rows.
+
+## D037 - OKX credential metadata lives in the source JSON
+
+Date: 2026-04-26
+
+### Context
+
+After consolidating OKX credentials into one source-level JSON file, the allowlisted IP address and API key remark/name were still separate config rows because they are non-secret. The user clarified that they are still part of the OKX credential bundle and should live in the same source JSON.
+
+### Decision
+
+Move OKX `allowed_ip_address` and `api_key_remark_name` into `/root/secrets/okx.json`. Remove standalone registry config rows for `OKX_ALLOWED_IP_ADDRESS` and `OKX_API_KEY_REMARK_NAME`. Register the JSON key names as source-secret fields.
+
+### Rationale
+
+The registry should expose one source-level alias for OKX, not split credential metadata across multiple config rows. One source JSON keeps the complete API-key bundle together while preserving the no-secret-values-in-Git rule.
+
+### Consequences
+
+- `OKX_SECRET_ALIAS` remains the single OKX credential/config entry.
+- JSON keys now include `api_key`, `secret_key`, `passphrase`, `allowed_ip_address`, and `api_key_remark_name`.
+- `SOURCE_SECRET_ALLOWED_IP_ADDRESS` and `SOURCE_SECRET_API_KEY_REMARK_NAME` are registered field rows with `applies_to=source_secret_json`.

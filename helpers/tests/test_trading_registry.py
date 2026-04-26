@@ -207,12 +207,21 @@ class RegistryHelperTests(unittest.TestCase):
                             "path": "/root/secrets/example-service.json",
                             "kind": "source_secret_json",
                             "use": "example service credentials",
-                            "fields": {"api_key": "example service API key"},
+                            "fields": {
+                                "allowed_ip_address": "example allowlisted IPv4 address",
+                                "api_key": "example service API key",
+                            },
                         }
                     }
                 )
             if path == "/root/secrets/example-service.json":
-                return json.dumps({"api_key": "secret-value", "secret_key": "other-secret"})
+                return json.dumps(
+                    {
+                        "allowed_ip_address": "203.0.113.10",
+                        "api_key": "secret-value",
+                        "secret_key": "other-secret",
+                    }
+                )
             raise AssertionError(f"unexpected read: {path}")
 
         resolver = SecretResolver(query, registry_path="/root/secrets/registry.json", read_text=read_text)
@@ -221,6 +230,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(
             resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET", "api_key"),
             "secret-value",
+        )
+        self.assertEqual(
+            resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET", "allowed_ip_address"),
+            "203.0.113.10",
         )
         with self.assertRaisesRegex(KeyError, "Secret JSON field not found"):
             resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET", "missing")
