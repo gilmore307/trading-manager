@@ -4,7 +4,6 @@ const REGISTRY_KINDS = Object.freeze([
   'field',
   'output',
   'repo',
-  'path',
   'config',
   'term',
   'script',

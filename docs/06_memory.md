@@ -10,3 +10,5 @@
 - Registry Markdown kind files define boundaries only; concrete entries live in SQL and GitHub visibility comes from generated `registry/current.csv`.
 - Contract drafting templates belong under `templates/contracts/`, not as numbered docs after `06_memory.md`.
 - Stale canceled-project registry entries were removed because GitHub history is the restore path.
+- Registry ids are stable automation references; keys are human-readable and unsafe for durable automation dereferencing.
+- Registry `path` is a nullable column for direct locators, not a registry kind.

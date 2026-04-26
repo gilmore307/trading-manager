@@ -24,6 +24,9 @@
 
 ## Recently Accepted
 
+- Added nullable registry `path` column and id-first path helper APIs.
+- Removed `path` as a registry kind and merged standalone root-path entries into their owning entity rows.
+- Restored `TAILSCALE` and `SMB` as active `term` entries.
 - Moved artifact/manifest/ready-signal/request contract placeholders from `docs/` to `templates/contracts/`.
 - Added registry kind boundaries for `artifact_type`, `manifest_type`, `ready_signal_type`, and `request_type`.
 - Removed canceled-project registry entries and regenerated `registry/current.csv`.

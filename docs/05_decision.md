@@ -171,7 +171,7 @@ Date: 2026-04-25
 
 ### Context
 
-Some registry kinds are easy to confuse, especially `field` vs status-value kinds, `repo` vs `path`, `path` vs `script`, and `config` vs `term`.
+Some registry kinds are easy to confuse, especially `field` vs status-value kinds, entity locators vs entity rows, and `config` vs `term`.
 
 ### Decision
 
@@ -231,3 +231,69 @@ The registry should reflect active trading-system vocabulary and shared infrastr
 - GitHub history remains the restore path if old entries are ever needed again.
 - Active `registry/current.csv` should contain only current registry entries.
 - Future registry entries should be trading-relevant or generally useful to the active server project boundary.
+
+## D013 - Registry path is a nullable column, not a kind
+
+Date: 2026-04-25
+
+### Context
+
+Some registry entries point to concrete entities such as repositories or helper source files. A separate `path` kind forced entries like repository name and repository root path to be split across two rows.
+
+### Decision
+
+Use a nullable `path` column on `trading_registry` for direct locators and addresses. Remove `path` as a registry kind.
+
+### Rationale
+
+This keeps the stable entity entry and its direct locator together. For example, `TRADING_MAIN_REPO` can carry both `payload = trading-main` and `path = /root/projects/trading-main`.
+
+### Consequences
+
+- Entity-like entries may populate `path`.
+- Non-entity entries leave `path` empty.
+- Do not reintroduce a `path` kind.
+- Script entries use `payload` for a meaningful helper/export description and `path` for the source locator.
+
+## D014 - Registry automation dereferences stable ids by default
+
+Date: 2026-04-25
+
+### Context
+
+Registry `key` values are human-readable labels and may be renamed by reviewed migrations. Registry `id` values are the stable automation references.
+
+### Decision
+
+Automation should dereference registry entries by `id`. Key-based helper functions must be marked unsafe and reserved for human/debug convenience or explicitly accepted rename-risk scenarios.
+
+### Rationale
+
+Using ids avoids silent breakage when a key is renamed for clarity.
+
+### Consequences
+
+- Prefer `getItemPathById` and `requireItemPathById`.
+- Key-based path helpers use the `Unsafe` suffix.
+- Documentation should warn against storing keys as stable automation references.
+
+## D015 - Tailscale and SMB remain infrastructure terms
+
+Date: 2026-04-25
+
+### Context
+
+Old project-specific entries were removed from the registry, but Tailscale and SMB remain relevant infrastructure concepts on this server.
+
+### Decision
+
+Keep `TAILSCALE` and `SMB` as active `term` entries. Do not restore canceled project-specific configuration entries for them.
+
+### Rationale
+
+The concepts are still useful as shared vocabulary, while stale project-specific defaults should stay out of the active registry.
+
+### Consequences
+
+- `TAILSCALE` and `SMB` are available as terms.
+- Project-specific VPN/SMB defaults require fresh registry review before reintroduction.

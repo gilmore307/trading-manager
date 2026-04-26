@@ -11,6 +11,8 @@ Markdown kind files must not list concrete active rows. They define scope, range
 
 `registry/current.csv` is the GitHub-visible snapshot of the active SQL table. It is generated from the database and must not be edited by hand.
 
+Registry `id` is the stable automation reference. Registry `key` is a human-readable label and may be renamed by reviewed migration. Automation should store and dereference ids, not keys.
+
 ## SQL Entry Schema
 
 Concrete entries use this shape:
@@ -22,6 +24,7 @@ Concrete entries use this shape:
 | `key` | Stable symbolic key. |
 | `payload_format` | Payload storage format, currently `text` or `file`. |
 | `payload` | Registered value or file reference. |
+| `path` | Optional direct locator/address for entries that point to concrete entities. |
 | `note` | Human-readable review note. |
 | `created_at` | Database insertion timestamp. |
 | `updated_at` | Database update timestamp. |
@@ -58,7 +61,6 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`maintenance_status`](./maintenance_status.md) — Default maintenance pass status values.
 - [`manifest_type`](./manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
 - [`output`](./output.md) — Reusable output/template identifiers. Use only for stable output shapes that multiple workflows may reference.
-- [`path`](./path.md) — Canonical filesystem path values. Use only for stable reviewed paths that should be referenced consistently.
 - [`ready_signal_type`](./ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
 - [`repo`](./repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
 - [`request_type`](./request_type.md) — Registered request type values used to classify cross-repository work requests.
@@ -77,4 +79,6 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - New fields, statuses, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
+- Use the `path` column for direct locators/addresses on entity-like entries such as repos and scripts.
+- Do not reintroduce `path` as a registry kind; path is a nullable column.
 - If a new kind is needed, add its Markdown boundary file, update helper kind lists, update the SQL kind check, and regenerate `registry/current.csv` in the same reviewed change.

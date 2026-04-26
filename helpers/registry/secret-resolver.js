@@ -80,7 +80,7 @@ function createSecretResolver(query, options = {}) {
   }
 
   async function getSecretAliasByConfigKey(configKey) {
-    const item = await registryReader.requireItemByKey(assertNonEmptyString('configKey', configKey));
+    const item = await registryReader.requireItemByKeyUnsafe(assertNonEmptyString('configKey', configKey));
 
     if (item.kind !== 'config') {
       throw new Error(`Registry item ${configKey} must be kind=config to resolve a secret alias`);

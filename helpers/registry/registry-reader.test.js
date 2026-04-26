@@ -22,6 +22,7 @@ function createRow(overrides) {
     payload_format: 'text',
     payload: 'id',
     note: 'canonical column name for trading_registry.id',
+    path: null,
     created_at: '2026-04-23T00:00:00.000Z',
     updated_at: '2026-04-23T00:00:00.000Z',
     ...overrides,
@@ -33,7 +34,6 @@ test('registry kinds stay fixed to the documented set', () => {
     'field',
     'output',
     'repo',
-    'path',
     'config',
     'term',
     'script',
@@ -74,6 +74,7 @@ test('mapRegistryItemRow converts snake_case columns into readable JS keys', () 
     payloadFormat: 'text',
     payload: 'id',
     note: 'canonical column name for trading_registry.id',
+    path: null,
     createdAt: '2026-04-23T00:00:00.000Z',
     updatedAt: '2026-04-23T00:00:00.000Z',
   });
@@ -94,10 +95,36 @@ test('getItemById uses a read-only trading_registry query', async () => {
   assert.deepEqual(calls[0].params, ['fld_A7K3P2Q9']);
 });
 
-test('getItemByKey returns null when no row matches', async () => {
+test('path helpers prefer stable ids and expose key lookup as unsafe', async () => {
+  const reader = createRegistryReader(async (sql, params) => {
+    if (params[0] === 'missing_path') {
+      return { rows: [createRow({ id: 'missing_path', path: null })] };
+    }
+
+    return { rows: [createRow({
+      id: 'rep_H6S3V8LA',
+      kind: 'repo',
+      key: 'TRADING_MAIN_REPO',
+      payload: 'trading-main',
+      path: '/root/projects/trading-main',
+    })] };
+  });
+
+  assert.equal(await reader.getItemPathById('rep_H6S3V8LA'), '/root/projects/trading-main');
+  assert.equal(await reader.requireItemPathById('rep_H6S3V8LA'), '/root/projects/trading-main');
+  assert.equal(await reader.getItemPathByKeyUnsafe('TRADING_MAIN_REPO'), '/root/projects/trading-main');
+  assert.equal(await reader.requireItemPathByKeyUnsafe('TRADING_MAIN_REPO'), '/root/projects/trading-main');
+  assert.equal(await reader.getItemPathById('missing_path'), null);
+  await assert.rejects(
+    () => reader.requireItemPathById('missing_path'),
+    /Registry item has no path for id: missing_path/
+  );
+});
+
+test('getItemByKeyUnsafe returns null when no row matches', async () => {
   const reader = createRegistryReader(async () => []);
 
-  const item = await reader.getItemByKey('MISSING_KEY');
+  const item = await reader.getItemByKeyUnsafe('MISSING_KEY');
 
   assert.equal(item, null);
 });
@@ -106,14 +133,14 @@ test('require item helpers throw clear errors when the item is missing', async (
   const reader = createRegistryReader(async () => ({ rows: [] }));
 
   await assert.rejects(() => reader.requireItemById('fld_missing'), /Registry item not found for id: fld_missing/);
-  await assert.rejects(() => reader.requireItemByKey('MISSING_KEY'), /Registry item not found for key: MISSING_KEY/);
+  await assert.rejects(() => reader.requireItemByKeyUnsafe('MISSING_KEY'), /Registry item not found for key: MISSING_KEY/);
 });
 
 test('lookup helpers reject blank id and key inputs', async () => {
   const reader = createRegistryReader(async () => ({ rows: [] }));
 
   await assert.rejects(() => reader.getItemById(''), /id must be a non-empty string/);
-  await assert.rejects(() => reader.getItemByKey('   '), /key must be a non-empty string/);
+  await assert.rejects(() => reader.getItemByKeyUnsafe('   '), /key must be a non-empty string/);
 });
 
 test('require helpers still work when destructured from the reader object', async () => {
@@ -128,24 +155,25 @@ test('listItemsByKind validates kind and returns mapped items', async () => {
   const reader = createRegistryReader(async (sql, params) => {
     assert.match(sql, /WHERE kind = \$1/);
     assert.match(sql, /ORDER BY key ASC/);
-    assert.deepEqual(params, ['path']);
+    assert.deepEqual(params, ['repo']);
 
     return {
       rows: [
         createRow({
-          id: 'pth_C4X8N2ME',
-          kind: 'path',
-          key: 'TRADING_MAIN_ROOT_PATH',
-          payload: '/root/projects/trading-main',
+          id: 'rep_H6S3V8LA',
+          kind: 'repo',
+          key: 'TRADING_MAIN_REPO',
+          payload: 'trading-main',
+          path: '/root/projects/trading-main',
         }),
       ],
     };
   });
 
-  const items = await reader.listItemsByKind('path');
+  const items = await reader.listItemsByKind('repo');
 
   assert.equal(items.length, 1);
-  assert.equal(items[0].kind, 'path');
+  assert.equal(items[0].kind, 'repo');
   assert.equal(items[0].payloadFormat, 'text');
   await assert.rejects(
     async () => reader.listItemsByKind('workflow'),

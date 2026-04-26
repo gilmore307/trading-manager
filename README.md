@@ -34,8 +34,10 @@ Component repositories keep their own docs spine. `trading-main` records system-
 
 ## Registry Rule
 
-Concrete registry entries live in the SQL-backed `trading_registry` table.
+Concrete registry entries live in the SQL-backed `trading_registry` table. The nullable `path` column stores direct locators/addresses for entity-like entries.
 
 - Kind Markdown files define kind boundaries and rejection rules only.
 - SQL migrations under `registry/sql/schema_migrations/` define concrete entries.
 - `registry/current.csv` is generated from SQL for GitHub visibility and must not be edited by hand.
+
+Registry ids are stable automation references. Registry keys are human-readable labels and may be renamed by reviewed migrations. Use id-based helpers in code.

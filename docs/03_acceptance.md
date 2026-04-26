@@ -2,7 +2,7 @@
 
 ## Acceptance Summary
 
-`trading-main` is accepted when it provides a coherent, reviewable, documentation-only system layer for the trading project.
+`trading-main` is accepted when it provides a coherent, reviewable system platform layer for the trading project.
 
 Acceptance for this repository focuses on:
 
@@ -67,6 +67,8 @@ Registry and template changes are acceptable when they:
 - keep trading-wide registered names in the SQL-backed `trading_registry`;
 - keep kind boundary/range rules in `registry/<kind>.md`;
 - regenerate `registry/current.csv` after SQL registry changes;
+- prefer id-based registry dereferencing for automation;
+- mark key-based helper use as unsafe or human/debug only;
 - avoid scattering field/status definitions across docs;
 - document compatibility impact when renaming or removing registered fields;
 - keep templates reusable and not tied to one component unless clearly labeled;
@@ -95,7 +97,7 @@ Shared environment changes are acceptable when they:
 
 ## Verification Commands
 
-Because `trading-main` is primarily documentation and contracts, required verification is inspection-based until tooling exists.
+Because `trading-main` is primarily docs, contracts, registry, templates, and shared helpers, required verification combines inspection with helper/schema checks.
 
 Current required checks before acceptance:
 
@@ -110,6 +112,7 @@ Manual review must confirm:
 - required docs files exist;
 - contract drafting templates live under `templates/contracts/`, not `docs/`;
 - registry kind Markdown files do not list concrete active rows;
+- entity-like registry entries use the nullable `path` column instead of a separate `path` kind;
 - `registry/current.csv` is present and generated from SQL when registry entries changed;
 - `.venv/` is not tracked;
 - no source-code directories were introduced;
@@ -118,7 +121,7 @@ Manual review must confirm:
 - docs do not duplicate canonical facts unnecessarily;
 - open gaps are tracked in `docs/04_task.md`.
 
-Future tooling may add markdown linting, link checks, schema validation, catalog validation, and contract example validation. New tooling should extend the acceptance path rather than replacing manual boundary review.
+Future tooling may add markdown linting, link checks, schema validation, registry validation, and contract example validation. New tooling should extend the acceptance path rather than replacing manual boundary review.
 
 ## Required Review Evidence
 

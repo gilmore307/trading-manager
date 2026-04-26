@@ -9,6 +9,7 @@ SELECT
   key,
   payload_format,
   payload,
+  path,
   note,
   created_at,
   updated_at
@@ -26,6 +27,7 @@ function mapRegistryItemRow(row) {
     key: row.key,
     payloadFormat: row.payload_format,
     payload: row.payload,
+    path: typeof row.path === 'string' && row.path.trim() !== '' ? row.path : null,
     note: row.note,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -54,6 +56,14 @@ function assertLookupValue(label, value) {
   return value;
 }
 
+function itemPathOrNull(item) {
+  if (!item || typeof item.path !== 'string' || item.path.trim() === '') {
+    return null;
+  }
+
+  return item.path;
+}
+
 function createRegistryReader(query) {
   if (typeof query !== 'function') {
     throw new TypeError('createRegistryReader requires an async query function');
@@ -73,7 +83,7 @@ function createRegistryReader(query) {
     return fetchOne(`${SELECT_COLUMNS} WHERE id = $1`, [assertLookupValue('id', id)]);
   }
 
-  async function getItemByKey(key) {
+  async function getItemByKeyUnsafe(key) {
     return fetchOne(`${SELECT_COLUMNS} WHERE key = $1`, [assertLookupValue('key', key)]);
   }
 
@@ -87,14 +97,44 @@ function createRegistryReader(query) {
     return item;
   }
 
-  async function requireItemByKey(key) {
-    const item = await getItemByKey(key);
+  async function requireItemByKeyUnsafe(key) {
+    const item = await getItemByKeyUnsafe(key);
 
     if (!item) {
       throw new Error(`Registry item not found for key: ${key}`);
     }
 
     return item;
+  }
+
+  async function getItemPathById(id) {
+    return itemPathOrNull(await getItemById(id));
+  }
+
+  async function getItemPathByKeyUnsafe(key) {
+    return itemPathOrNull(await getItemByKeyUnsafe(key));
+  }
+
+  async function requireItemPathById(id) {
+    const item = await requireItemById(id);
+    const path = itemPathOrNull(item);
+
+    if (!path) {
+      throw new Error(`Registry item has no path for id: ${id}`);
+    }
+
+    return path;
+  }
+
+  async function requireItemPathByKeyUnsafe(key) {
+    const item = await requireItemByKeyUnsafe(key);
+    const path = itemPathOrNull(item);
+
+    if (!path) {
+      throw new Error(`Registry item has no path for key: ${key}`);
+    }
+
+    return path;
   }
 
   async function listItemsByKind(kind) {
@@ -105,9 +145,13 @@ function createRegistryReader(query) {
   return {
     mapRegistryItemRow,
     getItemById,
-    getItemByKey,
+    getItemByKeyUnsafe,
+    getItemPathById,
+    getItemPathByKeyUnsafe,
     requireItemById,
-    requireItemByKey,
+    requireItemByKeyUnsafe,
+    requireItemPathById,
+    requireItemPathByKeyUnsafe,
     listItemsByKind,
   };
 }

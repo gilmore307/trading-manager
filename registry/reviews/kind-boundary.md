@@ -13,9 +13,7 @@ The current kind set is acceptable, but several pairs are easy to confuse. Keep 
 | Potential Overlap | Risk | Boundary Rule | Current Action |
 |---|---|---|---|
 | `field` vs status kinds | A status field such as `task_lifecycle_state` has both a field name and allowed values. | `field` registers the slot name; status kinds register allowed values for that slot. | Keep separate. |
-| `repo` vs `path` | A repository has both a name and a root path. | `repo` registers the repository name; `path` registers filesystem locations. | Keep separate. |
-| `path` vs `script` | A script locator is also a path. | `script` is for executable/source entrypoint locators; `path` is for general stable filesystem paths. | Keep separate. |
-| `config` vs `path` | Some config values are paths. | Use `config` when the value is a tunable setting; use `path` when the path itself is the stable referenced object. | Keep separate; document intent in the entry note. |
+| `path` column vs registry kind | Direct locators are needed for repos/scripts, but a separate kind splits one entity across rows. | Use nullable `path` column on the entity row; do not use `path` as a kind. | Keep as column only. |
 | `config` vs `term` | Config keys can look like named concepts. | Use `config` for machine-consumed values; use `term` for human-facing definitions. | Keep separate. |
 | `artifact_type` vs `output` | Artifact types and output templates can sound similar. | `artifact_type` classifies durable system artifacts; `output` names reusable output/template shapes. | Keep separate. |
 | `manifest_type` vs `artifact_type` | Manifests can be stored as artifacts. | `manifest_type` classifies evidence documents; `artifact_type` classifies durable output payloads. | Keep separate. |
@@ -37,6 +35,12 @@ field names go in `field`; allowed values go in the specific value kind.
 The second most important rule is:
 
 ```text
+entity locators go in the nullable `path` column; do not create `path` rows.
+```
+
+The third most important rule is:
+
+```text
 if code consumes it as a setting, use `config`; if humans consume it as a definition, use `term`.
 ```
 
@@ -45,6 +49,6 @@ if code consumes it as a setting, use `config`; if humans consume it as a defini
 Revisit the kind set if any of these happen:
 
 - `output` starts carrying concrete trading artifact classes that should be `artifact_type`;
-- more than one script/path/config entry is created for the same value;
+- scripts, repos, and configs start duplicating the same locator instead of using the entity row `path`;
 - status vocabularies multiply beyond task/review/acceptance/test/maintenance/docs;
 - component repositories start adding local registries because the central kind set is unclear.

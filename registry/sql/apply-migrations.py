@@ -31,6 +31,7 @@ COPY (
     key,
     payload_format,
     payload,
+    path,
     note,
     created_at,
     updated_at
