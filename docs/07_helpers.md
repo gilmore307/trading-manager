@@ -44,6 +44,26 @@ helpers/
 
 Future helper packages should live under a named subdirectory with a clear README when the boundary is more than trivial.
 
+## Current Package Status
+
+There is no formal shared helper package yet.
+
+Current facts:
+
+- `helpers/registry/` contains JavaScript helper code and tests.
+- There is no `package.json`, package name, version policy, Node engine declaration, install command, or cross-repository import contract.
+- The shared development environment is currently anchored by the Python `.venv` in `trading-main`, but no Python helper package exists yet.
+
+Therefore, current JavaScript registry helpers are internal `trading-main` maintenance/test helpers. Component repositories must not treat them as a runtime dependency or import them directly until a formal helper distribution decision is accepted.
+
+Before any helper becomes a cross-repository runtime dependency, choose and document one of these strategies:
+
+1. **Node package** — add `package.json`, package/version policy, Node version/engine requirement, test command, install method, and import examples.
+2. **Python package** — add Python package metadata, `.venv` installation policy, test command, and import examples.
+3. **Internal-only tool** — document that the helper is for `trading-main` maintenance/automation only and expose no component runtime dependency.
+
+Registry `script` rows may record approved helper method surfaces and source paths, but they are not package installation contracts by themselves.
+
 ## Public Interface Rules
 
 Shared helper APIs must be explicit and stable enough for component repositories to depend on.
@@ -86,6 +106,8 @@ A helper change is acceptable when:
 
 - the helper remains shared infrastructure, not component runtime code;
 - public API shape is documented or obvious from tests;
+- distribution status is explicit: packaged runtime dependency or internal-only maintenance helper;
+- packaged helpers declare runtime version, version policy, install method, and import/call examples;
 - relevant tests pass;
 - no secrets or credentials are stored;
 - helper behavior does not duplicate component-owned logic;

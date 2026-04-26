@@ -6,6 +6,18 @@ They should read from the SQL-backed `trading_registry` table and support CSV sn
 
 Do not treat registry helpers as a place for component runtime behavior.
 
+## Package Status
+
+These JavaScript helpers are not currently a formal package interface for component repositories.
+
+There is no `package.json`, package version, Node engine requirement, install command, or cross-repository import contract. Treat this directory as internal `trading-main` maintenance/test code until a helper distribution decision is accepted.
+
+Run tests directly from `trading-main` when changing this helper code:
+
+```bash
+node --test helpers/registry/registry-reader.test.js
+```
+
 ## Public Helper Surface
 
 The registered public helper surface is id-only:

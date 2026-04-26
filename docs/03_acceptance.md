@@ -83,6 +83,8 @@ Shared helper changes are acceptable when they:
 - include or declare appropriate tests once helper behavior exists;
 - avoid embedding secrets, provider credentials, or local-only paths;
 - keep public interfaces explicit and stable enough for component repositories;
+- state whether the helper is internal-only or a packaged runtime dependency;
+- for packaged helpers, define package metadata, version policy, runtime version, installation method, and import/call examples;
 - update `docs/07_helpers.md`, templates, registry, or contracts when helper behavior encodes a shared convention.
 
 ### For shared environment changes

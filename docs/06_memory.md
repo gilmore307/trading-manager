@@ -19,3 +19,4 @@
 
 - `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` are platform-function guides for `trading-main`; `00_scope.md` through `06_memory.md` remain project-wide.
 - Future global helpers, reusable templates, and shared fields/status/type values discovered in component work must be recorded through `trading-main` before they become cross-repository contracts.
+- Current JavaScript registry helpers are internal `trading-main` maintenance/test helpers until a formal Node package, Python package, or internal-only distribution decision is accepted.

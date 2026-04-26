@@ -532,3 +532,27 @@ This mirrors the actual top-level structure of `trading-main` and gives each own
 - Registry kind source-of-truth files still live under `registry/kinds/`.
 - Template drafts still live under `templates/`.
 - Helper code still lives under `helpers/`.
+
+## D026 - Current JavaScript registry helpers are internal until packaging is accepted
+
+Date: 2026-04-25
+
+### Context
+
+`helpers/registry/` contains tested JavaScript helper code for id-based registry lookups and config-id secret loading. However, `trading-main` does not yet define a formal helper package: there is no `package.json`, version policy, Node engine requirement, installation command, or cross-repository import contract. At the same time, the shared development environment is currently Python-centered through the `.venv` anchor.
+
+### Decision
+
+Treat the current JavaScript registry helpers as internal `trading-main` maintenance/test helpers, not as component-repository runtime dependencies. Before any component imports shared helper code at runtime, make an explicit distribution decision: Node package, Python package, or internal-only tool.
+
+### Rationale
+
+A tested helper file is not enough to be a stable package interface. Components need a clear language/runtime, versioning, installation, and import contract before depending on shared helper code.
+
+### Consequences
+
+- Component repositories must not directly import `helpers/registry/` as a runtime dependency yet.
+- Registry `script` entries remain useful as approved helper/automation surface records, but they are not package contracts.
+- If the helper becomes a Node package, add package metadata, Node engine, version policy, test command, install method, and import examples.
+- If the helper becomes a Python package, align it with the shared `.venv` environment and define package metadata, tests, install method, and import examples.
+- If the helper stays internal-only, keep docs explicit so component repositories do not rely on it.

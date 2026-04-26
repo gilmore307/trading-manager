@@ -8,9 +8,9 @@
 
 - Define concrete artifact, manifest, ready-signal, and request schemas from `templates/contracts/`.
 - Define shared environment runtime version and package manager.
-- Define initial `templates/` files.
-- Define initial `helpers/` package boundary.
-- Create component repository docs spines.
+- Define formal helper package/distribution strategy before any component repository imports helper code at runtime.
+- Promote concrete template schemas after artifact, manifest, ready-signal, and request contracts are accepted.
+- Create remaining component repository docs spines.
 
 ## Open Gaps
 
@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Clarified that current JS registry helpers are internal `trading-main` maintenance/test helpers, not a formal cross-repository runtime package.
 - Split `trading-main` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
 - Added registry/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
 - Moved registry kind boundary files into `registry/kinds/`; `registry/reviews/` remains for review artifacts.

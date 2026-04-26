@@ -132,6 +132,8 @@ The CSV export maintenance helper is separate from lookup helpers:
 
 - `registry/sql/apply-migrations.py --export-only`
 
+Registry `script` rows identify approved helper/automation surfaces and source locators; they do not by themselves define package installation or cross-repository runtime dependency contracts.
+
 Key-input helper APIs are intentionally not part of the public helper surface. If a human needs key-based debugging, use direct SQL inspection instead of adding key-input helpers.
 
 ## Registration Rules
