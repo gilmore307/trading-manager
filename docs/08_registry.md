@@ -54,7 +54,7 @@ Concrete registry entries live in the SQL-backed `trading_registry` table and ar
 | `key` | Human-readable symbolic label. Useful for display and review, but renameable. |
 | `payload_format` | Payload value format. See Payload Formats below. |
 | `payload` | Registered value or file reference. |
-| `path` | Optional direct locator/address for entity-like rows such as repos or scripts. |
+| `path` | Optional direct locator/address for entity-like rows such as repos, scripts, or provider documentation pages. |
 | `applies_to` | Usage scope. Required for `field` rows. |
 | `note` | Human-readable review note. |
 | `created_at` / `updated_at` | SQL-managed timestamps exported in the snapshot. |
@@ -161,8 +161,8 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 - Treat `key` values as renameable labels.
 - Store secret aliases only; never store secret values.
 
-Source-level secret JSON config rows should use `payload_format=secret_alias`, store the source alias in `payload`, and may mirror the JSON file path in `path`. JSON field names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, and `pat` are registered as `field` rows with `applies_to=source_secret_json`.
-- Use nullable `path` for direct locators; do not create a `path` kind.
+Source-level secret JSON config rows should use `payload_format=secret_alias`, store the source alias in `payload`, and may mirror the JSON file path in `path`. Provider `term` rows may use `path` for the canonical public documentation URL. JSON field names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, and `pat` are registered as `field` rows with `applies_to=source_secret_json`.
+- Use nullable `path` for direct locators such as local repo roots, helper source files, source-secret JSON files, and provider documentation URLs; do not create a `path` kind.
 - Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.
 - Script rows should represent stable callable helper/automation exports, not every helper source file, package constant, or test script.

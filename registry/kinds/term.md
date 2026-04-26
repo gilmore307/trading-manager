@@ -16,3 +16,7 @@ Reject or re-scope entries that are actually:
 - component-local notes;
 - config values;
 - field names;
+
+## Path Usage
+
+Provider/source terminology may use `path` for the canonical public documentation URL when that URL is a useful shared locator.

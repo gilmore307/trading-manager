@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Added official documentation URLs to registered provider term paths while keeping secret config paths pointed at local JSON files.
 - Registered FRED, Census, BEA, and BLS source-level secret aliases for macro/economic data acquisition.
 - Registered ThetaData provider terminology for options data; credentials/JAR placement deferred.
 - Registered Alpaca source-level secret alias for stock/ETF bars, quotes, trades, and news data acquisition.

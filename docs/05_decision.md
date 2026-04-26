@@ -868,3 +868,25 @@ These providers fit the standard source-level JSON secret pattern and are data-s
 - Config aliases are `FRED_SECRET_ALIAS`, `CENSUS_SECRET_ALIAS`, `BEA_SECRET_ALIAS`, and `BLS_SECRET_ALIAS`.
 - Source aliases are `fred`, `census`, `bea`, and `bls`.
 - Default tests must not require live provider credentials or network calls.
+
+## D041 - Provider term paths may hold official documentation URLs
+
+Date: 2026-04-26
+
+### Context
+
+Provider documentation will be consulted frequently while implementing data-source connectors. The registry already has a nullable `path` column for direct locators, while source-secret config rows use `path` for local secret JSON files.
+
+### Decision
+
+Use provider `term` row `path` values for canonical public documentation URLs. Keep source-secret `config` row `path` values pointed at local `/root/secrets/<source>.json` files.
+
+### Rationale
+
+This preserves a clean locator split: provider rows point to public docs, and credential config rows point to local secret material.
+
+### Consequences
+
+- Provider documentation URLs are available through the registry.
+- Secret alias rows remain safe and unambiguous for credential resolution.
+- Component repos should treat provider documentation URLs as registry metadata, not credentials.

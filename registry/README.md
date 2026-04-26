@@ -28,7 +28,7 @@ Concrete entries use this shape:
 | `key` | Human-readable symbolic label for display/review; renameable and not a durable automation input. |
 | `payload_format` | Payload value format. See Payload Formats below. |
 | `payload` | Registered value or file reference. |
-| `path` | Optional direct locator/address for entries that point to concrete entities. |
+| `path` | Optional direct locator/address for entries that point to concrete entities, including repo roots, script sources, source-secret JSON files, and provider documentation URLs. |
 | `applies_to` | Optional for most kinds; required for `field` entries. Records the table, file, contract, template, or data shape where the field is used. |
 | `note` | Human-readable review note. |
 | `created_at` | Database insertion timestamp. |
@@ -106,7 +106,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Registered registry item lookup APIs must take registry ids as input, not keys.
 - `script` rows are for stable callable helper/automation exports, not package constants or test scripts.
 - Repository rows should include the repository name in `payload` and the local checkout root in `path` when the checkout path is an approved shared fact.
-- Use the `path` column for direct locators/addresses on entity-like entries such as repos and scripts.
+- Use the `path` column for direct locators/addresses on entity-like entries such as repos, scripts, source-secret JSON config rows, and provider documentation term rows.
 - Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Source secret JSON field names use `applies_to=source_secret_json`.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.
 - If a new kind is needed, add its `registry/kinds/<kind>.md` boundary file, update the SQL kind check, update registry tests/docs, and regenerate `registry/current.csv` in the same reviewed change.
