@@ -68,7 +68,7 @@ class RegistryHelperTests(unittest.TestCase):
             "ALPACA_NEWS": "alpaca_news",
             "THETADATA_OPTION_1M_BUNDLE": "thetadata_option_1m_bundle",
             "THETADATA_OPTION_SNAPSHOT_BUNDLE": "thetadata_option_snapshot_bundle",
-            "OKX_BARS": "okx_bars",
+            "OKX_CRYPTO_MARKET_DATA": "okx_crypto_market_data",
             "MACRO_DATA": "macro_data",
             "CALENDAR_DISCOVERY": "calendar_discovery",
             "ETF_HOLDINGS": "etf_holdings",
@@ -88,6 +88,7 @@ class RegistryHelperTests(unittest.TestCase):
         expected_payloads = {
             "EQUITY_BAR": "equity_bar",
             "EQUITY_LIQUIDITY_BAR": "equity_liquidity_bar",
+            "CRYPTO_BAR": "crypto_bar",
             "CRYPTO_LIQUIDITY_BAR": "crypto_liquidity_bar",
             "OPTION_GREEKS_FIRST_ORDER": "option_greeks_first_order",
             "SEC_COMPANY_FACT": "sec_company_fact",
@@ -105,6 +106,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(
             by_key["EQUITY_LIQUIDITY_BAR"]["path"],
             "trading-data/templates/data_kinds/alpaca/equity_liquidity_bar.preview.csv",
+        )
+        self.assertEqual(
+            by_key["CRYPTO_BAR"]["path"],
+            "trading-data/templates/data_kinds/okx/crypto_bar.preview.csv",
         )
         self.assertEqual(
             by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE"]["path"],
