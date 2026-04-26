@@ -846,3 +846,25 @@ ThetaData is relevant to the options data domain, but its runtime credential/JAR
 - `THETADATA` is registered as a `term` row.
 - No ThetaData secret alias is registered yet.
 - `trading-data` may document ThetaData as the intended options-data provider, with implementation blocked on connector/JAR/credential layout decisions.
+
+## D040 - Economic data providers use source-level API key aliases
+
+Date: 2026-04-26
+
+### Context
+
+The user provided API keys for FRED, Census, BEA, and BLS. These sources support macroeconomic, demographic, labor, and market-context data acquisition for `trading-data`.
+
+### Decision
+
+Register FRED, Census, BEA, and BLS as provider terms and source-level secret aliases. Store each key in `/root/secrets/<source>.json` using the registered JSON key `api_key`.
+
+### Rationale
+
+These providers fit the standard source-level JSON secret pattern and are data-source connector dependencies, not source code or registry secret values.
+
+### Consequences
+
+- Config aliases are `FRED_SECRET_ALIAS`, `CENSUS_SECRET_ALIAS`, `BEA_SECRET_ALIAS`, and `BLS_SECRET_ALIAS`.
+- Source aliases are `fred`, `census`, `bea`, and `bls`.
+- Default tests must not require live provider credentials or network calls.
