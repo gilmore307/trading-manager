@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 readme = "README.md"
 
 [tool.setuptools]
-package-dir = {"" = "helpers/python"}
+package-dir = {"" = "helpers"}
 
 [tool.setuptools.packages.find]
-where = ["helpers/python"]
+where = ["helpers"]

@@ -42,7 +42,7 @@ helpers/
   python/                   Formal Python helper package source and tests.
 ```
 
-Python helper packages live under `helpers/python/` with root package metadata in `pyproject.toml`. Future helper packages should use a named package/subdirectory with a clear README when the boundary is more than trivial.
+Python helper packages live directly under `helpers/` with root package metadata in `pyproject.toml`. Future helper packages should use a named package/subdirectory with a clear README when the boundary is more than trivial.
 
 ## Current Package Status
 
@@ -64,7 +64,7 @@ Current package facts:
 - Python helper test command:
 
   ```bash
-  /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/python/tests
+  /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/tests
   ```
 
 Component repositories should consume the Python package.
@@ -94,7 +94,7 @@ Current official Python registry helper surface is id-input only:
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
 
-The official Python helper source lives under `helpers/python/trading_registry/`.
+The official Python helper source lives under `helpers/trading_registry/`.
 
 Registry maintenance commands, such as regenerating `registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
 

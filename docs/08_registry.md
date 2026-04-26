@@ -40,7 +40,7 @@ registry/
 Supporting helper code lives outside `registry/`:
 
 ```text
-helpers/python/trading_registry/    Shared Python registry reader and secret-resolution helpers.
+helpers/trading_registry/    Shared Python registry reader and secret-resolution helpers.
 ```
 
 ## Entry Model
@@ -106,7 +106,7 @@ Normal registry update flow:
 7. Run registry helper tests when helper behavior or registry reader behavior changed:
 
    ```bash
-   /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/python/tests
+   /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/tests
    ```
 
 For snapshot export only:

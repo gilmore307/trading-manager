@@ -588,7 +588,7 @@ Trading component repositories are expected to use Python through the shared `.v
 
 ### Decision
 
-Use the Python package in `helpers/python/` as the cross-repository runtime helper distribution strategy. Component repositories should consume the installed `trading_registry` package rather than loose source files.
+Use the Python package rooted at `helpers/trading_registry/` as the cross-repository runtime helper distribution strategy. Component repositories should consume the installed `trading_registry` package rather than loose source files.
 
 ### Rationale
 
@@ -632,7 +632,7 @@ Future trading component repositories are expected to use Python through the sha
 
 ### Decision
 
-Make the official cross-repository registry helper runtime surface a Python package. Package metadata lives in root `pyproject.toml`, source lives under `helpers/python/trading_registry/`, and the install path is editable installation into `/root/projects/trading-main/.venv`.
+Make the official cross-repository registry helper runtime surface a Python package. Package metadata lives in root `pyproject.toml`, source lives under `helpers/trading_registry/`, and the install path is editable installation into `/root/projects/trading-main/.venv`.
 
 ### Rationale
 
@@ -662,6 +662,6 @@ One implementation is easier to test, document, package, and consume. Since comp
 
 ### Consequences
 
-- `helpers/python/trading_registry/` is the only registry helper implementation.
-- The registry helper test command is `/root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/python/tests`.
+- `helpers/trading_registry/` is the only registry helper implementation.
+- The registry helper test command is `/root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/tests`.
 - Registry script rows remain pointed at Python helper methods and source files.
