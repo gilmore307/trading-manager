@@ -25,6 +25,7 @@ Concrete entries use this shape:
 | `payload_format` | Payload storage format, currently `text` or `file`. |
 | `payload` | Registered value or file reference. |
 | `path` | Optional direct locator/address for entries that point to concrete entities. |
+| `applies_to` | Optional usage/source scope. For `field` entries, records the table, file, contract, or data shape where the field is used. |
 | `note` | Human-readable review note. |
 | `created_at` | Database insertion timestamp. |
 | `updated_at` | Database update timestamp. |
@@ -80,5 +81,6 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos and scripts.
+- Use `applies_to` for field usage/source scope, especially where a field is used in a table, file, contract, or data shape.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.
 - If a new kind is needed, add its Markdown boundary file, update helper kind lists, update the SQL kind check, and regenerate `registry/current.csv` in the same reviewed change.

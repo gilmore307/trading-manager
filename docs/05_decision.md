@@ -297,3 +297,68 @@ The concepts are still useful as shared vocabulary, while stale project-specific
 
 - `TAILSCALE` and `SMB` are available as terms.
 - Project-specific VPN/SMB defaults require fresh registry review before reintroduction.
+
+## D016 - Field entries can record usage scope with `applies_to`
+
+Date: 2026-04-25
+
+### Context
+
+Field entries need more than a canonical field name. During review, it is useful to know which table, file, contract, template, or data shape a field is used in.
+
+### Decision
+
+Add nullable `trading_registry.applies_to`. For `field` entries, use it to record the field's known usage/source scope.
+
+### Rationale
+
+This avoids overloading `note` and makes field usage visible in `registry/current.csv`.
+
+### Consequences
+
+- Known field usage should be recorded in `applies_to`.
+- Empty `applies_to` means broad, unsettled, or not-yet-reviewed usage.
+- `applies_to` is especially important for fields tied to SQL tables, file schemas, manifests, requests, signals, templates, or task receipts.
+
+## D017 - Path helper methods are registered helper surfaces
+
+Date: 2026-04-25
+
+### Context
+
+The id-first path helper methods are part of the shared registry helper surface, but initially only their source file was registered.
+
+### Decision
+
+Register the id-first and unsafe key-based path helper methods as `script` entries pointing to `helpers/registry/registry-reader.js`.
+
+### Rationale
+
+The registry should expose reusable helper surfaces, not only files. Keeping method-level entries makes the approved helper API visible in `registry/current.csv`.
+
+### Consequences
+
+- `getItemPathById` and `requireItemPathById` are the preferred automation path helpers.
+- `getItemPathByKeyUnsafe` and `requireItemPathByKeyUnsafe` remain human/debug convenience helpers.
+- All four methods share the same source path because they live in `registry-reader.js`.
+
+## D018 - Secret resolver config lookup is id-first
+
+Date: 2026-04-25
+
+### Context
+
+Secret resolver helpers previously used config keys, but registry keys are renameable labels.
+
+### Decision
+
+Expose id-first config secret helpers and mark key-based config lookup helpers unsafe.
+
+### Rationale
+
+Secrets are sensitive enough that automation should not depend on renameable registry keys.
+
+### Consequences
+
+- Prefer `getSecretAliasByConfigId`, `getSecretEntryByConfigId`, `getSecretPathByConfigId`, and `loadSecretTextByConfigId`.
+- Key-based config lookup helpers carry the `Unsafe` suffix.

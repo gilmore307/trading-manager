@@ -32,6 +32,7 @@ COPY (
     payload_format,
     payload,
     path,
+    applies_to,
     note,
     created_at,
     updated_at

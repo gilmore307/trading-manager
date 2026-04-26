@@ -12,3 +12,5 @@
 - Stale canceled-project registry entries were removed because GitHub history is the restore path.
 - Registry ids are stable automation references; keys are human-readable and unsafe for durable automation dereferencing.
 - Registry `path` is a nullable column for direct locators, not a registry kind.
+- Field registry entries can use `applies_to` to show where the field is used.
+- Path helper methods are individually registered as script entries even though they share `registry-reader.js`.

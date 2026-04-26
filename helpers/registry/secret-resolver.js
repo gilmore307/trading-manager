@@ -79,30 +79,46 @@ function createSecretResolver(query, options = {}) {
     return parseRegistry(jsonText, registryPath);
   }
 
-  async function getSecretAliasByConfigKey(configKey) {
-    const item = await registryReader.requireItemByKeyUnsafe(assertNonEmptyString('configKey', configKey));
-
+  function assertConfigItem(item, label, value) {
     if (item.kind !== 'config') {
-      throw new Error(`Registry item ${configKey} must be kind=config to resolve a secret alias`);
+      throw new Error(`Registry item ${value} must be kind=config to resolve a secret alias by ${label}`);
     }
 
-    return assertNonEmptyString(`registry config payload for ${configKey}`, item.payload);
+    return assertNonEmptyString(`registry config payload for ${value}`, item.payload);
+  }
+
+  async function getSecretAliasByConfigId(configId) {
+    const normalized = assertNonEmptyString('configId', configId);
+    return assertConfigItem(await registryReader.requireItemById(normalized), 'id', normalized);
+  }
+
+  async function getSecretAliasByConfigKeyUnsafe(configKey) {
+    const normalized = assertNonEmptyString('configKey', configKey);
+    return assertConfigItem(await registryReader.requireItemByKeyUnsafe(normalized), 'key', normalized);
   }
 
   async function getSecretEntryByAlias(alias) {
     return getSecretEntryFromRegistry(await loadRegistry(), alias, registryPath);
   }
 
-  async function getSecretEntryByConfigKey(configKey) {
-    return getSecretEntryByAlias(await getSecretAliasByConfigKey(configKey));
+  async function getSecretEntryByConfigId(configId) {
+    return getSecretEntryByAlias(await getSecretAliasByConfigId(configId));
+  }
+
+  async function getSecretEntryByConfigKeyUnsafe(configKey) {
+    return getSecretEntryByAlias(await getSecretAliasByConfigKeyUnsafe(configKey));
   }
 
   async function getSecretPathByAlias(alias) {
     return (await getSecretEntryByAlias(alias)).path;
   }
 
-  async function getSecretPathByConfigKey(configKey) {
-    return (await getSecretEntryByConfigKey(configKey)).path;
+  async function getSecretPathByConfigId(configId) {
+    return (await getSecretEntryByConfigId(configId)).path;
+  }
+
+  async function getSecretPathByConfigKeyUnsafe(configKey) {
+    return (await getSecretEntryByConfigKeyUnsafe(configKey)).path;
   }
 
   async function loadSecretTextByAlias(alias) {
@@ -110,18 +126,26 @@ function createSecretResolver(query, options = {}) {
     return String(await readFile(entry.path, 'utf8')).trim();
   }
 
-  async function loadSecretTextByConfigKey(configKey) {
-    return loadSecretTextByAlias(await getSecretAliasByConfigKey(configKey));
+  async function loadSecretTextByConfigId(configId) {
+    return loadSecretTextByAlias(await getSecretAliasByConfigId(configId));
+  }
+
+  async function loadSecretTextByConfigKeyUnsafe(configKey) {
+    return loadSecretTextByAlias(await getSecretAliasByConfigKeyUnsafe(configKey));
   }
 
   return {
-    getSecretAliasByConfigKey,
+    getSecretAliasByConfigId,
+    getSecretAliasByConfigKeyUnsafe,
     getSecretEntryByAlias,
-    getSecretEntryByConfigKey,
+    getSecretEntryByConfigId,
+    getSecretEntryByConfigKeyUnsafe,
     getSecretPathByAlias,
-    getSecretPathByConfigKey,
+    getSecretPathByConfigId,
+    getSecretPathByConfigKeyUnsafe,
     loadSecretTextByAlias,
-    loadSecretTextByConfigKey,
+    loadSecretTextByConfigId,
+    loadSecretTextByConfigKeyUnsafe,
   };
 }
 

@@ -10,6 +10,7 @@ SELECT
   payload_format,
   payload,
   path,
+  applies_to,
   note,
   created_at,
   updated_at
@@ -28,6 +29,7 @@ function mapRegistryItemRow(row) {
     payloadFormat: row.payload_format,
     payload: row.payload,
     path: typeof row.path === 'string' && row.path.trim() !== '' ? row.path : null,
+    appliesTo: typeof row.applies_to === 'string' && row.applies_to.trim() !== '' ? row.applies_to : null,
     note: row.note,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

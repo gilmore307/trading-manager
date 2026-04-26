@@ -18,3 +18,7 @@ Path helpers follow that rule:
 - `requireItemPathByKeyUnsafe(key)` is for human/debug convenience and returns a path or throws.
 
 The `Unsafe` suffix means the lookup uses a renameable key rather than a stable id.
+
+## Secret Resolver Helpers
+
+Use config-id helpers for automation. Key-based config helpers carry the `Unsafe` suffix because registry keys are renameable.

@@ -23,6 +23,7 @@ function createRow(overrides) {
     payload: 'id',
     note: 'canonical column name for trading_registry.id',
     path: null,
+    applies_to: null,
     created_at: '2026-04-23T00:00:00.000Z',
     updated_at: '2026-04-23T00:00:00.000Z',
     ...overrides,
@@ -75,6 +76,7 @@ test('mapRegistryItemRow converts snake_case columns into readable JS keys', () 
     payload: 'id',
     note: 'canonical column name for trading_registry.id',
     path: null,
+    appliesTo: null,
     createdAt: '2026-04-23T00:00:00.000Z',
     updatedAt: '2026-04-23T00:00:00.000Z',
   });
@@ -228,16 +230,20 @@ test('getSecretEntryFromRegistry resolves slash-delimited aliases', () => {
   });
 });
 
-test('createSecretResolver resolves registered secret aliases and loads secret text', async () => {
+test('createSecretResolver resolves registered secret aliases by stable config id and unsafe key', async () => {
   const readCalls = [];
   const resolver = createSecretResolver(async (sql, params) => {
-    assert.match(sql, /WHERE key = \$1/);
-    assert.deepEqual(params, ['EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS']);
+    if (params[0] === 'cfg_EXAMPLETOKEN') {
+      assert.match(sql, /WHERE id = \$1/);
+    } else {
+      assert.match(sql, /WHERE key = \$1/);
+      assert.deepEqual(params, ['EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS']);
+    }
 
     return {
       rows: [
         createRow({
-          id: 'cfg_P4R8T2LM',
+          id: 'cfg_EXAMPLETOKEN',
           kind: 'config',
           key: 'EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS',
           payload: 'example-service/token',
@@ -271,15 +277,19 @@ test('createSecretResolver resolves registered secret aliases and loads secret t
   });
 
   assert.equal(
-    await resolver.getSecretAliasByConfigKey('EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS'),
+    await resolver.getSecretAliasByConfigId('cfg_EXAMPLETOKEN'),
     'example-service/token'
   );
   assert.equal(
-    await resolver.getSecretPathByConfigKey('EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS'),
+    await resolver.getSecretAliasByConfigKeyUnsafe('EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS'),
+    'example-service/token'
+  );
+  assert.equal(
+    await resolver.getSecretPathByConfigId('cfg_EXAMPLETOKEN'),
     '/root/secrets/example-service/token'
   );
   assert.equal(
-    await resolver.loadSecretTextByConfigKey('EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS'),
+    await resolver.loadSecretTextByConfigId('cfg_EXAMPLETOKEN'),
     'secret-value'
   );
   assert.equal(readCalls[0].path, '/root/secrets/registry.json');
@@ -299,7 +309,7 @@ test('createSecretResolver rejects non-config items for secret lookup', async ()
   });
 
   await assert.rejects(
-    () => resolver.getSecretAliasByConfigKey('OPENCLAW'),
+    () => resolver.getSecretAliasByConfigKeyUnsafe('OPENCLAW'),
     /must be kind=config/
   );
 });

@@ -68,6 +68,7 @@ Registry and template changes are acceptable when they:
 - keep kind boundary/range rules in `registry/<kind>.md`;
 - regenerate `registry/current.csv` after SQL registry changes;
 - prefer id-based registry dereferencing for automation;
+- ensure field entries use `applies_to` when their usage table/file/contract/data shape is known;
 - mark key-based helper use as unsafe or human/debug only;
 - avoid scattering field/status definitions across docs;
 - document compatibility impact when renaming or removing registered fields;
@@ -113,6 +114,7 @@ Manual review must confirm:
 - contract drafting templates live under `templates/contracts/`, not `docs/`;
 - registry kind Markdown files do not list concrete active rows;
 - entity-like registry entries use the nullable `path` column instead of a separate `path` kind;
+- field entries use `applies_to` for known usage/source scope;
 - `registry/current.csv` is present and generated from SQL when registry entries changed;
 - `.venv/` is not tracked;
 - no source-code directories were introduced;

@@ -16,3 +16,7 @@ Reject or re-scope entries that are actually:
 - repository names;
 - filesystem paths;
 - config defaults;
+
+## Usage Metadata
+
+For `field` entries, populate `trading_registry.applies_to` when the field is tied to a known table, file, contract, template, or data shape. Leave it empty only when the usage surface is intentionally broad or not yet settled.

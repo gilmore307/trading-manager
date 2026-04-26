@@ -24,6 +24,9 @@
 
 ## Recently Accepted
 
+- Registered id-first path helper methods in the SQL registry.
+- Added nullable registry `applies_to` column for field usage/source scope.
+- Updated secret resolver helper to prefer config ids and mark config-key lookups unsafe.
 - Added nullable registry `path` column and id-first path helper APIs.
 - Removed `path` as a registry kind and merged standalone root-path entries into their owning entity rows.
 - Restored `TAILSCALE` and `SMB` as active `term` entries.

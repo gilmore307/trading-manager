@@ -1,93 +1,98 @@
-id,kind,key,payload_format,payload,path,note,created_at,updated_at
-aco_Q1M7D4LP,acceptance_outcome,ACCEPTANCE_OUTCOME_ACCEPTED,text,accepted,,default shared acceptance outcome value for accepted work,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-aco_H7Y4P1ZD,acceptance_outcome,ACCEPTANCE_OUTCOME_BLOCKED,text,blocked,,default shared acceptance outcome value for work blocked from a final decision,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-aco_B8T3W6FN,acceptance_outcome,ACCEPTANCE_OUTCOME_REJECTED,text,rejected,,default shared acceptance outcome value for rejected work,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-aco_N5K2R9VC,acceptance_outcome,ACCEPTANCE_OUTCOME_RETURNED,text,returned,,default shared acceptance outcome value for work returned for more changes,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-cfg_J7D1K5RP,config,DEFAULT_TIMEZONE,text,America/New_York,,default shared timezone for this server,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-cfg_U8C2D6YA,config,OPENCLAW_DATABASE_URL_SECRET_ALIAS,text,openclaw/database-url,,"approved config key for the active OpenClaw PostgreSQL database URL secret alias; the registry stores the alias reference, not connection secret material",2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-dcs_H2W7M4QL,docs_status,DOCS_STATUS_ALIGNED,text,aligned,,default shared docs status value when docs match current project reality,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-dcs_X9K5F1VC,docs_status,DOCS_STATUS_BLOCKED,text,blocked,,default shared docs status value when docs status cannot be resolved because maintenance is blocked,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-dcs_R6P3T8NA,docs_status,DOCS_STATUS_DRIFTED,text,drifted,,default shared docs status value when docs have drifted from current project reality,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_GI3OL5K5,field,ACCEPTANCE_OUTCOME,text,acceptance_outcome,,canonical shared field name for acceptance outcome slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_J6FURQOE,field,ACCEPTANCE_REFERENCE,text,acceptance_reference,,canonical shared field name for acceptance reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_XYGQ3TIC,field,ACCEPTANCE_SUMMARY,text,acceptance_summary,,canonical shared field name for acceptance summary slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_YLTWJKTJ,field,ALLOWED_PATHS,text,allowed_paths,,canonical shared field name for allowed path slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_H2OBUVA0,field,BLOCKED_PATHS,text,blocked_paths,,canonical shared field name for blocked path slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_FN9DUG5U,field,BLOCKED_TASK_LIST,text,blocked_task_list,,canonical shared field name for blocked task list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_9BAEN7ZS,field,CHANGED_FILES,text,changed_files,,canonical shared field name for changed file list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_GNNVKXOG,field,CHANGE_SUMMARY,text,change_summary,,canonical shared field name for change summary slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_B29IDITT,field,CHECK_TIME,text,check_time,,canonical shared field name for maintenance check time slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_EIWWF5B5,field,COMMAND_LIST,text,command_list,,canonical shared field name for command list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_H6WM9AVU,field,COMPLETION_RECEIPT_REFERENCE,text,completion_receipt_reference,,canonical shared field name for completion receipt reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_5NFMUN7N,field,CONSTRAINTS,text,constraints,,canonical shared field name for execution constraint slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_F4OFEVFJ,field,DECISION_REFERENCES,text,decision_references,,canonical shared field name for decision reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_4UWS48ZI,field,DICTIONARY_ISSUE_LIST,text,dictionary_issue_list,,canonical shared field name for dictionary issue list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_2EZ9JU7F,field,DOCS_STATUS,text,docs_status,,canonical shared field name for docs status slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_RSIXOXTB,field,EXPECTED_OUTPUT,text,expected_output,,canonical shared field name for expected output slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_4ZRFN5AJ,field,FOLLOW_UP_TASK_LIST,text,follow_up_task_list,,canonical shared field name for follow-up task list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_GXYBK246,field,ISSUE_LIST,text,issue_list,,canonical shared field name for issue list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_BME8UR38,field,MAINTENANCE_STATUS,text,maintenance_status,,canonical shared field name for maintenance status slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_37IEP8QF,field,MAINTENANCE_SUMMARY,text,maintenance_summary,,canonical shared field name for maintenance summary slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_4BVOLV5F,field,MEMORY_ROUTE_ISSUE_LIST,text,memory_route_issue_list,,canonical shared field name for memory route issue list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_BJGL5P8K,field,NEXT_TASK_REFERENCE,text,next_task_reference,,canonical shared field name for next task reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_Z7TPA496,field,OUTPUT_REFERENCE,text,output_reference,,canonical shared field name for output reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_WNQIX52F,field,PENDING_ACCEPTANCE_LIST,text,pending_acceptance_list,,canonical shared field name for pending acceptance list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_O9Y3PMML,field,PENDING_DISPATCH_LIST,text,pending_dispatch_list,,canonical shared field name for pending dispatch list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_P8L2C4TY,field,REGISTRY_ITEM_CREATED_AT,text,created_at,,canonical column name for trading_registry.created_at,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_A7K3P2Q9,field,REGISTRY_ITEM_ID,text,id,,canonical column name for trading_registry.id,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_R7P1C6LW,field,REGISTRY_ITEM_KEY,text,key,,canonical column name for trading_registry.key,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_M4N8X2KD,field,REGISTRY_ITEM_KIND,text,kind,,canonical column name for trading_registry.kind,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_D3W7K1RM,field,REGISTRY_ITEM_NOTE,text,note,,canonical column name for trading_registry.note,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_M7Q2P8TZ,field,REGISTRY_ITEM_PATH,text,path,,canonical column name for trading_registry.path,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_B6J4N8XP,field,REGISTRY_ITEM_PAYLOAD,text,payload,,canonical column name for trading_registry.payload,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_T9V2H5QS,field,REGISTRY_ITEM_PAYLOAD_FORMAT,text,payload_format,,canonical column name for trading_registry.payload_format,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_Q5F9M2NZ,field,REGISTRY_ITEM_UPDATED_AT,text,updated_at,,canonical column name for trading_registry.updated_at,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_4YALJN0B,field,REPOSITORY_PATH,text,repository_path,,canonical shared field name for repository path slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_6XFD3B1C,field,REVIEWED_COMMANDS,text,reviewed_commands,,canonical shared field name for reviewed command list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_Q9KQLPH4,field,REVIEWED_FILES,text,reviewed_files,,canonical shared field name for reviewed file list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_6RJNNWV1,field,REVIEW_READINESS,text,review_readiness,,canonical shared field name for review readiness slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_SBU4RCHA,field,SPLIT_ISSUE_LIST,text,split_issue_list,,canonical shared field name for split issue list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_PVUM9JE5,field,TASK_GOAL,text,task_goal,,canonical shared field name for task goal slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_7X5H7N6Y,field,TASK_IDENTITY,text,task_identity,,canonical shared field name for task identity slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_5DVSJFM0,field,TASK_LIFECYCLE_STATE,text,task_lifecycle_state,,canonical shared field name for task lifecycle state slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_RSO93XMM,field,TASK_SCOPE,text,task_scope,,canonical shared field name for task scope slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_W9NA62KA,field,TASK_STATUS_SUMMARY,text,task_status_summary,,canonical shared field name for task status summary slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_VTD4KDTM,field,TEMPORARY_NEW_NAMES,text,temporary_new_names,,canonical shared field name for temporary new name slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_U27NM0BU,field,TEST_COMMANDS,text,test_commands,,canonical shared field name for test command slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_0YVMMK1A,field,TEST_EXPECTATION,text,test_expectation,,canonical shared field name for test expectation slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_YX5TMJN9,field,TEST_OUTPUT,text,test_output,,canonical shared field name for test output slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_T5PSOYKO,field,TEST_STATUS,text,test_status,,canonical shared field name for test status slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-fld_ZGTS8P3D,field,WORKFLOW_IDENTITY,text,workflow_identity,,canonical shared field name for workflow identity slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-mns_B5N1K6XD,maintenance_status,MAINTENANCE_STATUS_BLOCKED,text,blocked,,default shared maintenance status value when maintenance is blocked by a real constraint,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-mns_L4T8Q2WP,maintenance_status,MAINTENANCE_STATUS_HEALTHY,text,healthy,,default shared maintenance status value when the project is in healthy maintained shape,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-mns_P7C3V9RA,maintenance_status,MAINTENANCE_STATUS_NEEDS_ATTENTION,text,needs_attention,,default shared maintenance status value when maintenance found issues that need attention,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-rep_H6S3V8LA,repo,TRADING_MAIN_REPO,text,trading-main,/root/projects/trading-main,"canonical repository entry for the trading-main project, including its repository root path",2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-rrd_V9H5C2KR,review_readiness,REVIEW_READINESS_BLOCKED,text,blocked,,default shared review readiness value for work that is blocked from review,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-rrd_W6P3N1TX,review_readiness,REVIEW_READINESS_NOT_READY,text,not_ready,,default shared review readiness value for work that is not ready for review,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-rrd_L2F8Q4MA,review_readiness,REVIEW_READINESS_READY,text,ready,,default shared review readiness value for work that is ready for review,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-scr_7XQAMNBH,script,REGISTRY_HELPER_INDEX_SCRIPT,text,registry helper public module index,/root/projects/trading-main/helpers/registry/index.js,canonical source locator for the registry helper package entrypoint,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-scr_YO00DVVP,script,REGISTRY_READER_SCRIPT,text,createRegistryReader,/root/projects/trading-main/helpers/registry/registry-reader.js,canonical source locator for the registry reader helper,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-scr_MA60CYT4,script,REGISTRY_TYPES_SCRIPT,text,REGISTRY_KINDS,/root/projects/trading-main/helpers/registry/registry-types.js,canonical source locator for registry kind definitions,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-scr_Q2L6F8MW,script,SECRET_RESOLVER_SCRIPT,text,createSecretResolver,/root/projects/trading-main/helpers/registry/secret-resolver.js,canonical source locator for the secret resolver helper,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_H1V8L4TE,task_lifecycle_state,TASK_LIFECYCLE_STATE_ACCEPTED,text,accepted,,default shared task lifecycle state value for work that has been accepted,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_K5Q7F2MD,task_lifecycle_state,TASK_LIFECYCLE_STATE_BLOCKED,text,blocked,,default shared task lifecycle state value for work that is blocked,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_C9T1G7WF,task_lifecycle_state,TASK_LIFECYCLE_STATE_CANCELLED,text,cancelled,,default shared task lifecycle state value for work that has been cancelled,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_M4D6R8QJ,task_lifecycle_state,TASK_LIFECYCLE_STATE_CLOSED,text,closed,,default shared task lifecycle state value for work that is closed,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_D4N8K2QW,task_lifecycle_state,TASK_LIFECYCLE_STATE_DESIGNING,text,designing,,default shared task lifecycle state value for work that is still being designed,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_B6X2H5RA,task_lifecycle_state,TASK_LIFECYCLE_STATE_DISPATCHED,text,dispatched,,default shared task lifecycle state value for work that has been dispatched,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_T8J4W1NP,task_lifecycle_state,TASK_LIFECYCLE_STATE_EXECUTING,text,executing,,default shared task lifecycle state value for work in active execution,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_R3C9Y6UA,task_lifecycle_state,TASK_LIFECYCLE_STATE_READY_FOR_ACCEPTANCE,text,ready_for_acceptance,,default shared task lifecycle state value for work waiting for acceptance review,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_P7M3V9LC,task_lifecycle_state,TASK_LIFECYCLE_STATE_READY_TO_DISPATCH,text,ready_to_dispatch,,default shared task lifecycle state value for work ready to hand to an executor,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tls_N7B2P5XK,task_lifecycle_state,TASK_LIFECYCLE_STATE_REJECTED,text,rejected,,default shared task lifecycle state value for work that has been rejected,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-trm_RXUP2T7D,term,CODEX,text,Coding executor used for bounded implementation tasks under OpenClaw supervision.,,canonical shared definition for Codex in this workspace,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-trm_5HE1ZLG6,term,OPENCLAW,text,"Project sentinel and orchestration layer that owns project route, docs, dispatch, review, and acceptance.",,canonical shared definition for OpenClaw,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-trm_4F58616K,term,POSTGRESQL,text,Open-source relational database system used as the target engine for trading-main registry and related server-side data work.,,canonical shared definition for PostgreSQL,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-trm_S8M3B7VN,term,SMB,text,Server Message Block; network file-sharing protocol used for mounted or shared folders when needed.,,canonical shared definition for SMB in the trading server environment,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-trm_NBPU5J5P,term,SQL,text,Structured Query Language; the standard language for querying and managing relational databases.,,canonical shared definition for SQL,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-trm_T4X9L2QK,term,TAILSCALE,text,Mesh VPN used for private network connectivity between trusted devices and services.,,canonical shared definition for Tailscale in the trading server environment,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-trm_QLKAMITP,term,TRADING_MAIN_REGISTRY,text,"Trading-main registry for trading-wide referenced values, approved outputs, source locators, status vocabularies, and approved terms.",,canonical shared definition for trading-main registry,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tst_F6V1M5RA,test_status,TEST_STATUS_FAILED,text,failed,,default shared test status value for failing verification,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tst_X5N1B4QJ,test_status,TEST_STATUS_NOT_REQUIRED,text,not_required,,default shared test status value when verification was not required,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tst_P9C4T7XH,test_status,TEST_STATUS_NOT_RUN,text,not_run,,default shared test status value when verification did not run,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tst_R2D6K8YL,test_status,TEST_STATUS_PARTIALLY_RUN,text,partially_run,,default shared test status value when verification ran only partially,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
-tst_J3Q8L2NW,test_status,TEST_STATUS_PASSED,text,passed,,default shared test status value for passing verification,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+id,kind,key,payload_format,payload,path,applies_to,note,created_at,updated_at
+aco_Q1M7D4LP,acceptance_outcome,ACCEPTANCE_OUTCOME_ACCEPTED,text,accepted,,,default shared acceptance outcome value for accepted work,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+aco_H7Y4P1ZD,acceptance_outcome,ACCEPTANCE_OUTCOME_BLOCKED,text,blocked,,,default shared acceptance outcome value for work blocked from a final decision,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+aco_B8T3W6FN,acceptance_outcome,ACCEPTANCE_OUTCOME_REJECTED,text,rejected,,,default shared acceptance outcome value for rejected work,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+aco_N5K2R9VC,acceptance_outcome,ACCEPTANCE_OUTCOME_RETURNED,text,returned,,,default shared acceptance outcome value for work returned for more changes,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+cfg_J7D1K5RP,config,DEFAULT_TIMEZONE,text,America/New_York,,,default shared timezone for this server,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+cfg_U8C2D6YA,config,OPENCLAW_DATABASE_URL_SECRET_ALIAS,text,openclaw/database-url,,,"approved config key for the active OpenClaw PostgreSQL database URL secret alias; the registry stores the alias reference, not connection secret material",2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+dcs_H2W7M4QL,docs_status,DOCS_STATUS_ALIGNED,text,aligned,,,default shared docs status value when docs match current project reality,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+dcs_X9K5F1VC,docs_status,DOCS_STATUS_BLOCKED,text,blocked,,,default shared docs status value when docs status cannot be resolved because maintenance is blocked,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+dcs_R6P3T8NA,docs_status,DOCS_STATUS_DRIFTED,text,drifted,,,default shared docs status value when docs have drifted from current project reality,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_GI3OL5K5,field,ACCEPTANCE_OUTCOME,text,acceptance_outcome,,,canonical shared field name for acceptance outcome slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_J6FURQOE,field,ACCEPTANCE_REFERENCE,text,acceptance_reference,,,canonical shared field name for acceptance reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_XYGQ3TIC,field,ACCEPTANCE_SUMMARY,text,acceptance_summary,,,canonical shared field name for acceptance summary slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_YLTWJKTJ,field,ALLOWED_PATHS,text,allowed_paths,,,canonical shared field name for allowed path slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_H2OBUVA0,field,BLOCKED_PATHS,text,blocked_paths,,,canonical shared field name for blocked path slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_FN9DUG5U,field,BLOCKED_TASK_LIST,text,blocked_task_list,,,canonical shared field name for blocked task list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_9BAEN7ZS,field,CHANGED_FILES,text,changed_files,,,canonical shared field name for changed file list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_GNNVKXOG,field,CHANGE_SUMMARY,text,change_summary,,,canonical shared field name for change summary slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_B29IDITT,field,CHECK_TIME,text,check_time,,,canonical shared field name for maintenance check time slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_EIWWF5B5,field,COMMAND_LIST,text,command_list,,,canonical shared field name for command list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_H6WM9AVU,field,COMPLETION_RECEIPT_REFERENCE,text,completion_receipt_reference,,,canonical shared field name for completion receipt reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_5NFMUN7N,field,CONSTRAINTS,text,constraints,,,canonical shared field name for execution constraint slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_F4OFEVFJ,field,DECISION_REFERENCES,text,decision_references,,,canonical shared field name for decision reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_4UWS48ZI,field,DICTIONARY_ISSUE_LIST,text,dictionary_issue_list,,,canonical shared field name for dictionary issue list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_2EZ9JU7F,field,DOCS_STATUS,text,docs_status,,,canonical shared field name for docs status slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_RSIXOXTB,field,EXPECTED_OUTPUT,text,expected_output,,,canonical shared field name for expected output slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_4ZRFN5AJ,field,FOLLOW_UP_TASK_LIST,text,follow_up_task_list,,,canonical shared field name for follow-up task list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_GXYBK246,field,ISSUE_LIST,text,issue_list,,,canonical shared field name for issue list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_BME8UR38,field,MAINTENANCE_STATUS,text,maintenance_status,,,canonical shared field name for maintenance status slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_37IEP8QF,field,MAINTENANCE_SUMMARY,text,maintenance_summary,,,canonical shared field name for maintenance summary slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_4BVOLV5F,field,MEMORY_ROUTE_ISSUE_LIST,text,memory_route_issue_list,,,canonical shared field name for memory route issue list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_BJGL5P8K,field,NEXT_TASK_REFERENCE,text,next_task_reference,,,canonical shared field name for next task reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_Z7TPA496,field,OUTPUT_REFERENCE,text,output_reference,,,canonical shared field name for output reference slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_WNQIX52F,field,PENDING_ACCEPTANCE_LIST,text,pending_acceptance_list,,,canonical shared field name for pending acceptance list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_O9Y3PMML,field,PENDING_DISPATCH_LIST,text,pending_dispatch_list,,,canonical shared field name for pending dispatch list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_K8P3M6QA,field,REGISTRY_ITEM_APPLIES_TO,text,applies_to,,trading_registry,canonical column name for trading_registry.applies_to,2026-04-25 20:16:01.179909-04,2026-04-25 20:16:01.179909-04
+fld_P8L2C4TY,field,REGISTRY_ITEM_CREATED_AT,text,created_at,,trading_registry,canonical column name for trading_registry.created_at,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_A7K3P2Q9,field,REGISTRY_ITEM_ID,text,id,,trading_registry,canonical column name for trading_registry.id,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_R7P1C6LW,field,REGISTRY_ITEM_KEY,text,key,,trading_registry,canonical column name for trading_registry.key,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_M4N8X2KD,field,REGISTRY_ITEM_KIND,text,kind,,trading_registry,canonical column name for trading_registry.kind,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_D3W7K1RM,field,REGISTRY_ITEM_NOTE,text,note,,trading_registry,canonical column name for trading_registry.note,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_M7Q2P8TZ,field,REGISTRY_ITEM_PATH,text,path,,trading_registry,canonical column name for trading_registry.path,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_B6J4N8XP,field,REGISTRY_ITEM_PAYLOAD,text,payload,,trading_registry,canonical column name for trading_registry.payload,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_T9V2H5QS,field,REGISTRY_ITEM_PAYLOAD_FORMAT,text,payload_format,,trading_registry,canonical column name for trading_registry.payload_format,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_Q5F9M2NZ,field,REGISTRY_ITEM_UPDATED_AT,text,updated_at,,trading_registry,canonical column name for trading_registry.updated_at,2026-04-25 20:05:03.735509-04,2026-04-25 20:16:01.180555-04
+fld_4YALJN0B,field,REPOSITORY_PATH,text,repository_path,,,canonical shared field name for repository path slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_6XFD3B1C,field,REVIEWED_COMMANDS,text,reviewed_commands,,,canonical shared field name for reviewed command list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_Q9KQLPH4,field,REVIEWED_FILES,text,reviewed_files,,,canonical shared field name for reviewed file list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_6RJNNWV1,field,REVIEW_READINESS,text,review_readiness,,,canonical shared field name for review readiness slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_SBU4RCHA,field,SPLIT_ISSUE_LIST,text,split_issue_list,,,canonical shared field name for split issue list slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_PVUM9JE5,field,TASK_GOAL,text,task_goal,,,canonical shared field name for task goal slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_7X5H7N6Y,field,TASK_IDENTITY,text,task_identity,,,canonical shared field name for task identity slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_5DVSJFM0,field,TASK_LIFECYCLE_STATE,text,task_lifecycle_state,,,canonical shared field name for task lifecycle state slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_RSO93XMM,field,TASK_SCOPE,text,task_scope,,,canonical shared field name for task scope slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_W9NA62KA,field,TASK_STATUS_SUMMARY,text,task_status_summary,,,canonical shared field name for task status summary slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_VTD4KDTM,field,TEMPORARY_NEW_NAMES,text,temporary_new_names,,,canonical shared field name for temporary new name slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_U27NM0BU,field,TEST_COMMANDS,text,test_commands,,,canonical shared field name for test command slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_0YVMMK1A,field,TEST_EXPECTATION,text,test_expectation,,,canonical shared field name for test expectation slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_YX5TMJN9,field,TEST_OUTPUT,text,test_output,,,canonical shared field name for test output slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_T5PSOYKO,field,TEST_STATUS,text,test_status,,,canonical shared field name for test status slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+fld_ZGTS8P3D,field,WORKFLOW_IDENTITY,text,workflow_identity,,,canonical shared field name for workflow identity slots,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+mns_B5N1K6XD,maintenance_status,MAINTENANCE_STATUS_BLOCKED,text,blocked,,,default shared maintenance status value when maintenance is blocked by a real constraint,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+mns_L4T8Q2WP,maintenance_status,MAINTENANCE_STATUS_HEALTHY,text,healthy,,,default shared maintenance status value when the project is in healthy maintained shape,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+mns_P7C3V9RA,maintenance_status,MAINTENANCE_STATUS_NEEDS_ATTENTION,text,needs_attention,,,default shared maintenance status value when maintenance found issues that need attention,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+rep_H6S3V8LA,repo,TRADING_MAIN_REPO,text,trading-main,/root/projects/trading-main,,"canonical repository entry for the trading-main project, including its repository root path",2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+rrd_V9H5C2KR,review_readiness,REVIEW_READINESS_BLOCKED,text,blocked,,,default shared review readiness value for work that is blocked from review,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+rrd_W6P3N1TX,review_readiness,REVIEW_READINESS_NOT_READY,text,not_ready,,,default shared review readiness value for work that is not ready for review,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+rrd_L2F8Q4MA,review_readiness,REVIEW_READINESS_READY,text,ready,,,default shared review readiness value for work that is ready for review,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+scr_P9H4K2XM,script,GET_ITEM_PATH_BY_ID_HELPER,text,getItemPathById,/root/projects/trading-main/helpers/registry/registry-reader.js,,id-based optional path helper; returns path or null,2026-04-25 20:16:01.179909-04,2026-04-25 20:16:01.179909-04
+scr_L3V8N5TK,script,GET_ITEM_PATH_BY_KEY_UNSAFE_HELPER,text,getItemPathByKeyUnsafe,/root/projects/trading-main/helpers/registry/registry-reader.js,,key-based optional path helper for human/debug use; key is renameable,2026-04-25 20:16:01.179909-04,2026-04-25 20:16:01.179909-04
+scr_7XQAMNBH,script,REGISTRY_HELPER_INDEX_SCRIPT,text,registry helper public module index,/root/projects/trading-main/helpers/registry/index.js,,canonical source locator for the registry helper package entrypoint,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+scr_YO00DVVP,script,REGISTRY_READER_SCRIPT,text,createRegistryReader,/root/projects/trading-main/helpers/registry/registry-reader.js,,canonical source locator for the registry reader helper,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+scr_MA60CYT4,script,REGISTRY_TYPES_SCRIPT,text,REGISTRY_KINDS,/root/projects/trading-main/helpers/registry/registry-types.js,,canonical source locator for registry kind definitions,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+scr_D7Q6M1RA,script,REQUIRE_ITEM_PATH_BY_ID_HELPER,text,requireItemPathById,/root/projects/trading-main/helpers/registry/registry-reader.js,,id-based required path helper; returns path or throws,2026-04-25 20:16:01.179909-04,2026-04-25 20:16:01.179909-04
+scr_W2C9F7QP,script,REQUIRE_ITEM_PATH_BY_KEY_UNSAFE_HELPER,text,requireItemPathByKeyUnsafe,/root/projects/trading-main/helpers/registry/registry-reader.js,,key-based required path helper for human/debug use; key is renameable,2026-04-25 20:16:01.179909-04,2026-04-25 20:16:01.179909-04
+scr_Q2L6F8MW,script,SECRET_RESOLVER_SCRIPT,text,createSecretResolver,/root/projects/trading-main/helpers/registry/secret-resolver.js,,canonical source locator for the secret resolver helper,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_H1V8L4TE,task_lifecycle_state,TASK_LIFECYCLE_STATE_ACCEPTED,text,accepted,,,default shared task lifecycle state value for work that has been accepted,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_K5Q7F2MD,task_lifecycle_state,TASK_LIFECYCLE_STATE_BLOCKED,text,blocked,,,default shared task lifecycle state value for work that is blocked,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_C9T1G7WF,task_lifecycle_state,TASK_LIFECYCLE_STATE_CANCELLED,text,cancelled,,,default shared task lifecycle state value for work that has been cancelled,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_M4D6R8QJ,task_lifecycle_state,TASK_LIFECYCLE_STATE_CLOSED,text,closed,,,default shared task lifecycle state value for work that is closed,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_D4N8K2QW,task_lifecycle_state,TASK_LIFECYCLE_STATE_DESIGNING,text,designing,,,default shared task lifecycle state value for work that is still being designed,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_B6X2H5RA,task_lifecycle_state,TASK_LIFECYCLE_STATE_DISPATCHED,text,dispatched,,,default shared task lifecycle state value for work that has been dispatched,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_T8J4W1NP,task_lifecycle_state,TASK_LIFECYCLE_STATE_EXECUTING,text,executing,,,default shared task lifecycle state value for work in active execution,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_R3C9Y6UA,task_lifecycle_state,TASK_LIFECYCLE_STATE_READY_FOR_ACCEPTANCE,text,ready_for_acceptance,,,default shared task lifecycle state value for work waiting for acceptance review,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_P7M3V9LC,task_lifecycle_state,TASK_LIFECYCLE_STATE_READY_TO_DISPATCH,text,ready_to_dispatch,,,default shared task lifecycle state value for work ready to hand to an executor,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tls_N7B2P5XK,task_lifecycle_state,TASK_LIFECYCLE_STATE_REJECTED,text,rejected,,,default shared task lifecycle state value for work that has been rejected,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+trm_RXUP2T7D,term,CODEX,text,Coding executor used for bounded implementation tasks under OpenClaw supervision.,,,canonical shared definition for Codex in this workspace,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+trm_5HE1ZLG6,term,OPENCLAW,text,"Project sentinel and orchestration layer that owns project route, docs, dispatch, review, and acceptance.",,,canonical shared definition for OpenClaw,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+trm_4F58616K,term,POSTGRESQL,text,Open-source relational database system used as the target engine for trading-main registry and related server-side data work.,,,canonical shared definition for PostgreSQL,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+trm_S8M3B7VN,term,SMB,text,Server Message Block; network file-sharing protocol used for mounted or shared folders when needed.,,,canonical shared definition for SMB in the trading server environment,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+trm_NBPU5J5P,term,SQL,text,Structured Query Language; the standard language for querying and managing relational databases.,,,canonical shared definition for SQL,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+trm_T4X9L2QK,term,TAILSCALE,text,Mesh VPN used for private network connectivity between trusted devices and services.,,,canonical shared definition for Tailscale in the trading server environment,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+trm_QLKAMITP,term,TRADING_MAIN_REGISTRY,text,"Trading-main registry for trading-wide referenced values, approved outputs, source locators, status vocabularies, and approved terms.",,,canonical shared definition for trading-main registry,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tst_F6V1M5RA,test_status,TEST_STATUS_FAILED,text,failed,,,default shared test status value for failing verification,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tst_X5N1B4QJ,test_status,TEST_STATUS_NOT_REQUIRED,text,not_required,,,default shared test status value when verification was not required,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tst_P9C4T7XH,test_status,TEST_STATUS_NOT_RUN,text,not_run,,,default shared test status value when verification did not run,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tst_R2D6K8YL,test_status,TEST_STATUS_PARTIALLY_RUN,text,partially_run,,,default shared test status value when verification ran only partially,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
+tst_J3Q8L2NW,test_status,TEST_STATUS_PASSED,text,passed,,,default shared test status value for passing verification,2026-04-25 20:05:03.735509-04,2026-04-25 20:05:03.735509-04
