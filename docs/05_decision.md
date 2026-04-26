@@ -198,17 +198,18 @@ The initial artifact, manifest, ready-signal, and request contract placeholders 
 
 ### Decision
 
-Move artifact, manifest, ready-signal, and request drafting surfaces to `templates/contracts/`. Keep `docs/` focused on the 00-06 docs spine.
+Move artifact, manifest, ready-signal, and request drafting surfaces to `templates/contracts/`. Keep `docs/` focused on project governance plus any approved project-specific guide docs.
 
 ### Rationale
 
-The docs spine should contain ratified project context and governance. Drafting templates belong under `templates/`. Registry type vocabularies belong under `registry/`.
+The docs spine should contain ratified project context and governance. Drafting templates belong under `templates/`. Registry type vocabularies belong under `registry/`; registry operating guidance may live in an approved docs guide.
 
 ### Consequences
 
-- Do not add numbered docs beyond `06_memory.md` for templates or registries.
+- Do not add numbered docs beyond `06_memory.md` for reusable drafting templates.
 - Use `templates/contracts/` for reusable contract drafting surfaces.
 - Use `registry/kinds/*_type.md` and SQL migrations for registered type vocabularies.
+- Use `docs/07_registry.md` for the approved `trading-main` registry operating guide.
 
 ## D012 - Remove canceled-project registry entries
 
@@ -479,3 +480,26 @@ Kind files are normative boundary documentation. Review files are commentary and
 - New registry kinds must add `registry/kinds/<kind>.md`.
 - `registry/reviews/` must not own kind source-of-truth files.
 - `registry/README.md` remains the index for both SQL entries and kind boundary files.
+
+## D024 - Add a registry-specific docs guide
+
+Date: 2026-04-25
+
+### Context
+
+`trading-main` has grown from a docs-only coordination repository into the platform repository that also owns the SQL-backed registry, generated registry snapshot, registry helper surface, and registry maintenance workflow. Keeping all registry operating detail inside `00_scope.md` through `06_memory.md` would blur the project-wide docs with the registration subsystem guide.
+
+### Decision
+
+Keep `00_scope.md` through `06_memory.md` focused on the whole trading platform repository. Add `docs/07_registry.md` as the registry-specific operating guide.
+
+### Rationale
+
+The registry is now a first-class function of `trading-main`, not just a passing project context note. It needs a stable guide that explains ownership, entry model, SQL workflow, helper surface, and acceptance checks without overloading the general project docs.
+
+### Consequences
+
+- `docs/07_registry.md` is part of the accepted `trading-main` docs set.
+- `00_scope.md` through `06_memory.md` remain project-wide platform docs.
+- Registry kind source-of-truth files remain under `registry/kinds/`, not under `docs/`.
+- Contract drafting templates remain under `templates/contracts/`, not under `docs/`.

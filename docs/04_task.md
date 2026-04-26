@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Added `docs/07_registry.md` so `00_scope.md` through `06_memory.md` remain project-wide while registry-specific rules have their own guide.
 - Moved registry kind boundary files into `registry/kinds/`; `registry/reviews/` remains for review artifacts.
 - Registered all eight trading repositories as `repo` rows in `registry/current.csv`.
 - Registered `REGISTRY_EXPORT_CURRENT_CSV_HELPER` for regenerating `registry/current.csv`.
@@ -31,7 +32,7 @@
 - Backfilled `applies_to` for every active field registry entry and added a SQL check constraint to prevent blank field scopes.
 - Registered id-first path helper methods in the SQL registry.
 - Added nullable registry `applies_to` column for field usage/source scope.
-- Updated secret resolver helper to prefer config ids and mark config-key lookups unsafe.
+- Updated secret resolver helper to prefer config ids; later standardized the public helper surface to id-input only.
 - Added nullable registry `path` column and id-first path helper APIs.
 - Removed `path` as a registry kind and merged standalone root-path entries into their owning entity rows.
 - Restored `TAILSCALE` and `SMB` as active `term` entries.

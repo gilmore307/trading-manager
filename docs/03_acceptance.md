@@ -6,7 +6,7 @@
 
 Acceptance for this repository focuses on:
 
-- docs spine completeness;
+- docs spine completeness, including the registry-specific `07_registry.md`;
 - repository boundary clarity;
 - cross-repository workflow clarity;
 - shared contract clarity;
@@ -24,7 +24,7 @@ This repository does not accept trading runtime behavior. Runtime behavior is ac
 
 A change to `trading-main` can be accepted only if:
 
-- the docs spine remains complete;
+- the docs spine remains complete, including `07_registry.md`;
 - `README.md` accurately describes the repository boundary;
 - repository purpose remains system docs, contracts, registries, templates, shared helpers, and shared environment anchoring;
 - `.venv/`, if present, is ignored by Git and treated as local runtime infrastructure;
@@ -39,7 +39,7 @@ Documentation-only changes are acceptable when they:
 
 - update the narrowest authoritative file;
 - avoid duplicating durable facts across neighboring docs;
-- preserve the separation between scope, context, workflow, acceptance, task, decision, memory, and contracts;
+- preserve the separation between scope, context, workflow, acceptance, task, decision, memory, registry, and contracts;
 - mark unresolved items as explicit open gaps rather than pretending they are settled;
 - add or update decisions when a choice changes architecture, naming, contract shape, acceptance criteria, or repository boundaries;
 - keep examples clearly labeled as examples when they are not binding contracts;
@@ -69,7 +69,7 @@ Registry and template changes are acceptable when they:
 - regenerate `registry/current.csv` after SQL registry changes;
 - prefer id-based registry dereferencing for automation;
 - ensure every field entry has non-empty `applies_to`;
-- mark key-based helper use as unsafe or human/debug only;
+- do not add key-input helper APIs to the public helper surface;
 - avoid scattering field/status definitions across docs;
 - document compatibility impact when renaming or removing registered fields;
 - keep templates reusable and not tied to one component unless clearly labeled;
@@ -110,7 +110,7 @@ find . -maxdepth 2 -type f | sort
 
 Manual review must confirm:
 
-- required docs files exist;
+- required docs files exist, including `docs/07_registry.md`;
 - contract drafting templates live under `templates/contracts/`, not `docs/`;
 - registry kind Markdown files do not list concrete active rows;
 - entity-like registry entries use the nullable `path` column instead of a separate `path` kind;

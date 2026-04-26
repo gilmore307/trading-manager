@@ -2,6 +2,8 @@
 
 `registry/` is the canonical home for trading-wide registered names and shared vocabulary.
 
+For the docs-level registry guide, see [`docs/07_registry.md`](../docs/07_registry.md).
+
 The registry has two layers:
 
 1. **Kind boundary docs** — one Markdown file per `kind` under `registry/kinds/`, defining what that kind means and what belongs in it.

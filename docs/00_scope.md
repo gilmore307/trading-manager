@@ -17,7 +17,7 @@ This repository exists to keep the multi-repository trading system coherent. It 
 - Define shared manifest contracts.
 - Define shared ready-signal contracts.
 - Define shared request contracts.
-- Maintain trading-wide registered fields, identifiers, statuses, artifact types, and request types.
+- Maintain the trading-wide registry for fields, identifiers, statuses, artifact types, request types, and shared helper surfaces.
 - Store trading-wide templates.
 - Store shared helper code used across trading repositories.
 - Record system-level acceptance rules.
@@ -65,11 +65,11 @@ The project should prefer strict boundaries, durable contracts, and evidence-bas
 - The `.venv/` directory is runtime infrastructure, not repository content.
 - Component repositories may implement or consume contracts defined here, but they must not redefine incompatible local versions of global contracts.
 - Each component repository must keep its own docs spine; `trading-main` does not replace component-level documentation.
-- Trading-wide status vocabularies and registrable fields are maintained in `trading-main/registry/`.
+- Trading-wide status vocabularies and registrable fields are maintained in `trading-main/registry/`; see `docs/07_registry.md` for registry-specific rules.
 - A fact should live in the narrowest authoritative home:
   - system-wide facts live here;
   - component-specific facts live in the relevant component repository;
-  - trading-wide registered names and vocabularies live in `trading-main/registry/`.
+  - trading-wide registered names and vocabularies live in `trading-main/registry/`, with operating rules in `docs/07_registry.md`.
 - Market-state discovery must not use strategy returns or strategy performance as input. Strategy results may only be attached after market states have already been discovered.
 - `trading-storage` owns shared persistent storage contracts for trading artifacts; `trading-main` defines the system-level relationship to those contracts.
 
