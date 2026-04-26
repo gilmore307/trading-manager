@@ -19,4 +19,4 @@ Reject or re-scope entries that are actually:
 
 ## Usage Metadata
 
-For `field` entries, populate `trading_registry.applies_to` when the field is tied to a known table, file, contract, template, or data shape. Leave it empty only when the usage surface is intentionally broad or not yet settled.
+Every `field` entry must populate `trading_registry.applies_to`. Use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Do not add a field entry until its first valid usage scope is known.

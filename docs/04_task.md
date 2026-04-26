@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Backfilled `applies_to` for every active field registry entry and added a SQL check constraint to prevent blank field scopes.
 - Registered id-first path helper methods in the SQL registry.
 - Added nullable registry `applies_to` column for field usage/source scope.
 - Updated secret resolver helper to prefer config ids and mark config-key lookups unsafe.

@@ -362,3 +362,25 @@ Secrets are sensitive enough that automation should not depend on renameable reg
 
 - Prefer `getSecretAliasByConfigId`, `getSecretEntryByConfigId`, `getSecretPathByConfigId`, and `loadSecretTextByConfigId`.
 - Key-based config lookup helpers carry the `Unsafe` suffix.
+
+## D019 - Every field registry entry requires `applies_to`
+
+Date: 2026-04-25
+
+### Context
+
+The registry added `applies_to` for field usage/source scope. Leaving this blank for most field rows would make the column unreliable and force reviewers to infer where each field is used.
+
+### Decision
+
+Every `field` registry entry must have non-empty `applies_to`. Multiple usage surfaces are recorded as semicolon-separated scopes.
+
+### Rationale
+
+Field names are only useful if their valid usage surface is visible. A required `applies_to` column makes `registry/current.csv` useful for review and prevents broad, ambiguous field registrations.
+
+### Consequences
+
+- New `field` rows must include `applies_to` at registration time.
+- A SQL check constraint rejects blank `applies_to` for `kind = field`.
+- If a field belongs to multiple surfaces, use a semicolon-separated list.
