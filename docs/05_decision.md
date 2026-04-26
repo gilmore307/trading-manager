@@ -353,7 +353,7 @@ Secret resolver helpers previously used config keys, but registry keys are renam
 
 ### Decision
 
-Expose `SecretResolver.load_secret_text_by_config_id` as the id-first config secret helper in the official Python runtime helper surface.
+Expose `SecretResolver.load_secret_text_by_config_id` as the id-first config secret helper in the official Python runtime helper surface. It resolves source-level JSON secret aliases and may return either raw JSON text or a named JSON string field.
 
 ### Rationale
 
@@ -361,7 +361,7 @@ Secrets are sensitive enough that automation should not depend on renameable reg
 
 ### Consequences
 
-- Prefer `SecretResolver.load_secret_text_by_config_id`.
+- Prefer `SecretResolver.load_secret_text_by_config_id(config_id, field_name=None)` for source-level secret JSON.
 - Do not add key-input config secret helpers to the public helper surface.
 
 ## D019 - Every field registry entry requires `applies_to`
@@ -756,3 +756,26 @@ A local test inventory keeps coverage discoverable without polluting the registr
 - `helpers/tests/README.md` inventories each helper test script.
 - Tests enforce that first-party `helpers/tests/test_*.py` scripts are documented and absent from registry `script` rows.
 - New or renamed test scripts require the owning tests README to be updated in the same change.
+
+## D036 - Source secrets use one JSON file per source
+
+Date: 2026-04-26
+
+### Context
+
+OKX credentials were initially split into separate aliases/files for API key, secret key, and passphrase. The user clarified that source credentials should not be scattered: one source should use one JSON secret file, and the helper should own parsing named fields.
+
+### Decision
+
+Use one JSON secret file per source/provider under `/root/secrets/<source>.json`. Registry config rows should point to the source-level alias, such as `okx` or `github`, and may mirror the JSON file path in `path`. Register reusable JSON key names, such as `api_key`, `secret_key`, `passphrase`, and `pat`, as `field` rows with `applies_to=source_secret_json`.
+
+### Rationale
+
+A source-level JSON file keeps related credentials together, prevents config-row sprawl, and gives the resolver one consistent parsing model for OKX, GitHub, and future providers.
+
+### Consequences
+
+- Replace split OKX credential config rows with `OKX_SECRET_ALIAS`.
+- Add `GITHUB_SECRET_ALIAS` for the GitHub source-level JSON file.
+- `SecretResolver.load_secret_text_by_config_id(config_id, field_name=None)` returns raw JSON text or one named string field.
+- Secret values remain outside Git and outside registry rows.

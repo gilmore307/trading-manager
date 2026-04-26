@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Consolidated OKX and GitHub secret handling to one JSON secret file per source and registered source-secret JSON field names.
 - Registered OKX provider term, secret aliases, allowlisted IPv4 metadata, and API key remark without storing secret values in Git.
 - Defined test-script boundary: test scripts stay out of registry `script` rows and are inventoried in their test-directory README.
 - Removed registry kind vocabulary validators from the runtime helper package; tests now compare SQL kind constraints with `registry/kinds/*.md`.

@@ -93,9 +93,11 @@ Current official Python registry item lookup and secret helper surface is id-inp
 - `RegistryReader.get_key_by_id(id)`
 - `RegistryReader.get_payload_by_id(id)`
 - `RegistryReader.get_path_by_id(id)`
-- `SecretResolver.load_secret_text_by_config_id(config_id)`
+- `SecretResolver.load_secret_text_by_config_id(config_id, field_name=None)`
 
 Registry kind and payload-format vocabularies are registry/schema concerns, not runtime helper exports. Tests compare kind files and payload-format rows with SQL constraints; do not add package-level vocabulary validator helpers unless runtime validation becomes a real consumer requirement.
+
+Source secret configs should point to one source-level JSON file per provider/source. The secret resolver can return either the raw JSON text or one named JSON string field.
 
 The official Python helper source lives under `helpers/trading_registry/`.
 

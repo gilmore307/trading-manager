@@ -139,7 +139,7 @@ The registered official Python id-only lookup and secret helper surface is:
 - `RegistryReader.get_key_by_id(id)`
 - `RegistryReader.get_payload_by_id(id)`
 - `RegistryReader.get_path_by_id(id)`
-- `SecretResolver.load_secret_text_by_config_id(config_id)`
+- `SecretResolver.load_secret_text_by_config_id(config_id, field_name=None)`
 
 Registry kind and payload-format vocabularies are checked against SQL constraints by tests, not by public runtime helper exports.
 
@@ -160,6 +160,8 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 - Use stable `id` values for automation and durable references.
 - Treat `key` values as renameable labels.
 - Store secret aliases only; never store secret values.
+
+Source-level secret JSON config rows should use `payload_format=secret_alias`, store the source alias in `payload`, and may mirror the JSON file path in `path`. JSON field names such as `api_key`, `secret_key`, `passphrase`, and `pat` are registered as `field` rows with `applies_to=source_secret_json`.
 - Use nullable `path` for direct locators; do not create a `path` kind.
 - Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.

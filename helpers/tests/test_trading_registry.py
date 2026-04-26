@@ -156,43 +156,43 @@ class RegistryHelperTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "is not valid JSON"):
             parse_registry("{", "/root/secrets/registry.json")
         parsed = parse_registry(
-            json.dumps({"example-service": {"token": {"path": "/root/secrets/example-service/token"}}}),
+            json.dumps({"example-service": {"path": "/root/secrets/example-service.json"}}),
             "/root/secrets/registry.json",
         )
-        self.assertEqual(parsed["example-service"]["token"]["path"], "/root/secrets/example-service/token")
+        self.assertEqual(parsed["example-service"]["path"], "/root/secrets/example-service.json")
 
-    def test_get_secret_entry_from_registry_resolves_aliases(self):
+    def test_get_secret_entry_from_registry_resolves_source_json_aliases(self):
         entry = get_secret_entry_from_registry(
             {
                 "github": {
-                    "pat": {
-                        "path": "/root/secrets/github/pat",
-                        "kind": "token",
-                        "use": "git https credential helper",
-                    }
+                    "path": "/root/secrets/github.json",
+                    "kind": "source_secret_json",
+                    "use": "git operations",
+                    "fields": {"pat": "GitHub personal access token"},
                 }
             },
-            "github/pat",
+            "github",
             "/root/secrets/registry.json",
         )
-        self.assertEqual(entry["alias"], "github/pat")
-        self.assertEqual(entry["path"], "/root/secrets/github/pat")
-        self.assertEqual(entry["kind"], "token")
+        self.assertEqual(entry["alias"], "github")
+        self.assertEqual(entry["path"], "/root/secrets/github.json")
+        self.assertEqual(entry["kind"], "source_secret_json")
 
-    def test_secret_resolver_loads_secret_text_by_config_id(self):
+    def test_secret_resolver_loads_source_json_field_text_by_config_id(self):
         reads = []
 
         def query(sql, params):
             self.assertIn("WHERE id = %s", sql)
-            self.assertEqual(params, ["cfg_EXAMPLETOKEN"])
+            self.assertEqual(params, ["cfg_EXAMPLESECRET"])
             return {
                 "rows": [
                     create_row(
-                        id="cfg_EXAMPLETOKEN",
+                        id="cfg_EXAMPLESECRET",
                         kind="config",
-                        key="EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS",
+                        key="EXAMPLE_SERVICE_SECRET_ALIAS",
                         payload_format="secret_alias",
-                        payload="example-service/token",
+                        payload="example-service",
+                        path="/root/secrets/example-service.json",
                         applies_to=None,
                     )
                 ]
@@ -204,20 +204,26 @@ class RegistryHelperTests(unittest.TestCase):
                 return json.dumps(
                     {
                         "example-service": {
-                            "token": {
-                                "path": "/root/secrets/example-service/token",
-                                "kind": "token",
-                                "use": "example service bearer token",
-                            }
+                            "path": "/root/secrets/example-service.json",
+                            "kind": "source_secret_json",
+                            "use": "example service credentials",
+                            "fields": {"api_key": "example service API key"},
                         }
                     }
                 )
-            if path == "/root/secrets/example-service/token":
-                return "secret-value\n"
+            if path == "/root/secrets/example-service.json":
+                return json.dumps({"api_key": "secret-value", "secret_key": "other-secret"})
             raise AssertionError(f"unexpected read: {path}")
 
         resolver = SecretResolver(query, registry_path="/root/secrets/registry.json", read_text=read_text)
-        self.assertEqual(resolver.load_secret_text_by_config_id("cfg_EXAMPLETOKEN"), "secret-value")
+        raw_secret_json = resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET")
+        self.assertEqual(json.loads(raw_secret_json)["api_key"], "secret-value")
+        self.assertEqual(
+            resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET", "api_key"),
+            "secret-value",
+        )
+        with self.assertRaisesRegex(KeyError, "Secret JSON field not found"):
+            resolver.load_secret_text_by_config_id("cfg_EXAMPLESECRET", "missing")
         self.assertEqual(reads[0], "/root/secrets/registry.json")
 
     def test_secret_resolver_rejects_non_config_items(self):

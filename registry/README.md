@@ -97,7 +97,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 
 - Do not define the same kind in multiple Markdown files.
 - Do not store concrete active row lists in `registry/kinds/*.md`.
-- Do not store secrets. Store secret aliases only.
+- Do not store secrets. Store source-level secret aliases only; one provider/source should normally map to one JSON secret file.
 - Do not mix component-local implementation details into trading-wide registry entries.
 - New fields, statuses, payload formats, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
@@ -107,6 +107,6 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - `script` rows are for stable callable helper/automation exports, not package constants or test scripts.
 - Repository rows should include the repository name in `payload` and the local checkout root in `path` when the checkout path is an approved shared fact.
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos and scripts.
-- Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes.
+- Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Source secret JSON field names use `applies_to=source_secret_json`.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.
 - If a new kind is needed, add its `registry/kinds/<kind>.md` boundary file, update the SQL kind check, update registry tests/docs, and regenerate `registry/current.csv` in the same reviewed change.

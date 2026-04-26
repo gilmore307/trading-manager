@@ -65,7 +65,7 @@ def get_secret_entry_from_registry(
 
 
 class SecretResolver:
-    """Resolve secret text by stable registry config id."""
+    """Resolve source-level secret JSON text by stable registry config id."""
 
     def __init__(
         self,
@@ -81,7 +81,7 @@ class SecretResolver:
     def _load_registry(self) -> Mapping[str, Any]:
         return parse_registry(self._read_text(self._registry_path), self._registry_path)
 
-    def load_secret_text_by_config_id(self, config_id: str) -> str:
+    def load_secret_text_by_config_id(self, config_id: str, field_name: str | None = None) -> str:
         normalized = _non_empty_string("config_id", config_id)
         item = self._reader.require_item_by_id(normalized)
 
@@ -90,6 +90,36 @@ class SecretResolver:
                 f"Registry item {normalized} must be kind=config to resolve a secret alias by id"
             )
 
+        if item.payload_format != "secret_alias":
+            raise ValueError(
+                f"Registry item {normalized} must use payload_format=secret_alias to resolve a secret alias by id"
+            )
+
         alias = _non_empty_string(f"registry config payload for {normalized}", item.payload)
         entry = get_secret_entry_from_registry(self._load_registry(), alias, self._registry_path)
-        return self._read_text(str(entry["path"])).strip()
+        secret_path = _non_empty_string(f"secret path for {alias}", str(entry["path"]))
+
+        if item.path is not None and item.path != secret_path:
+            raise ValueError(
+                f"Registry item {normalized} path does not match secret registry path for alias {alias}"
+            )
+
+        secret_text = self._read_text(secret_path).strip()
+        if field_name is None:
+            return secret_text
+
+        field = _non_empty_string("field_name", field_name)
+        try:
+            parsed = json.loads(secret_text)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"Secret file for alias {alias} is not valid JSON: {error.msg}") from error
+
+        if not isinstance(parsed, Mapping):
+            raise ValueError(f"Secret file for alias {alias} must be a JSON object")
+        if field not in parsed:
+            raise KeyError(f"Secret JSON field not found for alias {alias}: {field}")
+
+        value = parsed[field]
+        if not isinstance(value, str):
+            raise ValueError(f"Secret JSON field for alias {alias} must be a string: {field}")
+        return value.strip()

@@ -14,7 +14,7 @@
 - `test_trading_registry.py` verifies:
   - id-based `RegistryReader` lookup, required lookup, path, payload, key, and kind-filter behavior;
   - registry row mapping into `RegistryItem` objects;
-  - secret alias parsing and id-based secret resolution behavior;
+  - source-level secret JSON alias parsing and id-based secret field resolution behavior;
   - SQL `kind` constraint alignment with `registry/kinds/*.md` and active `registry/current.csv` rows;
   - SQL `payload_format` constraint alignment with registered `kind=payload_format` rows;
   - test-script governance: first-party test scripts are documented here and are not registered as registry `script` rows.
