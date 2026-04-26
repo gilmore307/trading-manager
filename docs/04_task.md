@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Registered all eight trading repositories as `repo` rows in `registry/current.csv`.
 - Registered `REGISTRY_EXPORT_CURRENT_CSV_HELPER` for regenerating `registry/current.csv`.
 - Standardized registered helper surface to four id-only helpers: key, payload, path, and secret text by config id.
 - Backfilled `applies_to` for every active field registry entry and added a SQL check constraint to prevent blank field scopes.

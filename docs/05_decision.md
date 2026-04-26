@@ -435,3 +435,25 @@ This keeps the CSV generation command visible without mixing it into the id-only
 - Lookup helpers remain id-only.
 - CSV generation is registered as a maintenance helper.
 - The helper row points to `registry/sql/apply-migrations.py` and applies to `registry/current.csv`.
+
+## D022 - All trading repositories are registry entries
+
+Date: 2026-04-25
+
+### Context
+
+The trading platform is split across `trading-main` plus seven component repositories. Only registering `trading-main` would make cross-repository automation depend on unstated repository names and paths.
+
+### Decision
+
+Register every trading repository as a `repo` row with its stable registry id, repository key, repository name in `payload`, local checkout path in `path`, and component-repository context in `applies_to`.
+
+### Rationale
+
+The registry is the shared naming authority. Component repository names and checkout paths are shared infrastructure facts and should be discoverable through the registry instead of being re-invented in scripts or docs.
+
+### Consequences
+
+- All eight trading repositories are visible in `registry/current.csv`.
+- Automation should use repo row ids to retrieve repository names and paths.
+- Repository remotes are recorded in repo-row notes for review visibility.
