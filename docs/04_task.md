@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Registered FOMC calendar, official macro release calendar discovery, and ETF issuer holdings source terms.
 - Registered U.S. Treasury Fiscal Data as an open/no-key provider term with official documentation path.
 - Added official documentation URLs to registered provider term paths while keeping secret config paths pointed at local JSON files.
 - Registered FRED, Census, BEA, and BLS source-level secret aliases for macro/economic data acquisition.

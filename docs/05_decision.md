@@ -912,3 +912,25 @@ This keeps documentation discoverable through the registry while avoiding unnece
 - Provider key is `US_TREASURY_FISCAL_DATA`.
 - Registry path points to `https://fiscaldata.treasury.gov/api-documentation/`.
 - Connector implementation must still document endpoint coverage, pagination, rate/usage behavior, and fixture policy before acceptance.
+
+## D043 - Calendar and ETF holdings sources use official web sources
+
+Date: 2026-04-26
+
+### Context
+
+The user identified three non-credential data-source needs: FOMC calendar, official macro release calendars, and ETF holdings constituents/weights. These are not all conventional API credential surfaces; some require web discovery and issuer-site sourcing.
+
+### Decision
+
+Register shared source terms for FOMC calendar, official macro release calendar discovery, and ETF issuer holdings. Use the official Federal Reserve FOMC calendar URL for `FOMC_CALENDAR`; use web search to locate current official agency macro-release calendars; use issuer websites or issuer-published holdings files as the source of truth for ETF holdings and weights.
+
+### Rationale
+
+These source-of-truth rules should be explicit before connector or scraper work begins, especially where no credentialed provider API is involved.
+
+### Consequences
+
+- Third-party macro calendars and ETF aggregators are not source of truth unless explicitly approved as secondary references.
+- Connectors must preserve source URL, retrieval timestamp, and publication/effective date where available.
+- Default tests must use fixtures or mocks, not live web calls.
