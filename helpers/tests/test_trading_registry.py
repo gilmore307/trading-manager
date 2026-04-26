@@ -74,6 +74,23 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("iso_datetime", registered_formats)
         self.assertIn("secret_alias", registered_formats)
 
+
+    def test_test_scripts_are_documented_and_not_registered_as_scripts(self):
+        test_scripts = sorted(Path("helpers/tests").glob("test_*.py"))
+        self.assertTrue(test_scripts)
+
+        tests_readme = Path("helpers/tests/README.md").read_text()
+        for script in test_scripts:
+            self.assertIn(f"`{script.name}`", tests_readme)
+
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            script_rows = [row for row in csv.DictReader(csv_file) if row["kind"] == "script"]
+
+        for row in script_rows:
+            normalized_path = (row["path"] or "").replace("\\", "/")
+            self.assertNotIn("/tests/", normalized_path)
+            self.assertFalse(Path(normalized_path).name.startswith("test_"), row["key"])
+
     def test_map_registry_item_row(self):
         item = map_registry_item_row(create_row(payload_format="field_name"))
         self.assertEqual(item.id, "fld_A7K3P2Q9")

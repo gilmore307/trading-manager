@@ -25,3 +25,4 @@
 - Component runtime helpers should align with the Python `.venv` unless a future explicit decision accepts another runtime.
 - Registry `payload_format` is a registered value-format vocabulary, not just text/file storage; use the narrowest registered format and keep SQL constraint values aligned with `kind=payload_format` rows.
 - Registry kind vocabulary belongs to the SQL kind constraint and `registry/kinds/*.md`; do not mirror it as runtime package validators unless a real runtime consumer requires it.
+- Test scripts are repository-local verification assets, not registry `script` rows; each test directory README must inventory every first-party test script and what it verifies.

@@ -14,5 +14,6 @@ Reject or re-scope entries that are actually:
 
 - directories;
 - generated files;
+- test scripts or test fixtures;
 - runtime artifact paths;
 - generic terms;

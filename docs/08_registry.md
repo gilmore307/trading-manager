@@ -163,7 +163,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 - Use nullable `path` for direct locators; do not create a `path` kind.
 - Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.
-- Script rows should represent stable callable helper/automation exports, not every helper source file or package constant.
+- Script rows should represent stable callable helper/automation exports, not every helper source file, package constant, or test script.
 - Record review rationale in `note` or `registry/reviews/` when a boundary choice could be confused.
 
 ## Acceptance Checklist
@@ -178,4 +178,5 @@ A registry change is acceptable when:
 - registry item lookup and secret helper APIs remain id-input only;
 - every `field` row has non-empty `applies_to`;
 - migration dry-run reports no pending migrations after application;
-- relevant helper tests pass when helper behavior changed.
+- relevant helper tests pass when helper behavior changed;
+- test scripts remain out of registry `script` rows and are documented in their test-directory README.

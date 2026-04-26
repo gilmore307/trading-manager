@@ -82,6 +82,7 @@ Shared helper changes are acceptable when they:
 
 - provide reusable trading infrastructure rather than component-specific runtime behavior;
 - include or declare appropriate tests once helper behavior exists;
+- keep test scripts out of registry `script` rows and document each test script in its test-directory README;
 - avoid embedding secrets, provider credentials, or local-only paths;
 - keep public interfaces explicit and stable enough for component repositories;
 - state whether the helper is internal-only or a packaged runtime dependency;

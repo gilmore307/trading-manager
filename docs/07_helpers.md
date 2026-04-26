@@ -39,10 +39,11 @@ Helpers must not own:
 ```text
 helpers/
   README.md                 Helper boundary summary.
-  python/                   Formal Python helper package source and tests.
+  trading_registry/         Formal Python registry helper package source.
+  tests/                    Python helper tests and test-script inventory.
 ```
 
-Python helper packages live directly under `helpers/` with root package metadata in `pyproject.toml`. Future helper packages should use a named package/subdirectory with a clear README when the boundary is more than trivial.
+Python helper packages live directly under `helpers/` with root package metadata in `pyproject.toml`. Tests live under `helpers/tests/` and must be inventoried in `helpers/tests/README.md`. Future helper packages should use a named package/subdirectory with a clear README when the boundary is more than trivial.
 
 ## Current Package Status
 
@@ -106,6 +107,7 @@ When any component work discovers or creates a helper that should be global, rec
 
 - Shared helper code belongs under `helpers/`.
 - Public helper surfaces that automation may call should be registered as `script` rows when stable.
+- Test scripts are not registry `script` rows; document each test script in its test-directory README instead.
 - Helper-facing fields, config keys, statuses, and type values must be routed through the registry before cross-repository use.
 - Temporary helper names from implementation work must be reported during review if they may become shared.
 
@@ -118,6 +120,7 @@ A helper change is acceptable when:
 - distribution status is explicit: Python package for runtime dependency or internal-only maintenance helper;
 - packaged helpers declare runtime version, version policy, install method, and import/call examples;
 - relevant tests pass;
+- every first-party test script is documented in the owning test-directory README;
 - no secrets or credentials are stored;
 - helper behavior does not duplicate component-owned logic;
 - registry item lookup helpers use id-based lookup only;

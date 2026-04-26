@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Defined test-script boundary: test scripts stay out of registry `script` rows and are inventoried in their test-directory README.
 - Removed registry kind vocabulary validators from the runtime helper package; tests now compare SQL kind constraints with `registry/kinds/*.md`.
 - Registered legal `payload_format` values as `payload_format` registry rows and removed payload-format validators from the runtime helper surface.
 - Expanded registry `payload_format` beyond `text`/`file` and backfilled current rows with narrower formats.

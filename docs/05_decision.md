@@ -734,3 +734,25 @@ Runtime helpers should expose behavior needed by component consumers, not passiv
 - The Python package no longer exports `REGISTRY_KINDS`, `is_registry_kind`, or `assert_registry_kind`.
 - `RegistryReader.list_items_by_kind` only validates that kind input is non-empty; SQL/current-registry tests own legal-kind alignment.
 - Tests compare the latest SQL kind constraint with `registry/kinds/*.md` and ensure current rows use constrained kinds.
+
+## D035 - Test scripts are documented locally, not registered
+
+Date: 2026-04-25
+
+### Context
+
+The registry `script` kind is for stable callable helper or automation exports. Test scripts are verification assets, and registering them would blur the difference between public automation surfaces and local test coverage.
+
+### Decision
+
+Do not register test scripts as registry `script` rows. Each test directory owns a README inventory that lists every first-party test script and explains what it verifies.
+
+### Rationale
+
+A local test inventory keeps coverage discoverable without polluting the registry with non-runtime verification files. The registry stays focused on shared names and stable callable surfaces.
+
+### Consequences
+
+- `helpers/tests/README.md` inventories each helper test script.
+- Tests enforce that first-party `helpers/tests/test_*.py` scripts are documented and absent from registry `script` rows.
+- New or renamed test scripts require the owning tests README to be updated in the same change.
