@@ -1,12 +1,17 @@
 import json
+import re
 import unittest
+from pathlib import Path
 
 from trading_registry import (
+    PAYLOAD_FORMATS,
     REGISTRY_KINDS,
     RegistryReader,
     SecretResolver,
+    assert_payload_format,
     assert_registry_kind,
     get_secret_entry_from_registry,
+    is_payload_format,
     is_registry_kind,
     map_registry_item_row,
     parse_registry,
@@ -59,10 +64,29 @@ class RegistryHelperTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid registry kind: unknown"):
             assert_registry_kind("unknown")
 
+    def test_payload_formats_match_sql_constraint(self):
+        migration = Path("registry/sql/schema_migrations/004_expand_payload_formats.sql").read_text()
+        constraint = migration.split("CHECK (payload_format IN (", 1)[1].split("));", 1)[0]
+        quoted_formats = re.findall(r"'([^']+)'", constraint)
+        self.assertEqual(tuple(quoted_formats), PAYLOAD_FORMATS)
+
+    def test_payload_formats_include_structured_values(self):
+        self.assertIn("iso_time", PAYLOAD_FORMATS)
+        self.assertIn("iso_datetime", PAYLOAD_FORMATS)
+        self.assertIn("secret_alias", PAYLOAD_FORMATS)
+        self.assertTrue(is_payload_format("field_name"))
+        self.assertEqual(assert_payload_format("timezone"), "timezone")
+        with self.assertRaisesRegex(ValueError, "Invalid registry payload_format: yaml"):
+            assert_payload_format("yaml")
+
+    def test_map_registry_item_row_rejects_invalid_payload_format(self):
+        with self.assertRaisesRegex(ValueError, "Invalid registry payload_format: yaml"):
+            map_registry_item_row(create_row(payload_format="yaml"))
+
     def test_map_registry_item_row(self):
-        item = map_registry_item_row(create_row())
+        item = map_registry_item_row(create_row(payload_format="field_name"))
         self.assertEqual(item.id, "fld_A7K3P2Q9")
-        self.assertEqual(item.payload_format, "text")
+        self.assertEqual(item.payload_format, "field_name")
         self.assertEqual(item.applies_to, "trading_registry")
         self.assertIsNone(item.path)
 
@@ -79,6 +103,7 @@ class RegistryHelperTests(unittest.TestCase):
                         id="rep_H6S3V8LA",
                         kind="repo",
                         key="TRADING_MAIN_REPO",
+                        payload_format="repo_name",
                         payload="trading-main",
                         path="/root/projects/trading-main",
                         applies_to=None,
@@ -158,6 +183,7 @@ class RegistryHelperTests(unittest.TestCase):
                         id="cfg_EXAMPLETOKEN",
                         kind="config",
                         key="EXAMPLE_SERVICE_TOKEN_SECRET_ALIAS",
+                        payload_format="secret_alias",
                         payload="example-service/token",
                         applies_to=None,
                     )

@@ -69,7 +69,7 @@ Current package facts:
 
 Component repositories should consume the Python package.
 
-Registry `script` rows may record approved helper method surfaces and source paths, but they are not package installation contracts by themselves.
+Registry `script` rows may record approved helper export surfaces and source paths, but they are not package installation contracts by themselves.
 
 ## Public Interface Rules
 
@@ -87,12 +87,18 @@ Rules:
 
 ## Registry Helpers
 
-Current official Python registry helper surface is id-input only:
+Current official Python registry item lookup and secret helper surface is id-input only:
 
 - `RegistryReader.get_key_by_id(id)`
 - `RegistryReader.get_payload_by_id(id)`
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
+
+Payload-format validation exports are also official helper surfaces:
+
+- `PAYLOAD_FORMATS`
+- `is_payload_format(value)`
+- `assert_payload_format(value)`
 
 The official Python helper source lives under `helpers/trading_registry/`.
 
@@ -118,5 +124,5 @@ A helper change is acceptable when:
 - relevant tests pass;
 - no secrets or credentials are stored;
 - helper behavior does not duplicate component-owned logic;
-- registry-touching helpers use id-based lookup only;
+- registry item lookup helpers use id-based lookup only;
 - affected registry, template, or workflow docs are updated when helper behavior encodes a shared convention.

@@ -48,3 +48,7 @@ From the shared environment:
 Helper interfaces should stay explicit and reusable. Once helper behavior exists, acceptance should include tests.
 
 See `../docs/07_helpers.md` for the docs-level helper operating guide.
+
+## Registry Payload Formats
+
+The `trading_registry` package exposes `PAYLOAD_FORMATS`, `is_payload_format`, and `assert_payload_format` so helper consumers can validate registry `payload_format` values consistently with the SQL constraint.

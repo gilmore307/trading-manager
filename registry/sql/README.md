@@ -36,3 +36,7 @@ Use `--no-export` only for exceptional debugging; normal registry updates should
 `trading_registry.path` is nullable. Use it for direct locators or addresses when a registry item points to a concrete entity, such as a repository root or helper source file.
 
 Do not create a separate `path` kind. Registry id remains the stable automation reference; key lookups are for human/debug convenience only.
+
+## Payload Format Constraint
+
+`trading_registry.payload_format` is constrained to accepted value-format markers. When adding a new payload format, update the SQL check constraint, Python helper validation, registry docs, and `registry/current.csv` together.

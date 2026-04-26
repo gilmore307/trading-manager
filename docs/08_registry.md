@@ -52,7 +52,7 @@ Concrete registry entries live in the SQL-backed `trading_registry` table and ar
 | `id` | Stable automation reference. Use this in durable automation. |
 | `kind` | Registry category. Must have a matching `registry/kinds/<kind>.md` boundary file. |
 | `key` | Human-readable symbolic label. Useful for display and review, but renameable. |
-| `payload_format` | Payload storage format, currently `text` or `file`. |
+| `payload_format` | Payload value format. See Payload Formats below. |
 | `payload` | Registered value or file reference. |
 | `path` | Optional direct locator/address for entity-like rows such as repos or scripts. |
 | `applies_to` | Usage scope. Required for `field` rows. |
@@ -66,6 +66,35 @@ id is the stable input; key is display output.
 ```
 
 Helper APIs must not take registry `key` as input.
+
+
+## Payload Formats
+
+`payload_format` describes how to interpret the string stored in `payload`. It is not a registry kind. Use the narrowest accepted format that matches the value.
+
+Accepted formats:
+
+| Format | Meaning |
+|---|---|
+| `text` | General text fallback when no narrower format applies. |
+| `file` | File reference stored in `payload`. |
+| `json` | JSON-encoded value. |
+| `integer` | Base-10 integer encoded as text. |
+| `decimal` | Decimal numeric value encoded as text. |
+| `boolean` | Boolean encoded as `true` or `false`. |
+| `iso_date` | ISO 8601 calendar date, such as `2026-04-25`. |
+| `iso_time` | ISO 8601 time-of-day value. |
+| `iso_datetime` | ISO 8601 date-time value; include timezone when the value is absolute. |
+| `iso_duration` | ISO 8601 duration value. |
+| `timezone` | IANA timezone name. |
+| `secret_alias` | Local secret alias reference, never the secret value. |
+| `repo_name` | Git repository name. |
+| `field_name` | Canonical field name. |
+| `status_value` | Registered status/outcome value. |
+| `command` | Command or command fragment. |
+| `python_symbol` | Python import/member symbol. |
+
+Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL check constraint, Python helper validation, registry docs, and generated CSV in one reviewed change.
 
 ## Kind Boundaries
 
@@ -128,6 +157,12 @@ The registered official Python id-only lookup and secret helper surface is:
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id)`
 
+The payload-format validation helper exports are separate from registry item lookups:
+
+- `PAYLOAD_FORMATS`
+- `is_payload_format(value)`
+- `assert_payload_format(value)`
+
 The CSV export maintenance helper is separate from lookup helpers:
 
 - `registry/sql/apply-migrations.py --export-only`
@@ -148,7 +183,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 - Use nullable `path` for direct locators; do not create a `path` kind.
 - Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.
-- Script rows should represent callable helper or automation method surfaces, not every helper source file.
+- Script rows should represent stable helper/automation exports, not every helper source file.
 - Record review rationale in `note` or `registry/reviews/` when a boundary choice could be confused.
 
 ## Acceptance Checklist
@@ -160,7 +195,7 @@ A registry change is acceptable when:
 - kind boundary docs remain row-free;
 - no secrets are added;
 - no component-local implementation details are centralized;
-- helper APIs remain id-input only;
+- registry item lookup and secret helper APIs remain id-input only;
 - every `field` row has non-empty `applies_to`;
 - migration dry-run reports no pending migrations after application;
 - relevant helper tests pass when helper behavior changed.

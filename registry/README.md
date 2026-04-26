@@ -23,14 +23,43 @@ Concrete entries use this shape:
 |---|---|
 | `id` | Stable random identifier. |
 | `kind` | Registry kind. Must match one kind boundary file. |
-| `key` | Stable symbolic key. |
-| `payload_format` | Payload storage format, currently `text` or `file`. |
+| `key` | Human-readable symbolic label for display/review; renameable and not a durable automation input. |
+| `payload_format` | Payload value format. See Payload Formats below. |
 | `payload` | Registered value or file reference. |
 | `path` | Optional direct locator/address for entries that point to concrete entities. |
 | `applies_to` | Optional for most kinds; required for `field` entries. Records the table, file, contract, template, or data shape where the field is used. |
 | `note` | Human-readable review note. |
 | `created_at` | Database insertion timestamp. |
 | `updated_at` | Database update timestamp. |
+
+
+## Payload Formats
+
+`payload_format` describes how to interpret the string stored in `payload`. It is not a registry kind. Use the narrowest accepted format that matches the value.
+
+Accepted formats:
+
+| Format | Meaning |
+|---|---|
+| `text` | General text fallback when no narrower format applies. |
+| `file` | File reference stored in `payload`. |
+| `json` | JSON-encoded value. |
+| `integer` | Base-10 integer encoded as text. |
+| `decimal` | Decimal numeric value encoded as text. |
+| `boolean` | Boolean encoded as `true` or `false`. |
+| `iso_date` | ISO 8601 calendar date, such as `2026-04-25`. |
+| `iso_time` | ISO 8601 time-of-day value. |
+| `iso_datetime` | ISO 8601 date-time value; include timezone when the value is absolute. |
+| `iso_duration` | ISO 8601 duration value. |
+| `timezone` | IANA timezone name. |
+| `secret_alias` | Local secret alias reference, never the secret value. |
+| `repo_name` | Git repository name. |
+| `field_name` | Canonical field name. |
+| `status_value` | Registered status/outcome value. |
+| `command` | Command or command fragment. |
+| `python_symbol` | Python import/member symbol. |
+
+Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL check constraint, Python helper validation, registry docs, and generated CSV in one reviewed change.
 
 ## CSV Snapshot
 
@@ -88,7 +117,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - New fields, statuses, config keys, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
-- Registered helper APIs must take registry ids as input, not keys.
+- Registered registry item lookup APIs must take registry ids as input, not keys.
 - Repository rows should include the repository name in `payload` and the local checkout root in `path` when the checkout path is an approved shared fact.
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos and scripts.
 - Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes.

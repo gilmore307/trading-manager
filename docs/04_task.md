@@ -24,6 +24,7 @@
 
 ## Recently Accepted
 
+- Expanded registry `payload_format` beyond `text`/`file` and backfilled current rows with narrower formats.
 - Removed the old non-Python registry helper implementation; helper code is now Python-only.
 - Added formal Python registry helper package and pointed registry script rows at Python helper methods.
 - Created initial docs spines for remaining component repositories: manager, storage, strategy, model, execution, and dashboard.

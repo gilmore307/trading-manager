@@ -327,20 +327,20 @@ Date: 2026-04-25
 
 ### Context
 
-The shared registry helper surface should expose callable methods, not generic helper source files.
+The shared registry helper surface should expose stable method or constant exports, not generic helper source files.
 
 ### Decision
 
-Register callable helper methods as `script` entries with method names in `payload` and source locators in `path`.
+Register stable helper exports as `script` entries with the exported name in `payload` and source locators in `path`. Most entries are callable helper methods; stable constants may be registered when automation should share the exact vocabulary.
 
 ### Rationale
 
-The registry should expose reusable helper surfaces, not every helper source file. Method-level entries make the approved helper API visible in `registry/current.csv`.
+The registry should expose reusable helper surfaces, not every helper source file. Export-level entries make the approved helper API visible in `registry/current.csv`.
 
 ### Consequences
 
-- Registered helper rows represent callable methods.
-- Helper methods use registry id as input.
+- Registered helper rows represent stable helper exports.
+- Registry item lookup and secret helper methods use registry id as input.
 - Multiple helper rows may share the same source path when they live in the same file.
 
 ## D018 - Secret resolver config lookup is id-first
@@ -396,14 +396,14 @@ Registry keys are useful labels but are renameable. The helper surface briefly i
 
 ### Decision
 
-Register only four id-input helper methods as the public registry helper surface. Earlier camelCase helper names were superseded by the official Python helper surface in D030:
+For registry item lookup and secret resolution, register only four id-input helper methods in the public registry helper surface. Earlier camelCase helper names were superseded by the official Python helper surface in D030:
 
 - `RegistryReader.get_key_by_id`
 - `RegistryReader.get_payload_by_id`
 - `RegistryReader.get_path_by_id`
 - `SecretResolver.load_secret_text_by_config_id`
 
-Do not register key-input helper APIs. Do not register generic helper files as script entries when method-level helper entries are the intended public surface.
+Do not register key-input helper APIs. Do not register generic helper files as script entries when export-level helper entries are the intended public surface.
 
 ### Rationale
 
@@ -412,7 +412,7 @@ This keeps registry automation stable and simple: id in, approved value out. Key
 ### Consequences
 
 - Key-based helper APIs are removed from the public helper surface.
-- Script registry rows represent callable helper methods, not every helper source file.
+- Script registry rows represent stable helper exports, not every helper source file.
 - Human debugging can use SQL queries directly instead of key-input helper APIs.
 
 ## D021 - Current CSV export is a registered maintenance helper
@@ -665,3 +665,26 @@ One implementation is easier to test, document, package, and consume. Since comp
 - `helpers/trading_registry/` is the only registry helper implementation.
 - The registry helper test command is `/root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/tests`.
 - Registry script rows remain pointed at Python helper methods and source files.
+
+## D032 - Registry payload_format records value format
+
+Date: 2026-04-25
+
+### Context
+
+The registry initially allowed only `text` and `file` payload formats, so every active row used `text` even when the payload had a narrower interpretation such as repository name, field name, status value, secret alias, command, Python symbol, or timezone. Future contracts will also need date/time formats.
+
+### Decision
+
+Expand `payload_format` into an explicit payload value-format marker. Keep `text` as a fallback, but use narrower formats when they apply. Add date/time-capable formats such as `iso_date`, `iso_time`, `iso_datetime`, and `iso_duration`.
+
+### Rationale
+
+A more precise payload format makes registry review and automation safer without adding separate columns for every scalar type. The payload remains stored as text, while `payload_format` describes how consumers should interpret it.
+
+### Consequences
+
+- Current rows are backfilled to narrower formats where obvious: `field_name`, `status_value`, `repo_name`, `timezone`, `secret_alias`, `command`, and `python_symbol`.
+- Payload-format validation helper exports are registered as script rows.
+- Future rows should use the narrowest accepted payload format.
+- New payload formats require SQL constraint, Python helper validation, docs, and CSV updates in the same reviewed change.
