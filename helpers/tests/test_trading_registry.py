@@ -101,6 +101,14 @@ class RegistryHelperTests(unittest.TestCase):
         for key, payload in expected_payloads.items():
             self.assertEqual(by_key[key]["kind"], "data_kind")
             self.assertEqual(by_key[key]["payload"], payload)
+        self.assertEqual(
+            by_key["EQUITY_LIQUIDITY_BAR"]["path"],
+            "trading-data/templates/data_kinds/alpaca/equity_liquidity_bar.preview.csv",
+        )
+        self.assertEqual(
+            by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE"]["path"],
+            "trading-data/templates/data_kinds/alpaca/README.md",
+        )
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
 
     def test_registered_payload_formats_match_sql_constraint(self):
