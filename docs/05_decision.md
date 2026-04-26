@@ -890,3 +890,25 @@ This preserves a clean locator split: provider rows point to public docs, and cr
 - Provider documentation URLs are available through the registry.
 - Secret alias rows remain safe and unambiguous for credential resolution.
 - Component repos should treat provider documentation URLs as registry metadata, not credentials.
+
+## D042 - U.S. Treasury Fiscal Data is an open provider term without a secret alias
+
+Date: 2026-04-26
+
+### Context
+
+The user identified the U.S. Treasury Fiscal Data API documentation as a useful source for federal finance datasets and noted that it may not require an API key. The official documentation describes the API as open and not requiring a user account or token.
+
+### Decision
+
+Register U.S. Treasury Fiscal Data as provider terminology with its documentation URL in the provider term `path`. Do not create a source-secret alias unless future implementation discovers a credential requirement.
+
+### Rationale
+
+This keeps documentation discoverable through the registry while avoiding unnecessary secret/config rows for a public no-key API.
+
+### Consequences
+
+- Provider key is `US_TREASURY_FISCAL_DATA`.
+- Registry path points to `https://fiscaldata.treasury.gov/api-documentation/`.
+- Connector implementation must still document endpoint coverage, pagination, rate/usage behavior, and fixture policy before acceptance.
