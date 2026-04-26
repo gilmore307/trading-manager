@@ -64,7 +64,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         expected_bundles = {
             "ALPACA_BARS": "alpaca_bars",
-            "ALPACA_QUOTES_TRADES": "alpaca_quotes_trades",
+            "ALPACA_LIQUIDITY": "alpaca_liquidity",
             "ALPACA_NEWS": "alpaca_news",
             "THETADATA_OPTION_1M_BUNDLE": "thetadata_option_1m_bundle",
             "THETADATA_OPTION_SNAPSHOT_BUNDLE": "thetadata_option_snapshot_bundle",

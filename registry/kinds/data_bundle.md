@@ -10,7 +10,7 @@ A data bundle is a runnable or planned acquisition boundary such as bars, news, 
 
 Register bundle keys that may appear in `task_key.bundle`, runner routing, bundle READMEs, completion receipts, or cross-repository planning docs.
 
-Use `payload` for the concrete bundle key or pattern, for example `alpaca_news` or `macro_release_<release_key>`. Use `path` for the canonical provider/source documentation URL only when useful.
+Use `payload` for the concrete bundle key or pattern, for example `alpaca_news` or `macro_data`. Use `path` for the canonical bundle implementation directory or runner script when implemented. Provider/source documentation URLs belong on provider/source `term` rows, not on implemented `data_bundle` rows.
 
 ## Reject Or Re-scope
 
@@ -24,4 +24,4 @@ Reject or re-scope entries that are actually:
 
 ## Naming Rule
 
-Bundle keys should be stable snake_case. Bundle-specific task/run IDs should use the bundle key as their prefix, such as `alpaca_news_task_...` and `alpaca_news_run_...`.
+Bundle keys should be stable snake_case and should name the accepted final acquisition boundary. Bundle-specific task/run IDs should use the bundle key as their prefix, such as `alpaca_news_task_...` and `alpaca_news_run_...`. If a bundle is narrowed from raw source mechanics to a final output family, prefer the final output family name, e.g. `alpaca_liquidity` instead of `alpaca_quotes_trades`.

@@ -16,7 +16,7 @@ Register data kinds when they are useful for:
 - avoiding duplicate names for the same obtainable data category;
 - documenting source-of-truth ownership for a data category.
 
-Use `payload` for a stable snake_case data-kind key. Use `path` for the best public documentation URL for that data kind when available. Use `applies_to` for the owning source, bundle, or component scope.
+Use `payload` for a stable snake_case data-kind key. For final saved data kinds with accepted templates, use `path` for the canonical `trading-data/templates/data_kinds/*.preview.csv` template/preview file. For source-only or transient data kinds without accepted final templates, leave `path` null until a final template exists. Provider/source documentation URLs belong on provider/source `term` rows, not on final `data_kind` rows. Use `applies_to` for the owning source, bundle, or component scope.
 
 ## Reject Or Re-scope
 
@@ -34,4 +34,4 @@ The same economic measure should have one canonical acquisition source. FRED dat
 
 ## Derived and Raw High-Volume Data
 
-`data_kind` may name both source-provided categories and derived categories. For very high-volume source rows such as equity trades and quotes, source data kinds remain request/validation inputs, but default persistence should target registered final aggregate kinds such as `equity_liquidity_bar`. Raw rows may be streamed or temporarily segmented during a run and discarded after aggregation unless an explicit bounded debug or audit artifact is approved.
+`data_kind` may name both source-provided categories and derived categories. For very high-volume source rows such as equity trades and quotes, source data kinds remain request/validation inputs, but default persistence should target registered final aggregate kinds such as `equity_liquidity_bar`. Raw rows may be streamed or temporarily segmented during a run and discarded after aggregation unless an explicit bounded debug or audit artifact is approved. Final saved data kinds should have a CSV preview/template under `trading-data/templates/data_kinds/`, and the registry `path` should point to that template file.
