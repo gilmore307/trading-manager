@@ -34,4 +34,4 @@ The same economic measure should have one canonical acquisition source. FRED dat
 
 ## Derived and Raw High-Volume Data
 
-`data_kind` may name both source-provided categories and derived categories. For very high-volume source rows such as equity trades and quotes, source data kinds remain request/validation inputs, but default persistence should target registered derived aggregate kinds. Raw rows may be streamed or temporarily segmented during a run and discarded after aggregation unless an explicit bounded debug or audit artifact is approved.
+`data_kind` may name both source-provided categories and derived categories. For very high-volume source rows such as equity trades and quotes, source data kinds remain request/validation inputs, but default persistence should target registered final aggregate kinds such as `equity_liquidity_bar`. Raw rows may be streamed or temporarily segmented during a run and discarded after aggregation unless an explicit bounded debug or audit artifact is approved.
