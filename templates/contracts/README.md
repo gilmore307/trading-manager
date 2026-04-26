@@ -12,3 +12,5 @@ Current templates:
 - `request.md` — request contract drafting template.
 
 When a contract becomes concrete, its stable type names should be registered in `registry/` and its concrete entries should be inserted through SQL registry migrations.
+
+See `../../docs/09_templates.md` for template acceptance and promotion rules.

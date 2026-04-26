@@ -6,7 +6,7 @@
 
 Acceptance for this repository focuses on:
 
-- docs spine completeness, including the registry-specific `07_registry.md`;
+- docs spine completeness, including the platform guides `07_helpers.md`, `08_registry.md`, and `09_templates.md`;
 - repository boundary clarity;
 - cross-repository workflow clarity;
 - shared contract clarity;
@@ -24,7 +24,7 @@ This repository does not accept trading runtime behavior. Runtime behavior is ac
 
 A change to `trading-main` can be accepted only if:
 
-- the docs spine remains complete, including `07_registry.md`;
+- the docs spine remains complete, including `07_helpers.md`, `08_registry.md`, and `09_templates.md`;
 - `README.md` accurately describes the repository boundary;
 - repository purpose remains system docs, contracts, registries, templates, shared helpers, and shared environment anchoring;
 - `.venv/`, if present, is ignored by Git and treated as local runtime infrastructure;
@@ -39,7 +39,7 @@ Documentation-only changes are acceptable when they:
 
 - update the narrowest authoritative file;
 - avoid duplicating durable facts across neighboring docs;
-- preserve the separation between scope, context, workflow, acceptance, task, decision, memory, registry, and contracts;
+- preserve the separation between scope, context, workflow, acceptance, task, decision, memory, helpers, registry, templates, and contracts;
 - mark unresolved items as explicit open gaps rather than pretending they are settled;
 - add or update decisions when a choice changes architecture, naming, contract shape, acceptance criteria, or repository boundaries;
 - keep examples clearly labeled as examples when they are not binding contracts;
@@ -83,7 +83,7 @@ Shared helper changes are acceptable when they:
 - include or declare appropriate tests once helper behavior exists;
 - avoid embedding secrets, provider credentials, or local-only paths;
 - keep public interfaces explicit and stable enough for component repositories;
-- update templates or contracts when helper behavior encodes a shared convention.
+- update `docs/07_helpers.md`, templates, registry, or contracts when helper behavior encodes a shared convention.
 
 ### For shared environment changes
 
@@ -110,7 +110,7 @@ find . -maxdepth 2 -type f | sort
 
 Manual review must confirm:
 
-- required docs files exist, including `docs/07_registry.md`;
+- required docs files exist, including `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`;
 - contract drafting templates live under `templates/contracts/`, not `docs/`;
 - registry kind Markdown files do not list concrete active rows;
 - entity-like registry entries use the nullable `path` column instead of a separate `path` kind;

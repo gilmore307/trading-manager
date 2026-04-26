@@ -2,7 +2,7 @@
 
 `registry/` is the canonical home for trading-wide registered names and shared vocabulary.
 
-For the docs-level registry guide, see [`docs/07_registry.md`](../docs/07_registry.md).
+For the docs-level registry guide, see [`docs/08_registry.md`](../docs/08_registry.md).
 
 The registry has two layers:
 

@@ -7,7 +7,7 @@
 The earlier docs stay project-wide:
 
 - `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
-- This file describes the registry function specifically.
+- This file describes the `registry/` platform function specifically.
 
 The registry exists to prevent each component repository from inventing incompatible names, fields, statuses, helper references, or repository identifiers.
 

@@ -1,0 +1,84 @@
+# Helpers
+
+## Purpose
+
+`trading-main` owns shared helper code for trading-wide infrastructure concerns that multiple component repositories may consume.
+
+The earlier docs stay project-wide:
+
+- `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
+- This file describes the `helpers/` platform function specifically.
+
+Helpers exist to keep repeated cross-repository mechanics consistent without turning `trading-main` into a runtime implementation repository.
+
+## What Helpers Own
+
+Shared helpers may own reusable infrastructure behavior such as:
+
+- registry reading and validation helpers;
+- secret-alias resolution helpers that never store secret values;
+- artifact reference helpers;
+- manifest formatting or validation helpers;
+- request and ready-signal helper utilities;
+- shared schema or field validation utilities;
+- small CLI or library utilities that support platform contracts.
+
+Helpers must not own:
+
+- component runtime implementations;
+- market data fetching;
+- strategy logic;
+- model training or inference logic;
+- live/paper execution daemons;
+- dashboard application behavior;
+- generated data, notebooks, logs, or artifacts;
+- secrets, credentials, broker keys, or exchange keys.
+
+## Directory Layout
+
+```text
+helpers/
+  README.md                 Helper boundary summary.
+  registry/                 Registry reader, type, test, and secret-resolution helpers.
+```
+
+Future helper packages should live under a named subdirectory with a clear README when the boundary is more than trivial.
+
+## Public Interface Rules
+
+Shared helper APIs must be explicit and stable enough for component repositories to depend on.
+
+Rules:
+
+- Keep public exports narrow.
+- Prefer stable registry ids over renameable labels where helpers touch registry entries.
+- Do not introduce key-input registry helper APIs.
+- Keep helper behavior generic to the trading platform.
+- Avoid local-only paths unless the path is an approved registry entry or documented environment anchor.
+- Keep secrets outside the repository; helpers may resolve aliases but must not store secret values.
+- Add tests when behavior becomes executable rather than documentation-only.
+
+## Registry Helpers
+
+Current registry helper surface is id-input only:
+
+- `getKeyById(id)`
+- `getPayloadById(id)`
+- `getPathById(id)`
+- `loadSecretTextByConfigId(configId)`
+
+The helper source lives under `helpers/registry/`.
+
+Registry maintenance commands, such as regenerating `registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
+
+## Acceptance Checklist
+
+A helper change is acceptable when:
+
+- the helper remains shared infrastructure, not component runtime code;
+- public API shape is documented or obvious from tests;
+- relevant tests pass;
+- no secrets or credentials are stored;
+- helper behavior does not duplicate component-owned logic;
+- registry-touching helpers use id-based lookup only;
+- affected registry, template, or workflow docs are updated when helper behavior encodes a shared convention.

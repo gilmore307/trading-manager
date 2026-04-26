@@ -209,7 +209,7 @@ The docs spine should contain ratified project context and governance. Drafting 
 - Do not add numbered docs beyond `06_memory.md` for reusable drafting templates.
 - Use `templates/contracts/` for reusable contract drafting surfaces.
 - Use `registry/kinds/*_type.md` and SQL migrations for registered type vocabularies.
-- Use `docs/07_registry.md` for the approved `trading-main` registry operating guide.
+- Use `docs/08_registry.md` for the approved `trading-main` registry operating guide.
 
 ## D012 - Remove canceled-project registry entries
 
@@ -491,7 +491,7 @@ Date: 2026-04-25
 
 ### Decision
 
-Keep `00_scope.md` through `06_memory.md` focused on the whole trading platform repository. Add `docs/07_registry.md` as the registry-specific operating guide.
+Keep `00_scope.md` through `06_memory.md` focused on the whole trading platform repository. Add `docs/08_registry.md` as the registry-specific operating guide.
 
 ### Rationale
 
@@ -499,7 +499,36 @@ The registry is now a first-class function of `trading-main`, not just a passing
 
 ### Consequences
 
-- `docs/07_registry.md` is part of the accepted `trading-main` docs set.
+- `docs/08_registry.md` is part of the accepted `trading-main` docs set.
 - `00_scope.md` through `06_memory.md` remain project-wide platform docs.
 - Registry kind source-of-truth files remain under `registry/kinds/`, not under `docs/`.
 - Contract drafting templates remain under `templates/contracts/`, not under `docs/`.
+
+## D025 - Split platform-function guides into helpers registry and templates
+
+Date: 2026-04-25
+
+### Context
+
+`trading-main` owns three first-class platform functions beyond project-wide governance: shared helpers, the SQL-backed registry, and reusable templates. A single registry-specific guide did not capture the shape of the repository now that helpers and templates also have meaningful ownership boundaries.
+
+### Decision
+
+Use three numbered platform-function guide docs after the project-wide spine:
+
+- `docs/07_helpers.md`
+- `docs/08_registry.md`
+- `docs/09_templates.md`
+
+Keep `00_scope.md` through `06_memory.md` focused on the whole trading platform repository.
+
+### Rationale
+
+This mirrors the actual top-level structure of `trading-main` and gives each owned platform function a clear operating guide without crowding the project-wide docs.
+
+### Consequences
+
+- Helpers, registry, and templates each have a dedicated docs guide.
+- Registry kind source-of-truth files still live under `registry/kinds/`.
+- Template drafts still live under `templates/`.
+- Helper code still lives under `helpers/`.

@@ -24,7 +24,8 @@
 
 ## Recently Accepted
 
-- Added `docs/07_registry.md` so `00_scope.md` through `06_memory.md` remain project-wide while registry-specific rules have their own guide.
+- Split `trading-main` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
+- Added registry/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
 - Moved registry kind boundary files into `registry/kinds/`; `registry/reviews/` remains for review artifacts.
 - Registered all eight trading repositories as `repo` rows in `registry/current.csv`.
 - Registered `REGISTRY_EXPORT_CURRENT_CSV_HELPER` for regenerating `registry/current.csv`.
