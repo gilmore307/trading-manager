@@ -39,21 +39,25 @@ class StepResult:
     details: dict[str, Any] = field(default_factory=dict)
 
 
-def build_context(task_key: dict[str, Any]) -> BundleContext:
-    """Build development output paths from the task key.
+def build_context(task_key: dict[str, Any], run_id: str) -> BundleContext:
+    """Build development output paths for one run of a stable task key.
 
-    `output_dir` should normally be a path under TRADING_DATA_DEVELOPMENT_STORAGE_ROOT,
-    such as `data/storage/<task-id>`.
+    `output_root` should normally be a stable path under
+    TRADING_DATA_DEVELOPMENT_STORAGE_ROOT, such as `data/storage/<task-id>`.
+    Each run writes under `output_root/runs/<run-id>`, while the task-level
+    completion receipt lives at `output_root/completion_receipt.json`.
     """
 
-    run_dir = Path(task_key["output_dir"])
+    output_root = Path(task_key["output_root"])
+    run_dir = output_root / "runs" / run_id
     return BundleContext(
         task_key=task_key,
         run_dir=run_dir,
         raw_dir=run_dir / "raw",
         cleaned_dir=run_dir / "cleaned",
         saved_dir=run_dir / "saved",
-        receipt_path=run_dir / "receipt.json",
+        receipt_path=output_root / "completion_receipt.json",
+        metadata={"run_id": run_id},
     )
 
 
@@ -93,7 +97,7 @@ def write_receipt(
     save_result: StepResult | None = None,
     error: BaseException | None = None,
 ) -> StepResult:
-    """Emit a success or failure completion receipt.
+    """Append or update one run entry in the task-level completion receipt.
 
     Bundle-specific receipt serialization belongs here. This function should be
     able to run even when fetch, clean, or save fails.
@@ -102,10 +106,10 @@ def write_receipt(
     raise NotImplementedError("Implement bundle-specific receipt step")
 
 
-def run(task_key: dict[str, Any]) -> StepResult:
-    """Run the bundle from one manager-issued task key."""
+def run(task_key: dict[str, Any], *, run_id: str) -> StepResult:
+    """Run one invocation of a stable manager-issued task key."""
 
-    context = build_context(task_key)
+    context = build_context(task_key, run_id)
     context.raw_dir.mkdir(parents=True, exist_ok=True)
     context.cleaned_dir.mkdir(parents=True, exist_ok=True)
     context.saved_dir.mkdir(parents=True, exist_ok=True)

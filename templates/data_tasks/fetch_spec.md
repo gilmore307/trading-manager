@@ -36,7 +36,7 @@ List exact task key fields consumed by fetch.
 Development raw outputs must be written under:
 
 ```text
-data/storage/<task-id-or-run-id>/raw/
+data/storage/<task-id>/runs/<run-id>/raw/
 ```
 
 Record:

@@ -9,7 +9,7 @@ Define how `pipeline.py::save` writes cleaned outputs during development and how
 During development, save only to local files under:
 
 ```text
-data/storage/<task-id-or-run-id>/saved/
+data/storage/<task-id>/runs/<run-id>/saved/
 ```
 
 Do not write to SQL by default.
@@ -22,7 +22,8 @@ Do not write to SQL by default.
 
 ## Idempotency And Overwrite Policy
 
-- Idempotency key field:
+- Stable task id field:
+- Run id field:
 - Default overwrite policy:
 - Existing run directory behavior:
 - Partial save rollback/cleanup behavior:

@@ -96,7 +96,7 @@ Normal flow for a historical data acquisition bundle:
 5. Use `completion_receipt.json` as the draft evidence shape for development receipts under `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT`.
 5. Register any stable field/type/status names before implementation treats them as contracts.
 
-These data task templates are draft surfaces. They do not by themselves create accepted task-key, receipt, storage, or API schemas. Keep task keys and receipts minimal: only include fields used by manager, runner, bundle execution, storage output, or receipt evidence. Provider documentation URLs and similar lookup metadata belong in registry/provider docs, not runtime task keys.
+These data task templates are draft surfaces. They do not by themselves create accepted task-key, receipt, storage, or API schemas. Keep task keys and receipts minimal: only include fields used by manager, runner, bundle execution, storage output, or receipt evidence. Provider documentation URLs and similar lookup metadata belong in registry/provider docs, not runtime task keys. A task key is stable across scheduled runs; per-run evidence belongs in receipt `runs[]`.
 
 ## Recording Duty
 

@@ -25,6 +25,8 @@ Development-stage outputs should target `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` 
 
 Task key and completion receipt templates should contain only fields the runner, bundle, manager, or development evidence path will actually use. Do not add lookup/reference metadata such as provider documentation URLs when those values already live in the registry or bundle README.
 
+A task key is stable across many invocations, including periodic or scheduled tasks. Per-run data belongs in the task-level completion receipt under `runs[]`.
+
 ## Boundary
 
 These are templates, not accepted concrete schemas. Stable schema fields, status values, request types, artifact types, and storage contracts still require registry/docs review before implementation treats them as durable contracts.
@@ -33,4 +35,4 @@ No template may contain provider secret values, raw credentials, generated data,
 
 ## Implementation Shape
 
-By default, a bundle should start as one `pipeline.py` file exposing one `run(...)` entry point and internal `fetch`, `clean`, `save`, and `write_receipt` functions. Split those functions into separate modules only when the bundle becomes large enough to justify the extra structure.
+By default, a bundle should start as one `pipeline.py` file exposing one `run(task_key, run_id=...)` entry point and internal `fetch`, `clean`, `save`, and `write_receipt` functions. Split those functions into separate modules only when the bundle becomes large enough to justify the extra structure.

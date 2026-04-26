@@ -39,3 +39,4 @@
 - Added reusable draft data task templates under `templates/data_tasks/`: task key, bundle README, fetch spec, clean spec, save spec, completion receipt, and fixture policy. These support API-specific `trading-data` bundle design but are not accepted concrete schemas yet.
 - Data source bundles should default to one `pipeline.py` with `fetch`, `clean`, `save`, and `write_receipt` functions; split into separate modules only when complexity justifies it. Bundle README files carry API-specific details.
 - Data task key and completion receipt templates should stay minimal and operational. Removed unused metadata such as provider documentation URL from runtime JSON templates; provider docs belong in registry/bundle README.
+- A data task key is stable across periodic/scheduled runs. Per-run details belong in the task-level completion receipt under `runs[]`; run output directories should use `data/storage/<task-id>/runs/<run-id>/`.

@@ -1045,3 +1045,26 @@ Smaller runtime templates are easier for manager to generate, easier for data pi
 - `task_key.json` now contains only `task_id`, `bundle`, optional `credential_config_id`, `params`, and `output_dir`.
 - `completion_receipt.json` now contains only task identity, bundle, status/timestamps, output directory, output references, row counts, and error.
 - Additional fields require a demonstrated consumer or execution need.
+
+## D049 - Data task keys are stable across runs
+
+Date: 2026-04-26
+
+### Context
+
+The user clarified that one task may have multiple runs, such as periodic or scheduled tasks. The task key should remain stable, while per-run data should be recorded in completion receipts.
+
+### Decision
+
+Treat `task_key.json` as the stable task definition. Do not place run-specific values in the task key. Use task-level `completion_receipt.json` with a `runs[]` array, where each run entry records run id, status, timestamps, output directory, outputs, row counts, and error.
+
+### Rationale
+
+This keeps scheduled tasks replayable and comparable across invocations without mutating the task definition for every run.
+
+### Consequences
+
+- `task_key.json` uses `output_root`, not per-run `output_dir`.
+- `completion_receipt.json` contains `runs[]`.
+- Run outputs should live under `data/storage/<task-id>/runs/<run-id>/`.
+- `pipeline.py` takes `run_id` separately from the task key.

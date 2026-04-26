@@ -1,7 +1,7 @@
 {
-  "task_id": "<manager-assigned-task-id>",
+  "task_id": "<stable-manager-task-id>",
   "bundle": "<bundle-name>",
   "credential_config_id": null,
   "params": {},
-  "output_dir": "data/storage/<task-id>"
+  "output_root": "data/storage/<task-id>"
 }

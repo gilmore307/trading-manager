@@ -32,17 +32,17 @@ Required task key fields:
 - `task_id`
 - `bundle`
 - `params`
-- `output_dir`
+- `output_root`
 
 Optional task key fields:
 
 - `credential_config_id` when the bundle needs a registered credential alias
 
-Put API-specific inputs such as symbols, underlyings, ETF ids, macro release keys, calendar scope, time ranges, snapshot timestamps, granularity, source URLs, and provider parameters inside `params`. Do not put provider documentation URLs in the task key; those belong in registry/provider docs or this README.
+Put API-specific inputs such as symbols, underlyings, ETF ids, macro release keys, calendar scope, time ranges, snapshot timestamps, granularity, source URLs, and provider parameters inside `params`. Do not put provider documentation URLs in the task key; those belong in registry/provider docs or this README. Do not put `run_id` in the task key; it changes per invocation and belongs in receipt `runs[]`.
 
 ## Pipeline Module
 
-Default implementation should start as one `pipeline.py` file with one public `run(...)` entry point and four internal step functions. Split into separate modules only when complexity makes a single file hard to maintain.
+Default implementation should start as one `pipeline.py` file with one public `run(task_key, run_id=...)` entry point and four internal step functions. Split into separate modules only when complexity makes a single file hard to maintain.
 
 | Step function | Responsibility |
 |---|---|
@@ -56,12 +56,14 @@ Default implementation should start as one `pipeline.py` file with one public `r
 Development outputs should be grouped by task/run:
 
 ```text
-data/storage/<task-id-or-run-id>/
+data/storage/<task-id>/
   task_key.json
-  raw/
-  cleaned/
-  saved/
-  receipt.json
+  completion_receipt.json
+  runs/
+    <run-id>/
+      raw/
+      cleaned/
+      saved/
 ```
 
 ## API Requirements
