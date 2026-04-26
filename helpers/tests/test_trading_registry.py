@@ -89,6 +89,7 @@ class RegistryHelperTests(unittest.TestCase):
             "EQUITY_BAR": "equity_bar",
             "EQUITY_LIQUIDITY_BAR": "equity_liquidity_bar",
             "CRYPTO_BAR": "crypto_bar",
+            "CRYPTO_TRADE": "crypto_trade",
             "CRYPTO_LIQUIDITY_BAR": "crypto_liquidity_bar",
             "OPTION_GREEKS_FIRST_ORDER": "option_greeks_first_order",
             "SEC_COMPANY_FACT": "sec_company_fact",
@@ -111,6 +112,8 @@ class RegistryHelperTests(unittest.TestCase):
             by_key["CRYPTO_BAR"]["path"],
             "trading-data/templates/data_kinds/okx/crypto_bar.preview.csv",
         )
+        self.assertEqual(by_key["CRYPTO_TRADE"]["path"], "")
+        self.assertIn("transient inputs", by_key["CRYPTO_TRADE"]["note"])
         self.assertEqual(
             by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE"]["path"],
             "trading-data/templates/data_kinds/alpaca/README.md",
