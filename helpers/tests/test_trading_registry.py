@@ -53,6 +53,18 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
+    def test_sec_company_financials_terms_are_registered(self):
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(rows["SEC_EDGAR"]["kind"], "term")
+        self.assertEqual(
+            rows["SEC_EDGAR"]["path"],
+            "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+        )
+        self.assertEqual(rows["SEC_COMPANY_FINANCIALS"]["kind"], "term")
+        self.assertIn("sec_company_financials", rows["SEC_COMPANY_FINANCIALS"]["note"])
+
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
         for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
