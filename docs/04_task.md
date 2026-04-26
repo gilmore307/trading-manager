@@ -26,6 +26,7 @@
 
 ## Recently Accepted
 
+- Registered all current `task_key.json` and `completion_receipt.json` field names as `kind=field` rows.
 - Updated task key/receipt templates so stable task keys can have multiple run entries in completion receipts.
 - Simplified `task_key.json` and `completion_receipt.json` to minimal operational fields.
 - Updated data task templates so bundles default to one `pipeline.py` with fetch/clean/save/receipt step functions.

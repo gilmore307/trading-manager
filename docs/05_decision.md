@@ -1068,3 +1068,26 @@ This keeps scheduled tasks replayable and comparable across invocations without 
 - `completion_receipt.json` contains `runs[]`.
 - Run outputs should live under `data/storage/<task-id>/runs/<run-id>/`.
 - `pipeline.py` takes `run_id` separately from the task key.
+
+## D050 - Data task JSON fields are registered
+
+Date: 2026-04-26
+
+### Context
+
+The user asked whether the fields in `task_key.json` and `completion_receipt.json` had been registered. They had not yet been registered as `field` rows.
+
+### Decision
+
+Register every current minimal task key, completion receipt, and per-run receipt field as `kind=field` rows with explicit `applies_to` scopes.
+
+### Rationale
+
+These JSON templates are cross-repository handoff surfaces. Their field names should be registered before implementation depends on them.
+
+### Consequences
+
+- Task key fields are registered under `data_task_key`.
+- Task-level receipt fields are registered under `data_task_completion_receipt`.
+- Per-run receipt fields are registered under `data_task_completion_receipt_run`.
+- Any future runtime JSON field requires registry review before adoption.
