@@ -53,7 +53,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
-    def test_sec_company_financials_terms_are_registered(self):
+    def test_data_bundle_terms_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
@@ -64,6 +64,10 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(rows["SEC_COMPANY_FINANCIALS"]["kind"], "term")
         self.assertIn("sec_company_financials", rows["SEC_COMPANY_FINANCIALS"]["note"])
+        self.assertEqual(rows["ALPACA_QUOTES_TRADES"]["kind"], "term")
+        self.assertIn("alpaca_quotes_trades", rows["ALPACA_QUOTES_TRADES"]["note"])
+        self.assertEqual(rows["ALPACA_NEWS"]["kind"], "term")
+        self.assertIn("alpaca_news", rows["ALPACA_NEWS"]["note"])
 
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
