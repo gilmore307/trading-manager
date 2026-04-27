@@ -86,10 +86,11 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 79)
+        self.assertEqual(len(data_kinds), 80)
         expected_payloads = {
             "MACRO_RELEASE": "macro_release",
             "MACRO_RELEASE_EVENT": "macro_release_event",
+            "GDELT_ARTICLE": "gdelt_article",
             "EQUITY_BAR": "equity_bar",
             "EQUITY_LIQUIDITY_BAR": "equity_liquidity_bar",
             "CRYPTO_BAR": "crypto_bar",
@@ -406,6 +407,45 @@ class WebSearchHelperTests(unittest.TestCase):
                 writer.writerow(rows)
             resolver = SecretResolver(create_csv_registry_query(registry_csv), read_text=read_text)
             self.assertEqual(resolver.load_secret_text_by_config_id("cfg_TESTSEARCH", "api_key"), "search-key")
+
+    def test_bigquery_client_normalizes_query_results_with_mock_transport(self):
+        from trading_bigquery.client import BigQueryClient
+        from unittest.mock import patch
+
+        class FakeResponse:
+            status = 200
+
+            def __init__(self, payload):
+                self.payload = payload
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps(self.payload).encode()
+
+        service_account = {
+            "type": "service_account",
+            "project_id": "unit-project",
+            "client_email": "unit@example.test",
+            "token_uri": "https://oauth.example.test/token",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nunit\n-----END PRIVATE KEY-----\n",
+        }
+        query_payload = {"schema": {"fields": [{"name": "url"}, {"name": "title"}]}, "rows": [{"f": [{"v": "https://example.test"}, {"v": "Example"}]}], "totalRows": "1"}
+
+        with patch("trading_bigquery.client._jwt_encode_rs256", return_value="signed.jwt"), patch("urllib.request.urlopen", side_effect=[FakeResponse({"access_token": "token", "expires_in": 3600}), FakeResponse(query_payload)]) as urlopen:
+            result = BigQueryClient(service_account).query("SELECT url, title", max_results=1)
+
+        self.assertEqual(result.schema, ["url", "title"])
+        self.assertEqual(result.rows[0]["title"], "Example")
+        token_request = urlopen.call_args_list[0].args[0]
+        query_request = urlopen.call_args_list[1].args[0]
+        self.assertEqual(token_request.full_url, "https://oauth.example.test/token")
+        self.assertEqual(query_request.headers["Authorization"], "Bearer token")
+        self.assertIn("/projects/unit-project/queries", query_request.full_url)
 
     def test_brave_search_client_normalizes_results_with_mock_transport(self):
         from trading_web_search.brave import BraveSearchClient
