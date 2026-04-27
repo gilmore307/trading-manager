@@ -74,6 +74,7 @@ class RegistryHelperTests(unittest.TestCase):
             "MACRO_DATA": "macro_data",
             "CALENDAR_DISCOVERY": "calendar_discovery",
             "ETF_HOLDINGS": "etf_holdings",
+            "TRADING_ECONOMICS_CALENDAR_WEB": "trading_economics_calendar_web",
             "SEC_COMPANY_FINANCIALS": "sec_company_financials",
         }
         for key, payload in expected_bundles.items():
@@ -86,11 +87,12 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 80)
+        self.assertEqual(len(data_kinds), 82)
         expected_payloads = {
             "MACRO_RELEASE": "macro_release",
             "MACRO_RELEASE_EVENT": "macro_release_event",
             "GDELT_ARTICLE": "gdelt_article",
+            "TRADING_ECONOMICS_CALENDAR_EVENT": "trading_economics_calendar_event",
             "EQUITY_BAR": "equity_bar",
             "EQUITY_LIQUIDITY_BAR": "equity_liquidity_bar",
             "CRYPTO_BAR": "crypto_bar",

@@ -11,6 +11,10 @@
 
 ## Inventory
 
+- `test_trading_bigquery.py` verifies:
+  - BigQuery query-result metadata parsing for dry-run byte estimates;
+  - query request payload handling for `maximumBytesBilled` and dry-run flags.
+
 - `test_trading_registry.py` verifies:
   - id-based `RegistryReader` lookup, required lookup, path, payload, key, and kind-filter behavior;
   - registry row mapping into `RegistryItem` objects;

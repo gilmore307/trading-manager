@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -39,6 +39,9 @@ class BigQueryResult:
     rows: list[dict[str, Any]]
     job_reference: dict[str, Any] = field(default_factory=dict)
     total_rows: int | None = None
+    total_bytes_processed: int | None = None
+    cache_hit: bool | None = None
+    dry_run: bool = False
 
 
 class BigQueryError(RuntimeError):
@@ -93,11 +96,16 @@ def _parse_query_result(payload: Mapping[str, Any]) -> BigQueryResult:
         cells = row.get("f", []) if isinstance(row, Mapping) else []
         rows.append({name: _cell_value(cell) for name, cell in zip(names, cells, strict=False) if isinstance(cell, Mapping)})
     total_rows = payload.get("totalRows")
+    total_bytes_processed = payload.get("totalBytesProcessed")
+    cache_hit = payload.get("cacheHit")
     return BigQueryResult(
         schema=names,
         rows=rows,
         job_reference=dict(payload.get("jobReference") or {}),
         total_rows=int(total_rows) if isinstance(total_rows, str) and total_rows.isdigit() else None,
+        total_bytes_processed=int(total_bytes_processed) if isinstance(total_bytes_processed, str) and total_bytes_processed.isdigit() else None,
+        cache_hit=bool(cache_hit) if isinstance(cache_hit, bool) else None,
+        dry_run=bool(payload.get("dryRun", False)),
     )
 
 
@@ -154,10 +162,17 @@ class BigQueryClient:
         max_results: int | None = None,
         use_legacy_sql: bool = False,
         dry_run: bool = False,
+        maximum_bytes_billed: int | None = None,
+        max_bytes_billed: int | None = None,
     ) -> BigQueryResult:
         if not sql.strip():
             raise ValueError("sql must be non-empty")
         payload: dict[str, Any] = {"query": sql, "useLegacySql": use_legacy_sql, "dryRun": dry_run}
+        bytes_cap = maximum_bytes_billed if maximum_bytes_billed is not None else max_bytes_billed
+        if bytes_cap is not None:
+            if bytes_cap < 1:
+                raise ValueError("maximum_bytes_billed must be positive")
+            payload["maximumBytesBilled"] = str(bytes_cap)
         if max_results is not None:
             payload["maxResults"] = max_results
         url = f"{BIGQUERY_ENDPOINT}/projects/{project_id or self.project_id}/queries"
@@ -179,7 +194,8 @@ class BigQueryClient:
             raise BigQueryError("BigQuery query response was not a JSON object")
         if result_payload.get("errors"):
             raise BigQueryError("BigQuery query returned errors: " + json.dumps(result_payload.get("errors"))[:500])
-        return _parse_query_result(result_payload)
+        result = _parse_query_result(result_payload)
+        return replace(result, dry_run=True) if dry_run else result
 
 
 def bigquery_query(sql: str, **kwargs: Any) -> BigQueryResult:
