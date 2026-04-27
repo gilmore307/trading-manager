@@ -86,7 +86,7 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 75)
+        self.assertEqual(len(data_kinds), 78)
         expected_payloads = {
             "MACRO_RELEASE": "macro_release",
             "EQUITY_BAR": "equity_bar",
@@ -107,6 +107,9 @@ class RegistryHelperTests(unittest.TestCase):
             "MACRO_TREASURY_DTS": "macro_treasury_dts",
             "MACRO_FRED_NATIVE": "macro_fred_native",
             "MACRO_ALFRED_VINTAGE": "macro_alfred_vintage",
+            "TRADING_EVENT": "trading_event",
+            "EVENT_FACTOR": "event_factor",
+            "EVENT_ANALYSIS_REPORT": "event_analysis_report",
         }
         for key, payload in expected_payloads.items():
             self.assertEqual(by_key[key]["kind"], "data_kind")
