@@ -8,7 +8,7 @@ These templates are cross-repository planning surfaces:
 - `trading-data` uses bundle templates to implement fetch, clean, save, and receipt steps;
 - `trading-storage` uses receipt/output references later when durable contracts are accepted.
 
-Development-stage outputs should target `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` (`trading-data/data/storage/`) and not SQL by default.
+Development-stage outputs should target `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` (`trading-data/storage/`) and not SQL by default.
 
 ## Templates
 

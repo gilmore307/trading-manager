@@ -9,7 +9,7 @@ Define how `pipeline.py::save` writes cleaned outputs during development and how
 During development, save only to local files under:
 
 ```text
-data/storage/<task-id>/runs/<run-id>/saved/
+storage/<task-id>/runs/<run-id>/saved/
 ```
 
 Do not write to SQL by default.

@@ -945,7 +945,7 @@ The user clarified that current `trading-data` acquisition work concerns histori
 
 ### Decision
 
-Register shared workflow terms for historical data acquisition, manager-issued data task key files, and data task completion receipts. Treat the exact schema and storage placement as pending cross-repository contract work; development receipts use local `data/storage/` before durable storage contracts exist.
+Register shared workflow terms for historical data acquisition, manager-issued data task key files, and data task completion receipts. Treat the exact schema and storage placement as pending cross-repository contract work; development receipts use local `storage/` before durable storage contracts exist.
 
 ### Rationale
 
@@ -955,7 +955,7 @@ The boundary keeps orchestration, data acquisition, storage, and execution respo
 
 - `trading-data` remains historical-only for now.
 - `trading-manager` owns task-key creation and lifecycle orchestration.
-- Development-stage outputs and receipts use local `data/storage/`; `trading-storage` owns durable SQL output placement and completion receipt storage once schemas are accepted.
+- Development-stage outputs and receipts use local `storage/`; `trading-storage` owns durable SQL output placement and completion receipt storage once schemas are accepted.
 - Registry terms exist before component implementation depends on the names.
 
 ## D045 - Trading-data development outputs use local file storage before SQL
@@ -968,7 +968,7 @@ The user clarified that during development, `trading-data` outputs should not be
 
 ### Decision
 
-Register `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` as the development-stage output root for `trading-data`, with relative path `data/storage` and local path `/root/projects/trading-data/data/storage`. Use this root for development task outputs and completion receipts until durable `trading-storage` contracts are accepted.
+Register `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` as the development-stage output root for `trading-data`, with relative path `storage` and local path `/root/projects/trading-data/storage`. Use this root for development task outputs and completion receipts until durable `trading-storage` contracts are accepted.
 
 ### Rationale
 
@@ -977,7 +977,7 @@ This preserves clean databases during development while keeping a shared, regist
 ### Consequences
 
 - Default development tasks must not write to SQL.
-- Generated contents under `data/storage/` remain ignored by Git.
+- Generated contents under `storage/` remain ignored by Git.
 - Durable SQL table/partition and receipt storage contracts remain future `trading-storage` work.
 
 ## D046 - Data task API templates live in trading-main templates
@@ -1066,7 +1066,7 @@ This keeps scheduled tasks replayable and comparable across invocations without 
 
 - `task_key.json` uses `output_root`, not per-run `output_dir`.
 - `completion_receipt.json` contains `runs[]`.
-- Run outputs should live under `data/storage/<task-id>/runs/<run-id>/`.
+- Run outputs should live under `storage/<task-id>/runs/<run-id>/`.
 - `pipeline.py` takes `run_id` separately from the task key.
 
 ## D050 - Data task JSON fields are registered

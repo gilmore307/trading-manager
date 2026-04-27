@@ -112,21 +112,21 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(by_key[key]["payload"], payload)
         self.assertEqual(
             by_key["EQUITY_LIQUIDITY_BAR"]["path"],
-            "trading-data/templates/data_kinds/alpaca/equity_liquidity_bar.preview.csv",
+            "trading-data/storage/templates/data_kinds/alpaca/equity_liquidity_bar.preview.csv",
         )
         self.assertEqual(
             by_key["CRYPTO_BAR"]["path"],
-            "trading-data/templates/data_kinds/okx/crypto_bar.preview.csv",
+            "trading-data/storage/templates/data_kinds/okx/crypto_bar.preview.csv",
         )
         self.assertEqual(
             by_key["OPTION_ACTIVITY_EVENT_DETAIL"]["path"],
-            "trading-data/templates/data_kinds/thetadata/option_activity_event_detail.preview.json",
+            "trading-data/storage/templates/data_kinds/thetadata/option_activity_event_detail.preview.json",
         )
         self.assertEqual(by_key["CRYPTO_TRADE"]["path"], "")
         self.assertIn("transient inputs", by_key["CRYPTO_TRADE"]["note"])
         self.assertEqual(
             by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE"]["path"],
-            "trading-data/templates/data_kinds/alpaca/README.md",
+            "trading-data/storage/templates/data_kinds/alpaca/README.md",
         )
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
 

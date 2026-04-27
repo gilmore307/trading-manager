@@ -7,7 +7,7 @@
       "status": "<succeeded|failed>",
       "started_at": "<iso-datetime>",
       "completed_at": "<iso-datetime>",
-      "output_dir": "data/storage/<task-id>/runs/<run-id>",
+      "output_dir": "storage/<task-id>/runs/<run-id>",
       "outputs": [],
       "row_counts": {},
       "error": null

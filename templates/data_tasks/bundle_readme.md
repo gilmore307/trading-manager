@@ -48,7 +48,7 @@ Default implementation should start as one `pipeline.py` file with one public `r
 |---|---|
 | `fetch(...)` | Retrieve source data and write raw development files. |
 | `clean(...)` | Normalize provider data into bundle output shapes. |
-| `save(...)` | Save cleaned development files under `data/storage/`; durable SQL waits for contracts. |
+| `save(...)` | Save cleaned development files under `storage/`; durable SQL waits for contracts. |
 | `write_receipt(...)` | Emit success/failure completion receipt. |
 
 ## Outputs
@@ -56,7 +56,7 @@ Default implementation should start as one `pipeline.py` file with one public `r
 Development outputs should be grouped by task/run:
 
 ```text
-data/storage/<task-id>/
+storage/<task-id>/
   task_key.json
   completion_receipt.json
   runs/

@@ -3,5 +3,5 @@
   "bundle": "<bundle-name>",
   "credential_config_id": null,
   "params": {},
-  "output_root": "data/storage/<task-id>"
+  "output_root": "storage/<task-id>"
 }

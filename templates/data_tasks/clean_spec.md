@@ -6,7 +6,7 @@ Define how `pipeline.py::clean` converts raw provider/source data into normalize
 
 ## Inputs
 
-- Raw input directory: `data/storage/<task-id>/runs/<run-id>/raw/`
+- Raw input directory: `storage/<task-id>/runs/<run-id>/raw/`
 - Required raw file names or patterns:
 - Required task key fields:
 
@@ -45,7 +45,7 @@ Document checks that clean must prepare evidence for:
 Development cleaned outputs must be written under:
 
 ```text
-data/storage/<task-id>/runs/<run-id>/cleaned/
+storage/<task-id>/runs/<run-id>/cleaned/
 ```
 
 ## Default Test Policy

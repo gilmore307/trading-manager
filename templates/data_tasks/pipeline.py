@@ -43,7 +43,7 @@ def build_context(task_key: dict[str, Any], run_id: str) -> BundleContext:
     """Build development output paths for one run of a stable task key.
 
     `output_root` should normally be a stable path under
-    TRADING_DATA_DEVELOPMENT_STORAGE_ROOT, such as `data/storage/<task-id>`.
+    TRADING_DATA_DEVELOPMENT_STORAGE_ROOT, such as `storage/<task-id>`.
     Each run writes under `output_root/runs/<run-id>`, while the task-level
     completion receipt lives at `output_root/completion_receipt.json`.
     """
