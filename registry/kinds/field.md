@@ -20,3 +20,12 @@ Reject or re-scope entries that are actually:
 ## Usage Metadata
 
 Every `field` entry must populate `trading_registry.applies_to`. Use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Do not add a field entry until its first valid usage scope is known.
+
+## Naming Rule
+
+Prefer the broadest truthful field key.
+
+- Reusable metrics or columns should use generic metric/category keys, such as `BAR_CLOSE`, `QUOTE_BID`, `TRADE_SIZE`, or `GREEK_DELTA`.
+- Asset-class keys are acceptable when the field is inherently asset-class-specific, such as option contract fields.
+- Scenario-specific prefixes belong only to fields whose meaning is specific to that scenario, such as `OPTION_EVENT_DETAIL_PRICE_VS_ASK`.
+- Do not keep implementation/template-era prefixes like `OPTION_TEMPLATE_*` when the field is a reusable current data field.
