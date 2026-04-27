@@ -30,6 +30,7 @@ Concrete entries use this shape:
 | `payload` | Registered value or file reference. |
 | `path` | Optional direct locator/address for entries that point to concrete entities, including repo roots, script sources, source-secret JSON files, and provider documentation URLs. |
 | `applies_to` | Optional for most kinds; required for `field` entries. Records the table, file, contract, template, or data shape where the field is used. |
+| `artifact_sync_policy` | Review policy for whether registry row edits require follow-up changes in concrete code, template, docs, or other artifact files. See Artifact Sync Policy below. |
 | `note` | Human-readable review note. |
 | `created_at` | Database insertion timestamp. |
 | `updated_at` | Database update timestamp. |
@@ -44,6 +45,20 @@ The SQL `trading_registry_payload_format_check` constraint and the registered `p
 Use the narrowest registered format that matches the value. Keep `text` as the fallback only when no narrower registered format applies.
 
 Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL constraint, add the `payload_format` row, update registry docs/tests, and regenerate `registry/current.csv` in one reviewed change.
+
+## Artifact Sync Policy
+
+`artifact_sync_policy` tells reviewers whether a normal semantic edit to a registry row requires follow-up changes in concrete artifacts.
+
+Allowed values are registered as rows with `kind = artifact_sync_policy` and must stay aligned with the SQL `trading_registry_artifact_sync_policy_check` constraint.
+
+Use:
+
+- `registry_only` when registry row edits normally do not require artifact follow-up because durable consumers use stable ids and the row is not merged, deleted, or semantically repurposed.
+- `sync_artifact` when registry edits must be propagated into code, templates, docs, or other artifact files before acceptance.
+- `review_on_merge` when simple label edits may be registry-only, but merges, deletes, or semantic repurposing require downstream review.
+
+Key-only label renames can still be safe for id-based consumers, but payload/name changes for fields that appear in plain-text templates or code must be synchronized with those artifacts.
 
 ## CSV Snapshot
 

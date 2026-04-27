@@ -14,6 +14,7 @@ SELECT
   payload,
   path,
   applies_to,
+  artifact_sync_policy,
   note,
   created_at,
   updated_at
@@ -35,6 +36,7 @@ class RegistryItem:
     payload: str
     path: str | None
     applies_to: str | None
+    artifact_sync_policy: str | None
     note: str | None
     created_at: Any
     updated_at: Any
@@ -65,6 +67,7 @@ def map_registry_item_row(row: Mapping[str, Any]) -> RegistryItem:
         payload=row["payload"],
         path=_optional_non_empty(row.get("path")),
         applies_to=_optional_non_empty(row.get("applies_to")),
+        artifact_sync_policy=_optional_non_empty(row.get("artifact_sync_policy")),
         note=row.get("note"),
         created_at=row.get("created_at"),
         updated_at=row.get("updated_at"),

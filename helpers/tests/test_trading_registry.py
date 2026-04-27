@@ -22,6 +22,7 @@ def create_row(**overrides):
         "payload": "id",
         "path": None,
         "applies_to": "trading_registry",
+        "artifact_sync_policy": "sync_artifact",
         "note": "canonical column name for trading_registry.id",
         "created_at": "2026-04-23T00:00:00.000Z",
         "updated_at": "2026-04-23T00:00:00.000Z",
@@ -150,6 +151,28 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("iso_datetime", registered_formats)
         self.assertIn("secret_alias", registered_formats)
 
+    def test_registered_artifact_sync_policies_match_sql_constraint(self):
+        constraint_blocks = []
+        for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
+            text = migration.read_text()
+            if "CHECK (artifact_sync_policy IN (" in text:
+                constraint_blocks.append(
+                    text.split("CHECK (artifact_sync_policy IN (", 1)[1].split("));", 1)[0]
+                )
+        self.assertTrue(constraint_blocks)
+        constrained_policies = tuple(re.findall(r"'([^']+)'", constraint_blocks[-1]))
+
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            registered_policies = tuple(
+                row["payload"]
+                for row in csv.DictReader(csv_file)
+                if row["kind"] == "artifact_sync_policy"
+            )
+
+        self.assertEqual(sorted(registered_policies), sorted(constrained_policies))
+        self.assertIn("registry_only", registered_policies)
+        self.assertIn("sync_artifact", registered_policies)
+        self.assertIn("review_on_merge", registered_policies)
 
     def test_test_scripts_are_documented_and_not_registered_as_scripts(self):
         test_scripts = sorted(Path("helpers/tests").glob("test_*.py"))
@@ -172,6 +195,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(item.id, "fld_A7K3P2Q9")
         self.assertEqual(item.payload_format, "field_name")
         self.assertEqual(item.applies_to, "trading_registry")
+        self.assertEqual(item.artifact_sync_policy, "sync_artifact")
         self.assertIsNone(item.path)
 
     def test_id_only_registry_helpers_return_key_payload_and_path(self):

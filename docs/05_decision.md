@@ -1091,3 +1091,26 @@ These JSON templates are cross-repository handoff surfaces. Their field names sh
 - Task-level receipt fields are registered under `data_task_completion_receipt`.
 - Per-run receipt fields are registered under `data_task_completion_receipt_run`.
 - Any future runtime JSON field requires registry review before adoption.
+
+## D051 - Registry rows declare artifact sync policy
+
+Date: 2026-04-27
+
+### Context
+
+Registry keys are renameable display labels, while stable ids are the durable automation inputs. Some registry edits therefore remain registry-only. Other rows describe fields or templates whose payloads appear directly in code, CSV/JSON previews, Markdown templates, or other plain-text artifacts and must be kept synchronized.
+
+### Decision
+
+Add `artifact_sync_policy` to `trading_registry` and register the allowed values as `kind = artifact_sync_policy` rows. Use `registry_only`, `sync_artifact`, and `review_on_merge` to make follow-up expectations visible in `registry/current.csv`.
+
+### Rationale
+
+Reviewers need to know whether a registry edit is only a registry-label/schema change or whether it requires matching artifact edits. Making this explicit prevents silent drift between registry rows and the files they describe.
+
+### Consequences
+
+- `registry/current.csv` exports `artifact_sync_policy` for every row.
+- Legal artifact-sync policy values are registered rows and constrained in SQL.
+- Rows that point to concrete code/templates/docs should normally use `sync_artifact`.
+- Key-only renames can be artifact-neutral for id-based consumers, but merges, deletes, payload changes, or semantic repurposing require review or artifact synchronization.
