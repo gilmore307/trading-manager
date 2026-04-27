@@ -68,7 +68,7 @@ The accepted shared environment baseline is:
 
 Because this server's project work is centered on the trading system, `trading-main` is the canonical home for trading-wide shared assets:
 
-- `helpers/` stores shared helper code used by component repositories; `docs/07_helpers.md` explains the helper boundary.
+- `src/` stores shared helper code used by component repositories; `docs/07_helpers.md` explains the helper boundary.
 - `registry/` maintains the SQL-backed registration system; `docs/08_registry.md` explains the registry operating model.
 - `templates/` stores reusable trading project, contract, task, and implementation templates; `docs/09_templates.md` explains the template boundary.
 

@@ -18,8 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-MIGRATIONS_DIR = Path(__file__).resolve().parent / "schema_migrations"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MIGRATIONS_DIR = REPO_ROOT / "registry" / "sql" / "schema_migrations"
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_CSV_PATH = REPO_ROOT / "registry" / "current.csv"
 

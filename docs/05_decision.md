@@ -147,7 +147,7 @@ Concrete registry entries belong in SQL for queryability, constraints, and helpe
 
 ### Decision
 
-After SQL registry updates, `registry/sql/apply-migrations.py` exports the active `trading_registry` table to:
+After SQL registry updates, `scripts/apply_registry_migrations.py` exports the active `trading_registry` table to:
 
 ```text
 registry/current.csv
@@ -425,7 +425,7 @@ Date: 2026-04-25
 
 ### Decision
 
-Register `registry/sql/apply-migrations.py --export-only` as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.
+Register `scripts/apply_registry_migrations.py --export-only` as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.
 
 ### Rationale
 
@@ -435,7 +435,7 @@ This keeps the CSV generation command visible without mixing it into the id-only
 
 - Lookup helpers remain id-only.
 - CSV generation is registered as a maintenance helper.
-- The helper row points to `registry/sql/apply-migrations.py` and applies to `registry/current.csv`.
+- The helper row points to `scripts/apply_registry_migrations.py` and applies to `registry/current.csv`.
 
 ## D022 - All trading repositories are registry entries
 
@@ -531,7 +531,7 @@ This mirrors the actual top-level structure of `trading-main` and gives each own
 - Helpers, registry, and templates each have a dedicated docs guide.
 - Registry kind source-of-truth files still live under `registry/kinds/`.
 - Template drafts still live under `templates/`.
-- Helper code still lives under `helpers/`.
+- Helper code still lives under `src/`.
 
 ## D026 - Loose helper files are not package contracts
 
@@ -539,11 +539,11 @@ Date: 2026-04-25
 
 ### Context
 
-`helpers/` can contain tested helper code before it is safe for component repositories to consume that code at runtime. A helper file alone does not define package metadata, version policy, runtime version, installation method, or import/call examples.
+`src/` can contain tested helper code before it is safe for component repositories to consume that code at runtime. A helper file alone does not define package metadata, version policy, runtime version, installation method, or import/call examples.
 
 ### Decision
 
-Component repositories must not depend on loose helper files from `trading-main/helpers/`. Cross-repository runtime helper consumption requires an accepted package strategy.
+Component repositories must not depend on loose helper files from `trading-main/src/`. Cross-repository runtime helper consumption requires an accepted package strategy.
 
 ### Rationale
 
@@ -588,7 +588,7 @@ Trading component repositories are expected to use Python through the shared `.v
 
 ### Decision
 
-Use the Python package rooted at `helpers/trading_registry/` as the cross-repository runtime helper distribution strategy. Component repositories should consume the installed `trading_registry` package rather than loose source files.
+Use the Python package rooted at `src/trading_registry/` as the cross-repository runtime helper distribution strategy. Component repositories should consume the installed `trading_registry` package rather than loose source files.
 
 ### Rationale
 
@@ -597,7 +597,7 @@ This aligns helper consumption with the shared environment and gives component r
 ### Consequences
 
 - Components should import from `trading_registry` after installing `trading-main` editable into the shared environment.
-- Loose files under `trading-main/helpers/` are not runtime dependency contracts.
+- Loose files under `trading-main/src/` are not runtime dependency contracts.
 - New runtime helpers should normally be added to the Python helper package with tests and docs.
 
 ## D029 - Trading repositories remain private by default
@@ -632,7 +632,7 @@ Future trading component repositories are expected to use Python through the sha
 
 ### Decision
 
-Make the official cross-repository registry helper runtime surface a Python package. Package metadata lives in root `pyproject.toml`, source lives under `helpers/trading_registry/`, and the install path is editable installation into `/root/projects/trading-main/.venv`.
+Make the official cross-repository registry helper runtime surface a Python package. Package metadata lives in root `pyproject.toml`, source lives under `src/trading_registry/`, and the install path is editable installation into `/root/projects/trading-main/.venv`.
 
 ### Rationale
 
@@ -662,8 +662,8 @@ One implementation is easier to test, document, package, and consume. Since comp
 
 ### Consequences
 
-- `helpers/trading_registry/` is the only registry helper implementation.
-- The registry helper test command is `/root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/tests`.
+- `src/trading_registry/` is the only registry helper implementation.
+- The registry helper test command is `PYTHONPATH=src python3 -m unittest discover -s tests`.
 - Registry script rows remain pointed at Python helper methods and source files.
 
 ## D032 - Registry payload_format records value format
@@ -730,7 +730,7 @@ Runtime helpers should expose behavior needed by component consumers, not passiv
 
 ### Consequences
 
-- `helpers/trading_registry/registry_types.py` is removed.
+- `src/trading_registry/registry_types.py` is removed.
 - The Python package no longer exports `REGISTRY_KINDS`, `is_registry_kind`, or `assert_registry_kind`.
 - `RegistryReader.list_items_by_kind` only validates that kind input is non-empty; SQL/current-registry tests own legal-kind alignment.
 - Tests compare the latest SQL kind constraint with `registry/kinds/*.md` and ensure current rows use constrained kinds.
@@ -753,8 +753,8 @@ A local test inventory keeps coverage discoverable without polluting the registr
 
 ### Consequences
 
-- `helpers/tests/README.md` inventories each helper test script.
-- Tests enforce that first-party `helpers/tests/test_*.py` scripts are documented and absent from registry `script` rows.
+- `tests/README.md` inventories each helper test script.
+- Tests enforce that first-party `tests/test_*.py` scripts are documented and absent from registry `script` rows.
 - New or renamed test scripts require the owning tests README to be updated in the same change.
 
 ## D036 - Source secrets use one JSON file per source
@@ -1114,3 +1114,26 @@ Reviewers need to know whether a registry edit is only a registry-label/schema c
 - Legal artifact-sync policy values are registered rows and constrained in SQL.
 - Rows that point to concrete code/templates/docs should normally use `sync_artifact`.
 - Key-only renames can be artifact-neutral for id-based consumers, but merges, deletes, payload changes, or semantic repurposing require review or artifact synchronization.
+
+## D052 - Source and scripts directories are separated
+
+Date: 2026-04-27
+
+### Context
+
+The user clarified that `source` and `script` should not be treated as interchangeable concepts. Across trading repositories, source code directories should be distinguishable from executable maintenance or operational entrypoints, and `source` should not conflict with provider/data-source meaning.
+
+### Decision
+
+Use `src/` for importable, reusable implementation code and `scripts/` for executable maintenance or operational entrypoints. `scripts/` may import `src/`; `src/` must not import `scripts/`. Avoid creating `source/` directories. Use `provider` or `data_source` for external data origins, and use `implementation_path`, `source_file`, or `source_dir` only when referring to code locations.
+
+### Rationale
+
+This keeps package code, operational commands, and provider/source terminology from drifting into ambiguous names. It also makes registry `kind=script` rows easier to review because scripts are stable callable entrypoints rather than ordinary implementation files.
+
+### Consequences
+
+- The registry helper package moved from `helpers/trading_registry/` to `src/trading_registry/`.
+- Helper tests moved from `helpers/tests/` to `tests/`.
+- The registry migration/export command moved from `registry/sql/apply-migrations.py` to `scripts/apply_registry_migrations.py`.
+- Registry script rows now point to stable callable entrypoints or Python helper symbols under the new paths.

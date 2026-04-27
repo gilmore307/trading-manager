@@ -9,7 +9,6 @@ Markdown files in `registry/` define kind boundaries. SQL migrations define the 
 ```text
 registry/sql/
   README.md
-  apply-migrations.py
   schema_migrations/
     001_create_trading_registry.sql
     002_bootstrap_trading_registry.sql
@@ -25,7 +24,7 @@ registry/sql/
 
 ## CSV Snapshot
 
-`apply-migrations.py` exports the active `trading_registry` table to `../current.csv` after every non-dry-run migration pass.
+`scripts/apply_registry_migrations.py` exports the active `trading_registry` table to `../current.csv` after every non-dry-run migration pass.
 
 Use `--export-only` to refresh the CSV without applying migrations.
 

@@ -12,7 +12,9 @@ This repository also anchors the shared local trading development environment at
 
 ```text
 docs/             System-level docs spine: 00-06 project-wide docs plus 07-09 platform guides.
-helpers/          Shared helper code used across trading repositories.
+src/              Importable shared helper packages used across trading repositories.
+scripts/          Executable maintenance/operational commands that may import `src/`.
+tests/            First-party tests for source packages and repository governance checks.
 registry/         Trading-wide registry kind boundaries, SQL migrations, and generated current.csv snapshot.
 templates/        Trading-wide project, contract, task, and implementation templates, including contract drafting templates.
 pyproject.toml    Python helper package metadata for `trading-main-helpers`.

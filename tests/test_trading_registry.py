@@ -175,10 +175,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("review_on_merge", registered_policies)
 
     def test_test_scripts_are_documented_and_not_registered_as_scripts(self):
-        test_scripts = sorted(Path("helpers/tests").glob("test_*.py"))
+        test_scripts = sorted(Path("tests").glob("test_*.py"))
         self.assertTrue(test_scripts)
 
-        tests_readme = Path("helpers/tests/README.md").read_text()
+        tests_readme = Path("tests/README.md").read_text()
         for script in test_scripts:
             self.assertIn(f"`{script.name}`", tests_readme)
 

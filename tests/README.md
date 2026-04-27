@@ -1,6 +1,6 @@
-# Helper Tests
+# Tests
 
-`helpers/tests/` owns first-party tests for the `trading-main` helper package.
+`tests/` owns first-party tests for the `trading-main` source packages and repository governance checks.
 
 ## Boundary
 
@@ -17,6 +17,7 @@
   - source-level secret JSON alias parsing and id-based secret field resolution behavior;
   - SQL `kind` constraint alignment with `registry/kinds/*.md` and active `registry/current.csv` rows;
   - SQL `payload_format` constraint alignment with registered `kind=payload_format` rows;
+  - SQL `artifact_sync_policy` constraint alignment with registered `kind=artifact_sync_policy` rows;
   - test-script governance: first-party test scripts are documented here and are not registered as registry `script` rows.
 
 ## Run
@@ -24,5 +25,5 @@
 From the repository root:
 
 ```bash
-/root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/tests
+PYTHONPATH=src python3 -m unittest discover -s tests
 ```

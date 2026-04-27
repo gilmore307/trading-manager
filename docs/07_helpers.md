@@ -7,7 +7,7 @@
 The earlier docs stay project-wide:
 
 - `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
-- This file describes the `helpers/` platform function specifically.
+- This file describes the shared helper source boundary under `src/` specifically.
 
 Helpers exist to keep repeated cross-repository mechanics consistent without turning `trading-main` into a runtime implementation repository.
 
@@ -37,13 +37,17 @@ Helpers must not own:
 ## Directory Layout
 
 ```text
-helpers/
-  README.md                 Helper boundary summary.
+src/
+  README.md                 Source boundary summary.
   trading_registry/         Formal Python registry helper package source.
-  tests/                    Python helper tests and test-script inventory.
+scripts/
+  apply_registry_migrations.py  Executable registry maintenance command.
+tests/
+  README.md                 Test boundary and inventory.
+  test_trading_registry.py  Python helper and registry governance tests.
 ```
 
-Python helper packages live directly under `helpers/` with root package metadata in `pyproject.toml`. Tests live under `helpers/tests/` and must be inventoried in `helpers/tests/README.md`. Future helper packages should use a named package/subdirectory with a clear README when the boundary is more than trivial.
+Python helper packages live under `src/` with root package metadata in `pyproject.toml`. Executable maintenance or operational entrypoints live under `scripts/` and may import `src/`; `src/` must not import `scripts/`. Tests live under `tests/` and must be inventoried in `tests/README.md`. Future helper packages should use a named package/subdirectory with a clear README when the boundary is more than trivial.
 
 ## Current Package Status
 
@@ -65,7 +69,7 @@ Current package facts:
 - Python helper test command:
 
   ```bash
-  /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/tests
+  PYTHONPATH=src python3 -m unittest discover -s tests
   ```
 
 Component repositories should consume the Python package.
@@ -99,7 +103,7 @@ Registry kind and payload-format vocabularies are registry/schema concerns, not 
 
 Source secret configs should point to one source-level JSON file per provider/source. The secret resolver can return either the raw JSON text or one named JSON string field.
 
-The official Python helper source lives under `helpers/trading_registry/`.
+The official Python helper source lives under `src/trading_registry/`.
 
 Registry maintenance commands, such as regenerating `registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
 
@@ -107,7 +111,7 @@ Registry maintenance commands, such as regenerating `registry/current.csv`, are 
 
 When any component work discovers or creates a helper that should be global, record it in `trading-main` instead of leaving it in the component repository.
 
-- Shared helper code belongs under `helpers/`.
+- Shared helper code belongs under `src/`.
 - Public helper surfaces that automation may call should be registered as `script` rows when stable.
 - Test scripts are not registry `script` rows; document each test script in its test-directory README instead.
 - Helper-facing fields, config keys, statuses, and type values must be routed through the registry before cross-repository use.

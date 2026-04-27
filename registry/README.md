@@ -71,13 +71,13 @@ registry/current.csv
 Run this after SQL registry updates:
 
 ```bash
-registry/sql/apply-migrations.py
+scripts/apply_registry_migrations.py
 ```
 
 For export only:
 
 ```bash
-registry/sql/apply-migrations.py --export-only
+scripts/apply_registry_migrations.py --export-only
 ```
 
 This export-only command is registered as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.

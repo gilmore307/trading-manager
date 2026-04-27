@@ -40,7 +40,7 @@ registry/
 Supporting helper code lives outside `registry/`:
 
 ```text
-helpers/trading_registry/    Shared Python registry reader and secret-resolution helpers.
+src/trading_registry/    Shared Python registry reader and secret-resolution helpers.
 ```
 
 ## Entry Model
@@ -119,26 +119,26 @@ Normal registry update flow:
 4. Run the migration helper:
 
    ```bash
-   registry/sql/apply-migrations.py
+   scripts/apply_registry_migrations.py
    ```
 
 5. Confirm `registry/current.csv` was regenerated.
 6. Run a dry-run check:
 
    ```bash
-   registry/sql/apply-migrations.py --dry-run
+   scripts/apply_registry_migrations.py --dry-run
    ```
 
 7. Run registry helper tests when helper behavior or registry reader behavior changed:
 
    ```bash
-   /root/projects/trading-main/.venv/bin/python -m unittest discover -s helpers/tests
+   PYTHONPATH=src python3 -m unittest discover -s tests
    ```
 
 For snapshot export only:
 
 ```bash
-registry/sql/apply-migrations.py --export-only
+scripts/apply_registry_migrations.py --export-only
 ```
 
 That export command is registered as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.
@@ -158,7 +158,7 @@ Registry kind and payload-format vocabularies are checked against SQL constraint
 
 The CSV export maintenance helper is separate from lookup helpers:
 
-- `registry/sql/apply-migrations.py --export-only`
+- `scripts/apply_registry_migrations.py --export-only`
 
 Registry `script` rows identify approved helper/automation surfaces and source locators; they do not by themselves define package installation or cross-repository runtime dependency contracts.
 
