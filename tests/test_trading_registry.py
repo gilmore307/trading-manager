@@ -127,9 +127,11 @@ class RegistryHelperTests(unittest.TestCase):
             by_key["OPTION_ACTIVITY_EVENT_DETAIL"]["path"],
             "trading-data/storage/templates/data_kinds/thetadata/option_activity_event_detail.preview.csv",
         )
+        self.assertEqual(by_key["MACRO_RELEASE"]["path"], "")
+        self.assertIn("Transient cleaned source-evidence", by_key["MACRO_RELEASE"]["note"])
         self.assertEqual(
-            by_key["MACRO_RELEASE"]["path"],
-            "trading-data/storage/templates/data_kinds/macro/macro_release.preview.csv",
+            by_key["MACRO_RELEASE_EVENT"]["path"],
+            "trading-data/storage/templates/data_kinds/events/macro_release_event.preview.csv",
         )
         self.assertEqual(by_key["CRYPTO_TRADE"]["path"], "")
         self.assertIn("transient inputs", by_key["CRYPTO_TRADE"]["note"])
