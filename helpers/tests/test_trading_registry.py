@@ -85,7 +85,7 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 73)
+        self.assertEqual(len(data_kinds), 74)
         expected_payloads = {
             "EQUITY_BAR": "equity_bar",
             "EQUITY_LIQUIDITY_BAR": "equity_liquidity_bar",
@@ -93,6 +93,7 @@ class RegistryHelperTests(unittest.TestCase):
             "CRYPTO_TRADE": "crypto_trade",
             "CRYPTO_LIQUIDITY_BAR": "crypto_liquidity_bar",
             "OPTION_ACTIVITY_EVENT": "option_activity_event",
+            "OPTION_ACTIVITY_EVENT_DETAIL": "option_activity_event_detail",
             "OPTION_BAR": "option_bar",
             "OPTION_CHAIN_SNAPSHOT": "option_chain_snapshot",
             "OPTION_GREEKS_FIRST_ORDER": "option_greeks_first_order",
@@ -115,6 +116,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(
             by_key["CRYPTO_BAR"]["path"],
             "trading-data/templates/data_kinds/okx/crypto_bar.preview.csv",
+        )
+        self.assertEqual(
+            by_key["OPTION_ACTIVITY_EVENT_DETAIL"]["path"],
+            "trading-data/templates/data_kinds/thetadata/option_activity_event_detail.preview.json",
         )
         self.assertEqual(by_key["CRYPTO_TRADE"]["path"], "")
         self.assertIn("transient inputs", by_key["CRYPTO_TRADE"]["note"])
