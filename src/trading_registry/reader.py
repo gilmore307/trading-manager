@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 SELECT_COLUMNS = """
@@ -139,3 +141,26 @@ class RegistryReader:
 def create_registry_reader(query: QueryFn) -> RegistryReader:
     """Create a ``RegistryReader`` from a query callable."""
     return RegistryReader(query)
+
+
+def create_csv_registry_query(registry_csv: str | Path) -> QueryFn:
+    """Create a tiny id/kind query function backed by ``registry/current.csv``.
+
+    This is for helper scripts that need registry ids before a database
+    connection is available. It intentionally supports only the query shapes
+    used by ``RegistryReader``.
+    """
+    path = Path(registry_csv)
+
+    def query(sql: str, params: Sequence[str]) -> list[Mapping[str, Any]]:
+        with path.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        if "WHERE id = %s" in sql:
+            wanted = params[0]
+            return [row for row in rows if row.get("id") == wanted]
+        if "WHERE kind = %s" in sql:
+            wanted = params[0]
+            return sorted((row for row in rows if row.get("kind") == wanted), key=lambda row: row.get("key", ""))
+        raise ValueError("CSV registry query only supports WHERE id = %s or WHERE kind = %s")
+
+    return query

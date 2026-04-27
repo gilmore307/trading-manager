@@ -361,3 +361,66 @@ class RegistryHelperTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class WebSearchHelperTests(unittest.TestCase):
+    def test_csv_registry_query_resolves_config_secret(self):
+        from trading_registry import SecretResolver, create_csv_registry_query
+
+        rows = {
+            "id": "cfg_TESTSEARCH",
+            "kind": "config",
+            "key": "TEST_SEARCH_SECRET_ALIAS",
+            "payload_format": "secret_alias",
+            "payload": "test-search",
+            "path": "/root/secrets/test-search.json",
+            "applies_to": "unit",
+            "artifact_sync_policy": "registry_only",
+            "note": "unit",
+            "created_at": "",
+            "updated_at": "",
+        }
+
+        def read_text(path: str) -> str:
+            if path.endswith("registry.csv"):
+                raise AssertionError("registry CSV should be read by query helper")
+            if path == "/root/secrets/registry.json":
+                return json.dumps({"test-search": {"path": "/root/secrets/test-search.json"}})
+            if path == "/root/secrets/test-search.json":
+                return json.dumps({"api_key": "search-key"})
+            raise AssertionError(path)
+
+        import csv as _csv
+        import tempfile as _tempfile
+
+        with _tempfile.TemporaryDirectory() as temp_dir:
+            registry_csv = Path(temp_dir) / "registry.csv"
+            with registry_csv.open("w", newline="", encoding="utf-8") as handle:
+                writer = _csv.DictWriter(handle, fieldnames=list(rows))
+                writer.writeheader()
+                writer.writerow(rows)
+            resolver = SecretResolver(create_csv_registry_query(registry_csv), read_text=read_text)
+            self.assertEqual(resolver.load_secret_text_by_config_id("cfg_TESTSEARCH", "api_key"), "search-key")
+
+    def test_brave_search_client_normalizes_results_with_mock_transport(self):
+        from trading_web_search.brave import BraveSearchClient
+        from unittest.mock import patch
+        import io
+
+        class FakeResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps({"web": {"results": [{"title": "A", "url": "https://example.test", "description": "D", "site_name": "example"}]}}).encode()
+
+        with patch("urllib.request.urlopen", return_value=FakeResponse()) as urlopen:
+            results = BraveSearchClient("unit-key").search("macro release calendar", count=1)
+        self.assertEqual(results[0].title, "A")
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.headers["X-subscription-token"], "unit-key")
+        self.assertIn("macro+release+calendar", request.full_url)

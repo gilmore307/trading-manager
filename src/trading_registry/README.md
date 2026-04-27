@@ -18,3 +18,8 @@ Secret configs should point to one source-level JSON file per provider/source. T
 `SecretResolver.load_secret_text_by_config_id(config_id)` returns the raw JSON text.
 
 `SecretResolver.load_secret_text_by_config_id(config_id, field_name)` returns one string field from that JSON object, such as `api_key`, `secret_key`, `passphrase`, or `pat`.
+
+
+## CSV-backed registry query
+
+`create_csv_registry_query("registry/current.csv")` provides the small query surface used by `RegistryReader` and `SecretResolver` when helper scripts need id-based registry lookups before a database connection exists.

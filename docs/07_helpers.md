@@ -131,3 +131,18 @@ A helper change is acceptable when:
 - helper behavior does not duplicate component-owned logic;
 - registry item lookup helpers use id-based lookup only;
 - affected registry, template, or workflow docs are updated when helper behavior encodes a shared convention.
+
+
+## Brave Search helper
+
+Use `trading_web_search.brave` for code-level web search. The helper resolves `cfg_BRAVESEARCH` / `BRAVE_SEARCH_SECRET_ALIAS` through the trading registry and local `/root/secrets/brave.json`; repo code must not embed API keys.
+
+Default usage:
+
+```python
+from trading_web_search import brave_search
+
+results = brave_search("site:bls.gov CPI release schedule", count=5)
+```
+
+Production pipelines should treat search as discovery only: accept official source domains before parsing or persisting discovered calendar URLs.
