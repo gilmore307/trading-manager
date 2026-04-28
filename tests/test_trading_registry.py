@@ -22,6 +22,7 @@ def create_row(**overrides):
         "payload": "id",
         "path": None,
         "applies_to": "trading_registry",
+        "field_category": "identity",
         "artifact_sync_policy": "sync_artifact",
         "note": "canonical column name for trading_registry.id",
         "created_at": "2026-04-23T00:00:00.000Z",
@@ -183,6 +184,40 @@ class RegistryHelperTests(unittest.TestCase):
             if key not in {"INSTRUMENT_SYMBOL", "ISSUER"}:
                 self.assertEqual(registry[key]["path"], "storage/shared/market_etf_universe.csv")
 
+    def test_field_rows_have_one_exclusive_registered_category(self):
+        allowed_categories = {
+            "boolean",
+            "classification",
+            "collection",
+            "execution_contract",
+            "identity",
+            "nested_object",
+            "numeric_measure",
+            "quantity",
+            "reference",
+            "secret",
+            "state",
+            "temporal",
+            "text",
+        }
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+
+        field_rows = [row for row in rows if row["kind"] == "field"]
+        self.assertTrue(field_rows)
+        for row in field_rows:
+            self.assertIn(row["field_category"], allowed_categories, row["key"])
+        for row in rows:
+            if row["kind"] != "field":
+                self.assertEqual(row["field_category"], "", row["key"])
+
+        by_key = {row["key"]: row for row in field_rows}
+        self.assertEqual(by_key["UNIVERSE_TYPE"]["field_category"], "classification")
+        self.assertEqual(by_key["EVENT_TIME_ET"]["field_category"], "temporal")
+        self.assertEqual(by_key["EVENT_ID"]["field_category"], "identity")
+        self.assertEqual(by_key["EVENT_RELEVANCE_SCORE"]["field_category"], "numeric_measure")
+        self.assertEqual(by_key["SOURCE_SECRET_API_KEY"]["field_category"], "secret")
+
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
         for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
@@ -248,6 +283,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(item.id, "fld_A7K3P2Q9")
         self.assertEqual(item.payload_format, "field_name")
         self.assertEqual(item.applies_to, "trading_registry")
+        self.assertEqual(item.field_category, "identity")
         self.assertEqual(item.artifact_sync_policy, "sync_artifact")
         self.assertIsNone(item.path)
 

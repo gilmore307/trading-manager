@@ -30,6 +30,7 @@ Concrete entries use this shape:
 | `payload` | Registered value or file reference. |
 | `path` | Optional direct locator/address for entries that point to concrete entities, including repo roots, script sources, source-secret JSON files, and provider documentation URLs. |
 | `applies_to` | Optional for most kinds; required for `field` entries. Records the table, file, contract, template, or data shape where the field is used. |
+| `field_category` | Required for `field` entries and blank for all other kinds. Records exactly one exclusive semantic field category such as `classification`, `temporal`, `identity`, or `numeric_measure`. |
 | `artifact_sync_policy` | Review policy for whether registry row edits require follow-up changes in concrete code, template, docs, or other artifact files. See Artifact Sync Policy below. |
 | `note` | Human-readable review note. |
 | `created_at` | Database insertion timestamp. |
@@ -125,5 +126,6 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Repository rows should include the repository name in `payload` and the local checkout root in `path` when the checkout path is an approved shared fact.
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos, scripts, source-secret JSON config rows, and provider documentation term rows.
 - Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Source secret JSON field names use `applies_to=source_secret_json`.
+- Every `field` entry must populate exactly one `field_category`; non-`field` entries must leave `field_category` blank.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.
 - If a new kind is needed, add its `registry/kinds/<kind>.md` boundary file, update the SQL kind check, update registry tests/docs, and regenerate `registry/current.csv` in the same reviewed change.

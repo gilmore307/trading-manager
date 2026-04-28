@@ -33,6 +33,7 @@ COPY (
     payload,
     path,
     applies_to,
+    field_category,
     artifact_sync_policy,
     note,
     created_at,
