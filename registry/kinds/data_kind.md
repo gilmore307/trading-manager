@@ -8,15 +8,13 @@ A data kind is narrower than a `data_bundle` and usually names the actual obtain
 
 ## Range
 
-Register data kinds when they are useful for:
+Register active data kinds only when they have an evidence-backed contract. A row must satisfy at least one of these conditions:
 
-- `macro_data.params` source/dataset/release/series validation;
-- bundle-specific accepted dataset choices;
-- output routing and table/partition planning;
-- avoiding duplicate names for the same obtainable data category;
-- documenting source-of-truth ownership for a data category.
+- **Final saved shape:** the data kind has an accepted preview/template file under `trading-data/storage/templates/data_kinds/<source>/*.preview.csv`, and `path` points to that file.
+- **Routeable source-input contract:** the data kind is accepted by a named active `data_bundle`/pipeline as an input selector, and `applies_to` names that owner while `note` states whether persistence is transient, debug-only, or final.
+- **Derived durable product:** the data kind is a durable derived product with a documented owner and output/table contract.
 
-Use `payload` for a stable snake_case data-kind key. For final saved data kinds with accepted templates, use `path` for the canonical source-specific `trading-data/storage/templates/data_kinds/<source>/*.preview.csv` template/preview file. For source-only or transient data kinds without accepted final templates, leave `path` null until a final template exists. Provider/source documentation URLs belong on provider/source `term` rows, not on final `data_kind` rows. Use `applies_to` for the owning source, bundle, or component scope.
+Use `payload` for a stable snake_case data-kind key. For final saved data kinds with accepted templates, use `path` for the canonical source-specific preview/template file. For source-only or transient data kinds without accepted final templates, leave `path` null until a final template exists, but require explicit routeable ownership in `applies_to` and persistence semantics in `note`. Provider/source documentation URLs belong on provider/source `term` rows, not on `data_kind` rows.
 
 ## Reject Or Re-scope
 
@@ -24,6 +22,8 @@ Reject or re-scope entries that are actually:
 
 - acquisition bundle names, which belong in `data_bundle`;
 - provider/source names, which belong in `term`;
+- provider endpoint names with no active routeable input contract;
+- broad wishlist concepts or deprecated concepts with no current consumer;
 - credential aliases, which belong in `config`;
 - runtime JSON fields, which belong in `field`;
 - saved artifacts or template outputs, which belong in `output` or future storage contracts.
