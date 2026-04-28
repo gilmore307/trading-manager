@@ -67,7 +67,6 @@ class RegistryHelperTests(unittest.TestCase):
             "01_MARKET_REGIME_MODEL_INPUTS": "01_market_regime_model_inputs",
             "02_SECURITY_SELECTION_MODEL_INPUTS": "02_security_selection_model_inputs",
             "03_STRATEGY_SELECTION_MODEL_INPUTS": "03_strategy_selection_model_inputs",
-            "04_TRADE_QUALITY_MODEL_INPUTS": "04_trade_quality_model_inputs",
             "05_OPTION_EXPRESSION_MODEL_INPUTS": "05_option_expression_model_inputs",
             "06_EVENT_OVERLAY_MODEL_INPUTS": "06_event_overlay_model_inputs",
             "07_PORTFOLIO_RISK_MODEL_INPUTS": "07_portfolio_risk_model_inputs",
@@ -95,6 +94,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("STOCK_ETF_EXPOSURE_BUNDLE_DEPRECATED", rows)
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE", rows)
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE_CONFIG", rows)
+        self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS", rows)
+        self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
 
     def test_initial_data_kinds_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
