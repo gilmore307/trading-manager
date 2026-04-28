@@ -1293,12 +1293,31 @@ Date: 2026-04-28
 Status: Accepted
 
 Decision:
-Add `identity_field` for field names whose values identify, name, label, locate, or reference an entity/artifact/source/instrument/task/report/row. Keep `field` for non-identity, non-temporal, non-classification values.
+Add `identity_field` for field names whose values identify, name, or label an entity/artifact/source/instrument/task/report/row. Later D062 moved locator/reference fields into `path_field`. Keep `field` for non-identity, non-path, non-temporal, non-classification values.
 
 Rationale:
-Identifier and naming fields such as `id`, `event_id`, `symbol`, `title`, `headline`, `source_ref`, `url`, `path`, `issuer`, and `contract_symbol` have a distinct semantic role from ordinary numeric/text measures. They should not be mixed with metrics or free-text payload slots.
+Identifier and naming fields such as `id`, `event_id`, `symbol`, `title`, `headline`, `issuer`, and `contract_symbol` have a distinct semantic role from ordinary numeric/text measures. They should not be mixed with metrics or free-text payload slots. D062 later split path/URL/reference locators into `path_field`.
 
 Consequences:
 - Registry resolvers that consume field-name rows must accept `field`, `identity_field`, `temporal_field`, and `classification_field`.
 - Classification axes keep strict suffix semantics: `*_status` for status/lifecycle states, `*_type` for taxonomy/type axes, `*_scope` for coverage/scope, `*_tags` for multi-label sets, and `kind` only for registry-native terms such as `data_kind` or `registry_item_kind`. Generic `status` is not a valid semantic field when separate domains such as `data_kind_template_status` and `data_task_run_status` have different vocabularies.
 - `OPTION_RIGHT / right` becomes `OPTION_RIGHT_TYPE / option_right_type` because CALL/PUT is a tiny categorical type axis, not a clear standalone field word.
+
+## D062 - Locator fields and status/policy classification axes
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Split locator/reference fields into `path_field`, keep `identity_field` for identity/naming only, and normalize classification-axis wording so acceptance/review concepts are statuses while artifact sync policy is a policy type.
+
+Rationale:
+`identity_field` was too broad when it included URLs, paths, references, output dirs, and file lists. Those values locate artifacts or evidence; they do not name the entity itself. Likewise, `acceptance_outcome` and `review_readiness` are status axes in practice, while `artifact_sync_policy` is a policy-type axis rather than a status.
+
+Consequences:
+- `path_field` owns `path`, `url`, `source_url`, `report_url`, `source_ref`, `source_refs`, `repository_path`, `output_dir`, `outputs`, `preview_file`, `allowed_paths`, and similar locator/reference slots.
+- `identity_field` owns only ids, names, symbols, tickers, issuers, titles/headlines, contract symbols, and similar identity/naming slots.
+- `ACCEPTANCE_OUTCOME / acceptance_outcome` becomes `ACCEPTANCE_STATUS / acceptance_status`.
+- `REVIEW_READINESS / review_readiness` becomes `REVIEW_STATUS / review_status`.
+- `REGISTRY_ITEM_ARTIFACT_SYNC_POLICY / artifact_sync_policy` becomes the semantic classification field `REGISTRY_ITEM_ARTIFACT_SYNC_POLICY_TYPE / artifact_sync_policy_type`; the physical registry column may remain `artifact_sync_policy` as existing schema storage.

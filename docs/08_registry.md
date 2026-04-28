@@ -84,7 +84,7 @@ Do not add a new payload format when an existing one precisely describes the val
 
 `artifact_sync_policy` is a registered review policy for whether row edits need matching artifact updates.
 
-Allowed values are registered as `kind = status_value` rows with `applies_to = trading_registry.artifact_sync_policy` and must stay aligned with the SQL constraint:
+Allowed values are registered as `kind = status_value` rows with `applies_to = artifact_sync_policy_type` and must stay aligned with the SQL constraint:
 
 - `registry_only` — registry row edits normally do not require artifact follow-up when durable consumers use stable ids and no row is merged, deleted, or semantically repurposed.
 - `sync_artifact` — registry edits must be propagated to concrete code, template, docs, or other artifact files before acceptance.

@@ -14,10 +14,10 @@ Rules:
   - `*_type` for class/type/taxonomy distinctions, including source-provided category labels such as `source_event_type`.
   - `*_status` for state/status slots.
   - `*_scope` for scope/coverage axes.
-  - `*_policy`, `*_outcome`, and `*_readiness` only when those words are the actual semantic domain.
+  - `*_policy_type` for strategy/policy type axes such as `artifact_sync_policy_type`.
   - `*_tags` for multi-label tag sets.
   - `kind` only for registry-native schema terms such as `data_kind` or `registry_item_kind`; otherwise prefer `*_type`.
-- Avoid vague standalone names such as `category`, `kind`, `type`, `right`, or `side_hint` unless they are fixed external/source schema names that cannot be normalized.
+- Avoid vague standalone names such as `category`, `kind`, `type`, `right`, `outcome`, `readiness`, or `side_hint` unless they are fixed external/source schema names that cannot be normalized.
 - Keep date/time fields in `temporal_field`.
-- Keep identifiers, names, titles, URLs, paths, and references in `identity_field`.
+- Keep identifiers, names, and titles in `identity_field`; keep URLs, paths, and references in `path_field`.
 - Keep free-text descriptions, summaries, numeric metrics, and structured JSON payload slots in `field` unless the value is itself a classification label.

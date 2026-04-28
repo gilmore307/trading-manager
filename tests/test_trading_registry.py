@@ -279,15 +279,15 @@ class RegistryHelperTests(unittest.TestCase):
     def test_status_like_rows_use_one_kind_with_domain_scope(self):
         old_status_kinds = {
             "task_lifecycle_status",
-            "review_readiness",
-            "acceptance_outcome",
+            "review_status",
+            "acceptance_status",
             "test_status",
             "maintenance_status",
             "docs_status",
             "artifact_sync_policy",
         }
         expected_domains = old_status_kinds - {"artifact_sync_policy"}
-        expected_domains.add("trading_registry.artifact_sync_policy")
+        expected_domains.add("artifact_sync_policy_type")
 
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
@@ -359,7 +359,7 @@ class RegistryHelperTests(unittest.TestCase):
             field_like_rows = [
                 row
                 for row in csv.DictReader(csv_file)
-                if row["kind"] in {"field", "identity_field", "temporal_field", "classification_field"}
+                if row["kind"] in {"field", "identity_field", "path_field", "temporal_field", "classification_field"}
             ]
 
         payloads = [row["payload"] for row in field_like_rows]
@@ -391,7 +391,7 @@ class RegistryHelperTests(unittest.TestCase):
     def test_classification_fields_are_separate_semantic_axes(self):
         expected_classification_keys = {
             "ABNORMAL_ACTIVITY_TYPE",
-            "ACCEPTANCE_OUTCOME",
+            "ACCEPTANCE_STATUS",
             "DATA_KIND",
             "DOCS_STATUS",
             "ETF_HOLDING_ASSET_CLASS",
@@ -405,9 +405,9 @@ class RegistryHelperTests(unittest.TestCase):
             "MAINTENANCE_STATUS",
             "TRADE_SIDE_TYPE",
             "OPTION_RIGHT_TYPE",
-            "REGISTRY_ITEM_ARTIFACT_SYNC_POLICY",
+            "REGISTRY_ITEM_ARTIFACT_SYNC_POLICY_TYPE",
             "REGISTRY_ITEM_KIND",
-            "REVIEW_READINESS",
+            "REVIEW_STATUS",
             "SOURCE_TYPE",
             "DATA_KIND_TEMPLATE_STATUS",
             "DATA_TASK_RUN_STATUS",
@@ -433,18 +433,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["TRADE_SIDE_TYPE"]["payload"], "trade_side_type")
         self.assertEqual(rows["SOURCE_EVENT_TYPE"]["payload"], "source_event_type")
         self.assertEqual(rows["OPTION_RIGHT_TYPE"]["payload"], "option_right_type")
-        vague_payloads = {"category", "type", "status", "right", "themes", "tags", "scope", "class"}
+        vague_payloads = {"category", "type", "status", "right", "themes", "tags", "scope", "class", "outcome", "readiness"}
         classification_payloads = {
             row["payload"] for row in rows.values() if row["kind"] == "classification_field"
         }
         self.assertFalse(classification_payloads & vague_payloads)
         for row in rows.values():
             if row["kind"] == "classification_field" and row["payload"] not in {"data_kind", "kind"}:
-                self.assertRegex(row["payload"], r"_(type|status|scope|policy|outcome|readiness|tags|class)$")
+                self.assertRegex(row["payload"], r"_(type|status|scope|policy_type|tags|class)$")
         self.assertNotIn("OPTION_RIGHT", rows)
         self.assertNotIn("STATUS", rows)
         self.assertEqual(rows["DATA_KIND_TEMPLATE_STATUS"]["payload"], "data_kind_template_status")
         self.assertEqual(rows["DATA_TASK_RUN_STATUS"]["payload"], "data_task_run_status")
+        self.assertEqual(rows["ACCEPTANCE_STATUS"]["payload"], "acceptance_status")
+        self.assertEqual(rows["REVIEW_STATUS"]["payload"], "review_status")
+        self.assertEqual(rows["REGISTRY_ITEM_ARTIFACT_SYNC_POLICY_TYPE"]["payload"], "artifact_sync_policy_type")
+        self.assertNotIn("ACCEPTANCE_OUTCOME", rows)
+        self.assertNotIn("REVIEW_READINESS", rows)
+        self.assertNotIn("REGISTRY_ITEM_ARTIFACT_SYNC_POLICY", rows)
         self.assertEqual(rows["TITLE"]["kind"], "identity_field")
         self.assertEqual(rows["RETURN_ZSCORE"]["kind"], "field")
 
@@ -458,9 +464,6 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_REPORT_ID",
             "EVENT_SECURITY_ID",
             "EVENT_CANONICAL_EVENT_ID",
-            "SOURCE_URL",
-            "URL",
-            "SOURCE_REFS",
             "TASK_IDENTITY",
             "WORKFLOW_IDENTITY",
             "ETF_TICKER",
@@ -476,6 +479,33 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "identity_field")
             self.assertIn(rows[key]["payload_format"], {"field_name", "text"})
             self.assertIn("Identity value", rows[key]["note"])
+
+    def test_path_fields_are_separate_from_identity_fields(self):
+        expected_path_keys = {
+            "REGISTRY_ITEM_PATH",
+            "REPOSITORY_PATH",
+            "SOURCE_URL",
+            "URL",
+            "EVENT_REPORT_URL",
+            "EVENT_REPORT_JSON_URL",
+            "EVENT_SOURCE_REF",
+            "SOURCE_REFS",
+            "OUTPUT_REFERENCE",
+            "DATA_TASK_RUN_OUTPUT_DIR",
+            "DATA_TASK_RUN_OUTPUTS",
+            "DATA_KIND_TEMPLATE_PREVIEW_FILE",
+            "ALLOWED_PATHS",
+            "BLOCKED_PATHS",
+            "CHANGED_FILES",
+            "REVIEWED_FILES",
+            "TRADING_ECONOMICS_REFERENCE",
+        }
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        for key in expected_path_keys:
+            self.assertEqual(rows[key]["kind"], "path_field")
+            self.assertIn("Path value", rows[key]["note"])
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []
@@ -493,7 +523,7 @@ class RegistryHelperTests(unittest.TestCase):
                 row["payload"]
                 for row in csv.DictReader(csv_file)
                 if row["kind"] == "status_value"
-                and row["applies_to"] == "trading_registry.artifact_sync_policy"
+                and row["applies_to"] == "artifact_sync_policy_type"
             )
 
         self.assertEqual(sorted(registered_policies), sorted(constrained_policies))
