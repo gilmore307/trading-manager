@@ -150,7 +150,7 @@ class RegistryHelperTests(unittest.TestCase):
             by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE"]["path"],
             "trading-data/storage/templates/data_kinds/alpaca/README.md",
         )
-        removed_data_kind_keys = {
+        reclassified_data_kind_keys = {
             "ECONOMIC_RELEASE_EVENT",
             "EQUITY_EARNINGS_CALENDAR",
             "ETF_CONSTITUENT_WEIGHT",
@@ -158,15 +158,6 @@ class RegistryHelperTests(unittest.TestCase):
             "FOMC_MINUTES",
             "FOMC_SEP",
             "FOMC_STATEMENT",
-            "MACRO_BEA_FIXED_ASSETS",
-            "MACRO_ALFRED_VINTAGE",
-            "MACRO_BEA_NIPA",
-            "MACRO_BLS_CPI",
-            "MACRO_BLS_ECI",
-            "MACRO_FRED_NATIVE",
-            "MACRO_RELEASE",
-            "MACRO_TREASURY_DTS",
-            "MACRO_TREASURY_MTS",
             "SEC_FILING_DOCUMENT",
             "CRYPTO_TRADE",
             "CRYPTO_QUOTE",
@@ -185,9 +176,23 @@ class RegistryHelperTests(unittest.TestCase):
             "SEC_COMPANY_FACT",
             "FOMC_MEETING", 
         }
-        for key in removed_data_kind_keys:
+        for key in reclassified_data_kind_keys:
             self.assertIn(key, by_key)
             self.assertNotEqual(by_key[key]["kind"], "data_kind")
+
+        deleted_deprecated_macro_keys = {
+            "MACRO_BEA_FIXED_ASSETS",
+            "MACRO_ALFRED_VINTAGE",
+            "MACRO_BEA_NIPA",
+            "MACRO_BLS_CPI",
+            "MACRO_BLS_ECI",
+            "MACRO_FRED_NATIVE",
+            "MACRO_RELEASE",
+            "MACRO_TREASURY_DTS",
+            "MACRO_TREASURY_MTS",
+        }
+        for key in deleted_deprecated_macro_keys:
+            self.assertNotIn(key, by_key)
 
         expected_source_capabilities = {
             "CRYPTO_TRADE",
@@ -214,7 +219,7 @@ class RegistryHelperTests(unittest.TestCase):
         }
         for key in expected_source_capabilities:
             self.assertEqual(by_key[key]["kind"], "source_capability")
-        self.assertEqual(by_key["MACRO_RELEASE"]["kind"], "term")
+        self.assertNotIn("MACRO_RELEASE", by_key)
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
 
     def test_market_etf_universe_shared_csv_columns_are_registered(self):

@@ -125,17 +125,18 @@ Follow-up corrections:
 - Deleted historical `data_kind` rows were restored when they still represented source capability or terminology. They were not restored as active `data_kind` rows.
 - Added `source_capability` for source-level record families, endpoint families, raw inputs, transient evidence, and entitlement-gated provider capabilities that may inform adapters but are not accepted final saved shapes.
 
-Result after restoration pass:
+Result after restoration and obsolete macro-reference pruning:
 
-- Total registry rows: 509
+- Total registry rows: 478
 - `data_kind` rows: 18, still restricted to accepted final saved/template-backed shapes only
 - `source_capability` rows: 31, restored from deleted source/interface-capability history
-- `term` rows: 62, including restored provider/macro/ETF terminology that is not a final data shape
+- `term` rows: 31, after deleting deprecated macro_data-era official-source references such as `MACRO_BLS_CPI` that are unused by the current Trading Economics/event-overlay plan
 - `data_bundle` rows: 7, only numbered model-input bundles
 
 Removed or merged categories:
 
 - rows with no current source/interface/term role after review;
+- deprecated macro_data-era official-source references with `deprecated_macro_data_source_reference` or `deprecated_macro_data_transient_evidence` scope;
 - the erroneous leftover `REGISTRY_ITEM_FIELD_CATEGORY` row from the reverted field-category attempt;
 - duplicate scenario-specific field rows for `symbol`, `source_url`, `title`, `event_time_et`, `source_type`, `summary`, `url`, `event_id`, `evidence_window`, `source_refs`, `as_of_date`, `bundle`, `status`, and `id`.
 
