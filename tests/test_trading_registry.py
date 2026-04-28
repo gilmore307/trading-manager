@@ -68,8 +68,8 @@ class RegistryHelperTests(unittest.TestCase):
             "02_SECURITY_SELECTION_MODEL_INPUTS": "02_security_selection_model_inputs",
             "03_STRATEGY_SELECTION_MODEL_INPUTS": "03_strategy_selection_model_inputs",
             "05_OPTION_EXPRESSION_MODEL_INPUTS": "05_option_expression_model_inputs",
-            "06_EVENT_OVERLAY_MODEL_INPUTS": "06_event_overlay_model_inputs",
-            "07_PORTFOLIO_RISK_MODEL_INPUTS": "07_portfolio_risk_model_inputs",
+            "06_POSITION_EXECUTION_MODEL_INPUTS": "06_position_execution_model_inputs",
+            "07_EVENT_OVERLAY_MODEL_INPUTS": "07_event_overlay_model_inputs",
         }
         expected_sources = {
             "ALPACA_BARS": "alpaca_bars",
@@ -96,6 +96,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE_CONFIG", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
+        self.assertNotIn("06_EVENT_OVERLAY_MODEL_INPUTS", rows)
+        self.assertNotIn("06_EVENT_OVERLAY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
+        self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS", rows)
+        self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS_BUNDLE_CONFIG", rows)
 
     def test_initial_data_kinds_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:

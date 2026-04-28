@@ -1394,3 +1394,18 @@ Consequences:
 - `DATA_TASK_PARAMS / params` is `parameter_field`, not ordinary `field`.
 - Downstream registry field resolvers must accept `parameter_field` wherever they materialize template/task columns.
 - Prose explanations about parameters remain `text_field`; the parameter collection itself is `parameter_field`.
+
+## D067 - Reorder execution and event overlay bundles
+
+Accepted: 2026-04-28
+
+Layer 06 is now the position/execution model-input bundle and Layer 07 is now the event overlay model-input bundle.
+
+Registry changes:
+
+- `06_EVENT_OVERLAY_MODEL_INPUTS` became `06_POSITION_EXECUTION_MODEL_INPUTS` with payload `06_position_execution_model_inputs`.
+- `07_PORTFOLIO_RISK_MODEL_INPUTS` became `07_EVENT_OVERLAY_MODEL_INPUTS` with payload `07_event_overlay_model_inputs`.
+- The old 06/07 bundle config rows were removed because those manifest-style configs were obsolete.
+- Event overlay references, including equity abnormal activity, now apply to `07_event_overlay_model_inputs`.
+
+Rationale: Layer 05 chooses option contracts; Layer 06 needs selected-contract option time series to study execution. Event overlay should remain a later one-row-per-event context layer, not the sixth layer.
