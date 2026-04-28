@@ -273,6 +273,27 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("iso_datetime", registered_formats)
         self.assertIn("secret_alias", registered_formats)
 
+    def test_status_like_rows_use_one_kind_with_domain_scope(self):
+        old_status_kinds = {
+            "task_lifecycle_state",
+            "review_readiness",
+            "acceptance_outcome",
+            "test_status",
+            "maintenance_status",
+            "docs_status",
+            "artifact_sync_policy",
+        }
+        expected_domains = old_status_kinds - {"artifact_sync_policy"}
+        expected_domains.add("trading_registry.artifact_sync_policy")
+
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+
+        self.assertFalse({row["kind"] for row in rows} & old_status_kinds)
+        status_rows = [row for row in rows if row["kind"] == "status_value"]
+        self.assertTrue(status_rows)
+        self.assertEqual({row["applies_to"] for row in status_rows}, expected_domains)
+
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []
         for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
@@ -288,7 +309,8 @@ class RegistryHelperTests(unittest.TestCase):
             registered_policies = tuple(
                 row["payload"]
                 for row in csv.DictReader(csv_file)
-                if row["kind"] == "artifact_sync_policy"
+                if row["kind"] == "status_value"
+                and row["applies_to"] == "trading_registry.artifact_sync_policy"
             )
 
         self.assertEqual(sorted(registered_policies), sorted(constrained_policies))

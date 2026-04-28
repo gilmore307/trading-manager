@@ -1102,7 +1102,7 @@ Registry keys are renameable display labels, while stable ids are the durable au
 
 ### Decision
 
-Add `artifact_sync_policy` to `trading_registry` and register the allowed values as `kind = artifact_sync_policy` rows. Use `registry_only`, `sync_artifact`, and `review_on_merge` to make follow-up expectations visible in `registry/current.csv`.
+Add `artifact_sync_policy` to `trading_registry` and register the allowed values. Initially these used `kind = artifact_sync_policy`; after D054-style registry normalization they are represented as `kind = status_value` with `applies_to = trading_registry.artifact_sync_policy`. Use `registry_only`, `sync_artifact`, and `review_on_merge` to make follow-up expectations visible in `registry/current.csv`.
 
 ### Rationale
 
@@ -1155,3 +1155,21 @@ Consequences:
 - Cross-project static/shared files live under `storage/shared/`.
 - Registry paths for trading-main-owned templates must point to `storage/templates/...`.
 - Generated artifacts and local runtime state still do not belong in `trading-main/storage/`.
+
+
+## D054 - Status registry values use one kind
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Merge status-like registry kinds into `status_value`. The previous kind names (`task_lifecycle_state`, `review_readiness`, `acceptance_outcome`, `test_status`, `maintenance_status`, `docs_status`, and `artifact_sync_policy`) become status domains recorded in `applies_to`, not separate registry kinds.
+
+Rationale:
+These rows all have the same structural role: they register allowed state/policy values. Separate kinds made the registry kind system wider without adding a real contract boundary. The field rows still register slot names such as `TASK_LIFECYCLE_STATE`; `status_value` rows register allowed values for those slots.
+
+Consequences:
+- `registry/kinds/status_value.md` owns the status-value boundary.
+- Status rows must carry their domain in `applies_to`.
+- Artifact sync policy values remain constrained in SQL but are registered as `kind=status_value` with `applies_to=trading_registry.artifact_sync_policy`.

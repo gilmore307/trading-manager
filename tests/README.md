@@ -21,7 +21,7 @@
   - source-level secret JSON alias parsing and id-based secret field resolution behavior;
   - SQL `kind` constraint alignment with `registry/kinds/*.md` and active `registry/current.csv` rows;
   - SQL `payload_format` constraint alignment with registered `kind=payload_format` rows;
-  - SQL `artifact_sync_policy` constraint alignment with registered `kind=artifact_sync_policy` rows;
+  - SQL `artifact_sync_policy` constraint alignment with registered `kind=status_value` / `applies_to=trading_registry.artifact_sync_policy` rows;
   - test-script governance: first-party test scripts are documented here and are not registered as registry `script` rows.
 
 ## Run

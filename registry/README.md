@@ -50,7 +50,7 @@ Do not add a new payload format when an existing one precisely describes the val
 
 `artifact_sync_policy` tells reviewers whether a normal semantic edit to a registry row requires follow-up changes in concrete artifacts.
 
-Allowed values are registered as rows with `kind = artifact_sync_policy` and must stay aligned with the SQL `trading_registry_artifact_sync_policy_check` constraint.
+Allowed values are registered as rows with `kind = status_value` and `applies_to = trading_registry.artifact_sync_policy`; they must stay aligned with the SQL `trading_registry_artifact_sync_policy_check` constraint.
 
 Use:
 
@@ -86,28 +86,23 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 
 ## Kind Files
 
-- [`acceptance_outcome`](./kinds/acceptance_outcome.md) — Default acceptance outcome values for OpenClaw acceptance records.
 - [`artifact_type`](./kinds/artifact_type.md) — Registered artifact type values used to classify durable outputs produced and consumed across trading repositories.
 - [`config`](./kinds/config.md) — Non-secret configuration keys and secret-alias references. Payloads may contain secret aliases but must never contain secret values.
 - [`data_bundle`](./kinds/data_bundle.md) — Manager-facing runnable bundle keys accepted for task routing and receipts.
 - [`data_source`](./kinds/data_source.md) — Implemented source-interface or source-adapter identifiers.
 - [`data_kind`](./kinds/data_kind.md) — Canonical final saved or durable derived data-shape identifiers with accepted templates.
-- [`docs_status`](./kinds/docs_status.md) — Default documentation alignment status values.
 - [`field`](./kinds/field.md) — Canonical shared field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
-- [`maintenance_status`](./kinds/maintenance_status.md) — Default maintenance pass status values.
 - [`manifest_type`](./kinds/manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
 - [`payload_format`](./kinds/payload_format.md) — Registered values allowed in the `trading_registry.payload_format` column.
 - [`ready_signal_type`](./kinds/ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
 - [`repo`](./kinds/repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
 - [`request_type`](./kinds/request_type.md) — Registered request type values used to classify cross-repository work requests.
-- [`review_readiness`](./kinds/review_readiness.md) — Default review-readiness values for completion receipts and review queues.
 - [`script`](./kinds/script.md) — Canonical callable helper or automation export records, with source locators in `path`.
 - [`shared_artifact`](./kinds/shared_artifact.md) — Durable checked-in shared artifacts that are not templates, scripts, terms, or data-kind categories.
 - [`source_capability`](./kinds/source_capability.md) — Source-level record families, endpoint families, raw inputs, transient evidence, or entitlement-gated provider capabilities that are not final saved data shapes.
-- [`task_lifecycle_state`](./kinds/task_lifecycle_state.md) — Default task lifecycle state values for planning and execution records.
+- [`status_value`](./kinds/status_value.md) — Registered status or policy values; `applies_to` identifies the status domain such as `task_lifecycle_state`, `review_readiness`, `test_status`, or `trading_registry.artifact_sync_policy`.
 - [`template`](./kinds/template.md) — Reusable checked-in template identifiers.
 - [`term`](./kinds/term.md) — Approved shared terminology and definitions.
-- [`test_status`](./kinds/test_status.md) — Default test/verification status values.
 
 ## Review Files
 

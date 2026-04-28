@@ -84,7 +84,7 @@ Do not add a new payload format when an existing one precisely describes the val
 
 `artifact_sync_policy` is a registered review policy for whether row edits need matching artifact updates.
 
-Allowed values are registered as `kind = artifact_sync_policy` rows and must stay aligned with the SQL constraint:
+Allowed values are registered as `kind = status_value` rows with `applies_to = trading_registry.artifact_sync_policy` and must stay aligned with the SQL constraint:
 
 - `registry_only` — registry row edits normally do not require artifact follow-up when durable consumers use stable ids and no row is merged, deleted, or semantically repurposed.
 - `sync_artifact` — registry edits must be propagated to concrete code, template, docs, or other artifact files before acceptance.
@@ -112,6 +112,7 @@ The most important data-related split is:
 - `data_source` — implemented source adapters or source interfaces.
 - `source_capability` — source-level record families, raw inputs, endpoint families, transient evidence, or entitlement-gated provider capabilities that are not final saved shapes.
 - `data_bundle` — manager-facing runnable bundle boundaries.
+- `status_value` — allowed status/policy values; `applies_to` carries the specific status domain such as task lifecycle, review readiness, docs status, or artifact sync policy.
 
 `registry/reviews/` is for review records and boundary assessments, not normative kind definitions.
 
@@ -176,7 +177,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 
 - Register shared names before component repositories depend on them.
 - New shared fields discovered in component work must be registered here before other repositories depend on them.
-- Source adapters belong in `data_source`; manager-facing runnable task boundaries belong in `data_bundle`; accepted final saved data shapes belong in `data_kind`; reusable checked-in templates belong in `template`.
+- Source adapters belong in `data_source`; manager-facing runnable task boundaries belong in `data_bundle`; accepted final saved data shapes belong in `data_kind`; reusable checked-in templates belong in `template`; allowed state/policy values belong in `status_value`.
 - New global helper surfaces and reusable templates must be recorded in `trading-main` and linked to registry entries when they expose stable automation names.
 - Prefer existing entries over inventing near-duplicates.
 - Use stable `id` values for automation and durable references.
