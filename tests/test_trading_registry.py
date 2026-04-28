@@ -160,7 +160,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(len(rows), 61)
         self.assertEqual(
             list(rows[0].keys()),
-            ["symbol", "universe_role", "exposure_category", "bar_grain", "fund_name", "issuer"],
+            ["symbol", "universe_type", "exposure_type", "bar_grain", "fund_name", "issuer"],
         )
         self.assertEqual(rows[0]["symbol"], "AIQ")
         self.assertEqual(rows[-1]["symbol"], "VNQ")
@@ -170,8 +170,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-main/storage/shared/market_etf_universe.csv")
         expected_fields = {
             "INSTRUMENT_SYMBOL": "symbol",
-            "UNIVERSE_ROLE": "universe_role",
-            "EXPOSURE_CATEGORY": "exposure_category",
+            "UNIVERSE_TYPE": "universe_type",
+            "EXPOSURE_TYPE": "exposure_type",
             "BAR_GRAIN": "bar_grain",
             "FUND_NAME": "fund_name",
             "ISSUER": "issuer",
