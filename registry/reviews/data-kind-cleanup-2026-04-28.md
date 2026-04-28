@@ -116,6 +116,13 @@ Second cleanup after kind-boundary review:
 - `shared_artifact` rows: 1, for `MARKET_ETF_UNIVERSE_SHARED_CSV`
 - `output` kind removed from the active kind constraint and kind files
 
+Follow-up correction:
+
+- `EQUITY_ABNORMAL_ACTIVITY_BUNDLE` was removed from `data_bundle`; equity abnormal activity is an event-overlay detector path, not a standalone manager-facing bundle.
+- `EQUITY_ABNORMAL_ACTIVITY_BUNDLE_CONFIG` was removed from registry config for the same reason; the config remains implementation-local under the event overlay detector code.
+- `data_bundle` rows are now 7: only the numbered model-input bundles remain.
+- `data_kind` keeps `EQUITY_ABNORMAL_ACTIVITY_EVENT` because it has subordinate registered fields and an accepted final preview template.
+
 Deleted or merged categories:
 
 - obsolete macro_data-era official-source rows with no active consumer;

@@ -71,7 +71,6 @@ class RegistryHelperTests(unittest.TestCase):
             "05_OPTION_EXPRESSION_MODEL_INPUTS": "05_option_expression_model_inputs",
             "06_EVENT_OVERLAY_MODEL_INPUTS": "06_event_overlay_model_inputs",
             "07_PORTFOLIO_RISK_MODEL_INPUTS": "07_portfolio_risk_model_inputs",
-            "EQUITY_ABNORMAL_ACTIVITY_BUNDLE": "equity_abnormal_activity",
         }
         expected_sources = {
             "ALPACA_BARS": "alpaca_bars",
@@ -94,6 +93,8 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], payload)
         self.assertNotIn("MACRO_DATA", rows)
         self.assertNotIn("STOCK_ETF_EXPOSURE_BUNDLE_DEPRECATED", rows)
+        self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE", rows)
+        self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE_CONFIG", rows)
 
     def test_initial_data_kinds_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -102,6 +103,11 @@ class RegistryHelperTests(unittest.TestCase):
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
         self.assertEqual(len(data_kinds), 18)
+        for row in data_kinds:
+            self.assertTrue(row["path"], row["key"])
+            template_path = Path("/root/projects") / row["path"] if row["path"].startswith("trading-") else Path(row["path"])
+            self.assertTrue(template_path.exists(), row["key"])
+            self.assertGreater(template_path.stat().st_size, 0, row["key"])
         expected_payloads = {
             "MACRO_RELEASE_EVENT": "macro_release_event",
             "GDELT_ARTICLE": "gdelt_article",
