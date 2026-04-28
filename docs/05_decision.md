@@ -1228,3 +1228,23 @@ Consequences:
 - Trading Economics source category becomes `source_event_type`.
 - Option event side hint becomes `trade_side_type`.
 - Future classification fields should prefer explicit suffixes such as `*_type`, `*_status`, `*_scope`, `*_policy`, `*_outcome`, `*_readiness`, or `*_tags` according to the actual semantic domain.
+
+
+## D058 - Field registry is a semantic vocabulary
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Treat field rows as semantic vocabulary entries: same word means same concept, different words mean different concepts. Do not duplicate field rows only because the same semantic value appears in a different output template or pipeline stage.
+
+Rationale:
+The registry is a semantic table, not a usage-location table. Usage belongs in `applies_to`. Rows such as bar `open` and liquidity `trade_open` described the same open-price concept, while `count` was too vague for the trade-count concept already used elsewhere.
+
+Consequences:
+- OHLCV fields use canonical `open`, `high`, `low`, `close`, `volume`, and `vwap` across bars and trade-derived liquidity intervals.
+- Trade-count uses canonical payload `trade_count` across market bars, option bars, and liquidity intervals.
+- Template-specific duplicates with prefixes such as `trade_open`, `trade_high`, `trade_low`, `trade_close`, `trade_volume`, and `trade_vwap` are removed.
+- Generated artifact timestamps use canonical `generated_at_et`; context-specific spellings such as `analysis_generated_at_et` and `standard_generated_at_et` are removed.
+- Timestamp fields that were still registered as ordinary `field` rows, such as `interval_start_et` and `seen_at_utc`, are reclassified as `temporal_field`.

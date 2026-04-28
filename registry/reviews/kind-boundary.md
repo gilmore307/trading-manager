@@ -55,4 +55,5 @@ Revisit the kind set if any of these happen:
 - status values lose clear domain scoping in `applies_to`;
 - temporal fields start using locale-dependent date formats instead of ISO-8601 semantics;
 - classification fields duplicate the same semantic axis under component-specific names instead of widening `applies_to`;
+- ordinary fields duplicate the same semantic value under usage-specific prefixes such as bar/trade/template names instead of widening `applies_to`;
 - component repositories start adding local registries because the central kind set is unclear.

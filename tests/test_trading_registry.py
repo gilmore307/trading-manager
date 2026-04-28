@@ -318,6 +318,9 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_EFFECTIVE_TIME_ET",
             "EVENT_FACTOR_AS_OF_ET",
             "EVENT_TIME_ET",
+            "GDELT_ARTICLE_SEEN_AT_UTC",
+            "GENERATED_AT_ET",
+            "INTERVAL_START_ET",
             "OPTION_EXPIRATION",
             "REGISTRY_ITEM_CREATED_AT",
             "REGISTRY_ITEM_UPDATED_AT",
@@ -337,10 +340,48 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("ISO 8601", rows[key]["note"])
         self.assertNotIn("TIMELINE_CREATED_AT_ET", rows)
         self.assertNotIn("TIMELINE_UPDATED_AT_ET", rows)
+        self.assertNotIn("OPTION_EVENT_DETAIL_STANDARD_GENERATED_AT_ET", rows)
+        self.assertEqual(rows["GENERATED_AT_ET"]["payload"], "generated_at_et")
+        self.assertIn("event_analysis_report_template", rows["GENERATED_AT_ET"]["applies_to"])
+        self.assertIn("option_activity_event_detail_template", rows["GENERATED_AT_ET"]["applies_to"])
         self.assertIn("event_timeline_template", rows["REGISTRY_ITEM_CREATED_AT"]["applies_to"])
         self.assertIn("event_timeline_template", rows["REGISTRY_ITEM_UPDATED_AT"]["applies_to"])
         self.assertEqual(rows["DATA_TIMEFRAME"]["kind"], "field")
         self.assertEqual(rows["OPTION_DAYS_TO_EXPIRATION"]["kind"], "field")
+
+    def test_field_like_payloads_are_unique_semantic_words(self):
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            field_like_rows = [
+                row
+                for row in csv.DictReader(csv_file)
+                if row["kind"] in {"field", "temporal_field", "classification_field"}
+            ]
+
+        payloads = [row["payload"] for row in field_like_rows]
+        self.assertEqual(len(payloads), len(set(payloads)))
+
+        by_key = {row["key"]: row for row in field_like_rows}
+        for key in {"OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE", "CLOSE_PRICE", "VOLUME", "VWAP", "TRADE_COUNT"}:
+            self.assertIn("market_data_template", by_key[key]["applies_to"])
+            self.assertIn("option_bar_template", by_key[key]["applies_to"])
+            self.assertIn("market_liquidity_template", by_key[key]["applies_to"])
+        self.assertEqual(by_key["TRADE_COUNT"]["payload"], "trade_count")
+        for deleted_key in {
+            "BAR_OPEN",
+            "BAR_HIGH",
+            "BAR_LOW",
+            "BAR_CLOSE",
+            "BAR_VOLUME",
+            "BAR_COUNT",
+            "BAR_VWAP",
+            "TRADE_OPEN",
+            "TRADE_HIGH",
+            "TRADE_LOW",
+            "TRADE_CLOSE",
+            "TRADE_VOLUME",
+            "TRADE_VWAP",
+        }:
+            self.assertNotIn(deleted_key, by_key)
 
     def test_classification_fields_are_separate_semantic_axes(self):
         expected_classification_keys = {
