@@ -101,6 +101,35 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS", rows)
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS_BUNDLE_CONFIG", rows)
 
+    def test_model_input_output_fields_are_registered(self):
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        expected = {
+            "OPTION_SYMBOL": ("identity_field", "option_symbol", "position_execution_option_contract_timeseries"),
+            "DOLLAR_VOLUME": ("field", "dollar_volume", "strategy_selection_symbol_bar_liquidity"),
+            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "strategy_selection_symbol_bar_liquidity"),
+            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "strategy_selection_symbol_bar_liquidity"),
+            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "strategy_selection_symbol_bar_liquidity"),
+            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "option_expression_contract_snapshot"),
+            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "event_overlay_event"),
+            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "event_overlay_event"),
+            "SCOPE_TYPE": ("classification_field", "scope_type", "event_overlay_event"),
+            "REFERENCE_TYPE": ("classification_field", "reference_type", "event_overlay_event"),
+            "EVENT_REFERENCE": ("path_field", "reference", "event_overlay_event"),
+        }
+        for key, (kind, payload, applies_to) in expected.items():
+            self.assertEqual(rows[key]["kind"], kind)
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn(applies_to, rows[key]["applies_to"])
+
+        for key in ["SYMBOL", "DATA_TIMESTAMP", "OPEN_PRICE", "VWAP"]:
+            self.assertIn("market_regime_etf_bar", rows[key]["applies_to"])
+        for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
+            self.assertIn("security_selection_us_equity_etf_holding", rows[key]["applies_to"])
+        for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
+            self.assertIn("event_overlay_event", rows[key]["applies_to"])
+
     def test_initial_data_kinds_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))

@@ -1409,3 +1409,23 @@ Registry changes:
 - Event overlay references, including equity abnormal activity, now apply to `07_event_overlay_model_inputs`.
 
 Rationale: Layer 05 chooses option contracts; Layer 06 needs selected-contract option time series to study execution. Event overlay should remain a later one-row-per-event context layer, not the sixth layer.
+
+## D068 - Register model-input SQL output fields as business fields
+
+Accepted: 2026-04-28
+
+Current accepted model-input SQL outputs now have registry field coverage. Shared semantic fields such as `symbol`, `timestamp`, OHLCV, ETF holding columns, option contract identity columns, and event identity/title/source columns were attached to the relevant SQL table contracts via `applies_to`. New fields were added only where no canonical semantic field existed:
+
+- `option_symbol`
+- `dollar_volume`
+- `avg_bid_size`
+- `avg_ask_size`
+- `spread_bps`
+- `snapshot_type`
+- `information_role_type`
+- `event_category_type`
+- `scope_type`
+- `reference_type`
+- `reference`
+
+The registry should describe business output fields, not old manifest/config mechanics. Task/run lineage fields such as `run_id` and `task_id` remain receipt/run metadata rather than new business-output fields.
