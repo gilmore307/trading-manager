@@ -93,6 +93,25 @@ Rows that are merely provider endpoint names, broad source concepts, future wish
 4. Prune duplicate macro/source endpoint rows that are not active task parameters or final outputs.
 5. Regenerate `registry/current.csv` and verify downstream references before removing any row entirely.
 
-## Open Decision
+## Cleanup Applied
 
-Before writing the pruning migration, decide whether `data_kind` should allow **routeable transient source inputs** at all. My recommendation: yes, but only if they name a current pipeline input and have explicit `applies_to` ownership plus a note saying whether persistence is transient, debug-only, or final. Otherwise they should not be `data_kind`.
+Migrations `092_prune_obsolete_data_kinds.sql`, `093_prune_remaining_deprecated_macro_kinds.sql`, `094_merge_duplicate_field_rows.sql`, and `095_merge_remaining_duplicate_field_payloads.sql` applied the first cleanup pass.
+
+Result after cleanup:
+
+- Total registry rows: 474
+- `data_kind` rows: 45, down from 84
+- `field` rows: 283, down from 303
+- `data_kind` rows with no external reference outside registry migrations/current snapshot: 0
+- duplicate `field` payloads: 0
+- remaining duplicate payloads are only bundle-local `config` rows whose payload is intentionally the same marker while each row has a distinct config path/owner.
+
+Deleted or merged categories:
+
+- obsolete macro_data-era official-source rows with no active consumer;
+- obsolete FOMC/equity-earnings/source concept rows with no active route;
+- the transient `macro_release` data kind and its orphan `release_time` / `effective_until` fields;
+- the erroneous leftover `REGISTRY_ITEM_FIELD_CATEGORY` row from the reverted field-category attempt;
+- duplicate scenario-specific field rows for `symbol`, `source_url`, `title`, `event_time_et`, `source_type`, `summary`, `url`, `event_id`, `evidence_window`, `source_refs`, `as_of_date`, `bundle`, `status`, and `id`.
+
+Retained source-input data kinds are allowed only when they are currently consumed by `trading-data` source interfaces or an active pipeline. Their `path` values were cleared when they previously held provider documentation URLs.

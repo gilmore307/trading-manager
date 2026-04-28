@@ -93,9 +93,8 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 84)
+        self.assertEqual(len(data_kinds), 45)
         expected_payloads = {
-            "MACRO_RELEASE": "macro_release",
             "MACRO_RELEASE_EVENT": "macro_release_event",
             "GDELT_ARTICLE": "gdelt_article",
             "TRADING_ECONOMICS_CALENDAR_EVENT": "trading_economics_calendar_event",
@@ -114,11 +113,6 @@ class RegistryHelperTests(unittest.TestCase):
             "STOCK_ETF_EXPOSURE": "stock_etf_exposure",
             "EQUITY_ABNORMAL_ACTIVITY_EVENT": "equity_abnormal_activity_event",
             "FOMC_MEETING": "fomc_meeting",
-            "MACRO_BLS_CPI": "macro_bls_cpi",
-            "MACRO_BEA_NIPA": "macro_bea_nipa",
-            "MACRO_TREASURY_DTS": "macro_treasury_dts",
-            "MACRO_FRED_NATIVE": "macro_fred_native",
-            "MACRO_ALFRED_VINTAGE": "macro_alfred_vintage",
             "TRADING_EVENT": "trading_event",
             "EVENT_FACTOR": "event_factor",
             "EVENT_ANALYSIS_REPORT": "event_analysis_report",
@@ -138,8 +132,6 @@ class RegistryHelperTests(unittest.TestCase):
             by_key["OPTION_ACTIVITY_EVENT_DETAIL"]["path"],
             "trading-data/storage/templates/data_kinds/thetadata/option_activity_event_detail.preview.csv",
         )
-        self.assertEqual(by_key["MACRO_RELEASE"]["path"], "")
-        self.assertIn("Deprecated transient evidence", by_key["MACRO_RELEASE"]["note"])
         self.assertEqual(
             by_key["MACRO_RELEASE_EVENT"]["path"],
             "trading-data/storage/templates/data_kinds/events/macro_release_event.preview.csv",
@@ -150,6 +142,29 @@ class RegistryHelperTests(unittest.TestCase):
             by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE"]["path"],
             "trading-data/storage/templates/data_kinds/alpaca/README.md",
         )
+        removed_data_kind_keys = {
+            "ECONOMIC_RELEASE_EVENT",
+            "EQUITY_EARNINGS_CALENDAR",
+            "ETF_CONSTITUENT_WEIGHT",
+            "ETF_FUND_METADATA",
+            "FOMC_MINUTES",
+            "FOMC_SEP",
+            "FOMC_STATEMENT",
+            "MACRO_BEA_FIXED_ASSETS",
+            "MACRO_ALFRED_VINTAGE",
+            "MACRO_BEA_NIPA",
+            "MACRO_BLS_CPI",
+            "MACRO_BLS_ECI",
+            "MACRO_FRED_NATIVE",
+            "MACRO_RELEASE",
+            "MACRO_TREASURY_DTS",
+            "MACRO_TREASURY_MTS",
+            "SEC_FILING_DOCUMENT",
+        }
+        for key in removed_data_kind_keys:
+            self.assertNotIn(key, by_key)
+        self.assertEqual(by_key["FOMC_MEETING"]["path"], "")
+        self.assertEqual(by_key["SEC_COMPANY_FACT"]["path"], "")
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
         self.assertIn("Deprecated/removed executable bundle", by_key["MACRO_DATA"]["note"])
 
@@ -169,7 +184,7 @@ class RegistryHelperTests(unittest.TestCase):
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
         self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-main/storage/shared/market_etf_universe.csv")
         expected_fields = {
-            "INSTRUMENT_SYMBOL": "symbol",
+            "SYMBOL": "symbol",
             "UNIVERSE_TYPE": "universe_type",
             "EXPOSURE_TYPE": "exposure_type",
             "BAR_GRAIN": "bar_grain",
@@ -180,7 +195,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["kind"], "field")
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("market_etf_universe", registry[key]["applies_to"])
-            if key not in {"INSTRUMENT_SYMBOL", "ISSUER"}:
+            if key not in {"SYMBOL", "ISSUER"}:
                 self.assertEqual(registry[key]["path"], "storage/shared/market_etf_universe.csv")
 
     def test_registered_payload_formats_match_sql_constraint(self):
