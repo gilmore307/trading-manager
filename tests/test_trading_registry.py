@@ -54,7 +54,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
-    def test_data_bundle_rows_are_registered_as_data_bundle_kind(self):
+    def test_data_bundle_and_data_source_rows_are_separated(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
@@ -64,6 +64,16 @@ class RegistryHelperTests(unittest.TestCase):
             "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
         )
         expected_bundles = {
+            "01_MARKET_REGIME_MODEL_INPUTS": "01_market_regime_model_inputs",
+            "02_SECURITY_SELECTION_MODEL_INPUTS": "02_security_selection_model_inputs",
+            "03_STRATEGY_SELECTION_MODEL_INPUTS": "03_strategy_selection_model_inputs",
+            "04_TRADE_QUALITY_MODEL_INPUTS": "04_trade_quality_model_inputs",
+            "05_OPTION_EXPRESSION_MODEL_INPUTS": "05_option_expression_model_inputs",
+            "06_EVENT_OVERLAY_MODEL_INPUTS": "06_event_overlay_model_inputs",
+            "07_PORTFOLIO_RISK_MODEL_INPUTS": "07_portfolio_risk_model_inputs",
+            "EQUITY_ABNORMAL_ACTIVITY_BUNDLE": "equity_abnormal_activity",
+        }
+        expected_sources = {
             "ALPACA_BARS": "alpaca_bars",
             "ALPACA_LIQUIDITY": "alpaca_liquidity",
             "ALPACA_NEWS": "alpaca_news",
@@ -73,19 +83,17 @@ class RegistryHelperTests(unittest.TestCase):
             "OKX_CRYPTO_MARKET_DATA": "okx_crypto_market_data",
             "CALENDAR_DISCOVERY": "calendar_discovery",
             "ETF_HOLDINGS": "etf_holdings",
-            "01_MARKET_REGIME_MODEL_INPUTS": "01_market_regime_model_inputs",
-            "02_SECURITY_SELECTION_MODEL_INPUTS": "02_security_selection_model_inputs",
-            "03_STRATEGY_SELECTION_MODEL_INPUTS": "03_strategy_selection_model_inputs",
-            "04_TRADE_QUALITY_MODEL_INPUTS": "04_trade_quality_model_inputs",
-            "05_OPTION_EXPRESSION_MODEL_INPUTS": "05_option_expression_model_inputs",
-            "06_EVENT_OVERLAY_MODEL_INPUTS": "06_event_overlay_model_inputs",
-            "07_PORTFOLIO_RISK_MODEL_INPUTS": "07_portfolio_risk_model_inputs",
             "TRADING_ECONOMICS_CALENDAR_WEB": "trading_economics_calendar_web",
             "SEC_COMPANY_FINANCIALS": "sec_company_financials",
         }
         for key, payload in expected_bundles.items():
             self.assertEqual(rows[key]["kind"], "data_bundle")
             self.assertEqual(rows[key]["payload"], payload)
+        for key, payload in expected_sources.items():
+            self.assertEqual(rows[key]["kind"], "data_source")
+            self.assertEqual(rows[key]["payload"], payload)
+        self.assertNotIn("MACRO_DATA", rows)
+        self.assertNotIn("STOCK_ETF_EXPOSURE_BUNDLE_DEPRECATED", rows)
 
     def test_initial_data_kinds_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -93,7 +101,7 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 45)
+        self.assertEqual(len(data_kinds), 18)
         expected_payloads = {
             "MACRO_RELEASE_EVENT": "macro_release_event",
             "GDELT_ARTICLE": "gdelt_article",
@@ -101,18 +109,14 @@ class RegistryHelperTests(unittest.TestCase):
             "EQUITY_BAR": "equity_bar",
             "EQUITY_LIQUIDITY_BAR": "equity_liquidity_bar",
             "CRYPTO_BAR": "crypto_bar",
-            "CRYPTO_TRADE": "crypto_trade",
             "CRYPTO_LIQUIDITY_BAR": "crypto_liquidity_bar",
             "OPTION_ACTIVITY_EVENT": "option_activity_event",
             "OPTION_ACTIVITY_EVENT_DETAIL": "option_activity_event_detail",
             "OPTION_BAR": "option_bar",
             "OPTION_CHAIN_SNAPSHOT": "option_chain_snapshot",
-            "OPTION_GREEKS_FIRST_ORDER": "option_greeks_first_order",
-            "SEC_COMPANY_FACT": "sec_company_fact",
             "ETF_HOLDINGS_SNAPSHOT": "etf_holdings_snapshot",
             "STOCK_ETF_EXPOSURE": "stock_etf_exposure",
             "EQUITY_ABNORMAL_ACTIVITY_EVENT": "equity_abnormal_activity_event",
-            "FOMC_MEETING": "fomc_meeting",
             "TRADING_EVENT": "trading_event",
             "EVENT_FACTOR": "event_factor",
             "EVENT_ANALYSIS_REPORT": "event_analysis_report",
@@ -136,8 +140,6 @@ class RegistryHelperTests(unittest.TestCase):
             by_key["MACRO_RELEASE_EVENT"]["path"],
             "trading-data/storage/templates/data_kinds/events/macro_release_event.preview.csv",
         )
-        self.assertEqual(by_key["CRYPTO_TRADE"]["path"], "")
-        self.assertIn("transient inputs", by_key["CRYPTO_TRADE"]["note"])
         self.assertEqual(
             by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE"]["path"],
             "trading-data/storage/templates/data_kinds/alpaca/README.md",
@@ -160,13 +162,26 @@ class RegistryHelperTests(unittest.TestCase):
             "MACRO_TREASURY_DTS",
             "MACRO_TREASURY_MTS",
             "SEC_FILING_DOCUMENT",
+            "CRYPTO_TRADE",
+            "CRYPTO_QUOTE",
+            "CRYPTO_ORDER_BOOK",
+            "EQUITY_TRADE",
+            "EQUITY_QUOTE",
+            "EQUITY_SNAPSHOT",
+            "OPTION_GREEKS_FIRST_ORDER",
+            "OPTION_GREEKS_SECOND_ORDER",
+            "OPTION_GREEKS_THIRD_ORDER",
+            "OPTION_IMPLIED_VOLATILITY",
+            "OPTION_TRADE_GREEKS",
+            "OPTION_TRADE",
+            "OPTION_QUOTE",
+            "OPTION_NBBO",
+            "SEC_COMPANY_FACT",
+            "FOMC_MEETING", 
         }
         for key in removed_data_kind_keys:
             self.assertNotIn(key, by_key)
-        self.assertEqual(by_key["FOMC_MEETING"]["path"], "")
-        self.assertEqual(by_key["SEC_COMPANY_FACT"]["path"], "")
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
-        self.assertIn("Deprecated/removed executable bundle", by_key["MACRO_DATA"]["note"])
 
     def test_market_etf_universe_shared_csv_columns_are_registered(self):
         shared_path = Path("storage/shared/market_etf_universe.csv")

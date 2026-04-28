@@ -2,25 +2,28 @@
 
 ## Kind Boundary
 
-Historical data acquisition bundle names accepted for `trading-data` task keys, runner dispatch, and completion receipts.
+Manager-facing runnable bundle names accepted for task keys, runner dispatch, model-input manifests, and completion receipts.
 
-A data bundle is a runnable or planned acquisition boundary such as bars, news, quotes/trades, SEC company financials, ETF holdings, or a release-event pattern. It is narrower than a provider/source term and broader than one internal function.
+A data bundle is a task boundary that a manager can request directly. Source adapters and provider interfaces are not data bundles; they belong in `data_source`.
 
 ## Range
 
-Register bundle keys that may appear in `task_key.bundle`, runner routing, bundle READMEs, completion receipts, or cross-repository planning docs.
+Register bundle keys that may appear in manager-facing `task_key.bundle`, runner routing, bundle READMEs, completion receipts, or model-input planning docs.
 
-Use `payload` for the concrete bundle key or pattern, for example `alpaca_news` or `macro_data`. Use `path` for the canonical bundle implementation directory or runner script when implemented. Provider/source documentation URLs belong on provider/source `term` rows, not on implemented `data_bundle` rows.
+Use `payload` for the concrete bundle key. Use `path` for the canonical manager-facing bundle implementation directory or runner script when implemented. Source adapter directories under `data_sources/` belong in `data_source`, not `data_bundle`.
 
 ## Reject Or Re-scope
 
 Reject or re-scope entries that are actually:
 
 - provider/source names, which belong in `term`;
+- source adapters or provider interfaces, which belong in `data_source`;
 - credential aliases, which belong in `config`;
 - runtime JSON fields, which belong in `field`;
 - scripts or Python symbols, which belong in `script`;
-- output artifacts or saved datasets, which belong in `output` or future storage contracts.
+- template files, which belong in `template`;
+- shared checked-in data/config artifacts, which belong in `shared_artifact`;
+- saved dataset shapes, which belong in `data_kind`.
 
 ## Naming Rule
 

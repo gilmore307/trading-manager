@@ -21,6 +21,7 @@ The registry owns trading-wide facts that need one canonical name or identifier,
 - artifact, manifest, ready-signal, and request type values;
 - shared terminology;
 - non-secret config keys and secret-alias references;
+- manager-facing data bundles, implemented data sources, final data-kind shapes, reusable templates, and shared artifacts;
 - public helper or automation method entries;
 - generated GitHub-visible registry snapshots.
 
@@ -168,6 +169,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 
 - Register shared names before component repositories depend on them.
 - New shared fields discovered in component work must be registered here before other repositories depend on them.
+- Source adapters belong in `data_source`; manager-facing runnable task boundaries belong in `data_bundle`; accepted final saved data shapes belong in `data_kind`; reusable checked-in templates belong in `template`.
 - New global helper surfaces and reusable templates must be recorded in `trading-main` and linked to registry entries when they expose stable automation names.
 - Prefer existing entries over inventing near-duplicates.
 - Use stable `id` values for automation and durable references.

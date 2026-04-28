@@ -97,7 +97,7 @@ Rows that are merely provider endpoint names, broad source concepts, future wish
 
 Migrations `092_prune_obsolete_data_kinds.sql`, `093_prune_remaining_deprecated_macro_kinds.sql`, `094_merge_duplicate_field_rows.sql`, and `095_merge_remaining_duplicate_field_payloads.sql` applied the first cleanup pass.
 
-Result after cleanup:
+Result after first cleanup:
 
 - Total registry rows: 474
 - `data_kind` rows: 45, down from 84
@@ -105,6 +105,16 @@ Result after cleanup:
 - `data_kind` rows with no external reference outside registry migrations/current snapshot: 0
 - duplicate `field` payloads: 0
 - remaining duplicate payloads are only bundle-local `config` rows whose payload is intentionally the same marker while each row has a distinct config path/owner.
+
+Second cleanup after kind-boundary review:
+
+- Total registry rows: 445
+- `data_kind` rows: 18, restricted to accepted final saved/template-backed shapes only
+- `data_bundle` rows: 8, restricted to manager-facing bundle boundaries under `data_bundles/`
+- `data_source` rows: 12, reclassified from source-adapter rows that were incorrectly registered as bundles
+- `template` rows: 8, reclassified from former output rows that were actually templates
+- `shared_artifact` rows: 1, for `MARKET_ETF_UNIVERSE_SHARED_CSV`
+- `output` kind removed from the active kind constraint and kind files
 
 Deleted or merged categories:
 
