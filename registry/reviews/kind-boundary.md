@@ -14,6 +14,7 @@ The status-like kinds have been merged into one `status_value` kind because thei
 |---|---|---|---|
 | `field` vs `status_value` | A status field such as `task_lifecycle_state` has both a field name and allowed values. | `field` registers the slot name; `status_value` registers allowed values for that slot, with the slot/domain in `applies_to`. | Keep separate. |
 | `field` vs `temporal_field` | Time/date field names are structurally fields, but their value-format contract must be stricter and never overlaps ordinary categorical/numeric/text fields. | Use `temporal_field` for date/time/datetime/timestamp/availability/effective-time slots; use `field` for non-temporal slots. | Split temporal fields. |
+| `field` vs `classification_field` | Categorical field names are structurally fields, but their values represent semantic axes such as type, kind, scope, sector, side, or status. | Use `classification_field` for categorical/classification slots; merge semantically identical axes and put all usage scopes in `applies_to`. | Split classification fields. |
 | `path` column vs registry kind | Direct locators are needed for repos/scripts, but a separate kind splits one entity across rows. | Use nullable `path` column on the entity row; do not use `path` as a kind. | Keep as column only. |
 | `config` vs `term` | Config keys can look like named concepts. | Use `config` for machine-consumed values; use `term` for human-facing definitions. | Keep separate. |
 | `artifact_type` vs `output` | Artifact types and output templates can sound similar. | `artifact_type` classifies durable system artifacts; `output` names reusable output/template shapes. | Keep separate. |
@@ -30,7 +31,7 @@ Keep the current kind set after merging status-specific kinds into `status_value
 The most important rule is:
 
 ```text
-non-temporal field names go in `field`; date/time field names go in `temporal_field`; allowed status/policy values go in `status_value` with the domain in `applies_to`.
+plain non-temporal/non-categorical field names go in `field`; date/time field names go in `temporal_field`; categorical field names go in `classification_field`; allowed status/policy values go in `status_value` with the domain in `applies_to`.
 ```
 
 The second most important rule is:
@@ -53,4 +54,5 @@ Revisit the kind set if any of these happen:
 - scripts, repos, and configs start duplicating the same locator instead of using the entity row `path`;
 - status values lose clear domain scoping in `applies_to`;
 - temporal fields start using locale-dependent date formats instead of ISO-8601 semantics;
+- classification fields duplicate the same semantic axis under component-specific names instead of widening `applies_to`;
 - component repositories start adding local registries because the central kind set is unclear.

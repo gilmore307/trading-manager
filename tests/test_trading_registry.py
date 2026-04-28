@@ -245,8 +245,10 @@ class RegistryHelperTests(unittest.TestCase):
             "FUND_NAME": "fund_name",
             "ISSUER": "issuer",
         }
+        classification_fields = {"UNIVERSE_TYPE", "EXPOSURE_TYPE"}
         for key, payload in expected_fields.items():
-            self.assertEqual(registry[key]["kind"], "field")
+            expected_kind = "classification_field" if key in classification_fields else "field"
+            self.assertEqual(registry[key]["kind"], expected_kind)
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("market_etf_universe", registry[key]["applies_to"])
             if key not in {"SYMBOL", "ISSUER"}:
@@ -321,8 +323,6 @@ class RegistryHelperTests(unittest.TestCase):
             "REGISTRY_ITEM_UPDATED_AT",
             "SNAPSHOT_TIME_ET",
             "STOCK_ETF_AVAILABLE_TIME_ET",
-            "TIMELINE_CREATED_AT_ET",
-            "TIMELINE_UPDATED_AT_ET",
             "TRADE_TIMESTAMP_ET",
             "UNDERLYING_TIMESTAMP_ET",
             "WINDOW_END_ET",
@@ -335,8 +335,52 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "temporal_field")
             self.assertEqual(rows[key]["payload_format"], "field_name")
             self.assertIn("ISO 8601", rows[key]["note"])
+        self.assertNotIn("TIMELINE_CREATED_AT_ET", rows)
+        self.assertNotIn("TIMELINE_UPDATED_AT_ET", rows)
+        self.assertIn("event_timeline_template", rows["REGISTRY_ITEM_CREATED_AT"]["applies_to"])
+        self.assertIn("event_timeline_template", rows["REGISTRY_ITEM_UPDATED_AT"]["applies_to"])
         self.assertEqual(rows["DATA_TIMEFRAME"]["kind"], "field")
         self.assertEqual(rows["OPTION_DAYS_TO_EXPIRATION"]["kind"], "field")
+
+    def test_classification_fields_are_separate_semantic_axes(self):
+        expected_classification_keys = {
+            "ABNORMAL_ACTIVITY_TYPE",
+            "ACCEPTANCE_OUTCOME",
+            "DATA_KIND",
+            "DOCS_STATUS",
+            "ETF_HOLDING_ASSET_CLASS",
+            "ETF_HOLDING_SECTOR",
+            "EVENT_ANALYSIS_STATUS",
+            "EVENT_DEDUP_STATUS",
+            "EVENT_IMPACT_SCOPE",
+            "EVENT_TYPE",
+            "EXPOSURE_TYPE",
+            "GDELT_IMPACT_SCOPE_HINT",
+            "GDELT_THEMES",
+            "MAINTENANCE_STATUS",
+            "OPTION_EVENT_DETAIL_SIDE_HINT",
+            "OPTION_RIGHT",
+            "REGISTRY_ITEM_ARTIFACT_SYNC_POLICY",
+            "REGISTRY_ITEM_KIND",
+            "REVIEW_READINESS",
+            "SOURCE_TYPE",
+            "STATUS",
+            "STOCK_ETF_STYLE_TAGS",
+            "TASK_LIFECYCLE_STATE",
+            "TASK_SCOPE",
+            "TEST_STATUS",
+            "TRADING_ECONOMICS_CATEGORY",
+            "UNIVERSE_TYPE",
+        }
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        for key in expected_classification_keys:
+            self.assertEqual(rows[key]["kind"], "classification_field")
+            self.assertEqual(rows[key]["payload_format"], "field_name")
+            self.assertIn("stable lowercase token", rows[key]["note"])
+        self.assertEqual(rows["TITLE"]["kind"], "field")
+        self.assertEqual(rows["RETURN_ZSCORE"]["kind"], "field")
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []

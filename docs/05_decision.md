@@ -1191,3 +1191,21 @@ Consequences:
 - Temporal field values must use ISO-8601 semantics; date-only values use `YYYY-MM-DD`, and datetime/timestamp values must carry explicit timezone semantics.
 - Locale-dependent date strings such as `YY/MM/DD`, `MM/DD/YY`, or `DD/MM/YY` are not accepted for temporal fields.
 - Duplicate status payload rows such as `blocked`, `accepted`, and `rejected` should be merged into one `status_value` row with all applicable domains in `applies_to`.
+
+
+## D056 - Registry fields are semantic axes, not usage-specific spellings
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Merge temporal field rows that only differ by usage-specific suffixes, such as `updated_at` and `updated_at_et`, into one semantic field row. Add `classification_field` for categorical field axes and classify type/kind/status/scope/category/sector/side-style fields there.
+
+Rationale:
+The registry records shared semantic contracts, not every spelling variant used by a single template. If the same concept is used in multiple places, those scopes belong in `applies_to`. Timezone and serialization rules belong in the temporal field contract and template documentation, not in duplicate field rows. Categorical axes likewise deserve explicit review and semantic de-duplication.
+
+Consequences:
+- `created_at_et` and `updated_at_et` are replaced by canonical `created_at` and `updated_at` field payloads with event/detail template scopes added to `applies_to`.
+- Downstream templates and pipelines should use canonical field payloads from registry ids rather than component-specific duplicate names.
+- Classification field values should use stable lowercase token vocabularies unless a source contract explicitly requires a reviewed alternate encoding.

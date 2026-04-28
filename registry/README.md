@@ -87,6 +87,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 ## Kind Files
 
 - [`artifact_type`](./kinds/artifact_type.md) — Registered artifact type values used to classify durable outputs produced and consumed across trading repositories.
+- [`classification_field`](./kinds/classification_field.md) — Canonical categorical/classification field names whose values assign rows to semantic classes.
 - [`config`](./kinds/config.md) — Non-secret configuration keys and secret-alias references. Payloads may contain secret aliases but must never contain secret values.
 - [`data_bundle`](./kinds/data_bundle.md) — Manager-facing runnable bundle keys accepted for task routing and receipts.
 - [`data_source`](./kinds/data_source.md) — Implemented source-interface or source-adapter identifiers.
@@ -115,7 +116,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Do not store concrete active row lists in `registry/kinds/*.md`.
 - Do not store secrets. Store source-level secret aliases only; one provider/source should normally map to one JSON secret file.
 - Do not mix component-local implementation details into trading-wide registry entries.
-- New fields, temporal fields, statuses, payload formats, config keys, data bundles, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
+- New fields, temporal fields, classification fields, statuses, payload formats, config keys, data bundles, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
 - Test scripts must stay out of registry `script` rows and be documented in their test-directory README.
