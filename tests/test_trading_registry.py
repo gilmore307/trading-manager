@@ -292,7 +292,51 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertFalse({row["kind"] for row in rows} & old_status_kinds)
         status_rows = [row for row in rows if row["kind"] == "status_value"]
         self.assertTrue(status_rows)
-        self.assertEqual({row["applies_to"] for row in status_rows}, expected_domains)
+        domains = {
+            domain
+            for row in status_rows
+            for domain in row["applies_to"].split(";")
+            if domain
+        }
+        self.assertEqual(domains, expected_domains)
+        payloads = [row["payload"] for row in status_rows]
+        self.assertEqual(len(payloads), len(set(payloads)))
+        self.assertEqual(
+            next(row for row in status_rows if row["payload"] == "blocked")["key"],
+            "STATUS_BLOCKED",
+        )
+
+    def test_temporal_fields_are_separate_and_iso_scoped(self):
+        expected_temporal_keys = {
+            "AS_OF_DATE",
+            "CHECK_TIME",
+            "DATA_TASK_RUN_COMPLETED_AT",
+            "DATA_TASK_RUN_STARTED_AT",
+            "DATA_TIMESTAMP_ET",
+            "EVENT_EFFECTIVE_TIME_ET",
+            "EVENT_FACTOR_AS_OF_ET",
+            "EVENT_TIME_ET",
+            "OPTION_EXPIRATION",
+            "REGISTRY_ITEM_CREATED_AT",
+            "REGISTRY_ITEM_UPDATED_AT",
+            "SNAPSHOT_TIME_ET",
+            "STOCK_ETF_AVAILABLE_TIME_ET",
+            "TIMELINE_CREATED_AT_ET",
+            "TIMELINE_UPDATED_AT_ET",
+            "TRADE_TIMESTAMP_ET",
+            "UNDERLYING_TIMESTAMP_ET",
+            "WINDOW_END_ET",
+            "WINDOW_START_ET",
+        }
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        for key in expected_temporal_keys:
+            self.assertEqual(rows[key]["kind"], "temporal_field")
+            self.assertEqual(rows[key]["payload_format"], "field_name")
+            self.assertIn("ISO 8601", rows[key]["note"])
+        self.assertEqual(rows["DATA_TIMEFRAME"]["kind"], "field")
+        self.assertEqual(rows["OPTION_DAYS_TO_EXPIRATION"]["kind"], "field")
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []

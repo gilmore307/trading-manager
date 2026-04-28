@@ -102,6 +102,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`source_capability`](./kinds/source_capability.md) — Source-level record families, endpoint families, raw inputs, transient evidence, or entitlement-gated provider capabilities that are not final saved data shapes.
 - [`status_value`](./kinds/status_value.md) — Registered status or policy values; `applies_to` identifies the status domain such as `task_lifecycle_state`, `review_readiness`, `test_status`, or `trading_registry.artifact_sync_policy`.
 - [`template`](./kinds/template.md) — Reusable checked-in template identifiers.
+- [`temporal_field`](./kinds/temporal_field.md) — Canonical date/time/datetime field names with ISO-8601 value semantics.
 - [`term`](./kinds/term.md) — Approved shared terminology and definitions.
 
 ## Review Files
@@ -114,7 +115,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Do not store concrete active row lists in `registry/kinds/*.md`.
 - Do not store secrets. Store source-level secret aliases only; one provider/source should normally map to one JSON secret file.
 - Do not mix component-local implementation details into trading-wide registry entries.
-- New fields, statuses, payload formats, config keys, data bundles, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
+- New fields, temporal fields, statuses, payload formats, config keys, data bundles, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
 - Test scripts must stay out of registry `script` rows and be documented in their test-directory README.

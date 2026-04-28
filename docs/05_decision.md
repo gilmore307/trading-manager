@@ -1173,3 +1173,21 @@ Consequences:
 - `registry/kinds/status_value.md` owns the status-value boundary.
 - Status rows must carry their domain in `applies_to`.
 - Artifact sync policy values remain constrained in SQL but are registered as `kind=status_value` with `applies_to=trading_registry.artifact_sync_policy`.
+
+
+## D055 - Temporal fields use their own kind
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Move date/time/datetime/timestamp field-name rows from `field` to `temporal_field`. Merge duplicate `status_value` rows when the payload is the same and the row can carry multiple domains in `applies_to`.
+
+Rationale:
+Temporal fields such as `created_at`, `event_time_et`, `available_time_et`, and `as_of_date` never overlap ordinary categorical/numeric/text fields, and they need a stricter value-format contract. Status rows with the same payload are also one concept reused by multiple status domains, not separate kinds or separate values.
+
+Consequences:
+- Temporal field values must use ISO-8601 semantics; date-only values use `YYYY-MM-DD`, and datetime/timestamp values must carry explicit timezone semantics.
+- Locale-dependent date strings such as `YY/MM/DD`, `MM/DD/YY`, or `DD/MM/YY` are not accepted for temporal fields.
+- Duplicate status payload rows such as `blocked`, `accepted`, and `rejected` should be merged into one `status_value` row with all applicable domains in `applies_to`.
