@@ -74,6 +74,13 @@ class RegistryHelperTests(unittest.TestCase):
             "MACRO_DATA": "macro_data",
             "CALENDAR_DISCOVERY": "calendar_discovery",
             "ETF_HOLDINGS": "etf_holdings",
+            "MARKET_REGIME_MODEL_INPUTS": "market_regime_model_inputs",
+            "SECURITY_SELECTION_MODEL_INPUTS": "security_selection_model_inputs",
+            "STRATEGY_SELECTION_MODEL_INPUTS": "strategy_selection_model_inputs",
+            "TRADE_QUALITY_MODEL_INPUTS": "trade_quality_model_inputs",
+            "OPTION_EXPRESSION_MODEL_INPUTS": "option_expression_model_inputs",
+            "EVENT_OVERLAY_MODEL_INPUTS": "event_overlay_model_inputs",
+            "PORTFOLIO_RISK_MODEL_INPUTS": "portfolio_risk_model_inputs",
             "TRADING_ECONOMICS_CALENDAR_WEB": "trading_economics_calendar_web",
             "SEC_COMPANY_FINANCIALS": "sec_company_financials",
         }
@@ -87,7 +94,7 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 82)
+        self.assertEqual(len(data_kinds), 84)
         expected_payloads = {
             "MACRO_RELEASE": "macro_release",
             "MACRO_RELEASE_EVENT": "macro_release_event",
@@ -105,6 +112,8 @@ class RegistryHelperTests(unittest.TestCase):
             "OPTION_GREEKS_FIRST_ORDER": "option_greeks_first_order",
             "SEC_COMPANY_FACT": "sec_company_fact",
             "ETF_HOLDINGS_SNAPSHOT": "etf_holdings_snapshot",
+            "STOCK_ETF_EXPOSURE": "stock_etf_exposure",
+            "EQUITY_ABNORMAL_ACTIVITY_EVENT": "equity_abnormal_activity_event",
             "FOMC_MEETING": "fomc_meeting",
             "MACRO_BLS_CPI": "macro_bls_cpi",
             "MACRO_BEA_NIPA": "macro_bea_nipa",
