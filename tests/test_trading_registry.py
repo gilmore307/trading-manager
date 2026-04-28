@@ -153,6 +153,34 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
         self.assertIn("Deprecated/removed executable bundle", by_key["MACRO_DATA"]["note"])
 
+    def test_market_etf_universe_shared_csv_columns_are_registered(self):
+        shared_path = Path("storage/shared/market_etf_universe.csv")
+        with shared_path.open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+        self.assertEqual(len(rows), 61)
+        self.assertEqual(
+            list(rows[0].keys()),
+            ["ticker", "universe_role", "exposure_category", "bar_grain", "fund_name", "issuer"],
+        )
+        self.assertEqual(rows[0]["ticker"], "AIQ")
+        self.assertEqual(rows[-1]["ticker"], "VNQ")
+
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            registry = {row["key"]: row for row in csv.DictReader(csv_file)}
+        self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-main/storage/shared/market_etf_universe.csv")
+        expected_fields = {
+            "MARKET_ETF_UNIVERSE_TICKER": "ticker",
+            "MARKET_ETF_UNIVERSE_ROLE": "universe_role",
+            "MARKET_ETF_EXPOSURE_CATEGORY": "exposure_category",
+            "MARKET_ETF_BAR_GRAIN": "bar_grain",
+            "MARKET_ETF_FUND_NAME": "fund_name",
+            "MARKET_ETF_ISSUER": "issuer",
+        }
+        for key, payload in expected_fields.items():
+            self.assertEqual(registry[key]["kind"], "field")
+            self.assertEqual(registry[key]["payload"], payload)
+            self.assertEqual(registry[key]["path"], "storage/shared/market_etf_universe.csv")
+
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
         for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
