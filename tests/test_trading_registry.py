@@ -359,7 +359,7 @@ class RegistryHelperTests(unittest.TestCase):
             field_like_rows = [
                 row
                 for row in csv.DictReader(csv_file)
-                if row["kind"] in {"field", "identity_field", "path_field", "temporal_field", "classification_field", "text_field", "error_field"}
+                if row["kind"] in {"field", "identity_field", "path_field", "temporal_field", "classification_field", "text_field"}
             ]
 
         payloads = [row["payload"] for row in field_like_rows]
@@ -521,7 +521,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["TRADING_ECONOMICS_REFERENCE_PERIOD"]["kind"], "field")
         self.assertEqual(rows["TRADING_ECONOMICS_REFERENCE_PERIOD"]["payload"], "reference_period")
 
-    def test_text_and_error_fields_are_separate_from_plain_fields(self):
+    def test_text_fields_are_separate_from_plain_fields(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
@@ -538,8 +538,8 @@ class RegistryHelperTests(unittest.TestCase):
         }:
             self.assertEqual(rows[key]["kind"], "text_field")
             self.assertIn("Text value", rows[key]["note"])
-        self.assertEqual(rows["DATA_TASK_RUN_ERROR"]["kind"], "error_field")
-        self.assertIn("Error value", rows["DATA_TASK_RUN_ERROR"]["note"])
+        self.assertEqual(rows["DATA_TASK_RUN_ERROR"]["kind"], "text_field")
+        self.assertIn("Text value", rows["DATA_TASK_RUN_ERROR"]["note"])
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []
