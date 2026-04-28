@@ -71,7 +71,6 @@ class RegistryHelperTests(unittest.TestCase):
             "THETADATA_OPTION_EVENT_TIMELINE": "thetadata_option_event_timeline",
             "THETADATA_OPTION_SELECTION_SNAPSHOT": "thetadata_option_selection_snapshot",
             "OKX_CRYPTO_MARKET_DATA": "okx_crypto_market_data",
-            "MACRO_DATA": "macro_data",
             "CALENDAR_DISCOVERY": "calendar_discovery",
             "ETF_HOLDINGS": "etf_holdings",
             "MARKET_REGIME_MODEL_INPUTS": "market_regime_model_inputs",
@@ -140,7 +139,7 @@ class RegistryHelperTests(unittest.TestCase):
             "trading-data/storage/templates/data_kinds/thetadata/option_activity_event_detail.preview.csv",
         )
         self.assertEqual(by_key["MACRO_RELEASE"]["path"], "")
-        self.assertIn("Transient cleaned source-evidence", by_key["MACRO_RELEASE"]["note"])
+        self.assertIn("Deprecated transient evidence", by_key["MACRO_RELEASE"]["note"])
         self.assertEqual(
             by_key["MACRO_RELEASE_EVENT"]["path"],
             "trading-data/storage/templates/data_kinds/events/macro_release_event.preview.csv",
@@ -152,6 +151,7 @@ class RegistryHelperTests(unittest.TestCase):
             "trading-data/storage/templates/data_kinds/alpaca/README.md",
         )
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
+        self.assertIn("Deprecated/removed executable bundle", by_key["MACRO_DATA"]["note"])
 
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
