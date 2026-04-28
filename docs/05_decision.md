@@ -1339,3 +1339,21 @@ Consequences:
 - Scoped locator fields use names such as `registry_item_path`, `event_link_url`, `event_analysis_report_url`, `event_report_url`, `event_report_json_url`, `source_reference`, `source_references`, `source_snapshot_references`, `data_kind_template_preview_file_path`, `data_task_run_output_directory`, and `data_task_run_output_references`.
 - `TRADING_ECONOMICS_REFERENCE / reference` is not a locator and becomes ordinary `field` `TRADING_ECONOMICS_REFERENCE_PERIOD / reference_period`.
 - Downstream final saved templates and pipelines must use the normalized payloads; raw provider/API payload names may remain unchanged at ingestion boundaries.
+
+## D064 - Normalized tradable identifiers use symbol, not ticker
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Use `symbol` as the normalized project-facing word for tradable instrument identifiers. Reserve `ticker` for source/provider prose or raw ingestion aliases when an external source uses that word.
+
+Rationale:
+The registry had both `symbol` and `ticker` for the same normalized semantic axis. That violated the semantic-vocabulary rule: same meaning should use the same word. In final saved schemas, ETF and ETF-holding identifiers are tradable symbols, so scoped columns become `etf_symbol` and `holding_symbol`.
+
+Consequences:
+- `ETF_TICKER / etf_ticker` becomes `ETF_SYMBOL / etf_symbol`.
+- `ETF_HOLDING_TICKER / holding_ticker` becomes `ETF_HOLDING_SYMBOL / holding_symbol`.
+- Ingestion may temporarily accept legacy `etf_ticker` / `holding_ticker` aliases at provider/task boundaries, but final saved templates use `*_symbol`.
+- `EVENT_SECURITY_ID / security_id` is removed from active final event templates because no canonical security-master identifier exists yet and current sample usage duplicated `symbol`. If a true security master is introduced later, it should register a precise scoped identifier such as `security_master_id`, not a vague duplicate of `symbol`.

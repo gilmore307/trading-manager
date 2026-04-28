@@ -2,7 +2,7 @@
 
 Canonical shared field names whose values identify or name an entity, artifact, source, instrument, task, report, or row.
 
-Use this kind for fields such as `id`, `event_id`, `symbol`, `ticker`, `issuer_name`, `fund_name`, `title`, `timeline_headline`, `contract_symbol`, `cusip`, and `sedol`.
+Use this kind for fields such as `id`, `event_id`, `symbol`, `issuer_name`, `fund_name`, `title`, `timeline_headline`, `contract_symbol`, `cusip`, and `sedol`.
 
 Rules:
 
