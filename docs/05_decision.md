@@ -1371,7 +1371,26 @@ Rationale:
 The plain `field` kind was still carrying notes, summaries, caveats, request-parameter descriptions, coverage reasons, and error payloads. These are qualitatively different from scalar model/input fields: they explain or diagnose rather than measure, identify, locate, classify, or timestamp. Keeping them in `field` makes the kind boundary too broad.
 
 Consequences:
-- Add `text_field` for narrative/explanatory columns such as `summary`, `coverage_reason`, `known_caveats`, `request_parameters`, `acceptance_summary`, `change_summary`, `maintenance_summary`, `task_status_summary`, `error`, and registry `note`.
+- Add `text_field` for narrative/explanatory columns such as `summary`, `coverage_reason`, `known_caveats`, `acceptance_summary`, `change_summary`, `maintenance_summary`, `task_status_summary`, `error`, and registry `note`.
 - Failure/diagnostic payloads such as `error` are `text_field` because they explain failures.
 - Downstream registry field resolvers must accept `text_field` wherever they materialize final template columns.
 - Structured context/object fields remain ordinary `field` unless their primary role is explanation or error reporting.
+
+
+## D066 - Parameter collections are parameter fields
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Split request/task parameter collections out of both ordinary `field` and `text_field` into `parameter_field`.
+
+Rationale:
+`request_parameters` is not a prose note; it represents the parameter collection accepted by a data-kind/source request contract. Likewise task `params` is a bundle-specific parameter object. Treating these as text hides that they are structured input knobs rather than narrative explanation.
+
+Consequences:
+- `DATA_KIND_TEMPLATE_REQUEST_PARAMETERS / request_parameters` is `parameter_field`, not `text_field`.
+- `DATA_TASK_PARAMS / params` is `parameter_field`, not ordinary `field`.
+- Downstream registry field resolvers must accept `parameter_field` wherever they materialize template/task columns.
+- Prose explanations about parameters remain `text_field`; the parameter collection itself is `parameter_field`.

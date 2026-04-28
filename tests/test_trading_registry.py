@@ -359,7 +359,7 @@ class RegistryHelperTests(unittest.TestCase):
             field_like_rows = [
                 row
                 for row in csv.DictReader(csv_file)
-                if row["kind"] in {"field", "identity_field", "path_field", "temporal_field", "classification_field", "text_field"}
+                if row["kind"] in {"field", "identity_field", "path_field", "temporal_field", "classification_field", "text_field", "parameter_field"}
             ]
 
         payloads = [row["payload"] for row in field_like_rows]
@@ -529,7 +529,6 @@ class RegistryHelperTests(unittest.TestCase):
             "ACCEPTANCE_SUMMARY",
             "CHANGE_SUMMARY",
             "DATA_KIND_TEMPLATE_KNOWN_CAVEATS",
-            "DATA_KIND_TEMPLATE_REQUEST_PARAMETERS",
             "EVENT_COVERAGE_REASON",
             "MAINTENANCE_SUMMARY",
             "REGISTRY_ITEM_NOTE",
@@ -540,6 +539,14 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("Text value", rows[key]["note"])
         self.assertEqual(rows["DATA_TASK_RUN_ERROR"]["kind"], "text_field")
         self.assertIn("Text value", rows["DATA_TASK_RUN_ERROR"]["note"])
+
+    def test_parameter_fields_are_separate_from_text_and_plain_fields(self):
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        for key in {"DATA_TASK_PARAMS", "DATA_KIND_TEMPLATE_REQUEST_PARAMETERS"}:
+            self.assertEqual(rows[key]["kind"], "parameter_field")
+            self.assertIn("Parameter value", rows[key]["note"])
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []
