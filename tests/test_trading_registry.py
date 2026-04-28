@@ -186,7 +186,35 @@ class RegistryHelperTests(unittest.TestCase):
             "FOMC_MEETING", 
         }
         for key in removed_data_kind_keys:
-            self.assertNotIn(key, by_key)
+            self.assertIn(key, by_key)
+            self.assertNotEqual(by_key[key]["kind"], "data_kind")
+
+        expected_source_capabilities = {
+            "CRYPTO_TRADE",
+            "CRYPTO_QUOTE",
+            "CRYPTO_ORDER_BOOK",
+            "EQUITY_TRADE",
+            "EQUITY_QUOTE",
+            "EQUITY_SNAPSHOT",
+            "OPTION_GREEKS_FIRST_ORDER",
+            "OPTION_GREEKS_SECOND_ORDER",
+            "OPTION_GREEKS_THIRD_ORDER",
+            "OPTION_IMPLIED_VOLATILITY",
+            "OPTION_TRADE_GREEKS",
+            "OPTION_TRADE",
+            "OPTION_QUOTE",
+            "OPTION_NBBO",
+            "SEC_COMPANY_FACT",
+            "SEC_FILING_DOCUMENT",
+            "FOMC_MEETING",
+            "FOMC_MINUTES",
+            "FOMC_SEP",
+            "FOMC_STATEMENT",
+            "EQUITY_EARNINGS_CALENDAR",
+        }
+        for key in expected_source_capabilities:
+            self.assertEqual(by_key[key]["kind"], "source_capability")
+        self.assertEqual(by_key["MACRO_RELEASE"]["kind"], "term")
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
 
     def test_market_etf_universe_shared_csv_columns_are_registered(self):

@@ -21,7 +21,7 @@ The registry owns trading-wide facts that need one canonical name or identifier,
 - artifact, manifest, ready-signal, and request type values;
 - shared terminology;
 - non-secret config keys and secret-alias references;
-- manager-facing data bundles, implemented data sources, final data-kind shapes, reusable templates, and shared artifacts;
+- manager-facing data bundles, implemented data sources, source capabilities, final data-kind shapes, reusable templates, and shared artifacts;
 - public helper or automation method entries;
 - generated GitHub-visible registry snapshots.
 
@@ -105,6 +105,13 @@ Each kind file defines:
 Kind files must not list concrete active rows. Concrete rows belong in SQL migrations and `registry/current.csv`.
 
 The SQL `trading_registry.kind` constraint and `registry/kinds/*.md` files must stay aligned. Tests compare those two sources directly.
+
+The most important data-related split is:
+
+- `data_kind` — accepted final saved/template-backed data shapes only.
+- `data_source` — implemented source adapters or source interfaces.
+- `source_capability` — source-level record families, raw inputs, endpoint families, transient evidence, or entitlement-gated provider capabilities that are not final saved shapes.
+- `data_bundle` — manager-facing runnable bundle boundaries.
 
 `registry/reviews/` is for review records and boundary assessments, not normative kind definitions.
 

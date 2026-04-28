@@ -103,6 +103,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`review_readiness`](./kinds/review_readiness.md) — Default review-readiness values for completion receipts and review queues.
 - [`script`](./kinds/script.md) — Canonical callable helper or automation export records, with source locators in `path`.
 - [`shared_artifact`](./kinds/shared_artifact.md) — Durable checked-in shared artifacts that are not templates, scripts, terms, or data-kind categories.
+- [`source_capability`](./kinds/source_capability.md) — Source-level record families, endpoint families, raw inputs, transient evidence, or entitlement-gated provider capabilities that are not final saved data shapes.
 - [`task_lifecycle_state`](./kinds/task_lifecycle_state.md) — Default task lifecycle state values for planning and execution records.
 - [`template`](./kinds/template.md) — Reusable checked-in template identifiers.
 - [`term`](./kinds/term.md) — Approved shared terminology and definitions.

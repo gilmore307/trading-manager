@@ -116,19 +116,27 @@ Second cleanup after kind-boundary review:
 - `shared_artifact` rows: 1, for `MARKET_ETF_UNIVERSE_SHARED_CSV`
 - `output` kind removed from the active kind constraint and kind files
 
-Follow-up correction:
+Follow-up corrections:
 
 - `EQUITY_ABNORMAL_ACTIVITY_BUNDLE` was removed from `data_bundle`; equity abnormal activity is an event-overlay detector path, not a standalone manager-facing bundle.
 - `EQUITY_ABNORMAL_ACTIVITY_BUNDLE_CONFIG` was removed from registry config for the same reason; the config remains implementation-local under the event overlay detector code.
 - `data_bundle` rows are now 7: only the numbered model-input bundles remain.
 - `data_kind` keeps `EQUITY_ABNORMAL_ACTIVITY_EVENT` because it has subordinate registered fields and an accepted final preview template.
+- Deleted historical `data_kind` rows were restored when they still represented source capability or terminology. They were not restored as active `data_kind` rows.
+- Added `source_capability` for source-level record families, endpoint families, raw inputs, transient evidence, and entitlement-gated provider capabilities that may inform adapters but are not accepted final saved shapes.
 
-Deleted or merged categories:
+Result after restoration pass:
 
-- obsolete macro_data-era official-source rows with no active consumer;
-- obsolete FOMC/equity-earnings/source concept rows with no active route;
-- the transient `macro_release` data kind and its orphan `release_time` / `effective_until` fields;
+- Total registry rows: 509
+- `data_kind` rows: 18, still restricted to accepted final saved/template-backed shapes only
+- `source_capability` rows: 31, restored from deleted source/interface-capability history
+- `term` rows: 62, including restored provider/macro/ETF terminology that is not a final data shape
+- `data_bundle` rows: 7, only numbered model-input bundles
+
+Removed or merged categories:
+
+- rows with no current source/interface/term role after review;
 - the erroneous leftover `REGISTRY_ITEM_FIELD_CATEGORY` row from the reverted field-category attempt;
 - duplicate scenario-specific field rows for `symbol`, `source_url`, `title`, `event_time_et`, `source_type`, `summary`, `url`, `event_id`, `evidence_window`, `source_refs`, `as_of_date`, `bundle`, `status`, and `id`.
 
-Retained source-input data kinds are allowed only when they are currently consumed by `trading-data` source interfaces or an active pipeline. Their `path` values were cleared when they previously held provider documentation URLs.
+Source-input concepts are no longer allowed as `data_kind`. They must be `source_capability` when they describe source availability/raw input/entitlement capability, or `term` when they are glossary/provider/source-reference concepts.
