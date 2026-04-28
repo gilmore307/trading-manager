@@ -355,10 +355,9 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_IMPACT_SCOPE",
             "EVENT_TYPE",
             "EXPOSURE_TYPE",
-            "GDELT_IMPACT_SCOPE_HINT",
             "GDELT_THEMES",
             "MAINTENANCE_STATUS",
-            "OPTION_EVENT_DETAIL_SIDE_HINT",
+            "TRADE_SIDE_TYPE",
             "OPTION_RIGHT",
             "REGISTRY_ITEM_ARTIFACT_SYNC_POLICY",
             "REGISTRY_ITEM_KIND",
@@ -369,7 +368,7 @@ class RegistryHelperTests(unittest.TestCase):
             "TASK_LIFECYCLE_STATE",
             "TASK_SCOPE",
             "TEST_STATUS",
-            "TRADING_ECONOMICS_CATEGORY",
+            "SOURCE_EVENT_TYPE",
             "UNIVERSE_TYPE",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -379,6 +378,13 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "classification_field")
             self.assertEqual(rows[key]["payload_format"], "field_name")
             self.assertIn("stable lowercase token", rows[key]["note"])
+        self.assertNotIn("GDELT_IMPACT_SCOPE_HINT", rows)
+        self.assertNotIn("OPTION_EVENT_DETAIL_SIDE_HINT", rows)
+        self.assertNotIn("TRADING_ECONOMICS_CATEGORY", rows)
+        self.assertIn("gdelt_article_template", rows["EVENT_IMPACT_SCOPE"]["applies_to"])
+        self.assertEqual(rows["EVENT_IMPACT_SCOPE"]["payload"], "impact_scope")
+        self.assertEqual(rows["TRADE_SIDE_TYPE"]["payload"], "trade_side_type")
+        self.assertEqual(rows["SOURCE_EVENT_TYPE"]["payload"], "source_event_type")
         self.assertEqual(rows["TITLE"]["kind"], "field")
         self.assertEqual(rows["RETURN_ZSCORE"]["kind"], "field")
 

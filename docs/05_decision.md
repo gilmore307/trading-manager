@@ -1209,3 +1209,22 @@ Consequences:
 - `created_at_et` and `updated_at_et` are replaced by canonical `created_at` and `updated_at` field payloads with event/detail template scopes added to `applies_to`.
 - Downstream templates and pipelines should use canonical field payloads from registry ids rather than component-specific duplicate names.
 - Classification field values should use stable lowercase token vocabularies unless a source contract explicitly requires a reviewed alternate encoding.
+
+
+## D057 - Classification fields name semantic axes
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Classification field payloads name the semantic classification axis, not the source/template-specific spelling. Merge hint/source variants into the canonical axis when the meaning is the same.
+
+Rationale:
+Rows such as `impact_scope_hint` and `impact_scope` described the same classification axis at different pipeline stages. Similarly, vague names such as `category` and `side_hint` do not say what is being classified. Registry fields should make the semantic distinction explicit.
+
+Consequences:
+- GDELT impact-scope hint uses canonical `impact_scope`; `GDELT_IMPACT_SCOPE_HINT` is removed and `EVENT_IMPACT_SCOPE` applies to `gdelt_article_template`.
+- Trading Economics source category becomes `source_event_type`.
+- Option event side hint becomes `trade_side_type`.
+- Future classification fields should prefer explicit suffixes such as `*_type`, `*_status`, `*_scope`, `*_policy`, `*_outcome`, `*_readiness`, or `*_tags` according to the actual semantic domain.
