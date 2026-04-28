@@ -147,7 +147,7 @@ class RegistryHelperTests(unittest.TestCase):
             "trading-data/storage/templates/data_kinds/events/macro_release_event.preview.csv",
         )
         self.assertEqual(
-            by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE"]["path"],
+            by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE_PATH"]["path"],
             "trading-data/storage/templates/data_kinds/alpaca/README.md",
         )
         reclassified_data_kind_keys = {
@@ -229,7 +229,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(len(rows), 61)
         self.assertEqual(
             list(rows[0].keys()),
-            ["symbol", "universe_type", "exposure_type", "bar_grain", "fund_name", "issuer"],
+            ["symbol", "universe_type", "exposure_type", "bar_grain", "fund_name", "issuer_name"],
         )
         self.assertEqual(rows[0]["symbol"], "AIQ")
         self.assertEqual(rows[-1]["symbol"], "VNQ")
@@ -243,16 +243,16 @@ class RegistryHelperTests(unittest.TestCase):
             "EXPOSURE_TYPE": "exposure_type",
             "BAR_GRAIN": "bar_grain",
             "FUND_NAME": "fund_name",
-            "ISSUER": "issuer",
+            "ISSUER_NAME": "issuer_name",
         }
         classification_fields = {"UNIVERSE_TYPE", "EXPOSURE_TYPE"}
-        identity_fields = {"SYMBOL", "FUND_NAME", "ISSUER"}
+        identity_fields = {"SYMBOL", "FUND_NAME", "ISSUER_NAME"}
         for key, payload in expected_fields.items():
             expected_kind = "classification_field" if key in classification_fields else "identity_field" if key in identity_fields else "field"
             self.assertEqual(registry[key]["kind"], expected_kind)
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("market_etf_universe", registry[key]["applies_to"])
-            if key not in {"SYMBOL", "ISSUER"}:
+            if key not in {"SYMBOL", "ISSUER_NAME"}:
                 self.assertEqual(registry[key]["path"], "storage/shared/market_etf_universe.csv")
 
     def test_registered_payload_formats_match_sql_constraint(self):
@@ -469,7 +469,7 @@ class RegistryHelperTests(unittest.TestCase):
             "ETF_TICKER",
             "ETF_HOLDING_TICKER",
             "ETF_HOLDING_NAME",
-            "ISSUER",
+            "ISSUER_NAME",
             "OPTION_CONTRACT_SYMBOL",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -479,26 +479,31 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "identity_field")
             self.assertIn(rows[key]["payload_format"], {"field_name", "text"})
             self.assertIn("Identity value", rows[key]["note"])
+        for vague_key in {"ISSUER", "OPTION_EVENT_DETAIL_PROVIDER", "OPTION_EVENT_DETAIL_STANDARD_SOURCE"}:
+            self.assertNotIn(vague_key, rows)
+        self.assertEqual(rows["ISSUER_NAME"]["payload"], "issuer_name")
+        self.assertEqual(rows["OPTION_EVENT_DETAIL_SOURCE_PROVIDER_NAME"]["payload"], "source_provider_name")
+        self.assertEqual(rows["TIMELINE_HEADLINE"]["payload"], "timeline_headline")
 
     def test_path_fields_are_separate_from_identity_fields(self):
         expected_path_keys = {
             "REGISTRY_ITEM_PATH",
             "REPOSITORY_PATH",
             "SOURCE_URL",
-            "URL",
+            "EVENT_LINK_URL",
+            "EVENT_ANALYSIS_REPORT_URL",
             "EVENT_REPORT_URL",
             "EVENT_REPORT_JSON_URL",
-            "EVENT_SOURCE_REF",
-            "SOURCE_REFS",
+            "EVENT_SOURCE_REFERENCE",
+            "SOURCE_REFERENCES",
             "OUTPUT_REFERENCE",
-            "DATA_TASK_RUN_OUTPUT_DIR",
-            "DATA_TASK_RUN_OUTPUTS",
-            "DATA_KIND_TEMPLATE_PREVIEW_FILE",
-            "ALLOWED_PATHS",
-            "BLOCKED_PATHS",
-            "CHANGED_FILES",
-            "REVIEWED_FILES",
-            "TRADING_ECONOMICS_REFERENCE",
+            "DATA_TASK_RUN_OUTPUT_DIRECTORY",
+            "DATA_TASK_RUN_OUTPUT_REFERENCES",
+            "DATA_KIND_TEMPLATE_PREVIEW_FILE_PATH",
+            "EXECUTION_ALLOWED_PATHS",
+            "EXECUTION_BLOCKED_PATHS",
+            "COMPLETION_CHANGED_FILE_PATHS",
+            "ACCEPTANCE_REVIEWED_FILE_PATHS",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -506,6 +511,16 @@ class RegistryHelperTests(unittest.TestCase):
         for key in expected_path_keys:
             self.assertEqual(rows[key]["kind"], "path_field")
             self.assertIn("Path value", rows[key]["note"])
+        self.assertNotIn("URL", rows)
+        self.assertNotIn("EVENT_SOURCE_REF", rows)
+        self.assertEqual(rows["EVENT_LINK_URL"]["payload"], "event_link_url")
+        self.assertEqual(rows["EVENT_ANALYSIS_REPORT_URL"]["payload"], "event_analysis_report_url")
+        self.assertEqual(rows["EVENT_REPORT_URL"]["payload"], "event_report_url")
+        self.assertEqual(rows["EVENT_REPORT_JSON_URL"]["payload"], "event_report_json_url")
+        self.assertEqual(rows["EVENT_SOURCE_REFERENCE"]["payload"], "source_reference")
+        self.assertEqual(rows["SOURCE_REFERENCES"]["payload"], "source_references")
+        self.assertEqual(rows["TRADING_ECONOMICS_REFERENCE_PERIOD"]["kind"], "field")
+        self.assertEqual(rows["TRADING_ECONOMICS_REFERENCE_PERIOD"]["payload"], "reference_period")
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []

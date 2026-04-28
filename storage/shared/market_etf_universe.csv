@@ -1,4 +1,4 @@
-symbol,universe_type,exposure_type,bar_grain,fund_name,issuer
+symbol,universe_type,exposure_type,bar_grain,fund_name,issuer_name
 AIQ,sector_observation_etf,thematic_growth,1d,Global X Artificial Intelligence & Technology ETF,Global X
 ARKF,sector_observation_etf,thematic_growth,1d,ARK Blockchain & Fintech Innovation ETF,ARK Invest
 ARKG,sector_observation_etf,thematic_growth,1d,ARK Genomic Revolution ETF,ARK Invest

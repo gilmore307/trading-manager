@@ -1316,8 +1316,26 @@ Rationale:
 `identity_field` was too broad when it included URLs, paths, references, output dirs, and file lists. Those values locate artifacts or evidence; they do not name the entity itself. Likewise, `acceptance_outcome` and `review_readiness` are status axes in practice, while `artifact_sync_policy` is a policy-type axis rather than a status.
 
 Consequences:
-- `path_field` owns `path`, `url`, `source_url`, `report_url`, `source_ref`, `source_refs`, `repository_path`, `output_dir`, `outputs`, `preview_file`, `allowed_paths`, and similar locator/reference slots.
+- `path_field` owns locator/reference slots such as `registry_item_path`, `event_link_url`, `source_url`, `event_report_url`, `source_reference`, `source_references`, `repository_path`, `data_task_run_output_directory`, `data_task_run_output_references`, `data_kind_template_preview_file_path`, `execution_allowed_paths`, and similar scoped path/reference fields.
 - `identity_field` owns only ids, names, symbols, tickers, issuers, titles/headlines, contract symbols, and similar identity/naming slots.
 - `ACCEPTANCE_OUTCOME / acceptance_outcome` becomes `ACCEPTANCE_STATUS / acceptance_status`.
 - `REVIEW_READINESS / review_readiness` becomes `REVIEW_STATUS / review_status`.
 - `REGISTRY_ITEM_ARTIFACT_SYNC_POLICY / artifact_sync_policy` becomes the semantic classification field `REGISTRY_ITEM_ARTIFACT_SYNC_POLICY_TYPE / artifact_sync_policy_type`; the physical registry column may remain `artifact_sync_policy` as existing schema storage.
+
+## D063 - Scoped identity and path field names use prefix plus suffix
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Reserve single-name identity/path payloads for genuinely generic shared semantics. Scoped identity and locator fields must use prefix + semantic suffix.
+
+Rationale:
+After splitting `identity_field` and `path_field`, rows still mixed generic words such as `issuer`, `provider`, `headline`, `url`, `path`, `reference`, `source_ref`, and `outputs` with scoped fields. That recreated ambiguity inside the new kinds. A semantic vocabulary needs the word itself to communicate whether it is generic or context-scoped.
+
+Consequences:
+- Scoped identity fields use names such as `issuer_name`, `source_provider_name`, `source_name`, `timeline_headline`, `data_task_run_id`, and `option_event_detail_standard_id`.
+- Scoped locator fields use names such as `registry_item_path`, `event_link_url`, `event_analysis_report_url`, `event_report_url`, `event_report_json_url`, `source_reference`, `source_references`, `source_snapshot_references`, `data_kind_template_preview_file_path`, `data_task_run_output_directory`, and `data_task_run_output_references`.
+- `TRADING_ECONOMICS_REFERENCE / reference` is not a locator and becomes ordinary `field` `TRADING_ECONOMICS_REFERENCE_PERIOD / reference_period`.
+- Downstream final saved templates and pipelines must use the normalized payloads; raw provider/API payload names may remain unchanged at ingestion boundaries.
