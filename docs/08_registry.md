@@ -56,7 +56,6 @@ Concrete registry entries live in the SQL-backed `trading_registry` table and ar
 | `payload` | Registered value or file reference. |
 | `path` | Optional direct locator/address for entity-like rows such as repos, scripts, or provider documentation pages. |
 | `applies_to` | Usage scope. Required for `field` rows. |
-| `field_category` | Exclusive semantic category. Required for `field` rows and blank for non-`field` rows. |
 | `artifact_sync_policy` | Whether registry row edits require follow-up changes in concrete code, template, docs, or other artifact files. |
 | `note` | Human-readable review note. |
 | `created_at` / `updated_at` | SQL-managed timestamps exported in the snapshot. |
@@ -178,8 +177,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 
 Source-level secret JSON config rows should use `payload_format=secret_alias`, store the source alias in `payload`, and may mirror the JSON file path in `path`. Provider `term` rows may use `path` for the canonical public documentation URL. JSON field names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, and `pat` are registered as `field` rows with `applies_to=source_secret_json`.
 - Use nullable `path` for direct locators such as local repo roots, helper source files, source-secret JSON files, and provider documentation URLs; do not create a `path` kind.
-- Every `field` row must have non-empty `applies_to` and exactly one non-empty `field_category`.
-- Non-`field` rows must leave `field_category` blank.
+- Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.
 - Script rows should represent stable callable helper/automation exports, not every helper source file, package constant, or test script.
 - Record review rationale in `note` or `registry/reviews/` when a boundary choice could be confused.
@@ -195,7 +193,7 @@ A registry change is acceptable when:
 - no component-local implementation details are centralized;
 - registry item lookup and secret helper APIs remain id-input only;
 - rows marked `sync_artifact` have matching code/template/docs follow-up, or the diff explains why the edit was key-only and artifact-neutral;
-- every `field` row has non-empty `applies_to` and exactly one exclusive `field_category`;
+- every `field` row has non-empty `applies_to`;
 - migration dry-run reports no pending migrations after application;
 - relevant helper tests pass when helper behavior changed;
 - test scripts remain out of registry `script` rows and are documented in their test-directory README.

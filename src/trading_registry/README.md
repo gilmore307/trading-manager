@@ -9,7 +9,7 @@ Python registry helper package for `trading-main`.
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id, field_name=None)`
 
-Registry lookup helpers use stable registry ids as inputs. Registry keys are output/display labels only. `RegistryItem.field_category` is populated only for `field` rows and is the exclusive semantic field category exported by the registry.
+Registry lookup helpers use stable registry ids as inputs. Registry keys are output/display labels only.
 
 ## Source Secret JSON
 
