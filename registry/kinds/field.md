@@ -2,7 +2,7 @@
 
 ## Kind Boundary
 
-Canonical shared field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
+Canonical shared non-identity, non-temporal, non-classification field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
 
 ## Range
 
@@ -14,6 +14,9 @@ Reject or re-scope entries that are actually:
 
 - status values;
 - repository names;
+- identity/name/title/reference fields;
+- temporal/date/time fields;
+- classification axes;
 - filesystem paths;
 - config defaults;
 

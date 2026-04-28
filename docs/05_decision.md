@@ -1285,3 +1285,20 @@ Consequences:
 - Registry keys drop matching `_ET` / `_UTC` suffixes.
 - GDELT `seen_at` is normalized to America/New_York for final saved output.
 - Internal fetch manifests may still use explicitly UTC operational fields such as `fetched_at_utc`; those are not normalized model-facing temporal registry fields.
+
+## D061 - Identity fields have their own kind
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Add `identity_field` for field names whose values identify, name, label, locate, or reference an entity/artifact/source/instrument/task/report/row. Keep `field` for non-identity, non-temporal, non-classification values.
+
+Rationale:
+Identifier and naming fields such as `id`, `event_id`, `symbol`, `title`, `headline`, `source_ref`, `url`, `path`, `issuer`, and `contract_symbol` have a distinct semantic role from ordinary numeric/text measures. They should not be mixed with metrics or free-text payload slots.
+
+Consequences:
+- Registry resolvers that consume field-name rows must accept `field`, `identity_field`, `temporal_field`, and `classification_field`.
+- Classification axes keep strict suffix semantics: `*_status` for status/lifecycle states, `*_type` for taxonomy/type axes, `*_scope` for coverage/scope, `*_tags` for multi-label sets, and `kind` only for registry-native terms such as `data_kind` or `registry_item_kind`. Generic `status` is not a valid semantic field when separate domains such as `data_kind_template_status` and `data_task_run_status` have different vocabularies.
+- `OPTION_RIGHT / right` becomes `OPTION_RIGHT_TYPE / option_right_type` because CALL/PUT is a tiny categorical type axis, not a clear standalone field word.

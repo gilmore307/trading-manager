@@ -92,7 +92,8 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`data_bundle`](./kinds/data_bundle.md) — Manager-facing runnable bundle keys accepted for task routing and receipts.
 - [`data_source`](./kinds/data_source.md) — Implemented source-interface or source-adapter identifiers.
 - [`data_kind`](./kinds/data_kind.md) — Canonical final saved or durable derived data-shape identifiers with accepted templates.
-- [`field`](./kinds/field.md) — Canonical shared field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
+- [`field`](./kinds/field.md) — Canonical shared non-identity, non-temporal, non-classification field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
+- [`identity_field`](./kinds/identity_field.md) — Canonical field names whose values identify, name, label, locate, or reference entities, artifacts, sources, instruments, tasks, reports, or rows.
 - [`manifest_type`](./kinds/manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
 - [`payload_format`](./kinds/payload_format.md) — Registered values allowed in the `trading_registry.payload_format` column.
 - [`ready_signal_type`](./kinds/ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
@@ -116,7 +117,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Do not store concrete active row lists in `registry/kinds/*.md`.
 - Do not store secrets. Store source-level secret aliases only; one provider/source should normally map to one JSON secret file.
 - Do not mix component-local implementation details into trading-wide registry entries.
-- New fields, temporal fields, classification fields, statuses, payload formats, config keys, data bundles, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
+- New fields, identity fields, temporal fields, classification fields, statuses, payload formats, config keys, data bundles, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
 - Test scripts must stay out of registry `script` rows and be documented in their test-directory README.

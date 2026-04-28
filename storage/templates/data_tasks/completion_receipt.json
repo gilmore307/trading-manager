@@ -4,7 +4,7 @@
   "runs": [
     {
       "run_id": "<run-id>",
-      "status": "<succeeded|failed>",
+      "data_task_run_status": "<succeeded|failed>",
       "started_at": "<iso-datetime>",
       "completed_at": "<iso-datetime>",
       "output_dir": "storage/<task-id>/runs/<run-id>",

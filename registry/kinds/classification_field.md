@@ -2,7 +2,7 @@
 
 Canonical shared field names whose values classify, categorize, bucket, label, scope, or otherwise assign a row to a semantic class.
 
-Use this kind for fields such as `event_type`, `source_type`, `impact_scope`, `universe_type`, `exposure_type`, `status`, `kind`, `right`, `sector_type`, `asset_class`, and other categorical axes.
+Use this kind for fields such as `event_type`, `source_type`, `impact_scope`, `universe_type`, `exposure_type`, `option_right_type`, `sector_type`, `asset_class`, and other categorical axes.
 
 Rules:
 
@@ -16,6 +16,8 @@ Rules:
   - `*_scope` for scope/coverage axes.
   - `*_policy`, `*_outcome`, and `*_readiness` only when those words are the actual semantic domain.
   - `*_tags` for multi-label tag sets.
-- Avoid vague standalone names such as `category`, `kind`, `type`, or `side_hint` unless they are fixed external/source schema names that cannot be normalized.
+  - `kind` only for registry-native schema terms such as `data_kind` or `registry_item_kind`; otherwise prefer `*_type`.
+- Avoid vague standalone names such as `category`, `kind`, `type`, `right`, or `side_hint` unless they are fixed external/source schema names that cannot be normalized.
 - Keep date/time fields in `temporal_field`.
-- Keep free-text descriptions, titles, summaries, URLs, numeric metrics, and structured JSON payload slots in `field` unless the value is itself a classification label.
+- Keep identifiers, names, titles, URLs, paths, and references in `identity_field`.
+- Keep free-text descriptions, summaries, numeric metrics, and structured JSON payload slots in `field` unless the value is itself a classification label.

@@ -246,8 +246,9 @@ class RegistryHelperTests(unittest.TestCase):
             "ISSUER": "issuer",
         }
         classification_fields = {"UNIVERSE_TYPE", "EXPOSURE_TYPE"}
+        identity_fields = {"SYMBOL", "FUND_NAME", "ISSUER"}
         for key, payload in expected_fields.items():
-            expected_kind = "classification_field" if key in classification_fields else "field"
+            expected_kind = "classification_field" if key in classification_fields else "identity_field" if key in identity_fields else "field"
             self.assertEqual(registry[key]["kind"], expected_kind)
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("market_etf_universe", registry[key]["applies_to"])
@@ -358,7 +359,7 @@ class RegistryHelperTests(unittest.TestCase):
             field_like_rows = [
                 row
                 for row in csv.DictReader(csv_file)
-                if row["kind"] in {"field", "temporal_field", "classification_field"}
+                if row["kind"] in {"field", "identity_field", "temporal_field", "classification_field"}
             ]
 
         payloads = [row["payload"] for row in field_like_rows]
@@ -403,12 +404,13 @@ class RegistryHelperTests(unittest.TestCase):
             "SOURCE_THEME_TAGS",
             "MAINTENANCE_STATUS",
             "TRADE_SIDE_TYPE",
-            "OPTION_RIGHT",
+            "OPTION_RIGHT_TYPE",
             "REGISTRY_ITEM_ARTIFACT_SYNC_POLICY",
             "REGISTRY_ITEM_KIND",
             "REVIEW_READINESS",
             "SOURCE_TYPE",
-            "STATUS",
+            "DATA_KIND_TEMPLATE_STATUS",
+            "DATA_TASK_RUN_STATUS",
             "EXPOSURE_TAGS",
             "TASK_LIFECYCLE_STATUS",
             "TASK_SCOPE",
@@ -430,8 +432,50 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EVENT_IMPACT_SCOPE"]["payload"], "impact_scope")
         self.assertEqual(rows["TRADE_SIDE_TYPE"]["payload"], "trade_side_type")
         self.assertEqual(rows["SOURCE_EVENT_TYPE"]["payload"], "source_event_type")
-        self.assertEqual(rows["TITLE"]["kind"], "field")
+        self.assertEqual(rows["OPTION_RIGHT_TYPE"]["payload"], "option_right_type")
+        vague_payloads = {"category", "type", "status", "right", "themes", "tags", "scope", "class"}
+        classification_payloads = {
+            row["payload"] for row in rows.values() if row["kind"] == "classification_field"
+        }
+        self.assertFalse(classification_payloads & vague_payloads)
+        for row in rows.values():
+            if row["kind"] == "classification_field" and row["payload"] not in {"data_kind", "kind"}:
+                self.assertRegex(row["payload"], r"_(type|status|scope|policy|outcome|readiness|tags|class)$")
+        self.assertNotIn("OPTION_RIGHT", rows)
+        self.assertNotIn("STATUS", rows)
+        self.assertEqual(rows["DATA_KIND_TEMPLATE_STATUS"]["payload"], "data_kind_template_status")
+        self.assertEqual(rows["DATA_TASK_RUN_STATUS"]["payload"], "data_task_run_status")
+        self.assertEqual(rows["TITLE"]["kind"], "identity_field")
         self.assertEqual(rows["RETURN_ZSCORE"]["kind"], "field")
+
+    def test_identity_fields_are_separate_from_plain_fields(self):
+        expected_identity_keys = {
+            "ID",
+            "SYMBOL",
+            "TITLE",
+            "TIMELINE_HEADLINE",
+            "EVENT_ID",
+            "EVENT_REPORT_ID",
+            "EVENT_SECURITY_ID",
+            "EVENT_CANONICAL_EVENT_ID",
+            "SOURCE_URL",
+            "URL",
+            "SOURCE_REFS",
+            "TASK_IDENTITY",
+            "WORKFLOW_IDENTITY",
+            "ETF_TICKER",
+            "ETF_HOLDING_TICKER",
+            "ETF_HOLDING_NAME",
+            "ISSUER",
+            "OPTION_CONTRACT_SYMBOL",
+        }
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        for key in expected_identity_keys:
+            self.assertEqual(rows[key]["kind"], "identity_field")
+            self.assertIn(rows[key]["payload_format"], {"field_name", "text"})
+            self.assertIn("Identity value", rows[key]["note"])
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []
