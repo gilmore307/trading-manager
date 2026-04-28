@@ -136,51 +136,31 @@ class RegistryHelperTests(unittest.TestCase):
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
 
-        self.assertEqual(len(data_kinds), 18)
-        for row in data_kinds:
-            self.assertTrue(row["path"], row["key"])
-            template_path = Path("/root/projects") / row["path"] if row["path"].startswith("trading-") else Path(row["path"])
-            self.assertTrue(template_path.exists(), row["key"])
-            self.assertGreater(template_path.stat().st_size, 0, row["key"])
-        expected_payloads = {
-            "MACRO_RELEASE_EVENT": "macro_release_event",
-            "GDELT_ARTICLE": "gdelt_article",
-            "TRADING_ECONOMICS_CALENDAR_EVENT": "trading_economics_calendar_event",
-            "EQUITY_BAR": "equity_bar",
-            "EQUITY_LIQUIDITY_BAR": "equity_liquidity_bar",
-            "CRYPTO_BAR": "crypto_bar",
-            "CRYPTO_LIQUIDITY_BAR": "crypto_liquidity_bar",
-            "OPTION_ACTIVITY_EVENT": "option_activity_event",
-            "OPTION_ACTIVITY_EVENT_DETAIL": "option_activity_event_detail",
-            "OPTION_BAR": "option_bar",
-            "OPTION_CHAIN_SNAPSHOT": "option_chain_snapshot",
-            "ETF_HOLDINGS_SNAPSHOT": "etf_holdings_snapshot",
-            "STOCK_ETF_EXPOSURE": "stock_etf_exposure",
-            "EQUITY_ABNORMAL_ACTIVITY_EVENT": "equity_abnormal_activity_event",
-            "TRADING_EVENT": "trading_event",
-            "EVENT_FACTOR": "event_factor",
-            "EVENT_ANALYSIS_REPORT": "event_analysis_report",
-        }
-        for key, payload in expected_payloads.items():
-            self.assertEqual(by_key[key]["kind"], "data_kind")
-            self.assertEqual(by_key[key]["payload"], payload)
-        self.assertEqual(
-            by_key["EQUITY_LIQUIDITY_BAR"]["path"],
-            "trading-data/storage/templates/data_kinds/alpaca/equity_liquidity_bar.preview.csv",
-        )
-        self.assertEqual(
-            by_key["CRYPTO_BAR"]["path"],
-            "trading-data/storage/templates/data_kinds/okx/crypto_bar.preview.csv",
-        )
-        self.assertEqual(
-            by_key["OPTION_ACTIVITY_EVENT_DETAIL"]["path"],
-            "trading-data/storage/templates/data_kinds/thetadata/option_activity_event_detail.preview.csv",
-        )
-        self.assertEqual(
-            by_key["MACRO_RELEASE_EVENT"]["path"],
-            "trading-data/storage/templates/data_kinds/events/macro_release_event.preview.csv",
-        )
-        self.assertNotIn("DATA_KIND_TEMPLATE_PREVIEW_FILE_PATH", by_key)
+        self.assertEqual(data_kinds, [])
+        for row in rows:
+            self.assertNotIn("trading-data/storage/templates/data_kinds", row["path"])
+        for deleted_preview_key in {
+            "MACRO_RELEASE_EVENT",
+            "GDELT_ARTICLE",
+            "TRADING_ECONOMICS_CALENDAR_EVENT",
+            "EQUITY_BAR",
+            "EQUITY_LIQUIDITY_BAR",
+            "CRYPTO_BAR",
+            "CRYPTO_LIQUIDITY_BAR",
+            "OPTION_ACTIVITY_EVENT",
+            "OPTION_ACTIVITY_EVENT_DETAIL",
+            "OPTION_BAR",
+            "OPTION_CHAIN_SNAPSHOT",
+            "ETF_HOLDINGS_SNAPSHOT",
+            "STOCK_ETF_EXPOSURE",
+            "EQUITY_ABNORMAL_ACTIVITY_EVENT",
+            "TRADING_EVENT",
+            "EVENT_FACTOR",
+            "EVENT_ANALYSIS_REPORT",
+            "DATA_KIND_TEMPLATE_GENERATOR",
+            "DATA_KIND_TEMPLATE_PREVIEW_FILE_PATH",
+        }:
+            self.assertNotIn(deleted_preview_key, by_key)
         reclassified_data_kind_keys = {
             "ECONOMIC_RELEASE_EVENT",
             "EQUITY_EARNINGS_CALENDAR",

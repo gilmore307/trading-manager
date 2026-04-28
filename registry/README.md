@@ -91,7 +91,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`config`](./kinds/config.md) — Non-secret configuration keys and secret-alias references. Payloads may contain secret aliases but must never contain secret values.
 - [`data_bundle`](./kinds/data_bundle.md) — Manager-facing runnable bundle keys accepted for task routing and receipts.
 - [`data_source`](./kinds/data_source.md) — Implemented source-interface or source-adapter identifiers.
-- [`data_kind`](./kinds/data_kind.md) — Canonical final saved or durable derived data-shape identifiers with accepted templates.
+- [`data_kind`](./kinds/data_kind.md) — Canonical final saved or durable derived data-shape identifiers with accepted current storage contracts.
 - [`field`](./kinds/field.md) — Canonical shared non-identity, non-temporal, non-classification field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
 - [`identity_field`](./kinds/identity_field.md) — Canonical field names whose values identify or name entities, artifacts, sources, instruments, tasks, reports, or rows.
 - [`manifest_type`](./kinds/manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.

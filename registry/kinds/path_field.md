@@ -2,7 +2,7 @@
 
 Canonical shared field names whose values locate or reference artifacts, files, URLs, repository paths, output references, source references, reviewed files, or path lists.
 
-Use this kind for locator/reference fields such as `registry_item_path`, `repository_path`, `source_url`, `event_link_url`, `event_analysis_report_url`, `event_report_url`, `event_report_json_url`, `source_reference`, `source_references`, `data_task_run_output_directory`, `data_task_run_output_references`, `data_kind_template_preview_file_path`, `execution_allowed_paths`, and `completion_changed_file_paths`.
+Use this kind for locator/reference fields such as `registry_item_path`, `repository_path`, `data_task_run_output_directory`, `data_task_run_output_references`, `event_reference`, `execution_allowed_paths`, and `completion_changed_file_paths`.
 
 Rules:
 

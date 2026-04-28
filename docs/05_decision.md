@@ -1441,3 +1441,16 @@ Consequences:
 - Field-like kinds (`field`, `identity_field`, `path_field`, `temporal_field`, `classification_field`, `text_field`, and `parameter_field`) must not carry obsolete `*_template`, `option_template`, or `data_kind_template` `applies_to` values.
 - Retained final-SQL fields have `applies_to` values such as `market_regime_etf_bar`, `security_selection_us_equity_etf_holding`, `strategy_selection_symbol_bar_liquidity`, `option_expression_contract_snapshot`, `position_execution_option_contract_timeseries`, or `event_overlay_event`.
 - Preview/template file paths are not evidence for retaining field rows. If a field is not part of a current SQL contract or valid non-template artifact, it should be removed instead of preserved as vocabulary clutter.
+
+## D070 - Retired data-kind previews are not active registry items
+
+Accepted: 2026-04-28
+
+The old `trading-data/storage/templates/data_kinds/*.preview.csv` and preview JSON files are no longer active contracts. Dedicated SQL storage contracts now own accepted model-input/business data shapes, and current SQL business fields are registered directly against those tables.
+
+Consequences:
+
+- Remove active `data_kind` rows whose only contract evidence was a retired preview/template file.
+- Remove the old data-kind preview generator script registration.
+- Keep `source_capability` and `term` rows for source/provider concepts that are still useful for adapter planning, entitlement review, or glossary reference, but do not promote them to `data_kind` without a current accepted storage contract.
+- Do not recreate preview/template-only field rows or `applies_to` values. Registry retention is based on final SQL tables and still-valid shared/task/receipt/registry artifacts, not historical preview files.

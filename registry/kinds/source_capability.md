@@ -16,7 +16,7 @@ Use `payload` for the stable snake_case capability key. Use `path` for public pr
 
 Reject or re-scope entries that are actually:
 
-- final saved data shapes with accepted templates, which belong in `data_kind`;
+- final saved data shapes with accepted current storage contracts, which belong in `data_kind`;
 - implemented source adapters, which belong in `data_source`;
 - manager-facing bundles, which belong in `data_bundle`;
 - provider/company names, which belong in `term`;

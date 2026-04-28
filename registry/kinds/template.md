@@ -2,7 +2,7 @@
 
 ## Kind Boundary
 
-Reusable checked-in template identifiers for task keys, receipts, source-scaffold files, generated preview shapes, and other stable template artifacts.
+Reusable checked-in template identifiers for task keys, receipts, source-scaffold files, and other stable template artifacts. Retired data-kind preview shapes should not be registered.
 
 ## Range
 
