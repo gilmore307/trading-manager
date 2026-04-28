@@ -160,26 +160,28 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(len(rows), 61)
         self.assertEqual(
             list(rows[0].keys()),
-            ["ticker", "universe_role", "exposure_category", "bar_grain", "fund_name", "issuer"],
+            ["symbol", "universe_role", "exposure_category", "bar_grain", "fund_name", "issuer"],
         )
-        self.assertEqual(rows[0]["ticker"], "AIQ")
-        self.assertEqual(rows[-1]["ticker"], "VNQ")
+        self.assertEqual(rows[0]["symbol"], "AIQ")
+        self.assertEqual(rows[-1]["symbol"], "VNQ")
 
         with Path("registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
         self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-main/storage/shared/market_etf_universe.csv")
         expected_fields = {
-            "MARKET_ETF_UNIVERSE_TICKER": "ticker",
-            "MARKET_ETF_UNIVERSE_ROLE": "universe_role",
-            "MARKET_ETF_EXPOSURE_CATEGORY": "exposure_category",
-            "MARKET_ETF_BAR_GRAIN": "bar_grain",
-            "MARKET_ETF_FUND_NAME": "fund_name",
-            "MARKET_ETF_ISSUER": "issuer",
+            "INSTRUMENT_SYMBOL": "symbol",
+            "UNIVERSE_ROLE": "universe_role",
+            "EXPOSURE_CATEGORY": "exposure_category",
+            "BAR_GRAIN": "bar_grain",
+            "FUND_NAME": "fund_name",
+            "ISSUER": "issuer",
         }
         for key, payload in expected_fields.items():
             self.assertEqual(registry[key]["kind"], "field")
             self.assertEqual(registry[key]["payload"], payload)
-            self.assertEqual(registry[key]["path"], "storage/shared/market_etf_universe.csv")
+            self.assertIn("market_etf_universe", registry[key]["applies_to"])
+            if key not in {"INSTRUMENT_SYMBOL", "ISSUER"}:
+                self.assertEqual(registry[key]["path"], "storage/shared/market_etf_universe.csv")
 
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
