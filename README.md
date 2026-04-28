@@ -16,8 +16,10 @@ src/              Importable shared helper packages used across trading reposito
 scripts/          Executable maintenance/operational commands that may import `src/`.
 tests/            First-party tests for source packages and repository governance checks.
 registry/         Trading-wide registry kind boundaries, SQL migrations, and generated current.csv snapshot.
-templates/        Trading-wide project, contract, task, and implementation templates, including contract drafting templates.
-pyproject.toml    Python helper package metadata for `trading-main-helpers`.
+storage/         Tracked reusable non-code assets.
+  templates/     Trading-wide project, contract, task, and implementation templates.
+  shared/        Trading-wide static/shared files that are not templates.
+pyproject.toml   Python helper package metadata for `trading-main-helpers`.
 requirements.txt  Shared Python environment dependency ledger.
 ```
 

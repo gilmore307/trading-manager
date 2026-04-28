@@ -12,7 +12,7 @@
 
 ## Waiting On Cross-Repository Coordination
 
-- Define concrete artifact, manifest, ready-signal, and request schemas from `templates/contracts/`.
+- Define concrete artifact, manifest, ready-signal, and request schemas from `storage/templates/contracts/`.
 - Promote concrete template schemas after artifact, manifest, ready-signal, and request contracts are accepted.
 - Define shared storage root with `trading-storage`.
 
@@ -64,7 +64,7 @@
 - Added nullable registry `path` column and id-first path helper APIs.
 - Removed `path` as a registry kind and merged standalone root-path entries into their owning entity rows.
 - Restored `TAILSCALE` and `SMB` as active `term` entries.
-- Moved artifact/manifest/ready-signal/request contract placeholders from `docs/` to `templates/contracts/`.
+- Moved artifact/manifest/ready-signal/request contract placeholders from `docs/` to `storage/templates/contracts/`.
 - Added registry kind boundaries for `artifact_type`, `manifest_type`, `ready_signal_type`, and `request_type`.
 - Removed canceled-project registry entries and regenerated `registry/current.csv`.
 - Corrected registry shape so Markdown kind files define kind boundaries while SQL migrations own concrete entries.

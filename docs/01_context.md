@@ -70,7 +70,7 @@ Because this server's project work is centered on the trading system, `trading-m
 
 - `src/` stores shared helper code used by component repositories; `docs/07_helpers.md` explains the helper boundary.
 - `registry/` maintains the SQL-backed registration system; `docs/08_registry.md` explains the registry operating model.
-- `templates/` stores reusable trading project, contract, task, and implementation templates; `docs/09_templates.md` explains the template boundary.
+- `storage/templates/` stores reusable trading project, contract, task, and implementation templates; `docs/09_templates.md` explains the template boundary.
 
 Shared helpers are allowed in `trading-main`, but they must remain generic trading infrastructure. Component-specific runtime behavior still belongs in the owning component repository.
 

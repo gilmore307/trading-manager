@@ -198,16 +198,16 @@ The initial artifact, manifest, ready-signal, and request contract placeholders 
 
 ### Decision
 
-Move artifact, manifest, ready-signal, and request drafting surfaces to `templates/contracts/`. Keep `docs/` focused on project governance plus any approved project-specific guide docs.
+Move artifact, manifest, ready-signal, and request drafting surfaces to `storage/templates/contracts/`. Keep `docs/` focused on project governance plus any approved project-specific guide docs.
 
 ### Rationale
 
-The docs spine should contain ratified project context and governance. Drafting templates belong under `templates/`. Registry type vocabularies belong under `registry/`; registry operating guidance may live in an approved docs guide.
+The docs spine should contain ratified project context and governance. Drafting templates belong under `storage/templates/`. Registry type vocabularies belong under `registry/`; registry operating guidance may live in an approved docs guide.
 
 ### Consequences
 
 - Do not add numbered docs beyond `06_memory.md` for reusable drafting templates.
-- Use `templates/contracts/` for reusable contract drafting surfaces.
+- Use `storage/templates/contracts/` for reusable contract drafting surfaces.
 - Use `registry/kinds/*_type.md` and SQL migrations for registered type vocabularies.
 - Use `docs/08_registry.md` for the approved `trading-main` registry operating guide.
 
@@ -502,7 +502,7 @@ The registry is now a first-class function of `trading-main`, not just a passing
 - `docs/08_registry.md` is part of the accepted `trading-main` docs set.
 - `00_scope.md` through `06_memory.md` remain project-wide platform docs.
 - Registry kind source-of-truth files remain under `registry/kinds/`, not under `docs/`.
-- Contract drafting templates remain under `templates/contracts/`, not under `docs/`.
+- Contract drafting templates remain under `storage/templates/contracts/`, not under `docs/`.
 
 ## D025 - Split platform-function guides into helpers registry and templates
 
@@ -530,7 +530,7 @@ This mirrors the actual top-level structure of `trading-main` and gives each own
 
 - Helpers, registry, and templates each have a dedicated docs guide.
 - Registry kind source-of-truth files still live under `registry/kinds/`.
-- Template drafts still live under `templates/`.
+- Template drafts still live under `storage/templates/`.
 - Helper code still lives under `src/`.
 
 ## D026 - Loose helper files are not package contracts
@@ -990,11 +990,11 @@ The user approved designing templates around provider/API requirements for `trad
 
 ### Decision
 
-Create reusable draft data task templates under `templates/data_tasks/` in `trading-main`. Cover task keys, per-bundle README documentation, fetch requirements, clean/normalization requirements, save/output requirements, completion receipts, and fixture/live-call policy.
+Create reusable draft data task templates under `storage/templates/data_tasks/` in `trading-main`. Cover task keys, per-bundle README documentation, fetch requirements, clean/normalization requirements, save/output requirements, completion receipts, and fixture/live-call policy.
 
 ### Rationale
 
-The template shapes are cross-repository planning surfaces, so they belong in `trading-main/templates/` rather than being hidden as component-local docs or implementation files.
+The template shapes are cross-repository planning surfaces, so they belong in `trading-main/storage/templates/` rather than being hidden as component-local docs or implementation files.
 
 ### Consequences
 
@@ -1020,7 +1020,7 @@ This keeps manager invocation simple and avoids premature file sprawl while pres
 
 ### Consequences
 
-- `templates/data_tasks/pipeline.py` is the default implementation template.
+- `storage/templates/data_tasks/pipeline.py` is the default implementation template.
 - Bundle READMEs own bundle-specific API details.
 - Existing fetch/clean/save/receipt spec templates remain design documents, not required separate code files.
 
@@ -1137,3 +1137,21 @@ This keeps package code, operational commands, and provider/source terminology f
 - Helper tests moved from `helpers/tests/` to `tests/`.
 - The registry migration/export command moved from `registry/sql/apply-migrations.py` to `scripts/apply_registry_migrations.py`.
 - Registry script rows now point to stable callable entrypoints or Python helper symbols under the new paths.
+
+## D053 - Trading-main reusable assets live under storage
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Move trading-wide reusable template assets from top-level `templates/` into `storage/templates/`, and create `storage/shared/` for reviewed cross-project static files that are not templates.
+
+Rationale:
+`trading-main` now needs a broader tracked non-code asset boundary than templates alone. Keeping templates and shared static files under `storage/` makes the repository shape clearer while preserving the distinction from generated runtime outputs, secrets, caches, and component-owned implementation files.
+
+Consequences:
+- Reusable templates live under `storage/templates/`.
+- Cross-project static/shared files live under `storage/shared/`.
+- Registry paths for trading-main-owned templates must point to `storage/templates/...`.
+- Generated artifacts and local runtime state still do not belong in `trading-main/storage/`.

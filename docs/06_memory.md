@@ -8,7 +8,7 @@
 - The market-state contamination rule is a core system invariant.
 
 - Registry Markdown kind files under `registry/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `registry/current.csv`, and registry operating rules live in `docs/08_registry.md`.
-- Contract drafting templates belong under `templates/contracts/`, not as numbered docs after `06_memory.md`; `07_helpers.md`, `08_registry.md`, and `09_templates.md` are approved platform-function guides after the project-wide docs.
+- Contract drafting templates belong under `storage/templates/contracts/`, not as numbered docs after `06_memory.md`; `07_helpers.md`, `08_registry.md`, and `09_templates.md` are approved platform-function guides after the project-wide docs.
 - Stale canceled-project registry entries were removed because GitHub history is the restore path.
 - Registry ids are stable automation references; keys are human-readable and unsafe for durable automation dereferencing.
 - Registry `path` is a nullable column for direct locators, not a registry kind.
@@ -36,7 +36,7 @@
 - Source terms registered for web-discovered/non-credential data acquisition: `FOMC_CALENDAR` uses the official Federal Reserve calendar URL; `OFFICIAL_MACRO_RELEASE_CALENDAR` means use web search to find and confirm official agency release calendars; `ETF_ISSUER_HOLDINGS` means ETF constituents and weights come from issuer websites or issuer-published holdings files.
 - Registered workflow terms for `trading-data`: `HISTORICAL_DATA_ACQUISITION`, `DATA_TASK_KEY_FILE`, and `DATA_TASK_COMPLETION_RECEIPT`. Manager issues task key files; data executes historical acquisition scripts; development outputs/receipts use local `storage/`; storage owns durable SQL outputs and completion receipts once contracts are accepted.
 - `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` is registered as config payload `storage` with path `/root/projects/trading-data/storage`; use it for development-stage task outputs and receipts instead of SQL until durable storage contracts are accepted.
-- Added reusable draft data task templates under `templates/data_tasks/`: task key, bundle README, fetch spec, clean spec, save spec, completion receipt, and fixture policy. These support API-specific `trading-data` bundle design but are not accepted concrete schemas yet.
+- Added reusable draft data task templates under `storage/templates/data_tasks/`: task key, bundle README, fetch spec, clean spec, save spec, completion receipt, and fixture policy. These support API-specific `trading-data` bundle design but are not accepted concrete schemas yet.
 - Data source bundles should default to one `pipeline.py` with `fetch`, `clean`, `save`, and `write_receipt` functions; split into separate modules only when complexity justifies it. Bundle README files carry API-specific details.
 - Data task key and completion receipt templates should stay minimal and operational. Removed unused metadata such as provider documentation URL from runtime JSON templates; provider docs belong in registry/bundle README.
 - A data task key is stable across periodic/scheduled runs. Per-run details belong in the task-level completion receipt under `runs[]`; run output directories should use `storage/<task-id>/runs/<run-id>/`.
