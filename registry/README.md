@@ -101,7 +101,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`script`](./kinds/script.md) — Canonical callable helper or automation export records, with source locators in `path`.
 - [`shared_artifact`](./kinds/shared_artifact.md) — Durable checked-in shared artifacts that are not templates, scripts, terms, or data-kind categories.
 - [`source_capability`](./kinds/source_capability.md) — Source-level record families, endpoint families, raw inputs, transient evidence, or entitlement-gated provider capabilities that are not final saved data shapes.
-- [`status_value`](./kinds/status_value.md) — Registered status or policy values; `applies_to` identifies the status domain such as `task_lifecycle_state`, `review_readiness`, `test_status`, or `trading_registry.artifact_sync_policy`.
+- [`status_value`](./kinds/status_value.md) — Registered status or policy values; `applies_to` identifies the status domain such as `task_lifecycle_status`, `review_readiness`, `test_status`, or `trading_registry.artifact_sync_policy`.
 - [`template`](./kinds/template.md) — Reusable checked-in template identifiers.
 - [`temporal_field`](./kinds/temporal_field.md) — Canonical date/time/datetime field names with ISO-8601 value semantics.
 - [`term`](./kinds/term.md) — Approved shared terminology and definitions.

@@ -2,7 +2,7 @@
 
 Canonical shared field names whose values classify, categorize, bucket, label, scope, or otherwise assign a row to a semantic class.
 
-Use this kind for fields such as `event_type`, `source_type`, `impact_scope`, `universe_type`, `exposure_type`, `status`, `kind`, `right`, `sector`, `asset_class`, and other categorical axes.
+Use this kind for fields such as `event_type`, `source_type`, `impact_scope`, `universe_type`, `exposure_type`, `status`, `kind`, `right`, `sector_type`, `asset_class`, and other categorical axes.
 
 Rules:
 

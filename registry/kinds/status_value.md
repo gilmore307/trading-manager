@@ -6,7 +6,7 @@ Use this kind for allowed state-like values such as lifecycle states, review rea
 
 The status domain belongs in `applies_to`, for example:
 
-- `task_lifecycle_state`
+- `task_lifecycle_status`
 - `review_readiness`
 - `acceptance_outcome`
 - `test_status`

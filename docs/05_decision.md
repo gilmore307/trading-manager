@@ -1167,7 +1167,7 @@ Decision:
 Merge status-like registry kinds into `status_value`. The previous kind names (`task_lifecycle_state`, `review_readiness`, `acceptance_outcome`, `test_status`, `maintenance_status`, `docs_status`, and `artifact_sync_policy`) become status domains recorded in `applies_to`, not separate registry kinds.
 
 Rationale:
-These rows all have the same structural role: they register allowed state/policy values. Separate kinds made the registry kind system wider without adding a real contract boundary. The field rows still register slot names such as `TASK_LIFECYCLE_STATE`; `status_value` rows register allowed values for those slots.
+These rows all have the same structural role: they register allowed state/policy values. Separate kinds made the registry kind system wider without adding a real contract boundary. The field rows still register slot names such as `TASK_LIFECYCLE_STATUS`; `status_value` rows register allowed values for those slots.
 
 Consequences:
 - `registry/kinds/status_value.md` owns the status-value boundary.
@@ -1248,3 +1248,22 @@ Consequences:
 - Template-specific duplicates with prefixes such as `trade_open`, `trade_high`, `trade_low`, `trade_close`, `trade_volume`, and `trade_vwap` are removed.
 - Generated artifact timestamps use canonical `generated_at_et`; context-specific spellings such as `analysis_generated_at_et` and `standard_generated_at_et` are removed.
 - Timestamp fields that were still registered as ordinary `field` rows, such as `interval_start_et` and `seen_at_utc`, are reclassified as `temporal_field`.
+
+## D059 - Classification words name the axis, not the source context
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Normalize remaining classification field names so the word identifies the semantic axis. Use `*_status` for lifecycle/status slots, `*_type` for taxonomy labels, and `*_tags` for multi-label tag sets. Do not preserve vague source words such as `themes` when the field is really a source-provided theme/tag set.
+
+Rationale:
+`task_lifecycle_state` and `analysis_status` were the same kind of status slot expressed with different nouns. `themes`, `style_tags`, `sector`, and `exposure_type` were not all the same concept, but several names hid the axis distinction: GDELT themes are source-provided evidence tags, ETF holding sector is an issuer sector taxonomy label, market ETF exposure type is a curated universe role/type, and stock ETF exposure tags are derived model-facing labels.
+
+Consequences:
+- Task lifecycle field/domain uses `task_lifecycle_status`; corresponding status-value rows use that domain.
+- GDELT article source tags use `source_theme_tags`.
+- ETF holding sector taxonomy uses `sector_type`.
+- Stock ETF exposure multi-label output uses `exposure_tags`.
+- `exposure_type` remains separate because it classifies the curated ETF universe exposure role, not a sector/theme value itself.
