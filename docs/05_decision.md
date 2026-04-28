@@ -1357,3 +1357,21 @@ Consequences:
 - `ETF_HOLDING_TICKER / holding_ticker` becomes `ETF_HOLDING_SYMBOL / holding_symbol`.
 - Ingestion may temporarily accept legacy `etf_ticker` / `holding_ticker` aliases at provider/task boundaries, but final saved templates use `*_symbol`.
 - `EVENT_SECURITY_ID / security_id` is removed from active final event templates because no canonical security-master identifier exists yet and current sample usage duplicated `symbol`. If a true security master is introduced later, it should register a precise scoped identifier such as `security_master_id`, not a vague duplicate of `symbol`.
+
+## D065 - Narrative and error columns are not ordinary fields
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Split human-readable narrative/explanatory columns and error-detail columns out of ordinary `field` rows.
+
+Rationale:
+The plain `field` kind was still carrying notes, summaries, caveats, request-parameter descriptions, coverage reasons, and error payloads. These are qualitatively different from scalar model/input fields: they explain or diagnose rather than measure, identify, locate, classify, or timestamp. Keeping them in `field` makes the kind boundary too broad.
+
+Consequences:
+- Add `text_field` for narrative/explanatory columns such as `summary`, `coverage_reason`, `known_caveats`, `request_parameters`, `acceptance_summary`, `change_summary`, `maintenance_summary`, `task_status_summary`, and registry `note`.
+- Add `error_field` for failure/diagnostic payloads such as `error`.
+- Downstream registry field resolvers must accept `text_field` and `error_field` wherever they materialize final template columns.
+- Structured context/object fields remain ordinary `field` unless their primary role is explanation or error reporting.
