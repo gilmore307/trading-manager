@@ -314,22 +314,22 @@ class RegistryHelperTests(unittest.TestCase):
             "CHECK_TIME",
             "DATA_TASK_RUN_COMPLETED_AT",
             "DATA_TASK_RUN_STARTED_AT",
-            "DATA_TIMESTAMP_ET",
-            "EVENT_EFFECTIVE_TIME_ET",
-            "EVENT_FACTOR_AS_OF_ET",
-            "EVENT_TIME_ET",
-            "GDELT_ARTICLE_SEEN_AT_UTC",
-            "GENERATED_AT_ET",
-            "INTERVAL_START_ET",
+            "DATA_TIMESTAMP",
+            "EVENT_EFFECTIVE_TIME",
+            "EVENT_FACTOR_AS_OF",
+            "EVENT_TIME",
+            "GDELT_ARTICLE_SEEN_AT",
+            "GENERATED_AT",
+            "INTERVAL_START",
             "OPTION_EXPIRATION",
             "REGISTRY_ITEM_CREATED_AT",
             "REGISTRY_ITEM_UPDATED_AT",
-            "SNAPSHOT_TIME_ET",
-            "STOCK_ETF_AVAILABLE_TIME_ET",
-            "TRADE_TIMESTAMP_ET",
-            "UNDERLYING_TIMESTAMP_ET",
-            "WINDOW_END_ET",
-            "WINDOW_START_ET",
+            "SNAPSHOT_TIME",
+            "STOCK_ETF_AVAILABLE_TIME",
+            "TRADE_TIMESTAMP",
+            "UNDERLYING_TIMESTAMP",
+            "WINDOW_END",
+            "WINDOW_START",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -338,12 +338,16 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "temporal_field")
             self.assertEqual(rows[key]["payload_format"], "field_name")
             self.assertIn("ISO 8601", rows[key]["note"])
+            self.assertFalse(rows[key]["key"].endswith("_ET"))
+            self.assertFalse(rows[key]["key"].endswith("_UTC"))
+            self.assertFalse(rows[key]["payload"].endswith("_et"))
+            self.assertFalse(rows[key]["payload"].endswith("_utc"))
         self.assertNotIn("TIMELINE_CREATED_AT_ET", rows)
         self.assertNotIn("TIMELINE_UPDATED_AT_ET", rows)
-        self.assertNotIn("OPTION_EVENT_DETAIL_STANDARD_GENERATED_AT_ET", rows)
-        self.assertEqual(rows["GENERATED_AT_ET"]["payload"], "generated_at_et")
-        self.assertIn("event_analysis_report_template", rows["GENERATED_AT_ET"]["applies_to"])
-        self.assertIn("option_activity_event_detail_template", rows["GENERATED_AT_ET"]["applies_to"])
+        self.assertNotIn("OPTION_EVENT_DETAIL_STANDARD_GENERATED_AT", rows)
+        self.assertEqual(rows["GENERATED_AT"]["payload"], "generated_at")
+        self.assertIn("event_analysis_report_template", rows["GENERATED_AT"]["applies_to"])
+        self.assertIn("option_activity_event_detail_template", rows["GENERATED_AT"]["applies_to"])
         self.assertIn("event_timeline_template", rows["REGISTRY_ITEM_CREATED_AT"]["applies_to"])
         self.assertIn("event_timeline_template", rows["REGISTRY_ITEM_UPDATED_AT"]["applies_to"])
         self.assertEqual(rows["DATA_TIMEFRAME"]["kind"], "field")

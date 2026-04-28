@@ -138,6 +138,6 @@ Removed or merged categories:
 - rows with no current source/interface/term role after review;
 - deprecated macro_data-era official-source references with `deprecated_macro_data_source_reference` or `deprecated_macro_data_transient_evidence` scope;
 - the erroneous leftover `REGISTRY_ITEM_FIELD_CATEGORY` row from the reverted field-category attempt;
-- duplicate scenario-specific field rows for `symbol`, `source_url`, `title`, `event_time_et`, `source_type`, `summary`, `url`, `event_id`, `evidence_window`, `source_refs`, `as_of_date`, `bundle`, `status`, and `id`.
+- duplicate scenario-specific field rows for `symbol`, `source_url`, `title`, `event_time`, `source_type`, `summary`, `url`, `event_id`, `evidence_window`, `source_refs`, `as_of_date`, `bundle`, `status`, and `id`.
 
 Source-input concepts are no longer allowed as `data_kind`. They must be `source_capability` when they describe source availability/raw input/entitlement capability, or `term` when they are glossary/provider/source-reference concepts.

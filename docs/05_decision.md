@@ -1185,7 +1185,7 @@ Decision:
 Move date/time/datetime/timestamp field-name rows from `field` to `temporal_field`. Merge duplicate `status_value` rows when the payload is the same and the row can carry multiple domains in `applies_to`.
 
 Rationale:
-Temporal fields such as `created_at`, `event_time_et`, `available_time_et`, and `as_of_date` never overlap ordinary categorical/numeric/text fields, and they need a stricter value-format contract. Status rows with the same payload are also one concept reused by multiple status domains, not separate kinds or separate values.
+Temporal fields such as `created_at`, `event_time`, `available_time`, and `as_of_date` never overlap ordinary categorical/numeric/text fields, and they need a stricter value-format contract. Status rows with the same payload are also one concept reused by multiple status domains, not separate kinds or separate values.
 
 Consequences:
 - Temporal field values must use ISO-8601 semantics; date-only values use `YYYY-MM-DD`, and datetime/timestamp values must carry explicit timezone semantics.
@@ -1246,8 +1246,8 @@ Consequences:
 - OHLCV fields use canonical `open`, `high`, `low`, `close`, `volume`, and `vwap` across bars and trade-derived liquidity intervals.
 - Trade-count uses canonical payload `trade_count` across market bars, option bars, and liquidity intervals.
 - Template-specific duplicates with prefixes such as `trade_open`, `trade_high`, `trade_low`, `trade_close`, `trade_volume`, and `trade_vwap` are removed.
-- Generated artifact timestamps use canonical `generated_at_et`; context-specific spellings such as `analysis_generated_at_et` and `standard_generated_at_et` are removed.
-- Timestamp fields that were still registered as ordinary `field` rows, such as `interval_start_et` and `seen_at_utc`, are reclassified as `temporal_field`.
+- Generated artifact timestamps use canonical `generated_at`; context-specific spellings such as `analysis_generated_at` and `standard_generated_at` are removed.
+- Timestamp fields that were still registered as ordinary `field` rows, such as `interval_start` and `seen_at`, are reclassified as `temporal_field`.
 
 ## D059 - Classification words name the axis, not the source context
 
@@ -1267,3 +1267,21 @@ Consequences:
 - ETF holding sector taxonomy uses `sector_type`.
 - Stock ETF exposure multi-label output uses `exposure_tags`.
 - `exposure_type` remains separate because it classifies the curated ETF universe exposure role, not a sector/theme value itself.
+
+## D060 - Default timezone is not encoded in temporal field names
+
+Date: 2026-04-28
+
+Status: Accepted
+
+Decision:
+Remove default timezone suffixes such as `_et` and `_utc` from normalized temporal field payloads and keys. The `temporal_field` contract and template documentation own timezone semantics; normalized final outputs default to America/New_York unless a reviewed source contract explicitly says otherwise.
+
+Rationale:
+The registry is a semantic vocabulary. If all normalized model-facing timestamps use the same project timezone, encoding `ET` in each field name adds noise and makes keys/payloads less regular. The field word should identify the time concept (`event_time`, `window_start`, `generated_at`), not repeat the default timezone.
+
+Consequences:
+- `timestamp_et`, `event_time_et`, `effective_time_et`, `interval_start_et`, `available_time_et`, `window_start_et`, and similar payloads become `timestamp`, `event_time`, `effective_time`, `interval_start`, `available_time`, and `window_start`.
+- Registry keys drop matching `_ET` / `_UTC` suffixes.
+- GDELT `seen_at` is normalized to America/New_York for final saved output.
+- Internal fetch manifests may still use explicitly UTC operational fields such as `fetched_at_utc`; those are not normalized model-facing temporal registry fields.
