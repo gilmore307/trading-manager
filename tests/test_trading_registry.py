@@ -180,10 +180,7 @@ class RegistryHelperTests(unittest.TestCase):
             by_key["MACRO_RELEASE_EVENT"]["path"],
             "trading-data/storage/templates/data_kinds/events/macro_release_event.preview.csv",
         )
-        self.assertEqual(
-            by_key["DATA_KIND_TEMPLATE_PREVIEW_FILE_PATH"]["path"],
-            "trading-data/storage/templates/data_kinds/alpaca/README.md",
-        )
+        self.assertNotIn("DATA_KIND_TEMPLATE_PREVIEW_FILE_PATH", by_key)
         reclassified_data_kind_keys = {
             "ECONOMIC_RELEASE_EVENT",
             "EQUITY_EARNINGS_CALENDAR",
@@ -350,21 +347,13 @@ class RegistryHelperTests(unittest.TestCase):
             "DATA_TASK_RUN_COMPLETED_AT",
             "DATA_TASK_RUN_STARTED_AT",
             "DATA_TIMESTAMP",
-            "EVENT_EFFECTIVE_TIME",
-            "EVENT_FACTOR_AS_OF",
             "EVENT_TIME",
-            "GDELT_ARTICLE_SEEN_AT",
-            "GENERATED_AT",
-            "INTERVAL_START",
             "OPTION_EXPIRATION",
             "REGISTRY_ITEM_CREATED_AT",
             "REGISTRY_ITEM_UPDATED_AT",
             "SNAPSHOT_TIME",
             "STOCK_ETF_AVAILABLE_TIME",
-            "TRADE_TIMESTAMP",
             "UNDERLYING_TIMESTAMP",
-            "WINDOW_END",
-            "WINDOW_START",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -380,11 +369,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("TIMELINE_CREATED_AT_ET", rows)
         self.assertNotIn("TIMELINE_UPDATED_AT_ET", rows)
         self.assertNotIn("OPTION_EVENT_DETAIL_STANDARD_GENERATED_AT", rows)
-        self.assertEqual(rows["GENERATED_AT"]["payload"], "generated_at")
-        self.assertIn("event_analysis_report_template", rows["GENERATED_AT"]["applies_to"])
-        self.assertIn("option_activity_event_detail_template", rows["GENERATED_AT"]["applies_to"])
-        self.assertIn("event_timeline_template", rows["REGISTRY_ITEM_CREATED_AT"]["applies_to"])
-        self.assertIn("event_timeline_template", rows["REGISTRY_ITEM_UPDATED_AT"]["applies_to"])
+        self.assertNotIn("GENERATED_AT", rows)
+        self.assertEqual(rows["REGISTRY_ITEM_CREATED_AT"]["applies_to"], "trading_registry")
+        self.assertEqual(rows["REGISTRY_ITEM_UPDATED_AT"]["applies_to"], "trading_registry")
         self.assertEqual(rows["DATA_TIMEFRAME"]["kind"], "field")
         self.assertEqual(rows["OPTION_DAYS_TO_EXPIRATION"]["kind"], "field")
 
@@ -399,11 +386,18 @@ class RegistryHelperTests(unittest.TestCase):
         payloads = [row["payload"] for row in field_like_rows]
         self.assertEqual(len(payloads), len(set(payloads)))
 
+        for row in field_like_rows:
+            self.assertNotIn("trading-data/storage/templates/data_kinds", row["path"])
+            applies_to = set(filter(None, row["applies_to"].split(";")))
+            self.assertFalse({part for part in applies_to if part.endswith("_template")})
+            self.assertNotIn("option_template", applies_to)
+            self.assertNotIn("data_kind_template", applies_to)
+
         by_key = {row["key"]: row for row in field_like_rows}
         for key in {"OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE", "CLOSE_PRICE", "VOLUME", "VWAP", "TRADE_COUNT"}:
-            self.assertIn("market_data_template", by_key[key]["applies_to"])
-            self.assertIn("option_bar_template", by_key[key]["applies_to"])
-            self.assertIn("market_liquidity_template", by_key[key]["applies_to"])
+            self.assertIn("market_regime_etf_bar", by_key[key]["applies_to"])
+            self.assertIn("strategy_selection_symbol_bar_liquidity", by_key[key]["applies_to"])
+            self.assertIn("position_execution_option_contract_timeseries", by_key[key]["applies_to"])
         self.assertEqual(by_key["TRADE_COUNT"]["payload"], "trade_count")
         for deleted_key in {
             "BAR_OPEN",
@@ -424,32 +418,24 @@ class RegistryHelperTests(unittest.TestCase):
 
     def test_classification_fields_are_separate_semantic_axes(self):
         expected_classification_keys = {
-            "ABNORMAL_ACTIVITY_TYPE",
             "ACCEPTANCE_STATUS",
-            "DATA_KIND",
+            "DATA_TASK_RUN_STATUS",
             "DOCS_STATUS",
-            "ETF_HOLDING_ASSET_CLASS",
-            "SECTOR_TYPE",
-            "EVENT_ANALYSIS_STATUS",
-            "EVENT_DEDUP_STATUS",
-            "EVENT_IMPACT_SCOPE",
-            "EVENT_TYPE",
+            "EVENT_CATEGORY_TYPE",
             "EXPOSURE_TYPE",
-            "SOURCE_THEME_TAGS",
+            "INFORMATION_ROLE_TYPE",
             "MAINTENANCE_STATUS",
-            "TRADE_SIDE_TYPE",
             "OPTION_RIGHT_TYPE",
+            "REFERENCE_TYPE",
             "REGISTRY_ITEM_ARTIFACT_SYNC_POLICY_TYPE",
             "REGISTRY_ITEM_KIND",
             "REVIEW_STATUS",
-            "SOURCE_TYPE",
-            "DATA_KIND_TEMPLATE_STATUS",
-            "DATA_TASK_RUN_STATUS",
-            "EXPOSURE_TAGS",
+            "SCOPE_TYPE",
+            "SECTOR_TYPE",
+            "SNAPSHOT_TYPE",
             "TASK_LIFECYCLE_STATUS",
             "TASK_SCOPE",
             "TEST_STATUS",
-            "SOURCE_EVENT_TYPE",
             "UNIVERSE_TYPE",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -462,10 +448,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("GDELT_IMPACT_SCOPE_HINT", rows)
         self.assertNotIn("OPTION_EVENT_DETAIL_SIDE_HINT", rows)
         self.assertNotIn("TRADING_ECONOMICS_CATEGORY", rows)
-        self.assertIn("gdelt_article_template", rows["EVENT_IMPACT_SCOPE"]["applies_to"])
-        self.assertEqual(rows["EVENT_IMPACT_SCOPE"]["payload"], "impact_scope")
-        self.assertEqual(rows["TRADE_SIDE_TYPE"]["payload"], "trade_side_type")
-        self.assertEqual(rows["SOURCE_EVENT_TYPE"]["payload"], "source_event_type")
+        self.assertNotIn("EVENT_IMPACT_SCOPE", rows)
+        self.assertNotIn("TRADE_SIDE_TYPE", rows)
+        self.assertNotIn("SOURCE_EVENT_TYPE", rows)
         self.assertEqual(rows["OPTION_RIGHT_TYPE"]["payload"], "option_right_type")
         vague_payloads = {"category", "type", "status", "right", "themes", "tags", "scope", "class", "outcome", "readiness"}
         classification_payloads = {
@@ -477,7 +462,7 @@ class RegistryHelperTests(unittest.TestCase):
                 self.assertRegex(row["payload"], r"_(type|status|scope|policy_type|tags|class)$")
         self.assertNotIn("OPTION_RIGHT", rows)
         self.assertNotIn("STATUS", rows)
-        self.assertEqual(rows["DATA_KIND_TEMPLATE_STATUS"]["payload"], "data_kind_template_status")
+        self.assertNotIn("DATA_KIND_TEMPLATE_STATUS", rows)
         self.assertEqual(rows["DATA_TASK_RUN_STATUS"]["payload"], "data_task_run_status")
         self.assertEqual(rows["ACCEPTANCE_STATUS"]["payload"], "acceptance_status")
         self.assertEqual(rows["REVIEW_STATUS"]["payload"], "review_status")
@@ -486,24 +471,21 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("REVIEW_READINESS", rows)
         self.assertNotIn("REGISTRY_ITEM_ARTIFACT_SYNC_POLICY", rows)
         self.assertEqual(rows["TITLE"]["kind"], "identity_field")
-        self.assertEqual(rows["RETURN_ZSCORE"]["kind"], "field")
+        self.assertNotIn("RETURN_ZSCORE", rows)
 
     def test_identity_fields_are_separate_from_plain_fields(self):
         expected_identity_keys = {
             "ID",
             "SYMBOL",
             "TITLE",
-            "TIMELINE_HEADLINE",
             "EVENT_ID",
-            "EVENT_REPORT_ID",
-            "EVENT_CANONICAL_EVENT_ID",
             "TASK_IDENTITY",
             "WORKFLOW_IDENTITY",
             "ETF_SYMBOL",
             "ETF_HOLDING_SYMBOL",
             "ETF_HOLDING_NAME",
             "ISSUER_NAME",
-            "OPTION_CONTRACT_SYMBOL",
+            "OPTION_SYMBOL",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -515,24 +497,17 @@ class RegistryHelperTests(unittest.TestCase):
         for vague_key in {"ISSUER", "OPTION_EVENT_DETAIL_PROVIDER", "OPTION_EVENT_DETAIL_STANDARD_SOURCE"}:
             self.assertNotIn(vague_key, rows)
         self.assertEqual(rows["ISSUER_NAME"]["payload"], "issuer_name")
-        self.assertEqual(rows["OPTION_EVENT_DETAIL_SOURCE_PROVIDER_NAME"]["payload"], "source_provider_name")
-        self.assertEqual(rows["TIMELINE_HEADLINE"]["payload"], "timeline_headline")
+        self.assertNotIn("OPTION_EVENT_DETAIL_SOURCE_PROVIDER_NAME", rows)
+        self.assertNotIn("TIMELINE_HEADLINE", rows)
 
     def test_path_fields_are_separate_from_identity_fields(self):
         expected_path_keys = {
             "REGISTRY_ITEM_PATH",
             "REPOSITORY_PATH",
-            "SOURCE_URL",
-            "EVENT_LINK_URL",
-            "EVENT_ANALYSIS_REPORT_URL",
-            "EVENT_REPORT_URL",
-            "EVENT_REPORT_JSON_URL",
-            "EVENT_SOURCE_REFERENCE",
-            "SOURCE_REFERENCES",
             "OUTPUT_REFERENCE",
             "DATA_TASK_RUN_OUTPUT_DIRECTORY",
             "DATA_TASK_RUN_OUTPUT_REFERENCES",
-            "DATA_KIND_TEMPLATE_PREVIEW_FILE_PATH",
+            "EVENT_REFERENCE",
             "EXECUTION_ALLOWED_PATHS",
             "EXECUTION_BLOCKED_PATHS",
             "COMPLETION_CHANGED_FILE_PATHS",
@@ -546,14 +521,14 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("Path value", rows[key]["note"])
         self.assertNotIn("URL", rows)
         self.assertNotIn("EVENT_SOURCE_REF", rows)
-        self.assertEqual(rows["EVENT_LINK_URL"]["payload"], "event_link_url")
-        self.assertEqual(rows["EVENT_ANALYSIS_REPORT_URL"]["payload"], "event_analysis_report_url")
-        self.assertEqual(rows["EVENT_REPORT_URL"]["payload"], "event_report_url")
-        self.assertEqual(rows["EVENT_REPORT_JSON_URL"]["payload"], "event_report_json_url")
-        self.assertEqual(rows["EVENT_SOURCE_REFERENCE"]["payload"], "source_reference")
-        self.assertEqual(rows["SOURCE_REFERENCES"]["payload"], "source_references")
-        self.assertEqual(rows["TRADING_ECONOMICS_REFERENCE_PERIOD"]["kind"], "field")
-        self.assertEqual(rows["TRADING_ECONOMICS_REFERENCE_PERIOD"]["payload"], "reference_period")
+        self.assertNotIn("EVENT_LINK_URL", rows)
+        self.assertNotIn("EVENT_ANALYSIS_REPORT_URL", rows)
+        self.assertNotIn("EVENT_REPORT_URL", rows)
+        self.assertNotIn("EVENT_REPORT_JSON_URL", rows)
+        self.assertNotIn("EVENT_SOURCE_REFERENCE", rows)
+        self.assertNotIn("SOURCE_REFERENCES", rows)
+        self.assertEqual(rows["EVENT_REFERENCE"]["payload"], "reference")
+        self.assertNotIn("TRADING_ECONOMICS_REFERENCE_PERIOD", rows)
 
     def test_text_fields_are_separate_from_plain_fields(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -562,8 +537,6 @@ class RegistryHelperTests(unittest.TestCase):
         for key in {
             "ACCEPTANCE_SUMMARY",
             "CHANGE_SUMMARY",
-            "DATA_KIND_TEMPLATE_KNOWN_CAVEATS",
-            "EVENT_COVERAGE_REASON",
             "MAINTENANCE_SUMMARY",
             "REGISTRY_ITEM_NOTE",
             "SUMMARY",
@@ -578,7 +551,7 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        for key in {"DATA_TASK_PARAMS", "DATA_KIND_TEMPLATE_REQUEST_PARAMETERS"}:
+        for key in {"DATA_TASK_PARAMS"}:
             self.assertEqual(rows[key]["kind"], "parameter_field")
             self.assertIn("Parameter value", rows[key]["note"])
 

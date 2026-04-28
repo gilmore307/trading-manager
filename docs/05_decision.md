@@ -1429,3 +1429,15 @@ Current accepted model-input SQL outputs now have registry field coverage. Share
 - `reference`
 
 The registry should describe business output fields, not old manifest/config mechanics. Task/run lineage fields such as `run_id` and `task_id` remain receipt/run metadata rather than new business-output fields.
+
+## D069 - Prune obsolete preview/template-only field semantics
+
+Accepted: 2026-04-28
+
+The registry no longer keeps field-like rows that only described retired `trading-data/storage/templates/data_kinds/*.preview.csv` files. Accepted model-input outputs now use dedicated SQL contracts, so field rows survive only when they apply to a current SQL business table or a still-valid shared, registry, task, receipt, execution, acceptance, or maintenance artifact.
+
+Consequences:
+
+- Field-like kinds (`field`, `identity_field`, `path_field`, `temporal_field`, `classification_field`, `text_field`, and `parameter_field`) must not carry obsolete `*_template`, `option_template`, or `data_kind_template` `applies_to` values.
+- Retained final-SQL fields have `applies_to` values such as `market_regime_etf_bar`, `security_selection_us_equity_etf_holding`, `strategy_selection_symbol_bar_liquidity`, `option_expression_contract_snapshot`, `position_execution_option_contract_timeseries`, or `event_overlay_event`.
+- Preview/template file paths are not evidence for retaining field rows. If a field is not part of a current SQL contract or valid non-template artifact, it should be removed instead of preserved as vocabulary clutter.
