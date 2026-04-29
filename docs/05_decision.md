@@ -1764,3 +1764,39 @@ Use `helper_<domain>` for helper-oriented `applies_to` scopes, such as `helper_w
 
 - Do not add new helper script keys ending in `_HELPER`.
 - Helper script rows sort together by key.
+
+## D083 - Prune retired calendar discovery and inactive macro references
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+`calendar_discovery` was an older execution/web-discovery route. Current event/calendar acquisition should be represented by accepted source interfaces, especially `07_source_trading_economics_calendar_web`, not by retired discovery rows.
+
+Inactive official macro references such as BEA, BLS, Census, FRED, and U.S. Treasury Fiscal Data also remained as `term`/secret-alias rows after provider narrowing. Keeping them active made the registry look like it still endorsed those sources.
+
+### Decision
+
+Remove retired `calendar_discovery` rows and inactive macro-provider references from active registry vocabulary.
+
+Deleted active rows include:
+
+- `CALENDAR_DISCOVERY`
+- `ECONOMIC_RELEASE_CALENDAR`
+- `EQUITY_EARNINGS_CALENDAR`
+- `FOMC_MEETING`
+- `FOMC_MINUTES`
+- `FOMC_SEP`
+- `FOMC_STATEMENT`
+- `MACRO_RELEASE_CALENDAR`
+- `ECONOMIC_RELEASE_EVENT`
+- `FOMC_CALENDAR`
+- `NASDAQ_EARNINGS_CALENDAR`
+- `BEA`, `BLS`, `CENSUS`, `FRED`, `US_TREASURY_FISCAL_DATA`
+- `BEA_SECRET_ALIAS`, `BLS_SECRET_ALIAS`, `CENSUS_SECRET_ALIAS`, `FRED_SECRET_ALIAS`
+
+### Consequences
+
+- Re-add any removed macro/calendar provider only through a current accepted source-interface design.
+- `source_capability` rows should describe capabilities of active/current source interfaces or accepted raw-provider surfaces, not retired discovery routes.

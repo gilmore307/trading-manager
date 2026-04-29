@@ -73,7 +73,8 @@ class RegistryHelperTests(unittest.TestCase):
         }
         actual_providers = {key for key, row in rows.items() if row["kind"] == "provider"}
         self.assertEqual(actual_providers, expected_current_providers)
-        self.assertEqual(rows["FRED"]["kind"], "term")
+        for obsolete_provider_term in {"BEA", "BLS", "CENSUS", "FRED", "US_TREASURY_FISCAL_DATA"}:
+            self.assertNotIn(obsolete_provider_term, rows)
         self.assertEqual(rows["GITHUB"]["kind"], "term")
         expected_bundles = {
             "01_BUNDLE_MARKET_REGIME": "01_bundle_market_regime",
@@ -95,7 +96,6 @@ class RegistryHelperTests(unittest.TestCase):
             "THETADATA_OPTION_SELECTION_SNAPSHOT": "09_source_thetadata_option_selection_snapshot",
             "THETADATA_OPTION_PRIMARY_TRACKING": "10_source_thetadata_option_primary_tracking",
             "THETADATA_OPTION_EVENT_TIMELINE": "11_source_thetadata_option_event_timeline",
-            "CALENDAR_DISCOVERY": "calendar_discovery",
         }
         for key, payload in expected_bundles.items():
             self.assertEqual(rows[key]["kind"], "data_bundle")
@@ -106,8 +106,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key, payload in expected_sources.items():
             self.assertEqual(rows[key]["kind"], "data_source")
             self.assertEqual(rows[key]["payload"], payload)
-            if key != "CALENDAR_DISCOVERY":
-                self.assertIn(f"data_sources/{payload}", rows[key]["path"])
+            self.assertIn(f"data_sources/{payload}", rows[key]["path"])
         for row in rows.values():
             self.assertNotIn("trading-data/src/trading_data/", row["path"])
         self.assertNotIn("MACRO_DATA", rows)
@@ -190,13 +189,8 @@ class RegistryHelperTests(unittest.TestCase):
         }:
             self.assertNotIn(deleted_preview_key, by_key)
         reclassified_data_kind_keys = {
-            "ECONOMIC_RELEASE_EVENT",
-            "EQUITY_EARNINGS_CALENDAR",
             "ETF_CONSTITUENT_WEIGHT",
             "ETF_FUND_METADATA",
-            "FOMC_MINUTES",
-            "FOMC_SEP",
-            "FOMC_STATEMENT",
             "SEC_FILING_DOCUMENT",
             "CRYPTO_TRADE",
             "CRYPTO_QUOTE",
@@ -213,7 +207,6 @@ class RegistryHelperTests(unittest.TestCase):
             "OPTION_QUOTE",
             "OPTION_NBBO",
             "SEC_COMPANY_FACT",
-            "FOMC_MEETING", 
         }
         for key in reclassified_data_kind_keys:
             self.assertIn(key, by_key)
@@ -256,11 +249,6 @@ class RegistryHelperTests(unittest.TestCase):
             "OPTION_NBBO",
             "SEC_COMPANY_FACT",
             "SEC_FILING_DOCUMENT",
-            "FOMC_MEETING",
-            "FOMC_MINUTES",
-            "FOMC_SEP",
-            "FOMC_STATEMENT",
-            "EQUITY_EARNINGS_CALENDAR",
             "TRADING_ECONOMICS_CALENDAR_PAGE",
         }
         for key in expected_source_capabilities:
@@ -271,8 +259,25 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("05_source_gdelt_news", by_key["GDELT_GKG_RECORD"]["applies_to"])
         self.assertIn("06_source_etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
         self.assertIn("07_source_trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
+        for obsolete_calendar_or_macro_key in {
+            "CALENDAR_DISCOVERY",
+            "ECONOMIC_RELEASE_CALENDAR",
+            "EQUITY_EARNINGS_CALENDAR",
+            "FOMC_MEETING",
+            "FOMC_MINUTES",
+            "FOMC_SEP",
+            "FOMC_STATEMENT",
+            "MACRO_RELEASE_CALENDAR",
+            "ECONOMIC_RELEASE_EVENT",
+            "FOMC_CALENDAR",
+            "NASDAQ_EARNINGS_CALENDAR",
+            "BEA_SECRET_ALIAS",
+            "BLS_SECRET_ALIAS",
+            "CENSUS_SECRET_ALIAS",
+            "FRED_SECRET_ALIAS",
+        }:
+            self.assertNotIn(obsolete_calendar_or_macro_key, by_key)
         self.assertNotIn("MACRO_RELEASE", by_key)
-        self.assertIn("duplicate official", by_key["FRED"]["note"])
 
     def test_market_etf_universe_shared_csv_columns_are_registered(self):
         shared_path = Path("storage/shared/market_etf_universe.csv")
