@@ -144,9 +144,6 @@ class RegistryHelperTests(unittest.TestCase):
             "SCOPE_TYPE": ("classification_field", "scope_type", "bundle_07_event_overlay"),
             "REFERENCE_TYPE": ("classification_field", "reference_type", "bundle_07_event_overlay"),
             "EVENT_REFERENCE": ("path_field", "reference", "bundle_07_event_overlay"),
-            "QUOTE_TIMESTAMP": ("temporal_field", "quote_timestamp", "bundle_05_option_expression"),
-            "IV_TIMESTAMP": ("temporal_field", "iv_timestamp", "bundle_05_option_expression"),
-            "GREEKS_TIMESTAMP": ("temporal_field", "greeks_timestamp", "bundle_05_option_expression"),
             "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "bundle_05_option_expression"),
             "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "bundle_05_option_expression"),
             "QUOTE_BID_CONDITION": ("field", "bid_condition", "bundle_05_option_expression"),
@@ -165,6 +162,9 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("bundle_07_event_overlay", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
         self.assertNotIn("OPTION_CONTRACTS", rows)
+        self.assertNotIn("QUOTE_TIMESTAMP", rows)
+        self.assertNotIn("IV_TIMESTAMP", rows)
+        self.assertNotIn("GREEKS_TIMESTAMP", rows)
 
     def test_initial_data_kinds_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
