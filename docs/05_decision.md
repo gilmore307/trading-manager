@@ -1439,7 +1439,7 @@ The registry no longer keeps field-like rows that only described retired `tradin
 Consequences:
 
 - Field-like kinds (`field`, `identity_field`, `path_field`, `temporal_field`, `classification_field`, `text_field`, and `parameter_field`) must not carry obsolete `*_template`, `option_template`, or `data_kind_template` `applies_to` values.
-- Retained final-SQL fields have `applies_to` values such as `market_regime_etf_bar`, `security_selection_us_equity_etf_holding`, `strategy_selection_symbol_bar_liquidity`, `option_expression_contract_snapshot`, `position_execution_option_contract_timeseries`, or `event_overlay_event`.
+- Retained final-SQL fields have `applies_to` values such as `trading_data_01_bundle_market_regime`, `trading_data_02_bundle_security_selection`, `trading_data_03_bundle_strategy_selection`, `trading_data_05_bundle_option_expression`, `trading_data_06_bundle_position_execution`, or `trading_data_07_bundle_event_overlay`.
 - Preview/template file paths are not evidence for retaining field rows. If a field is not part of a current SQL contract or valid non-template artifact, it should be removed instead of preserved as vocabulary clutter.
 
 ## D070 - Retired data-kind previews are not active registry items
@@ -1475,3 +1475,30 @@ Prune obsolete numbered bundle-local config rows that pointed to removed `config
 - `data_bundle` rows describe manager-facing data acquisition/preparation bundles, not complete model-input universes.
 - SQL output tables may still live under the `model_inputs` schema because those tables are consumed by model layers.
 - Do not introduce new active package paths named `*_model_inputs` under `src/trading_data/data_bundles/`.
+
+## D072 - Bundle SQL tables use trading-data bundle names
+
+Date: 2026-04-28
+Status: Accepted
+
+### Context
+
+The accepted numbered data bundles wrote SQL tables with model-layer business names such as `market_regime_etf_bar` and `event_overlay_event`. Chentong clarified that these names will collide semantically once downstream training-data tables exist: these tables are the source-backed outputs of `trading-data` bundles, not the complete model/training data universe.
+
+### Decision
+
+Name accepted numbered bundle SQL tables after the writing bundle, using portable SQL snake_case:
+
+- `model_inputs.trading_data_01_bundle_market_regime`
+- `model_inputs.trading_data_02_bundle_security_selection`
+- `model_inputs.trading_data_03_bundle_strategy_selection`
+- `model_inputs.trading_data_05_bundle_option_expression`
+- `model_inputs.trading_data_06_bundle_position_execution`
+- `model_inputs.trading_data_07_bundle_event_overlay`
+
+CLI/package names may use hyphens where appropriate, but SQL identifiers use underscores.
+
+### Consequences
+
+- Do not name `trading-data` bundle output tables as if they are complete model-input or training-data tables.
+- Downstream training/model repositories can later create their own derived/training tables without colliding with source-backed bundle outputs.
