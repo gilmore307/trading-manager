@@ -365,6 +365,44 @@ class RegistryHelperTests(unittest.TestCase):
             if key not in {"SYMBOL", "ISSUER_NAME"}:
                 self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_etf_universe.csv")
 
+    def test_market_regime_relative_strength_combinations_shared_csv_is_registered(self):
+        shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
+        with shared_path.open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+        self.assertEqual(len(rows), 70)
+        self.assertEqual(
+            list(rows[0].keys()),
+            [
+                "combination_id",
+                "combination_group",
+                "numerator_symbol",
+                "denominator_symbol",
+                "numerator_bar_grain",
+                "denominator_bar_grain",
+                "feature_cadence",
+                "feature_family",
+                "interpretation",
+                "v1_status",
+                "notes",
+            ],
+        )
+        by_id = {row["combination_id"]: row for row in rows}
+        self.assertEqual(by_id["rsp_spy"]["feature_cadence"], "30m")
+        self.assertEqual(by_id["tlt_shy"]["combination_group"], "primary_30m")
+        self.assertEqual(by_id["ief_shy"]["feature_family"], "relative_strength")
+        self.assertEqual(by_id["smh_xlk"]["feature_cadence"], "1d_context")
+
+        with Path("scripts/current.csv").open(newline="") as csv_file:
+            registry = {row["key"]: row for row in csv.DictReader(csv_file)}
+        self.assertEqual(
+            registry["MARKET_REGIME_RELATIVE_STRENGTH_COMBINATIONS_SHARED_CSV"]["payload"],
+            "trading-storage/main/shared/market_regime_relative_strength_combinations.csv",
+        )
+        self.assertEqual(
+            registry["MARKET_REGIME_RELATIVE_STRENGTH_COMBINATIONS_SHARED_CSV"]["path"],
+            "/root/projects/trading-storage/main/shared/market_regime_relative_strength_combinations.csv",
+        )
+
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
         for migration in sorted(Path("scripts/sql/schema_migrations").glob("*.sql")):
