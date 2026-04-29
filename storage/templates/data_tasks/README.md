@@ -29,7 +29,7 @@ A task key is stable across many invocations, including periodic or scheduled ta
 
 ## Boundary
 
-These are templates, not accepted concrete schemas. Stable schema fields, status values, request types, artifact types, and storage contracts still require scripts/registry/docs review before implementation treats them as durable contracts.
+These are templates, not accepted concrete schemas. Stable schema fields, status values, request types, artifact types, and storage contracts still require scripts/docs review before implementation treats them as durable contracts.
 
 No template may contain provider secret values, raw credentials, generated data, or account-specific private configuration.
 

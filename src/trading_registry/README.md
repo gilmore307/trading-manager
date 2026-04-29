@@ -22,4 +22,4 @@ Secret configs should point to one source-level JSON file per provider/source. T
 
 ## CSV-backed registry query
 
-`create_csv_registry_query("scripts/registry/current.csv")` provides the small query surface used by `RegistryReader` and `SecretResolver` when helper scripts need id-based registry lookups before a database connection exists.
+`create_csv_registry_query("scripts/current.csv")` provides the small query surface used by `RegistryReader` and `SecretResolver` when helper scripts need id-based registry lookups before a database connection exists.

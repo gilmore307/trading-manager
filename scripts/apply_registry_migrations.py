@@ -5,8 +5,8 @@ The database URL is read from OPENCLAW_DATABASE_URL when set, otherwise
 from the local secret alias file /root/secrets/openclaw/database-url.
 
 After a non-dry-run migration pass, the script exports the current
-trading_registry table to scripts/registry/current.csv so GitHub has a
-readable snapshot of the active registry.
+trading_registry table to scripts/current.csv so GitHub has a readable
+snapshot of the active registry.
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-REGISTRY_ROOT = Path(__file__).resolve().parent
-MIGRATIONS_DIR = REGISTRY_ROOT / "sql" / "schema_migrations"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_ROOT = Path(__file__).resolve().parent
+MIGRATIONS_DIR = SCRIPTS_ROOT / "sql" / "schema_migrations"
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
-DEFAULT_CSV_PATH = REGISTRY_ROOT / "current.csv"
+DEFAULT_CSV_PATH = SCRIPTS_ROOT / "current.csv"
 
 REGISTRY_EXPORT_SQL = """
 COPY (
@@ -165,13 +165,13 @@ def export_registry_csv(db_url: str, csv_path: Path = DEFAULT_CSV_PATH) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="show pending migrations without applying")
-    parser.add_argument("--export-only", action="store_true", help="export scripts/registry/current.csv without applying migrations")
+    parser.add_argument("--export-only", action="store_true", help="export scripts/current.csv without applying migrations")
     parser.add_argument("--no-export", action="store_true", help="skip CSV export after applying migrations")
     parser.add_argument(
         "--csv-path",
         type=Path,
         default=DEFAULT_CSV_PATH,
-        help="CSV snapshot path, default: scripts/registry/current.csv",
+        help="CSV snapshot path, default: scripts/current.csv",
     )
     args = parser.parse_args()
 

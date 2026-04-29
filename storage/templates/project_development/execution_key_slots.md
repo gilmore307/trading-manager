@@ -29,5 +29,5 @@ If the project also records `task_lifecycle_state` or `test_status`, reuse the d
 
 ## Notes
 
-- Register or reuse these field names in `trading-main/scripts/registry/`.
+- Register or reuse these field names in `trading-main/scripts/`.
 - Include naming guidance in the task package or constraints when the task may require new names.

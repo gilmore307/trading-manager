@@ -19,7 +19,7 @@
   - id-based `RegistryReader` lookup, required lookup, path, payload, key, and kind-filter behavior;
   - registry row mapping into `RegistryItem` objects;
   - source-level secret JSON alias parsing and id-based secret field resolution behavior;
-  - SQL `kind` constraint alignment with `scripts/registry/kinds/*.md` and active `scripts/registry/current.csv` rows;
+  - SQL `kind` constraint alignment with `scripts/kinds/*.md` and active `scripts/current.csv` rows;
   - SQL `payload_format` constraint alignment with registered `kind=payload_format` rows;
   - SQL `artifact_sync_policy` constraint alignment with registered `kind=status_value` / `applies_to=artifact_sync_policy_type` rows;
   - test-script governance: first-party test scripts are documented here and are not registered as registry `script` rows.

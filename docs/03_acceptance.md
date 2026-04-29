@@ -30,7 +30,7 @@ A change to `trading-main` can be accepted only if:
 - `.venv/`, if present, is ignored by Git and treated as local runtime infrastructure;
 - no component runtime trading source code is introduced;
 - no market data, generated artifacts, logs, notebooks, credentials, or secrets are introduced;
-- trading-wide statuses and registrable fields are maintained under `scripts/registry/` rather than duplicated elsewhere;
+- trading-wide statuses and registrable fields are maintained under `scripts/` rather than duplicated elsewhere;
 - component-specific scope, implementation details, and task state are routed to the owning component repository.
 
 ### For documentation-only changes
@@ -55,7 +55,7 @@ Contract changes are acceptable when they:
 - identify producing and consuming repositories;
 - describe lifecycle expectations;
 - describe compatibility expectations;
-- reference `trading-main/scripts/registry/` for registered fields, identifiers, and status vocabularies;
+- reference `trading-main/scripts/` for registered fields, identifiers, and status vocabularies;
 - include enough examples for implementation without making examples the only definition;
 - document migration or compatibility impact when changing an existing contract;
 - update affected workflow and decision docs when contract shape changes.
@@ -65,8 +65,8 @@ Contract changes are acceptable when they:
 Registry and template changes are acceptable when they:
 
 - keep trading-wide registered names in the SQL-backed `trading_registry`;
-- keep kind boundary/range rules in `scripts/registry/kinds/<kind>.md`;
-- regenerate `scripts/registry/current.csv` after SQL registry changes;
+- keep kind boundary/range rules in `scripts/kinds/<kind>.md`;
+- regenerate `scripts/current.csv` after SQL registry changes;
 - prefer id-based registry dereferencing for automation;
 - ensure every field entry has non-empty `applies_to`;
 - choose the narrowest registered `payload_format` for registry payloads;
@@ -121,7 +121,7 @@ Manual review must confirm:
 - registry kind Markdown files do not list concrete active rows;
 - entity-like registry entries use the nullable `path` column instead of a separate `path` kind;
 - every field entry has non-empty `applies_to`;
-- `scripts/registry/current.csv` is present and generated from SQL when registry entries changed;
+- `scripts/current.csv` is present and generated from SQL when registry entries changed;
 - `.venv/` is not tracked;
 - no source-code directories were introduced;
 - no data/artifact/log/notebook directories were introduced unless explicitly documented as ignored local infrastructure;
@@ -154,7 +154,7 @@ A change must be rejected or returned for revision if it:
 - adds market data, generated artifacts, logs, notebooks, or research outputs to `trading-main`;
 - adds secrets or credentials;
 - tracks `.venv/` contents in Git;
-- duplicates registry status vocabularies or registrable fields as a competing source of truth outside `scripts/registry/`;
+- duplicates registry status vocabularies or registrable fields as a competing source of truth outside `scripts/`;
 - moves component-local implementation details into global docs;
 - changes repository responsibilities without a decision record;
 - changes cross-repository contracts without updating affected docs;
