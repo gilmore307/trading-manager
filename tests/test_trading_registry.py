@@ -63,6 +63,18 @@ class RegistryHelperTests(unittest.TestCase):
             rows["SEC_EDGAR"]["path"],
             "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
         )
+        expected_current_providers = {
+            "ALPACA",
+            "GDELT",
+            "OKX",
+            "SEC_EDGAR",
+            "THETADATA",
+            "TRADING_ECONOMICS",
+        }
+        actual_providers = {key for key, row in rows.items() if row["kind"] == "provider"}
+        self.assertEqual(actual_providers, expected_current_providers)
+        self.assertEqual(rows["FRED"]["kind"], "term")
+        self.assertEqual(rows["GITHUB"]["kind"], "term")
         expected_bundles = {
             "01_BUNDLE_MARKET_REGIME": "01_bundle_market_regime",
             "02_BUNDLE_SECURITY_SELECTION": "02_bundle_security_selection",
@@ -255,7 +267,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
         self.assertIn("trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
         self.assertNotIn("MACRO_RELEASE", by_key)
-        self.assertIn("do not duplicate official", by_key["FRED"]["note"])
+        self.assertIn("duplicate official", by_key["FRED"]["note"])
 
     def test_market_etf_universe_shared_csv_columns_are_registered(self):
         shared_path = Path("storage/shared/market_etf_universe.csv")

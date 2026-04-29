@@ -97,7 +97,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`manifest_type`](./kinds/manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
 - [`path_field`](./kinds/path_field.md) — Canonical field names whose values locate or reference artifacts, files, URLs, repository paths, source references, or output references.
 - [`payload_format`](./kinds/payload_format.md) — Registered values allowed in the `trading_registry.payload_format` column.
-- [`provider`](./kinds/provider.md) — External data/provider organizations, platforms, or authoritative source surfaces that own source capabilities.
+- [`provider`](./kinds/provider.md) — Current external data/provider organizations, platforms, or authoritative source surfaces that own capabilities used by active source interfaces.
 - [`ready_signal_type`](./kinds/ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
 - [`repo`](./kinds/repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
 - [`request_type`](./kinds/request_type.md) — Registered request type values used to classify cross-repository work requests.

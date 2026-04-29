@@ -2,13 +2,13 @@
 
 ## Kind Boundary
 
-External data/provider organizations, platforms, or authoritative source surfaces that own or publish source capabilities consumed by trading repositories.
+Current external data/provider organizations, platforms, or authoritative source surfaces that own or publish source capabilities consumed by active source interfaces.
 
-A provider names the source owner or provider surface itself, not an implemented adapter and not a specific endpoint/record family.
+A provider names the current source owner or provider surface itself, not an implemented adapter and not a specific endpoint/record family. Historical, fallback, secret-only, or documentation-only source references remain `term` rows until an active source interface uses them.
 
 ## Range
 
-Register providers when the source identity is useful for source selection, entitlement review, documentation, secret alias routing, or capability ownership.
+Register providers when the source identity is current and useful for source selection, entitlement review, documentation, secret alias routing, or capability ownership.
 
 Use `payload` for a stable snake_case provider key. Use `path` for public provider documentation or the authoritative source home page. Use `applies_to` for repositories, adapters, or capability scopes that consume the provider.
 

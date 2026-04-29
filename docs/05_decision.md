@@ -1574,3 +1574,35 @@ Use `term` only for ordinary glossary/reference concepts. Use `source_capability
 - Provider documentation URLs now belong on `provider.path` rather than provider `term` rows.
 - Provider capability coverage can be reviewed without promoting capabilities to final `data_kind` status.
 - The registry kind split is now: `provider` owns who publishes it; `source_capability` owns what the provider exposes; `data_source` owns our adapter; `data_bundle` owns manager-facing runs.
+
+## D076 - Provider rows are limited to current source-interface providers
+
+Date: 2026-04-28
+Status: Accepted
+
+### Context
+
+Splitting `provider` out of `term` made the provider/source-owner boundary clearer, but the first split promoted historical, fallback, secret-only, and non-data-source platform references into `provider`. That overstated current provider status and blurred active source-interface planning.
+
+### Decision
+
+Limit `provider` rows to current source-interface providers. Current providers are source owners actively used by implemented source interfaces or accepted active source workflows.
+
+Keep historical, fallback, documentation-only, or secret-alias-only references as `term` or `config` rows until a current source interface routes through them again.
+
+Current provider rows are:
+
+- `ALPACA`
+- `GDELT`
+- `OKX`
+- `SEC_EDGAR`
+- `THETADATA`
+- `TRADING_ECONOMICS`
+
+Reclassify `BEA`, `BLS`, `CENSUS`, `FRED`, `GITHUB`, and `US_TREASURY_FISCAL_DATA` back to `term` because they are not current trading-data source-interface providers.
+
+### Consequences
+
+- `provider` now means active current provider/source owner, not merely known possible source or stored secret alias.
+- Historical macro provider references can still exist as `term` rows for documentation and future revival.
+- Source-secret config rows may remain even when the provider is not current.

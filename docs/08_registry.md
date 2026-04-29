@@ -109,7 +109,7 @@ The SQL `trading_registry.kind` constraint and `registry/kinds/*.md` files must 
 The most important data-related split is:
 
 - `data_kind` — accepted final saved/template-backed data shapes only.
-- `provider` — external provider/source-owner identities such as data vendors, exchanges, official agencies, or authoritative source surfaces.
+- `provider` — current external provider/source-owner identities such as data vendors, exchanges, official agencies, or authoritative source surfaces used by active source interfaces.
 - `data_source` — implemented source adapters or source interfaces.
 - `source_capability` — source-level record families, raw inputs, endpoint families, transient evidence, or entitlement-gated provider capabilities that are not final saved shapes.
 - `data_bundle` — manager-facing runnable bundle boundaries.
