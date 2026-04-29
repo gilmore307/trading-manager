@@ -335,8 +335,15 @@ class RegistryHelperTests(unittest.TestCase):
             "docs_status",
             "artifact_sync_policy",
         }
-        expected_domains = old_status_kinds - {"artifact_sync_policy"}
-        expected_domains.add("artifact_sync_policy_type")
+        retired_unaccepted_slot_status_domains = {
+            "acceptance_status",
+            "task_lifecycle_status",
+            "review_status",
+            "test_status",
+            "maintenance_status",
+            "docs_status",
+        }
+        expected_domains = {"artifact_sync_policy_type"}
 
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
@@ -351,17 +358,17 @@ class RegistryHelperTests(unittest.TestCase):
             if domain
         }
         self.assertEqual(domains, expected_domains)
+        self.assertFalse(domains & retired_unaccepted_slot_status_domains)
         payloads = [row["payload"] for row in status_rows]
         self.assertEqual(len(payloads), len(set(payloads)))
         self.assertEqual(
-            next(row for row in status_rows if row["payload"] == "blocked")["key"],
-            "STATUS_BLOCKED",
+            next(row for row in status_rows if row["payload"] == "registry_only")["key"],
+            "ARTIFACT_SYNC_POLICY_TYPE_REGISTRY_ONLY",
         )
 
     def test_temporal_fields_are_separate_and_iso_scoped(self):
         expected_temporal_keys = {
             "AS_OF_DATE",
-            "CHECK_TIME",
             "DATA_TASK_RUN_COMPLETED_AT",
             "DATA_TASK_RUN_STARTED_AT",
             "DATA_TIMESTAMP",
@@ -404,12 +411,20 @@ class RegistryHelperTests(unittest.TestCase):
         payloads = [row["payload"] for row in field_like_rows]
         self.assertEqual(len(payloads), len(set(payloads)))
 
+        retired_unaccepted_slot_scopes = {
+            "acceptance_receipt_slots",
+            "completion_receipt_slots",
+            "execution_key_slots",
+            "maintenance_output_slots",
+            "task_register_slots",
+        }
         for row in field_like_rows:
             self.assertNotIn("trading-data/storage/templates/data_kinds", row["path"])
             applies_to = set(filter(None, row["applies_to"].split(";")))
             self.assertFalse({part for part in applies_to if part.endswith("_template")})
             self.assertNotIn("option_template", applies_to)
             self.assertNotIn("data_kind_template", applies_to)
+            self.assertFalse(applies_to & retired_unaccepted_slot_scopes)
 
         by_key = {row["key"]: row for row in field_like_rows}
         for key in {"OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE", "CLOSE_PRICE", "VOLUME", "VWAP", "TRADE_COUNT"}:
@@ -436,24 +451,17 @@ class RegistryHelperTests(unittest.TestCase):
 
     def test_classification_fields_are_separate_semantic_axes(self):
         expected_classification_keys = {
-            "ACCEPTANCE_STATUS",
             "DATA_TASK_RUN_STATUS",
-            "DOCS_STATUS",
             "EVENT_CATEGORY_TYPE",
             "EXPOSURE_TYPE",
             "INFORMATION_ROLE_TYPE",
-            "MAINTENANCE_STATUS",
             "OPTION_RIGHT_TYPE",
             "REFERENCE_TYPE",
             "REGISTRY_ITEM_ARTIFACT_SYNC_POLICY_TYPE",
             "REGISTRY_ITEM_KIND",
-            "REVIEW_STATUS",
             "SCOPE_TYPE",
             "SECTOR_TYPE",
             "SNAPSHOT_TYPE",
-            "TASK_LIFECYCLE_STATUS",
-            "TASK_SCOPE",
-            "TEST_STATUS",
             "UNIVERSE_TYPE",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -482,8 +490,6 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("STATUS", rows)
         self.assertNotIn("DATA_KIND_TEMPLATE_STATUS", rows)
         self.assertEqual(rows["DATA_TASK_RUN_STATUS"]["payload"], "data_task_run_status")
-        self.assertEqual(rows["ACCEPTANCE_STATUS"]["payload"], "acceptance_status")
-        self.assertEqual(rows["REVIEW_STATUS"]["payload"], "review_status")
         self.assertEqual(rows["REGISTRY_ITEM_ARTIFACT_SYNC_POLICY_TYPE"]["payload"], "artifact_sync_policy_type")
         self.assertNotIn("ACCEPTANCE_OUTCOME", rows)
         self.assertNotIn("REVIEW_READINESS", rows)
@@ -497,8 +503,6 @@ class RegistryHelperTests(unittest.TestCase):
             "SYMBOL",
             "TITLE",
             "EVENT_ID",
-            "TASK_IDENTITY",
-            "WORKFLOW_IDENTITY",
             "ETF_SYMBOL",
             "ETF_HOLDING_SYMBOL",
             "ETF_HOLDING_NAME",
@@ -521,15 +525,9 @@ class RegistryHelperTests(unittest.TestCase):
     def test_path_fields_are_separate_from_identity_fields(self):
         expected_path_keys = {
             "REGISTRY_ITEM_PATH",
-            "REPOSITORY_PATH",
-            "OUTPUT_REFERENCE",
             "DATA_TASK_RUN_OUTPUT_DIRECTORY",
             "DATA_TASK_RUN_OUTPUT_REFERENCES",
             "EVENT_REFERENCE",
-            "EXECUTION_ALLOWED_PATHS",
-            "EXECUTION_BLOCKED_PATHS",
-            "COMPLETION_CHANGED_FILE_PATHS",
-            "ACCEPTANCE_REVIEWED_FILE_PATHS",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -553,12 +551,8 @@ class RegistryHelperTests(unittest.TestCase):
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         for key in {
-            "ACCEPTANCE_SUMMARY",
-            "CHANGE_SUMMARY",
-            "MAINTENANCE_SUMMARY",
             "REGISTRY_ITEM_NOTE",
             "SUMMARY",
-            "TASK_STATUS_SUMMARY",
         }:
             self.assertEqual(rows[key]["kind"], "text_field")
             self.assertIn("Text value", rows[key]["note"])

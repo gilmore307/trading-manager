@@ -1624,3 +1624,32 @@ Registry paths for active `trading-data` data bundles, data sources, and helpers
 
 - Do not register new active paths under `trading-data/src/trading_data/`.
 - Current implementation paths should point directly to `src/data_bundles`, `src/data_sources`, `src/source_interfaces`, `src/source_availability`, or `src/storage`.
+
+## D078 - Park unaccepted project-development slot drafts outside the skill
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+The OpenClaw project-development skill contained both true skill scaffolding templates and broader slot-draft files such as acceptance receipt slots, completion receipt slots, execution key slots, maintenance output slots, and task register slots. Those slot scopes had also leaked into registry `applies_to` values even though they did not have accepted current contract files.
+
+### Decision
+
+Keep only the docs scaffolding, root README template, and Codex task prompt template in `skills/openclaw/project_development/templates/`.
+
+Move the unaccepted slot drafts into `trading-main/storage/templates/project_development/` as parked drafts:
+
+- `acceptance_receipt_slots.md`
+- `completion_receipt_slots.md`
+- `execution_key_slots.md`
+- `maintenance_output_slots.md`
+- `task_register_slots.md`
+
+Remove their registry field/status rows for now. Re-register only after each contract is redesigned and accepted one by one.
+
+### Consequences
+
+- The parked slot drafts are not active registry contracts.
+- Do not use `maintenance_output_slots`, `acceptance_receipt_slots`, `completion_receipt_slots`, `execution_key_slots`, or `task_register_slots` as active registry scopes until accepted again.
+- Current accepted data-task contracts remain under `data_task_key`, `data_task_completion_receipt`, and `data_task_completion_receipt_run`.

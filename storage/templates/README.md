@@ -10,3 +10,4 @@ See `../../docs/09_templates.md` for the docs-level template operating guide.
 
 - `contracts/` — reusable contract drafting templates.
 - `data_tasks/` — reusable draft templates for manager-driven historical `trading-data` acquisition tasks.
+- `project_development/` — parked project-development slot drafts moved out of the OpenClaw skill. These are not active registry contracts until reviewed one by one and re-registered.

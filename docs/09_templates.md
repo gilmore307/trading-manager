@@ -40,6 +40,7 @@ storage/templates/
   README.md                 Template boundary summary.
   contracts/                Contract drafting templates.
   data_tasks/               Historical data task drafting templates.
+  project_development/      Parked project-development slot drafts; not active contracts.
 ```
 
 Current contract drafting templates:
@@ -48,6 +49,16 @@ Current contract drafting templates:
 - `storage/templates/contracts/manifest.md`
 - `storage/templates/contracts/ready_signal.md`
 - `storage/templates/contracts/request.md`
+
+Current parked project-development drafts:
+
+- `storage/templates/project_development/acceptance_receipt_slots.md`
+- `storage/templates/project_development/completion_receipt_slots.md`
+- `storage/templates/project_development/execution_key_slots.md`
+- `storage/templates/project_development/maintenance_output_slots.md`
+- `storage/templates/project_development/task_register_slots.md`
+
+These project-development slot drafts are not active registry contracts. They were moved out of the OpenClaw skill so they can be reviewed one by one before any future registration.
 
 Current data task drafting templates:
 
