@@ -1473,7 +1473,7 @@ Prune obsolete numbered bundle-local config rows that pointed to removed `config
 ### Consequences
 
 - `data_bundle` rows describe manager-facing data acquisition/preparation bundles, not complete model-input universes.
-- SQL output tables may still live under the `model_inputs` schema because those tables are consumed by model layers.
+- SQL output tables live under the `trading_data` schema because they are source-backed trading-data bundle outputs, not complete model inputs.
 - Do not introduce new active package paths named `*_model_inputs` under `src/trading_data/data_bundles/`.
 
 ## D072 - Bundle SQL tables use trading-data bundle names
@@ -1489,12 +1489,12 @@ The accepted numbered data bundles wrote SQL tables with model-layer business na
 
 Name accepted numbered bundle SQL tables after the writing bundle, using portable SQL snake_case:
 
-- `model_inputs.trading_data_01_bundle_market_regime`
-- `model_inputs.trading_data_02_bundle_security_selection`
-- `model_inputs.trading_data_03_bundle_strategy_selection`
-- `model_inputs.trading_data_05_bundle_option_expression`
-- `model_inputs.trading_data_06_bundle_position_execution`
-- `model_inputs.trading_data_07_bundle_event_overlay`
+- `trading_data.trading_data_01_bundle_market_regime`
+- `trading_data.trading_data_02_bundle_security_selection`
+- `trading_data.trading_data_03_bundle_strategy_selection`
+- `trading_data.trading_data_05_bundle_option_expression`
+- `trading_data.trading_data_06_bundle_position_execution`
+- `trading_data.trading_data_07_bundle_event_overlay`
 
 CLI/package names may use hyphens where appropriate, but SQL identifiers use underscores.
 
@@ -1502,3 +1502,28 @@ CLI/package names may use hyphens where appropriate, but SQL identifiers use und
 
 - Do not name `trading-data` bundle output tables as if they are complete model-input or training-data tables.
 - Downstream training/model repositories can later create their own derived/training tables without colliding with source-backed bundle outputs.
+
+## D073 - Bundle SQL outputs use trading_data schema, not model_inputs
+
+Date: 2026-04-28
+Status: Accepted
+
+### Context
+
+After bundle table names were changed to follow the producing `trading-data` bundle, Chentong clarified that the SQL schema name `model_inputs` is still wrong. A bundle output is not the model's full input set; models also consume upstream model outputs, candidate artifacts, feature tables, portfolio/execution state, and later training-data tables.
+
+### Decision
+
+Accepted numbered `trading-data` bundle SQL outputs live under schema `trading_data`, not `model_inputs`:
+
+- `trading_data.trading_data_01_bundle_market_regime`
+- `trading_data.trading_data_02_bundle_security_selection`
+- `trading_data.trading_data_03_bundle_strategy_selection`
+- `trading_data.trading_data_05_bundle_option_expression`
+- `trading_data.trading_data_06_bundle_position_execution`
+- `trading_data.trading_data_07_bundle_event_overlay`
+
+### Consequences
+
+- `model_inputs` must not be used for source-backed `trading-data` bundle outputs.
+- Future model/training repositories can own their own model-input or training-data schemas without semantic collision.
