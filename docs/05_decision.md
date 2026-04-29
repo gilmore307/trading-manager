@@ -1900,7 +1900,7 @@ Retire `trading-main/storage/` and move the checked-in reusable non-code assets 
 Canonical paths are now:
 
 - `trading-storage/main/templates/` for reusable drafting and implementation templates.
-- `trading-storage/main/shared/` for reviewed shared static files such as `market_etf_universe.csv`.
+- `trading-storage/main/shared/` for reviewed shared static files such as `market_regime_etf_universe.csv`.
 
 `trading-main` keeps the registry and template operating rules; `trading-storage` owns the checked-in asset location.
 
@@ -1908,5 +1908,5 @@ Canonical paths are now:
 
 - No top-level `storage/` directory remains in `trading-main`.
 - Registry rows for shared storage assets use `trading-storage/main/...` payloads and `/root/projects/trading-storage/main/...` absolute paths where direct local locators are required.
-- Cross-repository code and docs should reference `trading-storage/main/shared/market_etf_universe.csv` for the reviewed ETF universe CSV.
+- Cross-repository code and docs should reference `trading-storage/main/shared/market_regime_etf_universe.csv` for the reviewed ETF universe CSV.
 - New shared fields, statuses, type values, helpers, or vocabulary introduced by templates still route through `trading-main` SQL registry migrations.

@@ -328,14 +328,14 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn(obsolete_calendar_or_macro_key, by_key)
         self.assertNotIn("MACRO_RELEASE", by_key)
 
-    def test_market_etf_universe_shared_csv_columns_are_registered(self):
-        shared_path = Path("/root/projects/trading-storage/main/shared/market_etf_universe.csv")
+    def test_market_regime_etf_universe_shared_csv_columns_are_registered(self):
+        shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_etf_universe.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         self.assertEqual(len(rows), 64)
         self.assertEqual(
             list(rows[0].keys()),
-            ["symbol", "universe_type", "exposure_type", "bar_grain", "fund_name", "issuer_name"],
+            ["symbol", "universe_type", "exposure_type", "bar_grain", "fund_name", "issuer_name", "interpretation"],
         )
         self.assertEqual(rows[0]["symbol"], "AIQ")
         self.assertIn("RSP", {row["symbol"] for row in rows})
@@ -345,8 +345,8 @@ class RegistryHelperTests(unittest.TestCase):
 
         with Path("scripts/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
-        self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["payload"], "trading-storage/main/shared/market_etf_universe.csv")
-        self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-storage/main/shared/market_etf_universe.csv")
+        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["payload"], "trading-storage/main/shared/market_regime_etf_universe.csv")
+        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-storage/main/shared/market_regime_etf_universe.csv")
         expected_fields = {
             "SYMBOL": "symbol",
             "UNIVERSE_TYPE": "universe_type",
@@ -354,16 +354,18 @@ class RegistryHelperTests(unittest.TestCase):
             "BAR_GRAIN": "bar_grain",
             "FUND_NAME": "fund_name",
             "ISSUER_NAME": "issuer_name",
+            "INTERPRETATION": "interpretation",
         }
         classification_fields = {"UNIVERSE_TYPE", "EXPOSURE_TYPE"}
         identity_fields = {"SYMBOL", "FUND_NAME", "ISSUER_NAME"}
+        text_fields = {"INTERPRETATION"}
         for key, payload in expected_fields.items():
-            expected_kind = "classification_field" if key in classification_fields else "identity_field" if key in identity_fields else "field"
+            expected_kind = "classification_field" if key in classification_fields else "identity_field" if key in identity_fields else "text_field" if key in text_fields else "field"
             self.assertEqual(registry[key]["kind"], expected_kind)
             self.assertEqual(registry[key]["payload"], payload)
-            self.assertIn("market_etf_universe", registry[key]["applies_to"])
-            if key not in {"SYMBOL", "ISSUER_NAME"}:
-                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_etf_universe.csv")
+            self.assertIn("market_regime_etf_universe", registry[key]["applies_to"])
+            if key not in {"SYMBOL", "ISSUER_NAME", "INTERPRETATION"}:
+                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_regime_etf_universe.csv")
 
     def test_market_regime_relative_strength_combinations_shared_csv_is_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
@@ -412,7 +414,8 @@ class RegistryHelperTests(unittest.TestCase):
         for key, (kind, payload) in expected_fields.items():
             self.assertEqual(registry[key]["kind"], kind)
             self.assertEqual(registry[key]["payload"], payload)
-            self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
+            if key != "INTERPRETATION":
+                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
             self.assertIn("market_regime_relative_strength_combinations", registry[key]["applies_to"])
 
     def test_registered_payload_formats_match_sql_constraint(self):
