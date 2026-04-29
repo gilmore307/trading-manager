@@ -381,7 +381,6 @@ class RegistryHelperTests(unittest.TestCase):
                 "denominator_bar_grain",
                 "feature_bar_grain",
                 "interpretation",
-                "notes",
             ],
         )
         by_id = {row["combination_id"]: row for row in rows}
@@ -400,6 +399,21 @@ class RegistryHelperTests(unittest.TestCase):
             registry["MARKET_REGIME_RELATIVE_STRENGTH_COMBINATIONS_SHARED_CSV"]["path"],
             "/root/projects/trading-storage/main/shared/market_regime_relative_strength_combinations.csv",
         )
+        expected_fields = {
+            "COMBINATION_ID": ("identity_field", "combination_id"),
+            "COMBINATION_TYPE": ("classification_field", "combination_type"),
+            "NUMERATOR_SYMBOL": ("identity_field", "numerator_symbol"),
+            "DENOMINATOR_SYMBOL": ("identity_field", "denominator_symbol"),
+            "NUMERATOR_BAR_GRAIN": ("field", "numerator_bar_grain"),
+            "DENOMINATOR_BAR_GRAIN": ("field", "denominator_bar_grain"),
+            "FEATURE_BAR_GRAIN": ("field", "feature_bar_grain"),
+            "INTERPRETATION": ("text_field", "interpretation"),
+        }
+        for key, (kind, payload) in expected_fields.items():
+            self.assertEqual(registry[key]["kind"], kind)
+            self.assertEqual(registry[key]["payload"], payload)
+            self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
+            self.assertIn("market_regime_relative_strength_combinations", registry[key]["applies_to"])
 
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
