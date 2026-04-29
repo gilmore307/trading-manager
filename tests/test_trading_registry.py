@@ -105,6 +105,8 @@ class RegistryHelperTests(unittest.TestCase):
         for key, payload in expected_sources.items():
             self.assertEqual(rows[key]["kind"], "data_source")
             self.assertEqual(rows[key]["payload"], payload)
+        for row in rows.values():
+            self.assertNotIn("trading-data/src/trading_data/", row["path"])
         self.assertNotIn("MACRO_DATA", rows)
         self.assertNotIn("STOCK_ETF_EXPOSURE_BUNDLE_DEPRECATED", rows)
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE", rows)

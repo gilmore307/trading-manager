@@ -1606,3 +1606,21 @@ Reclassify `BEA`, `BLS`, `CENSUS`, `FRED`, `GITHUB`, and `US_TREASURY_FISCAL_DAT
 - `provider` now means active current provider/source owner, not merely known possible source or stored secret alias.
 - Historical macro provider references can still exist as `term` rows for documentation and future revival.
 - Source-secret config rows may remain even when the provider is not current.
+
+## D077 - trading-data source packages live directly under src
+
+Date: 2026-04-28
+Status: Accepted
+
+### Context
+
+`trading-data` removed its redundant `src/trading_data/` package wrapper. The repository boundary already identifies the component, and the meaningful importable boundaries are data bundles, data sources, source interfaces, source availability probes, and storage helpers.
+
+### Decision
+
+Registry paths for active `trading-data` data bundles, data sources, and helpers use `trading-data/src/<package>/...` instead of `trading-data/src/trading_data/<package>/...`.
+
+### Consequences
+
+- Do not register new active paths under `trading-data/src/trading_data/`.
+- Current implementation paths should point directly to `src/data_bundles`, `src/data_sources`, `src/source_interfaces`, `src/source_availability`, or `src/storage`.
