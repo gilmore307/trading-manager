@@ -1403,10 +1403,10 @@ Layer 06 is now the position/execution model-input bundle and Layer 07 is now th
 
 Registry changes:
 
-- `06_EVENT_OVERLAY_MODEL_INPUTS` became `BUNDLE_06_POSITION_EXECUTION` with payload `bundle_06_position_execution`.
-- `07_PORTFOLIO_RISK_MODEL_INPUTS` became `BUNDLE_07_EVENT_OVERLAY` with payload `bundle_07_event_overlay`.
+- `06_EVENT_OVERLAY_MODEL_INPUTS` became `06_BUNDLE_POSITION_EXECUTION` with payload `06_bundle_position_execution`.
+- `07_PORTFOLIO_RISK_MODEL_INPUTS` became `07_BUNDLE_EVENT_OVERLAY` with payload `07_bundle_event_overlay`.
 - The old 06/07 bundle config rows were removed because those manifest-style configs were obsolete.
-- Event overlay references, including equity abnormal activity, now apply to `bundle_07_event_overlay`.
+- Event overlay references, including equity abnormal activity, now apply to `07_bundle_event_overlay`.
 
 Rationale: Layer 05 chooses option contracts; Layer 06 needs selected-contract option time series to study execution. Event overlay should remain a later one-row-per-event context layer, not the sixth layer.
 
@@ -1466,7 +1466,7 @@ The numbered `trading-data` packages were named `*_model_inputs`, which made the
 
 ### Decision
 
-Rename active numbered data-bundle registry rows to `BUNDLE_NN_<LAYER>` with payloads `bundle_NN_<layer>` and paths under `trading-data/src/trading_data/data_bundles/bundle_NN_<layer>`.
+Rename active numbered data-bundle registry rows to `NN_BUNDLE_<LAYER>` with payloads `NN_bundle_<layer>` and paths under `trading-data/src/trading_data/data_bundles/NN_bundle_<layer>`.
 
 Prune obsolete numbered bundle-local config rows that pointed to removed `config.json` files. Stable defaults for accepted numbered bundles live in reviewed pipeline code unless operators/researchers intentionally need a bundle-local config surface.
 

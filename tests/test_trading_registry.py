@@ -64,12 +64,12 @@ class RegistryHelperTests(unittest.TestCase):
             "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
         )
         expected_bundles = {
-            "BUNDLE_01_MARKET_REGIME": "bundle_01_market_regime",
-            "BUNDLE_02_SECURITY_SELECTION": "bundle_02_security_selection",
-            "BUNDLE_03_STRATEGY_SELECTION": "bundle_03_strategy_selection",
-            "BUNDLE_05_OPTION_EXPRESSION": "bundle_05_option_expression",
-            "BUNDLE_06_POSITION_EXECUTION": "bundle_06_position_execution",
-            "BUNDLE_07_EVENT_OVERLAY": "bundle_07_event_overlay",
+            "01_BUNDLE_MARKET_REGIME": "01_bundle_market_regime",
+            "02_BUNDLE_SECURITY_SELECTION": "02_bundle_security_selection",
+            "03_BUNDLE_STRATEGY_SELECTION": "03_bundle_strategy_selection",
+            "05_BUNDLE_OPTION_EXPRESSION": "05_bundle_option_expression",
+            "06_BUNDLE_POSITION_EXECUTION": "06_bundle_position_execution",
+            "07_BUNDLE_EVENT_OVERLAY": "07_bundle_event_overlay",
         }
         expected_sources = {
             "ALPACA_BARS": "alpaca_bars",
