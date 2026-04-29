@@ -210,9 +210,12 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("scripts/current.csv").open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         by_key = {row["key"]: row for row in rows}
-        data_kinds = [row for row in rows if row["kind"] == "data_kind"]
+        data_kinds = {row["key"]: row for row in rows if row["kind"] == "data_kind"}
 
-        self.assertEqual(data_kinds, [])
+        self.assertEqual(set(data_kinds), {"MARKET_REGIME_FEATURE_SNAPSHOTS"})
+        self.assertEqual(data_kinds["MARKET_REGIME_FEATURE_SNAPSHOTS"]["payload"], "derived_01_market_regime_feature_snapshots")
+        self.assertIn("trading-derived", data_kinds["MARKET_REGIME_FEATURE_SNAPSHOTS"]["applies_to"])
+        self.assertIn("market_regime_model", data_kinds["MARKET_REGIME_FEATURE_SNAPSHOTS"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
         for deleted_preview_key in {
@@ -260,6 +263,10 @@ class RegistryHelperTests(unittest.TestCase):
         for key in reclassified_data_kind_keys:
             self.assertIn(key, by_key)
             self.assertNotEqual(by_key[key]["kind"], "data_kind")
+
+        self.assertEqual(by_key["SNAPSHOT_TIME"]["kind"], "temporal_field")
+        self.assertEqual(by_key["SNAPSHOT_TIME"]["payload"], "snapshot_time")
+        self.assertIn("derived_01_market_regime_feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
 
         deleted_deprecated_macro_keys = {
             "MACRO_BEA_FIXED_ASSETS",

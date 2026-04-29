@@ -1910,3 +1910,26 @@ Canonical paths are now:
 - Registry rows for shared storage assets use `trading-storage/main/...` payloads and `/root/projects/trading-storage/main/...` absolute paths where direct local locators are required.
 - Cross-repository code and docs should reference `trading-storage/main/shared/market_regime_etf_universe.csv` for the reviewed ETF universe CSV.
 - New shared fields, statuses, type values, helpers, or vocabulary introduced by templates still route through `trading-main` SQL registry migrations.
+
+## D088 - Register market-regime feature snapshots as a data kind
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+Layer 1 `MarketRegimeModel` V1 derived output was simplified to a fixed-width point-in-time snapshot table: one row every 30 minutes, containing every feature available at that snapshot time. Chentong confirmed that non-feature columns should be registered, while feature columns should be registered separately as they are accepted.
+
+### Decision
+
+Register `MARKET_REGIME_FEATURE_SNAPSHOTS` as an active `data_kind` with payload `derived_01_market_regime_feature_snapshots`.
+
+Register the only non-feature business column through the existing `SNAPSHOT_TIME` temporal field by adding the `derived_01_market_regime_feature_snapshots` scope.
+
+Do not register candidate feature columns as part of this decision.
+
+### Consequences
+
+- The V1 snapshot table identity and `snapshot_time` column are visible in `scripts/current.csv`.
+- Feature columns remain reviewed one by one before becoming shared registry fields.
+- The snapshot table does not carry row-level `feature_version`, `available_time`, `lookback_start_time`, `decision_start_time`, `decision_end_time`, `source_table`, or `source_row_count` columns.
