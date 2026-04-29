@@ -1681,3 +1681,36 @@ Leave the files under `storage/templates/data_tasks/` as parked drafts only. Re-
 - The active registry no longer claims data-task key or completion-receipt contracts are final.
 - `storage/templates/data_tasks/` is draft reference material, not a registered contract surface.
 - Future task architecture work must create fresh reviewed migrations instead of relying on these removed rows.
+
+## D080 - Data source interfaces use number-first source names
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+Numbered data bundles already use number-first package and registry payload names such as `01_bundle_market_regime`. Trading-data source interfaces still used unscoped names such as `alpaca_bars`, which made source-interface directories less explicit than bundle directories.
+
+### Decision
+
+Use number-first source-interface names for active trading-data source directories and registry payloads: `NN_source_<semantic>`.
+
+Current source-interface names are:
+
+- `01_source_alpaca_bars`
+- `02_source_alpaca_liquidity`
+- `03_source_alpaca_news`
+- `04_source_okx_crypto_market_data`
+- `05_source_gdelt_news`
+- `06_source_etf_holdings`
+- `07_source_trading_economics_calendar_web`
+- `08_source_sec_company_financials`
+- `09_source_thetadata_option_selection_snapshot`
+- `10_source_thetadata_option_primary_tracking`
+- `11_source_thetadata_option_event_timeline`
+
+### Consequences
+
+- `trading-data/src/data_sources/` directories use number-first `NN_source_*` names.
+- `trading-main` data-source registry payload/path values use the same names.
+- Source-interface numbering is inventory/order clarity, not model-layer ownership; manager-facing model layers remain `data_bundle` rows.

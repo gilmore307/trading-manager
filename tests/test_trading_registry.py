@@ -84,17 +84,18 @@ class RegistryHelperTests(unittest.TestCase):
             "07_BUNDLE_EVENT_OVERLAY": "07_bundle_event_overlay",
         }
         expected_sources = {
-            "ALPACA_BARS": "alpaca_bars",
-            "ALPACA_LIQUIDITY": "alpaca_liquidity",
-            "ALPACA_NEWS": "alpaca_news",
-            "THETADATA_OPTION_PRIMARY_TRACKING": "thetadata_option_primary_tracking",
-            "THETADATA_OPTION_EVENT_TIMELINE": "thetadata_option_event_timeline",
-            "THETADATA_OPTION_SELECTION_SNAPSHOT": "thetadata_option_selection_snapshot",
-            "OKX_CRYPTO_MARKET_DATA": "okx_crypto_market_data",
+            "ALPACA_BARS": "01_source_alpaca_bars",
+            "ALPACA_LIQUIDITY": "02_source_alpaca_liquidity",
+            "ALPACA_NEWS": "03_source_alpaca_news",
+            "OKX_CRYPTO_MARKET_DATA": "04_source_okx_crypto_market_data",
+            "GDELT_NEWS": "05_source_gdelt_news",
+            "ETF_HOLDINGS": "06_source_etf_holdings",
+            "TRADING_ECONOMICS_CALENDAR_WEB": "07_source_trading_economics_calendar_web",
+            "SEC_COMPANY_FINANCIALS": "08_source_sec_company_financials",
+            "THETADATA_OPTION_SELECTION_SNAPSHOT": "09_source_thetadata_option_selection_snapshot",
+            "THETADATA_OPTION_PRIMARY_TRACKING": "10_source_thetadata_option_primary_tracking",
+            "THETADATA_OPTION_EVENT_TIMELINE": "11_source_thetadata_option_event_timeline",
             "CALENDAR_DISCOVERY": "calendar_discovery",
-            "ETF_HOLDINGS": "etf_holdings",
-            "TRADING_ECONOMICS_CALENDAR_WEB": "trading_economics_calendar_web",
-            "SEC_COMPANY_FINANCIALS": "sec_company_financials",
         }
         for key, payload in expected_bundles.items():
             self.assertEqual(rows[key]["kind"], "data_bundle")
@@ -105,6 +106,8 @@ class RegistryHelperTests(unittest.TestCase):
         for key, payload in expected_sources.items():
             self.assertEqual(rows[key]["kind"], "data_source")
             self.assertEqual(rows[key]["payload"], payload)
+            if key != "CALENDAR_DISCOVERY":
+                self.assertIn(f"data_sources/{payload}", rows[key]["path"])
         for row in rows.values():
             self.assertNotIn("trading-data/src/trading_data/", row["path"])
         self.assertNotIn("MACRO_DATA", rows)
@@ -262,12 +265,12 @@ class RegistryHelperTests(unittest.TestCase):
         }
         for key in expected_source_capabilities:
             self.assertEqual(by_key[key]["kind"], "source_capability")
-        self.assertIn("alpaca_bars", by_key["ALPACA_EQUITY_BAR"]["applies_to"])
-        self.assertIn("alpaca_news", by_key["ALPACA_EQUITY_NEWS"]["applies_to"])
-        self.assertIn("alpaca_liquidity", by_key["ALPACA_EQUITY_LATEST_SNAPSHOT"]["applies_to"])
-        self.assertIn("gdelt_news", by_key["GDELT_GKG_RECORD"]["applies_to"])
-        self.assertIn("etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
-        self.assertIn("trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
+        self.assertIn("01_source_alpaca_bars", by_key["ALPACA_EQUITY_BAR"]["applies_to"])
+        self.assertIn("03_source_alpaca_news", by_key["ALPACA_EQUITY_NEWS"]["applies_to"])
+        self.assertIn("02_source_alpaca_liquidity", by_key["ALPACA_EQUITY_LATEST_SNAPSHOT"]["applies_to"])
+        self.assertIn("05_source_gdelt_news", by_key["GDELT_GKG_RECORD"]["applies_to"])
+        self.assertIn("06_source_etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
+        self.assertIn("07_source_trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
         self.assertNotIn("MACRO_RELEASE", by_key)
         self.assertIn("duplicate official", by_key["FRED"]["note"])
 
