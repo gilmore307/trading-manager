@@ -1800,3 +1800,30 @@ Deleted active rows include:
 
 - Re-add any removed macro/calendar provider only through a current accepted source-interface design.
 - `source_capability` rows should describe capabilities of active/current source interfaces or accepted raw-provider surfaces, not retired discovery routes.
+
+## D084 - Layer 05 uses contract-level option snapshot rows
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+`trading-data` Layer 05 previously wrote one option-chain snapshot row containing nested `contracts` JSON plus `contract_count`. That made the final business table a transport envelope instead of the model-facing contract comparison surface.
+
+### Decision
+
+`bundle_05_option_expression` is a contract-level SQL table: one row per option contract per snapshot.
+
+The natural key is:
+
+```text
+underlying + snapshot_time + snapshot_type + option_symbol
+```
+
+The table includes `snapshot_type` (`entry`/`exit`) and explicit quote, implied-volatility, Greeks, underlying-context, expiration, right, strike, and option-symbol columns. It does not include nested `contracts` JSON or `contract_count` as active business fields.
+
+### Consequences
+
+- Remove active registry rows `OPTION_CONTRACT_COUNT` and `OPTION_CONTRACTS`.
+- Register explicit Layer 05 timestamp/code fields such as `QUOTE_TIMESTAMP`, `IV_TIMESTAMP`, `GREEKS_TIMESTAMP`, `QUOTE_BID_EXCHANGE`, `QUOTE_ASK_EXCHANGE`, `QUOTE_BID_CONDITION`, and `QUOTE_ASK_CONDITION`.
+- `run_id`, `task_id`, and write/audit timestamps remain receipt/run metadata, not accepted business-table columns.

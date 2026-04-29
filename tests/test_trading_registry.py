@@ -144,6 +144,13 @@ class RegistryHelperTests(unittest.TestCase):
             "SCOPE_TYPE": ("classification_field", "scope_type", "bundle_07_event_overlay"),
             "REFERENCE_TYPE": ("classification_field", "reference_type", "bundle_07_event_overlay"),
             "EVENT_REFERENCE": ("path_field", "reference", "bundle_07_event_overlay"),
+            "QUOTE_TIMESTAMP": ("temporal_field", "quote_timestamp", "bundle_05_option_expression"),
+            "IV_TIMESTAMP": ("temporal_field", "iv_timestamp", "bundle_05_option_expression"),
+            "GREEKS_TIMESTAMP": ("temporal_field", "greeks_timestamp", "bundle_05_option_expression"),
+            "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "bundle_05_option_expression"),
+            "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "bundle_05_option_expression"),
+            "QUOTE_BID_CONDITION": ("field", "bid_condition", "bundle_05_option_expression"),
+            "QUOTE_ASK_CONDITION": ("field", "ask_condition", "bundle_05_option_expression"),
         }
         for key, (kind, payload, applies_to) in expected.items():
             self.assertEqual(rows[key]["kind"], kind)
@@ -156,6 +163,8 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("bundle_02_security_selection", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
             self.assertIn("bundle_07_event_overlay", rows[key]["applies_to"])
+        self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
+        self.assertNotIn("OPTION_CONTRACTS", rows)
 
     def test_initial_data_kinds_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
