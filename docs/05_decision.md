@@ -198,16 +198,16 @@ The initial artifact, manifest, ready-signal, and request contract placeholders 
 
 ### Decision
 
-Move artifact, manifest, ready-signal, and request drafting surfaces to `storage/templates/contracts/`. Keep `docs/` focused on project governance plus any approved project-specific guide docs.
+Move artifact, manifest, ready-signal, and request drafting surfaces to `trading-storage/main/templates/contracts/`. Keep `docs/` focused on project governance plus any approved project-specific guide docs.
 
 ### Rationale
 
-The docs spine should contain ratified project context and governance. Drafting templates belong under `storage/templates/`. Registry type vocabularies belong under `scripts/`; registry operating guidance may live in an approved docs guide.
+The docs spine should contain ratified project context and governance. Drafting templates belong under `trading-storage/main/templates/`. Registry type vocabularies belong under `scripts/`; registry operating guidance may live in an approved docs guide.
 
 ### Consequences
 
 - Do not add numbered docs beyond `06_memory.md` for reusable drafting templates.
-- Use `storage/templates/contracts/` for reusable contract drafting surfaces.
+- Use `trading-storage/main/templates/contracts/` for reusable contract drafting surfaces.
 - Use `scripts/kinds/*_type.md` and SQL migrations for registered type vocabularies.
 - Use `docs/08_registry.md` for the approved `trading-main` registry operating guide.
 
@@ -502,7 +502,7 @@ The registry is now a first-class function of `trading-main`, not just a passing
 - `docs/08_registry.md` is part of the accepted `trading-main` docs set.
 - `00_scope.md` through `06_memory.md` remain project-wide platform docs.
 - Registry kind source-of-truth files remain under `scripts/kinds/`, not under `docs/`.
-- Contract drafting templates remain under `storage/templates/contracts/`, not under `docs/`.
+- Contract drafting templates remain under `trading-storage/main/templates/contracts/`, not under `docs/`.
 
 ## D025 - Split platform-function guides into helpers registry and templates
 
@@ -530,7 +530,7 @@ This mirrors the actual top-level structure of `trading-main` and gives each own
 
 - Helpers, registry, and templates each have a dedicated docs guide.
 - Registry kind source-of-truth files still live under `scripts/kinds/`.
-- Template drafts still live under `storage/templates/`.
+- Template drafts still live under `trading-storage/main/templates/`.
 - Helper code still lives under `src/`.
 
 ## D026 - Loose helper files are not package contracts
@@ -990,11 +990,11 @@ The user approved designing templates around provider/API requirements for `trad
 
 ### Decision
 
-Create reusable draft data task templates under `storage/templates/data_tasks/` in `trading-main`. Cover task keys, per-bundle README documentation, fetch requirements, clean/normalization requirements, save/output requirements, completion receipts, and fixture/live-call policy.
+Create reusable draft data task templates under `trading-storage/main/templates/data_tasks/`. Cover task keys, per-bundle README documentation, fetch requirements, clean/normalization requirements, save/output requirements, completion receipts, and fixture/live-call policy.
 
 ### Rationale
 
-The template shapes are cross-repository planning surfaces, so they belong in `trading-main/storage/templates/` rather than being hidden as component-local docs or implementation files.
+The template shapes are cross-repository planning surfaces, so they belong in `trading-storage/main/templates/` rather than being hidden as component-local docs or implementation files.
 
 ### Consequences
 
@@ -1020,7 +1020,7 @@ This keeps manager invocation simple and avoids premature file sprawl while pres
 
 ### Consequences
 
-- `storage/templates/data_tasks/pipeline.py` is the default implementation template.
+- `trading-storage/main/templates/data_tasks/pipeline.py` is the default implementation template.
 - Bundle READMEs own bundle-specific API details.
 - Existing fetch/clean/save/receipt spec templates remain design documents, not required separate code files.
 
@@ -1145,16 +1145,16 @@ Date: 2026-04-28
 Status: Accepted
 
 Decision:
-Move trading-wide reusable template assets from top-level `templates/` into `storage/templates/`, and create `storage/shared/` for reviewed cross-project static files that are not templates.
+Move trading-wide reusable template assets from top-level `templates/` into `trading-storage/main/templates/`, and create `trading-storage/main/shared/` for reviewed cross-project static files that are not templates.
 
 Rationale:
 `trading-main` now needs a broader tracked non-code asset boundary than templates alone. Keeping templates and shared static files under `storage/` makes the repository shape clearer while preserving the distinction from generated runtime outputs, secrets, caches, and component-owned implementation files.
 
 Consequences:
-- Reusable templates live under `storage/templates/`.
-- Cross-project static/shared files live under `storage/shared/`.
-- Registry paths for trading-main-owned templates must point to `storage/templates/...`.
-- Generated artifacts and local runtime state still do not belong in `trading-main/storage/`.
+- Reusable templates live under `trading-storage/main/templates/`.
+- Cross-project static/shared files live under `trading-storage/main/shared/`.
+- Registry paths for trading-main-owned templates must point to `trading-storage/main/templates/...`.
+- Generated artifacts and local runtime state do not belong in checked-in shared asset directories.
 
 
 ## D054 - Status registry values use one kind
@@ -1638,7 +1638,7 @@ The OpenClaw project-development skill contained both true skill scaffolding tem
 
 Keep only the docs scaffolding, root README template, and Codex task prompt template in `skills/openclaw/project_development/templates/`.
 
-Move the unaccepted slot drafts into `trading-main/storage/templates/project_development/` as parked drafts:
+Move the unaccepted slot drafts into `trading-storage/main/templates/project_development/` as parked drafts:
 
 - `acceptance_receipt_slots.md`
 - `completion_receipt_slots.md`
@@ -1670,16 +1670,16 @@ Remove registry rows tied to unaccepted data-task architecture scopes and templa
 - `data_task_key`
 - `data_task_completion_receipt`
 - `data_task_completion_receipt_run`
-- data-task template rows under `storage/templates/data_tasks/`
+- data-task template rows under `trading-storage/main/templates/data_tasks/`
 - `TRADING_SOURCE_DEVELOPMENT_STORAGE_ROOT`
 - data-task workflow terms for task key files, completion receipts, and task runs
 
-Leave the files under `storage/templates/data_tasks/` as parked drafts only. Re-register fields/templates/terms later one by one after the task architecture is redesigned and accepted.
+Leave the files under `trading-storage/main/templates/data_tasks/` as parked drafts only. Re-register fields/templates/terms later one by one after the task architecture is redesigned and accepted.
 
 ### Consequences
 
 - The active registry no longer claims data-task key or completion-receipt contracts are final.
-- `storage/templates/data_tasks/` is draft reference material, not a registered contract surface.
+- `trading-storage/main/templates/data_tasks/` is draft reference material, not a registered contract surface.
 - Future task architecture work must create fresh reviewed migrations instead of relying on these removed rows.
 
 ## D080 - Data source interfaces use number-first source names
@@ -1883,3 +1883,30 @@ The stable callable migration/export entrypoint is now `scripts/apply_registry_m
 - `registry/` is no longer a top-level repository directory.
 - Registry docs, tests, helper defaults, and cross-repository references should use `scripts/` paths.
 - SQL migration `150_update_flattened_registry_export_helper.sql` updates the active script registry row for `HELPER_REGISTRY_EXPORT_CURRENT_CSV` after the temporary `scripts/registry/` layout was rejected as one level too deep.
+
+## D087 - Shared storage assets move to trading-storage main
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+`trading-main/storage/` had become a mixed repository boundary: it held reusable templates and reviewed shared static files while `trading-main` also owned registry, helper, and governance rules. Chentong clarified that this directory can move directly to `trading-storage/main/` instead of keeping storage assets in `trading-main`.
+
+### Decision
+
+Retire `trading-main/storage/` and move the checked-in reusable non-code assets to `trading-storage/main/`.
+
+Canonical paths are now:
+
+- `trading-storage/main/templates/` for reusable drafting and implementation templates.
+- `trading-storage/main/shared/` for reviewed shared static files such as `market_etf_universe.csv`.
+
+`trading-main` keeps the registry and template operating rules; `trading-storage` owns the checked-in asset location.
+
+### Consequences
+
+- No top-level `storage/` directory remains in `trading-main`.
+- Registry rows for shared storage assets use `trading-storage/main/...` payloads and `/root/projects/trading-storage/main/...` absolute paths where direct local locators are required.
+- Cross-repository code and docs should reference `trading-storage/main/shared/market_etf_universe.csv` for the reviewed ETF universe CSV.
+- New shared fields, statuses, type values, helpers, or vocabulary introduced by templates still route through `trading-main` SQL registry migrations.

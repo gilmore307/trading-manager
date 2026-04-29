@@ -329,7 +329,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("MACRO_RELEASE", by_key)
 
     def test_market_etf_universe_shared_csv_columns_are_registered(self):
-        shared_path = Path("storage/shared/market_etf_universe.csv")
+        shared_path = Path("/root/projects/trading-storage/main/shared/market_etf_universe.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         self.assertEqual(len(rows), 61)
@@ -342,7 +342,8 @@ class RegistryHelperTests(unittest.TestCase):
 
         with Path("scripts/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
-        self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-main/storage/shared/market_etf_universe.csv")
+        self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["payload"], "trading-storage/main/shared/market_etf_universe.csv")
+        self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-storage/main/shared/market_etf_universe.csv")
         expected_fields = {
             "SYMBOL": "symbol",
             "UNIVERSE_TYPE": "universe_type",
@@ -359,7 +360,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("market_etf_universe", registry[key]["applies_to"])
             if key not in {"SYMBOL", "ISSUER_NAME"}:
-                self.assertEqual(registry[key]["path"], "storage/shared/market_etf_universe.csv")
+                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_etf_universe.csv")
 
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []

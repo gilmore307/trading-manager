@@ -117,7 +117,7 @@ find . -maxdepth 2 -type f | sort
 Manual review must confirm:
 
 - required docs files exist, including `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`;
-- contract drafting templates live under `storage/templates/contracts/`, not `docs/`;
+- contract drafting templates live under `trading-storage/main/templates/contracts/`, not `docs/`;
 - registry kind Markdown files do not list concrete active rows;
 - entity-like registry entries use the nullable `path` column instead of a separate `path` kind;
 - every field entry has non-empty `applies_to`;

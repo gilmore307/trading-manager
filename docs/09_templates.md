@@ -2,14 +2,14 @@
 
 ## Purpose
 
-`trading-main` owns reusable trading-wide templates for drafting contracts, tasks, prompts, and other repeatable project surfaces.
+`trading-main` owns the platform guidance and registry review flow for reusable trading-wide templates. The tracked template files themselves live under `trading-storage/main/templates/`.
 
 The earlier docs stay project-wide:
 
 - `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
-- This file describes the `storage/templates/` platform function specifically.
+- This file describes the `trading-storage/main/templates/` platform function specifically.
 
-Templates exist to keep drafting consistent without mistaking drafts for accepted contracts or concrete registry entries.
+Templates exist to keep drafting consistent without mistaking drafts for accepted contracts or concrete registry entries. `trading-storage` owns the checked-in non-code asset location; `trading-main` owns the registry and operating rules for shared names introduced by those assets.
 
 ## What Templates Own
 
@@ -36,7 +36,7 @@ Templates must not own:
 ## Directory Layout
 
 ```text
-storage/templates/
+trading-storage/main/templates/
   README.md                 Template boundary summary.
   contracts/                Contract drafting templates.
   data_tasks/               Parked historical data task drafts; not active contracts.
@@ -45,31 +45,31 @@ storage/templates/
 
 Current contract drafting templates:
 
-- `storage/templates/contracts/artifact.md`
-- `storage/templates/contracts/manifest.md`
-- `storage/templates/contracts/ready_signal.md`
-- `storage/templates/contracts/request.md`
+- `trading-storage/main/templates/contracts/artifact.md`
+- `trading-storage/main/templates/contracts/manifest.md`
+- `trading-storage/main/templates/contracts/ready_signal.md`
+- `trading-storage/main/templates/contracts/request.md`
 
 Current parked project-development drafts:
 
-- `storage/templates/project_development/acceptance_receipt_slots.md`
-- `storage/templates/project_development/completion_receipt_slots.md`
-- `storage/templates/project_development/execution_key_slots.md`
-- `storage/templates/project_development/maintenance_output_slots.md`
-- `storage/templates/project_development/task_register_slots.md`
+- `trading-storage/main/templates/project_development/acceptance_receipt_slots.md`
+- `trading-storage/main/templates/project_development/completion_receipt_slots.md`
+- `trading-storage/main/templates/project_development/execution_key_slots.md`
+- `trading-storage/main/templates/project_development/maintenance_output_slots.md`
+- `trading-storage/main/templates/project_development/task_register_slots.md`
 
 These project-development slot drafts are not active registry contracts. They were moved out of the OpenClaw skill so they can be reviewed one by one before any future registration.
 
 Parked data task drafting templates:
 
-- `storage/templates/data_tasks/task_key.json`
-- `storage/templates/data_tasks/source_readme.md`
-- `storage/templates/data_tasks/pipeline.py`
-- `storage/templates/data_tasks/fetch_spec.md`
-- `storage/templates/data_tasks/clean_spec.md`
-- `storage/templates/data_tasks/save_spec.md`
-- `storage/templates/data_tasks/completion_receipt.json`
-- `storage/templates/data_tasks/fixture_policy.md`
+- `trading-storage/main/templates/data_tasks/task_key.json`
+- `trading-storage/main/templates/data_tasks/source_readme.md`
+- `trading-storage/main/templates/data_tasks/pipeline.py`
+- `trading-storage/main/templates/data_tasks/fetch_spec.md`
+- `trading-storage/main/templates/data_tasks/clean_spec.md`
+- `trading-storage/main/templates/data_tasks/save_spec.md`
+- `trading-storage/main/templates/data_tasks/completion_receipt.json`
+- `trading-storage/main/templates/data_tasks/fixture_policy.md`
 
 ## Draft vs Contract
 
@@ -89,7 +89,7 @@ Rules:
 
 Normal flow for a shared contract shape:
 
-1. Draft the shape in `storage/templates/contracts/`.
+1. Draft the shape in `trading-storage/main/templates/contracts/`.
 2. Identify fields, type values, and status values that need registry entries.
 3. Register shared names through SQL migrations under `scripts/sql/schema_migrations/`.
 4. Regenerate `scripts/current.csv`.
@@ -98,13 +98,13 @@ Normal flow for a shared contract shape:
 
 ## Data Task Template Status
 
-The files under `storage/templates/data_tasks/` are parked drafts, not active registry contracts. The task architecture will be redesigned after model and source contracts settle.
+The files under `trading-storage/main/templates/data_tasks/` are parked drafts, not active registry contracts. The task architecture will be redesigned after model and source contracts settle.
 
 Do not register `data_task_key`, `data_task_completion_receipt`, or `data_task_completion_receipt_run` fields from these drafts until the task architecture is reviewed and accepted one contract at a time.
 
 ## Recording Duty
 
-When component work creates a reusable template shape, move or copy the reusable version into `trading-main/storage/templates/` before other repositories depend on it.
+When component work creates a reusable template shape, move or copy the reusable version into `trading-storage/main/templates/` before other repositories depend on it.
 
 If a template introduces shared fields, statuses, artifact types, manifest types, ready-signal types, request types, or config keys, route those names through the SQL registry and regenerate `scripts/current.csv`.
 
@@ -118,5 +118,5 @@ A template change is acceptable when:
 - the template does not claim to be a concrete accepted contract unless docs and registry entries support that;
 - examples are clearly non-binding unless explicitly accepted;
 - new shared field/type/status vocabulary is routed to the registry;
-- templates stay under `storage/templates/`, not under `docs/` or `scripts/`;
+- templates stay under `trading-storage/main/templates/`, not under `docs/` or `scripts/`;
 - unresolved schema choices are recorded as gaps rather than hidden assumptions.

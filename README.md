@@ -2,7 +2,7 @@
 
 `trading-main` is the system-level platform repository for the trading project.
 
-It owns global architecture, cross-repository workflow, shared contracts, field/status registries, project templates, shared helper code, system-level decisions, and global planning context.
+It owns global architecture, cross-repository workflow, shared contracts, field/status registries, shared helper code, system-level decisions, and global planning context.
 
 It does not own component runtime implementations, market data, generated artifacts, secrets, or component-local task state.
 
@@ -20,9 +20,6 @@ scripts/          Executable maintenance/operational commands plus registry main
   reviews/        Registry review notes.
   sql/            Registry SQL migrations and SQL notes.
 tests/            First-party tests for source packages and repository governance checks.
-storage/         Tracked reusable non-code assets.
-  templates/     Trading-wide project, contract, task, and implementation templates.
-  shared/        Trading-wide static/shared files that are not templates.
 pyproject.toml   Python helper package metadata for `trading-main-helpers`.
 requirements.txt  Shared Python environment dependency ledger.
 ```
