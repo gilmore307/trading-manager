@@ -374,23 +374,22 @@ class RegistryHelperTests(unittest.TestCase):
             list(rows[0].keys()),
             [
                 "combination_id",
-                "combination_group",
+                "combination_type",
                 "numerator_symbol",
                 "denominator_symbol",
                 "numerator_bar_grain",
                 "denominator_bar_grain",
-                "feature_cadence",
-                "feature_family",
+                "feature_bar_grain",
+                "feature_type",
                 "interpretation",
-                "v1_status",
                 "notes",
             ],
         )
         by_id = {row["combination_id"]: row for row in rows}
-        self.assertEqual(by_id["rsp_spy"]["feature_cadence"], "30m")
-        self.assertEqual(by_id["tlt_shy"]["combination_group"], "primary_30m")
-        self.assertEqual(by_id["ief_shy"]["feature_family"], "relative_strength")
-        self.assertEqual(by_id["smh_xlk"]["feature_cadence"], "1d_context")
+        self.assertEqual(by_id["rsp_spy"]["feature_bar_grain"], "30m")
+        self.assertEqual(by_id["tlt_shy"]["combination_type"], "primary")
+        self.assertEqual(by_id["ief_shy"]["feature_type"], "relative_strength")
+        self.assertEqual(by_id["smh_xlk"]["feature_bar_grain"], "1d")
 
         with Path("scripts/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
