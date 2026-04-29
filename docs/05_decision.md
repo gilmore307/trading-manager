@@ -425,7 +425,7 @@ Date: 2026-04-25
 
 ### Decision
 
-Register `scripts/apply_registry_migrations.py --export-only` as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.
+Register `scripts/apply_registry_migrations.py --export-only` as `HELPER_REGISTRY_EXPORT_CURRENT_CSV`.
 
 ### Rationale
 
@@ -1736,3 +1736,31 @@ Secret registry entries may describe actual local secret files as `source_secret
 
 - Do not add new active registry rows with `applies_to=source_secret_json`.
 - `source_secret_file_schema` names schema slots only; secret values remain outside Git under `/root/secrets/`.
+
+## D082 - Helper script keys use helper-first naming
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+Helper registry keys such as `BRAVE_SEARCH_HELPER` and `REGISTRY_EXPORT_CURRENT_CSV_HELPER` put the role token at the end, making helper rows less sortable and harder to scan as a group.
+
+### Decision
+
+Use helper-first script keys: `HELPER_<domain>_<action>`.
+
+Examples:
+
+- `HELPER_BRAVE_SEARCH`
+- `HELPER_BIGQUERY_REST_QUERY`
+- `HELPER_REGISTRY_EXPORT_CURRENT_CSV`
+- `HELPER_REGISTRY_GET_KEY_BY_ID`
+- `HELPER_REGISTRY_LOAD_SECRET_TEXT_BY_CONFIG_ID`
+
+Use `helper_<domain>` for helper-oriented `applies_to` scopes, such as `helper_web_search`.
+
+### Consequences
+
+- Do not add new helper script keys ending in `_HELPER`.
+- Helper script rows sort together by key.

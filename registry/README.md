@@ -80,7 +80,7 @@ For export only:
 scripts/apply_registry_migrations.py --export-only
 ```
 
-This export-only command is registered as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.
+This export-only command is registered as `HELPER_REGISTRY_EXPORT_CURRENT_CSV`.
 
 The migration helper applies pending SQL migrations and exports `registry/current.csv` after every non-dry-run migration pass unless `--no-export` is used.
 

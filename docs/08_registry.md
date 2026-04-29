@@ -153,7 +153,7 @@ For snapshot export only:
 scripts/apply_registry_migrations.py --export-only
 ```
 
-That export command is registered as `REGISTRY_EXPORT_CURRENT_CSV_HELPER`.
+That export command is registered as `HELPER_REGISTRY_EXPORT_CURRENT_CSV`.
 
 Do not hand-edit `registry/current.csv`.
 
