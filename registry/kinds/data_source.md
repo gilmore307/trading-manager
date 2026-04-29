@@ -2,22 +2,29 @@
 
 ## Kind Boundary
 
-Implemented source-interface or source-adapter identifiers that fetch, parse, probe, or normalize data from an external provider, official website, exchange, issuer file, or source system.
+Manager-facing `trading-source` source-output identifiers accepted for task routing, runner dispatch, model-input source tables, and completion receipts.
 
-A data source is not a manager-facing bundle and is not a final saved data shape. It names the implemented source boundary that pipelines or source-interface probes call.
+A data source is a source-backed output boundary that a manager can request directly. Provider/API/web/file connectors are not data sources; they belong in `data_feed`.
 
 ## Range
 
-Register data sources when they have an implemented source directory, source-interface catalog entry, or execution-owned source discovery adapter.
+Register data sources when they may appear in manager-facing task keys, runner routing, source READMEs, completion receipts, or model-input planning docs.
 
-Use `payload` for the stable snake_case source adapter key. Use `path` for the implementation directory or source-interface owner path.
+Use `payload` for the concrete `NN_source_<layer>` source key. Use `path` for the canonical manager-facing implementation directory, normally under `trading-source/src/data_sources/NN_source_<layer>`.
 
 ## Reject Or Re-scope
 
 Reject or re-scope entries that are actually:
 
-- manager-facing runnable bundles, which belong in `data_bundle`;
-- final saved output/data shapes, which belong in `data_kind`;
-- provider/company names, which belong in `term`;
-- credentials or source aliases, which belong in `config`;
-- callable helper exports, which belong in `script`.
+- provider/API/web/file feeds, which belong in `data_feed`;
+- final saved dataset shapes independent of the producing source, which belong in `data_kind`;
+- provider/company names, which belong in `provider`;
+- credentials or secret aliases, which belong in `config`;
+- runtime JSON fields, which belong in `field`;
+- scripts or Python symbols, which belong in `script`;
+- template files, which belong in `template`;
+- shared checked-in data/config artifacts, which belong in `shared_artifact`.
+
+## Naming Rule
+
+Source keys should be stable snake_case and use the accepted `NN_source_<layer>` pattern, such as `01_source_market_regime`. Source-specific task/run IDs should use the source key as their prefix.

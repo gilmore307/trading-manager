@@ -1,8 +1,8 @@
-# Fetch Spec: <bundle-name>
+# Fetch Spec: <source-name>
 
 ## Purpose
 
-Define exactly how `pipeline.py::fetch` retrieves historical source data for this bundle.
+Define exactly how `pipeline.py::fetch` retrieves historical source data for this source.
 
 ## Source And Authentication
 

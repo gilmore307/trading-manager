@@ -1,6 +1,6 @@
 {
   "task_id": "<stable-manager-task-id>",
-  "bundle": "<bundle-name>",
+  "source": "<source-name>",
   "runs": [
     {
       "run_id": "<run-id>",

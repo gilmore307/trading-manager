@@ -1,44 +1,44 @@
-# <bundle-name>
+# <source-name>
 
 ## Purpose
 
-Describe the historical data this bundle acquires and why this bundle boundary exists.
+Describe the historical data this source acquires/prepares and why this manager-facing source boundary exists.
 
-## Source
+## Source Inputs
 
-- Provider/source term:
+- Provider/feed term:
 - Documentation URL:
 - Credential config id or no-key rule:
-- Official source URL rule, if web/issuer sourced:
+- Official feed URL rule, if web/issuer sourced:
 
-## Bundle Boundary
+## Source Boundary
 
-This bundle includes:
+This source includes:
 
 - `<data-type-1>`
 - `<data-type-2>`
 
-This bundle excludes:
+This source excludes:
 
 - realtime data;
 - execution-time feeds;
 - strategy/model decisions;
-- durable SQL writes during development.
+- durable SQL writes during development unless an accepted storage contract exists.
 
 ## Task Key Inputs
 
 Required task key fields:
 
 - `task_id`
-- `bundle`
+- `source`
 - `params`
 - `output_root`
 
 Optional task key fields:
 
-- `credential_config_id` when the bundle needs a registered credential alias
+- `credential_config_id` when the source needs a registered credential alias
 
-Put API-specific inputs such as symbols, underlyings, ETF ids, macro release keys, calendar scope, time ranges, snapshot timestamps, granularity, source URLs, and provider parameters inside `params`. Do not put provider documentation URLs in the task key; those belong in registry/provider docs or this README. Do not put `run_id` in the task key; it changes per invocation and belongs in receipt `runs[]`.
+Put API-specific inputs such as symbols, underlyings, ETF ids, macro release keys, calendar scope, time ranges, snapshot timestamps, granularity, feed URLs, and provider parameters inside `params`. Do not put provider documentation URLs in the task key; those belong in registry/provider docs or this README. Do not put `run_id` in the task key; it changes per invocation and belongs in receipt `runs[]`.
 
 ## Pipeline Module
 
@@ -46,8 +46,8 @@ Default implementation should start as one `pipeline.py` file with one public `r
 
 | Step function | Responsibility |
 |---|---|
-| `fetch(...)` | Retrieve source data and write raw development files. |
-| `clean(...)` | Normalize provider data into bundle output shapes. |
+| `fetch(...)` | Retrieve feed data and write raw development files. |
+| `clean(...)` | Normalize provider/feed data into source output shapes. |
 | `save(...)` | Save cleaned development files under `storage/`; durable SQL waits for contracts. |
 | `write_receipt(...)` | Emit success/failure completion receipt. |
 

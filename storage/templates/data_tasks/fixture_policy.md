@@ -1,8 +1,8 @@
-# Fixture Policy: <bundle-name>
+# Fixture Policy: <source-name>
 
 ## Purpose
 
-Define safe fixture and live-call rules for this data-source bundle.
+Define safe fixture and live-call rules for this data-source source.
 
 ## Default Tests
 

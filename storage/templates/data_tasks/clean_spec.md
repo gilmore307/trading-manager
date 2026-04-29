@@ -1,8 +1,8 @@
-# Clean Spec: <bundle-name>
+# Clean Spec: <source-name>
 
 ## Purpose
 
-Define how `pipeline.py::clean` converts raw provider/source data into normalized development outputs.
+Define how `pipeline.py::clean` converts raw provider/feed data into normalized development outputs.
 
 ## Inputs
 

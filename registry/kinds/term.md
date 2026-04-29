@@ -16,9 +16,9 @@ Reject or re-scope entries that are actually:
 - component-local notes;
 - config values;
 - field names;
-- provider/source-owner identities, which belong in `provider`;
-- provider/source endpoint or record-family capabilities, which belong in `source_capability`;
+- provider/feed-owner identities, which belong in `provider`;
+- provider/feed endpoint or record-family capabilities, which belong in `feed_capability`;
 
 ## Path Usage
 
-Glossary/reference terminology may use `path` for canonical public documentation when that URL is a useful shared locator. Provider/source-owner home pages belong on `provider` rows; endpoint-family documentation belongs on `source_capability` rows.
+Glossary/reference terminology may use `path` for canonical public documentation when that URL is a useful shared locator. Provider/source-owner home pages belong on `provider` rows; endpoint-family documentation belongs on `feed_capability` rows.

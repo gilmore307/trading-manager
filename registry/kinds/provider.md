@@ -2,9 +2,9 @@
 
 ## Kind Boundary
 
-Current external data/provider organizations, platforms, or authoritative source surfaces that own or publish source capabilities consumed by active source interfaces.
+Current external data/provider organizations, platforms, or authoritative source surfaces that own or publish source capabilities consumed by active feed interfaces.
 
-A provider names the current source owner or provider surface itself, not an implemented adapter and not a specific endpoint/record family. Historical, fallback, secret-only, or documentation-only source references remain `term` rows until an active source interface uses them.
+A provider names the current source owner or provider surface itself, not an implemented adapter and not a specific endpoint/record family. Historical, fallback, secret-only, or documentation-only source references remain `term` rows until an active feed interface uses them.
 
 ## Range
 
@@ -16,8 +16,8 @@ Use `payload` for a stable snake_case provider key. Use `path` for public provid
 
 Reject or re-scope entries that are actually:
 
-- source/provider record families, endpoint families, raw inputs, or entitlement-gated capabilities, which belong in `source_capability`;
+- feed/provider record families, endpoint families, raw inputs, or entitlement-gated capabilities, which belong in `feed_capability`;
 - implemented adapters/interfaces, which belong in `data_source`;
-- manager-facing bundles, which belong in `data_bundle`;
+- manager-facing sources, which belong in `data_source`;
 - final saved data shapes with accepted current storage contracts, which belong in `data_kind`;
-- ordinary glossary-only concepts with no provider/source identity role, which belong in `term`.
+- ordinary glossary-only concepts with no provider/feed identity role, which belong in `term`.

@@ -1,4 +1,4 @@
-# Save Spec: <bundle-name>
+# Save Spec: <source-name>
 
 ## Purpose
 

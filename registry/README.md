@@ -89,21 +89,21 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`artifact_type`](./kinds/artifact_type.md) — Registered artifact type values used to classify durable outputs produced and consumed across trading repositories.
 - [`classification_field`](./kinds/classification_field.md) — Canonical categorical/classification field names whose values assign rows to semantic classes.
 - [`config`](./kinds/config.md) — Non-secret configuration keys and secret-alias references. Payloads may contain secret aliases but must never contain secret values.
-- [`data_bundle`](./kinds/data_bundle.md) — Manager-facing runnable bundle keys accepted for task routing and receipts.
-- [`data_source`](./kinds/data_source.md) — Implemented source-interface or source-adapter identifiers.
+- [`data_feed`](./kinds/data_feed.md) — Implemented provider/API/web/file feed connectors and feed-interface identifiers.
+- [`data_source`](./kinds/data_source.md) — Manager-facing runnable source keys accepted for task routing and receipts.
 - [`data_kind`](./kinds/data_kind.md) — Canonical final saved or durable derived data-shape identifiers with accepted current storage contracts.
 - [`field`](./kinds/field.md) — Canonical shared non-identity, non-temporal, non-classification field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
 - [`identity_field`](./kinds/identity_field.md) — Canonical field names whose values identify or name entities, artifacts, sources, instruments, tasks, reports, or rows.
 - [`manifest_type`](./kinds/manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
 - [`path_field`](./kinds/path_field.md) — Canonical field names whose values locate or reference artifacts, files, URLs, repository paths, source references, or output references.
 - [`payload_format`](./kinds/payload_format.md) — Registered values allowed in the `trading_registry.payload_format` column.
-- [`provider`](./kinds/provider.md) — Current external data/provider organizations, platforms, or authoritative source surfaces that own capabilities used by active source interfaces.
+- [`provider`](./kinds/provider.md) — Current external data/provider organizations, platforms, or authoritative source surfaces that own capabilities used by active feed interfaces.
 - [`ready_signal_type`](./kinds/ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
 - [`repo`](./kinds/repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
 - [`request_type`](./kinds/request_type.md) — Registered request type values used to classify cross-repository work requests.
 - [`script`](./kinds/script.md) — Canonical callable helper or automation export records, with source locators in `path`.
 - [`shared_artifact`](./kinds/shared_artifact.md) — Durable checked-in shared artifacts that are not templates, scripts, terms, or data-kind categories.
-- [`source_capability`](./kinds/source_capability.md) — Source-level record families, endpoint families, raw inputs, transient evidence, or entitlement-gated provider capabilities that are not final saved data shapes.
+- [`feed_capability`](./kinds/feed_capability.md) — Feed-level record families, endpoint families, raw inputs, transient evidence, or entitlement-gated provider capabilities that are not final saved data shapes.
 - [`status_value`](./kinds/status_value.md) — Registered status or policy values; `applies_to` identifies the value domain such as `task_lifecycle_status`, `review_status`, `acceptance_status`, `test_status`, or `artifact_sync_policy_type`.
 - [`template`](./kinds/template.md) — Reusable checked-in template identifiers.
 - [`temporal_field`](./kinds/temporal_field.md) — Canonical date/time/datetime field names with ISO-8601 value semantics.
@@ -117,9 +117,9 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 
 - Do not define the same kind in multiple Markdown files.
 - Do not store concrete active row lists in `registry/kinds/*.md`.
-- Do not store secrets. Store source-level secret aliases only; one provider/source should normally map to one JSON secret file.
+- Do not store secrets. Store source-level secret aliases only; one provider/feed should normally map to one JSON secret file.
 - Do not mix component-local implementation details into trading-wide registry entries.
-- New fields, identity fields, path fields, temporal fields, classification fields, statuses, payload formats, config keys, data bundles, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
+- New fields, identity fields, path fields, temporal fields, classification fields, statuses, payload formats, config keys, data sources, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
 - `registry/current.csv` must be regenerated after SQL registry changes.
 - `registry/current.csv` is a generated snapshot; do not hand-edit it.
 - Test scripts must stay out of registry `script` rows and be documented in their test-directory README.

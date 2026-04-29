@@ -72,7 +72,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn("trading-strategy", row["payload"])
             self.assertNotIn("trading-strategy", row["path"])
 
-    def test_data_bundle_and_data_source_rows_are_separated(self):
+    def test_data_feed_and_data_source_rows_are_separated(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
@@ -94,39 +94,42 @@ class RegistryHelperTests(unittest.TestCase):
         for obsolete_provider_term in {"BEA", "BLS", "CENSUS", "FRED", "US_TREASURY_FISCAL_DATA"}:
             self.assertNotIn(obsolete_provider_term, rows)
         self.assertEqual(rows["GITHUB"]["kind"], "term")
-        expected_bundles = {
-            "01_BUNDLE_MARKET_REGIME": "01_bundle_market_regime",
-            "02_BUNDLE_SECURITY_SELECTION": "02_bundle_security_selection",
-            "03_BUNDLE_STRATEGY_SELECTION": "03_bundle_strategy_selection",
-            "05_BUNDLE_OPTION_EXPRESSION": "05_bundle_option_expression",
-            "06_BUNDLE_POSITION_EXECUTION": "06_bundle_position_execution",
-            "07_BUNDLE_EVENT_OVERLAY": "07_bundle_event_overlay",
-        }
         expected_sources = {
-            "ALPACA_BARS": "01_source_alpaca_bars",
-            "ALPACA_LIQUIDITY": "02_source_alpaca_liquidity",
-            "ALPACA_NEWS": "03_source_alpaca_news",
-            "OKX_CRYPTO_MARKET_DATA": "04_source_okx_crypto_market_data",
-            "GDELT_NEWS": "05_source_gdelt_news",
-            "ETF_HOLDINGS": "06_source_etf_holdings",
-            "TRADING_ECONOMICS_CALENDAR_WEB": "07_source_trading_economics_calendar_web",
-            "SEC_COMPANY_FINANCIALS": "08_source_sec_company_financials",
-            "THETADATA_OPTION_SELECTION_SNAPSHOT": "09_source_thetadata_option_selection_snapshot",
-            "THETADATA_OPTION_PRIMARY_TRACKING": "10_source_thetadata_option_primary_tracking",
-            "THETADATA_OPTION_EVENT_TIMELINE": "11_source_thetadata_option_event_timeline",
+            "01_SOURCE_MARKET_REGIME": "01_source_market_regime",
+            "02_SOURCE_SECURITY_SELECTION": "02_source_security_selection",
+            "03_SOURCE_STRATEGY_SELECTION": "03_source_strategy_selection",
+            "05_SOURCE_OPTION_EXPRESSION": "05_source_option_expression",
+            "06_SOURCE_POSITION_EXECUTION": "06_source_position_execution",
+            "07_SOURCE_EVENT_OVERLAY": "07_source_event_overlay",
         }
-        for key, payload in expected_bundles.items():
-            self.assertEqual(rows[key]["kind"], "data_bundle")
-            self.assertEqual(rows[key]["payload"], payload)
-            self.assertIn(f"data_bundles/{payload}", rows[key]["path"])
-            self.assertNotIn("_model_inputs", rows[key]["payload"])
-            self.assertNotIn("_model_inputs", rows[key]["path"])
+        expected_feeds = {
+            "ALPACA_BARS": "01_feed_alpaca_bars",
+            "ALPACA_LIQUIDITY": "02_feed_alpaca_liquidity",
+            "ALPACA_NEWS": "03_feed_alpaca_news",
+            "OKX_CRYPTO_MARKET_DATA": "04_feed_okx_crypto_market_data",
+            "GDELT_NEWS": "05_feed_gdelt_news",
+            "ETF_HOLDINGS": "06_feed_etf_holdings",
+            "TRADING_ECONOMICS_CALENDAR_WEB": "07_feed_trading_economics_calendar_web",
+            "SEC_COMPANY_FINANCIALS": "08_feed_sec_company_financials",
+            "THETADATA_OPTION_SELECTION_SNAPSHOT": "09_feed_thetadata_option_selection_snapshot",
+            "THETADATA_OPTION_PRIMARY_TRACKING": "10_feed_thetadata_option_primary_tracking",
+            "THETADATA_OPTION_EVENT_TIMELINE": "11_feed_thetadata_option_event_timeline",
+        }
         for key, payload in expected_sources.items():
             self.assertEqual(rows[key]["kind"], "data_source")
             self.assertEqual(rows[key]["payload"], payload)
             self.assertIn(f"data_sources/{payload}", rows[key]["path"])
+            self.assertNotIn("_model_inputs", rows[key]["payload"])
+            self.assertNotIn("_model_inputs", rows[key]["path"])
+        for key, payload in expected_feeds.items():
+            self.assertEqual(rows[key]["kind"], "data_feed")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn(f"data_feed/{payload}", rows[key]["path"])
         for row in rows.values():
             self.assertNotIn("trading-source/src/trading_source/", row["path"])
+            self.assertNotIn("data_bundles/", row["path"])
+            self.assertNotIn("source_availability", row["path"])
+            self.assertNotIn("source_interfaces", row["path"])
         self.assertNotIn("MACRO_DATA", rows)
         self.assertNotIn("STOCK_ETF_EXPOSURE_BUNDLE_DEPRECATED", rows)
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE", rows)
@@ -151,21 +154,21 @@ class RegistryHelperTests(unittest.TestCase):
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         expected = {
-            "OPTION_SYMBOL": ("identity_field", "option_symbol", "bundle_06_position_execution"),
-            "DOLLAR_VOLUME": ("field", "dollar_volume", "bundle_03_strategy_selection"),
-            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "bundle_03_strategy_selection"),
-            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "bundle_03_strategy_selection"),
-            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "bundle_03_strategy_selection"),
-            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "bundle_05_option_expression"),
-            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "bundle_07_event_overlay"),
-            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "bundle_07_event_overlay"),
-            "SCOPE_TYPE": ("classification_field", "scope_type", "bundle_07_event_overlay"),
-            "REFERENCE_TYPE": ("classification_field", "reference_type", "bundle_07_event_overlay"),
-            "EVENT_REFERENCE": ("path_field", "reference", "bundle_07_event_overlay"),
-            "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "bundle_05_option_expression"),
-            "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "bundle_05_option_expression"),
-            "QUOTE_BID_CONDITION": ("field", "bid_condition", "bundle_05_option_expression"),
-            "QUOTE_ASK_CONDITION": ("field", "ask_condition", "bundle_05_option_expression"),
+            "OPTION_SYMBOL": ("identity_field", "option_symbol", "source_06_position_execution"),
+            "DOLLAR_VOLUME": ("field", "dollar_volume", "source_03_strategy_selection"),
+            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "source_03_strategy_selection"),
+            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "source_03_strategy_selection"),
+            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "source_03_strategy_selection"),
+            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "source_05_option_expression"),
+            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "source_07_event_overlay"),
+            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "source_07_event_overlay"),
+            "SCOPE_TYPE": ("classification_field", "scope_type", "source_07_event_overlay"),
+            "REFERENCE_TYPE": ("classification_field", "reference_type", "source_07_event_overlay"),
+            "EVENT_REFERENCE": ("path_field", "reference", "source_07_event_overlay"),
+            "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "source_05_option_expression"),
+            "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "source_05_option_expression"),
+            "QUOTE_BID_CONDITION": ("field", "bid_condition", "source_05_option_expression"),
+            "QUOTE_ASK_CONDITION": ("field", "ask_condition", "source_05_option_expression"),
         }
         for key, (kind, payload, applies_to) in expected.items():
             self.assertEqual(rows[key]["kind"], kind)
@@ -173,11 +176,11 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn(applies_to, rows[key]["applies_to"])
 
         for key in ["SYMBOL", "DATA_TIMESTAMP", "OPEN_PRICE", "VWAP"]:
-            self.assertIn("bundle_01_market_regime", rows[key]["applies_to"])
+            self.assertIn("source_01_market_regime", rows[key]["applies_to"])
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
-            self.assertIn("bundle_02_security_selection", rows[key]["applies_to"])
+            self.assertIn("source_02_security_selection", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
-            self.assertIn("bundle_07_event_overlay", rows[key]["applies_to"])
+            self.assertIn("source_07_event_overlay", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
         self.assertNotIn("OPTION_CONTRACTS", rows)
         self.assertNotIn("QUOTE_TIMESTAMP", rows)
@@ -253,7 +256,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key in deleted_deprecated_macro_keys:
             self.assertNotIn(key, by_key)
 
-        expected_source_capabilities = {
+        expected_feed_capabilities = {
             "ALPACA_EQUITY_BAR",
             "ALPACA_EQUITY_NEWS",
             "ALPACA_EQUITY_LATEST_SNAPSHOT",
@@ -278,14 +281,14 @@ class RegistryHelperTests(unittest.TestCase):
             "SEC_FILING_DOCUMENT",
             "TRADING_ECONOMICS_CALENDAR_PAGE",
         }
-        for key in expected_source_capabilities:
-            self.assertEqual(by_key[key]["kind"], "source_capability")
-        self.assertIn("01_source_alpaca_bars", by_key["ALPACA_EQUITY_BAR"]["applies_to"])
-        self.assertIn("03_source_alpaca_news", by_key["ALPACA_EQUITY_NEWS"]["applies_to"])
-        self.assertIn("02_source_alpaca_liquidity", by_key["ALPACA_EQUITY_LATEST_SNAPSHOT"]["applies_to"])
-        self.assertIn("05_source_gdelt_news", by_key["GDELT_GKG_RECORD"]["applies_to"])
-        self.assertIn("06_source_etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
-        self.assertIn("07_source_trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
+        for key in expected_feed_capabilities:
+            self.assertEqual(by_key[key]["kind"], "feed_capability")
+        self.assertIn("01_feed_alpaca_bars", by_key["ALPACA_EQUITY_BAR"]["applies_to"])
+        self.assertIn("03_feed_alpaca_news", by_key["ALPACA_EQUITY_NEWS"]["applies_to"])
+        self.assertIn("02_feed_alpaca_liquidity", by_key["ALPACA_EQUITY_LATEST_SNAPSHOT"]["applies_to"])
+        self.assertIn("05_feed_gdelt_news", by_key["GDELT_GKG_RECORD"]["applies_to"])
+        self.assertIn("06_feed_etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
+        self.assertIn("07_feed_trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
         for obsolete_calendar_or_macro_key in {
             "CALENDAR_DISCOVERY",
             "ECONOMIC_RELEASE_CALENDAR",
@@ -461,9 +464,9 @@ class RegistryHelperTests(unittest.TestCase):
 
         by_key = {row["key"]: row for row in field_like_rows}
         for key in {"OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE", "CLOSE_PRICE", "VOLUME", "VWAP", "TRADE_COUNT"}:
-            self.assertIn("bundle_01_market_regime", by_key[key]["applies_to"])
-            self.assertIn("bundle_03_strategy_selection", by_key[key]["applies_to"])
-            self.assertIn("bundle_06_position_execution", by_key[key]["applies_to"])
+            self.assertIn("source_01_market_regime", by_key[key]["applies_to"])
+            self.assertIn("source_03_strategy_selection", by_key[key]["applies_to"])
+            self.assertIn("source_06_position_execution", by_key[key]["applies_to"])
         self.assertEqual(by_key["TRADE_COUNT"]["payload"], "trade_count")
         for deleted_key in {
             "BAR_OPEN",

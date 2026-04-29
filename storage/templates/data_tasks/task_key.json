@@ -1,6 +1,6 @@
 {
   "task_id": "<stable-manager-task-id>",
-  "bundle": "<bundle-name>",
+  "source": "<source-name>",
   "credential_config_id": null,
   "params": {},
   "output_root": "storage/<task-id>"

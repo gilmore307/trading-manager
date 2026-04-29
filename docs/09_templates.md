@@ -63,7 +63,7 @@ These project-development slot drafts are not active registry contracts. They we
 Parked data task drafting templates:
 
 - `storage/templates/data_tasks/task_key.json`
-- `storage/templates/data_tasks/bundle_readme.md`
+- `storage/templates/data_tasks/source_readme.md`
 - `storage/templates/data_tasks/pipeline.py`
 - `storage/templates/data_tasks/fetch_spec.md`
 - `storage/templates/data_tasks/clean_spec.md`
@@ -98,7 +98,7 @@ Normal flow for a shared contract shape:
 
 ## Data Task Template Status
 
-The files under `storage/templates/data_tasks/` are parked drafts, not active registry contracts. The task architecture will be redesigned after model and bundle contracts settle.
+The files under `storage/templates/data_tasks/` are parked drafts, not active registry contracts. The task architecture will be redesigned after model and source contracts settle.
 
 Do not register `data_task_key`, `data_task_completion_receipt`, or `data_task_completion_receipt_run` fields from these drafts until the task architecture is reviewed and accepted one contract at a time.
 

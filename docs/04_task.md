@@ -29,9 +29,9 @@
 - Registered all current `task_key.json` and `completion_receipt.json` field names as `kind=field` rows.
 - Updated task key/receipt templates so stable task keys can have multiple run entries in completion receipts.
 - Simplified `task_key.json` and `completion_receipt.json` to minimal operational fields.
-- Updated data task templates so bundles default to one `pipeline.py` with fetch/clean/save/receipt step functions.
-- Added data task templates for task keys, bundle docs, fetch/clean/save specs, completion receipts, and fixture policy.
-- Registered the earlier draft development-storage-root contract, later pruned it from active registry rows, and kept local `storage/` as an ignored legacy runtime path for unmigrated source bundles.
+- Updated data task templates so sources default to one `pipeline.py` with fetch/clean/save/receipt step functions.
+- Added data task templates for task keys, source docs, fetch/clean/save specs, completion receipts, and fixture policy.
+- Registered the earlier draft development-storage-root contract, later pruned it from active registry rows, and kept local `storage/` as an ignored legacy runtime path for unmigrated source sources.
 - Registered manager-driven historical data task workflow terms for task key files and completion receipts.
 - Registered FOMC calendar, official macro release calendar discovery, and ETF issuer holdings source terms.
 - Registered U.S. Treasury Fiscal Data as an open/no-key provider term with official documentation path.

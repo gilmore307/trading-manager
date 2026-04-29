@@ -1,10 +1,10 @@
-"""Template pipeline for a trading-source historical acquisition bundle.
+"""Template pipeline for a trading-source historical acquisition source.
 
 Copy this file into:
 
-    trading-source/src/data_sources/<bundle>/pipeline.py
+    trading-source/src/data_sources/<source>/pipeline.py
 
-Keep one public bundle entry point (`run`) while preserving clear internal step
+Keep one public source entry point (`run`) while preserving clear internal step
 boundaries for fetch, clean, save, and receipt generation.
 """
 
@@ -16,7 +16,7 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class BundleContext:
+class SourceContext:
     """Runtime paths and shared state derived from the task key."""
 
     task_key: dict[str, Any]
@@ -39,7 +39,7 @@ class StepResult:
     details: dict[str, Any] = field(default_factory=dict)
 
 
-def build_context(task_key: dict[str, Any], run_id: str) -> BundleContext:
+def build_context(task_key: dict[str, Any], run_id: str) -> SourceContext:
     """Build development output paths for one run of a stable task key.
 
     `output_root` should normally be a stable ignored local runtime path such
@@ -50,7 +50,7 @@ def build_context(task_key: dict[str, Any], run_id: str) -> BundleContext:
 
     output_root = Path(task_key["output_root"])
     run_dir = output_root / "runs" / run_id
-    return BundleContext(
+    return SourceContext(
         task_key=task_key,
         run_dir=run_dir,
         raw_dir=run_dir / "raw",
@@ -61,35 +61,35 @@ def build_context(task_key: dict[str, Any], run_id: str) -> BundleContext:
     )
 
 
-def fetch(context: BundleContext) -> StepResult:
+def fetch(context: SourceContext) -> StepResult:
     """Retrieve source data and write raw development files.
 
-    Bundle-specific implementation belongs here.
+    Source-specific implementation belongs here.
     """
 
-    raise NotImplementedError("Implement bundle-specific fetch step")
+    raise NotImplementedError("Implement source-specific fetch step")
 
 
-def clean(context: BundleContext, fetch_result: StepResult) -> StepResult:
+def clean(context: SourceContext, fetch_result: StepResult) -> StepResult:
     """Normalize raw files into cleaned development outputs.
 
-    Bundle-specific implementation belongs here.
+    Source-specific implementation belongs here.
     """
 
-    raise NotImplementedError("Implement bundle-specific clean step")
+    raise NotImplementedError("Implement source-specific clean step")
 
 
-def save(context: BundleContext, clean_result: StepResult) -> StepResult:
+def save(context: SourceContext, clean_result: StepResult) -> StepResult:
     """Save cleaned outputs under the development run directory.
 
     Do not write to SQL by default during development.
     """
 
-    raise NotImplementedError("Implement bundle-specific save step")
+    raise NotImplementedError("Implement source-specific save step")
 
 
 def write_receipt(
-    context: BundleContext,
+    context: SourceContext,
     *,
     status: str,
     fetch_result: StepResult | None = None,
@@ -99,11 +99,11 @@ def write_receipt(
 ) -> StepResult:
     """Append or update one run entry in the task-level completion receipt.
 
-    Bundle-specific receipt serialization belongs here. This function should be
+    Source-specific receipt serialization belongs here. This function should be
     able to run even when fetch, clean, or save fails.
     """
 
-    raise NotImplementedError("Implement bundle-specific receipt step")
+    raise NotImplementedError("Implement source-specific receipt step")
 
 
 def run(task_key: dict[str, Any], *, run_id: str) -> StepResult:
