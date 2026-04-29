@@ -369,8 +369,6 @@ class RegistryHelperTests(unittest.TestCase):
     def test_temporal_fields_are_separate_and_iso_scoped(self):
         expected_temporal_keys = {
             "AS_OF_DATE",
-            "DATA_TASK_RUN_COMPLETED_AT",
-            "DATA_TASK_RUN_STARTED_AT",
             "DATA_TIMESTAMP",
             "EVENT_TIME",
             "OPTION_EXPIRATION",
@@ -451,7 +449,6 @@ class RegistryHelperTests(unittest.TestCase):
 
     def test_classification_fields_are_separate_semantic_axes(self):
         expected_classification_keys = {
-            "DATA_TASK_RUN_STATUS",
             "EVENT_CATEGORY_TYPE",
             "EXPOSURE_TYPE",
             "INFORMATION_ROLE_TYPE",
@@ -489,7 +486,6 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("OPTION_RIGHT", rows)
         self.assertNotIn("STATUS", rows)
         self.assertNotIn("DATA_KIND_TEMPLATE_STATUS", rows)
-        self.assertEqual(rows["DATA_TASK_RUN_STATUS"]["payload"], "data_task_run_status")
         self.assertEqual(rows["REGISTRY_ITEM_ARTIFACT_SYNC_POLICY_TYPE"]["payload"], "artifact_sync_policy_type")
         self.assertNotIn("ACCEPTANCE_OUTCOME", rows)
         self.assertNotIn("REVIEW_READINESS", rows)
@@ -525,8 +521,6 @@ class RegistryHelperTests(unittest.TestCase):
     def test_path_fields_are_separate_from_identity_fields(self):
         expected_path_keys = {
             "REGISTRY_ITEM_PATH",
-            "DATA_TASK_RUN_OUTPUT_DIRECTORY",
-            "DATA_TASK_RUN_OUTPUT_REFERENCES",
             "EVENT_REFERENCE",
         }
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -556,16 +550,12 @@ class RegistryHelperTests(unittest.TestCase):
         }:
             self.assertEqual(rows[key]["kind"], "text_field")
             self.assertIn("Text value", rows[key]["note"])
-        self.assertEqual(rows["DATA_TASK_RUN_ERROR"]["kind"], "text_field")
-        self.assertIn("Text value", rows["DATA_TASK_RUN_ERROR"]["note"])
 
     def test_parameter_fields_are_separate_from_text_and_plain_fields(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        for key in {"DATA_TASK_PARAMS"}:
-            self.assertEqual(rows[key]["kind"], "parameter_field")
-            self.assertIn("Parameter value", rows[key]["note"])
+        self.assertNotIn("DATA_TASK_PARAMS", rows)
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []

@@ -1653,3 +1653,31 @@ Remove their registry field/status rows for now. Re-register only after each con
 - The parked slot drafts are not active registry contracts.
 - Do not use `maintenance_output_slots`, `acceptance_receipt_slots`, `completion_receipt_slots`, `execution_key_slots`, or `task_register_slots` as active registry scopes until accepted again.
 - Current accepted data-task contracts remain under `data_task_key`, `data_task_completion_receipt`, and `data_task_completion_receipt_run`.
+
+## D079 - Remove unaccepted data-task architecture registry rows
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+The data-task key and completion-receipt templates were early task-architecture drafts. Their registry rows made fields such as `data_task_run_status`, `data_task_run_id`, output references, row counts, and completion timestamps look accepted even though the task architecture should wait until model and bundle contracts are settled.
+
+### Decision
+
+Remove registry rows tied to unaccepted data-task architecture scopes and templates:
+
+- `data_task_key`
+- `data_task_completion_receipt`
+- `data_task_completion_receipt_run`
+- data-task template rows under `storage/templates/data_tasks/`
+- `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT`
+- data-task workflow terms for task key files, completion receipts, and task runs
+
+Leave the files under `storage/templates/data_tasks/` as parked drafts only. Re-register fields/templates/terms later one by one after the task architecture is redesigned and accepted.
+
+### Consequences
+
+- The active registry no longer claims data-task key or completion-receipt contracts are final.
+- `storage/templates/data_tasks/` is draft reference material, not a registered contract surface.
+- Future task architecture work must create fresh reviewed migrations instead of relying on these removed rows.

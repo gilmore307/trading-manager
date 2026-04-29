@@ -39,7 +39,7 @@ Templates must not own:
 storage/templates/
   README.md                 Template boundary summary.
   contracts/                Contract drafting templates.
-  data_tasks/               Historical data task drafting templates.
+  data_tasks/               Parked historical data task drafts; not active contracts.
   project_development/      Parked project-development slot drafts; not active contracts.
 ```
 
@@ -60,7 +60,7 @@ Current parked project-development drafts:
 
 These project-development slot drafts are not active registry contracts. They were moved out of the OpenClaw skill so they can be reviewed one by one before any future registration.
 
-Current data task drafting templates:
+Parked data task drafting templates:
 
 - `storage/templates/data_tasks/task_key.json`
 - `storage/templates/data_tasks/bundle_readme.md`
@@ -96,18 +96,11 @@ Normal flow for a shared contract shape:
 5. Update workflow and acceptance docs if the contract becomes binding.
 6. Route implementation work to the owning component repositories.
 
-## Data Task Template Flow
+## Data Task Template Status
 
-Normal flow for a historical data acquisition bundle:
+The files under `storage/templates/data_tasks/` are parked drafts, not active registry contracts. The task architecture will be redesigned after model and bundle contracts settle.
 
-1. Start from `storage/templates/data_tasks/task_key.json` for manager/data handoff shape.
-2. Start from `storage/templates/data_tasks/bundle_readme.md` for the bundle boundary.
-3. Use `pipeline.py` as the default single-file implementation shape with internal `fetch`, `clean`, `save`, and `write_receipt` step functions.
-4. Fill API-specific requirements using `fetch_spec.md`, `clean_spec.md`, `save_spec.md`, and `fixture_policy.md`.
-5. Use `completion_receipt.json` as the draft evidence shape for development receipts under `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT`.
-6. Register any stable field/type/status names before implementation treats them as contracts.
-
-These data task templates are draft surfaces. They do not by themselves create accepted task-key, receipt, storage, or API schemas. Keep task keys and receipts minimal: only include fields used by manager, runner, bundle execution, storage output, or receipt evidence. Provider documentation URLs and similar lookup metadata belong in registry/provider docs, not runtime task keys. A task key is stable across scheduled runs; per-run evidence belongs in receipt `runs[]`.
+Do not register `data_task_key`, `data_task_completion_receipt`, or `data_task_completion_receipt_run` fields from these drafts until the task architecture is reviewed and accepted one contract at a time.
 
 ## Recording Duty
 
