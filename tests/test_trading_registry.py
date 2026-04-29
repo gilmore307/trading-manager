@@ -332,7 +332,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_etf_universe.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 50)
+        self.assertEqual(len(rows), 47)
         self.assertEqual(
             list(rows[0].keys()),
             ["symbol", "universe_type", "exposure_type", "bar_grain", "fund_name", "issuer_name", "interpretation"],
@@ -341,7 +341,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("RSP", {row["symbol"] for row in rows})
         self.assertIn("SHY", {row["symbol"] for row in rows})
         self.assertIn("IEF", {row["symbol"] for row in rows})
-        self.assertEqual(rows[-1]["symbol"], "VNQ")
+        self.assertEqual(rows[-1]["symbol"], "VIXY")
 
         with Path("scripts/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -371,7 +371,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 58)
+        self.assertEqual(len(rows), 55)
         self.assertEqual(
             list(rows[0].keys()),
             [
