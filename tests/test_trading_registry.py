@@ -194,7 +194,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], payload)
             self.assertIn(applies_to, rows[key]["applies_to"])
 
-        for key in ["SYMBOL", "DATA_TIMESTAMP", "OPEN_PRICE", "VWAP"]:
+        for key in ["SYMBOL", "DATA_TIMESTAMP", "BAR_OPEN", "BAR_VWAP"]:
             self.assertIn("01_source_market_regime", rows[key]["applies_to"])
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
             self.assertIn("02_source_security_selection", rows[key]["applies_to"])
@@ -452,7 +452,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("GENERATED_AT", rows)
         self.assertEqual(rows["REGISTRY_ITEM_CREATED_AT"]["applies_to"], "trading_registry")
         self.assertEqual(rows["REGISTRY_ITEM_UPDATED_AT"]["applies_to"], "trading_registry")
-        self.assertEqual(rows["DATA_TIMEFRAME"]["kind"], "field")
+        self.assertEqual(rows["TIMEFRAME"]["kind"], "field")
         self.assertEqual(rows["OPTION_DAYS_TO_EXPIRATION"]["kind"], "field")
 
     def test_field_like_payloads_are_unique_semantic_words(self):
@@ -482,19 +482,31 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertFalse(applies_to & retired_unaccepted_slot_scopes)
 
         by_key = {row["key"]: row for row in field_like_rows}
-        for key in {"OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE", "CLOSE_PRICE", "VOLUME", "VWAP", "TRADE_COUNT"}:
+        expected_bar_fields = {
+            "BAR_OPEN": "bar_open",
+            "BAR_HIGH": "bar_high",
+            "BAR_LOW": "bar_low",
+            "BAR_CLOSE": "bar_close",
+            "BAR_VOLUME": "bar_volume",
+            "BAR_VWAP": "bar_vwap",
+            "BAR_TRADE_COUNT": "bar_trade_count",
+        }
+        for key, payload in expected_bar_fields.items():
             self.assertIn("01_source_market_regime", by_key[key]["applies_to"])
             self.assertIn("03_source_strategy_selection", by_key[key]["applies_to"])
             self.assertIn("06_source_position_execution", by_key[key]["applies_to"])
-        self.assertEqual(by_key["TRADE_COUNT"]["payload"], "trade_count")
+            self.assertEqual(by_key[key]["payload"], payload)
+        self.assertEqual(by_key["TIMEFRAME"]["payload"], "timeframe")
         for deleted_key in {
-            "BAR_OPEN",
-            "BAR_HIGH",
-            "BAR_LOW",
-            "BAR_CLOSE",
-            "BAR_VOLUME",
+            "OPEN_PRICE",
+            "HIGH_PRICE",
+            "LOW_PRICE",
+            "CLOSE_PRICE",
+            "VOLUME",
+            "VWAP",
+            "TRADE_COUNT",
+            "DATA_TIMEFRAME",
             "BAR_COUNT",
-            "BAR_VWAP",
             "TRADE_OPEN",
             "TRADE_HIGH",
             "TRADE_LOW",
