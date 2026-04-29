@@ -217,12 +217,18 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn(key, by_key)
 
         expected_source_capabilities = {
+            "ALPACA_EQUITY_BAR",
+            "ALPACA_EQUITY_NEWS",
+            "ALPACA_EQUITY_LATEST_SNAPSHOT",
             "CRYPTO_TRADE",
             "CRYPTO_QUOTE",
             "CRYPTO_ORDER_BOOK",
+            "OKX_CRYPTO_CANDLE",
             "EQUITY_TRADE",
             "EQUITY_QUOTE",
             "EQUITY_SNAPSHOT",
+            "ETF_ISSUER_HOLDINGS",
+            "GDELT_GKG_RECORD",
             "OPTION_GREEKS_FIRST_ORDER",
             "OPTION_GREEKS_SECOND_ORDER",
             "OPTION_GREEKS_THIRD_ORDER",
@@ -238,9 +244,16 @@ class RegistryHelperTests(unittest.TestCase):
             "FOMC_SEP",
             "FOMC_STATEMENT",
             "EQUITY_EARNINGS_CALENDAR",
+            "TRADING_ECONOMICS_CALENDAR_PAGE",
         }
         for key in expected_source_capabilities:
             self.assertEqual(by_key[key]["kind"], "source_capability")
+        self.assertIn("alpaca_bars", by_key["ALPACA_EQUITY_BAR"]["applies_to"])
+        self.assertIn("alpaca_news", by_key["ALPACA_EQUITY_NEWS"]["applies_to"])
+        self.assertIn("alpaca_liquidity", by_key["ALPACA_EQUITY_LATEST_SNAPSHOT"]["applies_to"])
+        self.assertIn("gdelt_news", by_key["GDELT_GKG_RECORD"]["applies_to"])
+        self.assertIn("etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
+        self.assertIn("trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
         self.assertNotIn("MACRO_RELEASE", by_key)
         self.assertIn("must not duplicate official", by_key["FRED"]["note"])
 

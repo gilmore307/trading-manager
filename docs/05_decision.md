@@ -1527,3 +1527,29 @@ Accepted numbered `trading-data` bundle SQL outputs live under schema `trading_d
 
 - `model_inputs` must not be used for source-backed `trading-data` bundle outputs.
 - Future model/training repositories can own their own model-input or training-data schemas without semantic collision.
+
+## D074 - Complete implemented source-capability coverage
+
+Date: 2026-04-28
+Status: Accepted
+
+### Context
+
+`source_capability` is useful as the registry vocabulary for source/provider endpoint families and raw/transient record families, but coverage was incomplete. Some ThetaData, SEC, calendar, and raw quote/trade concepts existed while implemented Alpaca, GDELT, ETF holdings, OKX candle, and Trading Economics visible-page capabilities were missing or left as terms.
+
+### Decision
+
+Register source capabilities for currently implemented `trading-data` source-interface capabilities:
+
+- Alpaca historical equity bars, news, latest snapshots, trades, and quotes.
+- OKX crypto candles, trades, quotes, and order books.
+- GDELT GKG BigQuery records.
+- Official ETF issuer holdings publications across CSV/XLSX/JSON/HTML issuer surfaces.
+- Trading Economics visible calendar web pages.
+- Existing ThetaData option, SEC EDGAR, FOMC/calendar, and raw market-data capabilities remain `source_capability` where they describe source/provider record families rather than accepted final data shapes.
+
+### Consequences
+
+- Use `source_capability` for source availability, entitlement review, adapter planning, and transient/raw input documentation.
+- Do not promote source capabilities to `data_kind` without a current accepted storage contract.
+- Keep implemented adapters in `data_source`; keep manager-facing tasks in `data_bundle`.
