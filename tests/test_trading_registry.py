@@ -64,12 +64,12 @@ class RegistryHelperTests(unittest.TestCase):
             "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
         )
         expected_bundles = {
-            "01_MARKET_REGIME_MODEL_INPUTS": "01_market_regime_model_inputs",
-            "02_SECURITY_SELECTION_MODEL_INPUTS": "02_security_selection_model_inputs",
-            "03_STRATEGY_SELECTION_MODEL_INPUTS": "03_strategy_selection_model_inputs",
-            "05_OPTION_EXPRESSION_MODEL_INPUTS": "05_option_expression_model_inputs",
-            "06_POSITION_EXECUTION_MODEL_INPUTS": "06_position_execution_model_inputs",
-            "07_EVENT_OVERLAY_MODEL_INPUTS": "07_event_overlay_model_inputs",
+            "BUNDLE_01_MARKET_REGIME": "bundle_01_market_regime",
+            "BUNDLE_02_SECURITY_SELECTION": "bundle_02_security_selection",
+            "BUNDLE_03_STRATEGY_SELECTION": "bundle_03_strategy_selection",
+            "BUNDLE_05_OPTION_EXPRESSION": "bundle_05_option_expression",
+            "BUNDLE_06_POSITION_EXECUTION": "bundle_06_position_execution",
+            "BUNDLE_07_EVENT_OVERLAY": "bundle_07_event_overlay",
         }
         expected_sources = {
             "ALPACA_BARS": "alpaca_bars",
@@ -87,6 +87,9 @@ class RegistryHelperTests(unittest.TestCase):
         for key, payload in expected_bundles.items():
             self.assertEqual(rows[key]["kind"], "data_bundle")
             self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn(f"data_bundles/{payload}", rows[key]["path"])
+            self.assertNotIn("_model_inputs", rows[key]["payload"])
+            self.assertNotIn("_model_inputs", rows[key]["path"])
         for key, payload in expected_sources.items():
             self.assertEqual(rows[key]["kind"], "data_source")
             self.assertEqual(rows[key]["payload"], payload)
@@ -94,6 +97,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("STOCK_ETF_EXPOSURE_BUNDLE_DEPRECATED", rows)
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE", rows)
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE_CONFIG", rows)
+        for obsolete_config in {
+            "01_MARKET_REGIME_MODEL_INPUTS_BUNDLE_CONFIG",
+            "02_SECURITY_SELECTION_MODEL_INPUTS_BUNDLE_CONFIG",
+            "02_SECURITY_SELECTION_STOCK_ETF_EXPOSURE_CONFIG",
+            "03_STRATEGY_SELECTION_MODEL_INPUTS_BUNDLE_CONFIG",
+            "05_OPTION_EXPRESSION_MODEL_INPUTS_BUNDLE_CONFIG",
+        }:
+            self.assertNotIn(obsolete_config, rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
         self.assertNotIn("06_EVENT_OVERLAY_MODEL_INPUTS", rows)

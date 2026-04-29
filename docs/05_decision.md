@@ -1403,10 +1403,10 @@ Layer 06 is now the position/execution model-input bundle and Layer 07 is now th
 
 Registry changes:
 
-- `06_EVENT_OVERLAY_MODEL_INPUTS` became `06_POSITION_EXECUTION_MODEL_INPUTS` with payload `06_position_execution_model_inputs`.
-- `07_PORTFOLIO_RISK_MODEL_INPUTS` became `07_EVENT_OVERLAY_MODEL_INPUTS` with payload `07_event_overlay_model_inputs`.
+- `06_EVENT_OVERLAY_MODEL_INPUTS` became `BUNDLE_06_POSITION_EXECUTION` with payload `bundle_06_position_execution`.
+- `07_PORTFOLIO_RISK_MODEL_INPUTS` became `BUNDLE_07_EVENT_OVERLAY` with payload `bundle_07_event_overlay`.
 - The old 06/07 bundle config rows were removed because those manifest-style configs were obsolete.
-- Event overlay references, including equity abnormal activity, now apply to `07_event_overlay_model_inputs`.
+- Event overlay references, including equity abnormal activity, now apply to `bundle_07_event_overlay`.
 
 Rationale: Layer 05 chooses option contracts; Layer 06 needs selected-contract option time series to study execution. Event overlay should remain a later one-row-per-event context layer, not the sixth layer.
 
@@ -1454,3 +1454,24 @@ Consequences:
 - Remove the old data-kind preview generator script registration.
 - Keep `source_capability` and `term` rows for source/provider concepts that are still useful for adapter planning, entitlement review, or glossary reference, but do not promote them to `data_kind` without a current accepted storage contract.
 - Do not recreate preview/template-only field rows or `applies_to` values. Registry retention is based on final SQL tables and still-valid shared/task/receipt/registry artifacts, not historical preview files.
+
+## D071 - Numbered trading-data package names are data bundles, not model-input universes
+
+Date: 2026-04-28
+Status: Accepted
+
+### Context
+
+The numbered `trading-data` packages were named `*_model_inputs`, which made them sound like the complete input universe for each model layer. Chentong clarified that these packages only fetch and prepare the data that must come from data sources; the full model-input set also includes upstream model outputs, candidate artifacts, portfolio/execution state, and feature construction outside these data bundles.
+
+### Decision
+
+Rename active numbered data-bundle registry rows to `BUNDLE_NN_<LAYER>` with payloads `bundle_NN_<layer>` and paths under `trading-data/src/trading_data/data_bundles/bundle_NN_<layer>`.
+
+Prune obsolete numbered bundle-local config rows that pointed to removed `config.json` files. Stable defaults for accepted numbered bundles live in reviewed pipeline code unless operators/researchers intentionally need a bundle-local config surface.
+
+### Consequences
+
+- `data_bundle` rows describe manager-facing data acquisition/preparation bundles, not complete model-input universes.
+- SQL output tables may still live under the `model_inputs` schema because those tables are consumed by model layers.
+- Do not introduce new active package paths named `*_model_inputs` under `src/trading_data/data_bundles/`.
