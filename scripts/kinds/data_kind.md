@@ -2,7 +2,7 @@
 
 ## Kind Boundary
 
-Canonical final saved or durable derived data-shape identifiers that have accepted reviewed storage contracts and can be consumed across trading repositories.
+Canonical final saved data-shape identifiers that have accepted reviewed storage contracts and can be consumed across trading repositories. Manager-facing `trading-derived` generated-output boundaries belong in `data_derived`.
 
 A data kind names the saved/output shape, not every provider endpoint, transient source input, entitlement-blocked interface, feed-interface catalog item, or retired preview/template file.
 
@@ -17,6 +17,7 @@ Use `payload` for a stable snake_case data-kind key. Use `path` only for the can
 Reject or re-scope entries that are actually:
 
 - manager-facing acquisition source names, which belong in `data_source`;
+- manager-facing derived output boundaries, which belong in `data_derived`;
 - provider/feed-owner names, which belong in `provider`;
 - provider endpoint names or feed-interface catalog items, which belong in `data_feed`/feed-interface code;
 - transient source inputs such as trades, quotes, order books, raw Greeks, or entitlement-blocked endpoint families unless and until they become accepted saved templates;

@@ -17,5 +17,6 @@ Reject or re-scope entries that are actually:
 - template files, which belong in `template`;
 - runtime output instances;
 - provider/source adapters, which belong in `data_source`;
+- manager-facing derived output boundaries, which belong in `data_derived`;
 - final saved dataset categories, which belong in `data_kind`;
 - non-secret config defaults, which belong in `config`.

@@ -1911,25 +1911,26 @@ Canonical paths are now:
 - Cross-repository code and docs should reference `trading-storage/main/shared/market_regime_etf_universe.csv` for the reviewed ETF universe CSV.
 - New shared fields, statuses, type values, helpers, or vocabulary introduced by templates still route through `trading-main` SQL registry migrations.
 
-## D088 - Register market-regime feature snapshots as a data kind
+## D088 - Register market-regime derived output as data_derived
 
 Date: 2026-04-29
 Status: Accepted
 
 ### Context
 
-Layer 1 `MarketRegimeModel` V1 derived output was simplified to a fixed-width point-in-time snapshot table: one row every 30 minutes, containing every feature available at that snapshot time. Chentong confirmed that non-feature columns should be registered, while feature columns should be registered separately as they are accepted.
+Layer 1 `MarketRegimeModel` V1 derived output was simplified to a fixed-width point-in-time snapshot table: one row every 30 minutes, containing every feature available at that snapshot time. Chentong confirmed that non-feature columns should be registered, while feature columns should be registered separately as they are accepted. He also clarified that derived outputs should have their own registry kind and use the same number-first pattern as `trading-source` source boundaries.
 
 ### Decision
 
-Register `MARKET_REGIME_FEATURE_SNAPSHOTS` as an active `data_kind` with payload `derived_01_market_regime_feature_snapshots`.
+Register `01_DERIVED_MARKET_REGIME` as an active `data_derived` row with payload `01_derived_market_regime`.
 
-Register the only non-feature business column through the existing `SNAPSHOT_TIME` temporal field by adding the `derived_01_market_regime_feature_snapshots` scope.
+Register the only non-feature business column through the existing `SNAPSHOT_TIME` temporal field by adding the `01_derived_market_regime` and `derived_01_market_regime_feature_snapshots` scopes.
 
 Do not register candidate feature columns as part of this decision.
 
 ### Consequences
 
-- The V1 snapshot table identity and `snapshot_time` column are visible in `scripts/current.csv`.
+- The V1 derived-output boundary and `snapshot_time` column are visible in `scripts/current.csv`.
+- `data_derived` rows use `NN_derived_<layer>` payloads, mirroring `data_source` rows such as `01_source_market_regime`.
 - Feature columns remain reviewed one by one before becoming shared registry fields.
 - The snapshot table does not carry row-level `feature_version`, `available_time`, `lookback_start_time`, `decision_start_time`, `decision_end_time`, `source_table`, or `source_row_count` columns.

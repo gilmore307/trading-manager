@@ -17,6 +17,7 @@ Use `payload` for the concrete `NN_source_<layer>` source key. Use `path` for th
 Reject or re-scope entries that are actually:
 
 - provider/API/web/file feeds, which belong in `data_feed`;
+- manager-facing generated-data outputs, which belong in `data_derived`;
 - final saved dataset shapes independent of the producing source, which belong in `data_kind`;
 - provider/company names, which belong in `provider`;
 - credentials or secret aliases, which belong in `config`;
