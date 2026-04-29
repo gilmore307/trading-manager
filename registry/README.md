@@ -97,6 +97,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - [`manifest_type`](./kinds/manifest_type.md) — Registered manifest type values used to classify run evidence documents across trading repositories.
 - [`path_field`](./kinds/path_field.md) — Canonical field names whose values locate or reference artifacts, files, URLs, repository paths, source references, or output references.
 - [`payload_format`](./kinds/payload_format.md) — Registered values allowed in the `trading_registry.payload_format` column.
+- [`provider`](./kinds/provider.md) — External data/provider organizations, platforms, or authoritative source surfaces that own source capabilities.
 - [`ready_signal_type`](./kinds/ready_signal_type.md) — Registered ready-signal type values used to classify downstream consumability signals.
 - [`repo`](./kinds/repo.md) — Canonical repository identifiers. Use for repository names, not filesystem paths.
 - [`request_type`](./kinds/request_type.md) — Registered request type values used to classify cross-repository work requests.
@@ -125,7 +126,7 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Registered registry item lookup APIs must take registry ids as input, not keys.
 - `script` rows are for stable callable helper/automation exports, not package constants or test scripts.
 - Repository rows should include the repository name in `payload` and the local checkout root in `path` when the checkout path is an approved shared fact.
-- Use the `path` column for direct locators/addresses on entity-like entries such as repos, scripts, source-secret JSON config rows, and provider documentation term rows.
+- Use the `path` column for direct locators/addresses on entity-like entries such as repos, scripts, source-secret JSON config rows, provider home/documentation rows, and source-capability endpoint documentation rows.
 - Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Source secret JSON field names use `applies_to=source_secret_json`.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.
 - If a new kind is needed, add its `registry/kinds/<kind>.md` boundary file, update the SQL kind check, update registry tests/docs, and regenerate `registry/current.csv` in the same reviewed change.

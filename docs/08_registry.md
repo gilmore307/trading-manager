@@ -109,6 +109,7 @@ The SQL `trading_registry.kind` constraint and `registry/kinds/*.md` files must 
 The most important data-related split is:
 
 - `data_kind` — accepted final saved/template-backed data shapes only.
+- `provider` — external provider/source-owner identities such as data vendors, exchanges, official agencies, or authoritative source surfaces.
 - `data_source` — implemented source adapters or source interfaces.
 - `source_capability` — source-level record families, raw inputs, endpoint families, transient evidence, or entitlement-gated provider capabilities that are not final saved shapes.
 - `data_bundle` — manager-facing runnable bundle boundaries.
@@ -187,7 +188,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 - Set `artifact_sync_policy` explicitly when adding rows that point to code, templates, docs, or other concrete artifacts.
 - Store secret aliases only; never store secret values.
 
-Source-level secret JSON config rows should use `payload_format=secret_alias`, store the source alias in `payload`, and may mirror the JSON file path in `path`. Provider `term` rows may use `path` for the canonical public documentation URL. JSON field names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, and `pat` are registered as `field` rows with `applies_to=source_secret_json`.
+Source-level secret JSON config rows should use `payload_format=secret_alias`, store the source alias in `payload`, and may mirror the JSON file path in `path`. `provider` rows may use `path` for the canonical public provider home or documentation URL. JSON field names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, and `pat` are registered as `field` rows with `applies_to=source_secret_json`.
 - Use nullable `path` for direct locators such as local repo roots, helper source files, source-secret JSON files, and provider documentation URLs; do not create a `path` kind.
 - Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.

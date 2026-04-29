@@ -58,7 +58,7 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        self.assertEqual(rows["SEC_EDGAR"]["kind"], "term")
+        self.assertEqual(rows["SEC_EDGAR"]["kind"], "provider")
         self.assertEqual(
             rows["SEC_EDGAR"]["path"],
             "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
@@ -255,7 +255,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
         self.assertIn("trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
         self.assertNotIn("MACRO_RELEASE", by_key)
-        self.assertIn("must not duplicate official", by_key["FRED"]["note"])
+        self.assertIn("do not duplicate official", by_key["FRED"]["note"])
 
     def test_market_etf_universe_shared_csv_columns_are_registered(self):
         shared_path = Path("storage/shared/market_etf_universe.csv")

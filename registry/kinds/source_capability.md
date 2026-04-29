@@ -19,6 +19,6 @@ Reject or re-scope entries that are actually:
 - final saved data shapes with accepted current storage contracts, which belong in `data_kind`;
 - implemented source adapters, which belong in `data_source`;
 - manager-facing bundles, which belong in `data_bundle`;
-- provider/company names, which belong in `term`;
+- provider/company/source-owner names, which belong in `provider`;
 - ordinary glossary-only concepts with no source/interface role, which belong in `term`;
 - runtime fields, which belong in `field`.

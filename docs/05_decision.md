@@ -1553,3 +1553,24 @@ Register source capabilities for currently implemented `trading-data` source-int
 - Use `source_capability` for source availability, entitlement review, adapter planning, and transient/raw input documentation.
 - Do not promote source capabilities to `data_kind` without a current accepted storage contract.
 - Keep implemented adapters in `data_source`; keep manager-facing tasks in `data_bundle`.
+
+## D075 - Split provider identities out of generic terms
+
+Date: 2026-04-28
+Status: Accepted
+
+### Context
+
+After `source_capability` became the registry kind for provider/source endpoint families and raw record families, provider identities themselves were still stored as generic `term` rows. That made the source vocabulary uneven: provider/source owners, provider capabilities, implemented adapters, and manager-facing bundles were no longer equally explicit.
+
+### Decision
+
+Add `provider` as the registry kind for external data/provider organizations, platforms, exchanges, official agencies, code hosts, and authoritative source surfaces. Reclassify provider/source-owner rows such as Alpaca, OKX, ThetaData, GDELT, SEC EDGAR, Trading Economics, FRED, BEA, BLS, Census, GitHub, and U.S. Treasury Fiscal Data from `term` to `provider`.
+
+Use `term` only for ordinary glossary/reference concepts. Use `source_capability` for endpoint families, raw/transient record families, or entitlement-gated capabilities owned by a provider. Use `data_source` for implemented adapters/interfaces.
+
+### Consequences
+
+- Provider documentation URLs now belong on `provider.path` rather than provider `term` rows.
+- Provider capability coverage can be reviewed without promoting capabilities to final `data_kind` status.
+- The registry kind split is now: `provider` owns who publishes it; `source_capability` owns what the provider exposes; `data_source` owns our adapter; `data_bundle` owns manager-facing runs.
