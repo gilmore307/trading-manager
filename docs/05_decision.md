@@ -767,7 +767,7 @@ OKX credentials were initially split into separate aliases/files for API key, se
 
 ### Decision
 
-Use one JSON secret file per source/provider under `/root/secrets/<source>.json`. Registry config rows should point to the source-level alias, such as `okx` or `github`, and may mirror the JSON file path in `path`. Register reusable JSON key names, such as `api_key`, `secret_key`, `passphrase`, `endpoint`, `allowed_ip_address`, `api_key_remark_name`, and `pat`, as `field` rows with `applies_to=source_secret_json`.
+Use one JSON secret file per source/provider under `/root/secrets/<source>.json`. Registry config rows should point to the source-level alias, such as `okx` or `github`, and may mirror the JSON file path in `path`. Register reusable JSON key names, such as `api_key`, `secret_key`, `passphrase`, `endpoint`, `allowed_ip_address`, `api_key_remark_name`, and `pat`, as `field` rows with `applies_to=source_secret_file_schema`.
 
 ### Rationale
 
@@ -801,7 +801,7 @@ The registry should expose one source-level alias for OKX, not split credential 
 
 - `OKX_SECRET_ALIAS` remains the single OKX credential/config entry.
 - JSON keys now include `api_key`, `secret_key`, `passphrase`, `allowed_ip_address`, and `api_key_remark_name`.
-- `SOURCE_SECRET_ALLOWED_IP_ADDRESS` and `SOURCE_SECRET_API_KEY_REMARK_NAME` are registered field rows with `applies_to=source_secret_json`.
+- `SOURCE_SECRET_ALLOWED_IP_ADDRESS` and `SOURCE_SECRET_API_KEY_REMARK_NAME` are registered field rows with `applies_to=source_secret_file_schema`.
 
 ## D038 - Alpaca is a registered stock and ETF data provider config surface
 
@@ -1714,3 +1714,25 @@ Current source-interface names are:
 - `trading-data/src/data_sources/` directories use number-first `NN_source_*` names.
 - `trading-main` data-source registry payload/path values use the same names.
 - Source-interface numbering is inventory/order clarity, not model-layer ownership; manager-facing model layers remain `data_bundle` rows.
+
+## D081 - Rename source secret schema scope
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+The registry used `source_secret_json` as an `applies_to` scope for canonical JSON keys in source-level secret files. That name sounded like a file kind or concrete JSON object rather than the schema scope for fields inside `/root/secrets/<source>.json` files.
+
+### Decision
+
+Rename the registry field scope from `source_secret_json` to `source_secret_file_schema`.
+
+Use `source_secret_file_schema` for canonical secret-file key names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, `pat`, `allowed_ip_address`, and `api_key_remark_name`.
+
+Secret registry entries may describe actual local secret files as `source_secret_file`; the registry field scope remains `source_secret_file_schema`.
+
+### Consequences
+
+- Do not add new active registry rows with `applies_to=source_secret_json`.
+- `source_secret_file_schema` names schema slots only; secret values remain outside Git under `/root/secrets/`.

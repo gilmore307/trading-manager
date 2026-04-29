@@ -127,6 +127,6 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - `script` rows are for stable callable helper/automation exports, not package constants or test scripts.
 - Repository rows should include the repository name in `payload` and the local checkout root in `path` when the checkout path is an approved shared fact.
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos, scripts, source-secret JSON config rows, provider home/documentation rows, and source-capability endpoint documentation rows.
-- Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Source secret JSON field names use `applies_to=source_secret_json`.
+- Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Source secret file schema field names use `applies_to=source_secret_file_schema`.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.
 - If a new kind is needed, add its `registry/kinds/<kind>.md` boundary file, update the SQL kind check, update registry tests/docs, and regenerate `registry/current.csv` in the same reviewed change.

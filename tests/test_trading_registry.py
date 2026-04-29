@@ -676,7 +676,7 @@ class RegistryHelperTests(unittest.TestCase):
             {
                 "github": {
                     "path": "/root/secrets/github.json",
-                    "kind": "source_secret_json",
+                    "kind": "source_secret_file",
                     "use": "git operations",
                     "fields": {"pat": "GitHub personal access token"},
                 }
@@ -686,7 +686,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(entry["alias"], "github")
         self.assertEqual(entry["path"], "/root/secrets/github.json")
-        self.assertEqual(entry["kind"], "source_secret_json")
+        self.assertEqual(entry["kind"], "source_secret_file")
 
     def test_secret_resolver_loads_source_json_field_text_by_config_id(self):
         reads = []
@@ -715,7 +715,7 @@ class RegistryHelperTests(unittest.TestCase):
                     {
                         "example-service": {
                             "path": "/root/secrets/example-service.json",
-                            "kind": "source_secret_json",
+                            "kind": "source_secret_file",
                             "use": "example service credentials",
                             "fields": {
                                 "allowed_ip_address": "example allowlisted IPv4 address",
