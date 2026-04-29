@@ -149,6 +149,15 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS", rows)
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS_BUNDLE_CONFIG", rows)
 
+    def test_event_database_scope_is_not_active(self):
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            offenders = [
+                (row["key"], row["applies_to"])
+                for row in csv.DictReader(csv_file)
+                if "event_database" in (row["applies_to"] or "")
+            ]
+        self.assertEqual(offenders, [])
+
     def test_applies_to_uses_number_first_source_scopes(self):
         pattern = re.compile(r"(?:^|;)source_[0-9]{2}_")
         with Path("registry/current.csv").open(newline="") as csv_file:
