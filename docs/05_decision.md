@@ -1439,7 +1439,7 @@ The registry no longer keeps field-like rows that only described retired `tradin
 Consequences:
 
 - Field-like kinds (`field`, `identity_field`, `path_field`, `temporal_field`, `classification_field`, `text_field`, and `parameter_field`) must not carry obsolete `*_template`, `option_template`, or `data_kind_template` `applies_to` values.
-- Retained final-SQL fields have `applies_to` values such as `trading_data_01_bundle_market_regime`, `trading_data_02_bundle_security_selection`, `trading_data_03_bundle_strategy_selection`, `trading_data_05_bundle_option_expression`, `trading_data_06_bundle_position_execution`, or `trading_data_07_bundle_event_overlay`.
+- Retained final-SQL fields have `applies_to` values such as `bundle_01_market_regime`, `bundle_02_security_selection`, `bundle_03_strategy_selection`, `bundle_05_option_expression`, `bundle_06_position_execution`, or `bundle_07_event_overlay`.
 - Preview/template file paths are not evidence for retaining field rows. If a field is not part of a current SQL contract or valid non-template artifact, it should be removed instead of preserved as vocabulary clutter.
 
 ## D070 - Retired data-kind previews are not active registry items
@@ -1489,12 +1489,12 @@ The accepted numbered data bundles wrote SQL tables with model-layer business na
 
 Name accepted numbered bundle SQL tables after the writing bundle, using portable SQL snake_case:
 
-- `trading_data.trading_data_01_bundle_market_regime`
-- `trading_data.trading_data_02_bundle_security_selection`
-- `trading_data.trading_data_03_bundle_strategy_selection`
-- `trading_data.trading_data_05_bundle_option_expression`
-- `trading_data.trading_data_06_bundle_position_execution`
-- `trading_data.trading_data_07_bundle_event_overlay`
+- `trading_data.bundle_01_market_regime`
+- `trading_data.bundle_02_security_selection`
+- `trading_data.bundle_03_strategy_selection`
+- `trading_data.bundle_05_option_expression`
+- `trading_data.bundle_06_position_execution`
+- `trading_data.bundle_07_event_overlay`
 
 CLI/package names may use hyphens where appropriate, but SQL identifiers use underscores.
 
@@ -1516,12 +1516,12 @@ After bundle table names were changed to follow the producing `trading-data` bun
 
 Accepted numbered `trading-data` bundle SQL outputs live under schema `trading_data`, not `model_inputs`:
 
-- `trading_data.trading_data_01_bundle_market_regime`
-- `trading_data.trading_data_02_bundle_security_selection`
-- `trading_data.trading_data_03_bundle_strategy_selection`
-- `trading_data.trading_data_05_bundle_option_expression`
-- `trading_data.trading_data_06_bundle_position_execution`
-- `trading_data.trading_data_07_bundle_event_overlay`
+- `trading_data.bundle_01_market_regime`
+- `trading_data.bundle_02_security_selection`
+- `trading_data.bundle_03_strategy_selection`
+- `trading_data.bundle_05_option_expression`
+- `trading_data.bundle_06_position_execution`
+- `trading_data.bundle_07_event_overlay`
 
 ### Consequences
 

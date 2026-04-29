@@ -117,17 +117,17 @@ class RegistryHelperTests(unittest.TestCase):
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         expected = {
-            "OPTION_SYMBOL": ("identity_field", "option_symbol", "trading_data_06_bundle_position_execution"),
-            "DOLLAR_VOLUME": ("field", "dollar_volume", "trading_data_03_bundle_strategy_selection"),
-            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "trading_data_03_bundle_strategy_selection"),
-            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "trading_data_03_bundle_strategy_selection"),
-            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "trading_data_03_bundle_strategy_selection"),
-            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "trading_data_05_bundle_option_expression"),
-            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "trading_data_07_bundle_event_overlay"),
-            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "trading_data_07_bundle_event_overlay"),
-            "SCOPE_TYPE": ("classification_field", "scope_type", "trading_data_07_bundle_event_overlay"),
-            "REFERENCE_TYPE": ("classification_field", "reference_type", "trading_data_07_bundle_event_overlay"),
-            "EVENT_REFERENCE": ("path_field", "reference", "trading_data_07_bundle_event_overlay"),
+            "OPTION_SYMBOL": ("identity_field", "option_symbol", "bundle_06_position_execution"),
+            "DOLLAR_VOLUME": ("field", "dollar_volume", "bundle_03_strategy_selection"),
+            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "bundle_03_strategy_selection"),
+            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "bundle_03_strategy_selection"),
+            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "bundle_03_strategy_selection"),
+            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "bundle_05_option_expression"),
+            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "bundle_07_event_overlay"),
+            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "bundle_07_event_overlay"),
+            "SCOPE_TYPE": ("classification_field", "scope_type", "bundle_07_event_overlay"),
+            "REFERENCE_TYPE": ("classification_field", "reference_type", "bundle_07_event_overlay"),
+            "EVENT_REFERENCE": ("path_field", "reference", "bundle_07_event_overlay"),
         }
         for key, (kind, payload, applies_to) in expected.items():
             self.assertEqual(rows[key]["kind"], kind)
@@ -135,11 +135,11 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn(applies_to, rows[key]["applies_to"])
 
         for key in ["SYMBOL", "DATA_TIMESTAMP", "OPEN_PRICE", "VWAP"]:
-            self.assertIn("trading_data_01_bundle_market_regime", rows[key]["applies_to"])
+            self.assertIn("bundle_01_market_regime", rows[key]["applies_to"])
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
-            self.assertIn("trading_data_02_bundle_security_selection", rows[key]["applies_to"])
+            self.assertIn("bundle_02_security_selection", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
-            self.assertIn("trading_data_07_bundle_event_overlay", rows[key]["applies_to"])
+            self.assertIn("bundle_07_event_overlay", rows[key]["applies_to"])
 
     def test_initial_data_kinds_are_registered(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
@@ -386,9 +386,9 @@ class RegistryHelperTests(unittest.TestCase):
 
         by_key = {row["key"]: row for row in field_like_rows}
         for key in {"OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE", "CLOSE_PRICE", "VOLUME", "VWAP", "TRADE_COUNT"}:
-            self.assertIn("trading_data_01_bundle_market_regime", by_key[key]["applies_to"])
-            self.assertIn("trading_data_03_bundle_strategy_selection", by_key[key]["applies_to"])
-            self.assertIn("trading_data_06_bundle_position_execution", by_key[key]["applies_to"])
+            self.assertIn("bundle_01_market_regime", by_key[key]["applies_to"])
+            self.assertIn("bundle_03_strategy_selection", by_key[key]["applies_to"])
+            self.assertIn("bundle_06_position_execution", by_key[key]["applies_to"])
         self.assertEqual(by_key["TRADE_COUNT"]["payload"], "trade_count")
         for deleted_key in {
             "BAR_OPEN",
