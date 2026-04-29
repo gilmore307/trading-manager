@@ -332,7 +332,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_etf_universe.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 49)
+        self.assertEqual(len(rows), 50)
         self.assertEqual(
             list(rows[0].keys()),
             ["symbol", "universe_type", "exposure_type", "bar_grain", "fund_name", "issuer_name", "interpretation"],
@@ -371,7 +371,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 57)
+        self.assertEqual(len(rows), 58)
         self.assertEqual(
             list(rows[0].keys()),
             [
