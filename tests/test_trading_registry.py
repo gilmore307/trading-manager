@@ -380,7 +380,6 @@ class RegistryHelperTests(unittest.TestCase):
                 "numerator_bar_grain",
                 "denominator_bar_grain",
                 "feature_bar_grain",
-                "feature_type",
                 "interpretation",
                 "notes",
             ],
@@ -388,7 +387,7 @@ class RegistryHelperTests(unittest.TestCase):
         by_id = {row["combination_id"]: row for row in rows}
         self.assertEqual(by_id["rsp_spy"]["feature_bar_grain"], "30m")
         self.assertEqual(by_id["tlt_shy"]["combination_type"], "primary")
-        self.assertEqual(by_id["ief_shy"]["feature_type"], "relative_strength")
+        self.assertEqual(by_id["ief_shy"]["combination_type"], "primary")
         self.assertEqual(by_id["smh_xlk"]["feature_bar_grain"], "1d")
 
         with Path("scripts/current.csv").open(newline="") as csv_file:
