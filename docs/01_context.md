@@ -33,7 +33,7 @@ Current expected external interfaces include:
 - macroeconomic and calendar data sources;
 - broker or exchange APIs, including OKX or Alpaca;
 - local or shared filesystem storage used by the trading repositories;
-- `trading-main/registry/` and `docs/08_registry.md` for trading-wide registered names, status vocabularies, and registrable fields;
+- `trading-main/scripts/registry/` and `docs/08_registry.md` for trading-wide registered names, status vocabularies, and registrable fields;
 - OpenClaw/Codex execution surfaces for planning, implementation, review, and acceptance.
 
 Specific providers, credentials, quotas, and environments are not defined in this file unless they become system-level assumptions.
@@ -69,7 +69,7 @@ The accepted shared environment baseline is:
 Because this server's project work is centered on the trading system, `trading-main` is the canonical home for trading-wide shared assets:
 
 - `src/` stores shared helper code used by component repositories; `docs/07_helpers.md` explains the helper boundary.
-- `registry/` maintains the SQL-backed registration system; `docs/08_registry.md` explains the registry operating model.
+- `scripts/registry/` maintains the SQL-backed registration system; `docs/08_registry.md` explains the registry operating model.
 - `storage/templates/` stores reusable trading project, contract, task, and implementation templates; `docs/09_templates.md` explains the template boundary.
 
 Shared helpers are allowed in `trading-main`, but they must remain generic trading infrastructure. Component-specific runtime behavior still belongs in the owning component repository.
@@ -90,7 +90,7 @@ Runtime deployment environments, production hosts, storage volumes, broker crede
 
 System-level dependencies currently assumed:
 
-- `trading-main/registry/` and `docs/08_registry.md` for registered names, shared status vocabularies, and registrable fields;
+- `trading-main/scripts/registry/` and `docs/08_registry.md` for registered names, shared status vocabularies, and registrable fields;
 - `requirements.txt` in `trading-main` for reviewed shared Python dependencies;
 - OpenClaw project-development process for docs spine, task boundaries, acceptance, and review;
 - component repositories for concrete implementation;
@@ -125,7 +125,7 @@ For `trading-main`, Codex should normally not be needed unless there is a bulk d
 - `trading-main` owns docs, contracts, registries, templates, shared helpers, and the gitignored shared environment anchor.
 - Cross-repository behavior must be described through explicit contracts before implementation depends on it.
 - Component repositories must not silently fork global contracts.
-- Trading-wide status vocabularies and registrable fields belong in `trading-main/registry/`; registry operating details belong in `docs/08_registry.md`.
+- Trading-wide status vocabularies and registrable fields belong in `trading-main/scripts/registry/`; registry operating details belong in `docs/08_registry.md`.
 - Component-specific details belong in the component repository docs, not in `trading-main`.
 - Market-state discovery must not be contaminated by strategy performance.
 - Execution-related code must treat broker and exchange operations as safety-sensitive external actions.

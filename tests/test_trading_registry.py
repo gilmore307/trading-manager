@@ -34,7 +34,7 @@ def create_row(**overrides):
 class RegistryHelperTests(unittest.TestCase):
     def test_registry_kind_files_match_sql_constraint_and_current_rows(self):
         constraint_blocks = []
-        for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
+        for migration in sorted(Path("scripts/registry/sql/schema_migrations").glob("*.sql")):
             text = migration.read_text()
             if "CHECK (kind IN (" in text:
                 constraint_blocks.append(text.split("CHECK (kind IN (", 1)[1].split("));", 1)[0])
@@ -43,11 +43,11 @@ class RegistryHelperTests(unittest.TestCase):
 
         kind_files = sorted(
             path.stem
-            for path in Path("registry/kinds").glob("*.md")
+            for path in Path("scripts/registry/kinds").glob("*.md")
             if path.name != "README.md"
         )
 
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             current_kinds = {row["kind"] for row in csv.DictReader(csv_file)}
 
         self.assertEqual(kind_files, constrained_kinds)
@@ -55,7 +55,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("payload_format", constrained_kinds)
 
     def test_component_repository_rows_use_source_and_derived_boundaries(self):
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         self.assertEqual(rows["TRADING_SOURCE_REPO"]["payload"], "trading-source")
@@ -73,7 +73,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn("trading-strategy", row["path"])
 
     def test_data_feed_and_data_source_rows_are_separated(self):
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         self.assertEqual(rows["SEC_EDGAR"]["kind"], "provider")
@@ -150,7 +150,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS_BUNDLE_CONFIG", rows)
 
     def test_event_database_scope_is_not_active(self):
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             offenders = [
                 (row["key"], row["applies_to"])
                 for row in csv.DictReader(csv_file)
@@ -160,7 +160,7 @@ class RegistryHelperTests(unittest.TestCase):
 
     def test_applies_to_uses_number_first_source_scopes(self):
         pattern = re.compile(r"(?:^|;)source_[0-9]{2}_")
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             offenders = [
                 (row["key"], row["applies_to"])
                 for row in csv.DictReader(csv_file)
@@ -169,7 +169,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
     def test_model_input_output_fields_are_registered(self):
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         expected = {
@@ -207,7 +207,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("GREEKS_TIMESTAMP", rows)
 
     def test_initial_data_kinds_are_registered(self):
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         by_key = {row["key"]: row for row in rows}
         data_kinds = [row for row in rows if row["kind"] == "data_kind"]
@@ -340,7 +340,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows[0]["symbol"], "AIQ")
         self.assertEqual(rows[-1]["symbol"], "VNQ")
 
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
         self.assertEqual(registry["MARKET_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-main/storage/shared/market_etf_universe.csv")
         expected_fields = {
@@ -363,14 +363,14 @@ class RegistryHelperTests(unittest.TestCase):
 
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
-        for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
+        for migration in sorted(Path("scripts/registry/sql/schema_migrations").glob("*.sql")):
             text = migration.read_text()
             if "CHECK (payload_format IN (" in text:
                 constraint_blocks.append(text.split("CHECK (payload_format IN (", 1)[1].split("));", 1)[0])
         self.assertTrue(constraint_blocks)
         constrained_formats = tuple(re.findall(r"'([^']+)'", constraint_blocks[-1]))
 
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registered_formats = tuple(
                 row["payload"]
                 for row in csv.DictReader(csv_file)
@@ -402,7 +402,7 @@ class RegistryHelperTests(unittest.TestCase):
         }
         expected_domains = {"artifact_sync_policy_type"}
 
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
 
         self.assertFalse({row["kind"] for row in rows} & old_status_kinds)
@@ -435,7 +435,7 @@ class RegistryHelperTests(unittest.TestCase):
             "STOCK_ETF_AVAILABLE_TIME",
             "UNDERLYING_TIMESTAMP",
         }
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         for key in expected_temporal_keys:
@@ -456,7 +456,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["OPTION_DAYS_TO_EXPIRATION"]["kind"], "field")
 
     def test_field_like_payloads_are_unique_semantic_words(self):
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             field_like_rows = [
                 row
                 for row in csv.DictReader(csv_file)
@@ -530,7 +530,7 @@ class RegistryHelperTests(unittest.TestCase):
             "SNAPSHOT_TYPE",
             "UNIVERSE_TYPE",
         }
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         for key in expected_classification_keys:
@@ -574,7 +574,7 @@ class RegistryHelperTests(unittest.TestCase):
             "ISSUER_NAME",
             "OPTION_SYMBOL",
         }
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         for key in expected_identity_keys:
@@ -592,7 +592,7 @@ class RegistryHelperTests(unittest.TestCase):
             "REGISTRY_ITEM_PATH",
             "EVENT_REFERENCE",
         }
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         for key in expected_path_keys:
@@ -610,7 +610,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("TRADING_ECONOMICS_REFERENCE_PERIOD", rows)
 
     def test_text_fields_are_separate_from_plain_fields(self):
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         for key in {
@@ -621,14 +621,14 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("Text value", rows[key]["note"])
 
     def test_parameter_fields_are_separate_from_text_and_plain_fields(self):
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         self.assertNotIn("DATA_TASK_PARAMS", rows)
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
         constraint_blocks = []
-        for migration in sorted(Path("registry/sql/schema_migrations").glob("*.sql")):
+        for migration in sorted(Path("scripts/registry/sql/schema_migrations").glob("*.sql")):
             text = migration.read_text()
             if "CHECK (artifact_sync_policy IN (" in text:
                 constraint_blocks.append(
@@ -637,7 +637,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertTrue(constraint_blocks)
         constrained_policies = tuple(re.findall(r"'([^']+)'", constraint_blocks[-1]))
 
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registered_policies = tuple(
                 row["payload"]
                 for row in csv.DictReader(csv_file)
@@ -658,7 +658,7 @@ class RegistryHelperTests(unittest.TestCase):
         for script in test_scripts:
             self.assertIn(f"`{script.name}`", tests_readme)
 
-        with Path("registry/current.csv").open(newline="") as csv_file:
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             script_rows = [row for row in csv.DictReader(csv_file) if row["kind"] == "script"]
 
         for row in script_rows:

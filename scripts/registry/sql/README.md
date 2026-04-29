@@ -2,12 +2,12 @@
 
 This directory owns the SQL-backed concrete registry entries for `trading-main`.
 
-Markdown files in `registry/` define kind boundaries. SQL migrations define the actual active entries and schema.
+Markdown files in `scripts/registry/` define kind boundaries. SQL migrations define the actual active entries and schema.
 
 ## Layout
 
 ```text
-registry/sql/
+scripts/registry/sql/
   README.md
   schema_migrations/
     001_create_trading_registry.sql
@@ -20,11 +20,11 @@ registry/sql/
 - Treat migrations as append-only after commit.
 - Do not list concrete row inventories in kind Markdown files.
 - Do not store secrets in SQL payloads. Use secret aliases for `config` entries.
-- If a new `kind` is introduced, update both the SQL kind check and the corresponding `registry/kinds/<kind>.md` boundary file. The SQL kind check must stay aligned with `registry/kinds/*.md`; tests enforce this.
+- If a new `kind` is introduced, update both the SQL kind check and the corresponding `scripts/registry/kinds/<kind>.md` boundary file. The SQL kind check must stay aligned with `scripts/registry/kinds/*.md`; tests enforce this.
 
 ## CSV Snapshot
 
-`scripts/apply_registry_migrations.py` exports the active `trading_registry` table to `../current.csv` after every non-dry-run migration pass.
+`scripts/registry/apply_registry_migrations.py` exports the active `trading_registry` table to `../current.csv` after every non-dry-run migration pass.
 
 Use `--export-only` to refresh the CSV without applying migrations.
 
@@ -38,4 +38,4 @@ Do not create a separate `path` kind. Registry id remains the stable automation 
 
 ## Payload Format Constraint
 
-`trading_registry.payload_format` is constrained to registered value-format markers. When adding a new payload format, update the SQL check constraint, add the matching `kind=payload_format` registry row, update docs/tests, and regenerate `registry/current.csv` together.
+`trading_registry.payload_format` is constrained to registered value-format markers. When adding a new payload format, update the SQL check constraint, add the matching `kind=payload_format` registry row, update docs/tests, and regenerate `scripts/registry/current.csv` together.

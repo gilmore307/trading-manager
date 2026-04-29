@@ -11,12 +11,12 @@
 
 ## Inventory
 
-- `apply_registry_migrations.py` — applies pending SQL registry migrations exactly once and exports `registry/current.csv` unless `--no-export` is used.
+- `registry/apply_registry_migrations.py` — applies pending SQL registry migrations exactly once and exports `scripts/registry/current.csv` unless `--no-export` is used.
 
 ## Run
 
 ```bash
-python3 scripts/apply_registry_migrations.py
-python3 scripts/apply_registry_migrations.py --dry-run
-python3 scripts/apply_registry_migrations.py --export-only
+python3 scripts/registry/apply_registry_migrations.py
+python3 scripts/registry/apply_registry_migrations.py --dry-run
+python3 scripts/registry/apply_registry_migrations.py --export-only
 ```

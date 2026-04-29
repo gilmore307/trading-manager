@@ -38,7 +38,7 @@ Optional task key fields:
 
 - `credential_config_id` when the source needs a registered credential alias
 
-Put API-specific inputs such as symbols, underlyings, ETF ids, macro release keys, calendar scope, time ranges, snapshot timestamps, granularity, feed URLs, and provider parameters inside `params`. Do not put provider documentation URLs in the task key; those belong in registry/provider docs or this README. Do not put `run_id` in the task key; it changes per invocation and belongs in receipt `runs[]`.
+Put API-specific inputs such as symbols, underlyings, ETF ids, macro release keys, calendar scope, time ranges, snapshot timestamps, granularity, feed URLs, and provider parameters inside `params`. Do not put provider documentation URLs in the task key; those belong in scripts/registry/provider docs or this README. Do not put `run_id` in the task key; it changes per invocation and belongs in receipt `runs[]`.
 
 ## Pipeline Module
 

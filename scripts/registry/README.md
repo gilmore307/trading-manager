@@ -1,19 +1,19 @@
 # Registry
 
-`registry/` is the canonical home for trading-wide registered names and shared vocabulary.
+`scripts/registry/` is the canonical home for trading-wide registered names and shared vocabulary.
 
-For the docs-level registry guide, see [`docs/08_registry.md`](../docs/08_registry.md).
+For the docs-level registry guide, see [`docs/08_registry.md`](../../docs/08_registry.md).
 
 The registry has two layers:
 
-1. **Kind boundary docs** — one Markdown file per `kind` under `registry/kinds/`, defining what that kind means and what belongs in it.
-2. **SQL-backed entries** — concrete registered items live in the active `trading_registry` table and its migrations under `registry/sql/schema_migrations/`.
+1. **Kind boundary docs** — one Markdown file per `kind` under `scripts/registry/kinds/`, defining what that kind means and what belongs in it.
+2. **SQL-backed entries** — concrete registered items live in the active `trading_registry` table and its migrations under `scripts/registry/sql/schema_migrations/`.
 
-`registry/kinds/*.md` files must not list concrete active rows. They define scope, range, and rejection boundaries only.
+`scripts/registry/kinds/*.md` files must not list concrete active rows. They define scope, range, and rejection boundaries only.
 
-The SQL `trading_registry.kind` constraint and `registry/kinds/*.md` files must stay aligned. Tests compare those two sources directly.
+The SQL `trading_registry.kind` constraint and `scripts/registry/kinds/*.md` files must stay aligned. Tests compare those two sources directly.
 
-`registry/current.csv` is the GitHub-visible snapshot of the active SQL table. It is generated from the database and must not be edited by hand.
+`scripts/registry/current.csv` is the GitHub-visible snapshot of the active SQL table. It is generated from the database and must not be edited by hand.
 
 Registry `id` is the stable automation reference. Registry `key` is a human-readable output/display label and may be renamed by reviewed migration. Helper APIs must not take key as input.
 
@@ -38,13 +38,13 @@ Concrete entries use this shape:
 
 ## Payload Formats
 
-`payload_format` describes how to interpret the string stored in `payload`. Legal values are first-class registry entries with `kind = payload_format`; `registry/current.csv` is the reviewable snapshot.
+`payload_format` describes how to interpret the string stored in `payload`. Legal values are first-class registry entries with `kind = payload_format`; `scripts/registry/current.csv` is the reviewable snapshot.
 
 The SQL `trading_registry_payload_format_check` constraint and the registered `payload_format` rows must stay aligned. Tests compare those two sources directly.
 
 Use the narrowest registered format that matches the value. Keep `text` as the fallback only when no narrower registered format applies.
 
-Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL constraint, add the `payload_format` row, update registry docs/tests, and regenerate `registry/current.csv` in one reviewed change.
+Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL constraint, add the `payload_format` row, update registry docs/tests, and regenerate `scripts/registry/current.csv` in one reviewed change.
 
 ## Artifact Sync Policy
 
@@ -65,24 +65,24 @@ Key-only label renames can still be safe for id-based consumers, but payload/nam
 The current registry table is exported to:
 
 ```text
-registry/current.csv
+scripts/registry/current.csv
 ```
 
 Run this after SQL registry updates:
 
 ```bash
-scripts/apply_registry_migrations.py
+scripts/registry/apply_registry_migrations.py
 ```
 
 For export only:
 
 ```bash
-scripts/apply_registry_migrations.py --export-only
+scripts/registry/apply_registry_migrations.py --export-only
 ```
 
 This export-only command is registered as `HELPER_REGISTRY_EXPORT_CURRENT_CSV`.
 
-The migration helper applies pending SQL migrations and exports `registry/current.csv` after every non-dry-run migration pass unless `--no-export` is used.
+The migration helper applies pending SQL migrations and exports `scripts/registry/current.csv` after every non-dry-run migration pass unless `--no-export` is used.
 
 ## Kind Files
 
@@ -111,17 +111,17 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 
 ## Review Files
 
-`registry/reviews/` holds review notes and boundary assessments, not kind source-of-truth files.
+`scripts/registry/reviews/` holds review notes and boundary assessments, not kind source-of-truth files.
 
 ## Rules
 
 - Do not define the same kind in multiple Markdown files.
-- Do not store concrete active row lists in `registry/kinds/*.md`.
+- Do not store concrete active row lists in `scripts/registry/kinds/*.md`.
 - Do not store secrets. Store source-level secret aliases only; one provider/feed should normally map to one JSON secret file.
 - Do not mix component-local implementation details into trading-wide registry entries.
-- New fields, identity fields, path fields, temporal fields, classification fields, statuses, payload formats, config keys, data sources, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
-- `registry/current.csv` must be regenerated after SQL registry changes.
-- `registry/current.csv` is a generated snapshot; do not hand-edit it.
+- New fields, identity fields, path fields, temporal fields, classification fields, statuses, payload formats, config keys, data feeds, data sources, data kinds, templates, shared artifacts, script locators, and stable names should be registered in SQL before component repositories depend on them.
+- `scripts/registry/current.csv` must be regenerated after SQL registry changes.
+- `scripts/registry/current.csv` is a generated snapshot; do not hand-edit it.
 - Test scripts must stay out of registry `script` rows and be documented in their test-directory README.
 - Registered registry item lookup APIs must take registry ids as input, not keys.
 - `script` rows are for stable callable helper/automation exports, not package constants or test scripts.
@@ -129,4 +129,4 @@ The migration helper applies pending SQL migrations and exports `registry/curren
 - Use the `path` column for direct locators/addresses on entity-like entries such as repos, scripts, source-secret JSON config rows, provider home/documentation rows, and source-capability endpoint documentation rows.
 - Every `field` entry must populate `applies_to`; use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Source secret file schema field names use `applies_to=source_secret_file_schema`.
 - Do not reintroduce `path` as a registry kind; path is a nullable column.
-- If a new kind is needed, add its `registry/kinds/<kind>.md` boundary file, update the SQL kind check, update registry tests/docs, and regenerate `registry/current.csv` in the same reviewed change.
+- If a new kind is needed, add its `scripts/registry/kinds/<kind>.md` boundary file, update the SQL kind check, update registry tests/docs, and regenerate `scripts/registry/current.csv` in the same reviewed change.

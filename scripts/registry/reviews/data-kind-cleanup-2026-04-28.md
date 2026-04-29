@@ -6,7 +6,7 @@ The registry has accumulated broad source concepts as `data_kind` rows. Several 
 
 ## Current Evidence
 
-From `registry/current.csv` after reverting the erroneous field-category change:
+From `scripts/registry/current.csv` after reverting the erroneous field-category change:
 
 - Total `data_kind` rows: 84
 - Rows with a registry `path`: 68
@@ -87,11 +87,11 @@ Rows that are merely provider endpoint names, broad source concepts, future wish
 
 ## Proposed Cleanup Phases
 
-1. Tighten `registry/kinds/data_kind.md` to require one active contract class: final template, routeable source-input contract, or durable derived output.
+1. Tighten `scripts/registry/kinds/data_kind.md` to require one active contract class: final template, routeable source-input contract, or durable derived output.
 2. Add an audit test that flags active `data_kind` rows without one of those evidence anchors.
 3. Create a migration that marks non-contract rows as deprecated or moves them to `term` where they are only terminology/source concepts.
 4. Prune duplicate macro/source endpoint rows that are not active task parameters or final outputs.
-5. Regenerate `registry/current.csv` and verify downstream references before removing any row entirely.
+5. Regenerate `scripts/registry/current.csv` and verify downstream references before removing any row entirely.
 
 ## Cleanup Applied
 

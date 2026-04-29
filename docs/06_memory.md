@@ -4,10 +4,10 @@
 
 - `trading-main` should stay strict: global docs, contracts, registry, templates, shared helpers, plus the gitignored shared environment anchor.
 - Do not let `trading-main` become a dumping ground for component-local implementation detail.
-- Keep trading statuses and registrable fields in `trading-main/registry/`, not scattered through docs.
+- Keep trading statuses and registrable fields in `trading-main/scripts/registry/`, not scattered through docs.
 - The market-state contamination rule is a core system invariant.
 
-- Registry Markdown kind files under `registry/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `registry/current.csv`, and registry operating rules live in `docs/08_registry.md`.
+- Registry Markdown kind files under `scripts/registry/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `scripts/registry/current.csv`, and registry operating rules live in `docs/08_registry.md`.
 - Contract drafting templates belong under `storage/templates/contracts/`, not as numbered docs after `06_memory.md`; `07_helpers.md`, `08_registry.md`, and `09_templates.md` are approved platform-function guides after the project-wide docs.
 - Stale canceled-project registry entries were removed because GitHub history is the restore path.
 - Registry ids are stable automation references; keys are human-readable and unsafe for durable automation dereferencing.
@@ -24,7 +24,7 @@
 - Trading repositories are private by default; visibility changes need explicit owner approval and a pre-change review.
 - Component runtime helpers should align with the Python `.venv` unless a future explicit decision accepts another runtime.
 - Registry `payload_format` is a registered value-format vocabulary, not just text/file storage; use the narrowest registered format and keep SQL constraint values aligned with `kind=payload_format` rows.
-- Registry kind vocabulary belongs to the SQL kind constraint and `registry/kinds/*.md`; do not mirror it as runtime package validators unless a real runtime consumer requires it.
+- Registry kind vocabulary belongs to the SQL kind constraint and `scripts/registry/kinds/*.md`; do not mirror it as runtime package validators unless a real runtime consumer requires it.
 - Test scripts are repository-local verification assets, not registry `script` rows; each test directory README must inventory every first-party test script and what it verifies.
 - OKX is registered as a provider term for crypto data acquisition and trading. Registry config row `OKX_SECRET_ALIAS` points to source-level alias `okx` and path `/root/secrets/okx.json`; JSON fields are `api_key`, `secret_key`, `passphrase`, `allowed_ip_address`, and `api_key_remark_name`.
 - Source secrets use one JSON file per feed/provider under `/root/secrets/<source>.json`; reusable JSON key names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, `allowed_ip_address`, `api_key_remark_name`, and `pat` are registered as `field` rows with `applies_to=source_secret_file_schema`.
@@ -37,6 +37,6 @@
 - The earlier `TRADING_SOURCE_DEVELOPMENT_STORAGE_ROOT` draft config was pruned from active registry rows; unmigrated `trading-source` development outputs still use ignored local `storage/` paths until durable storage contracts are accepted.
 - Added reusable draft data task templates under `storage/templates/data_tasks/`: task key, source README, fetch spec, clean spec, save spec, completion receipt, and fixture policy. These support API-specific `trading-source` source design but are not accepted concrete schemas yet.
 - Data source sources should default to one `pipeline.py` with `fetch`, `clean`, `save`, and `write_receipt` functions; split into separate modules only when complexity justifies it. Source README files carry API-specific details.
-- Data task key and completion receipt templates should stay minimal and operational. Removed unused metadata such as provider documentation URL from runtime JSON templates; provider docs belong in registry/source README.
+- Data task key and completion receipt templates should stay minimal and operational. Removed unused metadata such as provider documentation URL from runtime JSON templates; provider docs belong in scripts/registry/source README.
 - A data task key is stable across periodic/scheduled runs. Per-run details belong in the task-level completion receipt under `runs[]`; run output directories should use `storage/<task-id>/runs/<run-id>/`.
 - Registered all current minimal data task JSON fields as registry `field` rows: task key fields `task_id`, `source`, `credential_config_id`, `params`, `output_root`; receipt fields `task_id`, `source`, `runs`; run fields `run_id`, `status`, `started_at`, `completed_at`, `output_dir`, `outputs`, `row_counts`, `error`.

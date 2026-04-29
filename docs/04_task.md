@@ -42,7 +42,7 @@
 - Consolidated OKX and GitHub secret handling to one JSON secret file per source and registered source-secret JSON field names.
 - Moved OKX allowlisted IPv4 and API key remark into the source-level OKX JSON secret file contract.
 - Defined test-script boundary: test scripts stay out of registry `script` rows and are inventoried in their test-directory README.
-- Removed registry kind vocabulary validators from the runtime helper package; tests now compare SQL kind constraints with `registry/kinds/*.md`.
+- Removed registry kind vocabulary validators from the runtime helper package; tests now compare SQL kind constraints with `scripts/registry/kinds/*.md`.
 - Registered legal `payload_format` values as `payload_format` registry rows and removed payload-format validators from the runtime helper surface.
 - Expanded registry `payload_format` beyond `text`/`file` and backfilled current rows with narrower formats.
 - Removed the old non-Python registry helper implementation; helper code is now Python-only.
@@ -52,10 +52,10 @@
 - Defined helper distribution boundary: cross-repository runtime helpers use the Python helper package.
 - Defined shared environment baseline: Python 3.12, `.venv`, `pip`, and reviewed `requirements.txt`.
 - Split `trading-main` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
-- Added registry/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
-- Moved registry kind boundary files into `registry/kinds/`; `registry/reviews/` remains for review artifacts.
-- Registered all eight trading repositories as `repo` rows in `registry/current.csv`; later renamed `trading-data` to `trading-source` and `trading-strategy` to `trading-derived`.
-- Registered `HELPER_REGISTRY_EXPORT_CURRENT_CSV` for regenerating `registry/current.csv`.
+- Added scripts/registry/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
+- Moved registry kind boundary files into `scripts/registry/kinds/`; `scripts/registry/reviews/` remains for review artifacts.
+- Registered all eight trading repositories as `repo` rows in `scripts/registry/current.csv`; later renamed `trading-data` to `trading-source` and `trading-strategy` to `trading-derived`.
+- Registered `HELPER_REGISTRY_EXPORT_CURRENT_CSV` for regenerating `scripts/registry/current.csv`.
 - Standardized registered helper surface to four id-only helpers: key, payload, path, and secret text by config id.
 - Backfilled `applies_to` for every active field registry entry and added a SQL check constraint to prevent blank field scopes.
 - Registered id-first path helper methods in the SQL registry.
@@ -66,9 +66,9 @@
 - Restored `TAILSCALE` and `SMB` as active `term` entries.
 - Moved artifact/manifest/ready-signal/request contract placeholders from `docs/` to `storage/templates/contracts/`.
 - Added registry kind boundaries for `artifact_type`, `manifest_type`, `ready_signal_type`, and `request_type`.
-- Removed canceled-project registry entries and regenerated `registry/current.csv`.
+- Removed canceled-project registry entries and regenerated `scripts/registry/current.csv`.
 - Corrected registry shape so Markdown kind files define kind boundaries while SQL migrations own concrete entries.
-- Added SQL-to-CSV registry snapshot generation at `registry/current.csv`.
+- Added SQL-to-CSV registry snapshot generation at `scripts/registry/current.csv`.
 - Added registry kind boundary overlap review.
 - Migrated former standalone registry into `trading-main`: SQL migrations own concrete entries, Markdown kind files own boundaries.
 

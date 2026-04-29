@@ -39,7 +39,7 @@ Helpers must not own:
 ```text
 src/
   README.md                 Source boundary summary.
-  trading_registry/         Formal Python registry helper package source.
+  trading_scripts/registry/         Formal Python registry helper package source.
 scripts/
   apply_registry_migrations.py  Executable registry maintenance command.
 tests/
@@ -99,13 +99,13 @@ Current official Python registry item lookup and secret helper surface is id-inp
 - `RegistryReader.get_path_by_id(id)`
 - `SecretResolver.load_secret_text_by_config_id(config_id, field_name=None)`
 
-Registry kind and payload-format vocabularies are registry/schema concerns, not runtime helper exports. Tests compare kind files and payload-format rows with SQL constraints; do not add package-level vocabulary validator helpers unless runtime validation becomes a real consumer requirement.
+Registry kind and payload-format vocabularies are scripts/registry/schema concerns, not runtime helper exports. Tests compare kind files and payload-format rows with SQL constraints; do not add package-level vocabulary validator helpers unless runtime validation becomes a real consumer requirement.
 
 Source secret configs should point to one source-level JSON file per provider/source. The secret resolver can return either the raw JSON text or one named JSON string field.
 
-The official Python helper source lives under `src/trading_registry/`.
+The official Python helper source lives under `src/trading_scripts/registry/`.
 
-Registry maintenance commands, such as regenerating `registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
+Registry maintenance commands, such as regenerating `scripts/registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
 
 ## Recording Duty
 
