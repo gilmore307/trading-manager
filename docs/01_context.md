@@ -16,10 +16,10 @@ The system needs a stable global coordination layer because its responsibilities
 |---|---|---|
 | `trading-main` | Global platform layer | Owns system architecture, global workflow, shared contracts, registries, templates, shared helpers, system-level decisions, and cross-repository planning. It does not store data, generated artifacts, secrets, or component runtime implementations. |
 | `trading-manager` | Control plane | Coordinates workflow sequencing, schedules, queues, readiness checks, retries, recovery, manual override, lifecycle policy, request generation, and watchlist coordination. |
-| `trading-data` | Data upstream | Connects to data sources, fetches market/regime/options data, normalizes rows, writes data outputs, and emits ready signals. |
+| `trading-source` | External/source-backed observations | Connects to providers and approved web/file sources, fetches observed market/options/issuer/filing/news/calendar data, normalizes rows, writes source-backed outputs, and emits ready signals. |
 | `trading-storage` | Shared persistence contract | Defines persistent storage layout, artifact placement, partitioning, retention, archive, rehydrate, backup, and restore expectations. |
-| `trading-strategy` | Strategy research and backtest runtime | Runs strategy families and variants against historical data and produces standardized trades, returns, equity curves, summaries, manifests, and oracle outputs. |
-| `trading-model` | Offline modeling and market-state research | Discovers market states from market-only features, evaluates state usefulness after attaching strategy results, and outputs mappings, confidence, and research verdicts. |
+| `trading-derived` | Internally generated datasets | Consumes approved source observations and produces labels, samples, signals, candidates, oracle outcomes, backtest/evaluation outputs, manifests, and ready signals. |
+| `trading-model` | Offline modeling and market-state research | Consumes the `trading-source` + `trading-derived` dataset foundation for training, research, evaluation, mappings, confidence, and verdicts. |
 | `trading-execution` | Live/paper execution runtime | Runs trading daemons, creates execution plans, places broker/exchange orders, records positions/orders, reconciles state, and emits execution artifacts. |
 | `trading-dashboard` | Downstream UI and visualization | Displays already-produced trading outputs through dashboard pages, server endpoints, and visualization adapters. |
 

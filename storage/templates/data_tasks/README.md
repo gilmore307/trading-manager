@@ -1,14 +1,14 @@
 # Data Task Templates
 
-Reusable draft templates for manager-driven `trading-data` historical acquisition tasks.
+Reusable draft templates for manager-driven `trading-source` historical acquisition tasks.
 
 These templates are cross-repository planning surfaces:
 
 - `trading-manager` uses the task-key shape to request work;
-- `trading-data` uses bundle templates to implement fetch, clean, save, and receipt steps;
+- `trading-source` uses bundle templates to implement fetch, clean, save, and receipt steps;
 - `trading-storage` uses receipt/output references later when durable contracts are accepted.
 
-Development-stage outputs should target `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` (`trading-data/storage/`) and not SQL by default.
+Legacy development-stage file outputs should target ignored local `trading-source/storage/` paths until a durable SQL/artifact contract exists.
 
 ## Templates
 

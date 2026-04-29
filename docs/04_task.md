@@ -7,7 +7,7 @@
 ## Queued Tasks
 
 - Define data task key file and completion receipt schemas across manager/storage.
-- Define migration criteria from `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` local files to durable `trading-storage` SQL/artifact contracts.
+- Define migration criteria from legacy local `storage/` files in `trading-source` to durable `trading-storage` SQL/artifact contracts.
 - None that can be completed safely without cross-repository contract coordination.
 
 ## Waiting On Cross-Repository Coordination
@@ -31,7 +31,7 @@
 - Simplified `task_key.json` and `completion_receipt.json` to minimal operational fields.
 - Updated data task templates so bundles default to one `pipeline.py` with fetch/clean/save/receipt step functions.
 - Added data task templates for task keys, bundle docs, fetch/clean/save specs, completion receipts, and fixture policy.
-- Registered `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` and clarified that development receipts/data use local `storage/` rather than SQL.
+- Registered the earlier draft development-storage-root contract, later pruned it from active registry rows, and kept local `storage/` as an ignored legacy runtime path for unmigrated source bundles.
 - Registered manager-driven historical data task workflow terms for task key files and completion receipts.
 - Registered FOMC calendar, official macro release calendar discovery, and ETF issuer holdings source terms.
 - Registered U.S. Treasury Fiscal Data as an open/no-key provider term with official documentation path.
@@ -47,14 +47,14 @@
 - Expanded registry `payload_format` beyond `text`/`file` and backfilled current rows with narrower formats.
 - Removed the old non-Python registry helper implementation; helper code is now Python-only.
 - Added formal Python registry helper package and pointed registry script rows at Python helper methods.
-- Created initial docs spines for remaining component repositories: manager, storage, strategy, model, execution, and dashboard.
+- Created initial docs spines for remaining component repositories: manager, storage, derived, model, execution, and dashboard.
 - Defined repository visibility policy: trading repositories stay private unless the owner explicitly approves a visibility change.
 - Defined helper distribution boundary: cross-repository runtime helpers use the Python helper package.
 - Defined shared environment baseline: Python 3.12, `.venv`, `pip`, and reviewed `requirements.txt`.
 - Split `trading-main` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
 - Added registry/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
 - Moved registry kind boundary files into `registry/kinds/`; `registry/reviews/` remains for review artifacts.
-- Registered all eight trading repositories as `repo` rows in `registry/current.csv`.
+- Registered all eight trading repositories as `repo` rows in `registry/current.csv`; later renamed `trading-data` to `trading-source` and `trading-strategy` to `trading-derived`.
 - Registered `HELPER_REGISTRY_EXPORT_CURRENT_CSV` for regenerating `registry/current.csv`.
 - Standardized registered helper surface to four id-only helpers: key, payload, path, and secret text by config id.
 - Backfilled `applies_to` for every active field registry entry and added a SQL check constraint to prevent blank field scopes.
@@ -76,9 +76,9 @@
 - Initial repository list approved:
   - `trading-main`
   - `trading-manager`
-  - `trading-data`
+  - `trading-source`
   - `trading-storage`
-  - `trading-strategy`
+  - `trading-derived`
   - `trading-model`
   - `trading-execution`
   - `trading-dashboard`

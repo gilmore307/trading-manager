@@ -54,6 +54,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
+    def test_component_repository_rows_use_source_and_derived_boundaries(self):
+        with Path("registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(rows["TRADING_SOURCE_REPO"]["payload"], "trading-source")
+        self.assertEqual(rows["TRADING_SOURCE_REPO"]["path"], "/root/projects/trading-source")
+        self.assertIn("trading-source.git", rows["TRADING_SOURCE_REPO"]["note"])
+        self.assertEqual(rows["TRADING_DERIVED_REPO"]["payload"], "trading-derived")
+        self.assertEqual(rows["TRADING_DERIVED_REPO"]["path"], "/root/projects/trading-derived")
+        self.assertIn("trading-derived.git", rows["TRADING_DERIVED_REPO"]["note"])
+        self.assertNotIn("TRADING_DATA_REPO", rows)
+        self.assertNotIn("TRADING_STRATEGY_REPO", rows)
+        for row in rows.values():
+            self.assertNotIn("trading-data", row["payload"])
+            self.assertNotIn("trading-data", row["path"])
+            self.assertNotIn("trading-strategy", row["payload"])
+            self.assertNotIn("trading-strategy", row["path"])
+
     def test_data_bundle_and_data_source_rows_are_separated(self):
         with Path("registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -108,7 +126,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], payload)
             self.assertIn(f"data_sources/{payload}", rows[key]["path"])
         for row in rows.values():
-            self.assertNotIn("trading-data/src/trading_data/", row["path"])
+            self.assertNotIn("trading-source/src/trading_source/", row["path"])
         self.assertNotIn("MACRO_DATA", rows)
         self.assertNotIn("STOCK_ETF_EXPOSURE_BUNDLE_DEPRECATED", rows)
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE", rows)
@@ -174,7 +192,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(data_kinds, [])
         for row in rows:
-            self.assertNotIn("trading-data/storage/templates/data_kinds", row["path"])
+            self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
         for deleted_preview_key in {
             "MACRO_RELEASE_EVENT",
             "GDELT_ARTICLE",
@@ -434,7 +452,7 @@ class RegistryHelperTests(unittest.TestCase):
             "task_register_slots",
         }
         for row in field_like_rows:
-            self.assertNotIn("trading-data/storage/templates/data_kinds", row["path"])
+            self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
             applies_to = set(filter(None, row["applies_to"].split(";")))
             self.assertFalse({part for part in applies_to if part.endswith("_template")})
             self.assertNotIn("option_template", applies_to)

@@ -15,7 +15,7 @@ From `registry/current.csv` after reverting the erroneous field-category change:
 - Rows with neither `path` nor directly scoped fields: 14
 - Rows with no direct code/doc references outside registry migrations/current snapshot: 34
 
-Existing local data-kind preview templates under `trading-data/storage/templates/data_kinds/` support these active final saved shapes:
+Existing local data-kind preview templates under `trading-source/storage/templates/data_kinds/` support these active final saved shapes:
 
 - `crypto_bar`
 - `crypto_liquidity_bar`
@@ -79,7 +79,7 @@ These should not stay as active final data kinds unless each gets an accepted fi
 
 A `data_kind` row should be active only if it satisfies at least one of these mutually clear conditions:
 
-1. **Final saved shape** — has an existing canonical preview/template path under `trading-data/storage/templates/data_kinds/<source>/`.
+1. **Final saved shape** — has an existing canonical preview/template path under `trading-source/storage/templates/data_kinds/<source>/`.
 2. **Routeable source-input contract** — is accepted by a named active `data_bundle`/pipeline as an input selector and documents persistence behavior as transient, raw, or final.
 3. **Derived model/input product** — is a durable derived product with a documented owner and output contract.
 

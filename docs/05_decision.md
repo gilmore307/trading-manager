@@ -36,13 +36,13 @@ Date: 2026-04-25
 
 Global docs should coordinate repositories without replacing their local project boundaries.
 
-## D004 - Use `trading-data` rather than `trading-fetcher`
+## D004 - Use `trading-source` rather than `trading-fetcher`
 
 Date: 2026-04-25
 
 ### Decision
 
-The data upstream repository will be named `trading-data`.
+The data upstream repository will be named `trading-source`.
 
 ### Rationale
 
@@ -817,12 +817,12 @@ Register Alpaca as a provider term and add `ALPACA_SECRET_ALIAS` pointing to sou
 
 ### Rationale
 
-Alpaca is a data-source connector dependency for `trading-data`; credentials and endpoint should be available through the same source-level JSON secret pattern as OKX and GitHub.
+Alpaca is a data-source connector dependency for `trading-source`; credentials and endpoint should be available through the same source-level JSON secret pattern as OKX and GitHub.
 
 ### Consequences
 
 - Alpaca JSON fields are `api_key`, `secret_key`, and `endpoint`.
-- `trading-data` may plan an Alpaca source connector using `ALPACA_SECRET_ALIAS` once implementation begins.
+- `trading-source` may plan an Alpaca source connector using `ALPACA_SECRET_ALIAS` once implementation begins.
 - Default tests still must not require live Alpaca credentials or network calls.
 
 ## D039 - ThetaData is registered as options-data provider terminology only
@@ -845,7 +845,7 @@ ThetaData is relevant to the options data domain, but its runtime credential/JAR
 
 - `THETADATA` is registered as a `term` row.
 - No ThetaData secret alias is registered yet.
-- `trading-data` may document ThetaData as the intended options-data provider, with implementation blocked on connector/JAR/credential layout decisions.
+- `trading-source` may document ThetaData as the intended options-data provider, with implementation blocked on connector/JAR/credential layout decisions.
 
 ## D040 - Economic data providers use source-level API key aliases
 
@@ -853,7 +853,7 @@ Date: 2026-04-26
 
 ### Context
 
-The user provided API keys for FRED, Census, BEA, and BLS. These sources support macroeconomic, demographic, labor, and market-context data acquisition for `trading-data`.
+The user provided API keys for FRED, Census, BEA, and BLS. These sources support macroeconomic, demographic, labor, and market-context data acquisition for `trading-source`.
 
 ### Decision
 
@@ -941,7 +941,7 @@ Date: 2026-04-26
 
 ### Context
 
-The user clarified that current `trading-data` acquisition work concerns historical data. Realtime data and execution-time feeds belong to `trading-execution` later. Data tasks should be initiated by `trading-manager` and completed by `trading-data` with durable evidence in `trading-storage`.
+The user clarified that current `trading-source` acquisition work concerns historical data. Realtime data and execution-time feeds belong to `trading-execution` later. Data tasks should be initiated by `trading-manager` and completed by `trading-source` with durable evidence in `trading-storage`.
 
 ### Decision
 
@@ -953,7 +953,7 @@ The boundary keeps orchestration, data acquisition, storage, and execution respo
 
 ### Consequences
 
-- `trading-data` remains historical-only for now.
+- `trading-source` remains historical-only for now.
 - `trading-manager` owns task-key creation and lifecycle orchestration.
 - Development-stage outputs and receipts use local `storage/`; `trading-storage` owns durable SQL output placement and completion receipt storage once schemas are accepted.
 - Registry terms exist before component implementation depends on the names.
@@ -964,11 +964,11 @@ Date: 2026-04-26
 
 ### Context
 
-The user clarified that during development, `trading-data` outputs should not be written to SQL. Local files are easier to inspect and delete and avoid polluting a database while schemas are still changing.
+The user clarified that during development, `trading-source` outputs should not be written to SQL. Local files are easier to inspect and delete and avoid polluting a database while schemas are still changing.
 
 ### Decision
 
-Register `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT` as the development-stage output root for `trading-data`, with relative path `storage` and local path `/root/projects/trading-data/storage`. Use this root for development task outputs and completion receipts until durable `trading-storage` contracts are accepted.
+Register `TRADING_SOURCE_DEVELOPMENT_STORAGE_ROOT` as the development-stage output root for `trading-source`, with relative path `storage` and local path `/root/projects/trading-source/storage`. Use this root for development task outputs and completion receipts until durable `trading-storage` contracts are accepted.
 
 ### Rationale
 
@@ -986,7 +986,7 @@ Date: 2026-04-26
 
 ### Context
 
-The user approved designing templates around provider/API requirements for `trading-data` bundles. These shapes affect `trading-manager` task keys, `trading-data` bundle implementation, and later `trading-storage` receipt/output contracts.
+The user approved designing templates around provider/API requirements for `trading-source` bundles. These shapes affect `trading-manager` task keys, `trading-source` bundle implementation, and later `trading-storage` receipt/output contracts.
 
 ### Decision
 
@@ -998,7 +998,7 @@ The template shapes are cross-repository planning surfaces, so they belong in `t
 
 ### Consequences
 
-- `trading-data` can reference these templates when designing API-specific bundles.
+- `trading-source` can reference these templates when designing API-specific bundles.
 - The templates remain drafts until schemas are accepted through docs, registry, and tests.
 - Stable fields/type/status values discovered while filling templates must be routed through registry migrations.
 
@@ -1434,7 +1434,7 @@ The registry should describe business output fields, not old manifest/config mec
 
 Accepted: 2026-04-28
 
-The registry no longer keeps field-like rows that only described retired `trading-data/storage/templates/data_kinds/*.preview.csv` files. Accepted model-input outputs now use dedicated SQL contracts, so field rows survive only when they apply to a current SQL business table or a still-valid shared, registry, task, receipt, execution, acceptance, or maintenance artifact.
+The registry no longer keeps field-like rows that only described retired `trading-source/storage/templates/data_kinds/*.preview.csv` files. Accepted model-input outputs now use dedicated SQL contracts, so field rows survive only when they apply to a current SQL business table or a still-valid shared, registry, task, receipt, execution, acceptance, or maintenance artifact.
 
 Consequences:
 
@@ -1446,7 +1446,7 @@ Consequences:
 
 Accepted: 2026-04-28
 
-The old `trading-data/storage/templates/data_kinds/*.preview.csv` and preview JSON files are no longer active contracts. Dedicated SQL storage contracts now own accepted model-input/business data shapes, and current SQL business fields are registered directly against those tables.
+The old `trading-source/storage/templates/data_kinds/*.preview.csv` and preview JSON files are no longer active contracts. Dedicated SQL storage contracts now own accepted model-input/business data shapes, and current SQL business fields are registered directly against those tables.
 
 Consequences:
 
@@ -1455,77 +1455,77 @@ Consequences:
 - Keep `source_capability` and `term` rows for source/provider concepts that are still useful for adapter planning, entitlement review, or glossary reference, but do not promote them to `data_kind` without a current accepted storage contract.
 - Do not recreate preview/template-only field rows or `applies_to` values. Registry retention is based on final SQL tables and still-valid shared/task/receipt/registry artifacts, not historical preview files.
 
-## D071 - Numbered trading-data package names are data bundles, not model-input universes
+## D071 - Numbered trading-source package names are data bundles, not model-input universes
 
 Date: 2026-04-28
 Status: Accepted
 
 ### Context
 
-The numbered `trading-data` packages were named `*_model_inputs`, which made them sound like the complete input universe for each model layer. Chentong clarified that these packages only fetch and prepare the data that must come from data sources; the full model-input set also includes upstream model outputs, candidate artifacts, portfolio/execution state, and feature construction outside these data bundles.
+The numbered `trading-source` packages were named `*_model_inputs`, which made them sound like the complete input universe for each model layer. Chentong clarified that these packages only fetch and prepare the data that must come from data sources; the full model-input set also includes upstream model outputs, candidate artifacts, portfolio/execution state, and feature construction outside these data bundles.
 
 ### Decision
 
-Rename active numbered data-bundle registry rows to `NN_BUNDLE_<LAYER>` with payloads `NN_bundle_<layer>` and paths under `trading-data/src/trading_data/data_bundles/NN_bundle_<layer>`.
+Rename active numbered data-bundle registry rows to `NN_BUNDLE_<LAYER>` with payloads `NN_bundle_<layer>` and paths under the then-current bundle package path. Later D077 moved active paths to `trading-source/src/data_bundles/NN_bundle_<layer>`.
 
 Prune obsolete numbered bundle-local config rows that pointed to removed `config.json` files. Stable defaults for accepted numbered bundles live in reviewed pipeline code unless operators/researchers intentionally need a bundle-local config surface.
 
 ### Consequences
 
 - `data_bundle` rows describe manager-facing data acquisition/preparation bundles, not complete model-input universes.
-- SQL output tables live under the `trading_data` schema because they are source-backed trading-data bundle outputs, not complete model inputs.
-- Do not introduce new active package paths named `*_model_inputs` under `src/trading_data/data_bundles/`.
+- SQL output tables live under the `trading_source` schema because they are source-backed trading-source bundle outputs, not complete model inputs.
+- Do not introduce new active package paths named `*_model_inputs` under `src/trading_source/data_bundles/`.
 
-## D072 - Bundle SQL tables use trading-data bundle names
+## D072 - Bundle SQL tables use trading-source bundle names
 
 Date: 2026-04-28
 Status: Accepted
 
 ### Context
 
-The accepted numbered data bundles wrote SQL tables with model-layer business names such as `market_regime_etf_bar` and `event_overlay_event`. Chentong clarified that these names will collide semantically once downstream training-data tables exist: these tables are the source-backed outputs of `trading-data` bundles, not the complete model/training data universe.
+The accepted numbered data bundles wrote SQL tables with model-layer business names such as `market_regime_etf_bar` and `event_overlay_event`. Chentong clarified that these names will collide semantically once downstream training-data tables exist: these tables are the source-backed outputs of `trading-source` bundles, not the complete model/training data universe.
 
 ### Decision
 
 Name accepted numbered bundle SQL tables after the writing bundle, using portable SQL snake_case:
 
-- `trading_data.bundle_01_market_regime`
-- `trading_data.bundle_02_security_selection`
-- `trading_data.bundle_03_strategy_selection`
-- `trading_data.bundle_05_option_expression`
-- `trading_data.bundle_06_position_execution`
-- `trading_data.bundle_07_event_overlay`
+- `trading_source.bundle_01_market_regime`
+- `trading_source.bundle_02_security_selection`
+- `trading_source.bundle_03_strategy_selection`
+- `trading_source.bundle_05_option_expression`
+- `trading_source.bundle_06_position_execution`
+- `trading_source.bundle_07_event_overlay`
 
 CLI/package names may use hyphens where appropriate, but SQL identifiers use underscores.
 
 ### Consequences
 
-- Do not name `trading-data` bundle output tables as if they are complete model-input or training-data tables.
+- Do not name `trading-source` bundle output tables as if they are complete model-input or training-data tables.
 - Downstream training/model repositories can later create their own derived/training tables without colliding with source-backed bundle outputs.
 
-## D073 - Bundle SQL outputs use trading_data schema, not model_inputs
+## D073 - Bundle SQL outputs use trading_source schema, not model_inputs
 
 Date: 2026-04-28
 Status: Accepted
 
 ### Context
 
-After bundle table names were changed to follow the producing `trading-data` bundle, Chentong clarified that the SQL schema name `model_inputs` is still wrong. A bundle output is not the model's full input set; models also consume upstream model outputs, candidate artifacts, feature tables, portfolio/execution state, and later training-data tables.
+After bundle table names were changed to follow the producing `trading-source` bundle, Chentong clarified that the SQL schema name `model_inputs` is still wrong. A bundle output is not the model's full input set; models also consume upstream model outputs, candidate artifacts, feature tables, portfolio/execution state, and later training-data tables.
 
 ### Decision
 
-Accepted numbered `trading-data` bundle SQL outputs live under schema `trading_data`, not `model_inputs`:
+Accepted numbered `trading-source` bundle SQL outputs live under schema `trading_source`, not `model_inputs`:
 
-- `trading_data.bundle_01_market_regime`
-- `trading_data.bundle_02_security_selection`
-- `trading_data.bundle_03_strategy_selection`
-- `trading_data.bundle_05_option_expression`
-- `trading_data.bundle_06_position_execution`
-- `trading_data.bundle_07_event_overlay`
+- `trading_source.bundle_01_market_regime`
+- `trading_source.bundle_02_security_selection`
+- `trading_source.bundle_03_strategy_selection`
+- `trading_source.bundle_05_option_expression`
+- `trading_source.bundle_06_position_execution`
+- `trading_source.bundle_07_event_overlay`
 
 ### Consequences
 
-- `model_inputs` must not be used for source-backed `trading-data` bundle outputs.
+- `model_inputs` must not be used for source-backed `trading-source` bundle outputs.
 - Future model/training repositories can own their own model-input or training-data schemas without semantic collision.
 
 ## D074 - Complete implemented source-capability coverage
@@ -1539,7 +1539,7 @@ Status: Accepted
 
 ### Decision
 
-Register source capabilities for currently implemented `trading-data` source-interface capabilities:
+Register source capabilities for currently implemented `trading-source` source-interface capabilities:
 
 - Alpaca historical equity bars, news, latest snapshots, trades, and quotes.
 - OKX crypto candles, trades, quotes, and order books.
@@ -1599,7 +1599,7 @@ Current provider rows are:
 - `THETADATA`
 - `TRADING_ECONOMICS`
 
-Reclassify `BEA`, `BLS`, `CENSUS`, `FRED`, `GITHUB`, and `US_TREASURY_FISCAL_DATA` back to `term` because they are not current trading-data source-interface providers.
+Reclassify `BEA`, `BLS`, `CENSUS`, `FRED`, `GITHUB`, and `US_TREASURY_FISCAL_DATA` back to `term` because they are not current trading-source source-interface providers.
 
 ### Consequences
 
@@ -1607,22 +1607,22 @@ Reclassify `BEA`, `BLS`, `CENSUS`, `FRED`, `GITHUB`, and `US_TREASURY_FISCAL_DAT
 - Historical macro provider references can still exist as `term` rows for documentation and future revival.
 - Source-secret config rows may remain even when the provider is not current.
 
-## D077 - trading-data source packages live directly under src
+## D077 - trading-source source packages live directly under src
 
 Date: 2026-04-28
 Status: Accepted
 
 ### Context
 
-`trading-data` removed its redundant `src/trading_data/` package wrapper. The repository boundary already identifies the component, and the meaningful importable boundaries are data bundles, data sources, source interfaces, source availability probes, and storage helpers.
+`trading-source` removed its redundant `src/trading_source/` package wrapper. The repository boundary already identifies the component, and the meaningful importable boundaries are data bundles, data sources, source interfaces, source availability probes, and storage helpers.
 
 ### Decision
 
-Registry paths for active `trading-data` data bundles, data sources, and helpers use `trading-data/src/<package>/...` instead of `trading-data/src/trading_data/<package>/...`.
+Registry paths for active `trading-source` data bundles, data sources, and helpers use `trading-source/src/<package>/...` instead of `trading-source/src/trading_source/<package>/...`.
 
 ### Consequences
 
-- Do not register new active paths under `trading-data/src/trading_data/`.
+- Do not register new active paths under `trading-source/src/trading_source/`.
 - Current implementation paths should point directly to `src/data_bundles`, `src/data_sources`, `src/source_interfaces`, `src/source_availability`, or `src/storage`.
 
 ## D078 - Park unaccepted project-development slot drafts outside the skill
@@ -1671,7 +1671,7 @@ Remove registry rows tied to unaccepted data-task architecture scopes and templa
 - `data_task_completion_receipt`
 - `data_task_completion_receipt_run`
 - data-task template rows under `storage/templates/data_tasks/`
-- `TRADING_DATA_DEVELOPMENT_STORAGE_ROOT`
+- `TRADING_SOURCE_DEVELOPMENT_STORAGE_ROOT`
 - data-task workflow terms for task key files, completion receipts, and task runs
 
 Leave the files under `storage/templates/data_tasks/` as parked drafts only. Re-register fields/templates/terms later one by one after the task architecture is redesigned and accepted.
@@ -1693,7 +1693,7 @@ Numbered data bundles already use number-first package and registry payload name
 
 ### Decision
 
-Use number-first source-interface names for active trading-data source directories and registry payloads: `NN_source_<semantic>`.
+Use number-first source-interface names for active trading-source source directories and registry payloads: `NN_source_<semantic>`.
 
 Current source-interface names are:
 
@@ -1711,7 +1711,7 @@ Current source-interface names are:
 
 ### Consequences
 
-- `trading-data/src/data_sources/` directories use number-first `NN_source_*` names.
+- `trading-source/src/data_sources/` directories use number-first `NN_source_*` names.
 - `trading-main` data-source registry payload/path values use the same names.
 - Source-interface numbering is inventory/order clarity, not model-layer ownership; manager-facing model layers remain `data_bundle` rows.
 
@@ -1808,7 +1808,7 @@ Status: Accepted
 
 ### Context
 
-`trading-data` Layer 05 previously wrote one option-chain snapshot row containing nested `contracts` JSON plus `contract_count`. That made the final business table a transport envelope instead of the model-facing contract comparison surface.
+`trading-source` Layer 05 previously wrote one option-chain snapshot row containing nested `contracts` JSON plus `contract_count`. That made the final business table a transport envelope instead of the model-facing contract comparison surface.
 
 ### Decision
 
@@ -1827,3 +1827,30 @@ The table includes `snapshot_type` (`entry`/`exit`) and explicit quote, implied-
 - Remove active registry rows `OPTION_CONTRACT_COUNT` and `OPTION_CONTRACTS`.
 - Register explicit Layer 05 timestamp/code fields such as `QUOTE_TIMESTAMP`, `IV_TIMESTAMP`, `GREEKS_TIMESTAMP`, `QUOTE_BID_EXCHANGE`, `QUOTE_ASK_EXCHANGE`, `QUOTE_BID_CONDITION`, and `QUOTE_ASK_CONDITION`.
 - `run_id`, `task_id`, and write/audit timestamps remain receipt/run metadata, not accepted business-table columns.
+
+## D085 - Rename data/strategy repositories to source/derived
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+Chentong clarified that the former `trading-data` and `trading-strategy` names did not describe the intended dataset boundary precisely enough. The first repository is external/source-backed observed data from providers such as Alpaca, ThetaData, OKX, SEC, GDELT, issuer files, and approved web sources. The second repository is internally generated data.
+
+### Decision
+
+Rename and redefine the component repositories:
+
+- `trading-data` -> `trading-source`
+- `trading-strategy` -> `trading-derived`
+
+`trading-source` owns source-backed acquisition, cleaning, normalization, validation, and source-output publication. `trading-derived` owns generated labels, samples, signals, candidates, oracle outcomes, backtest/evaluation outputs, and related derived datasets. Strategy/backtest/oracle logic may exist in `trading-derived` only as data-generation logic.
+
+Together, `trading-source` and `trading-derived` form the training-dataset foundation for downstream `trading-model` work.
+
+### Consequences
+
+- Active registry repository rows, paths, `applies_to` scopes, and notes use `trading-source` and `trading-derived`.
+- Source-backed bundle SQL output contracts use the `trading_source` schema.
+- `trading-model` should treat training data as a composition of source observations plus derived generated rows, not as a single repository's responsibility.
+- Future docs and tasks should avoid using strategy/backtest runtime as the repo-level boundary.

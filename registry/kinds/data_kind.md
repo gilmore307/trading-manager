@@ -8,7 +8,7 @@ A data kind names the saved/output shape, not every provider endpoint, transient
 
 ## Range
 
-Register active data kinds only when the data kind has an accepted, current storage contract. Retired preview/template files under `trading-data/storage/templates/data_kinds/` are not evidence for active `data_kind` status.
+Register active data kinds only when the data kind has an accepted, current storage contract. Retired preview/template files under `trading-source/storage/templates/data_kinds/` are not evidence for active `data_kind` status.
 
 Use `payload` for a stable snake_case data-kind key. Use `path` only for the canonical current contract artifact when one exists; provider/source documentation URLs belong on provider/source `term` or `source_capability` rows, not on `data_kind` rows.
 

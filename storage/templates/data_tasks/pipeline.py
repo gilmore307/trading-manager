@@ -1,8 +1,8 @@
-"""Template pipeline for a trading-data historical acquisition bundle.
+"""Template pipeline for a trading-source historical acquisition bundle.
 
 Copy this file into:
 
-    src/trading_data/data_sources/<bundle>/pipeline.py
+    trading-source/src/data_sources/<bundle>/pipeline.py
 
 Keep one public bundle entry point (`run`) while preserving clear internal step
 boundaries for fetch, clean, save, and receipt generation.
@@ -42,8 +42,8 @@ class StepResult:
 def build_context(task_key: dict[str, Any], run_id: str) -> BundleContext:
     """Build development output paths for one run of a stable task key.
 
-    `output_root` should normally be a stable path under
-    TRADING_DATA_DEVELOPMENT_STORAGE_ROOT, such as `storage/<task-id>`.
+    `output_root` should normally be a stable ignored local runtime path such
+    as `storage/<task-id>` until a durable storage contract exists.
     Each run writes under `output_root/runs/<run-id>`, while the task-level
     completion receipt lives at `output_root/completion_receipt.json`.
     """

@@ -16,19 +16,19 @@ The trading system collaboration model has these layers:
    - `trading-manager` receives user, Agent, schedule, recovery, or manual intent.
    - It turns intent into structured cross-repository requests.
 
-2. **Data production**
-   - `trading-data` receives data requests and produces data artifacts, manifests, and ready signals.
+2. **Source-data production**
+   - `trading-source` receives source-data requests and produces external/source-backed observations, manifests, and ready signals.
 
 3. **Shared persistence**
    - `trading-storage` defines how persistent outputs are laid out, retained, archived, restored, and referenced.
    - Other repositories use storage contracts rather than inventing local path rules.
 
-4. **Strategy research**
-   - `trading-strategy` consumes data artifacts and produces strategy artifacts, manifests, and ready signals.
+4. **Derived-data generation**
+   - `trading-derived` consumes source observations and produces internally generated labels, samples, signals, candidates, oracle outcomes, backtest/evaluation outputs, manifests, and ready signals.
 
 5. **Model research**
-   - `trading-model` consumes market data artifacts and strategy artifacts.
-   - It produces state tables, state evaluations, mappings, verdicts, manifests, and ready signals.
+   - `trading-model` consumes the `trading-source` + `trading-derived` dataset foundation.
+   - It produces state tables, training/evaluation outputs, mappings, verdicts, manifests, and ready signals.
 
 6. **Promotion and lifecycle**
    - `trading-manager` consumes manifests and ready signals.
@@ -54,7 +54,7 @@ The trading system collaboration model has these layers:
 - Shared statuses and registrable fields are maintained in `trading-main/registry/`; registry operating rules are in `docs/08_registry.md`.
 - `trading-main` defines global collaboration contracts but does not execute workflows.
 - Component-local workflow detail belongs in the owning component repository.
-- Execution consumes promoted decisions only; it must not choose strategies or train models.
+- Execution consumes promoted decisions only; it must not generate derived datasets or train models.
 - Dashboard consumes existing outputs only; it must not recompute upstream truth.
 
 ## Primary Collaboration Flow
@@ -63,12 +63,12 @@ The trading system collaboration model has these layers:
 flowchart TD
   A[User / Agent / Schedule / Manual Intent] --> B[trading-manager]
   B --> C[Structured Request]
-  C --> D[trading-data]
-  D --> E[Data Artifacts]
-  D --> F[Data Manifest]
-  D --> G[Data Ready Signal]
+  C --> D[trading-source]
+  D --> E[Source Observations]
+  D --> F[Source Manifest]
+  D --> G[Source Ready Signal]
 
-  E --> H[trading-strategy]
+  E --> H[trading-derived]
   F --> H
   G --> H
 
@@ -76,9 +76,9 @@ flowchart TD
   F --> I
   G --> I
 
-  H --> J[Strategy Artifacts]
-  H --> K[Strategy Manifest]
-  H --> L[Strategy Ready Signal]
+  H --> J[Derived Dataset Artifacts]
+  H --> K[Derived Manifest]
+  H --> L[Derived Ready Signal]
 
   J --> I
   K --> I
@@ -140,7 +140,7 @@ Where:
 - routing promoted decisions to execution;
 - avoiding component-internal implementation control.
 
-The manager should not become a hidden implementation layer for data fetching, strategy logic, modeling, execution, or dashboard rendering.
+The manager should not become a hidden implementation layer for source fetching, derived-data generation, modeling, execution, or dashboard rendering.
 
 ## Storage Collaboration Role
 
@@ -155,13 +155,13 @@ Other repositories may write and read storage-backed outputs according to storag
 The model collaboration flow has one hard sequencing rule:
 
 ```text
-market data -> market-only features -> market-state discovery -> state table
-strategy outputs -> attach after state table exists -> state evaluation -> winner mapping
+source observations -> market-only features -> market-state discovery -> state table
+derived strategy/evaluation outputs -> attach after state table exists -> state evaluation -> winner mapping
 ```
 
-Strategy returns or strategy performance must not be used to discover market states.
+Strategy returns, backtest results, oracle outcomes, or other generated derived outputs must not be used to discover market states.
 
-This rule is system-level because violating it invalidates the interpretation of downstream strategy-selection evidence.
+This rule is system-level because violating it invalidates the interpretation of downstream strategy-selection and training evidence.
 
 ## Execution Collaboration Boundary
 
@@ -170,7 +170,7 @@ This rule is system-level because violating it invalidates the interpretation of
 It must not:
 
 - train models;
-- run strategy backtests;
+- run derived-data generators or strategy backtests;
 - choose active strategy variants by itself;
 - make cross-repository promotion decisions;
 - bypass manager-controlled lifecycle policy.
@@ -182,7 +182,7 @@ It must not:
 It must not:
 
 - fetch market data as a source of truth;
-- run strategy backtests;
+- run derived-data generators or strategy backtests;
 - train models;
 - execute trades;
 - silently recompute or overwrite upstream outputs.
