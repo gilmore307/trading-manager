@@ -273,6 +273,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(by_key["SNAPSHOT_TIME"]["payload"], "snapshot_time")
         self.assertIn("01_derived_market_regime", by_key["SNAPSHOT_TIME"]["applies_to"])
         self.assertNotIn("feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
+        payloads = {row["payload"] for row in rows}
+        for generated_feature_column in {"spy_return_30m", "spy_return_1d", "spy_return_5d", "spy_return_20d"}:
+            self.assertNotIn(generated_feature_column, payloads)
 
         deleted_deprecated_macro_keys = {
             "MACRO_BEA_FIXED_ASSETS",
