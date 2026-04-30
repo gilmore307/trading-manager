@@ -1,6 +1,6 @@
-# trading-main
+# trading-manager
 
-`trading-main` is the system-level platform repository for the trading project.
+`trading-manager` is the system-level platform repository for the trading project.
 
 It owns global architecture, cross-repository workflow, control-plane orchestration contracts, shared contracts, field/status registries, shared helper code, system-level decisions, and global planning context.
 
@@ -20,7 +20,7 @@ scripts/          Executable maintenance/operational commands plus registry main
   reviews/        Registry review notes.
   sql/            Registry SQL migrations and SQL notes.
 tests/            First-party tests for source packages and repository governance checks.
-pyproject.toml   Python helper package metadata for `trading-main-helpers`.
+pyproject.toml   Python helper package metadata for `trading-manager-helpers`.
 requirements.txt  Shared Python environment dependency ledger.
 ```
 
@@ -40,7 +40,7 @@ docs/
   09_templates.md
 ```
 
-Component repositories keep their own docs spine. In `trading-main`, `00_scope.md` through `06_memory.md` remain the project-wide platform docs, while `07_helpers.md`, `08_registry.md`, and `09_templates.md` explain the three platform functions this repository owns.
+Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` through `06_memory.md` remain the project-wide platform docs, while `07_helpers.md`, `08_registry.md`, and `09_templates.md` explain the three platform functions this repository owns.
 
 ## Registry Rule
 
@@ -56,6 +56,6 @@ See `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` for 
 
 ## Shared Environment Rule
 
-The shared trading Python environment is anchored at `/root/projects/trading-main/.venv` and currently uses Python 3.12 with `pip`. Dependencies must be added to `requirements.txt` through reviewed commits before installation into the shared environment.
+The shared trading Python environment is anchored at `/root/projects/trading-manager/.venv` and currently uses Python 3.12 with `pip`. Dependencies must be added to `requirements.txt` through reviewed commits before installation into the shared environment.
 
-The formal runtime helper package is Python (`trading-main-helpers`, import package `trading_registry`). Component repositories should use this Python package for shared helper access.
+The formal runtime helper package is Python (`trading-manager-helpers`, import package `trading_registry`). Component repositories should use this Python package for shared helper access.

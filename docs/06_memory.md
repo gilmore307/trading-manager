@@ -2,9 +2,9 @@
 
 ## Durable Local Notes
 
-- `trading-main` should stay strict: global docs, contracts, registry, templates, shared helpers, plus the gitignored shared environment anchor.
-- Do not let `trading-main` become a dumping ground for component-local implementation detail.
-- Keep trading statuses and registrable fields in `trading-main/scripts/`, not scattered through docs.
+- `trading-manager` should stay strict: global docs, contracts, registry, templates, shared helpers, plus the gitignored shared environment anchor.
+- Do not let `trading-manager` become a dumping ground for component-local implementation detail.
+- Keep trading statuses and registrable fields in `trading-manager/scripts/`, not scattered through docs.
 - The market-state contamination rule is a core system invariant.
 
 - Registry Markdown kind files under `scripts/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `scripts/current.csv`, and registry operating rules live in `docs/08_registry.md`.
@@ -17,10 +17,10 @@
 - Registered helper APIs are id-only: get key, payload, path, or secret text by stable registry id.
 - Registry keys are output/display labels, not helper inputs.
 
-- `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` are platform-function guides for `trading-main`; `00_scope.md` through `06_memory.md` remain project-wide.
-- Future global helpers, reusable templates, and shared fields/status/type values discovered in component work must be recorded through `trading-main` before they become cross-repository contracts.
+- `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` are platform-function guides for `trading-manager`; `00_scope.md` through `06_memory.md` remain project-wide.
+- Future global helpers, reusable templates, and shared fields/status/type values discovered in component work must be recorded through `trading-manager` before they become cross-repository contracts.
 - Official registry helper runtime surface is the Python `trading_registry` package under `src/`; the older non-Python helper implementation was removed.
-- Shared environment baseline is Python 3.12 at `/root/projects/trading-main/.venv`, installed with `pip` from root `requirements.txt`.
+- Shared environment baseline is Python 3.12 at `/root/projects/trading-manager/.venv`, installed with `pip` from root `requirements.txt`.
 - Trading repositories are private by default; visibility changes need explicit owner approval and a pre-change review.
 - Component runtime helpers should align with the Python `.venv` unless a future explicit decision accepts another runtime.
 - Registry `payload_format` is a registered value-format vocabulary, not just text/file storage; use the narrowest registered format and keep SQL constraint values aligned with `kind=payload_format` rows.
@@ -41,4 +41,4 @@
 - A data task key is stable across periodic/scheduled runs. Per-run details belong in the task-level completion receipt under `runs[]`; run output directories should use `storage/<task-id>/runs/<run-id>/`.
 - Registered all current minimal data task JSON fields as registry `field` rows: task key fields `task_id`, `source`, `credential_config_id`, `params`, `output_root`; receipt fields `task_id`, `source`, `runs`; run fields `run_id`, `status`, `started_at`, `completed_at`, `output_dir`, `outputs`, `row_counts`, `error`.
 - 2026-04-30: Merged the old `trading-source` / `trading-derived` data-production split into canonical `trading-data`. Active chain is `feed_* -> source_NN_* -> feature_NN_* -> model_NN_*`; Layer 1 SQL chain is `trading_data.source_01_market_regime -> trading_data.feature_01_market_regime -> trading_model.model_01_market_regime`. Registry now uses `TRADING_DATA_REPO`, `data_feature`, and `FEATURE_01_MARKET_REGIME`; active `data_derived` is retired.
-- 2026-04-30: Merged the unimplemented `trading-manager` control-plane/documentation boundary into `trading-main`. Active control-plane request generation, readiness checks, lifecycle routing, retry/recovery policy, manual override, and promotion coordination now belong to `trading-main`; the standalone `trading-manager` repository is retired.
+- 2026-04-30: Merged the unimplemented `trading-manager` control-plane/documentation boundary into `trading-manager`. Active control-plane request generation, readiness checks, lifecycle routing, retry/recovery policy, manual override, and promotion coordination now belong to `trading-manager`; the standalone `trading-manager` repository is retired.

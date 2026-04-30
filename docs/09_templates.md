@@ -2,14 +2,14 @@
 
 ## Purpose
 
-`trading-main` owns the platform guidance and registry review flow for reusable trading-wide templates. The tracked template files themselves live under `trading-storage/main/templates/`.
+`trading-manager` owns the platform guidance and registry review flow for reusable trading-wide templates. The tracked template files themselves live under `trading-storage/main/templates/`.
 
 The earlier docs stay project-wide:
 
 - `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
 - This file describes the `trading-storage/main/templates/` platform function specifically.
 
-Templates exist to keep drafting consistent without mistaking drafts for accepted contracts or concrete registry entries. `trading-storage` owns the checked-in non-code asset location; `trading-main` owns the registry and operating rules for shared names introduced by those assets.
+Templates exist to keep drafting consistent without mistaking drafts for accepted contracts or concrete registry entries. `trading-storage` owns the checked-in non-code asset location; `trading-manager` owns the registry and operating rules for shared names introduced by those assets.
 
 ## What Templates Own
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`trading-main` owns the trading registry: the shared registration system for trading-wide names, vocabulary, status values, repository identifiers, helper surfaces, and other stable values that multiple repositories may consume.
+`trading-manager` owns the trading registry: the shared registration system for trading-wide names, vocabulary, status values, repository identifiers, helper surfaces, and other stable values that multiple repositories may consume.
 
 The earlier docs stay project-wide:
 
@@ -181,7 +181,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 - Register shared names before component repositories depend on them.
 - New shared fields discovered in component work must be registered here before other repositories depend on them.
 - Feed adapters/connectors belong in `data_feed`; control-plane-facing runnable source boundaries belong in `data_source`; accepted final saved data shapes belong in `data_kind`; reusable checked-in templates belong in `template`; allowed state/policy values belong in `status_value`; date/time field names belong in `temporal_field`; categorical field names belong in `classification_field`.
-- New global helper surfaces and reusable templates must be recorded in `trading-main` and linked to registry entries when they expose stable automation names.
+- New global helper surfaces and reusable templates must be recorded in `trading-manager` and linked to registry entries when they expose stable automation names.
 - Prefer existing entries over inventing near-duplicates.
 - Use stable `id` values for automation and durable references.
 - Treat `key` values as renameable labels.

@@ -1,6 +1,6 @@
 # Registry SQL
 
-This directory owns the SQL-backed concrete registry entries for `trading-main`.
+This directory owns the SQL-backed concrete registry entries for `trading-manager`.
 
 Markdown files in `scripts/` define kind boundaries. SQL migrations define the actual active entries and schema.
 

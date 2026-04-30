@@ -2,7 +2,7 @@
 
 ## Acceptance Summary
 
-`trading-main` is accepted when it provides a coherent, reviewable system platform layer for the trading project.
+`trading-manager` is accepted when it provides a coherent, reviewable system platform layer for the trading project.
 
 Acceptance for this repository focuses on:
 
@@ -20,9 +20,9 @@ This repository does not accept trading runtime behavior. Runtime behavior is ac
 
 ## Acceptance Rules
 
-### For `trading-main`
+### For `trading-manager`
 
-A change to `trading-main` can be accepted only if:
+A change to `trading-manager` can be accepted only if:
 
 - the docs spine remains complete, including `07_helpers.md`, `08_registry.md`, and `09_templates.md`;
 - `README.md` accurately describes the repository boundary;
@@ -55,7 +55,7 @@ Contract changes are acceptable when they:
 - identify producing and consuming repositories;
 - describe lifecycle expectations;
 - describe compatibility expectations;
-- reference `trading-main/scripts/` for registered fields, identifiers, and status vocabularies;
+- reference `trading-manager/scripts/` for registered fields, identifiers, and status vocabularies;
 - include enough examples for implementation without making examples the only definition;
 - document migration or compatibility impact when changing an existing contract;
 - update affected workflow and decision docs when contract shape changes.
@@ -104,7 +104,7 @@ Shared environment changes are acceptable when they:
 
 ## Verification Commands
 
-Because `trading-main` is primarily docs, contracts, registry, templates, and shared helpers, required verification combines inspection with helper/schema checks.
+Because `trading-manager` is primarily docs, contracts, registry, templates, and shared helpers, required verification combines inspection with helper/schema checks.
 
 Current required checks before acceptance:
 
@@ -150,8 +150,8 @@ OpenClaw acceptance requires:
 
 A change must be rejected or returned for revision if it:
 
-- adds component runtime trading code to `trading-main`;
-- adds market data, generated artifacts, logs, notebooks, or research outputs to `trading-main`;
+- adds component runtime trading code to `trading-manager`;
+- adds market data, generated artifacts, logs, notebooks, or research outputs to `trading-manager`;
 - adds secrets or credentials;
 - tracks `.venv/` contents in Git;
 - duplicates registry status vocabularies or registrable fields as a competing source of truth outside `scripts/`;

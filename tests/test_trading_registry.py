@@ -54,27 +54,27 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
-    def test_component_repository_rows_use_trading_data_and_main_boundaries(self):
+    def test_component_repository_rows_use_trading_data_and_manager_boundaries(self):
         with Path("scripts/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         self.assertEqual(rows["TRADING_DATA_REPO"]["payload"], "trading-data")
         self.assertEqual(rows["TRADING_DATA_REPO"]["path"], "/root/projects/trading-data")
         self.assertIn("trading-data.git", rows["TRADING_DATA_REPO"]["note"])
-        self.assertEqual(rows["TRADING_MAIN_REPO"]["payload"], "trading-main")
-        self.assertEqual(rows["TRADING_MAIN_REPO"]["path"], "/root/projects/trading-main")
-        self.assertIn("control-plane", rows["TRADING_MAIN_REPO"]["note"])
+        self.assertEqual(rows["TRADING_MANAGER_REPO"]["payload"], "trading-manager")
+        self.assertEqual(rows["TRADING_MANAGER_REPO"]["path"], "/root/projects/trading-manager")
+        self.assertIn("control-plane", rows["TRADING_MANAGER_REPO"]["note"])
+        self.assertNotIn("TRADING_MAIN_REPO", rows)
         self.assertNotIn("TRADING_SOURCE_REPO", rows)
         self.assertNotIn("TRADING_DERIVED_REPO", rows)
-        self.assertNotIn("TRADING_MANAGER_REPO", rows)
         self.assertNotIn("TRADING_STRATEGY_REPO", rows)
         for row in rows.values():
+            self.assertNotIn("trading-main", row["payload"])
+            self.assertNotIn("trading-main", row["path"])
             self.assertNotIn("trading-source", row["payload"])
             self.assertNotIn("trading-source", row["path"])
             self.assertNotIn("trading-derived", row["payload"])
             self.assertNotIn("trading-derived", row["path"])
-            self.assertNotIn("trading-manager", row["payload"])
-            self.assertNotIn("trading-manager", row["path"])
             self.assertNotIn("trading-strategy", row["payload"])
             self.assertNotIn("trading-strategy", row["path"])
 
@@ -769,19 +769,19 @@ class RegistryHelperTests(unittest.TestCase):
                     create_row(
                         id="rep_H6S3V8LA",
                         kind="repo",
-                        key="TRADING_MAIN_REPO",
+                        key="TRADING_MANAGER_REPO",
                         payload_format="repo_name",
-                        payload="trading-main",
-                        path="/root/projects/trading-main",
+                        payload="trading-manager",
+                        path="/root/projects/trading-manager",
                         applies_to=None,
                     )
                 ]
             }
 
         reader = RegistryReader(query)
-        self.assertEqual(reader.get_key_by_id("rep_H6S3V8LA"), "TRADING_MAIN_REPO")
-        self.assertEqual(reader.get_payload_by_id("rep_H6S3V8LA"), "trading-main")
-        self.assertEqual(reader.get_path_by_id("rep_H6S3V8LA"), "/root/projects/trading-main")
+        self.assertEqual(reader.get_key_by_id("rep_H6S3V8LA"), "TRADING_MANAGER_REPO")
+        self.assertEqual(reader.get_payload_by_id("rep_H6S3V8LA"), "trading-manager")
+        self.assertEqual(reader.get_path_by_id("rep_H6S3V8LA"), "/root/projects/trading-manager")
         self.assertIsNone(reader.get_key_by_id("missing"))
         self.assertIsNone(reader.get_payload_by_id("missing"))
         self.assertIsNone(reader.get_path_by_id("missing"))
@@ -802,7 +802,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("WHERE kind = %s", sql)
             self.assertIn("ORDER BY key ASC", sql)
             self.assertEqual(params, ["repo"])
-            return [create_row(kind="repo", key="TRADING_MAIN_REPO", payload="trading-main")]
+            return [create_row(kind="repo", key="TRADING_MANAGER_REPO", payload="trading-manager")]
 
         reader = RegistryReader(query)
         items = reader.list_items_by_kind("repo")

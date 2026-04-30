@@ -1,6 +1,6 @@
 # Scripts
 
-`scripts/` stores executable maintenance and operational entrypoints for `trading-main`, plus the SQL-backed registry maintenance files those entrypoints own.
+`scripts/` stores executable maintenance and operational entrypoints for `trading-manager`, plus the SQL-backed registry maintenance files those entrypoints own.
 
 For the docs-level registry guide, see [`docs/08_registry.md`](../docs/08_registry.md).
 

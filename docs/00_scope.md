@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`trading-main` is the system-level documentation and contract repository for the full trading project.
+`trading-manager` is the system-level documentation and contract repository for the full trading project.
 
 It defines the global architecture, repository relationships, cross-repository workflow, control-plane orchestration responsibilities, shared artifact contracts, manifest contracts, ready-signal contracts, request contracts, and project-level governance rules for the trading system.
 
@@ -51,32 +51,32 @@ This repository exists to keep the multi-repository trading system coherent. It 
 
 The owner intends the trading project to be a large, core multi-repository system on this server.
 
-`trading-main` should act as the stable global coordination layer for that system. It should keep project shape, repository relationships, shared contracts, and architecture decisions explicit before implementation work spreads across component repositories.
+`trading-manager` should act as the stable global coordination layer for that system. It should keep project shape, repository relationships, shared contracts, and architecture decisions explicit before implementation work spreads across component repositories.
 
 The project should prefer strict boundaries, durable contracts, and evidence-based acceptance over fast but vague implementation.
 
 ## Boundary Rules
 
-- `trading-main` is the trading platform main repository: docs, contracts, control-plane orchestration policy, registries, templates, shared helpers, and shared environment anchor.
-- `trading-main` may contain shared helper code used across trading repositories; see `docs/07_helpers.md`.
-- `trading-main` must not contain component runtime implementations; control-plane scripts may create requests or review evidence, but must not fetch provider data, build features, train models, execute trades, or render dashboards.
-- `trading-main` must not contain market data or generated trading artifacts.
-- `trading-main` must not contain secrets or credentials.
-- `trading-main` may contain a local gitignored `.venv/` directory as the shared trading development environment anchor.
+- `trading-manager` is the trading platform main repository: docs, contracts, control-plane orchestration policy, registries, templates, shared helpers, and shared environment anchor.
+- `trading-manager` may contain shared helper code used across trading repositories; see `docs/07_helpers.md`.
+- `trading-manager` must not contain component runtime implementations; control-plane scripts may create requests or review evidence, but must not fetch provider data, build features, train models, execute trades, or render dashboards.
+- `trading-manager` must not contain market data or generated trading artifacts.
+- `trading-manager` must not contain secrets or credentials.
+- `trading-manager` may contain a local gitignored `.venv/` directory as the shared trading development environment anchor.
 - The `.venv/` directory is runtime infrastructure, not repository content.
 - Component repositories may implement or consume contracts defined here, but they must not redefine incompatible local versions of global contracts.
-- Each component repository must keep its own docs spine; `trading-main` does not replace component-level documentation.
-- Trading-wide status vocabularies and registrable fields are maintained in `trading-main/scripts/`; see `docs/08_registry.md` for registry-specific rules.
+- Each component repository must keep its own docs spine; `trading-manager` does not replace component-level documentation.
+- Trading-wide status vocabularies and registrable fields are maintained in `trading-manager/scripts/`; see `docs/08_registry.md` for registry-specific rules.
 - A fact should live in the narrowest authoritative home:
   - system-wide facts live here;
   - component-specific facts live in the relevant component repository;
-  - trading-wide registered names and vocabularies live in `trading-main/scripts/`, with operating rules in `docs/08_registry.md`.
+  - trading-wide registered names and vocabularies live in `trading-manager/scripts/`, with operating rules in `docs/08_registry.md`.
 - Market-state discovery must not use strategy returns or strategy performance as input. Strategy results may only be attached after market states have already been discovered.
-- `trading-storage` owns shared persistent storage contracts for trading artifacts; `trading-main` defines the system-level relationship to those contracts.
+- `trading-storage` owns shared persistent storage contracts for trading artifacts; `trading-manager` defines the system-level relationship to those contracts.
 
 ## Out-of-Scope Signals
 
-A request should be rejected or re-scoped if it asks `trading-main` to:
+A request should be rejected or re-scoped if it asks `trading-manager` to:
 
 - implement trading runtime code;
 - fetch or normalize market data;
@@ -85,7 +85,7 @@ A request should be rejected or re-scoped if it asks `trading-main` to:
 - execute orders;
 - store generated data or artifacts;
 - become a dumping ground for component-specific implementation notes;
-- duplicate status vocabulary outside `trading-main/scripts/`;
+- duplicate status vocabulary outside `trading-manager/scripts/`;
 - override a component repo's local docs instead of referencing them;
 - accept a cross-repository behavior without a documented contract;
 - define market states using strategy returns or strategy profitability.

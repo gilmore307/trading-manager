@@ -2031,3 +2031,39 @@ This does not make `trading-main` a component runtime repository. Data productio
 - Historical decisions and migrations may continue to mention `trading-manager` as append-only history.
 - The remote/local `trading-manager` repository can be deleted after documentation and registry changes are pushed.
 - If a future scheduler/control-plane implementation grows large enough to deserve its own repository, that split requires a new decision and registry migration.
+
+
+## D092 - Rename trading-main repository to trading-manager
+
+Date: 2026-04-30
+Status: Accepted
+
+### Context
+
+After the unimplemented standalone `trading-manager` repository was merged into `trading-main`, the surviving repository became both the platform contract repository and the control plane. The name `trading-main` no longer described the active responsibility as directly as `trading-manager`.
+
+The old `trading-manager` repository had already been deleted after its documentation responsibility was merged, so the repository name was available for the surviving platform/control-plane repository.
+
+### Decision
+
+Rename canonical `trading-main` to `trading-manager`.
+
+The renamed `trading-manager` owns the same platform/control-plane responsibilities that were accepted in D091:
+
+- global architecture and repository relationships;
+- shared contracts, registry, templates, and helper surfaces;
+- shared Python environment anchoring;
+- structured request generation;
+- readiness checks and lifecycle routing;
+- retry/recovery/manual override policy;
+- promotion coordination.
+
+The importable helper package remains `trading_registry`; the distribution package name becomes `trading-manager-helpers`.
+
+### Consequences
+
+- Rename the active repo registry key from `TRADING_MAIN_REPO` to `TRADING_MANAGER_REPO`.
+- Rename the registry term from `TRADING_MAIN_REGISTRY` to `TRADING_MANAGER_REGISTRY`.
+- Update active docs, helper package metadata, absolute local paths, and cross-repository references from `/root/projects/trading-main` to `/root/projects/trading-manager`.
+- Rename the GitHub repository `gilmore307/trading-main` to `gilmore307/trading-manager` and move the local checkout accordingly.
+- Historical decisions and migrations may continue to mention `trading-main` as append-only history.

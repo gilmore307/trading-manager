@@ -1,6 +1,6 @@
 # Source
 
-`src/` stores importable, reusable implementation code for `trading-main` shared helper packages.
+`src/` stores importable, reusable implementation code for `trading-manager` shared helper packages.
 
 The formal cross-repository helper runtime surface is Python. Package metadata lives in root `pyproject.toml`; importable source lives under this directory.
 
@@ -21,8 +21,8 @@ Tests live under `tests/`. Executable maintenance entrypoints live under `script
 From the shared environment:
 
 ```bash
-/root/projects/trading-main/.venv/bin/python -m pip install -r /root/projects/trading-main/requirements.txt
-/root/projects/trading-main/.venv/bin/python -m pip install -e /root/projects/trading-main
+/root/projects/trading-manager/.venv/bin/python -m pip install -r /root/projects/trading-manager/requirements.txt
+/root/projects/trading-manager/.venv/bin/python -m pip install -e /root/projects/trading-manager
 ```
 
 ## Test

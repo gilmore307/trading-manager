@@ -6,7 +6,7 @@
 
 ## Queued Tasks
 
-- Define data task key file and completion receipt schemas across `trading-main` control-plane and `trading-storage`.
+- Define data task key file and completion receipt schemas across `trading-manager` control-plane and `trading-storage`.
 - Define migration criteria from any legacy local data-production staging files to durable `trading-storage` SQL/artifact contracts.
 - None that can be completed safely without cross-repository contract coordination.
 
@@ -51,7 +51,7 @@
 - Defined repository visibility policy: trading repositories stay private unless the owner explicitly approves a visibility change.
 - Defined helper distribution boundary: cross-repository runtime helpers use the Python helper package.
 - Defined shared environment baseline: Python 3.12, `.venv`, `pip`, and reviewed `requirements.txt`.
-- Split `trading-main` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
+- Split `trading-manager` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
 - Added scripts/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
 - Moved registry kind boundary files into `scripts/kinds/`; `scripts/reviews/` remains for review artifacts.
 - Registered the active trading repositories as `repo` rows in `scripts/current.csv`; later merged source/derived data-production boundaries back into `trading-data`.
@@ -70,11 +70,11 @@
 - Corrected registry shape so Markdown kind files define kind boundaries while SQL migrations own concrete entries.
 - Added SQL-to-CSV registry snapshot generation at `scripts/current.csv`.
 - Added registry kind boundary overlap review.
-- Migrated former standalone registry into `trading-main`: SQL migrations own concrete entries, Markdown kind files own boundaries.
+- Migrated former standalone registry into `trading-manager`: SQL migrations own concrete entries, Markdown kind files own boundaries.
 
-- Defined initial `trading-main` docs spine and pushed initial trading repositories to GitHub.
+- Defined initial `trading-manager` docs spine and pushed initial trading repositories to GitHub.
 - Initial repository list approved:
-  - `trading-main`
+  - `trading-manager`
   - `trading-data`
   - `trading-storage`
   - `trading-model`

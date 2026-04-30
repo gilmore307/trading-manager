@@ -2,14 +2,14 @@
 
 ## Purpose
 
-`trading-main` owns shared helper code for trading-wide infrastructure concerns that multiple component repositories may consume.
+`trading-manager` owns shared helper code for trading-wide infrastructure concerns that multiple component repositories may consume.
 
 The earlier docs stay project-wide:
 
 - `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
 - This file describes the shared helper source boundary under `src/` specifically.
 
-Helpers exist to keep repeated cross-repository mechanics consistent without turning `trading-main` into a runtime implementation repository.
+Helpers exist to keep repeated cross-repository mechanics consistent without turning `trading-manager` into a runtime implementation repository.
 
 ## What Helpers Own
 
@@ -56,14 +56,14 @@ The formal cross-repository helper runtime surface is now Python.
 Current package facts:
 
 - Package metadata lives in root `pyproject.toml`.
-- Python package name: `trading-main-helpers`.
+- Python package name: `trading-manager-helpers`.
 - Import package: `trading_registry`.
 - Requires Python 3.12 or newer.
 - Shared environment install command:
 
   ```bash
-  /root/projects/trading-main/.venv/bin/python -m pip install -r /root/projects/trading-main/requirements.txt
-  /root/projects/trading-main/.venv/bin/python -m pip install -e /root/projects/trading-main
+  /root/projects/trading-manager/.venv/bin/python -m pip install -r /root/projects/trading-manager/requirements.txt
+  /root/projects/trading-manager/.venv/bin/python -m pip install -e /root/projects/trading-manager
   ```
 
 - Python helper test command:
@@ -109,7 +109,7 @@ Registry maintenance commands, such as regenerating `scripts/current.csv`, are r
 
 ## Recording Duty
 
-When any component work discovers or creates a helper that should be global, record it in `trading-main` instead of leaving it in the component repository.
+When any component work discovers or creates a helper that should be global, record it in `trading-manager` instead of leaving it in the component repository.
 
 - Shared helper code belongs under `src/`.
 - Public helper surfaces that automation may call should be registered as `script` rows when stable.

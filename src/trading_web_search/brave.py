@@ -1,6 +1,6 @@
 """Brave Search API helper.
 
-The default helper resolves the Brave API key from the trading-main registry
+The default helper resolves the Brave API key from the trading-manager registry
 config id and local secret alias. Secret values are never stored in repo files.
 """
 
@@ -17,7 +17,7 @@ from typing import Any, Mapping
 from trading_registry import SecretResolver, create_csv_registry_query
 
 BRAVE_SEARCH_CONFIG_ID = "cfg_BRAVESEARCH"
-DEFAULT_REGISTRY_CSV = Path("/root/projects/trading-main/scripts/current.csv")
+DEFAULT_REGISTRY_CSV = Path("/root/projects/trading-manager/scripts/current.csv")
 DEFAULT_SECRETS_REGISTRY = Path("/root/secrets/registry.json")
 DEFAULT_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 DEFAULT_TIMEOUT_SECONDS = 20

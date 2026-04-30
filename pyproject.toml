@@ -3,9 +3,9 @@ requires = ["setuptools>=69,<76"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trading-main-helpers"
+name = "trading-manager-helpers"
 version = "0.1.0"
-description = "Shared Python helper package for trading-main platform helpers."
+description = "Shared Python helper package for trading-manager platform helpers."
 requires-python = ">=3.12"
 readme = "README.md"
 

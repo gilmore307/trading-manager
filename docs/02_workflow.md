@@ -13,7 +13,7 @@ Component-internal workflows belong in each component repository's own `docs/02_
 The trading system collaboration model has these layers:
 
 1. **Intent and control**
-   - `trading-main` control-plane policy receives user, Agent, schedule, recovery, or manual intent.
+   - `trading-manager` control-plane policy receives user, Agent, schedule, recovery, or manual intent.
    - It turns intent into structured cross-repository requests.
 
 2. **Data production**
@@ -28,7 +28,7 @@ The trading system collaboration model has these layers:
    - It produces model output tables, training/evaluation outputs, mappings, verdicts, manifests, and ready signals.
 
 5. **Promotion and lifecycle**
-   - `trading-main` control-plane policy consumes manifests and ready signals.
+   - `trading-manager` control-plane policy consumes manifests and ready signals.
    - It decides whether outputs should be reviewed, promoted, retried, archived, rehydrated, or routed downstream.
 
 6. **Execution**
@@ -48,8 +48,8 @@ The trading system collaboration model has these layers:
 - Manifests provide run evidence.
 - Ready signals provide downstream consumability markers.
 - Artifact references provide stable handoff points.
-- Shared statuses and registrable fields are maintained in `trading-main/scripts/`; registry operating rules are in `docs/08_registry.md`.
-- `trading-main` defines global collaboration contracts and owns control-plane request/lifecycle policy, but does not execute component runtime workflows.
+- Shared statuses and registrable fields are maintained in `trading-manager/scripts/`; registry operating rules are in `docs/08_registry.md`.
+- `trading-manager` defines global collaboration contracts and owns control-plane request/lifecycle policy, but does not execute component runtime workflows.
 - Component-local workflow detail belongs in the owning component repository.
 - Execution consumes promoted decisions only; it must not generate derived datasets or train models.
 - Dashboard consumes existing outputs only; it must not recompute upstream truth.
@@ -58,7 +58,7 @@ The trading system collaboration model has these layers:
 
 ```mermaid
 flowchart TD
-  A[User / Agent / Schedule / Manual Intent] --> B[trading-main Control Plane]
+  A[User / Agent / Schedule / Manual Intent] --> B[trading-manager Control Plane]
   B --> C[Structured Request]
   C --> D[trading-data]
   D --> E[Feed Evidence]
@@ -74,7 +74,7 @@ flowchart TD
   I --> N[Model Manifest]
   I --> O[Model Ready Signal]
 
-  M --> P[trading-main Promotion / Lifecycle]
+  M --> P[trading-manager Promotion / Lifecycle]
   N --> P
   O --> P
   G --> P
@@ -115,7 +115,7 @@ Where:
 
 ## Control-Plane Collaboration Role
 
-`trading-main` coordinates system progress at the control-plane boundary by:
+`trading-manager` coordinates system progress at the control-plane boundary by:
 
 - creating structured requests;
 - checking dependency readiness;
@@ -132,7 +132,7 @@ The control plane should not become a hidden implementation layer for data fetch
 
 Other repositories may write and read storage-backed outputs according to storage and artifact contracts, but they should not invent incompatible local layouts for system-level artifacts.
 
-`trading-main` may define system-level artifact expectations, while `trading-storage` owns concrete persistent storage rules.
+`trading-manager` may define system-level artifact expectations, while `trading-storage` owns concrete persistent storage rules.
 
 ## Model Contamination Boundary
 
@@ -157,7 +157,7 @@ It must not:
 - run feature/data generators or strategy backtests;
 - choose active strategy variants by itself;
 - make cross-repository promotion decisions;
-- bypass `trading-main` control-plane lifecycle policy.
+- bypass `trading-manager` control-plane lifecycle policy.
 
 ## Dashboard Collaboration Boundary
 
@@ -180,5 +180,5 @@ The following collaboration details still need definition before implementation 
 - exact manifest schema;
 - exact ready-signal schema;
 - exact shared storage root;
-- exact registered status vocabulary and field names in `trading-main/scripts/`, governed by `docs/08_registry.md`;
+- exact registered status vocabulary and field names in `trading-manager/scripts/`, governed by `docs/08_registry.md`;
 - exact shared environment runtime version and dependency policy.

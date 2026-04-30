@@ -1,6 +1,6 @@
 # trading_registry
 
-Python registry helper package for `trading-main`.
+Python registry helper package for `trading-manager`.
 
 ## Public Surface
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply trading-main registry PostgreSQL migrations exactly once.
+"""Apply trading-manager registry PostgreSQL migrations exactly once.
 
 The database URL is read from OPENCLAW_DATABASE_URL when set, otherwise
 from the local secret alias file /root/secrets/openclaw/database-url.

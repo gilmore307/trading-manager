@@ -24,7 +24,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from trading_registry import SecretResolver, create_csv_registry_query
 
 GDELT_BIGQUERY_CONFIG_ID = "cfg_GDELTBQ1"
-DEFAULT_REGISTRY_CSV = Path("/root/projects/trading-main/scripts/current.csv")
+DEFAULT_REGISTRY_CSV = Path("/root/projects/trading-manager/scripts/current.csv")
 DEFAULT_SECRETS_REGISTRY = Path("/root/secrets/registry.json")
 DEFAULT_SCOPE = "https://www.googleapis.com/auth/bigquery.readonly"
 BIGQUERY_ENDPOINT = "https://bigquery.googleapis.com/bigquery/v2"

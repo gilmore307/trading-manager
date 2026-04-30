@@ -1,11 +1,11 @@
 # Shared trading Python environment dependencies.
 #
-# Runtime anchor: /root/projects/trading-main/.venv
+# Runtime anchor: /root/projects/trading-manager/.venv
 # Python: 3.12
 # Installer: python -m pip install -r requirements.txt
 #
 # Add dependencies only through reviewed changes. Keep this file empty until a
 # component has an accepted dependency need.
 
-# Packaging backend for editable installs of trading-main helper package.
+# Packaging backend for editable installs of trading-manager helper package.
 setuptools>=69,<76

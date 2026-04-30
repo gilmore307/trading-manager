@@ -1,6 +1,6 @@
 # Tests
 
-`tests/` owns first-party tests for the `trading-main` source packages and repository governance checks.
+`tests/` owns first-party tests for the `trading-manager` source packages and repository governance checks.
 
 ## Boundary
 
