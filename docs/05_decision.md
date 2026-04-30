@@ -1959,3 +1959,41 @@ Registry keys use the same order in uppercase, for example `SOURCE_01_MARKET_REG
 - Active `scripts/current.csv` source and derived rows use type-first keys, payloads, paths, and `applies_to` scopes.
 - Historical SQL migrations remain append-only; migrations 164 and 165 record the active naming change.
 - Feeds keep their existing `NN_feed_*` names unless separately reviewed.
+
+## D090 - Merge source and derived data production into trading-data
+
+Date: 2026-04-30
+Status: Accepted
+
+### Context
+
+The earlier split between `trading-source` and `trading-derived` clarified a source-backed versus generated-data distinction, but the active implementation made the feed → source → feature path one continuous data-production line. Keeping separate repositories and registry kinds forced unnecessary handoff vocabulary between source construction and deterministic feature construction.
+
+Layer 1 also clarified the preferred model-facing term: deterministic point-in-time model inputs should be called features, not derived outputs.
+
+### Decision
+
+Use `trading-data` as the canonical data-production repository.
+
+`trading-data` owns:
+
+- provider/API/web/file feed adapters (`feed_*` implementation packages);
+- model-scoped source construction (`source_NN_<layer>` tables and packages);
+- deterministic point-in-time feature construction (`feature_NN_<layer>` tables and packages).
+
+`trading-model` owns model outputs, evaluation, config proposals, promotion, and rollback. The canonical Layer 1 SQL chain is:
+
+```text
+trading_data.source_01_market_regime
+  -> trading_data.feature_01_market_regime
+  -> trading_model.model_01_market_regime
+```
+
+The active registry uses `TRADING_DATA_REPO`, `data_feature`, and `FEATURE_01_MARKET_REGIME`. The active `data_derived` kind is retired.
+
+### Consequences
+
+- The old `trading-source` and `trading-derived` repositories are merged into `trading-data` and should not receive new active contracts.
+- `feature_NN_<layer>` replaces `derived_NN_<layer>` for deterministic model-facing data surfaces.
+- Historical migrations and older decisions remain append-only records, but active docs, registry exports, and new implementation paths should use `trading-data`, `data_source`, and `data_feature` terminology.
+- Remote repository rename/deletion is an operational follow-up to align GitHub with the accepted repository boundary.

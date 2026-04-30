@@ -7,7 +7,7 @@
 ## Queued Tasks
 
 - Define data task key file and completion receipt schemas across manager/storage.
-- Define migration criteria from legacy local `storage/` files in `trading-source` to durable `trading-storage` SQL/artifact contracts.
+- Define migration criteria from any legacy local data-production staging files to durable `trading-storage` SQL/artifact contracts.
 - None that can be completed safely without cross-repository contract coordination.
 
 ## Waiting On Cross-Repository Coordination
@@ -54,7 +54,7 @@
 - Split `trading-main` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
 - Added scripts/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
 - Moved registry kind boundary files into `scripts/kinds/`; `scripts/reviews/` remains for review artifacts.
-- Registered all eight trading repositories as `repo` rows in `scripts/current.csv`; later renamed `trading-data` to `trading-source` and `trading-strategy` to `trading-derived`.
+- Registered the active trading repositories as `repo` rows in `scripts/current.csv`; later merged source/derived data-production boundaries back into `trading-data`.
 - Registered `HELPER_REGISTRY_EXPORT_CURRENT_CSV` for regenerating `scripts/current.csv`.
 - Standardized registered helper surface to four id-only helpers: key, payload, path, and secret text by config id.
 - Backfilled `applies_to` for every active field registry entry and added a SQL check constraint to prevent blank field scopes.
@@ -76,9 +76,8 @@
 - Initial repository list approved:
   - `trading-main`
   - `trading-manager`
-  - `trading-source`
+  - `trading-data`
   - `trading-storage`
-  - `trading-derived`
   - `trading-model`
   - `trading-execution`
   - `trading-dashboard`
