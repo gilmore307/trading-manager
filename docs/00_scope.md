@@ -4,15 +4,16 @@
 
 `trading-main` is the system-level documentation and contract repository for the full trading project.
 
-It defines the global architecture, repository relationships, cross-repository workflow, shared artifact contracts, manifest contracts, ready-signal contracts, request contracts, and project-level governance rules for the trading system.
+It defines the global architecture, repository relationships, cross-repository workflow, control-plane orchestration responsibilities, shared artifact contracts, manifest contracts, ready-signal contracts, request contracts, and project-level governance rules for the trading system.
 
-This repository exists to keep the multi-repository trading system coherent. It does not implement trading logic, store market data, run models, execute trades, or host dashboard code.
+This repository exists to keep the multi-repository trading system coherent. It also owns the former manager/control-plane responsibility for request generation, readiness checks, lifecycle routing, retries, recovery, manual override, and promotion policy. It does not implement data production, modeling, trade execution, persistent storage, or dashboard runtime code.
 
 ## In Scope
 
 - Define the global trading-system architecture.
 - Define the official trading repository map.
 - Define cross-repository workflow and handoff rules.
+- Own control-plane request generation, readiness checks, retry/recovery policy, lifecycle routing, manual override rules, and promotion routing.
 - Define shared artifact contracts.
 - Define shared manifest contracts.
 - Define shared ready-signal contracts.
@@ -40,7 +41,7 @@ This repository exists to keep the multi-repository trading system coherent. It 
 - Broker or exchange order placement.
 - Dashboard frontend implementation.
 - Dashboard backend/server implementation.
-- Component-repository task queues once work has moved into that component repo.
+- Component-repository internal task queues or run state once work has moved into that component repo.
 - Raw data, generated artifacts, notebooks, logs, or research outputs.
 - Secrets, credentials, API tokens, brokerage credentials, or exchange keys.
 - Source code for runtime trading components.
@@ -56,9 +57,9 @@ The project should prefer strict boundaries, durable contracts, and evidence-bas
 
 ## Boundary Rules
 
-- `trading-main` is the trading platform main repository: docs, contracts, registries, templates, shared helpers, and shared environment anchor.
+- `trading-main` is the trading platform main repository: docs, contracts, control-plane orchestration policy, registries, templates, shared helpers, and shared environment anchor.
 - `trading-main` may contain shared helper code used across trading repositories; see `docs/07_helpers.md`.
-- `trading-main` must not contain component runtime implementations.
+- `trading-main` must not contain component runtime implementations; control-plane scripts may create requests or review evidence, but must not fetch provider data, build features, train models, execute trades, or render dashboards.
 - `trading-main` must not contain market data or generated trading artifacts.
 - `trading-main` must not contain secrets or credentials.
 - `trading-main` may contain a local gitignored `.venv/` directory as the shared trading development environment anchor.

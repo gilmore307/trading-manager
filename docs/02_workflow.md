@@ -13,7 +13,7 @@ Component-internal workflows belong in each component repository's own `docs/02_
 The trading system collaboration model has these layers:
 
 1. **Intent and control**
-   - `trading-manager` receives user, Agent, schedule, recovery, or manual intent.
+   - `trading-main` control-plane policy receives user, Agent, schedule, recovery, or manual intent.
    - It turns intent into structured cross-repository requests.
 
 2. **Data production**
@@ -28,7 +28,7 @@ The trading system collaboration model has these layers:
    - It produces model output tables, training/evaluation outputs, mappings, verdicts, manifests, and ready signals.
 
 5. **Promotion and lifecycle**
-   - `trading-manager` consumes manifests and ready signals.
+   - `trading-main` control-plane policy consumes manifests and ready signals.
    - It decides whether outputs should be reviewed, promoted, retried, archived, rehydrated, or routed downstream.
 
 6. **Execution**
@@ -49,7 +49,7 @@ The trading system collaboration model has these layers:
 - Ready signals provide downstream consumability markers.
 - Artifact references provide stable handoff points.
 - Shared statuses and registrable fields are maintained in `trading-main/scripts/`; registry operating rules are in `docs/08_registry.md`.
-- `trading-main` defines global collaboration contracts but does not execute workflows.
+- `trading-main` defines global collaboration contracts and owns control-plane request/lifecycle policy, but does not execute component runtime workflows.
 - Component-local workflow detail belongs in the owning component repository.
 - Execution consumes promoted decisions only; it must not generate derived datasets or train models.
 - Dashboard consumes existing outputs only; it must not recompute upstream truth.
@@ -58,7 +58,7 @@ The trading system collaboration model has these layers:
 
 ```mermaid
 flowchart TD
-  A[User / Agent / Schedule / Manual Intent] --> B[trading-manager]
+  A[User / Agent / Schedule / Manual Intent] --> B[trading-main Control Plane]
   B --> C[Structured Request]
   C --> D[trading-data]
   D --> E[Feed Evidence]
@@ -74,7 +74,7 @@ flowchart TD
   I --> N[Model Manifest]
   I --> O[Model Ready Signal]
 
-  M --> P[trading-manager Promotion / Lifecycle]
+  M --> P[trading-main Promotion / Lifecycle]
   N --> P
   O --> P
   G --> P
@@ -101,7 +101,7 @@ flowchart TD
 Every cross-repository handoff should follow this pattern:
 
 ```text
-request -> run -> artifact(s) -> manifest -> ready signal -> downstream consumption or manager review
+request -> run -> artifact(s) -> manifest -> ready signal -> downstream consumption or control-plane review
 ```
 
 Where:
@@ -111,11 +111,11 @@ Where:
 - **artifact(s)** are durable outputs;
 - **manifest** records what happened and what was produced;
 - **ready signal** marks whether downstream consumers may use the outputs;
-- **manager review or downstream consumption** advances the system lifecycle.
+- **control-plane review or downstream consumption** advances the system lifecycle.
 
-## Manager Collaboration Role
+## Control-Plane Collaboration Role
 
-`trading-manager` coordinates system progress by:
+`trading-main` coordinates system progress at the control-plane boundary by:
 
 - creating structured requests;
 - checking dependency readiness;
@@ -124,7 +124,7 @@ Where:
 - routing promoted decisions to execution;
 - avoiding component-internal implementation control.
 
-The manager should not become a hidden implementation layer for data fetching, feature generation, modeling, execution, or dashboard rendering.
+The control plane should not become a hidden implementation layer for data fetching, feature generation, modeling, execution, or dashboard rendering.
 
 ## Storage Collaboration Role
 
@@ -157,7 +157,7 @@ It must not:
 - run feature/data generators or strategy backtests;
 - choose active strategy variants by itself;
 - make cross-repository promotion decisions;
-- bypass manager-controlled lifecycle policy.
+- bypass `trading-main` control-plane lifecycle policy.
 
 ## Dashboard Collaboration Boundary
 

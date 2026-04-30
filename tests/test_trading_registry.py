@@ -54,21 +54,27 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
-    def test_component_repository_rows_use_trading_data_boundary(self):
+    def test_component_repository_rows_use_trading_data_and_main_boundaries(self):
         with Path("scripts/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         self.assertEqual(rows["TRADING_DATA_REPO"]["payload"], "trading-data")
         self.assertEqual(rows["TRADING_DATA_REPO"]["path"], "/root/projects/trading-data")
         self.assertIn("trading-data.git", rows["TRADING_DATA_REPO"]["note"])
+        self.assertEqual(rows["TRADING_MAIN_REPO"]["payload"], "trading-main")
+        self.assertEqual(rows["TRADING_MAIN_REPO"]["path"], "/root/projects/trading-main")
+        self.assertIn("control-plane", rows["TRADING_MAIN_REPO"]["note"])
         self.assertNotIn("TRADING_SOURCE_REPO", rows)
         self.assertNotIn("TRADING_DERIVED_REPO", rows)
+        self.assertNotIn("TRADING_MANAGER_REPO", rows)
         self.assertNotIn("TRADING_STRATEGY_REPO", rows)
         for row in rows.values():
             self.assertNotIn("trading-source", row["payload"])
             self.assertNotIn("trading-source", row["path"])
             self.assertNotIn("trading-derived", row["payload"])
             self.assertNotIn("trading-derived", row["path"])
+            self.assertNotIn("trading-manager", row["payload"])
+            self.assertNotIn("trading-manager", row["path"])
             self.assertNotIn("trading-strategy", row["payload"])
             self.assertNotIn("trading-strategy", row["path"])
 

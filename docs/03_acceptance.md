@@ -26,7 +26,7 @@ A change to `trading-main` can be accepted only if:
 
 - the docs spine remains complete, including `07_helpers.md`, `08_registry.md`, and `09_templates.md`;
 - `README.md` accurately describes the repository boundary;
-- repository purpose remains system docs, contracts, registries, templates, shared helpers, and shared environment anchoring;
+- repository purpose remains system docs, contracts, control-plane orchestration policy, registries, templates, shared helpers, and shared environment anchoring;
 - `.venv/`, if present, is ignored by Git and treated as local runtime infrastructure;
 - no component runtime trading source code is introduced;
 - no market data, generated artifacts, logs, notebooks, credentials, or secrets are introduced;

@@ -935,7 +935,7 @@ These source-of-truth rules should be explicit before connector or scraper work 
 - Connectors must preserve source URL, retrieval timestamp, and publication/effective date where available.
 - Default tests must use fixtures or mocks, not live web calls.
 
-## D044 - Data acquisition is manager-driven and historical-only
+## D044 - Data acquisition is control-plane-driven and historical-only
 
 Date: 2026-04-26
 
@@ -1016,7 +1016,7 @@ Default each data source bundle to one `pipeline.py` file with one public `run(.
 
 ### Rationale
 
-This keeps manager invocation simple and avoids premature file sprawl while preserving testable/replayable boundaries inside the pipeline.
+This keeps control-plane invocation simple and avoids premature file sprawl while preserving testable/replayable boundaries inside the pipeline.
 
 ### Consequences
 
@@ -1034,11 +1034,11 @@ The initial `task_key.json` and `completion_receipt.json` templates included met
 
 ### Decision
 
-Keep data task key and completion receipt JSON templates minimal. Include only fields used by manager handoff, bundle execution, development output location, and completion evidence. Put provider documentation URLs and other lookup metadata in scripts/provider docs or bundle READMEs instead of runtime JSON.
+Keep data task key and completion receipt JSON templates minimal. Include only fields used by control-plane handoff, bundle execution, development output location, and completion evidence. Put provider documentation URLs and other lookup metadata in scripts/provider docs or bundle READMEs instead of runtime JSON.
 
 ### Rationale
 
-Smaller runtime templates are easier for manager to generate, easier for data pipelines to validate, and less likely to ossify unused conventions.
+Smaller runtime templates are easier for control plane to generate, easier for data pipelines to validate, and less likely to ossify unused conventions.
 
 ### Consequences
 
@@ -1472,7 +1472,7 @@ Prune obsolete numbered bundle-local config rows that pointed to removed `config
 
 ### Consequences
 
-- `data_bundle` rows describe manager-facing data acquisition/preparation bundles, not complete model-input universes.
+- `data_bundle` rows describe control-plane-facing data acquisition/preparation bundles, not complete model-input universes.
 - SQL output tables live under the `trading_source` schema because they are source-backed trading-source bundle outputs, not complete model inputs.
 - Do not introduce new active package paths named `*_model_inputs` under `src/trading_source/data_bundles/`.
 
@@ -1552,7 +1552,7 @@ Register source capabilities for currently implemented `trading-source` source-i
 
 - Use `source_capability` for source availability, entitlement review, adapter planning, and transient/raw input documentation.
 - Do not promote source capabilities to `data_kind` without a current accepted storage contract.
-- Keep implemented adapters in `data_source`; keep manager-facing tasks in `data_bundle`.
+- Keep implemented adapters in `data_source`; keep control-plane-facing tasks in `data_bundle`.
 
 ## D075 - Split provider identities out of generic terms
 
@@ -1561,7 +1561,7 @@ Status: Accepted
 
 ### Context
 
-After `source_capability` became the registry kind for provider/source endpoint families and raw record families, provider identities themselves were still stored as generic `term` rows. That made the source vocabulary uneven: provider/source owners, provider capabilities, implemented adapters, and manager-facing bundles were no longer equally explicit.
+After `source_capability` became the registry kind for provider/source endpoint families and raw record families, provider identities themselves were still stored as generic `term` rows. That made the source vocabulary uneven: provider/source owners, provider capabilities, implemented adapters, and control-plane-facing bundles were no longer equally explicit.
 
 ### Decision
 
@@ -1573,7 +1573,7 @@ Use `term` only for ordinary glossary/reference concepts. Use `source_capability
 
 - Provider documentation URLs now belong on `provider.path` rather than provider `term` rows.
 - Provider capability coverage can be reviewed without promoting capabilities to final `data_kind` status.
-- The registry kind split is now: `provider` owns who publishes it; `source_capability` owns what the provider exposes; `data_source` owns our adapter; `data_bundle` owns manager-facing runs.
+- The registry kind split is now: `provider` owns who publishes it; `source_capability` owns what the provider exposes; `data_source` owns our adapter; `data_bundle` owns control-plane-facing runs.
 
 ## D076 - Provider rows are limited to current source-interface providers
 
@@ -1713,7 +1713,7 @@ Current source-interface names are:
 
 - `trading-source/src/data_sources/` directories use number-first `NN_source_*` names.
 - `trading-main` data-source registry payload/path values use the same names.
-- Source-interface numbering is inventory/order clarity, not model-layer ownership; manager-facing model layers remain `data_bundle` rows.
+- Source-interface numbering is inventory/order clarity, not model-layer ownership; control-plane-facing model layers remain `data_bundle` rows.
 
 ## D081 - Rename source secret schema scope
 
@@ -1947,7 +1947,7 @@ Number-first source and derived payloads such as `01_source_market_regime` mirro
 
 ### Decision
 
-Use type-first names for manager-facing source and derived boundaries:
+Use type-first names for control-plane-facing source and derived boundaries:
 
 - `source_NN_<layer>` for `data_source` package/payload/table scopes, for example `source_01_market_regime`.
 - `derived_NN_<layer>` for `data_derived` package/payload/table scopes, for example `derived_01_market_regime`.
@@ -1997,3 +1997,37 @@ The active registry uses `TRADING_DATA_REPO`, `data_feature`, and `FEATURE_01_MA
 - `feature_NN_<layer>` replaces `derived_NN_<layer>` for deterministic model-facing data surfaces.
 - Historical migrations and older decisions remain append-only records, but active docs, registry exports, and new implementation paths should use `trading-data`, `data_source`, and `data_feature` terminology.
 - Remote repository rename/deletion is an operational follow-up to align GitHub with the accepted repository boundary.
+
+
+## D091 - Merge manager control plane into trading-main
+
+Date: 2026-04-30
+Status: Accepted
+
+### Context
+
+`trading-manager` was created as a planned control-plane repository, but it had no implementation scripts yet. Its useful content was documentation about orchestration, structured requests, lifecycle evidence, retries, recovery, manual override, and promotion routing.
+
+Keeping that as a separate repository now adds another boundary without enough implementation weight. `trading-main` already owns global contracts, repository relationships, templates, registry names, and system-level workflow decisions, so the control-plane responsibility is more naturally part of the main platform layer until there is a concrete need to split it again.
+
+### Decision
+
+Merge the former `trading-manager` responsibility into `trading-main`.
+
+`trading-main` now owns the control-plane boundary for:
+
+- structured cross-repository request generation;
+- readiness checks and dependency review;
+- lifecycle routing, retries, recovery, archive/rehydrate policy, and manual override rules;
+- promotion coordination from model/data evidence toward execution;
+- control-plane task-key and completion-receipt contracts.
+
+This does not make `trading-main` a component runtime repository. Data production remains in `trading-data`; storage contracts remain in `trading-storage`; model outputs/evaluation remain in `trading-model`; execution remains in `trading-execution`; dashboard rendering remains in `trading-dashboard`.
+
+### Consequences
+
+- Retire the active `TRADING_MANAGER_REPO` registry row.
+- Active docs should refer to the `trading-main` control plane instead of a standalone `trading-manager` repository.
+- Historical decisions and migrations may continue to mention `trading-manager` as append-only history.
+- The remote/local `trading-manager` repository can be deleted after documentation and registry changes are pushed.
+- If a future scheduler/control-plane implementation grows large enough to deserve its own repository, that split requires a new decision and registry migration.

@@ -2,9 +2,9 @@
 
 `trading-main` is the system-level platform repository for the trading project.
 
-It owns global architecture, cross-repository workflow, shared contracts, field/status registries, shared helper code, system-level decisions, and global planning context.
+It owns global architecture, cross-repository workflow, control-plane orchestration contracts, shared contracts, field/status registries, shared helper code, system-level decisions, and global planning context.
 
-It does not own component runtime implementations, market data, generated artifacts, secrets, or component-local task state.
+It does not own component runtime implementations, market data, generated artifacts, secrets, or component-local task state. Control-plane request generation, readiness review, lifecycle routing, and promotion policy belong here; data, model, execution, storage, and dashboard implementation remain in their component repositories.
 
 This repository also anchors the shared local trading development environment at `.venv/`. The `.venv/` directory is local runtime infrastructure and must remain ignored by Git.
 

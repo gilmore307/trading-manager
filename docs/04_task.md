@@ -6,7 +6,7 @@
 
 ## Queued Tasks
 
-- Define data task key file and completion receipt schemas across manager/storage.
+- Define data task key file and completion receipt schemas across `trading-main` control-plane and `trading-storage`.
 - Define migration criteria from any legacy local data-production staging files to durable `trading-storage` SQL/artifact contracts.
 - None that can be completed safely without cross-repository contract coordination.
 
@@ -32,7 +32,7 @@
 - Updated data task templates so sources default to one `pipeline.py` with fetch/clean/save/receipt step functions.
 - Added data task templates for task keys, source docs, fetch/clean/save specs, completion receipts, and fixture policy.
 - Registered the earlier draft development-storage-root contract, later pruned it from active registry rows, and kept local `storage/` as an ignored legacy runtime path for unmigrated source sources.
-- Registered manager-driven historical data task workflow terms for task key files and completion receipts.
+- Registered control-plane-driven historical data task workflow terms for task key files and completion receipts.
 - Registered FOMC calendar, official macro release calendar discovery, and ETF issuer holdings source terms.
 - Registered U.S. Treasury Fiscal Data as an open/no-key provider term with official documentation path.
 - Added official documentation URLs to registered provider term paths while keeping secret config paths pointed at local JSON files.
@@ -47,7 +47,7 @@
 - Expanded registry `payload_format` beyond `text`/`file` and backfilled current rows with narrower formats.
 - Removed the old non-Python registry helper implementation; helper code is now Python-only.
 - Added formal Python registry helper package and pointed registry script rows at Python helper methods.
-- Created initial docs spines for remaining component repositories: manager, storage, derived, model, execution, and dashboard.
+- Created initial docs spines for component repositories including the now-merged manager, storage, derived, model, execution, and dashboard repositories.
 - Defined repository visibility policy: trading repositories stay private unless the owner explicitly approves a visibility change.
 - Defined helper distribution boundary: cross-repository runtime helpers use the Python helper package.
 - Defined shared environment baseline: Python 3.12, `.venv`, `pip`, and reviewed `requirements.txt`.
@@ -75,7 +75,6 @@
 - Defined initial `trading-main` docs spine and pushed initial trading repositories to GitHub.
 - Initial repository list approved:
   - `trading-main`
-  - `trading-manager`
   - `trading-data`
   - `trading-storage`
   - `trading-model`

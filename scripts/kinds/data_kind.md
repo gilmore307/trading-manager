@@ -16,8 +16,8 @@ Use `payload` for a stable snake_case data-kind key. Use `path` only for the can
 
 Reject or re-scope entries that are actually:
 
-- manager-facing acquisition source names, which belong in `data_source`;
-- manager-facing deterministic feature output boundaries, which belong in `data_feature`;
+- control-plane-facing acquisition source names, which belong in `data_source`;
+- control-plane-facing deterministic feature output boundaries, which belong in `data_feature`;
 - provider/feed-owner names, which belong in `provider`;
 - provider endpoint names or feed-interface catalog items, which belong in `data_feed`/feed-interface code;
 - transient source inputs such as trades, quotes, order books, raw Greeks, or entitlement-blocked endpoint families unless and until they become accepted saved templates;

@@ -21,7 +21,7 @@ The registry owns trading-wide facts that need one canonical name or identifier,
 - artifact, manifest, ready-signal, and request type values;
 - shared terminology;
 - non-secret config keys and secret-alias references;
-- manager-facing data sources, implemented data feeds, feed capabilities, final data-kind shapes, reusable templates, and shared artifacts;
+- control-plane-facing data sources, implemented data feeds, feed capabilities, final data-kind shapes, reusable templates, and shared artifacts;
 - public helper or automation method entries;
 - generated GitHub-visible registry snapshots.
 
@@ -112,7 +112,7 @@ The most important data-related split is:
 - `provider` — current external provider/feed-owner identities such as data vendors, exchanges, official agencies, or authoritative source surfaces used by active feed interfaces.
 - `data_feed` — implemented provider/API/web/file feed connectors or feed interfaces.
 - `feed_capability` — feed-level record families, raw inputs, endpoint families, transient evidence, or entitlement-gated provider capabilities that are not final saved shapes.
-- `data_source` — manager-facing runnable source boundaries.
+- `data_source` — control-plane-facing runnable source boundaries.
 - `status_value` — allowed status/policy values; `applies_to` carries the specific status domain such as task lifecycle, review readiness, docs status, or artifact sync policy.
 - `temporal_field` — date/time/datetime field names; values must use ISO-8601 semantics rather than locale-dependent date strings.
 - `classification_field` — categorical/classification field names; register the semantic axis once and list all usage scopes in `applies_to`.
@@ -180,7 +180,7 @@ Key-input helper APIs are intentionally not part of the public helper surface. C
 
 - Register shared names before component repositories depend on them.
 - New shared fields discovered in component work must be registered here before other repositories depend on them.
-- Feed adapters/connectors belong in `data_feed`; manager-facing runnable source boundaries belong in `data_source`; accepted final saved data shapes belong in `data_kind`; reusable checked-in templates belong in `template`; allowed state/policy values belong in `status_value`; date/time field names belong in `temporal_field`; categorical field names belong in `classification_field`.
+- Feed adapters/connectors belong in `data_feed`; control-plane-facing runnable source boundaries belong in `data_source`; accepted final saved data shapes belong in `data_kind`; reusable checked-in templates belong in `template`; allowed state/policy values belong in `status_value`; date/time field names belong in `temporal_field`; categorical field names belong in `classification_field`.
 - New global helper surfaces and reusable templates must be recorded in `trading-main` and linked to registry entries when they expose stable automation names.
 - Prefer existing entries over inventing near-duplicates.
 - Use stable `id` values for automation and durable references.

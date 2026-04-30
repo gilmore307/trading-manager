@@ -8,16 +8,16 @@ A data source is a source-backed output boundary that a manager can request dire
 
 ## Range
 
-Register data sources when they may appear in manager-facing task keys, runner routing, source READMEs, completion receipts, or model-input planning docs.
+Register data sources when they may appear in control-plane-facing task keys, runner routing, source READMEs, completion receipts, or model-input planning docs.
 
-Use `payload` for the concrete `source_NN_<layer>` source key. Use `path` for the canonical manager-facing implementation directory, normally under `trading-data/src/data_source/source_NN_<layer>`.
+Use `payload` for the concrete `source_NN_<layer>` source key. Use `path` for the canonical control-plane-facing implementation directory, normally under `trading-data/src/data_source/source_NN_<layer>`.
 
 ## Reject Or Re-scope
 
 Reject or re-scope entries that are actually:
 
 - provider/API/web/file feeds, which belong in `data_feed`;
-- manager-facing deterministic feature outputs, which belong in `data_feature`;
+- control-plane-facing deterministic feature outputs, which belong in `data_feature`;
 - final saved dataset shapes independent of the producing source, which belong in `data_kind`;
 - provider/company names, which belong in `provider`;
 - credentials or secret aliases, which belong in `config`;

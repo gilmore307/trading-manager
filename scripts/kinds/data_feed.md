@@ -4,7 +4,7 @@
 
 Implemented provider/API/web/file feed identifiers that fetch, parse, probe, or normalize the smallest external data-access surface owned by `trading-data`.
 
-A data feed is not a manager-facing source output and is not a final saved data shape. It names the provider-facing boundary that source pipelines, feed-interface probes, or availability checks call.
+A data feed is not a control-plane-facing source output and is not a final saved data shape. It names the provider-facing boundary that source pipelines, feed-interface probes, or availability checks call.
 
 ## Range
 
@@ -16,7 +16,7 @@ Use `payload` for the stable snake_case feed key. Use `path` for the implementat
 
 Reject or re-scope entries that are actually:
 
-- manager-facing runnable source outputs, which belong in `data_source`;
+- control-plane-facing runnable source outputs, which belong in `data_source`;
 - final saved output/data shapes, which belong in `data_kind`;
 - provider/company names, which belong in `provider`;
 - credentials or secret aliases, which belong in `config`;

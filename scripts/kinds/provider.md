@@ -18,6 +18,6 @@ Reject or re-scope entries that are actually:
 
 - feed/provider record families, endpoint families, raw inputs, or entitlement-gated capabilities, which belong in `feed_capability`;
 - implemented adapters/interfaces, which belong in `data_source`;
-- manager-facing sources, which belong in `data_source`;
+- control-plane-facing sources, which belong in `data_source`;
 - final saved data shapes with accepted current storage contracts, which belong in `data_kind`;
 - ordinary glossary-only concepts with no provider/feed identity role, which belong in `term`.

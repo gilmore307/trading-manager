@@ -6,7 +6,7 @@ The trading project is a core multi-repository system for building, evaluating, 
 
 The system needs a stable global coordination layer because its responsibilities are intentionally split across multiple repositories. Without a shared architecture and contract repository, each component could invent incompatible artifact layouts, request formats, manifest schemas, ready-signal conventions, and responsibility boundaries.
 
-`trading-main` exists to keep those global relationships explicit and reviewable, and to provide the trading-wide registry, templates, and shared helpers that all component repositories can use.
+`trading-main` exists to keep those global relationships explicit and reviewable, to own control-plane request/lifecycle policy, and to provide the trading-wide registry, templates, and shared helpers that all component repositories can use.
 
 ## Related Systems
 
@@ -14,8 +14,7 @@ The system needs a stable global coordination layer because its responsibilities
 
 | Repository | System-Level Role | Summary |
 |---|---|---|
-| `trading-main` | Global platform layer | Owns system architecture, global workflow, shared contracts, registries, templates, shared helpers, system-level decisions, and cross-repository planning. It does not store data, generated artifacts, secrets, or component runtime implementations. |
-| `trading-manager` | Control plane | Coordinates workflow sequencing, schedules, queues, readiness checks, retries, recovery, manual override, lifecycle policy, request generation, and watchlist coordination. |
+| `trading-main` | Global platform and control plane | Owns system architecture, global workflow, shared contracts, registries, templates, shared helpers, system-level decisions, cross-repository planning, request generation, readiness checks, retries/recovery policy, manual override rules, lifecycle routing, and promotion coordination. It does not store data, generated artifacts, secrets, or component runtime implementations. |
 | `trading-data` | Feed/source/feature data production | Owns provider feed adapters, approved web/file ingestion, model-scoped source construction, deterministic point-in-time feature tables, and data-production evidence. |
 | `trading-storage` | Shared persistence contract | Defines persistent storage layout, artifact placement, partitioning, retention, archive, rehydrate, backup, and restore expectations. |
 | `trading-model` | Offline modeling and market-state research | Consumes the `trading-data` feature/data foundation for training, research, evaluation, mappings, confidence, and verdicts. |
@@ -121,7 +120,7 @@ For `trading-main`, Codex should normally not be needed unless there is a bulk d
 
 ## Important Constraints
 
-- `trading-main` owns docs, contracts, registries, templates, shared helpers, and the gitignored shared environment anchor.
+- `trading-main` owns docs, contracts, control-plane orchestration policy, registries, templates, shared helpers, and the gitignored shared environment anchor.
 - Cross-repository behavior must be described through explicit contracts before implementation depends on it.
 - Component repositories must not silently fork global contracts.
 - Trading-wide status vocabularies and registrable fields belong in `trading-main/scripts/`; registry operating details belong in `docs/08_registry.md`.
