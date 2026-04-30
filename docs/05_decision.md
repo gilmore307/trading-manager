@@ -2092,3 +2092,22 @@ Concrete column registration remains deferred until real evaluation/promotion fl
 
 - Promotion table names are globally stable without implying that any model has been promoted.
 - Promotion candidates remain evidence-backed by `model_eval_run` in the `trading-model` schema.
+
+## D094 - Store generated market-regime features as JSONB payload
+
+Date: 2026-04-30
+Status: Accepted
+
+### Context
+
+The development DB smoke test for `feature_01_market_regime` found that materializing all generated feature keys as physical PostgreSQL `DOUBLE PRECISION` columns can exceed the PostgreSQL tuple-size limit once rows become dense.
+
+### Decision
+
+Keep the registered table name `FEATURE_01_MARKET_REGIME` → `feature_01_market_regime`, but clarify the registry note: the table is keyed by `snapshot_time`, while generated feature values live in `feature_payload_json` JSONB and remain model-local generated keys unless separately promoted.
+
+### Consequences
+
+- The registry still owns the feature boundary/table name.
+- Generated feature keys are not silently turned into global registry fields.
+- PostgreSQL row-size limits no longer force a table-name change.
