@@ -219,6 +219,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("data_derived/01_derived_market_regime", data_derived["01_DERIVED_MARKET_REGIME"]["path"])
         self.assertIn("trading-derived", data_derived["01_DERIVED_MARKET_REGIME"]["applies_to"])
         self.assertIn("market_regime_model", data_derived["01_DERIVED_MARKET_REGIME"]["applies_to"])
+        self.assertIn("01_derived_market_regime_feature_snapshots", data_derived["01_DERIVED_MARKET_REGIME"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
         for deleted_preview_key in {
@@ -270,7 +271,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(by_key["SNAPSHOT_TIME"]["kind"], "temporal_field")
         self.assertEqual(by_key["SNAPSHOT_TIME"]["payload"], "snapshot_time")
         self.assertIn("01_derived_market_regime", by_key["SNAPSHOT_TIME"]["applies_to"])
-        self.assertIn("derived_01_market_regime_feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
+        self.assertIn("01_derived_market_regime_feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
 
         deleted_deprecated_macro_keys = {
             "MACRO_BEA_FIXED_ASSETS",
