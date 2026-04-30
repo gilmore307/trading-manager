@@ -2,13 +2,13 @@
 
 ## Kind Boundary
 
-Canonical final saved data-shape identifiers that have accepted reviewed storage contracts and can be consumed across trading repositories. Manager-facing `trading-derived` generated-output boundaries belong in `data_derived`.
+Canonical final saved data-shape identifiers that have accepted reviewed storage contracts and can be consumed across trading repositories. Manager-facing `trading-data` deterministic feature-output boundaries belong in `data_feature`.
 
 A data kind names the saved/output shape, not every provider endpoint, transient source input, entitlement-blocked interface, feed-interface catalog item, or retired preview/template file.
 
 ## Range
 
-Register active data kinds only when the data kind has an accepted, current storage contract. Retired preview/template files under `trading-source/storage/templates/data_kinds/` are not evidence for active `data_kind` status.
+Register active data kinds only when the data kind has an accepted, current storage contract. Retired preview/template files under legacy source storage template paths are not evidence for active `data_kind` status.
 
 Use `payload` for a stable snake_case data-kind key. Use `path` only for the canonical current contract artifact when one exists; provider/feed documentation URLs belong on provider/feed `term` or `feed_capability` rows, not on `data_kind` rows.
 
@@ -17,7 +17,7 @@ Use `payload` for a stable snake_case data-kind key. Use `path` only for the can
 Reject or re-scope entries that are actually:
 
 - manager-facing acquisition source names, which belong in `data_source`;
-- manager-facing derived output boundaries, which belong in `data_derived`;
+- manager-facing deterministic feature output boundaries, which belong in `data_feature`;
 - provider/feed-owner names, which belong in `provider`;
 - provider endpoint names or feed-interface catalog items, which belong in `data_feed`/feed-interface code;
 - transient source inputs such as trades, quotes, order books, raw Greeks, or entitlement-blocked endpoint families unless and until they become accepted saved templates;

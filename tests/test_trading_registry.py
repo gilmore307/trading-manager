@@ -54,21 +54,21 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
-    def test_component_repository_rows_use_source_and_derived_boundaries(self):
+    def test_component_repository_rows_use_trading_data_boundary(self):
         with Path("scripts/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        self.assertEqual(rows["TRADING_SOURCE_REPO"]["payload"], "trading-source")
-        self.assertEqual(rows["TRADING_SOURCE_REPO"]["path"], "/root/projects/trading-source")
-        self.assertIn("trading-source.git", rows["TRADING_SOURCE_REPO"]["note"])
-        self.assertEqual(rows["TRADING_DERIVED_REPO"]["payload"], "trading-derived")
-        self.assertEqual(rows["TRADING_DERIVED_REPO"]["path"], "/root/projects/trading-derived")
-        self.assertIn("trading-derived.git", rows["TRADING_DERIVED_REPO"]["note"])
-        self.assertNotIn("TRADING_DATA_REPO", rows)
+        self.assertEqual(rows["TRADING_DATA_REPO"]["payload"], "trading-data")
+        self.assertEqual(rows["TRADING_DATA_REPO"]["path"], "/root/projects/trading-data")
+        self.assertIn("trading-data.git", rows["TRADING_DATA_REPO"]["note"])
+        self.assertNotIn("TRADING_SOURCE_REPO", rows)
+        self.assertNotIn("TRADING_DERIVED_REPO", rows)
         self.assertNotIn("TRADING_STRATEGY_REPO", rows)
         for row in rows.values():
-            self.assertNotIn("trading-data", row["payload"])
-            self.assertNotIn("trading-data", row["path"])
+            self.assertNotIn("trading-source", row["payload"])
+            self.assertNotIn("trading-source", row["path"])
+            self.assertNotIn("trading-derived", row["payload"])
+            self.assertNotIn("trading-derived", row["path"])
             self.assertNotIn("trading-strategy", row["payload"])
             self.assertNotIn("trading-strategy", row["path"])
 
@@ -118,7 +118,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key, payload in expected_sources.items():
             self.assertEqual(rows[key]["kind"], "data_source")
             self.assertEqual(rows[key]["payload"], payload)
-            self.assertIn(f"data_sources/{payload}", rows[key]["path"])
+            self.assertIn(f"data_source/{payload}", rows[key]["path"])
             self.assertNotIn("_model_inputs", rows[key]["payload"])
             self.assertNotIn("_model_inputs", rows[key]["path"])
         for key, payload in expected_feeds.items():
@@ -126,7 +126,9 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], payload)
             self.assertIn(f"data_feed/{payload}", rows[key]["path"])
         for row in rows.values():
-            self.assertNotIn("trading-source/src/trading_source/", row["path"])
+            self.assertNotIn("trading-source", row["path"])
+            self.assertNotIn("trading-derived", row["path"])
+            self.assertNotIn("data_sources/", row["path"])
             self.assertNotIn("data_bundles/", row["path"])
             self.assertNotIn("source_availability", row["path"])
             self.assertNotIn("source_interfaces", row["path"])
@@ -211,16 +213,18 @@ class RegistryHelperTests(unittest.TestCase):
             rows = list(csv.DictReader(csv_file))
         by_key = {row["key"]: row for row in rows}
         data_kinds = {row["key"]: row for row in rows if row["kind"] == "data_kind"}
+        data_features = {row["key"]: row for row in rows if row["kind"] == "data_feature"}
         data_derived = {row["key"]: row for row in rows if row["kind"] == "data_derived"}
 
         self.assertEqual(data_kinds, {})
-        self.assertEqual(set(data_derived), {"DERIVED_01_MARKET_REGIME"})
-        self.assertEqual(data_derived["DERIVED_01_MARKET_REGIME"]["payload"], "derived_01_market_regime")
-        self.assertIn("data_derived/derived_01_market_regime", data_derived["DERIVED_01_MARKET_REGIME"]["path"])
-        self.assertIn("trading-derived", data_derived["DERIVED_01_MARKET_REGIME"]["applies_to"])
-        self.assertIn("market_regime_model", data_derived["DERIVED_01_MARKET_REGIME"]["applies_to"])
-        self.assertIn("source_01_market_regime", data_derived["DERIVED_01_MARKET_REGIME"]["applies_to"])
-        self.assertNotIn("feature_snapshots", data_derived["DERIVED_01_MARKET_REGIME"]["applies_to"])
+        self.assertEqual(data_derived, {})
+        self.assertEqual(set(data_features), {"FEATURE_01_MARKET_REGIME"})
+        self.assertEqual(data_features["FEATURE_01_MARKET_REGIME"]["payload"], "feature_01_market_regime")
+        self.assertIn("data_feature/feature_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["path"])
+        self.assertIn("trading-data", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
+        self.assertIn("market_regime_model", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
+        self.assertIn("source_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
+        self.assertNotIn("feature_snapshots", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
         for deleted_preview_key in {
@@ -271,7 +275,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(by_key["SNAPSHOT_TIME"]["kind"], "temporal_field")
         self.assertEqual(by_key["SNAPSHOT_TIME"]["payload"], "snapshot_time")
-        self.assertIn("derived_01_market_regime", by_key["SNAPSHOT_TIME"]["applies_to"])
+        self.assertIn("feature_01_market_regime", by_key["SNAPSHOT_TIME"]["applies_to"])
         self.assertNotIn("feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
         payloads = {row["payload"] for row in rows}
         for generated_feature_column in {"spy_return_30m", "spy_return_1d", "spy_return_5d", "spy_return_20d"}:

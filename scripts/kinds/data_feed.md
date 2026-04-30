@@ -2,7 +2,7 @@
 
 ## Kind Boundary
 
-Implemented provider/API/web/file feed identifiers that fetch, parse, probe, or normalize the smallest external data-access surface owned by `trading-source`.
+Implemented provider/API/web/file feed identifiers that fetch, parse, probe, or normalize the smallest external data-access surface owned by `trading-data`.
 
 A data feed is not a manager-facing source output and is not a final saved data shape. It names the provider-facing boundary that source pipelines, feed-interface probes, or availability checks call.
 
@@ -10,7 +10,7 @@ A data feed is not a manager-facing source output and is not a final saved data 
 
 Register data feeds when they have an implemented feed directory, feed-interface catalog entry, or execution-owned feed discovery adapter.
 
-Use `payload` for the stable snake_case feed key. Use `path` for the implementation directory or feed-interface owner path, normally under `trading-source/src/data_feed/NN_feed_<surface>`.
+Use `payload` for the stable snake_case feed key. Use `path` for the implementation directory or feed-interface owner path, normally under `trading-data/src/data_feed/NN_feed_<surface>`.
 
 ## Reject Or Re-scope
 
