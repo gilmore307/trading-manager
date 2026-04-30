@@ -2067,3 +2067,28 @@ The importable helper package remains `trading_registry`; the distribution packa
 - Update active docs, helper package metadata, absolute local paths, and cross-repository references from `/root/projects/trading-main` to `/root/projects/trading-manager`.
 - Rename the GitHub repository `gilmore307/trading-main` to `gilmore307/trading-manager` and move the local checkout accordingly.
 - Historical decisions and migrations may continue to mention `trading-main` as append-only history.
+
+## D093 - Register generic model promotion table names
+
+Date: 2026-04-30
+Status: Accepted
+
+### Context
+
+`trading-model` added promotion infrastructure after the first generic governance/evaluation schema. The new promotion tables are generic across model layers and should be globally named before other repositories refer to them.
+
+### Decision
+
+Register the following generic `trading_model` table names as registry terms:
+
+- `MODEL_CONFIG_VERSION_TABLE` → `model_config_version`
+- `MODEL_PROMOTION_CANDIDATE_TABLE` → `model_promotion_candidate`
+- `MODEL_PROMOTION_DECISION_TABLE` → `model_promotion_decision`
+- `MODEL_PROMOTION_ROLLBACK_TABLE` → `model_promotion_rollback`
+
+Concrete column registration remains deferred until real evaluation/promotion flows prove the schema stable.
+
+### Consequences
+
+- Promotion table names are globally stable without implying that any model has been promoted.
+- Promotion candidates remain evidence-backed by `model_eval_run` in the `trading-model` schema.
