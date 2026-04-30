@@ -1924,7 +1924,7 @@ Layer 1 `MarketRegimeModel` V1 derived output was simplified to a fixed-width po
 
 Register `01_DERIVED_MARKET_REGIME` as an active `data_derived` row with payload `01_derived_market_regime`.
 
-Register the only non-feature business column through the existing `SNAPSHOT_TIME` temporal field by adding the `01_derived_market_regime` and `01_derived_market_regime_feature_snapshots` scopes.
+Register the only non-feature business column through the existing `SNAPSHOT_TIME` temporal field by adding the `01_derived_market_regime` scope.
 
 Do not register candidate feature columns as part of this decision.
 
@@ -1932,6 +1932,6 @@ Do not register candidate feature columns as part of this decision.
 
 - The V1 derived-output boundary and `snapshot_time` column are visible in `scripts/current.csv`.
 - `data_derived` rows use `NN_derived_<layer>` payloads, mirroring `data_source` rows such as `01_source_market_regime`.
-- Concrete derived outputs under a `data_derived` boundary also use number-first names, such as `01_derived_market_regime_feature_snapshots`.
+- For Layer 1 V1, `01_derived_market_regime` is both the derived-output boundary and the total wide table name.
 - Feature columns remain reviewed one by one before becoming shared registry fields.
 - The snapshot table does not carry row-level `feature_version`, `available_time`, `lookback_start_time`, `decision_start_time`, `decision_end_time`, `source_table`, or `source_row_count` columns.
