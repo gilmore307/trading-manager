@@ -95,12 +95,12 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn(obsolete_provider_term, rows)
         self.assertEqual(rows["GITHUB"]["kind"], "term")
         expected_sources = {
-            "01_SOURCE_MARKET_REGIME": "01_source_market_regime",
-            "02_SOURCE_SECURITY_SELECTION": "02_source_security_selection",
-            "03_SOURCE_STRATEGY_SELECTION": "03_source_strategy_selection",
-            "05_SOURCE_OPTION_EXPRESSION": "05_source_option_expression",
-            "06_SOURCE_POSITION_EXECUTION": "06_source_position_execution",
-            "07_SOURCE_EVENT_OVERLAY": "07_source_event_overlay",
+            "SOURCE_01_MARKET_REGIME": "source_01_market_regime",
+            "SOURCE_02_SECURITY_SELECTION": "source_02_security_selection",
+            "SOURCE_03_STRATEGY_SELECTION": "source_03_strategy_selection",
+            "SOURCE_05_OPTION_EXPRESSION": "source_05_option_expression",
+            "SOURCE_06_POSITION_EXECUTION": "source_06_position_execution",
+            "SOURCE_07_EVENT_OVERLAY": "source_07_event_overlay",
         }
         expected_feeds = {
             "ALPACA_BARS": "01_feed_alpaca_bars",
@@ -158,8 +158,8 @@ class RegistryHelperTests(unittest.TestCase):
             ]
         self.assertEqual(offenders, [])
 
-    def test_applies_to_uses_number_first_source_scopes(self):
-        pattern = re.compile(r"(?:^|;)source_[0-9]{2}_")
+    def test_applies_to_uses_type_first_source_scopes(self):
+        pattern = re.compile(r"(?:^|;)[0-9]{2}_source_")
         with Path("scripts/current.csv").open(newline="") as csv_file:
             offenders = [
                 (row["key"], row["applies_to"])
@@ -173,21 +173,21 @@ class RegistryHelperTests(unittest.TestCase):
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         expected = {
-            "OPTION_SYMBOL": ("identity_field", "option_symbol", "06_source_position_execution"),
-            "DOLLAR_VOLUME": ("field", "dollar_volume", "03_source_strategy_selection"),
-            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "03_source_strategy_selection"),
-            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "03_source_strategy_selection"),
-            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "03_source_strategy_selection"),
-            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "05_source_option_expression"),
-            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "07_source_event_overlay"),
-            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "07_source_event_overlay"),
-            "SCOPE_TYPE": ("classification_field", "scope_type", "07_source_event_overlay"),
-            "REFERENCE_TYPE": ("classification_field", "reference_type", "07_source_event_overlay"),
-            "EVENT_REFERENCE": ("path_field", "reference", "07_source_event_overlay"),
-            "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "05_source_option_expression"),
-            "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "05_source_option_expression"),
-            "QUOTE_BID_CONDITION": ("field", "bid_condition", "05_source_option_expression"),
-            "QUOTE_ASK_CONDITION": ("field", "ask_condition", "05_source_option_expression"),
+            "OPTION_SYMBOL": ("identity_field", "option_symbol", "source_06_position_execution"),
+            "DOLLAR_VOLUME": ("field", "dollar_volume", "source_03_strategy_selection"),
+            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "source_03_strategy_selection"),
+            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "source_03_strategy_selection"),
+            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "source_03_strategy_selection"),
+            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "source_05_option_expression"),
+            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "source_07_event_overlay"),
+            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "source_07_event_overlay"),
+            "SCOPE_TYPE": ("classification_field", "scope_type", "source_07_event_overlay"),
+            "REFERENCE_TYPE": ("classification_field", "reference_type", "source_07_event_overlay"),
+            "EVENT_REFERENCE": ("path_field", "reference", "source_07_event_overlay"),
+            "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "source_05_option_expression"),
+            "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "source_05_option_expression"),
+            "QUOTE_BID_CONDITION": ("field", "bid_condition", "source_05_option_expression"),
+            "QUOTE_ASK_CONDITION": ("field", "ask_condition", "source_05_option_expression"),
         }
         for key, (kind, payload, applies_to) in expected.items():
             self.assertEqual(rows[key]["kind"], kind)
@@ -195,11 +195,11 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn(applies_to, rows[key]["applies_to"])
 
         for key in ["SYMBOL", "DATA_TIMESTAMP", "BAR_OPEN", "BAR_VWAP"]:
-            self.assertIn("01_source_market_regime", rows[key]["applies_to"])
+            self.assertIn("source_01_market_regime", rows[key]["applies_to"])
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
-            self.assertIn("02_source_security_selection", rows[key]["applies_to"])
+            self.assertIn("source_02_security_selection", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
-            self.assertIn("07_source_event_overlay", rows[key]["applies_to"])
+            self.assertIn("source_07_event_overlay", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
         self.assertNotIn("OPTION_CONTRACTS", rows)
         self.assertNotIn("QUOTE_TIMESTAMP", rows)
@@ -214,13 +214,13 @@ class RegistryHelperTests(unittest.TestCase):
         data_derived = {row["key"]: row for row in rows if row["kind"] == "data_derived"}
 
         self.assertEqual(data_kinds, {})
-        self.assertEqual(set(data_derived), {"01_DERIVED_MARKET_REGIME"})
-        self.assertEqual(data_derived["01_DERIVED_MARKET_REGIME"]["payload"], "01_derived_market_regime")
-        self.assertIn("data_derived/01_derived_market_regime", data_derived["01_DERIVED_MARKET_REGIME"]["path"])
-        self.assertIn("trading-derived", data_derived["01_DERIVED_MARKET_REGIME"]["applies_to"])
-        self.assertIn("market_regime_model", data_derived["01_DERIVED_MARKET_REGIME"]["applies_to"])
-        self.assertIn("01_source_market_regime", data_derived["01_DERIVED_MARKET_REGIME"]["applies_to"])
-        self.assertNotIn("feature_snapshots", data_derived["01_DERIVED_MARKET_REGIME"]["applies_to"])
+        self.assertEqual(set(data_derived), {"DERIVED_01_MARKET_REGIME"})
+        self.assertEqual(data_derived["DERIVED_01_MARKET_REGIME"]["payload"], "derived_01_market_regime")
+        self.assertIn("data_derived/derived_01_market_regime", data_derived["DERIVED_01_MARKET_REGIME"]["path"])
+        self.assertIn("trading-derived", data_derived["DERIVED_01_MARKET_REGIME"]["applies_to"])
+        self.assertIn("market_regime_model", data_derived["DERIVED_01_MARKET_REGIME"]["applies_to"])
+        self.assertIn("source_01_market_regime", data_derived["DERIVED_01_MARKET_REGIME"]["applies_to"])
+        self.assertNotIn("feature_snapshots", data_derived["DERIVED_01_MARKET_REGIME"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
         for deleted_preview_key in {
@@ -271,7 +271,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(by_key["SNAPSHOT_TIME"]["kind"], "temporal_field")
         self.assertEqual(by_key["SNAPSHOT_TIME"]["payload"], "snapshot_time")
-        self.assertIn("01_derived_market_regime", by_key["SNAPSHOT_TIME"]["applies_to"])
+        self.assertIn("derived_01_market_regime", by_key["SNAPSHOT_TIME"]["applies_to"])
         self.assertNotIn("feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
         payloads = {row["payload"] for row in rows}
         for generated_feature_column in {"spy_return_30m", "spy_return_1d", "spy_return_5d", "spy_return_20d"}:
@@ -565,9 +565,9 @@ class RegistryHelperTests(unittest.TestCase):
             "BAR_TRADE_COUNT": "bar_trade_count",
         }
         for key, payload in expected_bar_fields.items():
-            self.assertIn("01_source_market_regime", by_key[key]["applies_to"])
-            self.assertIn("03_source_strategy_selection", by_key[key]["applies_to"])
-            self.assertIn("06_source_position_execution", by_key[key]["applies_to"])
+            self.assertIn("source_01_market_regime", by_key[key]["applies_to"])
+            self.assertIn("source_03_strategy_selection", by_key[key]["applies_to"])
+            self.assertIn("source_06_position_execution", by_key[key]["applies_to"])
             self.assertEqual(by_key[key]["payload"], payload)
         self.assertEqual(by_key["TIMEFRAME"]["payload"], "timeframe")
         for deleted_key in {

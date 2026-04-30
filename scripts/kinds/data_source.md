@@ -10,7 +10,7 @@ A data source is a source-backed output boundary that a manager can request dire
 
 Register data sources when they may appear in manager-facing task keys, runner routing, source READMEs, completion receipts, or model-input planning docs.
 
-Use `payload` for the concrete `NN_source_<layer>` source key. Use `path` for the canonical manager-facing implementation directory, normally under `trading-source/src/data_sources/NN_source_<layer>`.
+Use `payload` for the concrete `source_NN_<layer>` source key. Use `path` for the canonical manager-facing implementation directory, normally under `trading-source/src/data_sources/source_NN_<layer>`.
 
 ## Reject Or Re-scope
 
@@ -28,4 +28,4 @@ Reject or re-scope entries that are actually:
 
 ## Naming Rule
 
-Source keys should be stable snake_case and use the accepted `NN_source_<layer>` pattern, such as `01_source_market_regime`. Source-specific task/run IDs should use the source key as their prefix.
+Source keys should be stable snake_case and use the accepted `source_NN_<layer>` pattern, such as `source_01_market_regime`. Source-specific task/run IDs should use the source key as their prefix.

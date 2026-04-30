@@ -10,7 +10,7 @@ A data-derived boundary is an internally generated output surface that a manager
 
 Register data-derived rows when they may appear in derived task keys, derived runner routing, model-input planning docs, storage contracts, completion receipts, or cross-repository handoffs.
 
-Use `payload` for the concrete `NN_derived_<layer>` derived key. Use `path` for the canonical implementation directory when accepted, normally under `trading-derived/src/data_derived/NN_derived_<layer>`.
+Use `payload` for the concrete `derived_NN_<layer>` derived key. Use `path` for the canonical implementation directory when accepted, normally under `trading-derived/src/data_derived/derived_NN_<layer>`.
 
 ## Reject Or Re-scope
 
@@ -26,4 +26,4 @@ Reject or re-scope entries that are actually:
 
 ## Naming Rule
 
-Derived keys should be stable snake_case and use the accepted `NN_derived_<layer>` pattern, such as `01_derived_market_regime`, mirroring the `NN_source_<layer>` source naming pattern.
+Derived keys should be stable snake_case and use the accepted `derived_NN_<layer>` pattern, such as `derived_01_market_regime`, mirroring the `source_NN_<layer>` source naming pattern.

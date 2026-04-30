@@ -1682,7 +1682,7 @@ Leave the files under `trading-storage/main/templates/data_tasks/` as parked dra
 - `trading-storage/main/templates/data_tasks/` is draft reference material, not a registered contract surface.
 - Future task architecture work must create fresh reviewed migrations instead of relying on these removed rows.
 
-## D080 - Data source interfaces use number-first source names
+## D080 - Data source interfaces use type-first source names
 
 Date: 2026-04-29
 Status: Accepted
@@ -1693,7 +1693,7 @@ Numbered data bundles already use number-first package and registry payload name
 
 ### Decision
 
-Use number-first source-interface names for active trading-source source directories and registry payloads: `NN_source_<semantic>`.
+Use type-first source-interface names for active trading-source source directories and registry payloads: `NN_source_<semantic>`.
 
 Current source-interface names are:
 
@@ -1918,20 +1918,44 @@ Status: Accepted
 
 ### Context
 
-Layer 1 `MarketRegimeModel` V1 derived output was simplified to a fixed-width point-in-time table: one row every 30 minutes, containing every feature available at that snapshot time. Chentong confirmed that non-feature structural columns should be registered, while concrete generated feature columns such as `spy_return_30m` should not become individual registry rows. He also clarified that derived outputs should have their own registry kind and use the same number-first pattern as `trading-source` source boundaries.
+Layer 1 `MarketRegimeModel` V1 derived output was simplified to a fixed-width point-in-time table: one row every 30 minutes, containing every feature available at that snapshot time. Chentong confirmed that non-feature structural columns should be registered, while concrete generated feature columns such as `spy_return_30m` should not become individual registry rows. He also clarified that derived outputs should have their own registry kind and use the same reviewed naming pattern as `trading-source` source boundaries.
 
 ### Decision
 
-Register `01_DERIVED_MARKET_REGIME` as an active `data_derived` row with payload `01_derived_market_regime`.
+Register `DERIVED_01_MARKET_REGIME` as an active `data_derived` row with payload `derived_01_market_regime`.
 
-Register the only non-feature business column through the existing `SNAPSHOT_TIME` temporal field by adding the `01_derived_market_regime` scope.
+Register the only non-feature business column through the existing `SNAPSHOT_TIME` temporal field by adding the `derived_01_market_regime` scope.
 
 Do not register concrete generated feature columns such as `spy_return_30m`, `spy_return_1d`, or future per-symbol/per-horizon expansions as individual registry rows. Govern those columns through reviewed feature-family rules/catalogs and storage contracts.
 
 ### Consequences
 
 - The V1 derived-output boundary and `snapshot_time` column are visible in `scripts/current.csv`.
-- `data_derived` rows use `NN_derived_<layer>` payloads, mirroring `data_source` rows such as `01_source_market_regime`.
-- For Layer 1 V1, `01_derived_market_regime` is both the derived-output boundary and the total wide table name.
+- `data_derived` rows use `derived_NN_<layer>` payloads, mirroring `data_source` rows such as `source_01_market_regime`.
+- For Layer 1 V1, `derived_01_market_regime` is both the derived-output boundary and the total wide table name.
 - Concrete generated feature columns remain reviewed through feature-family definitions and storage contracts, not individual registry rows.
 - The snapshot table does not carry row-level `feature_version`, `available_time`, `lookback_start_time`, `decision_start_time`, `decision_end_time`, `source_table`, or `source_row_count` columns.
+
+## D089 - Source and derived boundaries use type-first names
+
+Date: 2026-04-29
+Status: Accepted
+
+### Context
+
+Number-first source and derived payloads such as `01_source_market_regime` mirrored earlier package naming, but physical SQL tables were already source-first, for example `source_01_market_regime`. Keeping both shapes created unnecessary translation and made SQL-safe names diverge from registry/package names.
+
+### Decision
+
+Use type-first names for manager-facing source and derived boundaries:
+
+- `source_NN_<layer>` for `data_source` package/payload/table scopes, for example `source_01_market_regime`.
+- `derived_NN_<layer>` for `data_derived` package/payload/table scopes, for example `derived_01_market_regime`.
+
+Registry keys use the same order in uppercase, for example `SOURCE_01_MARKET_REGIME` and `DERIVED_01_MARKET_REGIME`.
+
+### Consequences
+
+- Active `scripts/current.csv` source and derived rows use type-first keys, payloads, paths, and `applies_to` scopes.
+- Historical SQL migrations remain append-only; migrations 164 and 165 record the active naming change.
+- Feeds keep their existing `NN_feed_*` names unless separately reviewed.
