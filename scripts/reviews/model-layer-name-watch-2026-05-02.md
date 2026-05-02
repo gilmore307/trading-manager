@@ -60,3 +60,34 @@ Before the next `SecuritySelectionModel` implementation or task-template update:
 4. Add SQL migrations under `scripts/sql/schema_migrations/` and regenerate `scripts/current.csv` in the same change.
 
 No Codex-specific temporary names were found in `trading-manager` itself during this heartbeat; the watch items came from recent `trading-model` architecture commits.
+
+## Follow-up: registry alignment commit `f08570e`
+
+A later registry alignment migration, `178_align_model_registry_to_current_route.sql`, addressed part of this watch list.
+
+Registered or reconciled rows now include:
+
+- `MODEL_02_SECURITY_SELECTION` as a planned Layer 2 output term, with physical artifact/table contract still pending implementation.
+- `MARKET_CONTEXT_STATE`
+- `SECTOR_CONTEXT_STATE`
+- `TARGET_CANDIDATE_ID`
+- `ANONYMOUS_TARGET_FEATURE_VECTOR`
+- Layer 1 market-property factor fields replacing the older proxy-dashboard factor set:
+  - `price_behavior_factor`
+  - `trend_certainty_factor`
+  - `capital_flow_factor`
+  - `sentiment_factor`
+  - `valuation_pressure_factor`
+  - `fundamental_strength_factor`
+  - `macro_environment_factor`
+  - `market_structure_factor`
+  - `risk_stress_factor`
+
+The migration also removed the older `TREND_FACTOR`, `VOLATILITY_STRESS_FACTOR`, `CORRELATION_STRESS_FACTOR`, `CREDIT_STRESS_FACTOR`, `RATE_PRESSURE_FACTOR`, `DOLLAR_PRESSURE_FACTOR`, `COMMODITY_PRESSURE_FACTOR`, `SECTOR_ROTATION_FACTOR`, `BREADTH_FACTOR`, and `RISK_APPETITE_FACTOR` rows.
+
+Remaining watch items before implementation:
+
+- Decide whether `feature_02_security_selection` should become a `data_feature` registry row once a concrete deterministic feature surface exists.
+- Reconcile `sector_selection_parameter` / `sector_selection_parameter_surface`; neither should be registered until the output schema is concrete.
+- Hold `sector_market_condition_profile`, `sector_trend_stability_vector`, `trend_stability_score`, `cycle_regularity_score`, `strategy_fit_state`, and `composite_strategy_recommendation` until they appear in an accepted schema or task handoff.
+- Because the newly inserted market-property factor fields use `artifact_sync_policy = sync_artifact`, downstream code/docs should be checked during the next Model 1 implementation review to ensure generated outputs actually use these canonical field names.
