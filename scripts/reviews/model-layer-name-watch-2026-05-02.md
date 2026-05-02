@@ -91,3 +91,12 @@ Remaining watch items before implementation:
 - Reconcile `sector_selection_parameter` / `sector_selection_parameter_surface`; neither should be registered until the output schema is concrete.
 - Hold `sector_market_condition_profile`, `sector_trend_stability_vector`, `trend_stability_score`, `cycle_regularity_score`, `strategy_fit_state`, and `composite_strategy_recommendation` until they appear in an accepted schema or task handoff.
 - Because the newly inserted market-property factor fields use `artifact_sync_policy = sync_artifact`, downstream code/docs should be checked during the next Model 1 implementation review to ensure generated outputs actually use these canonical field names.
+
+## Follow-up: trading-model doc streamline `3036451`
+
+The `trading-model` documentation streamline made the current route more direct rather than introducing a broad new naming set. Two phrases should stay on watch:
+
+- `anonymous_target_candidate_builder` — now appears repeatedly as the bridge into `StrategySelectionModel` and is already used as an `applies_to` token for `TARGET_CANDIDATE_ID` and `ANONYMOUS_TARGET_FEATURE_VECTOR`, but it is not yet registered as its own shared term or component id. Register only if it becomes a concrete artifact producer, package/module boundary, task template, or cross-repository handoff.
+- `direct_stock_etf_comparison` / direct stock-ETF comparison — currently prose for `OptionExpressionModel` V1 alongside long call / long put. Do not register until it becomes a formal expression type, status value, output field, or evaluation class.
+
+No Codex temporary names were found in `trading-manager` during this follow-up.
