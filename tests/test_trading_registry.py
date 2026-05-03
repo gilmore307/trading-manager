@@ -356,6 +356,24 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn(obsolete_calendar_or_macro_key, by_key)
         self.assertNotIn("MACRO_RELEASE", by_key)
 
+    def test_layer_one_artifact_chain_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        expected = {
+            "SOURCE_01_MARKET_REGIME": ("data_source", "source_01_market_regime"),
+            "FEATURE_01_MARKET_REGIME": ("data_feature", "feature_01_market_regime"),
+            "MODEL_01_MARKET_REGIME": ("term", "model_01_market_regime"),
+            "MODEL_01_MARKET_REGIME_EXPLAINABILITY": ("term", "model_01_market_regime_explainability"),
+            "MODEL_01_MARKET_REGIME_DIAGNOSTICS": ("term", "model_01_market_regime_diagnostics"),
+        }
+        for key, (kind, payload) in expected.items():
+            self.assertEqual(rows[key]["kind"], kind)
+            self.assertEqual(rows[key]["payload"], payload)
+
+        self.assertIn("model_01_market_regime", rows["MODEL_01_MARKET_REGIME_EXPLAINABILITY"]["applies_to"])
+        self.assertIn("model_01_market_regime", rows["MODEL_01_MARKET_REGIME_DIAGNOSTICS"]["applies_to"])
+
     def test_market_regime_etf_universe_shared_csv_columns_are_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_etf_universe.csv")
         with shared_path.open(newline="") as csv_file:

@@ -23,6 +23,8 @@ Accepted examples:
 - `source_01_market_regime`
 - `feature_01_market_regime`
 - `model_01_market_regime`
+- `model_01_market_regime_explainability`
+- `model_01_market_regime_diagnostics`
 - `source_02_target_candidate_holdings`
 - `feature_02_sector_context`
 - `model_02_sector_context`
