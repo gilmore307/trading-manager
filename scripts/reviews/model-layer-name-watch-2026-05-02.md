@@ -117,3 +117,25 @@ Do not immediately register both model-facing and physical names as duplicate fi
 1. Whether `field` rows should name physical SQL aliases (`layer01_*`, `layer02_*`) while payload/notes mention model-facing JSON keys (`1_*`, `2_*`).
 2. Whether compact numeric-prefix keys are allowed as registry `key` values, or should remain payload/schema contract strings under safe registry keys.
 3. Whether the earlier newly inserted unprefixed factor rows should be migrated, aliased, or marked deprecated so downstream code does not split between unprefixed and prefixed contracts.
+
+## Follow-up: current candidate-boundary commits `62c1caa` / `817880a` / `14bfdf0`
+
+Heartbeat review of the latest `trading-model`, `trading-data`, and `trading-storage` commits found no Codex-only temporary names in `trading-manager` itself. The recent work mostly reinforced previously watched boundary terms.
+
+Already registry-covered or intentionally pending:
+
+- `model_02_security_selection`, `market_context_state`, `sector_context_state`, `target_candidate_id`, and `anonymous_target_feature_vector` are already present as registry terms from migration `178_align_model_registry_to_current_route.sql`.
+- `feature_02_security_selection` is now a concrete data-feature surface in `trading-data` with an executable compatibility wrapper, but it still is not registered in `scripts/current.csv`. This should likely become a `data_feature` row once the registry naming pattern for feature surfaces is accepted.
+- `stock_etf_exposure` remains a registered data kind with deprecated/legacy bundle history. Current docs correctly treat it as downstream anonymous target candidate-builder evidence, not Layer 2 core behavior input.
+- `anonymous_target_candidate_builder` has become a real `trading-model/src/models/` package boundary and target-candidate contract owner. It is still only used as an `applies_to` token in registry rows. If it becomes a task template, artifact producer, or cross-repo callable component, register it as a shared component/term in `trading-manager` rather than leaving it only implicit.
+
+New caution from the storage/data alignment:
+
+- `bkch_bitw` was reclassified from Layer 1 primary evidence to Layer 2 `sector_rotation` evidence. The pair is data content in `market_regime_relative_strength_combinations.csv`, not a shared registry name by itself. Do not register ticker-pair content unless pair ids become stable reusable contract keys outside the shared CSV.
+- `sector_or_industry_symbol` is now part of the `sector_context_state` contract. Hold it for implementation review before field registration because the contract explicitly says Layer 2 field names are model-local until implementation/evaluation proves which names should be shared.
+
+Recommended next registry cleanup:
+
+1. Add or intentionally defer a `FEATURE_02_SECURITY_SELECTION` / `feature_02_security_selection` registry row before the next Layer 2 SQL/model implementation slice.
+2. Decide whether `ANONYMOUS_TARGET_CANDIDATE_BUILDER` should be a first-class component/term row now that it owns a concrete `src/models/` package and contract file.
+3. Do not register `bkch_bitw` or other relative-strength pair ids unless a separate pair-id registry policy is accepted.
