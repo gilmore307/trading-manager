@@ -10,24 +10,24 @@ Recent reviewed commits were concentrated in `trading-model` and introduced the 
 - Layer 3+ as anonymous target-candidate and strategy-fit modeling.
 - ETF/sector behavior attributes inferred in Layer 2 rather than pre-assigned.
 
-## Already covered in the registry snapshot
+## Registry-covered surfaces after follow-ups
 
-The current registry snapshot already contains entries for the older shared surfaces below:
+The current registry snapshot now contains entries for these shared surfaces:
 
 - `model_01_market_regime`
 - `trading_model.model_01_market_regime`
-- `source_02_security_selection`
-- Layer 1 market-property output fields such as `trend_factor`, `breadth_factor`, `sector_rotation_factor`, and `data_quality_score`
+- `source_02_target_candidate_holdings`
+- `feature_02_sector_context`
+- `model_02_sector_context`
+- `sector_context_state`
 - model governance table names such as `model_dataset_request`, `model_eval_metric`, and `model_config_version`
 
 ## Candidate names to review before the next implementation slice
 
-These names are now present in accepted or near-accepted model docs, but are not yet registered in `scripts/current.csv` as of this review. Do not blindly register all of them: first decide which ones are durable shared contracts versus design-language placeholders.
+These names appear in accepted or near-accepted model docs. Do not blindly register all of them: first decide which ones are durable shared contracts versus design-language placeholders.
 
 ### Likely shared output / feature surfaces
 
-- `feature_02_security_selection` — likely data-feature key if Layer 2 deterministic feature routing becomes manager-facing.
-- `model_02_security_selection` — likely model-output/table term if the Layer 2 model output is materialized with the same pattern as `model_01_market_regime`.
 - `sector_selection_parameter_surface` — possible Layer 2 output-surface term, but should be reconciled with `sector_selection_parameter` before registration.
 
 ### Likely field or identity-field candidates
@@ -52,10 +52,10 @@ These names are now present in accepted or near-accepted model docs, but are not
 
 ## Recommendation
 
-Before the next `SecuritySelectionModel` implementation or task-template update:
+Before the next `SectorContextModel` implementation or task-template update:
 
-1. Pick the canonical Layer 2 output key/table name (`model_02_security_selection` versus another accepted form).
-2. Reconcile `sector_selection_parameter` and `sector_selection_parameter_surface` into one durable contract term.
+1. Treat `model_02_sector_context` / `feature_02_sector_context` as the accepted registered surface names.
+2. Reconcile `sector_selection_parameter` and `sector_selection_parameter_surface` into one durable contract term before either becomes a shared schema field.
 3. Register only fields that appear in a concrete output schema, task receipt, storage contract, or cross-repository handoff.
 4. Add SQL migrations under `scripts/sql/schema_migrations/` and regenerate `scripts/current.csv` in the same change.
 
@@ -63,11 +63,11 @@ No Codex-specific temporary names were found in `trading-manager` itself during 
 
 ## Follow-up: registry alignment commit `f08570e`
 
-A later registry alignment migration, `178_align_model_registry_to_current_route.sql`, addressed part of this watch list.
+Registry alignment migrations `178_align_model_registry_to_current_route.sql` and `179_rename_model_two_to_sector_context.sql` addressed this watch list.
 
 Registered or reconciled rows now include:
 
-- `MODEL_02_SECURITY_SELECTION` as a planned Layer 2 output term, with physical artifact/table contract still pending implementation.
+- `MODEL_02_SECTOR_CONTEXT` as the accepted Layer 2 output term, with physical artifact/table contract `trading_model.model_02_sector_context`.
 - `MARKET_CONTEXT_STATE`
 - `SECTOR_CONTEXT_STATE`
 - `TARGET_CANDIDATE_ID`
@@ -87,7 +87,7 @@ The migration also removed the older `TREND_FACTOR`, `VOLATILITY_STRESS_FACTOR`,
 
 Remaining watch items before implementation:
 
-- Decide whether `feature_02_security_selection` should become a `data_feature` registry row once a concrete deterministic feature surface exists.
+- `feature_02_sector_context` is now registered as `FEATURE_02_SECTOR_CONTEXT`; keep future field-level registration deferred until a concrete output/schema proves which fields are shared.
 - Reconcile `sector_selection_parameter` / `sector_selection_parameter_surface`; neither should be registered until the output schema is concrete.
 - Hold `sector_market_condition_profile`, `sector_trend_stability_vector`, `trend_stability_score`, `cycle_regularity_score`, `strategy_fit_state`, and `composite_strategy_recommendation` until they appear in an accepted schema or task handoff.
 - Because the newly inserted market-property factor fields use `artifact_sync_policy = sync_artifact`, downstream code/docs should be checked during the next Model 1 implementation review to ensure generated outputs actually use these canonical field names.
@@ -124,8 +124,8 @@ Heartbeat review of the latest `trading-model`, `trading-data`, and `trading-sto
 
 Already registry-covered or intentionally pending:
 
-- `model_02_security_selection`, `market_context_state`, `sector_context_state`, `target_candidate_id`, and `anonymous_target_feature_vector` are already present as registry terms from migration `178_align_model_registry_to_current_route.sql`.
-- `feature_02_security_selection` is now a concrete data-feature surface in `trading-data` with an executable compatibility wrapper, but it still is not registered in `scripts/current.csv`. This should likely become a `data_feature` row once the registry naming pattern for feature surfaces is accepted.
+- `model_02_sector_context`, `market_context_state`, `sector_context_state`, `target_candidate_id`, and `anonymous_target_feature_vector` are present as registry terms after migrations `178`/`179`.
+- `feature_02_sector_context` is a concrete registered `data_feature` row in `scripts/current.csv` after migration `179_rename_model_two_to_sector_context.sql`.
 - `stock_etf_exposure` remains a registered data kind with deprecated/legacy bundle history. Current docs correctly treat it as downstream anonymous target candidate-builder evidence, not Layer 2 core behavior input.
 - `anonymous_target_candidate_builder` has become a real `trading-model/src/models/` package boundary and target-candidate contract owner. It is still only used as an `applies_to` token in registry rows. If it becomes a task template, artifact producer, or cross-repo callable component, register it as a shared component/term in `trading-manager` rather than leaving it only implicit.
 
@@ -136,6 +136,6 @@ New caution from the storage/data alignment:
 
 Recommended next registry cleanup:
 
-1. Add or intentionally defer a `FEATURE_02_SECURITY_SELECTION` / `feature_02_security_selection` registry row before the next Layer 2 SQL/model implementation slice.
-2. Decide whether `ANONYMOUS_TARGET_CANDIDATE_BUILDER` should be a first-class component/term row now that it owns a concrete `src/models/` package and contract file.
-3. Do not register `bkch_bitw` or other relative-strength pair ids unless a separate pair-id registry policy is accepted.
+1. Decide whether `ANONYMOUS_TARGET_CANDIDATE_BUILDER` should be a first-class component/term row now that it owns a concrete `src/models/` package and contract file.
+2. Do not register `bkch_bitw` or other relative-strength pair ids unless a separate pair-id registry policy is accepted.
+3. Keep Layer 2 field-level registration deferred until the `SectorContextModel` implementation proves which output fields are truly shared.
