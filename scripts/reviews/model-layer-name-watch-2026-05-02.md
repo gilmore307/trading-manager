@@ -139,3 +139,19 @@ Recommended next registry cleanup:
 1. Decide whether `ANONYMOUS_TARGET_CANDIDATE_BUILDER` should be a first-class component/term row now that it owns a concrete `src/models/` package and contract file.
 2. Do not register `bkch_bitw` or other relative-strength pair ids unless a separate pair-id registry policy is accepted.
 3. Keep Layer 2 field-level registration deferred until the `SectorContextModel` implementation proves which output fields are truly shared.
+
+## Follow-up: sector context registry alignment `dacf22d` / `59634e5`
+
+Later alignment commits resolved the main pending watch items from the previous heartbeat.
+
+Resolved / registered:
+
+- `FEATURE_02_SECTOR_CONTEXT` / `feature_02_sector_context` is now a first-class `data_feature` row (`dki_SCFS001`) for the Layer 2 deterministic SectorContextModel feature surface.
+- `MODEL_02_SECTOR_CONTEXT` / `model_02_sector_context` replaced the earlier `MODEL_02_SECURITY_SELECTION` term as the accepted Layer 2 model-output route.
+- `SECTOR_CONTEXT_MODEL` / `sector_context_model` is now registered as the canonical Layer 2 model id.
+- `ANONYMOUS_TARGET_CANDIDATE_BUILDER` / `anonymous_target_candidate_builder` is now registered as a concrete boundary term between SectorContextModel and StrategySelectionModel.
+
+Current caution:
+
+- Old names may still exist as compatibility wrappers or migration history (`feature_02_security_selection`, `model_02_security_selection`, `source_02_security_selection`). Treat new uses of those names as suspect unless they are explicitly compatibility/deprecation surfaces.
+- The current registry rows make `feature_02_sector_context` and `model_02_sector_context` the preferred Layer 2 route. Future implementation reviews should reject newly introduced `SecuritySelectionModel` Layer 2 identifiers unless the docs explicitly mean the downstream target/security-selection stage, not sector context modeling.
