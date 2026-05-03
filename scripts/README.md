@@ -4,7 +4,7 @@
 
 Registry maintenance is intentionally grouped under `scripts/registry/` so future non-registry maintenance commands can be added under `scripts/` without mixing boundaries.
 
-For the docs-level registry guide, see [`docs/08_registry.md`](../docs/08_registry.md).
+For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_registry.md).
 
 ## Boundary
 

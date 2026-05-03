@@ -6,7 +6,7 @@
 
 The earlier docs stay project-wide:
 
-- `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
+- `00_scope.md`, `01_context.md`, and `80_`/`81_`/`82_` describe the whole trading platform repository and its governance; `02_`/`03_` layer docs own layer workflow and acceptance.
 - This file describes the `trading-storage/main/templates/` platform function specifically.
 
 Templates exist to keep drafting consistent without mistaking drafts for accepted contracts or concrete registry entries. `trading-storage` owns the checked-in non-code asset location; `trading-manager` owns the registry and operating rules for shared names introduced by those assets.

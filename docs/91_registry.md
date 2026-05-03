@@ -6,7 +6,7 @@
 
 The earlier docs stay project-wide:
 
-- `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
+- `00_scope.md`, `01_context.md`, and `80_`/`81_`/`82_` describe the whole trading platform repository and its governance; `02_`/`03_` layer docs own layer workflow and acceptance.
 - This file describes the `scripts/` platform function specifically.
 
 The registry exists to prevent each component repository from inventing incompatible names, fields, statuses, helper references, or repository identifiers.

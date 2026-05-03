@@ -7,8 +7,8 @@
 - Keep trading statuses and registrable fields in `trading-manager/scripts/`, not scattered through docs.
 - The market-state contamination rule is a core system invariant.
 
-- Registry Markdown kind files under `scripts/registry/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `scripts/registry/current.csv`, and registry operating rules live in `docs/08_registry.md`.
-- Contract drafting templates belong under `trading-storage/main/templates/contracts/`, not as numbered docs after `06_memory.md`; `07_helpers.md`, `08_registry.md`, and `09_templates.md` are approved platform-function guides after the project-wide docs.
+- Registry Markdown kind files under `scripts/registry/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `scripts/registry/current.csv`, and registry operating rules live in `docs/91_registry.md`.
+- Contract drafting templates belong under `trading-storage/main/templates/contracts/`, not as numbered docs; `90_helpers.md`, `91_registry.md`, and `92_templates.md` are approved platform-function guides.
 - Stale canceled-project registry entries were removed because GitHub history is the restore path.
 - Registry ids are stable automation references; keys are human-readable and unsafe for durable automation dereferencing.
 - Registry `path` is a nullable column for direct locators, not a registry kind.
@@ -17,7 +17,7 @@
 - Registered helper APIs are id-only: get key, payload, path, or secret text by stable registry id.
 - Registry keys are output/display labels, not helper inputs.
 
-- `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` are platform-function guides for `trading-manager`; `00_scope.md` through `06_memory.md` remain project-wide.
+- `docs/90_helpers.md`, `docs/91_registry.md`, and `docs/92_templates.md` are platform-function guides for `trading-manager`; `00_scope.md`, `01_context.md`, and `80_`/`81_`/`82_` remain platform governance docs while `02_`/`03_` own layer workflow and acceptance.
 - Future global helpers, reusable templates, and shared fields/status/type values discovered in component work must be recorded through `trading-manager` before they become cross-repository contracts.
 - Official registry helper runtime surface is the Python `trading_registry` package under `src/`; the older non-Python helper implementation was removed.
 - Shared environment baseline is Python 3.12 at `/root/projects/trading-manager/.venv`, installed with `pip` from root `requirements.txt`.

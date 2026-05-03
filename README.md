@@ -11,7 +11,7 @@ This repository also anchors the shared local trading development environment at
 ## Top-Level Structure
 
 ```text
-docs/             System-level docs spine: 00-06 project-wide docs plus 07-09 platform guides.
+docs/             System-level docs spine: 00/01 platform boundary, 02+ layer workflow/acceptance docs, 80+ governance docs, 90+ platform guides.
 src/              Importable shared helper packages used across trading repositories.
 scripts/          Executable maintenance/operational commands.
   registry/       Registry maintenance surface: migration/export entrypoint, generated CSV, kind boundaries, rules, and SQL migrations.
@@ -26,19 +26,17 @@ requirements.txt  Shared Python environment dependency ledger.
 docs/
   00_scope.md
   01_context.md
-  02_workflow.md
-  03_acceptance.md
-  04_task.md
-  05_decision.md
-  06_memory.md
-  07_helpers.md
-  08_registry.md
-  09_templates.md
-  91_layer_01_market_regime.md
-  92_layer_02_sector_context.md
+  02_layer_01_market_regime.md
+  03_layer_02_sector_context.md
+  80_task.md
+  81_decision.md
+  82_memory.md
+  90_helpers.md
+  91_registry.md
+  92_templates.md
 ```
 
-Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` through `06_memory.md` remain the project-wide platform docs, while `07_helpers.md`, `08_registry.md`, and `09_templates.md` explain the three platform functions this repository owns. Layer-specific `91_`/`92_` docs record current cross-repository naming and control-plane boundaries while the lower-number docs spine is being evaluated.
+Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` and `01_context.md` own the platform boundary, `02_`/`03_` layer docs own current cross-repository naming/control-plane workflows plus acceptance gates, `80_`/`81_`/`82_` own task/decision/memory, and `90_helpers.md`, `91_registry.md`, and `92_templates.md` explain the three platform functions this repository owns.
 
 ## Registry Rule
 
@@ -50,7 +48,7 @@ Concrete registry entries live in the SQL-backed `trading_registry` table. The n
 
 Registry ids are stable automation references. Registry keys are human-readable labels and may be renamed by reviewed migrations. Use id-based helpers in code.
 
-See `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md` for platform-function guides.
+See `docs/90_helpers.md`, `docs/91_registry.md`, and `docs/92_templates.md` for platform-function guides.
 
 ## Shared Environment Rule
 

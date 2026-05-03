@@ -206,10 +206,10 @@ The docs spine should contain ratified project context and governance. Drafting 
 
 ### Consequences
 
-- Do not add numbered docs beyond `06_memory.md` for reusable drafting templates.
+- Do not add numbered docs beyond `82_memory.md` for reusable drafting templates.
 - Use `trading-storage/main/templates/contracts/` for reusable contract drafting surfaces.
 - Use `scripts/registry/kinds/*_type.md` and SQL migrations for registered type vocabularies.
-- Use `docs/08_registry.md` for the approved `trading-main` registry operating guide.
+- Use `docs/91_registry.md` for the approved `trading-main` registry operating guide.
 
 ## D012 - Remove canceled-project registry entries
 
@@ -487,11 +487,11 @@ Date: 2026-04-25
 
 ### Context
 
-`trading-main` has grown from a docs-only coordination repository into the platform repository that also owns the SQL-backed registry, generated registry snapshot, registry helper surface, and registry maintenance workflow. Keeping all registry operating detail inside `00_scope.md` through `06_memory.md` would blur the project-wide docs with the registration subsystem guide.
+`trading-main` has grown from a docs-only coordination repository into the platform repository that also owns the SQL-backed registry, generated registry snapshot, registry helper surface, and registry maintenance workflow. Keeping all registry operating detail inside the core governance docs would blur the project-wide docs with the registration subsystem guide.
 
 ### Decision
 
-Keep `00_scope.md` through `06_memory.md` focused on the whole trading platform repository. Add `docs/08_registry.md` as the registry-specific operating guide.
+Keep the core governance docs focused on the whole trading platform repository. Add `docs/91_registry.md` as the registry-specific operating guide.
 
 ### Rationale
 
@@ -499,8 +499,8 @@ The registry is now a first-class function of `trading-main`, not just a passing
 
 ### Consequences
 
-- `docs/08_registry.md` is part of the accepted `trading-main` docs set.
-- `00_scope.md` through `06_memory.md` remain project-wide platform docs.
+- `docs/91_registry.md` is part of the accepted `trading-main` docs set.
+- core governance docs remain project-wide platform docs.
 - Registry kind source-of-truth files remain under `scripts/registry/kinds/`, not under `docs/`.
 - Contract drafting templates remain under `trading-storage/main/templates/contracts/`, not under `docs/`.
 
@@ -516,11 +516,11 @@ Date: 2026-04-25
 
 Use three numbered platform-function guide docs after the project-wide spine:
 
-- `docs/07_helpers.md`
-- `docs/08_registry.md`
-- `docs/09_templates.md`
+- `docs/90_helpers.md`
+- `docs/91_registry.md`
+- `docs/92_templates.md`
 
-Keep `00_scope.md` through `06_memory.md` focused on the whole trading platform repository.
+Keep the core governance docs focused on the whole trading platform repository.
 
 ### Rationale
 
@@ -2179,3 +2179,41 @@ Per-kind boundary files remain under `scripts/registry/kinds/`; cross-kind and t
 - Registry docs, tests, helper defaults, and the registered CSV export helper use `scripts/registry/` paths.
 - The SQL `kind` constraint and `scripts/registry/kinds/*.md` files remain aligned by tests.
 - Rule files are normative; dated watch-list prose should be promoted, resolved, or removed instead of accumulating as ad hoc review notes.
+
+## D097 - Layer workflow and acceptance live in layer docs
+
+Date: 2026-05-03
+Status: Accepted
+
+### Context
+
+The previous docs spine kept `02_workflow.md` and `03_acceptance.md` as repository-wide files while layer-specific files lived under high-number `91_` / `92_` names. That caused duplication: workflow, handoff, evidence, and acceptance are not separate from a layer's contract; they are part of the layer boundary itself.
+
+### Decision
+
+Use layer-first docs numbering in layer-aware trading repositories:
+
+```text
+00_scope.md
+01_context.md
+02_layer_01_market_regime.md
+03_layer_02_sector_context.md
+04_layer_03_...                 # future layer
+...
+80_task.md
+81_decision.md
+82_memory.md
+90+ reference / platform guide docs
+```
+
+Delete standalone `02_workflow.md` and `03_acceptance.md` where layer files exist. Each layer file owns its workflow diagram, input/output boundary, handoff rules, diagnostics/evidence surfaces, and acceptance gates.
+
+This pattern applies across `trading-model`, `trading-data`, `trading-storage`, and `trading-manager` for the currently accepted Layer 1 and Layer 2 boundaries. Repositories without layer-specific docs may keep component-wide workflow/acceptance files until their layer/stage boundaries are accepted.
+
+### Consequences
+
+- Workflow and acceptance are reviewed where the layer contract is reviewed.
+- Future Layer 3+ docs can take the next numeric slots without colliding with task/decision/memory files.
+- `80_`+ files own task, decision, and memory continuity.
+- `90_`+ files own reference guides, architecture references, registry/helpers/templates, and similar non-layer material.
+- Registry path rows that point to renamed docs require reviewed registry migrations and regenerated `scripts/registry/current.csv`.

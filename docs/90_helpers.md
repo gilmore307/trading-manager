@@ -6,7 +6,7 @@
 
 The earlier docs stay project-wide:
 
-- `00_scope.md` through `06_memory.md` describe the whole trading platform repository and its governance.
+- `00_scope.md`, `01_context.md`, and `80_`/`81_`/`82_` describe the whole trading platform repository and its governance; `02_`/`03_` layer docs own layer workflow and acceptance.
 - This file describes the shared helper source boundary under `src/` specifically.
 
 Helpers exist to keep repeated cross-repository mechanics consistent without turning `trading-manager` into a runtime implementation repository.
@@ -105,7 +105,7 @@ Source secret configs should point to one source-level JSON file per provider/so
 
 The official Python helper source lives under `src/trading_scripts/`.
 
-Registry maintenance commands, such as regenerating `scripts/registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
+Registry maintenance commands, such as regenerating `scripts/registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/91_registry.md`.
 
 ## Recording Duty
 

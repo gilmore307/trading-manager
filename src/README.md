@@ -52,4 +52,4 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 
 Use `scripts/` for executable commands. `scripts/` may import `src/`; `src/` must not import `scripts/`.
 
-See `../docs/07_helpers.md` for the docs-level helper operating guide.
+See `../docs/90_helpers.md` for the docs-level helper operating guide.

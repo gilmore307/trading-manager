@@ -42,3 +42,39 @@ selected | watch | blocked | insufficient_data
 ## Registry duty
 
 New shared fields, statuses, reason-code vocabularies, artifact names, or helper surfaces discovered while working on Layer 2 require reviewed registry migrations before other repositories hard-depend on them. Documentation-only clarification does not by itself require a registry migration.
+
+## Stage flow
+
+```mermaid
+flowchart LR
+    intent["user/agent/schedule intent<br/>Layer 2 sector-context work"]
+    registry["trading-manager registry and contracts<br/>shared names, statuses, templates"]
+    data["trading-data<br/>feature_02_sector_context"]
+    model["trading-model<br/>model_02_sector_context + support artifacts"]
+    storage["trading-storage<br/>durable references when accepted"]
+    downstream["anonymous target candidate builder<br/>later Layer 3 input preparation"]
+
+    intent --> registry --> data --> model --> downstream
+    registry --> storage
+    storage --> downstream
+```
+
+## Layer acceptance
+
+Layer 2 manager changes are acceptable when they:
+
+- keep `trading-manager` at the control-plane, registry, contract, template, and lifecycle boundary;
+- avoid introducing component runtime trading code, market data, generated artifacts, notebooks, credentials, or secrets;
+- keep Layer 2 scoped to sector/industry context and handoff state, not final stocks, strategies, option contracts, position sizing, or portfolio actions;
+- update registry migrations and regenerate `scripts/registry/current.csv` when shared names, statuses, fields, or artifact paths change;
+- keep component-specific implementation detail in the owning component repository.
+
+Current verification:
+
+```bash
+git status --short
+find docs -maxdepth 1 -type f | sort
+find . -maxdepth 2 -type f | sort
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+git diff --check
+```

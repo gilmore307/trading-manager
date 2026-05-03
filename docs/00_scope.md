@@ -19,7 +19,7 @@ This repository exists to keep the multi-repository trading system coherent. It 
 - Define shared ready-signal contracts.
 - Define shared request contracts.
 - Maintain the trading-wide registry for fields, identifiers, statuses, artifact types, request types, and shared helper surfaces.
-- Store trading-wide templates; see `docs/09_templates.md`.
+- Store trading-wide templates; see `docs/92_templates.md`.
 - Store shared helper code used across trading repositories.
 - Record system-level acceptance rules.
 - Record system-level architectural decisions.
@@ -58,7 +58,7 @@ The project should prefer strict boundaries, durable contracts, and evidence-bas
 ## Boundary Rules
 
 - `trading-manager` is the trading platform main repository: docs, contracts, control-plane orchestration policy, registries, templates, shared helpers, and shared environment anchor.
-- `trading-manager` may contain shared helper code used across trading repositories; see `docs/07_helpers.md`.
+- `trading-manager` may contain shared helper code used across trading repositories; see `docs/90_helpers.md`.
 - `trading-manager` must not contain component runtime implementations; control-plane scripts may create requests or review evidence, but must not fetch provider data, build features, train models, execute trades, or render dashboards.
 - `trading-manager` must not contain market data or generated trading artifacts.
 - `trading-manager` must not contain secrets or credentials.
@@ -66,11 +66,11 @@ The project should prefer strict boundaries, durable contracts, and evidence-bas
 - The `.venv/` directory is runtime infrastructure, not repository content.
 - Component repositories may implement or consume contracts defined here, but they must not redefine incompatible local versions of global contracts.
 - Each component repository must keep its own docs spine; `trading-manager` does not replace component-level documentation.
-- Trading-wide status vocabularies and registrable fields are maintained in `trading-manager/scripts/`; see `docs/08_registry.md` for registry-specific rules.
+- Trading-wide status vocabularies and registrable fields are maintained in `trading-manager/scripts/`; see `docs/91_registry.md` for registry-specific rules.
 - A fact should live in the narrowest authoritative home:
   - system-wide facts live here;
   - component-specific facts live in the relevant component repository;
-  - trading-wide registered names and vocabularies live in `trading-manager/scripts/`, with operating rules in `docs/08_registry.md`.
+  - trading-wide registered names and vocabularies live in `trading-manager/scripts/`, with operating rules in `docs/91_registry.md`.
 - Market-state discovery must not use strategy returns or strategy performance as input. Strategy results may only be attached after market states have already been discovered.
 - `trading-storage` owns shared persistent storage contracts for trading artifacts; `trading-manager` defines the system-level relationship to those contracts.
 

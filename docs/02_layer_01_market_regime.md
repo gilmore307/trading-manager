@@ -39,3 +39,39 @@ Layer 1 must remain broad-market only. It must not route or register Layer 1 out
 ## Registry duty
 
 New shared fields, statuses, reason-code vocabularies, artifact names, or helper surfaces discovered while working on Layer 1 require reviewed registry migrations before other repositories hard-depend on them. Documentation-only clarification does not by itself require a registry migration.
+
+## Stage flow
+
+```mermaid
+flowchart LR
+    intent["user/agent/schedule intent<br/>Layer 1 market-regime work"]
+    registry["trading-manager registry and contracts<br/>shared names, statuses, templates"]
+    data["trading-data<br/>source_01_market_regime -> feature_01_market_regime"]
+    model["trading-model<br/>model_01_market_regime + support artifacts"]
+    storage["trading-storage<br/>durable references when accepted"]
+    review["promotion / lifecycle review<br/>evidence-backed routing"]
+
+    intent --> registry --> data --> model --> review
+    registry --> storage
+    storage --> review
+```
+
+## Layer acceptance
+
+Layer 1 manager changes are acceptable when they:
+
+- keep `trading-manager` at the control-plane, registry, contract, template, and lifecycle boundary;
+- avoid introducing component runtime trading code, market data, generated artifacts, notebooks, credentials, or secrets;
+- preserve broad-market-only Layer 1 naming and reject sector/security/strategy/option/portfolio leakage;
+- update registry migrations and regenerate `scripts/registry/current.csv` when shared names, statuses, fields, or artifact paths change;
+- keep component-specific implementation detail in the owning component repository.
+
+Current verification:
+
+```bash
+git status --short
+find docs -maxdepth 1 -type f | sort
+find . -maxdepth 2 -type f | sort
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+git diff --check
+```

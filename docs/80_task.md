@@ -51,8 +51,8 @@
 - Defined repository visibility policy: trading repositories stay private unless the owner explicitly approves a visibility change.
 - Defined helper distribution boundary: cross-repository runtime helpers use the Python helper package.
 - Defined shared environment baseline: Python 3.12, `.venv`, `pip`, and reviewed `requirements.txt`.
-- Split `trading-manager` platform-function guides into `docs/07_helpers.md`, `docs/08_registry.md`, and `docs/09_templates.md`.
-- Added scripts/platform guide docs so `00_scope.md` through `06_memory.md` remain project-wide while platform-specific rules have focused guides.
+- Split `trading-manager` platform-function guides into `docs/90_helpers.md`, `docs/91_registry.md`, and `docs/92_templates.md`.
+- Added scripts/platform guide docs so platform-specific rules have focused guides separate from task/decision/memory and layer workflow docs.
 - Moved registry kind boundary files into `scripts/registry/kinds/`; `scripts/registry/rules/` remains for review artifacts.
 - Registered the active trading repositories as `repo` rows in `scripts/registry/current.csv`; later merged source/derived data-production boundaries back into `trading-data`.
 - Registered `HELPER_REGISTRY_EXPORT_CURRENT_CSV` for regenerating `scripts/registry/current.csv`.
