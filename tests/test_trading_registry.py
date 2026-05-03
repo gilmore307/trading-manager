@@ -102,7 +102,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["GITHUB"]["kind"], "term")
         expected_sources = {
             "SOURCE_01_MARKET_REGIME": "source_01_market_regime",
-            "SOURCE_02_SECURITY_SELECTION": "source_02_security_selection",
+            "SOURCE_02_TARGET_CANDIDATE_HOLDINGS": "source_02_target_candidate_holdings",
             "SOURCE_03_STRATEGY_SELECTION": "source_03_strategy_selection",
             "SOURCE_05_OPTION_EXPRESSION": "source_05_option_expression",
             "SOURCE_06_POSITION_EXECUTION": "source_06_position_execution",
@@ -144,8 +144,6 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("EQUITY_ABNORMAL_ACTIVITY_BUNDLE_CONFIG", rows)
         for obsolete_config in {
             "01_MARKET_REGIME_MODEL_INPUTS_BUNDLE_CONFIG",
-            "02_SECURITY_SELECTION_MODEL_INPUTS_BUNDLE_CONFIG",
-            "02_SECURITY_SELECTION_STOCK_ETF_EXPOSURE_CONFIG",
             "03_STRATEGY_SELECTION_MODEL_INPUTS_BUNDLE_CONFIG",
             "05_OPTION_EXPRESSION_MODEL_INPUTS_BUNDLE_CONFIG",
         }:
@@ -205,7 +203,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key in ["SYMBOL", "DATA_TIMESTAMP", "BAR_OPEN", "BAR_VWAP"]:
             self.assertIn("source_01_market_regime", rows[key]["applies_to"])
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
-            self.assertIn("source_02_security_selection", rows[key]["applies_to"])
+            self.assertIn("source_02_target_candidate_holdings", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
             self.assertIn("source_07_event_overlay", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
@@ -224,12 +222,16 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(data_kinds, {})
         self.assertEqual(data_derived, {})
-        self.assertEqual(set(data_features), {"FEATURE_01_MARKET_REGIME"})
+        self.assertEqual(set(data_features), {"FEATURE_01_MARKET_REGIME", "FEATURE_02_SECTOR_CONTEXT"})
         self.assertEqual(data_features["FEATURE_01_MARKET_REGIME"]["payload"], "feature_01_market_regime")
         self.assertIn("data_feature/feature_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["path"])
+        self.assertEqual(data_features["FEATURE_02_SECTOR_CONTEXT"]["payload"], "feature_02_sector_context")
+        self.assertIn("data_feature/feature_02_sector_context", data_features["FEATURE_02_SECTOR_CONTEXT"]["path"])
         self.assertIn("trading-data", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("market_regime_model", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("source_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
+        self.assertIn("sector_context_model", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
+        self.assertIn("source_01_market_regime", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
         self.assertNotIn("feature_snapshots", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
