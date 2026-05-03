@@ -91,8 +91,8 @@ Normal flow for a shared contract shape:
 
 1. Draft the shape in `trading-storage/main/templates/contracts/`.
 2. Identify fields, type values, and status values that need registry entries.
-3. Register shared names through SQL migrations under `scripts/sql/schema_migrations/`.
-4. Regenerate `scripts/current.csv`.
+3. Register shared names through SQL migrations under `scripts/registry/sql/schema_migrations/`.
+4. Regenerate `scripts/registry/current.csv`.
 5. Update workflow and acceptance docs if the contract becomes binding.
 6. Route implementation work to the owning component repositories.
 
@@ -106,7 +106,7 @@ Do not register `data_task_key`, `data_task_completion_receipt`, or `data_task_c
 
 When component work creates a reusable template shape, move or copy the reusable version into `trading-storage/main/templates/` before other repositories depend on it.
 
-If a template introduces shared fields, statuses, artifact types, manifest types, ready-signal types, request types, or config keys, route those names through the SQL registry and regenerate `scripts/current.csv`.
+If a template introduces shared fields, statuses, artifact types, manifest types, ready-signal types, request types, or config keys, route those names through the SQL registry and regenerate `scripts/registry/current.csv`.
 
 Temporary template fields must be called out during review instead of silently becoming local conventions.
 

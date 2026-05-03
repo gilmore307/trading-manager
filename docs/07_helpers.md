@@ -105,7 +105,7 @@ Source secret configs should point to one source-level JSON file per provider/so
 
 The official Python helper source lives under `src/trading_scripts/`.
 
-Registry maintenance commands, such as regenerating `scripts/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
+Registry maintenance commands, such as regenerating `scripts/registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/08_registry.md`.
 
 ## Recording Duty
 

@@ -17,7 +17,7 @@ from typing import Any, Mapping
 from trading_registry import SecretResolver, create_csv_registry_query
 
 BRAVE_SEARCH_CONFIG_ID = "cfg_BRAVESEARCH"
-DEFAULT_REGISTRY_CSV = Path("/root/projects/trading-manager/scripts/current.csv")
+DEFAULT_REGISTRY_CSV = Path("/root/projects/trading-manager/scripts/registry/current.csv")
 DEFAULT_SECRETS_REGISTRY = Path("/root/secrets/registry.json")
 DEFAULT_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 DEFAULT_TIMEOUT_SECONDS = 20

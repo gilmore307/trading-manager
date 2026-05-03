@@ -124,7 +124,7 @@ The initial registry migration converted active SQL rows into Markdown tables. T
 
 ### Decision
 
-`scripts/kinds/<kind>.md` files define kind boundaries, ranges, and rejection rules only. Concrete registered items live in the SQL-backed `trading_registry` table and append-only migrations under `scripts/sql/schema_migrations/`.
+`scripts/registry/kinds/<kind>.md` files define kind boundaries, ranges, and rejection rules only. Concrete registered items live in the SQL-backed `trading_registry` table and append-only migrations under `scripts/registry/sql/schema_migrations/`.
 
 ### Rationale
 
@@ -147,10 +147,10 @@ Concrete registry entries belong in SQL for queryability, constraints, and helpe
 
 ### Decision
 
-After SQL registry updates, `scripts/apply_registry_migrations.py` exports the active `trading_registry` table to:
+After SQL registry updates, `scripts/registry/apply_registry_migrations.py` exports the active `trading_registry` table to:
 
 ```text
-scripts/current.csv
+scripts/registry/current.csv
 ```
 
 The CSV is a generated snapshot and must not be edited by hand.
@@ -175,7 +175,7 @@ Some registry kinds are easy to confuse, especially `field` vs status-value kind
 
 ### Decision
 
-Keep the current kind set and document tie-breaker rules in `scripts/reviews/kind-boundary.md`.
+Keep the current kind set and document tie-breaker rules in `scripts/registry/rules/kind-boundary.md`.
 
 ### Rationale
 
@@ -208,7 +208,7 @@ The docs spine should contain ratified project context and governance. Drafting 
 
 - Do not add numbered docs beyond `06_memory.md` for reusable drafting templates.
 - Use `trading-storage/main/templates/contracts/` for reusable contract drafting surfaces.
-- Use `scripts/kinds/*_type.md` and SQL migrations for registered type vocabularies.
+- Use `scripts/registry/kinds/*_type.md` and SQL migrations for registered type vocabularies.
 - Use `docs/08_registry.md` for the approved `trading-main` registry operating guide.
 
 ## D012 - Remove canceled-project registry entries
@@ -230,7 +230,7 @@ The registry should reflect active trading-system vocabulary and shared infrastr
 ### Consequences
 
 - GitHub history remains the restore path if old entries are ever needed again.
-- Active `scripts/current.csv` should contain only current registry entries.
+- Active `scripts/registry/current.csv` should contain only current registry entries.
 - Future registry entries should be trading-relevant or generally useful to the active server project boundary.
 
 ## D013 - Registry path is a nullable column, not a kind
@@ -313,7 +313,7 @@ Add nullable `trading_registry.applies_to`. For `field` entries, use it to recor
 
 ### Rationale
 
-This avoids overloading `note` and makes field usage visible in `scripts/current.csv`.
+This avoids overloading `note` and makes field usage visible in `scripts/registry/current.csv`.
 
 ### Consequences
 
@@ -335,7 +335,7 @@ Register stable callable helper exports as `script` entries with the exported na
 
 ### Rationale
 
-The registry should expose reusable callable helper surfaces, not every helper source file or package constant. Export-level entries make the approved helper API visible in `scripts/current.csv`.
+The registry should expose reusable callable helper surfaces, not every helper source file or package constant. Export-level entries make the approved helper API visible in `scripts/registry/current.csv`.
 
 ### Consequences
 
@@ -378,7 +378,7 @@ Every `field` registry entry must have non-empty `applies_to`. Multiple usage su
 
 ### Rationale
 
-Field names are only useful if their valid usage surface is visible. A required `applies_to` column makes `scripts/current.csv` useful for review and prevents broad, ambiguous field registrations.
+Field names are only useful if their valid usage surface is visible. A required `applies_to` column makes `scripts/registry/current.csv` useful for review and prevents broad, ambiguous field registrations.
 
 ### Consequences
 
@@ -421,11 +421,11 @@ Date: 2026-04-25
 
 ### Context
 
-`scripts/current.csv` is generated from SQL and should be refreshed after registry changes. The helper command itself should be discoverable from the registry.
+`scripts/registry/current.csv` is generated from SQL and should be refreshed after registry changes. The helper command itself should be discoverable from the registry.
 
 ### Decision
 
-Register `scripts/apply_registry_migrations.py --export-only` as `HELPER_REGISTRY_EXPORT_CURRENT_CSV`.
+Register `scripts/registry/apply_registry_migrations.py --export-only` as `HELPER_REGISTRY_EXPORT_CURRENT_CSV`.
 
 ### Rationale
 
@@ -435,7 +435,7 @@ This keeps the CSV generation command visible without mixing it into the id-only
 
 - Lookup helpers remain id-only.
 - CSV generation is registered as a maintenance helper.
-- The helper row points to `scripts/apply_registry_migrations.py` and applies to `scripts/current.csv`.
+- The helper row points to `scripts/registry/apply_registry_migrations.py` and applies to `scripts/registry/current.csv`.
 
 ## D022 - All trading repositories are registry entries
 
@@ -455,21 +455,21 @@ The registry is the shared naming authority. Component repository names and chec
 
 ### Consequences
 
-- All eight trading repositories are visible in `scripts/current.csv`.
+- All eight trading repositories are visible in `scripts/registry/current.csv`.
 - Automation should use repo row ids to retrieve repository names and paths.
 - Repository remotes are recorded in repo-row notes for review visibility.
 
-## D023 - Registry kind boundaries live under scripts/kinds
+## D023 - Registry kind boundaries live under scripts/registry/kinds
 
 Date: 2026-04-25
 
 ### Context
 
-Registry root was mixing generated snapshots, SQL tooling, review notes, and kind boundary files such as `acceptance_outcome.md`. Moving those files into `scripts/reviews/` would confuse source-of-truth definitions with review artifacts.
+Registry root was mixing generated snapshots, SQL tooling, review notes, and kind boundary files such as `acceptance_outcome.md`. Moving those files into `scripts/registry/rules/` would confuse source-of-truth definitions with review artifacts.
 
 ### Decision
 
-Move all registry kind boundary files into `scripts/kinds/`. Keep `scripts/reviews/` for review notes and boundary assessments only.
+Move all registry kind boundary files into `scripts/registry/kinds/`. Keep `scripts/registry/rules/` for review notes and boundary assessments only.
 
 ### Rationale
 
@@ -477,8 +477,8 @@ Kind files are normative boundary documentation. Review files are commentary and
 
 ### Consequences
 
-- New registry kinds must add `scripts/kinds/<kind>.md`.
-- `scripts/reviews/` must not own kind source-of-truth files.
+- New registry kinds must add `scripts/registry/kinds/<kind>.md`.
+- `scripts/registry/rules/` must not own kind source-of-truth files.
 - `scripts/README.md` remains the index for both SQL entries and kind boundary files.
 
 ## D024 - Add a registry-specific docs guide
@@ -501,7 +501,7 @@ The registry is now a first-class function of `trading-main`, not just a passing
 
 - `docs/08_registry.md` is part of the accepted `trading-main` docs set.
 - `00_scope.md` through `06_memory.md` remain project-wide platform docs.
-- Registry kind source-of-truth files remain under `scripts/kinds/`, not under `docs/`.
+- Registry kind source-of-truth files remain under `scripts/registry/kinds/`, not under `docs/`.
 - Contract drafting templates remain under `trading-storage/main/templates/contracts/`, not under `docs/`.
 
 ## D025 - Split platform-function guides into helpers registry and templates
@@ -529,7 +529,7 @@ This mirrors the actual top-level structure of `trading-main` and gives each own
 ### Consequences
 
 - Helpers, registry, and templates each have a dedicated docs guide.
-- Registry kind source-of-truth files still live under `scripts/kinds/`.
+- Registry kind source-of-truth files still live under `scripts/registry/kinds/`.
 - Template drafts still live under `trading-storage/main/templates/`.
 - Helper code still lives under `src/`.
 
@@ -708,7 +708,7 @@ Legal registry vocabulary belongs in the registry. Runtime helpers should stay f
 ### Consequences
 
 - `payload_format` is now a registry kind with a boundary file.
-- Legal payload-format values are visible in `scripts/current.csv`.
+- Legal payload-format values are visible in `scripts/registry/current.csv`.
 - The Python package no longer exports payload-format validator helpers.
 - Tests compare registered payload-format rows with the SQL check constraint.
 
@@ -722,7 +722,7 @@ After moving payload-format vocabulary out of runtime helper exports, the Python
 
 ### Decision
 
-Remove registry kind vocabulary validators from the runtime helper package. Treat legal registry kinds as a schema and registry-docs boundary: the SQL kind constraint and `scripts/kinds/*.md` files must stay aligned, and tests enforce that alignment.
+Remove registry kind vocabulary validators from the runtime helper package. Treat legal registry kinds as a schema and registry-docs boundary: the SQL kind constraint and `scripts/registry/kinds/*.md` files must stay aligned, and tests enforce that alignment.
 
 ### Rationale
 
@@ -733,7 +733,7 @@ Runtime helpers should expose behavior needed by component consumers, not passiv
 - `src/trading_scripts/registry_types.py` is removed.
 - The Python package no longer exports `REGISTRY_KINDS`, `is_registry_kind`, or `assert_registry_kind`.
 - `RegistryReader.list_items_by_kind` only validates that kind input is non-empty; SQL/current-registry tests own legal-kind alignment.
-- Tests compare the latest SQL kind constraint with `scripts/kinds/*.md` and ensure current rows use constrained kinds.
+- Tests compare the latest SQL kind constraint with `scripts/registry/kinds/*.md` and ensure current rows use constrained kinds.
 
 ## D035 - Test scripts are documented locally, not registered
 
@@ -1102,7 +1102,7 @@ Registry keys are renameable display labels, while stable ids are the durable au
 
 ### Decision
 
-Add `artifact_sync_policy` to `trading_registry` and register the allowed values. Initially these used `kind = artifact_sync_policy`; after D054-style registry normalization they are represented as `kind = status_value` with `applies_to = trading_registry.artifact_sync_policy`. Use `registry_only`, `sync_artifact`, and `review_on_merge` to make follow-up expectations visible in `scripts/current.csv`.
+Add `artifact_sync_policy` to `trading_registry` and register the allowed values. Initially these used `kind = artifact_sync_policy`; after D054-style registry normalization they are represented as `kind = status_value` with `applies_to = trading_registry.artifact_sync_policy`. Use `registry_only`, `sync_artifact`, and `review_on_merge` to make follow-up expectations visible in `scripts/registry/current.csv`.
 
 ### Rationale
 
@@ -1110,7 +1110,7 @@ Reviewers need to know whether a registry edit is only a registry-label/schema c
 
 ### Consequences
 
-- `scripts/current.csv` exports `artifact_sync_policy` for every row.
+- `scripts/registry/current.csv` exports `artifact_sync_policy` for every row.
 - Legal artifact-sync policy values are registered rows and constrained in SQL.
 - Rows that point to concrete code/templates/docs should normally use `sync_artifact`.
 - Key-only renames can be artifact-neutral for id-based consumers, but merges, deletes, payload changes, or semantic repurposing require review or artifact synchronization.
@@ -1135,7 +1135,7 @@ This keeps package code, operational commands, and provider/source terminology f
 
 - The registry helper package moved from `helpers/trading_scripts/` to `src/trading_scripts/`.
 - Helper tests moved from `helpers/tests/` to `tests/`.
-- The registry migration/export command moved from `scripts/sql/apply-migrations.py` to `scripts/apply_registry_migrations.py`.
+- The registry migration/export command moved from `scripts/registry/sql/apply-migrations.py` to `scripts/registry/apply_registry_migrations.py`.
 - Registry script rows now point to stable callable entrypoints or Python helper symbols under the new paths.
 
 ## D053 - Trading-main reusable assets live under storage
@@ -1170,7 +1170,7 @@ Rationale:
 These rows all have the same structural role: they register allowed state/policy values. Separate kinds made the registry kind system wider without adding a real contract boundary. The field rows still register slot names such as `TASK_LIFECYCLE_STATUS`; `status_value` rows register allowed values for those slots.
 
 Consequences:
-- `scripts/kinds/status_value.md` owns the status-value boundary.
+- `scripts/registry/kinds/status_value.md` owns the status-value boundary.
 - Status rows must carry their domain in `applies_to`.
 - Artifact sync policy values remain constrained in SQL but are registered as `kind=status_value` with `applies_to=trading_registry.artifact_sync_policy`.
 
@@ -1868,7 +1868,7 @@ The registry is maintained by migration/export tooling and generated snapshots. 
 
 Move the registry maintenance surface under `scripts/`.
 
-This includes:
+This originally included:
 
 - `scripts/current.csv`
 - `scripts/kinds/`
@@ -1876,13 +1876,14 @@ This includes:
 - `scripts/sql/schema_migrations/`
 - `scripts/apply_registry_migrations.py`
 
-The stable callable migration/export entrypoint is now `scripts/apply_registry_migrations.py`.
+The stable callable migration/export entrypoint was originally `scripts/apply_registry_migrations.py`. This flat layout was later superseded by D096.
 
 ### Consequences
 
 - `registry/` is no longer a top-level repository directory.
-- Registry docs, tests, helper defaults, and cross-repository references should use `scripts/` paths.
-- SQL migration `150_update_flattened_registry_export_helper.sql` updates the active script registry row for `HELPER_REGISTRY_EXPORT_CURRENT_CSV` after the temporary `scripts/registry/` layout was rejected as one level too deep.
+- Registry docs, tests, helper defaults, and cross-repository references used flat `scripts/` paths after this decision.
+- SQL migration `150_update_flattened_registry_export_helper.sql` updated the active script registry row for `HELPER_REGISTRY_EXPORT_CURRENT_CSV` after the temporary `scripts/registry/` layout was rejected as one level too deep.
+- D096 later reintroduced `scripts/registry/` because `scripts/` needed room for non-registry maintenance code.
 
 ## D087 - Shared storage assets move to trading-storage main
 
@@ -1930,7 +1931,7 @@ Do not register concrete generated feature columns such as `spy_return_30m`, `sp
 
 ### Consequences
 
-- The V1 derived-output boundary and `snapshot_time` column are visible in `scripts/current.csv`.
+- The V1 derived-output boundary and `snapshot_time` column are visible in `scripts/registry/current.csv`.
 - `data_derived` rows use `derived_NN_<layer>` payloads, mirroring `data_source` rows such as `source_01_market_regime`.
 - For Layer 1 V1, `derived_01_market_regime` is both the derived-output boundary and the total wide table name.
 - Concrete generated feature columns remain reviewed through feature-family definitions and storage contracts, not individual registry rows.
@@ -1956,7 +1957,7 @@ Registry keys use the same order in uppercase, for example `SOURCE_01_MARKET_REG
 
 ### Consequences
 
-- Active `scripts/current.csv` source and derived rows use type-first keys, payloads, paths, and `applies_to` scopes.
+- Active `scripts/registry/current.csv` source and derived rows use type-first keys, payloads, paths, and `applies_to` scopes.
 - Historical SQL migrations remain append-only; migrations 164 and 165 record the active naming change.
 - Feeds keep their existing `NN_feed_*` names unless separately reviewed.
 
@@ -2142,3 +2143,39 @@ Layer-owned fields use compact numeric prefixes as the canonical names in docs, 
 Do not create semantic physical-column aliases such as `layer01_*` or `layer02_*`. If SQL requires quoting because a column starts with a digit, quote the compact canonical name. Generic identity, lineage, timestamp, and receipt/run metadata fields do not need a layer prefix.
 
 Concrete shared name changes still require reviewed SQL registry migrations before other repositories hard-depend on them; this documentation clarification alone does not migrate existing registry rows.
+
+## D096 - Group registry maintenance under scripts/registry
+
+Date: 2026-05-03
+Status: Accepted
+
+### Context
+
+The flat `scripts/` registry layout mixed the migration/export entrypoint, generated CSV, kind boundary files, SQL migrations, and review notes directly with the general scripts boundary. Chentong clarified that future non-registry functionality will also live under `scripts/`, so registry files need their own nested boundary.
+
+The old `scripts/reviews/` files were also dated investigation notes. They should become durable rule files rather than growing as loose review artifacts.
+
+### Decision
+
+Move the registry maintenance surface under `scripts/registry/`:
+
+- `scripts/registry/apply_registry_migrations.py`
+- `scripts/registry/current.csv`
+- `scripts/registry/kinds/`
+- `scripts/registry/rules/`
+- `scripts/registry/sql/schema_migrations/`
+
+Rename the former review-note boundary to `rules/` and promote the active notes into one-file-per-aspect rule files:
+
+- `kind-routing.md`
+- `data-kind-contract.md`
+- `model-layer-naming.md`
+
+Per-kind boundary files remain under `scripts/registry/kinds/`; cross-kind and table-shape constraints live under `scripts/registry/rules/`.
+
+### Consequences
+
+- `scripts/` is available for future non-registry maintenance features without mixing registry internals into the top-level inventory.
+- Registry docs, tests, helper defaults, and the registered CSV export helper use `scripts/registry/` paths.
+- The SQL `kind` constraint and `scripts/registry/kinds/*.md` files remain aligned by tests.
+- Rule files are normative; dated watch-list prose should be promoted, resolved, or removed instead of accumulating as ad hoc review notes.

@@ -7,7 +7,7 @@
 - Keep trading statuses and registrable fields in `trading-manager/scripts/`, not scattered through docs.
 - The market-state contamination rule is a core system invariant.
 
-- Registry Markdown kind files under `scripts/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `scripts/current.csv`, and registry operating rules live in `docs/08_registry.md`.
+- Registry Markdown kind files under `scripts/registry/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `scripts/registry/current.csv`, and registry operating rules live in `docs/08_registry.md`.
 - Contract drafting templates belong under `trading-storage/main/templates/contracts/`, not as numbered docs after `06_memory.md`; `07_helpers.md`, `08_registry.md`, and `09_templates.md` are approved platform-function guides after the project-wide docs.
 - Stale canceled-project registry entries were removed because GitHub history is the restore path.
 - Registry ids are stable automation references; keys are human-readable and unsafe for durable automation dereferencing.
@@ -24,7 +24,7 @@
 - Trading repositories are private by default; visibility changes need explicit owner approval and a pre-change review.
 - Component runtime helpers should align with the Python `.venv` unless a future explicit decision accepts another runtime.
 - Registry `payload_format` is a registered value-format vocabulary, not just text/file storage; use the narrowest registered format and keep SQL constraint values aligned with `kind=payload_format` rows.
-- Registry kind vocabulary belongs to the SQL kind constraint and `scripts/kinds/*.md`; do not mirror it as runtime package validators unless a real runtime consumer requires it.
+- Registry kind vocabulary belongs to the SQL kind constraint and `scripts/registry/kinds/*.md`; do not mirror it as runtime package validators unless a real runtime consumer requires it.
 - Test scripts are repository-local verification assets, not registry `script` rows; each test directory README must inventory every first-party test script and what it verifies.
 - OKX is registered as a provider term for crypto data acquisition and trading. Registry config row `OKX_SECRET_ALIAS` points to source-level alias `okx` and path `/root/secrets/okx.json`; JSON fields are `api_key`, `secret_key`, `passphrase`, `allowed_ip_address`, and `api_key_remark_name`.
 - Source secrets use one JSON file per feed/provider under `/root/secrets/<source>.json`; reusable JSON key names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, `allowed_ip_address`, `api_key_remark_name`, and `pat` are registered as `field` rows with `applies_to=source_secret_file_schema`.

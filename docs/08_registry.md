@@ -31,27 +31,30 @@ The registry does not own component-local implementation details, runtime data, 
 
 ```text
 scripts/
-  README.md                 Registry index and operating rules.
-  current.csv               Generated SQL snapshot for GitHub visibility.
-  kinds/                    One Markdown boundary file per registry kind.
-  reviews/                  Review notes and boundary assessments.
-  sql/                      Migration tooling and SQL schema migrations.
+  README.md                 Scripts boundary and inventory.
+  registry/
+    README.md               Registry operating index.
+    apply_registry_migrations.py
+    current.csv             Generated SQL snapshot for GitHub visibility.
+    kinds/                  One Markdown boundary file per registry kind.
+    rules/                  Normative table-shape, kind-routing, and naming rules.
+    sql/                    SQL notes and append-only schema migrations.
 ```
 
 Supporting helper code lives outside `scripts/`:
 
 ```text
-src/trading_scripts/    Shared Python registry reader and secret-resolution helpers.
+src/trading_registry/    Shared Python registry reader and secret-resolution helpers.
 ```
 
 ## Entry Model
 
-Concrete registry entries live in the SQL-backed `trading_registry` table and are exported to `scripts/current.csv`.
+Concrete registry entries live in the SQL-backed `trading_registry` table and are exported to `scripts/registry/current.csv`.
 
 | Field | Registry Meaning |
 |---|---|
 | `id` | Stable automation reference. Use this in durable automation. |
-| `kind` | Registry category. Must have a matching `scripts/kinds/<kind>.md` boundary file. |
+| `kind` | Registry category. Must have a matching `scripts/registry/kinds/<kind>.md` boundary file. |
 | `key` | Human-readable symbolic label. Useful for display and review, but renameable. |
 | `payload_format` | Payload value format. See Payload Formats below. |
 | `payload` | Registered value or file reference. |
@@ -72,13 +75,13 @@ Helper APIs must not take registry `key` as input.
 
 ## Payload Formats
 
-`payload_format` describes how to interpret the string stored in `payload`. Legal values are first-class registry entries with `kind = payload_format`; `scripts/current.csv` is the reviewable snapshot.
+`payload_format` describes how to interpret the string stored in `payload`. Legal values are first-class registry entries with `kind = payload_format`; `scripts/registry/current.csv` is the reviewable snapshot.
 
 The SQL `trading_registry_payload_format_check` constraint and the registered `payload_format` rows must stay aligned. Tests compare those two sources directly.
 
 Use the narrowest registered format that matches the value. Keep `text` as the fallback only when no narrower registered format applies.
 
-Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL constraint, add the `payload_format` row, update registry docs/tests, and regenerate `scripts/current.csv` in one reviewed change.
+Do not add a new payload format when an existing one precisely describes the value. If a new format is needed, update the SQL constraint, add the `payload_format` row, update registry docs/tests, and regenerate `scripts/registry/current.csv` in one reviewed change.
 
 ## Artifact Sync Policies
 
@@ -94,7 +97,7 @@ For field rows, key-only display-label renames may be harmless to id-based consu
 
 ## Kind Boundaries
 
-Kind source-of-truth files live under `scripts/kinds/`.
+Kind source-of-truth files live under `scripts/registry/kinds/`.
 
 Each kind file defines:
 
@@ -102,9 +105,9 @@ Each kind file defines:
 - what belongs in the kind;
 - what should be rejected or re-scoped.
 
-Kind files must not list concrete active rows. Concrete rows belong in SQL migrations and `scripts/current.csv`.
+Kind files must not list concrete active rows. Concrete rows belong in SQL migrations and `scripts/registry/current.csv`.
 
-The SQL `trading_registry.kind` constraint and `scripts/kinds/*.md` files must stay aligned. Tests compare those two sources directly.
+The SQL `trading_registry.kind` constraint and `scripts/registry/kinds/*.md` files must stay aligned. Tests compare those two sources directly.
 
 The most important data-related split is:
 
@@ -117,7 +120,7 @@ The most important data-related split is:
 - `temporal_field` — date/time/datetime field names; values must use ISO-8601 semantics rather than locale-dependent date strings.
 - `classification_field` — categorical/classification field names; register the semantic axis once and list all usage scopes in `applies_to`.
 
-`scripts/reviews/` is for review records and boundary assessments, not normative kind definitions.
+`scripts/registry/rules/` owns cross-kind, table-shape, and naming rules. It does not replace the per-kind source-of-truth files under `scripts/registry/kinds/`.
 
 ## SQL And Snapshot Workflow
 
@@ -126,19 +129,19 @@ Use SQL migrations for concrete registry entries.
 Normal registry update flow:
 
 1. Classify the entry's kind.
-2. If the kind boundary is unclear, update or review `scripts/kinds/<kind>.md` first.
-3. Add a SQL migration under `scripts/sql/schema_migrations/`.
+2. If the kind boundary is unclear, update or review `scripts/registry/kinds/<kind>.md` first.
+3. Add a SQL migration under `scripts/registry/sql/schema_migrations/`.
 4. Run the migration helper:
 
    ```bash
-   scripts/apply_registry_migrations.py
+   scripts/registry/apply_registry_migrations.py
    ```
 
-5. Confirm `scripts/current.csv` was regenerated.
+5. Confirm `scripts/registry/current.csv` was regenerated.
 6. Run a dry-run check:
 
    ```bash
-   scripts/apply_registry_migrations.py --dry-run
+   scripts/registry/apply_registry_migrations.py --dry-run
    ```
 
 7. Run registry helper tests when helper behavior or registry reader behavior changed:
@@ -150,12 +153,12 @@ Normal registry update flow:
 For snapshot export only:
 
 ```bash
-scripts/apply_registry_migrations.py --export-only
+scripts/registry/apply_registry_migrations.py --export-only
 ```
 
 That export command is registered as `HELPER_REGISTRY_EXPORT_CURRENT_CSV`.
 
-Do not hand-edit `scripts/current.csv`.
+Do not hand-edit `scripts/registry/current.csv`.
 
 ## Helper Surface
 
@@ -170,7 +173,7 @@ Registry kind and payload-format vocabularies are checked against SQL constraint
 
 The CSV export maintenance helper is separate from lookup helpers:
 
-- `scripts/apply_registry_migrations.py --export-only`
+- `scripts/registry/apply_registry_migrations.py --export-only`
 
 Registry `script` rows identify approved helper/automation surfaces and source locators; they do not by themselves define package installation or cross-repository runtime dependency contracts.
 
@@ -193,14 +196,14 @@ Source-level secret JSON config rows should use `payload_format=secret_alias`, s
 - Every `field` row must have non-empty `applies_to`.
 - Repository rows should carry repository name in `payload` and local checkout root in `path` when the checkout path is an approved shared fact.
 - Script rows should represent stable callable helper/automation exports, not every helper source file, package constant, or test script.
-- Record review rationale in `note` or `scripts/reviews/` when a boundary choice could be confused.
+- Record row-specific rationale in `note`; update `scripts/registry/rules/` when the rationale should become a reusable rule.
 
 ## Acceptance Checklist
 
 A registry change is acceptable when:
 
 - SQL migrations own concrete row changes;
-- `scripts/current.csv` is regenerated from SQL;
+- `scripts/registry/current.csv` is regenerated from SQL;
 - kind boundary docs remain row-free;
 - no secrets are added;
 - no component-local implementation details are centralized;

@@ -144,7 +144,7 @@ def create_registry_reader(query: QueryFn) -> RegistryReader:
 
 
 def create_csv_registry_query(registry_csv: str | Path) -> QueryFn:
-    """Create a tiny id/kind query function backed by ``scripts/current.csv``.
+    """Create a tiny id/kind query function backed by ``scripts/registry/current.csv``.
 
     This is for helper scripts that need registry ids before a database
     connection is available. It intentionally supports only the query shapes

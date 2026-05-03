@@ -19,4 +19,4 @@ Rules:
 - Keep the status or policy-type slot name itself registered as a `classification_field` row when it appears in records or templates.
 - Keep the status value registered here when code, receipts, or docs need a shared allowed value.
 - Do not create a separate kind for each status domain.
-- Do not use this kind for entity categories such as request types, ready-signal types, manifest types, artifact types, payload formats, data kinds, data sources, or data sources.
+- Do not use this kind for entity categories such as request types, ready-signal types, manifest types, artifact types, payload formats, data kinds, data feeds, or data sources.

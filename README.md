@@ -13,12 +13,8 @@ This repository also anchors the shared local trading development environment at
 ```text
 docs/             System-level docs spine: 00-06 project-wide docs plus 07-09 platform guides.
 src/              Importable shared helper packages used across trading repositories.
-scripts/          Executable maintenance/operational commands plus registry maintenance files.
-  apply_registry_migrations.py  Registry migration/export entrypoint.
-  current.csv     Generated registry snapshot.
-  kinds/          Registry kind boundary docs.
-  reviews/        Registry review notes.
-  sql/            Registry SQL migrations and SQL notes.
+scripts/          Executable maintenance/operational commands.
+  registry/       Registry maintenance surface: migration/export entrypoint, generated CSV, kind boundaries, rules, and SQL migrations.
 tests/            First-party tests for source packages and repository governance checks.
 pyproject.toml   Python helper package metadata for `trading-manager-helpers`.
 requirements.txt  Shared Python environment dependency ledger.
@@ -49,8 +45,8 @@ Component repositories keep their own docs spine. In `trading-manager`, `00_scop
 Concrete registry entries live in the SQL-backed `trading_registry` table. The nullable `path` column stores direct locators/addresses for entity-like entries.
 
 - Kind Markdown files define kind boundaries and rejection rules only.
-- SQL migrations under `scripts/sql/schema_migrations/` define concrete entries.
-- `scripts/current.csv` is generated from SQL for GitHub visibility and must not be edited by hand.
+- SQL migrations under `scripts/registry/sql/schema_migrations/` define concrete entries.
+- `scripts/registry/current.csv` is generated from SQL for GitHub visibility and must not be edited by hand.
 
 Registry ids are stable automation references. Registry keys are human-readable labels and may be renamed by reviewed migrations. Use id-based helpers in code.
 

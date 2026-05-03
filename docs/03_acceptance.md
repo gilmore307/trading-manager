@@ -65,8 +65,8 @@ Contract changes are acceptable when they:
 Registry and template changes are acceptable when they:
 
 - keep trading-wide registered names in the SQL-backed `trading_registry`;
-- keep kind boundary/range rules in `scripts/kinds/<kind>.md`;
-- regenerate `scripts/current.csv` after SQL registry changes;
+- keep kind boundary/range rules in `scripts/registry/kinds/<kind>.md`;
+- regenerate `scripts/registry/current.csv` after SQL registry changes;
 - prefer id-based registry dereferencing for automation;
 - ensure every field entry has non-empty `applies_to`;
 - choose the narrowest registered `payload_format` for registry payloads;
@@ -121,7 +121,7 @@ Manual review must confirm:
 - registry kind Markdown files do not list concrete active rows;
 - entity-like registry entries use the nullable `path` column instead of a separate `path` kind;
 - every field entry has non-empty `applies_to`;
-- `scripts/current.csv` is present and generated from SQL when registry entries changed;
+- `scripts/registry/current.csv` is present and generated from SQL when registry entries changed;
 - `.venv/` is not tracked;
 - no source-code directories were introduced;
 - no data/artifact/log/notebook directories were introduced unless explicitly documented as ignored local infrastructure;
