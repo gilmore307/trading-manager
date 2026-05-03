@@ -155,3 +155,23 @@ Current caution:
 
 - Old names may still exist as compatibility wrappers or migration history (`feature_02_security_selection`, `model_02_security_selection`, `source_02_security_selection`). Treat new uses of those names as suspect unless they are explicitly compatibility/deprecation surfaces.
 - The current registry rows make `feature_02_sector_context` and `model_02_sector_context` the preferred Layer 2 route. Future implementation reviews should reject newly introduced `SecuritySelectionModel` Layer 2 identifiers unless the docs explicitly mean the downstream target/security-selection stage, not sector context modeling.
+
+## Follow-up: layer artifact naming docs `10662e2` / `2ebbe4a` / `62b5267` / `6e04523`
+
+The latest cross-repo documentation commits accepted a stricter layer-artifact naming rule: compact numeric-prefixed model fields are canonical in docs, model-facing payloads, and SQL physical columns, and SQL DDL should quote names such as `1_price_behavior_factor` or `2_trend_stability_score` instead of inventing semantic aliases such as `layer01_*` / `layer02_*`.
+
+New or newly concrete shared artifact names now appear across manager/model/data/storage docs:
+
+- `trading_model.model_01_market_regime_explainability`
+- `trading_model.model_01_market_regime_diagnostics`
+- `trading_model.model_02_sector_context_explainability`
+- `trading_model.model_02_sector_context_diagnostics`
+
+Registry gap to resolve before implementation hard-depends on these names:
+
+1. Add registry rows for the explainability and diagnostics model artifacts, or explicitly document why primary model-output terms cover their companion tables.
+2. Reconcile existing unprefixed Layer 1 field rows (`price_behavior_factor`, `transition_pressure`, `data_quality_score`, etc.) with the now-accepted compact canonical model-field names (`1_*`). The registry should not let downstream code split between unprefixed registry fields and prefixed SQL/model contract fields.
+3. Decide whether Layer 2 compact output fields such as `2_trend_stability_score`, `2_sector_handoff_state`, `2_eligibility_state`, and `2_state_quality_score` should be registered now that they are listed as the stable downstream `model_02_sector_context` contract.
+4. Register allowed handoff/status values only if they become formal status vocabularies outside the Layer 2 contract prose. Current accepted values are `selected`, `watch`, `blocked`, and `insufficient_data` for `2_sector_handoff_state`.
+
+Compatibility/deprecation caution remains: new implementation should not introduce `layer01_*` / `layer02_*` physical aliases or revive `model_02_security_selection` / `feature_02_security_selection` except as explicit compatibility wrappers.
