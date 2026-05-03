@@ -100,3 +100,20 @@ The `trading-model` documentation streamline made the current route more direct 
 - `direct_stock_etf_comparison` / direct stock-ETF comparison — currently prose for `OptionExpressionModel` V1 alongside long call / long put. Do not register until it becomes a formal expression type, status value, output field, or evaluation class.
 
 No Codex temporary names were found in `trading-manager` during this follow-up.
+
+## Follow-up: trading-model output key prefix commit `86e4afa`
+
+The later `trading-model` commit `86e4afa` accepted a stronger output-key ownership rule: model-facing keys use compact layer prefixes such as `1_price_behavior_factor` and `2_sector_observed_behavior_vector`, while persisted SQL columns should use safe aliases such as `layer01_price_behavior_factor` and `layer02_sector_observed_behavior_vector`.
+
+New/shared surfaces to keep under registry review:
+
+- Layer 1 model-facing keys: `1_price_behavior_factor`, `1_trend_certainty_factor`, `1_capital_flow_factor`, `1_sentiment_factor`, `1_valuation_pressure_factor`, `1_fundamental_strength_factor`, `1_macro_environment_factor`, `1_market_structure_factor`, `1_risk_stress_factor`, `1_transition_pressure`, and `1_data_quality_score`.
+- Layer 1 physical SQL aliases, if persisted: `layer01_price_behavior_factor`, `layer01_trend_certainty_factor`, `layer01_capital_flow_factor`, `layer01_sentiment_factor`, `layer01_valuation_pressure_factor`, `layer01_fundamental_strength_factor`, `layer01_macro_environment_factor`, `layer01_market_structure_factor`, `layer01_risk_stress_factor`, `layer01_transition_pressure`, and `layer01_data_quality_score`.
+- Layer 2 model-facing keys now documented with `2_` ownership: `2_sector_observed_behavior_vector`, `2_sector_attribute_vector`, `2_sector_conditional_behavior_vector`, `2_sector_trend_stability_vector`, `2_sector_tradability_vector`, `2_sector_risk_context_vector`, `2_sector_quality_diagnostics`, `2_eligibility_state`, `2_sector_handoff_state`, and optional `2_sector_selection_parameter`.
+- Layer 2 physical SQL aliases should use corresponding `layer02_*` names only once a concrete persisted schema exists.
+
+Do not immediately register both model-facing and physical names as duplicate field rows. Before the next implementation slice, decide the registry ownership pattern explicitly:
+
+1. Whether `field` rows should name physical SQL aliases (`layer01_*`, `layer02_*`) while payload/notes mention model-facing JSON keys (`1_*`, `2_*`).
+2. Whether compact numeric-prefix keys are allowed as registry `key` values, or should remain payload/schema contract strings under safe registry keys.
+3. Whether the earlier newly inserted unprefixed factor rows should be migrated, aliased, or marked deprecated so downstream code does not split between unprefixed and prefixed contracts.
