@@ -38,9 +38,11 @@ docs/
   07_helpers.md
   08_registry.md
   09_templates.md
+  91_layer_01_market_regime.md
+  92_layer_02_sector_context.md
 ```
 
-Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` through `06_memory.md` remain the project-wide platform docs, while `07_helpers.md`, `08_registry.md`, and `09_templates.md` explain the three platform functions this repository owns.
+Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` through `06_memory.md` remain the project-wide platform docs, while `07_helpers.md`, `08_registry.md`, and `09_templates.md` explain the three platform functions this repository owns. Layer-specific `91_`/`92_` docs record current cross-repository naming and control-plane boundaries while the lower-number docs spine is being evaluated.
 
 ## Registry Rule
 

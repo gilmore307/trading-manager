@@ -2111,3 +2111,34 @@ Keep the registered table name `FEATURE_01_MARKET_REGIME` → `feature_01_market
 - The registry still owns the feature boundary/table name.
 - Generated feature keys are not silently turned into global registry fields.
 - PostgreSQL row-size limits no longer force a table-name change.
+
+
+## D095 - Layer artifact names and fields use compact numeric layer prefixes
+
+Date: 2026-05-03
+Status: Accepted
+
+The trading system has explicit model layers, and layer ownership should be visible in shared artifact and field names without maintaining separate docs/model/SQL aliases.
+
+Accepted artifact chain pattern:
+
+```text
+source_NN_<layer_slug>
+feature_NN_<layer_slug>
+model_NN_<layer_slug>
+model_NN_<layer_slug>_explainability
+model_NN_<layer_slug>_diagnostics
+```
+
+`source` and `feature` artifacts belong to the data-production boundary. The primary `model` artifact is the narrow downstream contract. `model_explainability` owns human-review details that should not become hard downstream dependencies. `model_diagnostics` owns acceptance, monitoring, gating, freshness, missingness, baseline, refit, and no-future-leak evidence.
+
+Layer-owned fields use compact numeric prefixes as the canonical names in docs, model-facing payloads, and SQL physical columns:
+
+```text
+1_*
+2_*
+```
+
+Do not create semantic physical-column aliases such as `layer01_*` or `layer02_*`. If SQL requires quoting because a column starts with a digit, quote the compact canonical name. Generic identity, lineage, timestamp, and receipt/run metadata fields do not need a layer prefix.
+
+Concrete shared name changes still require reviewed SQL registry migrations before other repositories hard-depend on them; this documentation clarification alone does not migrate existing registry rows.
