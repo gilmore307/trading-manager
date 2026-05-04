@@ -78,6 +78,8 @@ Layer 3 monthly variant-lifecycle review may use model-local draft terms such as
 
 Accepted cross-repo handoff: manager-requested deterministic Layer 3 strategy selection feature production belongs to `trading-data` as `feature_03_strategy_selection`. `trading-manager` owns request generation/orchestration, `trading-data` owns deterministic per-bar family/variant simulation code inside `trading-data/src/data_feature/feature_03_strategy_selection/`, and `trading-model` owns oracle construction, variant lifecycle proposals, agent-reviewed expansion/pruning/promotion decisions, and StrategySelectionModel training.
 
+Within that handoff, serialized StrategySelectionModel variant specs may carry family-local parameter keys such as `channel_window_profile`, `breakout_buffer_atr`, `min_atr_pct`, `confirmation_bars`, and family-specific signal reasons. Treat those as model-owned spec payload vocabulary while `trading-manager` only passes or references a reviewed variant universe. Register individual family parameter keys or signal/status values only when manager requests, storage schemas, query contracts, lifecycle tasks, or downstream repositories depend on them independently of the serialized model spec.
+
 Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, parameter/profile axes, lifecycle/oracle review terms, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. The `feature_03_strategy_selection` data-feature name is accepted for that concrete handoff; remaining Layer 3 draft terms stay review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` until promoted.
 
 ## Registration Trigger
