@@ -72,7 +72,9 @@ Human-readable ETF/sector behavior labels such as `growth`, `defensive`, `cyclic
 
 Layer 3 design work may use draft StrategySelectionModel names such as `model_03_strategy_selection`, `3_strategy_family`, `3_strategy_variant`, and related `3_*` fields in `trading-model` contract drafts. Do not register those names merely because they appear in draft docs.
 
-Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. Until then, keep the draft names review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` and avoid treating them as active registry commitments.
+Layer 3 family-spec implementation may also use model-local draft parameter names such as `signal_bar_interval`, `unified_1min_bar_grid`, `ma_window_profile`, or other reviewed `*_profile` axes while the family/variant catalog is still being shaped. Treat these as local implementation-review vocabulary, not registry commitments, until a concrete SQL/storage/task handoff needs them.
+
+Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, parameter/profile axes, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. Until then, keep the draft names review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` and avoid treating them as active registry commitments.
 
 ## Registration Trigger
 
