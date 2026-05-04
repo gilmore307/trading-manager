@@ -28,6 +28,7 @@ Accepted examples:
 - `source_02_target_candidate_holdings`
 - `feature_02_sector_context`
 - `model_02_sector_context`
+- `source_03_strategy_selection`
 
 Rules:
 
@@ -43,6 +44,7 @@ Layer-owned fields use compact numeric prefixes only when the field is specific 
 ```text
 1_*
 2_*
+3_*  # only after a Layer 3 contract is accepted for registry promotion
 ```
 
 Generic identity, lineage, timestamp, receipt, run, and registry metadata fields should stay generic and should not receive a layer prefix.
@@ -65,6 +67,12 @@ Current accepted shared surfaces are:
 - `anonymous_target_feature_vector`
 
 Human-readable ETF/sector behavior labels such as `growth`, `defensive`, `cyclical`, `inflation_sensitive`, and `safe_haven` are not prerequisite fixed registry classes. They may be post-hoc interpretations after Layer 2 evidence, but should not become hard-coded shared classes unless a reviewed output/status vocabulary requires them.
+
+## Layer 3 Draft Boundary
+
+Layer 3 design work may use draft StrategySelectionModel names such as `model_03_strategy_selection`, `3_strategy_family`, `3_strategy_variant`, and related `3_*` fields in `trading-model` contract drafts. Do not register those names merely because they appear in draft docs.
+
+Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. Until then, keep the draft names review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` and avoid treating them as active registry commitments.
 
 ## Registration Trigger
 
