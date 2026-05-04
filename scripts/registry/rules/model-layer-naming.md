@@ -74,7 +74,9 @@ Layer 3 design work may use draft StrategySelectionModel names such as `model_03
 
 Layer 3 family-spec implementation may also use model-local draft parameter names such as `signal_bar_interval`, `unified_1min_bar_grid`, `ma_window_profile`, or other reviewed `*_profile` axes while the family/variant catalog is still being shaped. Treat these as local implementation-review vocabulary, not registry commitments, until a concrete SQL/storage/task handoff needs them.
 
-Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, parameter/profile axes, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. Until then, keep the draft names review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` and avoid treating them as active registry commitments.
+Layer 3 monthly variant-lifecycle review may use model-local draft terms such as `active variant universe`, `training candidate subset`, `Universal Oracle`, `Theoretic Strategy Oracle`, `Practical Strategy Oracle`, and oracle-gap language. Keep these terms model-local until a reviewed manager-controlled lifecycle task, storage contract, or promotion workflow depends on them.
+
+Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, parameter/profile axes, lifecycle/oracle review terms, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. Until then, keep the draft names review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` and avoid treating them as active registry commitments.
 
 ## Registration Trigger
 
