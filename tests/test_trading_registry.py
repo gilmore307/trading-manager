@@ -224,27 +224,27 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(data_derived, {})
         self.assertEqual(
             set(data_features),
-            {"FEATURE_01_MARKET_REGIME", "FEATURE_02_SECTOR_CONTEXT", "FEATURE_03_STRATEGY_VARIANT_SIMULATION"},
+            {"FEATURE_01_MARKET_REGIME", "FEATURE_02_SECTOR_CONTEXT", "FEATURE_03_STRATEGY_SELECTION"},
         )
         self.assertEqual(data_features["FEATURE_01_MARKET_REGIME"]["payload"], "feature_01_market_regime")
         self.assertIn("data_feature/feature_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["path"])
         self.assertEqual(data_features["FEATURE_02_SECTOR_CONTEXT"]["payload"], "feature_02_sector_context")
         self.assertIn("data_feature/feature_02_sector_context", data_features["FEATURE_02_SECTOR_CONTEXT"]["path"])
         self.assertEqual(
-            data_features["FEATURE_03_STRATEGY_VARIANT_SIMULATION"]["payload"],
-            "feature_03_strategy_variant_simulation",
+            data_features["FEATURE_03_STRATEGY_SELECTION"]["payload"],
+            "feature_03_strategy_selection",
         )
         self.assertIn(
-            "data_feature/feature_03_strategy_variant_simulation",
-            data_features["FEATURE_03_STRATEGY_VARIANT_SIMULATION"]["path"],
+            "data_feature/feature_03_strategy_selection",
+            data_features["FEATURE_03_STRATEGY_SELECTION"]["path"],
         )
         self.assertIn("trading-data", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("market_regime_model", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("source_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("sector_context_model", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
         self.assertIn("source_01_market_regime", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
-        self.assertIn("model_03_strategy_selection", data_features["FEATURE_03_STRATEGY_VARIANT_SIMULATION"]["applies_to"])
-        self.assertIn("strategy_selection_model", data_features["FEATURE_03_STRATEGY_VARIANT_SIMULATION"]["applies_to"])
+        self.assertIn("model_03_strategy_selection", data_features["FEATURE_03_STRATEGY_SELECTION"]["applies_to"])
+        self.assertIn("strategy_selection_model", data_features["FEATURE_03_STRATEGY_SELECTION"]["applies_to"])
         self.assertNotIn("feature_snapshots", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
