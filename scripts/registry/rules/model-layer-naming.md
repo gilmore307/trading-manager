@@ -76,7 +76,9 @@ Layer 3 family-spec implementation may also use model-local draft parameter name
 
 Layer 3 monthly variant-lifecycle review may use model-local draft terms such as `active variant universe`, `training candidate subset`, `Universal Oracle`, `Theoretic Strategy Oracle`, `Practical Strategy Oracle`, and oracle-gap language. Keep these terms model-local until a reviewed manager-controlled lifecycle task, storage contract, or promotion workflow depends on them.
 
-Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, parameter/profile axes, lifecycle/oracle review terms, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. Until then, keep the draft names review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` and avoid treating them as active registry commitments.
+Accepted cross-repo handoff: manager-requested deterministic strategy variant simulation belongs to `trading-data` as `feature_03_strategy_variant_simulation`. `trading-manager` owns request generation/orchestration, `trading-data` owns deterministic per-bar family/variant simulation feature production, and `trading-model` owns oracle construction, variant lifecycle proposals, agent-reviewed expansion/pruning/promotion decisions, and StrategySelectionModel training.
+
+Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, parameter/profile axes, lifecycle/oracle review terms, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. The `feature_03_strategy_variant_simulation` data-feature name is accepted for that concrete handoff; remaining Layer 3 draft terms stay review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` until promoted.
 
 ## Registration Trigger
 
