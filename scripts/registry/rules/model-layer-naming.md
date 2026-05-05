@@ -84,7 +84,7 @@ Human-readable ETF/sector behavior labels such as `growth`, `defensive`, `cyclic
 
 ## Layer 3 Target-State Boundary
 
-Layer 3 is reset to target state-vector construction. Current accepted shared names are:
+Layer 3 is target state-vector construction. Current accepted shared names are:
 
 - `source_03_target_state` — target-local observed-input source contract for anonymous candidates;
 - `feature_03_target_state_vector` — deterministic market/sector/target/cross-state feature surface produced by `trading-data`;
@@ -94,9 +94,7 @@ Layer 3 is reset to target state-vector construction. Current accepted shared na
 
 `trading-manager` owns target-state request naming and orchestration. `trading-data` owns deterministic point-in-time feature production. `trading-model` owns labels, training, evaluation, promotion evidence, and model-output semantics.
 
-The older `source_03_strategy_selection`, `feature_03_strategy_selection`, `model_03_strategy_selection`, and `StrategySelectionModel` names are legacy compatibility/research assets. Do not expand them as active Layer 3 work unless a later reviewed decision reactivates strategy/variant selection as a downstream layer or decision surface.
-
-Strategy-family/variant vocabulary such as `3_strategy_family`, `3_strategy_variant`, `active variant universe`, `training candidate subset`, `Universal Oracle`, `Theoretic Strategy Oracle`, `Practical Strategy Oracle`, and family-local parameters such as `channel_window_profile`, `breakout_buffer_atr`, `min_atr_pct`, or `confirmation_bars` should remain legacy/model-local. Register those names only if a future accepted manager-controlled lifecycle task, SQL/storage contract, promotion workflow, or downstream repository dependency requires them independently of serialized model-local specs.
+Do not register retired action/variant-selection surfaces as active Layer 3 contracts. Any future action or expression-selection lifecycle must be reviewed as a downstream consumer outside the Layer 3 target-state boundary.
 
 Shared TargetStateVector V1 row keys and top-level feature-block names are registry-owned once both `trading-data` and `trading-model` depend on them. Current shared block names are `market_state_features`, `sector_state_features`, `target_state_features`, and `cross_state_features`; the current sparse synchronized state windows are `5min`, `15min`, `60min`, and `390min`; and the accepted sync-policy value is `market_sector_target_blocks_must_share_identical_observation_windows`.
 

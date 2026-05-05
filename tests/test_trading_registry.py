@@ -104,7 +104,6 @@ class RegistryHelperTests(unittest.TestCase):
             "SOURCE_01_MARKET_REGIME": "source_01_market_regime",
             "SOURCE_02_TARGET_CANDIDATE_HOLDINGS": "source_02_target_candidate_holdings",
             "SOURCE_03_TARGET_STATE": "source_03_target_state",
-            "SOURCE_03_STRATEGY_SELECTION": "source_03_strategy_selection",
             "SOURCE_05_OPTION_EXPRESSION": "source_05_option_expression",
             "SOURCE_06_POSITION_EXECUTION": "source_06_position_execution",
             "SOURCE_07_EVENT_OVERLAY": "source_07_event_overlay",
@@ -248,7 +247,6 @@ class RegistryHelperTests(unittest.TestCase):
                 "FEATURE_01_MARKET_REGIME",
                 "FEATURE_02_SECTOR_CONTEXT",
                 "FEATURE_03_TARGET_STATE_VECTOR",
-                "FEATURE_03_STRATEGY_SELECTION",
             },
         )
         self.assertEqual(data_features["FEATURE_01_MARKET_REGIME"]["payload"], "feature_01_market_regime")
@@ -262,14 +260,6 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn(
             "data_feature/feature_03_target_state_vector",
             data_features["FEATURE_03_TARGET_STATE_VECTOR"]["path"],
-        )
-        self.assertEqual(
-            data_features["FEATURE_03_STRATEGY_SELECTION"]["payload"],
-            "feature_03_strategy_selection",
-        )
-        self.assertIn(
-            "Legacy compatibility",
-            data_features["FEATURE_03_STRATEGY_SELECTION"]["note"],
         )
         self.assertIn("trading-data", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("market_regime_model", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
@@ -646,7 +636,6 @@ class RegistryHelperTests(unittest.TestCase):
         for key, payload in expected_bar_fields.items():
             self.assertIn("source_01_market_regime", by_key[key]["applies_to"])
             self.assertIn("source_03_target_state", by_key[key]["applies_to"])
-            self.assertIn("source_03_strategy_selection", by_key[key]["applies_to"])
             self.assertIn("source_06_position_execution", by_key[key]["applies_to"])
             self.assertEqual(by_key[key]["payload"], payload)
         self.assertEqual(by_key["TIMEFRAME"]["payload"], "timeframe")
