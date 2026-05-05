@@ -456,6 +456,10 @@ class RegistryHelperTests(unittest.TestCase):
             "INTERPRETATION": "interpretation",
         }
         classification_fields = {"UNIVERSE_TYPE", "MODEL_LAYER", "EXPOSURE_TYPE"}
+        self.assertEqual(registry["MODEL_LAYER_LAYER_01_MARKET_REGIME"]["kind"], "term")
+        self.assertEqual(registry["MODEL_LAYER_LAYER_01_MARKET_REGIME"]["payload"], "layer_01_market_regime")
+        self.assertEqual(registry["MODEL_LAYER_LAYER_02_SECTOR_CONTEXT"]["kind"], "term")
+        self.assertEqual(registry["MODEL_LAYER_LAYER_02_SECTOR_CONTEXT"]["payload"], "layer_02_sector_context")
         identity_fields = {"SYMBOL", "FUND_NAME", "ISSUER_NAME"}
         text_fields = {"INTERPRETATION"}
         for key, payload in expected_fields.items():
