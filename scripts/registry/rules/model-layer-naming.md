@@ -86,7 +86,9 @@ The older `source_03_strategy_selection`, `feature_03_strategy_selection`, `mode
 
 Strategy-family/variant vocabulary such as `3_strategy_family`, `3_strategy_variant`, `active variant universe`, `training candidate subset`, `Universal Oracle`, `Theoretic Strategy Oracle`, `Practical Strategy Oracle`, and family-local parameters such as `channel_window_profile`, `breakout_buffer_atr`, `min_atr_pct`, or `confirmation_bars` should remain legacy/model-local. Register those names only if a future accepted manager-controlled lifecycle task, SQL/storage contract, promotion workflow, or downstream repository dependency requires them independently of serialized model-local specs.
 
-Layer 3 target-state fields may use compact `3_*` payloads only after the target-state contract requires concrete shared fields. Do not register generated feature columns or model-local embedding/cluster labels merely because they appear in TargetStateVectorModel design notes.
+Shared TargetStateVector V1 row keys and top-level feature-block names are registry-owned once both `trading-data` and `trading-model` depend on them. Current shared block names are `market_state_features`, `sector_state_features`, `target_state_features`, and `cross_state_features`; the current sparse trailing state windows are `5min`, `15min`, `60min`, and `390min`.
+
+Layer 3 target-state fields may use compact `3_*` payloads only after the target-state contract requires concrete shared fields. Do not register generated feature columns, model-local feature-group internals, label families, embedding names, or cluster labels merely because they appear in TargetStateVectorModel design notes.
 
 ## Registration Trigger
 

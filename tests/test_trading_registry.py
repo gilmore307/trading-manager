@@ -562,7 +562,8 @@ class RegistryHelperTests(unittest.TestCase):
             "REGISTRY_ITEM_CREATED_AT",
             "REGISTRY_ITEM_UPDATED_AT",
             "SNAPSHOT_TIME",
-            "STOCK_ETF_AVAILABLE_TIME",
+            "AVAILABLE_TIME",
+            "TRADEABLE_TIME",
             "UNDERLYING_TIMESTAMP",
         }
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -584,6 +585,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["REGISTRY_ITEM_UPDATED_AT"]["applies_to"], "trading_registry")
         self.assertEqual(rows["TIMEFRAME"]["kind"], "field")
         self.assertEqual(rows["OPTION_DAYS_TO_EXPIRATION"]["kind"], "field")
+        self.assertIn("model_03_target_state_vector", rows["AVAILABLE_TIME"]["applies_to"])
+        self.assertIn("target_state_vector_model", rows["TRADEABLE_TIME"]["applies_to"])
 
     def test_field_like_payloads_are_unique_semantic_words(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -628,6 +631,23 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("source_06_position_execution", by_key[key]["applies_to"])
             self.assertEqual(by_key[key]["payload"], payload)
         self.assertEqual(by_key["TIMEFRAME"]["payload"], "timeframe")
+        self.assertEqual(by_key["TARGET_CANDIDATE_ID"]["kind"], "identity_field")
+        self.assertIn("model_03_target_state_vector", by_key["TARGET_CANDIDATE_ID"]["applies_to"])
+        target_state_fields = {
+            "TARGET_STATE_VECTOR_VERSION": "target_state_vector_version",
+            "MARKET_CONTEXT_STATE_REF": "market_context_state_ref",
+            "SECTOR_CONTEXT_STATE_REF": "sector_context_state_ref",
+            "TARGET_STATE_VECTOR_REF": "target_state_vector_ref",
+            "SOURCE_RUN_REF": "source_run_ref",
+            "MARKET_STATE_FEATURES": "market_state_features",
+            "SECTOR_STATE_FEATURES": "sector_state_features",
+            "TARGET_STATE_FEATURES": "target_state_features",
+            "CROSS_STATE_FEATURES": "cross_state_features",
+        }
+        for key, payload in target_state_fields.items():
+            self.assertEqual(by_key[key]["payload"], payload)
+        self.assertIn("feature_03_target_state_vector", by_key["MARKET_STATE_FEATURES"]["applies_to"])
+        self.assertIn("model_03_target_state_vector", by_key["CROSS_STATE_FEATURES"]["applies_to"])
         for deleted_key in {
             "OPEN_PRICE",
             "HIGH_PRICE",
