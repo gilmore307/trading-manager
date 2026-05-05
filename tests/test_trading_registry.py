@@ -103,6 +103,7 @@ class RegistryHelperTests(unittest.TestCase):
         expected_sources = {
             "SOURCE_01_MARKET_REGIME": "source_01_market_regime",
             "SOURCE_02_TARGET_CANDIDATE_HOLDINGS": "source_02_target_candidate_holdings",
+            "SOURCE_03_TARGET_STATE": "source_03_target_state",
             "SOURCE_03_STRATEGY_SELECTION": "source_03_strategy_selection",
             "SOURCE_05_OPTION_EXPRESSION": "source_05_option_expression",
             "SOURCE_06_POSITION_EXECUTION": "source_06_position_execution",
@@ -180,10 +181,10 @@ class RegistryHelperTests(unittest.TestCase):
 
         expected = {
             "OPTION_SYMBOL": ("identity_field", "option_symbol", "source_06_position_execution"),
-            "DOLLAR_VOLUME": ("field", "dollar_volume", "source_03_strategy_selection"),
-            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "source_03_strategy_selection"),
-            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "source_03_strategy_selection"),
-            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "source_03_strategy_selection"),
+            "DOLLAR_VOLUME": ("field", "dollar_volume", "source_03_target_state"),
+            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "source_03_target_state"),
+            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "source_03_target_state"),
+            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "source_03_target_state"),
             "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "source_05_option_expression"),
             "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "source_07_event_overlay"),
             "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "source_07_event_overlay"),
@@ -224,27 +225,40 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(data_derived, {})
         self.assertEqual(
             set(data_features),
-            {"FEATURE_01_MARKET_REGIME", "FEATURE_02_SECTOR_CONTEXT", "FEATURE_03_STRATEGY_SELECTION"},
+            {
+                "FEATURE_01_MARKET_REGIME",
+                "FEATURE_02_SECTOR_CONTEXT",
+                "FEATURE_03_TARGET_STATE_VECTOR",
+                "FEATURE_03_STRATEGY_SELECTION",
+            },
         )
         self.assertEqual(data_features["FEATURE_01_MARKET_REGIME"]["payload"], "feature_01_market_regime")
         self.assertIn("data_feature/feature_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["path"])
         self.assertEqual(data_features["FEATURE_02_SECTOR_CONTEXT"]["payload"], "feature_02_sector_context")
         self.assertIn("data_feature/feature_02_sector_context", data_features["FEATURE_02_SECTOR_CONTEXT"]["path"])
         self.assertEqual(
+            data_features["FEATURE_03_TARGET_STATE_VECTOR"]["payload"],
+            "feature_03_target_state_vector",
+        )
+        self.assertIn(
+            "data_feature/feature_03_target_state_vector",
+            data_features["FEATURE_03_TARGET_STATE_VECTOR"]["path"],
+        )
+        self.assertEqual(
             data_features["FEATURE_03_STRATEGY_SELECTION"]["payload"],
             "feature_03_strategy_selection",
         )
         self.assertIn(
-            "data_feature/feature_03_strategy_selection",
-            data_features["FEATURE_03_STRATEGY_SELECTION"]["path"],
+            "Legacy compatibility",
+            data_features["FEATURE_03_STRATEGY_SELECTION"]["note"],
         )
         self.assertIn("trading-data", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("market_regime_model", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("source_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("sector_context_model", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
         self.assertIn("source_01_market_regime", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
-        self.assertIn("model_03_strategy_selection", data_features["FEATURE_03_STRATEGY_SELECTION"]["applies_to"])
-        self.assertIn("strategy_selection_model", data_features["FEATURE_03_STRATEGY_SELECTION"]["applies_to"])
+        self.assertIn("model_03_target_state_vector", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
+        self.assertIn("target_state_vector_model", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
         self.assertNotIn("feature_snapshots", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
@@ -609,6 +623,7 @@ class RegistryHelperTests(unittest.TestCase):
         }
         for key, payload in expected_bar_fields.items():
             self.assertIn("source_01_market_regime", by_key[key]["applies_to"])
+            self.assertIn("source_03_target_state", by_key[key]["applies_to"])
             self.assertIn("source_03_strategy_selection", by_key[key]["applies_to"])
             self.assertIn("source_06_position_execution", by_key[key]["applies_to"])
             self.assertEqual(by_key[key]["payload"], payload)

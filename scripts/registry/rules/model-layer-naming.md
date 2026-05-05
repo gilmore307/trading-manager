@@ -28,7 +28,9 @@ Accepted examples:
 - `source_02_target_candidate_holdings`
 - `feature_02_sector_context`
 - `model_02_sector_context`
-- `source_03_strategy_selection`
+- `source_03_target_state`
+- `feature_03_target_state_vector`
+- `model_03_target_state_vector`
 
 Rules:
 
@@ -68,19 +70,23 @@ Current accepted shared surfaces are:
 
 Human-readable ETF/sector behavior labels such as `growth`, `defensive`, `cyclical`, `inflation_sensitive`, and `safe_haven` are not prerequisite fixed registry classes. They may be post-hoc interpretations after Layer 2 evidence, but should not become hard-coded shared classes unless a reviewed output/status vocabulary requires them.
 
-## Layer 3 Draft Boundary
+## Layer 3 Target-State Boundary
 
-Layer 3 design work may use draft StrategySelectionModel names such as `model_03_strategy_selection`, `3_strategy_family`, `3_strategy_variant`, and related `3_*` fields in `trading-model` contract drafts. Do not register those names merely because they appear in draft docs.
+Layer 3 is reset to target state-vector construction. Current accepted shared names are:
 
-Layer 3 family-spec implementation may also use model-local draft parameter names such as `signal_bar_interval`, `unified_1min_bar_grid`, `ma_window_profile`, or other reviewed `*_profile` axes while the family/variant catalog is still being shaped. Treat these as local implementation-review vocabulary, not registry commitments, until a concrete SQL/storage/task handoff needs them.
+- `source_03_target_state` — target-local observed-input source contract for anonymous candidates;
+- `feature_03_target_state_vector` — deterministic market/sector/target/cross-state feature surface produced by `trading-data`;
+- `target_state_vector_model` — canonical Layer 3 model id;
+- `model_03_target_state_vector` — model-owned output/table surface;
+- `target_state_vector` — model-facing anonymous target state vector.
 
-Layer 3 monthly variant-lifecycle review may use model-local draft terms such as `active variant universe`, `training candidate subset`, `Universal Oracle`, `Theoretic Strategy Oracle`, `Practical Strategy Oracle`, and oracle-gap language. Keep these terms model-local until a reviewed manager-controlled lifecycle task, storage contract, or promotion workflow depends on them.
+`trading-manager` owns target-state request naming and orchestration. `trading-data` owns deterministic point-in-time feature production. `trading-model` owns labels, training, evaluation, promotion evidence, and model-output semantics.
 
-Accepted cross-repo handoff: manager-requested deterministic Layer 3 strategy selection feature production belongs to `trading-data` as `feature_03_strategy_selection`. `trading-manager` owns request generation/orchestration, `trading-data` owns deterministic per-bar family/variant simulation code inside `trading-data/src/data_feature/feature_03_strategy_selection/`, and `trading-model` owns oracle construction, variant lifecycle proposals, agent-reviewed expansion/pruning/promotion decisions, and StrategySelectionModel training.
+The older `source_03_strategy_selection`, `feature_03_strategy_selection`, `model_03_strategy_selection`, and `StrategySelectionModel` names are legacy compatibility/research assets. Do not expand them as active Layer 3 work unless a later reviewed decision reactivates strategy/variant selection as a downstream layer or decision surface.
 
-Within that handoff, serialized StrategySelectionModel variant specs may carry family-local parameter keys such as `channel_window_profile`, `breakout_buffer_atr`, `min_atr_pct`, `confirmation_bars`, and family-specific signal reasons. Treat those as model-owned spec payload vocabulary while `trading-manager` only passes or references a reviewed variant universe. Register individual family parameter keys or signal/status values only when manager requests, storage schemas, query contracts, lifecycle tasks, or downstream repositories depend on them independently of the serialized model spec.
+Strategy-family/variant vocabulary such as `3_strategy_family`, `3_strategy_variant`, `active variant universe`, `training candidate subset`, `Universal Oracle`, `Theoretic Strategy Oracle`, `Practical Strategy Oracle`, and family-local parameters such as `channel_window_profile`, `breakout_buffer_atr`, `min_atr_pct`, or `confirmation_bars` should remain legacy/model-local. Register those names only if a future accepted manager-controlled lifecycle task, SQL/storage contract, promotion workflow, or downstream repository dependency requires them independently of serialized model-local specs.
 
-Register Layer 3 model surfaces, support artifacts, compact fields, status vocabularies, parameter/profile axes, lifecycle/oracle review terms, or strategy-family/variant taxonomies only after the contract is accepted for cross-repository dependence or implementation needs a concrete SQL/storage/task handoff. The `feature_03_strategy_selection` data-feature name is accepted for that concrete handoff; remaining Layer 3 draft terms stay review-visible in `trading-model/docs/04_layer_03_strategy_selection.md` until promoted.
+Layer 3 target-state fields may use compact `3_*` payloads only after the target-state contract requires concrete shared fields. Do not register generated feature columns or model-local embedding/cluster labels merely because they appear in TargetStateVectorModel design notes.
 
 ## Registration Trigger
 
