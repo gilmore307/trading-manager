@@ -31,6 +31,8 @@ Accepted examples:
 - `source_03_target_state`
 - `feature_03_target_state_vector`
 - `model_03_target_state_vector`
+- `model_04_alpha_confidence`
+- `model_05_trading_projection`
 
 Rules:
 
@@ -55,9 +57,19 @@ Do not register generated feature columns merely because a model emits them. Reg
 
 When a reviewed model contract makes a compact numeric-prefixed field the canonical downstream name, any active `field` row for that shared field should use the same compact payload. Do not leave downstream code split between an unprefixed registry field such as `price_behavior_factor` and a canonical physical/model field such as `1_price_behavior_factor`. If an unprefixed phrase is still useful as human concept language, keep it in notes or register it as a separate explanatory `term`, not as the canonical model-output `field`.
 
+## V2.2 Direction-Neutral Flow
+
+Current accepted model-layer intent is direction-neutral tradability first:
+
+```text
+market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_state_vector -> alpha_confidence_model -> trading_projection_model
+```
+
+Layer 3 direction evidence is not Layer 4 alpha/direction confidence. Layer 4 `alpha_confidence_model` owns long/short confidence, expected value, risk, and uncertainty. Layer 5 `trading_projection_model` owns offline target actions and target exposure. Event evidence is an overlay/input, not a peer model layer unless a later reviewed contract changes that boundary.
+
 ## Layer 2 Boundary
 
-Layer 2 currently means market-state-conditioned sector/industry trend-stability and sector-context modeling.
+Layer 2 currently means market-state-conditioned sector/industry direction-neutral tradability and sector-context modeling.
 
 Current accepted shared surfaces are:
 
@@ -90,7 +102,7 @@ Shared TargetStateVector V1 row keys and top-level feature-block names are regis
 
 Direction-neutral TargetStateVector names must keep signed direction evidence separate from quality/tradability. Use `*_direction_*` names for signed long/short state evidence, `*_trend_quality_*` / `*_path_stability_*` for structural quality, `*_liquidity_tradability_*` for practical tradability, and `*_residual_direction` for beta/context-adjusted relative direction. Do not revive generic `strength`, `readiness`, or `cost` names when the contract distinguishes direction, quality, transition risk, and tradability.
 
-Layer 3 target-state fields may use compact `3_*` payloads only after the target-state contract requires concrete shared fields. Do not register generated feature columns, model-local feature-group internals, label families, embedding names, or cluster labels merely because they appear in TargetStateVectorModel design notes.
+Layer 3 target-state fields may use compact `3_*` payloads only after the target-state contract requires concrete shared fields. Do not register generated feature columns, model-local feature-group internals, label families, embedding names, or cluster labels merely because they appear in TargetStateVectorModel design notes. Layer 3 preprocessing vector block names such as `target_behavior_vector`, `event_risk_context_vector`, and `candidate_quality_vector` remain model-local until implementation/evaluation proves a reviewed cross-repository contract needs them.
 
 ## Registration Trigger
 
