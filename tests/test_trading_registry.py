@@ -149,6 +149,13 @@ class RegistryHelperTests(unittest.TestCase):
             "05_OPTION_EXPRESSION_MODEL_INPUTS_BUNDLE_CONFIG",
         }:
             self.assertNotIn(obsolete_config, rows)
+        self.assertEqual(rows["TARGET_STATE_VECTOR_SYNCHRONIZED_STATE_WINDOWS"]["payload"], "5min;15min;60min;390min")
+        self.assertEqual(rows["TARGET_STATE_VECTOR_VERSION_DEFAULT"]["payload"], "target_state_vector_v1")
+        self.assertEqual(
+            rows["TARGET_STATE_VECTOR_WINDOW_SYNC_POLICY"]["payload"],
+            "market_sector_target_blocks_must_share_identical_observation_windows",
+        )
+        self.assertNotIn("TARGET_STATE_VECTOR_TRAILING_STATE_WINDOWS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
         self.assertNotIn("06_EVENT_OVERLAY_MODEL_INPUTS", rows)
@@ -643,11 +650,19 @@ class RegistryHelperTests(unittest.TestCase):
             "SECTOR_STATE_FEATURES": "sector_state_features",
             "TARGET_STATE_FEATURES": "target_state_features",
             "CROSS_STATE_FEATURES": "cross_state_features",
+            "STATE_OBSERVATION_WINDOWS": "state_observation_windows",
+            "STATE_WINDOW_SYNC_POLICY": "state_window_sync_policy",
+            "FEATURE_QUALITY_DIAGNOSTICS": "feature_quality_diagnostics",
+            "RUN_ID": "run_id",
         }
         for key, payload in target_state_fields.items():
             self.assertEqual(by_key[key]["payload"], payload)
         self.assertIn("feature_03_target_state_vector", by_key["MARKET_STATE_FEATURES"]["applies_to"])
         self.assertIn("model_03_target_state_vector", by_key["CROSS_STATE_FEATURES"]["applies_to"])
+        self.assertIn("market_state_features", by_key["STATE_OBSERVATION_WINDOWS"]["applies_to"])
+        self.assertIn("cross_state_features", by_key["STATE_WINDOW_SYNC_POLICY"]["applies_to"])
+        self.assertIn("feature_03_target_state_vector", by_key["FEATURE_QUALITY_DIAGNOSTICS"]["applies_to"])
+        self.assertIn("feature_03_target_state_vector", by_key["RUN_ID"]["applies_to"])
         for deleted_key in {
             "OPEN_PRICE",
             "HIGH_PRICE",
