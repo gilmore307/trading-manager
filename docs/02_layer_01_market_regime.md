@@ -21,12 +21,12 @@ trading_model.model_01_market_regime_diagnostics
 Layer-owned output fields use compact numeric prefixes everywhere they are the reviewed canonical name:
 
 ```text
-1_price_behavior_factor
-1_transition_pressure
+1_market_direction_score
+1_market_transition_risk_score
 1_data_quality_score
 ```
 
-Do not create semantic aliases such as `layer01_price_behavior_factor` for physical SQL columns. If SQL needs quoting because a column starts with a digit, quote the compact canonical name instead of inventing a second name.
+Do not create semantic aliases such as `layer01_market_direction_score` for physical SQL columns. If SQL needs quoting because a column starts with a digit, quote the compact canonical name instead of inventing a second name.
 
 Generic identity, lineage, and timestamp fields do not need a layer prefix, for example `available_time`, `model_id`, `model_version`, and receipt/run metadata.
 

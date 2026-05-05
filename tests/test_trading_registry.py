@@ -166,6 +166,20 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MARKET_LIQUIDITY_SUPPORT_SCORE"]["payload"], "1_market_liquidity_support_score")
         self.assertEqual(rows["MARKET_COVERAGE_SCORE"]["payload"], "1_coverage_score")
         self.assertEqual(rows["MARKET_DATA_QUALITY_SCORE"]["payload"], "1_data_quality_score")
+        for retired_layer_one_field in {
+            "PRICE_BEHAVIOR_FACTOR",
+            "TREND_CERTAINTY_FACTOR",
+            "CAPITAL_FLOW_FACTOR",
+            "SENTIMENT_FACTOR",
+            "VALUATION_PRESSURE_FACTOR",
+            "FUNDAMENTAL_STRENGTH_FACTOR",
+            "MACRO_ENVIRONMENT_FACTOR",
+            "MARKET_STRUCTURE_FACTOR",
+            "RISK_STRESS_FACTOR",
+            "TRANSITION_PRESSURE",
+            "DATA_QUALITY_SCORE",
+        }:
+            self.assertNotIn(retired_layer_one_field, rows)
         self.assertNotIn("TARGET_STATE_VECTOR_TRAILING_STATE_WINDOWS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
@@ -417,9 +431,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(len(rows), 47)
         self.assertEqual(
             list(rows[0].keys()),
-            ["symbol", "universe_type", "exposure_type", "bar_grain", "fund_name", "issuer_name", "interpretation"],
+            ["symbol", "universe_type", "model_layer", "exposure_type", "bar_grain", "fund_name", "issuer_name", "interpretation"],
         )
         self.assertEqual(rows[0]["symbol"], "AIQ")
+        self.assertEqual(rows[0]["model_layer"], "layer_02_sector_context")
+        self.assertEqual({row["model_layer"] for row in rows}, {"layer_01_market_regime", "layer_02_sector_context"})
         self.assertIn("RSP", {row["symbol"] for row in rows})
         self.assertIn("SHY", {row["symbol"] for row in rows})
         self.assertIn("IEF", {row["symbol"] for row in rows})
@@ -432,13 +448,14 @@ class RegistryHelperTests(unittest.TestCase):
         expected_fields = {
             "SYMBOL": "symbol",
             "UNIVERSE_TYPE": "universe_type",
+            "MODEL_LAYER": "model_layer",
             "EXPOSURE_TYPE": "exposure_type",
             "BAR_GRAIN": "bar_grain",
             "FUND_NAME": "fund_name",
             "ISSUER_NAME": "issuer_name",
             "INTERPRETATION": "interpretation",
         }
-        classification_fields = {"UNIVERSE_TYPE", "EXPOSURE_TYPE"}
+        classification_fields = {"UNIVERSE_TYPE", "MODEL_LAYER", "EXPOSURE_TYPE"}
         identity_fields = {"SYMBOL", "FUND_NAME", "ISSUER_NAME"}
         text_fields = {"INTERPRETATION"}
         for key, payload in expected_fields.items():
@@ -459,6 +476,7 @@ class RegistryHelperTests(unittest.TestCase):
             [
                 "combination_id",
                 "combination_type",
+                "model_layer",
                 "numerator_symbol",
                 "denominator_symbol",
                 "numerator_bar_grain",
@@ -469,6 +487,9 @@ class RegistryHelperTests(unittest.TestCase):
         )
         by_id = {row["combination_id"]: row for row in rows}
         self.assertEqual(by_id["rsp_spy"]["feature_bar_grain"], "30m")
+        self.assertEqual(by_id["rsp_spy"]["model_layer"], "layer_01_market_regime")
+        self.assertEqual(by_id["smh_xlk"]["model_layer"], "layer_02_sector_context")
+        self.assertEqual({row["model_layer"] for row in rows}, {"layer_01_market_regime", "layer_02_sector_context"})
         self.assertEqual(by_id["tlt_shy"]["combination_type"], "primary")
         self.assertEqual(by_id["ief_shy"]["combination_type"], "primary")
         self.assertEqual(by_id["smh_xlk"]["feature_bar_grain"], "1d")
@@ -486,6 +507,7 @@ class RegistryHelperTests(unittest.TestCase):
         expected_fields = {
             "COMBINATION_ID": ("identity_field", "combination_id"),
             "COMBINATION_TYPE": ("classification_field", "combination_type"),
+            "MODEL_LAYER": ("classification_field", "model_layer"),
             "NUMERATOR_SYMBOL": ("identity_field", "numerator_symbol"),
             "DENOMINATOR_SYMBOL": ("identity_field", "denominator_symbol"),
             "NUMERATOR_BAR_GRAIN": ("field", "numerator_bar_grain"),
@@ -496,7 +518,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key, (kind, payload) in expected_fields.items():
             self.assertEqual(registry[key]["kind"], kind)
             self.assertEqual(registry[key]["payload"], payload)
-            if key != "INTERPRETATION":
+            if key not in {"INTERPRETATION", "MODEL_LAYER"}:
                 self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
             self.assertIn("market_regime_relative_strength_combinations", registry[key]["applies_to"])
 
@@ -707,6 +729,7 @@ class RegistryHelperTests(unittest.TestCase):
             "SECTOR_TYPE",
             "SNAPSHOT_TYPE",
             "UNIVERSE_TYPE",
+            "MODEL_LAYER",
         }
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -714,7 +737,10 @@ class RegistryHelperTests(unittest.TestCase):
         for key in expected_classification_keys:
             self.assertEqual(rows[key]["kind"], "classification_field")
             self.assertEqual(rows[key]["payload_format"], "field_name")
-            self.assertIn("stable lowercase token", rows[key]["note"])
+            if key == "MODEL_LAYER":
+                self.assertIn("explicitly assigns", rows[key]["note"])
+            else:
+                self.assertIn("stable lowercase token", rows[key]["note"])
         self.assertNotIn("GDELT_IMPACT_SCOPE_HINT", rows)
         self.assertNotIn("OPTION_EVENT_DETAIL_SIDE_HINT", rows)
         self.assertNotIn("TRADING_ECONOMICS_CATEGORY", rows)
@@ -729,7 +755,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertFalse(classification_payloads & vague_payloads)
         for row in rows.values():
             if row["kind"] == "classification_field" and row["payload"] not in {"data_kind", "kind"}:
-                self.assertRegex(row["payload"], r"_(type|status|scope|policy_type|tags|class)$")
+                self.assertRegex(row["payload"], r"_(type|status|scope|policy_type|tags|class|layer)$")
         self.assertNotIn("OPTION_RIGHT", rows)
         self.assertNotIn("STATUS", rows)
         self.assertNotIn("DATA_KIND_TEMPLATE_STATUS", rows)

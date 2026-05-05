@@ -55,7 +55,7 @@ Generic identity, lineage, timestamp, receipt, run, and registry metadata fields
 
 Do not register generated feature columns merely because a model emits them. Register only durable fields that appear in a reviewed schema, task receipt, storage contract, or cross-repository handoff.
 
-When a reviewed model contract makes a compact numeric-prefixed field the canonical downstream name, any active `field` row for that shared field should use the same compact payload. Do not leave downstream code split between an unprefixed registry field such as `price_behavior_factor` and a canonical physical/model field such as `1_price_behavior_factor`. If an unprefixed phrase is still useful as human concept language, keep it in notes or register it as a separate explanatory `term`, not as the canonical model-output `field`.
+When a reviewed model contract makes a compact numeric-prefixed field the canonical downstream name, any active `field` row for that shared field should use the same compact payload. Do not leave downstream code split between an unprefixed registry field such as `market_direction_score` and a canonical physical/model field such as `1_market_direction_score`. If an unprefixed phrase is still useful as human concept language, keep it in notes or register it as a separate explanatory `term`, not as the canonical model-output `field`.
 
 ## V2.2 Direction-Neutral Flow
 
