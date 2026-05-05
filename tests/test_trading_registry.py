@@ -155,6 +155,8 @@ class RegistryHelperTests(unittest.TestCase):
             rows["TARGET_STATE_VECTOR_WINDOW_SYNC_POLICY"]["payload"],
             "market_sector_target_blocks_must_share_identical_observation_windows",
         )
+        self.assertIn("3_target_direction_score_<window>", rows["TARGET_STATE_VECTOR_DIRECTION_NEUTRAL_SCORE_FAMILIES"]["payload"])
+        self.assertIn("3_tradability_score_<window>", rows["TARGET_STATE_VECTOR_DIRECTION_NEUTRAL_SCORE_FAMILIES"]["payload"])
         self.assertNotIn("TARGET_STATE_VECTOR_TRAILING_STATE_WINDOWS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
@@ -654,6 +656,14 @@ class RegistryHelperTests(unittest.TestCase):
             "STATE_WINDOW_SYNC_POLICY": "state_window_sync_policy",
             "FEATURE_QUALITY_DIAGNOSTICS": "feature_quality_diagnostics",
             "RUN_ID": "run_id",
+            "SECTOR_RELATIVE_DIRECTION_STATE": "sector_relative_direction_state",
+            "SECTOR_TREND_QUALITY_STABILITY_STATE": "sector_trend_quality_stability_state",
+            "TARGET_DIRECTION_RETURN_SHAPE": "target_direction_return_shape",
+            "TARGET_TREND_QUALITY_STATE": "target_trend_quality_state",
+            "TARGET_LIQUIDITY_TRADABILITY_STATE": "target_liquidity_tradability_state",
+            "TARGET_VS_MARKET_RESIDUAL_DIRECTION": "target_vs_market_residual_direction",
+            "TARGET_VS_SECTOR_RESIDUAL_DIRECTION": "target_vs_sector_residual_direction",
+            "RELATIVE_LIQUIDITY_TRADABILITY_STATE": "relative_liquidity_tradability_state",
         }
         for key, payload in target_state_fields.items():
             self.assertEqual(by_key[key]["payload"], payload)
@@ -663,6 +673,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("cross_state_features", by_key["STATE_WINDOW_SYNC_POLICY"]["applies_to"])
         self.assertIn("feature_03_target_state_vector", by_key["FEATURE_QUALITY_DIAGNOSTICS"]["applies_to"])
         self.assertIn("feature_03_target_state_vector", by_key["RUN_ID"]["applies_to"])
+        self.assertIn("sector_state_features", by_key["SECTOR_RELATIVE_DIRECTION_STATE"]["applies_to"])
+        self.assertIn("target_state_features", by_key["TARGET_DIRECTION_RETURN_SHAPE"]["applies_to"])
+        self.assertIn("cross_state_features", by_key["TARGET_VS_MARKET_RESIDUAL_DIRECTION"]["applies_to"])
         for deleted_key in {
             "OPEN_PRICE",
             "HIGH_PRICE",

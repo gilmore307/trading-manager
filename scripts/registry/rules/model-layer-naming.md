@@ -88,6 +88,8 @@ Strategy-family/variant vocabulary such as `3_strategy_family`, `3_strategy_vari
 
 Shared TargetStateVector V1 row keys and top-level feature-block names are registry-owned once both `trading-data` and `trading-model` depend on them. Current shared block names are `market_state_features`, `sector_state_features`, `target_state_features`, and `cross_state_features`; the current sparse synchronized state windows are `5min`, `15min`, `60min`, and `390min`; and the accepted sync-policy value is `market_sector_target_blocks_must_share_identical_observation_windows`.
 
+Direction-neutral TargetStateVector names must keep signed direction evidence separate from quality/tradability. Use `*_direction_*` names for signed long/short state evidence, `*_trend_quality_*` / `*_path_stability_*` for structural quality, `*_liquidity_tradability_*` for practical tradability, and `*_residual_direction` for beta/context-adjusted relative direction. Do not revive generic `strength`, `readiness`, or `cost` names when the contract distinguishes direction, quality, transition risk, and tradability.
+
 Layer 3 target-state fields may use compact `3_*` payloads only after the target-state contract requires concrete shared fields. Do not register generated feature columns, model-local feature-group internals, label families, embedding names, or cluster labels merely because they appear in TargetStateVectorModel design notes.
 
 ## Registration Trigger
