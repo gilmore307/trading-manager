@@ -104,9 +104,9 @@ class RegistryHelperTests(unittest.TestCase):
             "SOURCE_01_MARKET_REGIME": "source_01_market_regime",
             "SOURCE_02_TARGET_CANDIDATE_HOLDINGS": "source_02_target_candidate_holdings",
             "SOURCE_03_TARGET_STATE": "source_03_target_state",
+            "SOURCE_04_EVENT_OVERLAY": "source_04_event_overlay",
             "SOURCE_05_OPTION_EXPRESSION": "source_05_option_expression",
             "SOURCE_06_POSITION_EXECUTION": "source_06_position_execution",
-            "SOURCE_07_EVENT_OVERLAY": "source_07_event_overlay",
         }
         expected_feeds = {
             "ALPACA_BARS": "01_feed_alpaca_bars",
@@ -149,7 +149,7 @@ class RegistryHelperTests(unittest.TestCase):
         }:
             self.assertNotIn(obsolete_config, rows)
         self.assertEqual(rows["TARGET_STATE_VECTOR_SYNCHRONIZED_STATE_WINDOWS"]["payload"], "5min;15min;60min;390min")
-        self.assertEqual(rows["TARGET_STATE_VECTOR_VERSION_DEFAULT"]["payload"], "target_state_vector_v1")
+        self.assertEqual(rows["TARGET_CONTEXT_STATE_VERSION_DEFAULT"]["payload"], "target_context_state_v1")
         self.assertEqual(
             rows["TARGET_STATE_VECTOR_WINDOW_SYNC_POLICY"]["payload"],
             "market_sector_target_blocks_must_share_identical_observation_windows",
@@ -172,10 +172,13 @@ class RegistryHelperTests(unittest.TestCase):
         }:
             self.assertIn(expected_target_state_vector_payload, {row["payload"] for row in rows.values()})
         self.assertEqual(rows["MODEL_VECTOR_TAXONOMY"]["payload"], "trading-model/docs/92_vector_taxonomy.md")
+        self.assertEqual(rows["EVENT_OVERLAY_MODEL"]["payload"], "event_overlay_model")
+        self.assertEqual(rows["MODEL_04_EVENT_OVERLAY"]["payload"], "model_04_event_overlay")
+        self.assertEqual(rows["EVENT_CONTEXT_VECTOR"]["payload"], "event_context_vector")
         self.assertEqual(rows["ALPHA_CONFIDENCE_MODEL"]["payload"], "alpha_confidence_model")
-        self.assertEqual(rows["MODEL_04_ALPHA_CONFIDENCE"]["payload"], "model_04_alpha_confidence")
+        self.assertEqual(rows["MODEL_05_ALPHA_CONFIDENCE"]["payload"], "model_05_alpha_confidence")
         self.assertEqual(rows["TRADING_PROJECTION_MODEL"]["payload"], "trading_projection_model")
-        self.assertEqual(rows["MODEL_05_TRADING_PROJECTION"]["payload"], "model_05_trading_projection")
+        self.assertEqual(rows["MODEL_06_TRADING_PROJECTION"]["payload"], "model_06_trading_projection")
         self.assertEqual(rows["MARKET_DIRECTION_SCORE"]["payload"], "1_market_direction_score")
         self.assertEqual(rows["MARKET_TREND_QUALITY_SCORE"]["payload"], "1_market_trend_quality_score")
         self.assertEqual(rows["MARKET_LIQUIDITY_SUPPORT_SCORE"]["payload"], "1_market_liquidity_support_score")
@@ -233,11 +236,11 @@ class RegistryHelperTests(unittest.TestCase):
             "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "source_03_target_state"),
             "QUOTE_SPREAD_BPS": ("field", "spread_bps", "source_03_target_state"),
             "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "source_05_option_expression"),
-            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "source_07_event_overlay"),
-            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "source_07_event_overlay"),
-            "SCOPE_TYPE": ("classification_field", "scope_type", "source_07_event_overlay"),
-            "REFERENCE_TYPE": ("classification_field", "reference_type", "source_07_event_overlay"),
-            "EVENT_REFERENCE": ("path_field", "reference", "source_07_event_overlay"),
+            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "source_04_event_overlay"),
+            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "source_04_event_overlay"),
+            "SCOPE_TYPE": ("classification_field", "scope_type", "source_04_event_overlay"),
+            "REFERENCE_TYPE": ("classification_field", "reference_type", "source_04_event_overlay"),
+            "EVENT_REFERENCE": ("path_field", "reference", "source_04_event_overlay"),
             "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "source_05_option_expression"),
             "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "source_05_option_expression"),
             "QUOTE_BID_CONDITION": ("field", "bid_condition", "source_05_option_expression"),
@@ -253,7 +256,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
             self.assertIn("source_02_target_candidate_holdings", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
-            self.assertIn("source_07_event_overlay", rows[key]["applies_to"])
+            self.assertIn("source_04_event_overlay", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
         self.assertNotIn("OPTION_CONTRACTS", rows)
         self.assertNotIn("QUOTE_TIMESTAMP", rows)
@@ -685,10 +688,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(by_key["TARGET_CANDIDATE_ID"]["kind"], "identity_field")
         self.assertIn("model_03_target_state_vector", by_key["TARGET_CANDIDATE_ID"]["applies_to"])
         target_state_fields = {
-            "TARGET_STATE_VECTOR_VERSION": "target_state_vector_version",
+            "TARGET_CONTEXT_STATE_VERSION": "target_context_state_version",
             "MARKET_CONTEXT_STATE_REF": "market_context_state_ref",
             "SECTOR_CONTEXT_STATE_REF": "sector_context_state_ref",
-            "TARGET_STATE_VECTOR_REF": "target_state_vector_ref",
+            "TARGET_CONTEXT_STATE_REF": "target_context_state_ref",
             "SOURCE_RUN_REF": "source_run_ref",
             "RUN_ID": "run_id",
         }

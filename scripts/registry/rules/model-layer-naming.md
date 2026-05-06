@@ -31,8 +31,10 @@ Accepted examples:
 - `source_03_target_state`
 - `feature_03_target_state_vector`
 - `model_03_target_state_vector`
-- `model_04_alpha_confidence`
-- `model_05_trading_projection`
+- `source_04_event_overlay`
+- `model_04_event_overlay`
+- `model_05_alpha_confidence`
+- `model_06_trading_projection`
 
 Rules:
 
@@ -64,10 +66,10 @@ For accepted model state outputs, only reviewed core scalar score tokens belong 
 Current accepted model-layer intent is direction-neutral tradability first:
 
 ```text
-market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_state_vector -> alpha_confidence_model -> trading_projection_model
+market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> event_context_vector -> alpha_confidence_model -> trading_projection_model
 ```
 
-Layer 3 direction evidence is not Layer 4 alpha/direction confidence. Layer 4 `alpha_confidence_model` owns long/short confidence, expected value, risk, and uncertainty. Layer 5 `trading_projection_model` owns offline target actions and target exposure. Event evidence is an overlay/input, not a peer model layer unless a later reviewed contract changes that boundary.
+Layer 3 direction evidence is not Layer 5 alpha/direction confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns long/short confidence, expected value, risk, and uncertainty. Layer 6 `trading_projection_model` owns offline trading intent and target exposure. Event evidence is a context model layer, not a final action or execution surface.
 
 ## Layer 1 Boundary
 
@@ -96,7 +98,7 @@ Layer 3 is target state-vector construction. Current accepted shared names are:
 - `feature_03_target_state_vector` — deterministic market/sector/target/cross-state feature surface produced by `trading-data`;
 - `target_state_vector_model` — canonical Layer 3 model id;
 - `model_03_target_state_vector` — model-owned output/table surface;
-- `target_state_vector` — model-facing anonymous target state vector.
+- `target_context_state` — conceptual model-facing anonymous target context/state output; historical physical implementation names such as `model_03_target_state_vector` remain unchanged until a separate migration is accepted.
 
 `trading-manager` owns target-state request naming and orchestration. `trading-data` owns deterministic point-in-time feature production. `trading-model` owns labels, training, evaluation, promotion evidence, and model-output semantics.
 
