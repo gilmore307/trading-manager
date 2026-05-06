@@ -8,6 +8,8 @@ A `state_vector_value` row may represent:
 - fixed enum/window values accepted by the state-vector contract;
 - contract-local value tokens that are consumed as state evidence rather than generic table columns.
 
+Every payload must include the owning model layer as a numeric prefix, for example `3_market_state_features` for a Layer 3 TargetStateVector value. Do not register bare state-vector values such as `market_state_features`, `sector_confirmed`, or `5min` when the value belongs to a numbered model contract.
+
 Reject from this kind:
 
 - table columns, request parameters, ids, references, timestamps, paths, free-text fields, and ordinary schema slots; use the narrowest field-like kind instead;
