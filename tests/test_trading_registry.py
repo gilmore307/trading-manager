@@ -157,36 +157,36 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("3_target_direction_score_<window>", rows["TARGET_STATE_VECTOR_DIRECTION_NEUTRAL_SCORE_FAMILIES"]["payload"])
         self.assertIn("3_tradability_score_<window>", rows["TARGET_STATE_VECTOR_DIRECTION_NEUTRAL_SCORE_FAMILIES"]["payload"])
         for expected_target_state_vector_payload in {
-            "3_market_regime_state",
-            "3_market_trend_state",
-            "3_market_volatility_state",
-            "3_market_breadth_state",
-            "3_market_liquidity_stress_state",
-            "3_market_correlation_state",
+            "market_regime_state",
+            "market_trend_state",
+            "market_volatility_state",
+            "market_breadth_state",
+            "market_liquidity_stress_state",
+            "market_correlation_state",
             "sector_context_state",
-            "3_sector_relative_direction_state",
-            "3_sector_trend_quality_stability_state",
-            "3_sector_volatility_state",
-            "3_sector_breadth_dispersion_state",
-            "3_sector_liquidity_tradability_state",
-            "3_target_direction_return_shape",
-            "3_target_trend_quality_state",
-            "3_target_volatility_range_state",
-            "3_target_gap_jump_state",
-            "3_target_volume_activity_state",
-            "3_target_liquidity_tradability_state",
-            "3_target_vwap_location_state",
-            "3_target_session_position_state",
-            "3_target_data_quality_state",
-            "3_target_vs_market_residual_direction",
-            "3_target_vs_sector_residual_direction",
-            "3_target_vs_market_volatility",
-            "3_target_vs_sector_volatility",
-            "3_target_market_beta_correlation",
-            "3_target_sector_beta_correlation",
-            "3_sector_confirmation_state",
-            "3_idiosyncratic_residual_state",
-            "3_relative_liquidity_tradability_state",
+            "sector_relative_direction_state",
+            "sector_trend_quality_stability_state",
+            "sector_volatility_state",
+            "sector_breadth_dispersion_state",
+            "sector_liquidity_tradability_state",
+            "target_direction_return_shape",
+            "target_trend_quality_state",
+            "target_volatility_range_state",
+            "target_gap_jump_state",
+            "target_volume_activity_state",
+            "target_liquidity_tradability_state",
+            "target_vwap_location_state",
+            "target_session_position_state",
+            "target_data_quality_state",
+            "target_vs_market_residual_direction",
+            "target_vs_sector_residual_direction",
+            "target_vs_market_volatility",
+            "target_vs_sector_volatility",
+            "target_market_beta_correlation",
+            "target_sector_beta_correlation",
+            "sector_confirmation_state",
+            "idiosyncratic_residual_state",
+            "relative_liquidity_tradability_state",
             "3_target_direction_score_<window>",
             "3_target_trend_quality_score_<window>",
             "3_target_path_stability_score_<window>",
@@ -198,19 +198,19 @@ class RegistryHelperTests(unittest.TestCase):
             "3_tradability_score_<window>",
             "3_state_quality_score",
             "3_evidence_count",
-            "3_target_state_vector",
-            "3_score_payload",
-            "3_target_state_embedding",
-            "3_state_cluster_id",
-            "3_state_quality_diagnostics",
-            "3_state_window_5min",
-            "3_state_window_15min",
-            "3_state_window_60min",
-            "3_state_window_390min",
-            "3_sector_confirmation_state_sector_confirmed",
-            "3_sector_confirmation_state_sector_divergent",
-            "3_sector_confirmation_state_flat_or_mixed",
-            "3_target_session_window_policy_completed_1min_bars",
+            "target_state_vector",
+            "score_payload",
+            "target_state_embedding",
+            "state_cluster_id",
+            "state_quality_diagnostics",
+            "5min",
+            "15min",
+            "60min",
+            "390min",
+            "sector_confirmed",
+            "sector_divergent",
+            "flat_or_mixed",
+            "completed_1min_bars",
         }:
             self.assertIn(expected_target_state_vector_payload, {row["payload"] for row in rows.values()})
         self.assertEqual(rows["MODEL_VECTOR_TAXONOMY"]["payload"], "trading-model/docs/92_vector_taxonomy.md")
@@ -218,11 +218,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_04_ALPHA_CONFIDENCE"]["payload"], "model_04_alpha_confidence")
         self.assertEqual(rows["TRADING_PROJECTION_MODEL"]["payload"], "trading_projection_model")
         self.assertEqual(rows["MODEL_05_TRADING_PROJECTION"]["payload"], "model_05_trading_projection")
-        self.assertEqual(rows["MODEL_01_MARKET_DIRECTION_SCORE_VALUE"]["payload"], "1_market_direction_score")
-        self.assertEqual(rows["MODEL_01_MARKET_TREND_QUALITY_SCORE_VALUE"]["payload"], "1_market_trend_quality_score")
-        self.assertEqual(rows["MODEL_01_MARKET_LIQUIDITY_SUPPORT_SCORE_VALUE"]["payload"], "1_market_liquidity_support_score")
-        self.assertEqual(rows["MODEL_01_MARKET_COVERAGE_SCORE_VALUE"]["payload"], "1_coverage_score")
-        self.assertEqual(rows["MODEL_01_MARKET_DATA_QUALITY_SCORE_VALUE"]["payload"], "1_data_quality_score")
+        self.assertEqual(rows["MARKET_DIRECTION_SCORE"]["payload"], "1_market_direction_score")
+        self.assertEqual(rows["MARKET_TREND_QUALITY_SCORE"]["payload"], "1_market_trend_quality_score")
+        self.assertEqual(rows["MARKET_LIQUIDITY_SUPPORT_SCORE"]["payload"], "1_market_liquidity_support_score")
+        self.assertEqual(rows["MARKET_COVERAGE_SCORE"]["payload"], "1_coverage_score")
+        self.assertEqual(rows["MARKET_DATA_QUALITY_SCORE"]["payload"], "1_data_quality_score")
         for retired_layer_one_field in {
             "PRICE_BEHAVIOR_FACTOR",
             "TREND_CERTAINTY_FACTOR",
@@ -739,43 +739,40 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("feature_03_target_state_vector", by_key["RUN_ID"]["applies_to"])
 
         state_vector_values = {row["key"]: row for row in state_vector_value_rows}
-        for row in state_vector_value_rows:
-            self.assertRegex(row["key"], r"^MODEL_[0-9]{2}_")
-            self.assertRegex(row["payload"], r"^[0-9]+_")
         target_state_vector_values = {
-            "MODEL_03_MARKET_STATE_FEATURES_VALUE": "3_market_state_features",
-            "MODEL_03_SECTOR_STATE_FEATURES_VALUE": "3_sector_state_features",
-            "MODEL_03_TARGET_STATE_FEATURES_VALUE": "3_target_state_features",
-            "MODEL_03_CROSS_STATE_FEATURES_VALUE": "3_cross_state_features",
-            "MODEL_03_STATE_OBSERVATION_WINDOWS_VALUE": "3_state_observation_windows",
-            "MODEL_03_STATE_WINDOW_SYNC_POLICY_VALUE": "3_state_window_sync_policy",
-            "MODEL_03_FEATURE_QUALITY_DIAGNOSTICS_VALUE": "3_feature_quality_diagnostics",
-            "MODEL_03_SECTOR_RELATIVE_DIRECTION_STATE_VALUE": "3_sector_relative_direction_state",
-            "MODEL_03_SECTOR_TREND_QUALITY_STABILITY_STATE_VALUE": "3_sector_trend_quality_stability_state",
-            "MODEL_03_TARGET_DIRECTION_RETURN_SHAPE_VALUE": "3_target_direction_return_shape",
-            "MODEL_03_TARGET_TREND_QUALITY_STATE_VALUE": "3_target_trend_quality_state",
-            "MODEL_03_TARGET_LIQUIDITY_TRADABILITY_STATE_VALUE": "3_target_liquidity_tradability_state",
-            "MODEL_03_TARGET_VS_MARKET_RESIDUAL_DIRECTION_VALUE": "3_target_vs_market_residual_direction",
-            "MODEL_03_TARGET_VS_SECTOR_RESIDUAL_DIRECTION_VALUE": "3_target_vs_sector_residual_direction",
-            "MODEL_03_RELATIVE_LIQUIDITY_TRADABILITY_STATE_VALUE": "3_relative_liquidity_tradability_state",
+            "MARKET_STATE_FEATURES": "market_state_features",
+            "SECTOR_STATE_FEATURES": "sector_state_features",
+            "TARGET_STATE_FEATURES": "target_state_features",
+            "CROSS_STATE_FEATURES": "cross_state_features",
+            "STATE_OBSERVATION_WINDOWS": "state_observation_windows",
+            "STATE_WINDOW_SYNC_POLICY": "state_window_sync_policy",
+            "FEATURE_QUALITY_DIAGNOSTICS": "feature_quality_diagnostics",
+            "SECTOR_RELATIVE_DIRECTION_STATE": "sector_relative_direction_state",
+            "SECTOR_TREND_QUALITY_STABILITY_STATE": "sector_trend_quality_stability_state",
+            "TARGET_DIRECTION_RETURN_SHAPE": "target_direction_return_shape",
+            "TARGET_TREND_QUALITY_STATE": "target_trend_quality_state",
+            "TARGET_LIQUIDITY_TRADABILITY_STATE": "target_liquidity_tradability_state",
+            "TARGET_VS_MARKET_RESIDUAL_DIRECTION": "target_vs_market_residual_direction",
+            "TARGET_VS_SECTOR_RESIDUAL_DIRECTION": "target_vs_sector_residual_direction",
+            "RELATIVE_LIQUIDITY_TRADABILITY_STATE": "relative_liquidity_tradability_state",
         }
         for key, payload in target_state_vector_values.items():
             self.assertEqual(state_vector_values[key]["payload"], payload)
 
         layer_one_state_vector_values = {
-            "MODEL_01_MARKET_DIRECTION_SCORE_VALUE": "1_market_direction_score",
-            "MODEL_01_MARKET_DIRECTION_STRENGTH_SCORE_VALUE": "1_market_direction_strength_score",
-            "MODEL_01_MARKET_TREND_QUALITY_SCORE_VALUE": "1_market_trend_quality_score",
-            "MODEL_01_MARKET_STABILITY_SCORE_VALUE": "1_market_stability_score",
-            "MODEL_01_MARKET_RISK_STRESS_SCORE_VALUE": "1_market_risk_stress_score",
-            "MODEL_01_MARKET_TRANSITION_RISK_SCORE_VALUE": "1_market_transition_risk_score",
-            "MODEL_01_BREADTH_PARTICIPATION_SCORE_VALUE": "1_breadth_participation_score",
-            "MODEL_01_CORRELATION_CROWDING_SCORE_VALUE": "1_correlation_crowding_score",
-            "MODEL_01_DISPERSION_OPPORTUNITY_SCORE_VALUE": "1_dispersion_opportunity_score",
-            "MODEL_01_MARKET_LIQUIDITY_PRESSURE_SCORE_VALUE": "1_market_liquidity_pressure_score",
-            "MODEL_01_MARKET_LIQUIDITY_SUPPORT_SCORE_VALUE": "1_market_liquidity_support_score",
-            "MODEL_01_MARKET_COVERAGE_SCORE_VALUE": "1_coverage_score",
-            "MODEL_01_MARKET_DATA_QUALITY_SCORE_VALUE": "1_data_quality_score",
+            "MARKET_DIRECTION_SCORE": "1_market_direction_score",
+            "MARKET_DIRECTION_STRENGTH_SCORE": "1_market_direction_strength_score",
+            "MARKET_TREND_QUALITY_SCORE": "1_market_trend_quality_score",
+            "MARKET_STABILITY_SCORE": "1_market_stability_score",
+            "MARKET_RISK_STRESS_SCORE": "1_market_risk_stress_score",
+            "MARKET_TRANSITION_RISK_SCORE": "1_market_transition_risk_score",
+            "BREADTH_PARTICIPATION_SCORE": "1_breadth_participation_score",
+            "CORRELATION_CROWDING_SCORE": "1_correlation_crowding_score",
+            "DISPERSION_OPPORTUNITY_SCORE": "1_dispersion_opportunity_score",
+            "MARKET_LIQUIDITY_PRESSURE_SCORE": "1_market_liquidity_pressure_score",
+            "MARKET_LIQUIDITY_SUPPORT_SCORE": "1_market_liquidity_support_score",
+            "MARKET_COVERAGE_SCORE": "1_coverage_score",
+            "MARKET_DATA_QUALITY_SCORE": "1_data_quality_score",
         }
         for key, payload in layer_one_state_vector_values.items():
             self.assertEqual(state_vector_values[key]["payload"], payload)
@@ -784,25 +781,25 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("market_context_state", state_vector_values[key]["applies_to"])
 
         layer_two_state_vector_values = {
-            "MODEL_02_SECTOR_RELATIVE_DIRECTION_SCORE_VALUE": "2_sector_relative_direction_score",
-            "MODEL_02_SECTOR_TREND_QUALITY_SCORE_VALUE": "2_sector_trend_quality_score",
-            "MODEL_02_SECTOR_TREND_STABILITY_SCORE_VALUE": "2_sector_trend_stability_score",
-            "MODEL_02_SECTOR_TRANSITION_RISK_SCORE_VALUE": "2_sector_transition_risk_score",
-            "MODEL_02_MARKET_CONTEXT_SUPPORT_SCORE_VALUE": "2_market_context_support_score",
-            "MODEL_02_SECTOR_BREADTH_CONFIRMATION_SCORE_VALUE": "2_sector_breadth_confirmation_score",
-            "MODEL_02_SECTOR_DISPERSION_CROWDING_SCORE_VALUE": "2_sector_dispersion_crowding_score",
-            "MODEL_02_SECTOR_LIQUIDITY_TRADABILITY_SCORE_VALUE": "2_sector_liquidity_tradability_score",
-            "MODEL_02_SECTOR_TRADABILITY_SCORE_VALUE": "2_sector_tradability_score",
-            "MODEL_02_SECTOR_HANDOFF_STATE_VALUE": "2_sector_handoff_state",
-            "MODEL_02_SECTOR_HANDOFF_BIAS_VALUE": "2_sector_handoff_bias",
-            "MODEL_02_SECTOR_HANDOFF_RANK_VALUE": "2_sector_handoff_rank",
-            "MODEL_02_SECTOR_HANDOFF_REASON_CODES_VALUE": "2_sector_handoff_reason_codes",
-            "MODEL_02_SECTOR_ELIGIBILITY_STATE_VALUE": "2_eligibility_state",
-            "MODEL_02_SECTOR_ELIGIBILITY_REASON_CODES_VALUE": "2_eligibility_reason_codes",
-            "MODEL_02_SECTOR_STATE_QUALITY_SCORE_VALUE": "2_state_quality_score",
-            "MODEL_02_SECTOR_COVERAGE_SCORE_VALUE": "2_coverage_score",
-            "MODEL_02_SECTOR_DATA_QUALITY_SCORE_VALUE": "2_data_quality_score",
-            "MODEL_02_SECTOR_EVIDENCE_COUNT_VALUE": "2_evidence_count",
+            "SECTOR_RELATIVE_DIRECTION_SCORE": "2_sector_relative_direction_score",
+            "SECTOR_TREND_QUALITY_SCORE": "2_sector_trend_quality_score",
+            "SECTOR_TREND_STABILITY_SCORE": "2_sector_trend_stability_score",
+            "SECTOR_TRANSITION_RISK_SCORE": "2_sector_transition_risk_score",
+            "MARKET_CONTEXT_SUPPORT_SCORE": "2_market_context_support_score",
+            "SECTOR_BREADTH_CONFIRMATION_SCORE": "2_sector_breadth_confirmation_score",
+            "SECTOR_DISPERSION_CROWDING_SCORE": "2_sector_dispersion_crowding_score",
+            "SECTOR_LIQUIDITY_TRADABILITY_SCORE": "2_sector_liquidity_tradability_score",
+            "SECTOR_TRADABILITY_SCORE": "2_sector_tradability_score",
+            "SECTOR_HANDOFF_STATE": "2_sector_handoff_state",
+            "SECTOR_HANDOFF_BIAS": "2_sector_handoff_bias",
+            "SECTOR_HANDOFF_RANK": "2_sector_handoff_rank",
+            "SECTOR_HANDOFF_REASON_CODES": "2_sector_handoff_reason_codes",
+            "SECTOR_ELIGIBILITY_STATE": "2_eligibility_state",
+            "SECTOR_ELIGIBILITY_REASON_CODES": "2_eligibility_reason_codes",
+            "SECTOR_STATE_QUALITY_SCORE": "2_state_quality_score",
+            "SECTOR_COVERAGE_SCORE": "2_coverage_score",
+            "SECTOR_DATA_QUALITY_SCORE": "2_data_quality_score",
+            "SECTOR_EVIDENCE_COUNT": "2_evidence_count",
         }
         for key, payload in layer_two_state_vector_values.items():
             self.assertEqual(state_vector_values[key]["payload"], payload)
@@ -811,30 +808,30 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("sector_context_state", state_vector_values[key]["applies_to"])
 
         for key, payload in {
-            "MODEL_02_SECTOR_HANDOFF_STATE_SELECTED_VALUE": "2_sector_handoff_state_selected",
-            "MODEL_02_SECTOR_HANDOFF_STATE_WATCH_VALUE": "2_sector_handoff_state_watch",
-            "MODEL_02_SECTOR_HANDOFF_STATE_BLOCKED_VALUE": "2_sector_handoff_state_blocked",
-            "MODEL_02_SECTOR_HANDOFF_STATE_INSUFFICIENT_DATA_VALUE": "2_sector_handoff_state_insufficient_data",
-            "MODEL_02_SECTOR_HANDOFF_BIAS_LONG_BIAS_VALUE": "2_sector_handoff_bias_long_bias",
-            "MODEL_02_SECTOR_HANDOFF_BIAS_SHORT_BIAS_VALUE": "2_sector_handoff_bias_short_bias",
-            "MODEL_02_SECTOR_HANDOFF_BIAS_NEUTRAL_VALUE": "2_sector_handoff_bias_neutral",
-            "MODEL_02_SECTOR_HANDOFF_BIAS_MIXED_VALUE": "2_sector_handoff_bias_mixed",
-            "MODEL_02_SECTOR_ELIGIBILITY_STATE_ELIGIBLE_VALUE": "2_sector_eligibility_state_eligible",
-            "MODEL_02_SECTOR_ELIGIBILITY_STATE_WATCH_VALUE": "2_sector_eligibility_state_watch",
-            "MODEL_02_SECTOR_ELIGIBILITY_STATE_EXCLUDED_VALUE": "2_sector_eligibility_state_excluded",
-            "MODEL_02_SECTOR_ELIGIBILITY_STATE_INSUFFICIENT_DATA_VALUE": "2_sector_eligibility_state_insufficient_data",
+            "SECTOR_HANDOFF_STATE_SELECTED": "selected",
+            "SECTOR_HANDOFF_STATE_WATCH": "watch",
+            "SECTOR_HANDOFF_STATE_BLOCKED": "blocked",
+            "SECTOR_HANDOFF_STATE_INSUFFICIENT_DATA": "insufficient_data",
+            "SECTOR_HANDOFF_BIAS_LONG_BIAS": "long_bias",
+            "SECTOR_HANDOFF_BIAS_SHORT_BIAS": "short_bias",
+            "SECTOR_HANDOFF_BIAS_NEUTRAL": "neutral",
+            "SECTOR_HANDOFF_BIAS_MIXED": "mixed",
+            "SECTOR_ELIGIBILITY_STATE_ELIGIBLE": "eligible",
+            "SECTOR_ELIGIBILITY_STATE_WATCH": "watch",
+            "SECTOR_ELIGIBILITY_STATE_EXCLUDED": "excluded",
+            "SECTOR_ELIGIBILITY_STATE_INSUFFICIENT_DATA": "insufficient_data",
         }.items():
             self.assertEqual(state_vector_values[key]["payload"], payload)
             self.assertIn("model_02_sector_context", state_vector_values[key]["applies_to"])
 
-        self.assertIn("feature_03_target_state_vector", state_vector_values["MODEL_03_MARKET_STATE_FEATURES_VALUE"]["applies_to"])
-        self.assertIn("model_03_target_state_vector", state_vector_values["MODEL_03_CROSS_STATE_FEATURES_VALUE"]["applies_to"])
-        self.assertIn("3_market_state_features", state_vector_values["MODEL_03_STATE_OBSERVATION_WINDOWS_VALUE"]["applies_to"])
-        self.assertIn("3_cross_state_features", state_vector_values["MODEL_03_STATE_WINDOW_SYNC_POLICY_VALUE"]["applies_to"])
-        self.assertIn("feature_03_target_state_vector", state_vector_values["MODEL_03_FEATURE_QUALITY_DIAGNOSTICS_VALUE"]["applies_to"])
-        self.assertIn("3_sector_state_features", state_vector_values["MODEL_03_SECTOR_RELATIVE_DIRECTION_STATE_VALUE"]["applies_to"])
-        self.assertIn("3_target_state_features", state_vector_values["MODEL_03_TARGET_DIRECTION_RETURN_SHAPE_VALUE"]["applies_to"])
-        self.assertIn("3_cross_state_features", state_vector_values["MODEL_03_TARGET_VS_MARKET_RESIDUAL_DIRECTION_VALUE"]["applies_to"])
+        self.assertIn("feature_03_target_state_vector", state_vector_values["MARKET_STATE_FEATURES"]["applies_to"])
+        self.assertIn("model_03_target_state_vector", state_vector_values["CROSS_STATE_FEATURES"]["applies_to"])
+        self.assertIn("market_state_features", state_vector_values["STATE_OBSERVATION_WINDOWS"]["applies_to"])
+        self.assertIn("cross_state_features", state_vector_values["STATE_WINDOW_SYNC_POLICY"]["applies_to"])
+        self.assertIn("feature_03_target_state_vector", state_vector_values["FEATURE_QUALITY_DIAGNOSTICS"]["applies_to"])
+        self.assertIn("sector_state_features", state_vector_values["SECTOR_RELATIVE_DIRECTION_STATE"]["applies_to"])
+        self.assertIn("target_state_features", state_vector_values["TARGET_DIRECTION_RETURN_SHAPE"]["applies_to"])
+        self.assertIn("cross_state_features", state_vector_values["TARGET_VS_MARKET_RESIDUAL_DIRECTION"]["applies_to"])
         for deleted_key in {
             "OPEN_PRICE",
             "HIGH_PRICE",
