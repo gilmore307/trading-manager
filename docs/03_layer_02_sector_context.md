@@ -39,6 +39,14 @@ Allowed handoff states are:
 selected | watch | blocked | insufficient_data
 ```
 
+Allowed handoff bias values are:
+
+```text
+long_bias | short_bias | neutral | mixed
+```
+
+The registry owns the active V2.2 shared Layer 2 fields for signed direction, direction-neutral trend/tradability, transition risk, handoff state/bias, coverage, data quality, and evidence count. Do not reintroduce old readiness aliases such as `2_selection_readiness_score` as cross-repository contract fields.
+
 ## Registry duty
 
 New shared fields, statuses, reason-code vocabularies, artifact names, or helper surfaces discovered while working on Layer 2 require reviewed registry migrations before other repositories hard-depend on them. Documentation-only clarification does not by itself require a registry migration.
@@ -66,7 +74,7 @@ Layer 2 manager changes are acceptable when they:
 - keep `trading-manager` at the control-plane, registry, contract, template, and lifecycle boundary;
 - avoid introducing component runtime trading code, market data, generated artifacts, notebooks, credentials, or secrets;
 - keep Layer 2 scoped to sector/industry context and handoff state, not final stocks, strategies, option contracts, position sizing, or portfolio actions;
-- update registry migrations and regenerate `scripts/registry/current.csv` when shared names, statuses, fields, or artifact paths change;
+- update registry migrations and regenerate `scripts/registry/current.csv` when shared names, statuses, fields, handoff/bias values, threshold config names, or artifact paths change;
 - keep component-specific implementation detail in the owning component repository.
 
 Current verification:
