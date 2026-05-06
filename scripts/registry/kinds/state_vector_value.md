@@ -8,7 +8,7 @@ A `state_vector_value` row may represent:
 - fixed enum/window values accepted by the state-vector contract;
 - contract-local value tokens that are consumed as state evidence rather than generic table columns.
 
-Payloads must match the reviewed model contract exactly. Use compact numeric prefixes only when the contract token itself uses one, for example `1_market_direction_score`, `2_sector_relative_direction_score`, or `3_target_direction_score_<window>`; do not add prefixes to bare contract tokens such as `market_state_features`, `sector_confirmed`, or `5min`.
+Keys and payloads must carry the owning model-layer prefix. Registry keys use `MODEL_NN_<TOKEN>_VALUE`, for example `MODEL_01_MARKET_DIRECTION_SCORE_VALUE`, `MODEL_02_SECTOR_HANDOFF_STATE_SELECTED_VALUE`, or `MODEL_03_MARKET_STATE_FEATURES_VALUE`. Payloads use compact numeric prefixes such as `1_market_direction_score`, `2_sector_relative_direction_score`, `2_sector_handoff_state_selected`, `3_market_state_features`, or `3_state_window_5min`. Do not keep bare payload tokens inside `state_vector_value`.
 
 When a reviewed model-output payload token is part of the state-vector contract, classify that registry row as `state_vector_value` instead of also keeping it as `field`. Use field-like kinds only for storage/schema slots whose primary reviewed role is physical carriage rather than state-vector semantics.
 
