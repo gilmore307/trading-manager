@@ -787,7 +787,8 @@ class RegistryHelperTests(unittest.TestCase):
             "SECTOR_TRANSITION_RISK_SCORE": "2_sector_transition_risk_score",
             "MARKET_CONTEXT_SUPPORT_SCORE": "2_market_context_support_score",
             "SECTOR_BREADTH_CONFIRMATION_SCORE": "2_sector_breadth_confirmation_score",
-            "SECTOR_DISPERSION_CROWDING_SCORE": "2_sector_dispersion_crowding_score",
+            "SECTOR_INTERNAL_DISPERSION_SCORE": "2_sector_internal_dispersion_score",
+            "SECTOR_CROWDING_RISK_SCORE": "2_sector_crowding_risk_score",
             "SECTOR_LIQUIDITY_TRADABILITY_SCORE": "2_sector_liquidity_tradability_score",
             "SECTOR_TRADABILITY_SCORE": "2_sector_tradability_score",
             "SECTOR_HANDOFF_STATE": "2_sector_handoff_state",
@@ -831,6 +832,16 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("feature_03_target_state_vector", state_vector_values["FEATURE_QUALITY_DIAGNOSTICS"]["applies_to"])
         self.assertIn("sector_state_features", state_vector_values["SECTOR_RELATIVE_DIRECTION_STATE"]["applies_to"])
         self.assertIn("target_state_features", state_vector_values["TARGET_DIRECTION_RETURN_SHAPE"]["applies_to"])
+        self.assertEqual(state_vector_values["TARGET_TREND_AGE_STATE"]["payload"], "target_trend_age_state")
+        self.assertEqual(state_vector_values["TARGET_EXHAUSTION_DECAY_STATE"]["payload"], "target_exhaustion_decay_state")
+        self.assertEqual(state_vector_values["TARGET_PEER_RANK_STATE"]["payload"], "target_peer_rank_state")
+        self.assertEqual(state_vector_values["TARGET_DIRECTION_STRENGTH_SCORE_BY_WINDOW"]["payload"], "3_target_direction_strength_score_<window>")
+        self.assertEqual(state_vector_values["TARGET_STATE_PERSISTENCE_SCORE_BY_WINDOW"]["payload"], "3_target_state_persistence_score_<window>")
+        self.assertEqual(state_vector_values["TARGET_EXHAUSTION_RISK_SCORE_BY_WINDOW"]["payload"], "3_target_exhaustion_risk_score_<window>")
+        self.assertEqual(state_vector_values["TARGET_STATE_OPTIONAL_OVERLAY_NOT_REQUIRED_V1"]["payload"], "optional_overlay_not_required_for_state_vector_v1")
+        self.assertEqual(state_vector_values["TARGET_STATE_UNRESOLVED_IMPLIED_RANGE_IDENTIFIER"]["payload"], "/implied/range")
+        self.assertEqual(state_vector_values["TARGET_STATE_UNRESOLVED_STRESS_COST_IDENTIFIER"]["payload"], "/stress/cost")
+        self.assertEqual(state_vector_values["TARGET_STATE_UNRESOLVED_OPTIONABILITY_COST_IDENTIFIER"]["payload"], "/optionability/cost")
         self.assertIn("cross_state_features", state_vector_values["TARGET_VS_MARKET_RESIDUAL_DIRECTION"]["applies_to"])
         for deleted_key in {
             "OPEN_PRICE",
