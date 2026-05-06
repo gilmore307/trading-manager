@@ -57,7 +57,7 @@ Do not register generated feature columns merely because a model emits them. Reg
 
 When a reviewed model contract makes a compact numeric-prefixed field the canonical downstream name, any active `field` row for that shared field should use the same compact payload. Do not leave downstream code split between an unprefixed registry field such as `market_direction_score` and a canonical physical/model field such as `1_market_direction_score`. If an unprefixed phrase is still useful as human concept language, keep it in notes or register it as a separate explanatory `term`, not as the canonical model-output `field`.
 
-For accepted model state outputs, a reviewed state-vector payload token belongs in `state_vector_value`, not in duplicate `field` and `state_vector_value` rows. Use `field` only for a distinct storage/schema slot whose reviewed role is physical carriage rather than the state-vector semantic token itself.
+For accepted model state outputs, only reviewed core scalar score tokens belong in `state_vector_value`. Do not duplicate them as generic `field` rows. State-vector block/group names, diagnostics, routing/audit fields, windows, enum values, research payloads, and unresolved placeholders remain model-local docs/contracts unless later promoted by manager-phase durable interface review.
 
 ## V2.2 Direction-Neutral Flow
 
@@ -71,11 +71,11 @@ Layer 3 direction evidence is not Layer 4 alpha/direction confidence. Layer 4 `a
 
 ## Layer 1 Boundary
 
-Layer 1 currently means broad market-context state and direction-neutral market tradability/regime evidence. Accepted `1_*` MarketRegime state outputs are `state_vector_value` tokens for `market_context_state`, not duplicate generic `field` rows.
+Layer 1 currently means broad market-context state and direction-neutral market tradability/regime evidence. Accepted core `1_*` MarketRegime scalar scores are `state_vector_value` tokens for `market_context_state`, not duplicate generic `field` rows. Diagnostic payloads such as coverage/data quality stay out of registry state-vector values unless later promoted through a narrower contract review.
 
 ## Layer 2 Boundary
 
-Layer 2 currently means market-state-conditioned sector/industry direction-neutral tradability and sector-context modeling. Accepted `2_*` SectorContext state outputs are `state_vector_value` tokens for `sector_context_state`; fixed handoff/eligibility enum values also belong in `state_vector_value`.
+Layer 2 currently means market-state-conditioned sector/industry direction-neutral tradability and sector-context modeling. Accepted core `2_*` SectorContext scalar scores are `state_vector_value` tokens for `sector_context_state`; handoff/eligibility/routing enum values stay model-local unless manager-phase interface promotion requires a narrower registry kind.
 
 Current accepted shared surfaces are:
 

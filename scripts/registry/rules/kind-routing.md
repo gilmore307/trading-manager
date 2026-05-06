@@ -31,9 +31,9 @@ Rules:
 - Use `status_value` for allowed state or policy values such as lifecycle, review, test, docs, maintenance, acceptance, readiness, and artifact-sync values.
 - Put the status domain in `applies_to`, for example `task_lifecycle_status` or `artifact_sync_policy_type`.
 - Do not create one registry kind per status domain.
-- Use `state_vector_value` only for reviewed value tokens inside an accepted model state-vector contract, such as state-vector block/group names, score-family names, diagnostic payload names, window values, or enum values.
-- Preserve the exact reviewed contract token in `state_vector_value.payload`; use compact numeric prefixes only when the contract token itself is prefixed.
-- If the reviewed registry token is a model state-vector payload token, classify that row as `state_vector_value` rather than duplicating it as `field`.
+- Use `state_vector_value` only for reviewed core scalar score tokens inside an accepted model state-vector contract.
+- Preserve the exact reviewed score token in `state_vector_value.payload`; these payloads should carry compact numeric layer prefixes such as `1_*`, `2_*`, or `3_*`.
+- Do not route state-vector block/group names, diagnostics, routing/audit fields, windows, enum values, research payloads, or unresolved source-mapping placeholders into `state_vector_value`; keep them in model-local docs/contracts unless a later manager-phase durable interface review promotes them through a narrower registry kind.
 - Use field-like kinds only for separate storage/schema slots whose primary reviewed role is physical carriage, not for the same state-vector payload token.
 - Use `artifact_type`, `manifest_type`, `ready_signal_type`, `request_type`, and `payload_format` only for values whose structural role is materially different from a generic status/policy value.
 

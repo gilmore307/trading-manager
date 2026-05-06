@@ -2238,3 +2238,24 @@ Current registry state-vector rows remain the reviewed naming and semantics auth
 - Model work continues with local/offline evidence and reviewed state-vector semantics.
 - `trading-data` and `trading-storage` may keep minimal development-mode receipts and local ignored staging, but must not present them as final durable cross-repository contracts.
 - When manager development begins, contract promotion should review the complete model stack at once instead of backfilling premature layer-local assumptions.
+
+## D099 - Registry state-vector values stay limited to core scores
+
+Date: 2026-05-06
+Status: Accepted
+
+### Context
+
+The model state-vector contracts contain more than downstream score semantics: diagnostics, block/group names, windows, enum values, handoff/routing states, embeddings, clusters, evidence counts, and unresolved source-mapping placeholders. Registering all of those as `state_vector_value` rows made the registry look like a full model-local schema mirror instead of a shared naming authority.
+
+### Decision
+
+Keep `state_vector_value` registry rows limited to reviewed core scalar score tokens only.
+
+Diagnostics, coverage/data-quality/state-quality/evidence-count fields, block/group names, window/enum values, routing/handoff/eligibility fields, embeddings, clusters, and unresolved source-mapping placeholders stay in model-local docs/contracts unless later promoted through a manager-phase durable interface review and assigned a narrower registry kind.
+
+### Consequences
+
+- Registry state-vector rows remain compact and focused on cross-repository score naming.
+- Model-local contracts can continue documenting diagnostics and auxiliary payload structure without forcing every internal value into the registry.
+- Manager-phase interface promotion can still register non-score payloads later when there is a concrete durable storage/request/API need.
