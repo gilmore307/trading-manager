@@ -6,23 +6,17 @@
 
 ## Queued Tasks
 
-- Define data task key file and completion receipt schemas across `trading-manager` control-plane and `trading-storage`.
-- Define migration criteria from any legacy local data-production staging files to durable `trading-storage` SQL/artifact contracts.
-- None that can be completed safely without cross-repository contract coordination.
+- None that should be started before the remaining model layers are designed.
 
-## Waiting On Cross-Repository Coordination
+## Deferred Until Manager Phase
 
-- Define concrete artifact, manifest, ready-signal, and request schemas from `trading-storage/main/templates/contracts/`.
-- Promote concrete template schemas after artifact, manifest, ready-signal, and request contracts are accepted.
-- Define shared storage root with `trading-storage`.
+- Define data task key/request schemas, completion-receipt schemas, artifact references, manifests, ready signals, request schemas, shared storage root, and migration criteria from legacy local data-production staging files into durable `trading-storage` SQL/artifact contracts.
+- Promote concrete templates from `trading-storage/main/templates/contracts/` only after all model layers are designed and the `trading-manager` development phase begins.
+- Until then, keep current registry rows as reviewed naming/state-vector semantics, not as final durable manager/storage interface contracts.
 
 ## Open Gaps
 
-- Exact artifact reference format.
-- Exact manifest schema.
-- Exact ready-signal schema.
-- Exact request schema.
-- Exact shared storage root.
+- None for the current model-design phase; durable manager/storage interface gaps are intentionally deferred above.
 
 ## Recently Accepted
 

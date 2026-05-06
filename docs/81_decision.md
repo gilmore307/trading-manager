@@ -2217,3 +2217,24 @@ This pattern applies across `trading-model`, `trading-data`, `trading-storage`, 
 - `80_`+ files own task, decision, and memory continuity.
 - `90_`+ files own reference guides, architecture references, registry/helpers/templates, and similar non-layer material.
 - Registry path rows that point to renamed docs require reviewed registry migrations and regenerated `scripts/registry/current.csv`.
+
+## D098 - Durable contract promotion waits for the manager phase
+
+Date: 2026-05-06
+Status: Accepted
+
+### Context
+
+The model stack is still being designed layer by layer. Promoting artifact, manifest, ready-signal, request, durable receipt, shared storage root, and SQL destination contracts too early would freeze manager/storage interfaces before Layers 4-7 are understood.
+
+### Decision
+
+Do not promote final durable manager/storage interface contracts until all model layers are designed and the `trading-manager` development phase begins.
+
+Current registry state-vector rows remain the reviewed naming and semantics authority for model work, but they are not a commitment that durable manager/storage request, artifact, manifest, ready-signal, receipt, or storage contracts are final.
+
+### Consequences
+
+- Model work continues with local/offline evidence and reviewed state-vector semantics.
+- `trading-data` and `trading-storage` may keep minimal development-mode receipts and local ignored staging, but must not present them as final durable cross-repository contracts.
+- When manager development begins, contract promotion should review the complete model stack at once instead of backfilling premature layer-local assumptions.
