@@ -760,49 +760,50 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(state_vector_values[key]["payload"], payload)
 
         layer_one_state_vector_values = {
-            "MODEL_01_MARKET_DIRECTION_SCORE_VALUE": "1_market_direction_score",
-            "MODEL_01_MARKET_DIRECTION_STRENGTH_SCORE_VALUE": "1_market_direction_strength_score",
-            "MODEL_01_MARKET_TREND_QUALITY_SCORE_VALUE": "1_market_trend_quality_score",
-            "MODEL_01_MARKET_STABILITY_SCORE_VALUE": "1_market_stability_score",
-            "MODEL_01_MARKET_RISK_STRESS_SCORE_VALUE": "1_market_risk_stress_score",
-            "MODEL_01_MARKET_TRANSITION_RISK_SCORE_VALUE": "1_market_transition_risk_score",
-            "MODEL_01_BREADTH_PARTICIPATION_SCORE_VALUE": "1_breadth_participation_score",
-            "MODEL_01_CORRELATION_CROWDING_SCORE_VALUE": "1_correlation_crowding_score",
-            "MODEL_01_DISPERSION_OPPORTUNITY_SCORE_VALUE": "1_dispersion_opportunity_score",
-            "MODEL_01_MARKET_LIQUIDITY_PRESSURE_SCORE_VALUE": "1_market_liquidity_pressure_score",
-            "MODEL_01_MARKET_LIQUIDITY_SUPPORT_SCORE_VALUE": "1_market_liquidity_support_score",
-            "MODEL_01_MARKET_COVERAGE_SCORE_VALUE": "1_coverage_score",
-            "MODEL_01_MARKET_DATA_QUALITY_SCORE_VALUE": "1_data_quality_score",
+            "MARKET_DIRECTION_SCORE": "1_market_direction_score",
+            "MARKET_DIRECTION_STRENGTH_SCORE": "1_market_direction_strength_score",
+            "MARKET_TREND_QUALITY_SCORE": "1_market_trend_quality_score",
+            "MARKET_STABILITY_SCORE": "1_market_stability_score",
+            "MARKET_RISK_STRESS_SCORE": "1_market_risk_stress_score",
+            "MARKET_TRANSITION_RISK_SCORE": "1_market_transition_risk_score",
+            "BREADTH_PARTICIPATION_SCORE": "1_breadth_participation_score",
+            "CORRELATION_CROWDING_SCORE": "1_correlation_crowding_score",
+            "DISPERSION_OPPORTUNITY_SCORE": "1_dispersion_opportunity_score",
+            "MARKET_LIQUIDITY_PRESSURE_SCORE": "1_market_liquidity_pressure_score",
+            "MARKET_LIQUIDITY_SUPPORT_SCORE": "1_market_liquidity_support_score",
+            "MARKET_COVERAGE_SCORE": "1_coverage_score",
+            "MARKET_DATA_QUALITY_SCORE": "1_data_quality_score",
         }
         for key, payload in layer_one_state_vector_values.items():
             self.assertEqual(state_vector_values[key]["payload"], payload)
-            self.assertEqual(by_key[key.replace("MODEL_01_", "").replace("_VALUE", "")]["payload"], payload)
+            self.assertNotIn(key, by_key)
             self.assertIn("model_01_market_regime", state_vector_values[key]["applies_to"])
             self.assertIn("market_context_state", state_vector_values[key]["applies_to"])
 
         layer_two_state_vector_values = {
-            "MODEL_02_SECTOR_RELATIVE_DIRECTION_SCORE_VALUE": "2_sector_relative_direction_score",
-            "MODEL_02_SECTOR_TREND_QUALITY_SCORE_VALUE": "2_sector_trend_quality_score",
-            "MODEL_02_SECTOR_TREND_STABILITY_SCORE_VALUE": "2_sector_trend_stability_score",
-            "MODEL_02_SECTOR_TRANSITION_RISK_SCORE_VALUE": "2_sector_transition_risk_score",
-            "MODEL_02_MARKET_CONTEXT_SUPPORT_SCORE_VALUE": "2_market_context_support_score",
-            "MODEL_02_SECTOR_BREADTH_CONFIRMATION_SCORE_VALUE": "2_sector_breadth_confirmation_score",
-            "MODEL_02_SECTOR_DISPERSION_CROWDING_SCORE_VALUE": "2_sector_dispersion_crowding_score",
-            "MODEL_02_SECTOR_LIQUIDITY_TRADABILITY_SCORE_VALUE": "2_sector_liquidity_tradability_score",
-            "MODEL_02_SECTOR_TRADABILITY_SCORE_VALUE": "2_sector_tradability_score",
-            "MODEL_02_SECTOR_HANDOFF_STATE_VALUE": "2_sector_handoff_state",
-            "MODEL_02_SECTOR_HANDOFF_BIAS_VALUE": "2_sector_handoff_bias",
-            "MODEL_02_SECTOR_HANDOFF_RANK_VALUE": "2_sector_handoff_rank",
-            "MODEL_02_SECTOR_HANDOFF_REASON_CODES_VALUE": "2_sector_handoff_reason_codes",
-            "MODEL_02_SECTOR_ELIGIBILITY_STATE_VALUE": "2_eligibility_state",
-            "MODEL_02_SECTOR_ELIGIBILITY_REASON_CODES_VALUE": "2_eligibility_reason_codes",
-            "MODEL_02_SECTOR_STATE_QUALITY_SCORE_VALUE": "2_state_quality_score",
-            "MODEL_02_SECTOR_COVERAGE_SCORE_VALUE": "2_coverage_score",
-            "MODEL_02_SECTOR_DATA_QUALITY_SCORE_VALUE": "2_data_quality_score",
-            "MODEL_02_SECTOR_EVIDENCE_COUNT_VALUE": "2_evidence_count",
+            "SECTOR_RELATIVE_DIRECTION_SCORE": "2_sector_relative_direction_score",
+            "SECTOR_TREND_QUALITY_SCORE": "2_sector_trend_quality_score",
+            "SECTOR_TREND_STABILITY_SCORE": "2_sector_trend_stability_score",
+            "SECTOR_TRANSITION_RISK_SCORE": "2_sector_transition_risk_score",
+            "MARKET_CONTEXT_SUPPORT_SCORE": "2_market_context_support_score",
+            "SECTOR_BREADTH_CONFIRMATION_SCORE": "2_sector_breadth_confirmation_score",
+            "SECTOR_DISPERSION_CROWDING_SCORE": "2_sector_dispersion_crowding_score",
+            "SECTOR_LIQUIDITY_TRADABILITY_SCORE": "2_sector_liquidity_tradability_score",
+            "SECTOR_TRADABILITY_SCORE": "2_sector_tradability_score",
+            "SECTOR_HANDOFF_STATE": "2_sector_handoff_state",
+            "SECTOR_HANDOFF_BIAS": "2_sector_handoff_bias",
+            "SECTOR_HANDOFF_RANK": "2_sector_handoff_rank",
+            "SECTOR_HANDOFF_REASON_CODES": "2_sector_handoff_reason_codes",
+            "SECTOR_ELIGIBILITY_STATE": "2_eligibility_state",
+            "SECTOR_ELIGIBILITY_REASON_CODES": "2_eligibility_reason_codes",
+            "SECTOR_STATE_QUALITY_SCORE": "2_state_quality_score",
+            "SECTOR_COVERAGE_SCORE": "2_coverage_score",
+            "SECTOR_DATA_QUALITY_SCORE": "2_data_quality_score",
+            "SECTOR_EVIDENCE_COUNT": "2_evidence_count",
         }
         for key, payload in layer_two_state_vector_values.items():
             self.assertEqual(state_vector_values[key]["payload"], payload)
+            self.assertNotIn(key, by_key)
             self.assertIn("model_02_sector_context", state_vector_values[key]["applies_to"])
             self.assertIn("sector_context_state", state_vector_values[key]["applies_to"])
 

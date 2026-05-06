@@ -10,13 +10,13 @@ A `state_vector_value` row may represent:
 
 Payloads must match the reviewed model contract exactly. Use compact numeric prefixes only when the contract token itself uses one, for example `1_market_direction_score`, `2_sector_relative_direction_score`, or `3_target_direction_score_<window>`; do not add prefixes to bare contract tokens such as `market_state_features`, `sector_confirmed`, or `5min`.
 
-When a stable model-output field is also a state-vector semantic value, keep both registrations: the physical column remains in the narrowest field-like kind, and a separate `state_vector_value` row owns the semantic model-state token.
+When a reviewed model-output payload token is part of the state-vector contract, classify that registry row as `state_vector_value` instead of also keeping it as `field`. Use field-like kinds only for storage/schema slots whose primary reviewed role is physical carriage rather than state-vector semantics.
 
 Reject from this kind:
 
-- table columns, request parameters, ids, references, timestamps, paths, free-text fields, and ordinary schema slots; use the narrowest field-like kind instead;
+- storage-only table columns, request parameters, ids, references, timestamps, paths, free-text fields, and ordinary schema slots; use the narrowest field-like kind instead;
 - model ids, data-feature names, data-source names, scripts, templates, or repository names;
 - generic lifecycle/review/test/docs/status values; use `status_value` unless the value is specifically part of a model state-vector payload;
 - non-reviewed experiment labels or downstream action/strategy/position-sizing values.
 
-A state-vector value may be carried by feature/model rows, but this kind classifies the semantic token inside the reviewed vector contract, not the physical storage column that contains it.
+A state-vector value may later be stored in tables, files, or feature/model rows, but the registry row owns the reviewed contract token rather than duplicating a separate generic field registration for the same token.
