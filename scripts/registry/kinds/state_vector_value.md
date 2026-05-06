@@ -8,7 +8,9 @@ A `state_vector_value` row may represent:
 - fixed enum/window values accepted by the state-vector contract;
 - contract-local value tokens that are consumed as state evidence rather than generic table columns.
 
-Payloads must match the reviewed model contract exactly. Use compact numeric prefixes only when the contract token itself uses one, for example `3_target_direction_score_<window>`; do not add prefixes to bare contract tokens such as `market_state_features`, `sector_confirmed`, or `5min`.
+Payloads must match the reviewed model contract exactly. Use compact numeric prefixes only when the contract token itself uses one, for example `1_market_direction_score`, `2_sector_relative_direction_score`, or `3_target_direction_score_<window>`; do not add prefixes to bare contract tokens such as `market_state_features`, `sector_confirmed`, or `5min`.
+
+When a stable model-output field is also a state-vector semantic value, keep both registrations: the physical column remains in the narrowest field-like kind, and a separate `state_vector_value` row owns the semantic model-state token.
 
 Reject from this kind:
 

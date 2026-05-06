@@ -57,6 +57,8 @@ Do not register generated feature columns merely because a model emits them. Reg
 
 When a reviewed model contract makes a compact numeric-prefixed field the canonical downstream name, any active `field` row for that shared field should use the same compact payload. Do not leave downstream code split between an unprefixed registry field such as `market_direction_score` and a canonical physical/model field such as `1_market_direction_score`. If an unprefixed phrase is still useful as human concept language, keep it in notes or register it as a separate explanatory `term`, not as the canonical model-output `field`.
 
+For accepted model state outputs, register two roles when both are true: the physical persisted column belongs in `field`, and the semantic value inside the model's state-vector contract belongs in `state_vector_value`. Layer 1 and Layer 2 compact outputs such as `1_market_direction_score` and `2_sector_relative_direction_score` should therefore appear in both roles.
+
 ## V2.2 Direction-Neutral Flow
 
 Current accepted model-layer intent is direction-neutral tradability first:
@@ -67,9 +69,13 @@ market_context_state -> sector_context_state -> anonymous_target_feature_vector 
 
 Layer 3 direction evidence is not Layer 4 alpha/direction confidence. Layer 4 `alpha_confidence_model` owns long/short confidence, expected value, risk, and uncertainty. Layer 5 `trading_projection_model` owns offline target actions and target exposure. Event evidence is an overlay/input, not a peer model layer unless a later reviewed contract changes that boundary.
 
+## Layer 1 Boundary
+
+Layer 1 currently means broad market-context state and direction-neutral market tradability/regime evidence. Accepted `1_*` MarketRegime outputs are both persisted model fields and semantic `state_vector_value` tokens for `market_context_state`.
+
 ## Layer 2 Boundary
 
-Layer 2 currently means market-state-conditioned sector/industry direction-neutral tradability and sector-context modeling.
+Layer 2 currently means market-state-conditioned sector/industry direction-neutral tradability and sector-context modeling. Accepted `2_*` SectorContext outputs are both persisted model fields and semantic `state_vector_value` tokens for `sector_context_state`; fixed handoff/eligibility enum values also belong in `state_vector_value`.
 
 Current accepted shared surfaces are:
 

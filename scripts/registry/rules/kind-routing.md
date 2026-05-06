@@ -34,6 +34,7 @@ Rules:
 - Use `state_vector_value` only for reviewed value tokens inside an accepted model state-vector contract, such as state-vector block/group names, score-family names, diagnostic payload names, window values, or enum values.
 - Preserve the exact reviewed contract token in `state_vector_value.payload`; use compact numeric prefixes only when the contract token itself is prefixed.
 - Keep the physical table column that carries a state vector in the narrowest field-like kind; keep the semantic token inside the vector as `state_vector_value`.
+- If a model-output field is also a model state-vector value, register both rows with distinct keys: a field-like row for the physical column and a `state_vector_value` row for the semantic state token.
 - Use `artifact_type`, `manifest_type`, `ready_signal_type`, `request_type`, and `payload_format` only for values whose structural role is materially different from a generic status/policy value.
 
 ## Data Production Kinds
