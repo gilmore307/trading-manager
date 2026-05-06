@@ -31,6 +31,8 @@ Rules:
 - Use `status_value` for allowed state or policy values such as lifecycle, review, test, docs, maintenance, acceptance, readiness, and artifact-sync values.
 - Put the status domain in `applies_to`, for example `task_lifecycle_status` or `artifact_sync_policy_type`.
 - Do not create one registry kind per status domain.
+- Use `state_vector_value` only for reviewed value tokens inside an accepted model state-vector contract, such as state-vector block/group names, score-family names, diagnostic payload names, window values, or enum values.
+- Keep the physical table column that carries a state vector in the narrowest field-like kind; keep the semantic token inside the vector as `state_vector_value`.
 - Use `artifact_type`, `manifest_type`, `ready_signal_type`, `request_type`, and `payload_format` only for values whose structural role is materially different from a generic status/policy value.
 
 ## Data Production Kinds

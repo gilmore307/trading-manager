@@ -682,11 +682,13 @@ class RegistryHelperTests(unittest.TestCase):
 
     def test_field_like_payloads_are_unique_semantic_words(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            registry_rows = list(csv.DictReader(csv_file))
             field_like_rows = [
                 row
-                for row in csv.DictReader(csv_file)
+                for row in registry_rows
                 if row["kind"] in {"field", "identity_field", "path_field", "temporal_field", "classification_field", "text_field", "parameter_field"}
             ]
+            state_vector_value_rows = [row for row in registry_rows if row["kind"] == "state_vector_value"]
 
         payloads = [row["payload"] for row in field_like_rows]
         self.assertEqual(len(payloads), len(set(payloads)))
@@ -730,6 +732,14 @@ class RegistryHelperTests(unittest.TestCase):
             "SECTOR_CONTEXT_STATE_REF": "sector_context_state_ref",
             "TARGET_STATE_VECTOR_REF": "target_state_vector_ref",
             "SOURCE_RUN_REF": "source_run_ref",
+            "RUN_ID": "run_id",
+        }
+        for key, payload in target_state_fields.items():
+            self.assertEqual(by_key[key]["payload"], payload)
+        self.assertIn("feature_03_target_state_vector", by_key["RUN_ID"]["applies_to"])
+
+        state_vector_values = {row["key"]: row for row in state_vector_value_rows}
+        target_state_vector_values = {
             "MARKET_STATE_FEATURES": "market_state_features",
             "SECTOR_STATE_FEATURES": "sector_state_features",
             "TARGET_STATE_FEATURES": "target_state_features",
@@ -737,7 +747,6 @@ class RegistryHelperTests(unittest.TestCase):
             "STATE_OBSERVATION_WINDOWS": "state_observation_windows",
             "STATE_WINDOW_SYNC_POLICY": "state_window_sync_policy",
             "FEATURE_QUALITY_DIAGNOSTICS": "feature_quality_diagnostics",
-            "RUN_ID": "run_id",
             "SECTOR_RELATIVE_DIRECTION_STATE": "sector_relative_direction_state",
             "SECTOR_TREND_QUALITY_STABILITY_STATE": "sector_trend_quality_stability_state",
             "TARGET_DIRECTION_RETURN_SHAPE": "target_direction_return_shape",
@@ -747,17 +756,16 @@ class RegistryHelperTests(unittest.TestCase):
             "TARGET_VS_SECTOR_RESIDUAL_DIRECTION": "target_vs_sector_residual_direction",
             "RELATIVE_LIQUIDITY_TRADABILITY_STATE": "relative_liquidity_tradability_state",
         }
-        for key, payload in target_state_fields.items():
-            self.assertEqual(by_key[key]["payload"], payload)
-        self.assertIn("feature_03_target_state_vector", by_key["MARKET_STATE_FEATURES"]["applies_to"])
-        self.assertIn("model_03_target_state_vector", by_key["CROSS_STATE_FEATURES"]["applies_to"])
-        self.assertIn("market_state_features", by_key["STATE_OBSERVATION_WINDOWS"]["applies_to"])
-        self.assertIn("cross_state_features", by_key["STATE_WINDOW_SYNC_POLICY"]["applies_to"])
-        self.assertIn("feature_03_target_state_vector", by_key["FEATURE_QUALITY_DIAGNOSTICS"]["applies_to"])
-        self.assertIn("feature_03_target_state_vector", by_key["RUN_ID"]["applies_to"])
-        self.assertIn("sector_state_features", by_key["SECTOR_RELATIVE_DIRECTION_STATE"]["applies_to"])
-        self.assertIn("target_state_features", by_key["TARGET_DIRECTION_RETURN_SHAPE"]["applies_to"])
-        self.assertIn("cross_state_features", by_key["TARGET_VS_MARKET_RESIDUAL_DIRECTION"]["applies_to"])
+        for key, payload in target_state_vector_values.items():
+            self.assertEqual(state_vector_values[key]["payload"], payload)
+        self.assertIn("feature_03_target_state_vector", state_vector_values["MARKET_STATE_FEATURES"]["applies_to"])
+        self.assertIn("model_03_target_state_vector", state_vector_values["CROSS_STATE_FEATURES"]["applies_to"])
+        self.assertIn("market_state_features", state_vector_values["STATE_OBSERVATION_WINDOWS"]["applies_to"])
+        self.assertIn("cross_state_features", state_vector_values["STATE_WINDOW_SYNC_POLICY"]["applies_to"])
+        self.assertIn("feature_03_target_state_vector", state_vector_values["FEATURE_QUALITY_DIAGNOSTICS"]["applies_to"])
+        self.assertIn("sector_state_features", state_vector_values["SECTOR_RELATIVE_DIRECTION_STATE"]["applies_to"])
+        self.assertIn("target_state_features", state_vector_values["TARGET_DIRECTION_RETURN_SHAPE"]["applies_to"])
+        self.assertIn("cross_state_features", state_vector_values["TARGET_VS_MARKET_RESIDUAL_DIRECTION"]["applies_to"])
         for deleted_key in {
             "OPEN_PRICE",
             "HIGH_PRICE",
