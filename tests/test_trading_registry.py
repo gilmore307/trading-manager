@@ -186,6 +186,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("5_alpha_direction_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("5_alpha_tradability_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("5_base_alpha_direction_score_<horizon>", rows["ALPHA_CONFIDENCE_BASE_DIAGNOSTIC_SCORE_FAMILIES"]["payload"])
+        self.assertIn(
+            "5_market_adjusted_alpha_score_<horizon>",
+            rows["ALPHA_CONFIDENCE_BASELINE_ADJUSTMENT_DIAGNOSTIC_SCORE_FAMILIES"]["payload"],
+        )
+        self.assertIn(
+            "5_event_adjustment_reason_codes_<horizon>",
+            rows["ALPHA_CONFIDENCE_EVENT_ADJUSTMENT_DIAGNOSTIC_FIELD_FAMILIES"]["payload"],
+        )
         self.assertEqual(
             rows["ALPHA_CONFIDENCE_VECTOR_OUTPUT_TIER_POLICY"]["payload"],
             "base_unadjusted_diagnostic_only;final_adjusted_layer_6_facing",
