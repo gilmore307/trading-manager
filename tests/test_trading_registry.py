@@ -275,6 +275,11 @@ class RegistryHelperTests(unittest.TestCase):
             "SCOPE_TYPE": ("classification_field", "scope_type", "source_04_event_overlay"),
             "REFERENCE_TYPE": ("classification_field", "reference_type", "source_04_event_overlay"),
             "EVENT_REFERENCE": ("path_field", "reference", "source_04_event_overlay"),
+            "EVENT_CANONICAL_EVENT_ID": ("identity_field", "canonical_event_id", "source_04_event_overlay"),
+            "EVENT_DEDUP_STATUS": ("classification_field", "dedup_status", "source_04_event_overlay"),
+            "EVENT_SOURCE_PRIORITY": ("field", "source_priority", "source_04_event_overlay"),
+            "EVENT_COVERAGE_REASON": ("text_field", "coverage_reason", "source_04_event_overlay"),
+            "EVENT_COVERED_BY_EVENT_ID": ("identity_field", "covered_by_event_id", "source_04_event_overlay"),
             "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "source_05_option_expression"),
             "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "source_05_option_expression"),
             "QUOTE_BID_CONDITION": ("field", "bid_condition", "source_05_option_expression"),
@@ -870,6 +875,7 @@ class RegistryHelperTests(unittest.TestCase):
     def test_classification_fields_are_separate_semantic_axes(self):
         expected_classification_keys = {
             "EVENT_CATEGORY_TYPE",
+            "EVENT_DEDUP_STATUS",
             "EXPOSURE_TYPE",
             "INFORMATION_ROLE_TYPE",
             "OPTION_RIGHT_TYPE",
@@ -928,6 +934,8 @@ class RegistryHelperTests(unittest.TestCase):
             "ETF_HOLDING_NAME",
             "ISSUER_NAME",
             "OPTION_SYMBOL",
+            "EVENT_CANONICAL_EVENT_ID",
+            "EVENT_COVERED_BY_EVENT_ID",
         }
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -971,6 +979,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key in {
             "REGISTRY_ITEM_NOTE",
             "SUMMARY",
+            "EVENT_COVERAGE_REASON",
         }:
             self.assertEqual(rows[key]["kind"], "text_field")
             self.assertIn("Text value", rows[key]["note"])
