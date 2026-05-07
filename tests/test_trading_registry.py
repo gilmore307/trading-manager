@@ -232,7 +232,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EFFECTIVE_CURRENT_UNDERLYING_EXPOSURE"]["payload"], "effective_current_underlying_exposure")
         self.assertEqual(rows["OPTION_EXPRESSION_MODEL"]["payload"], "option_expression_model")
         self.assertEqual(rows["MODEL_08_OPTION_EXPRESSION"]["payload"], "model_08_option_expression")
+        self.assertEqual(rows["OPTION_EXPRESSION_PLAN"]["payload"], "option_expression_plan")
+        self.assertEqual(rows["EXPRESSION_VECTOR"]["payload"], "expression_vector")
         self.assertIn("layer_08_after_underlying_action", rows["OPTION_EXPRESSION_MODEL_LAYER_POLICY"]["payload"])
+        self.assertIn("8_option_expression_eligibility_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("8_option_theta_risk_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("8_resolved_expression_type", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("long_call", rows["OPTION_EXPRESSION_TYPES"]["payload"])
+        self.assertIn("option_expression_not_broker_order", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
         self.assertNotIn("MODEL_07_OPTION_EXPRESSION", rows)
         self.assertNotIn("TRADING_PROJECTION_MODEL", rows)
         self.assertNotIn("MODEL_06_TRADING_PROJECTION", rows)
@@ -847,6 +854,16 @@ class RegistryHelperTests(unittest.TestCase):
             "UNDERLYING_LIQUIDITY_FIT_SCORE_BY_HORIZON": "7_underlying_liquidity_fit_score_<horizon>",
             "UNDERLYING_HOLDING_TIME_FIT_SCORE_BY_HORIZON": "7_underlying_holding_time_fit_score_<horizon>",
             "UNDERLYING_ACTION_CONFIDENCE_SCORE_BY_HORIZON": "7_underlying_action_confidence_score_<horizon>",
+            "OPTION_EXPRESSION_ELIGIBILITY_SCORE_BY_HORIZON": "8_option_expression_eligibility_score_<horizon>",
+            "OPTION_EXPRESSION_DIRECTION_SCORE_BY_HORIZON": "8_option_expression_direction_score_<horizon>",
+            "OPTION_CONTRACT_FIT_SCORE_BY_HORIZON": "8_option_contract_fit_score_<horizon>",
+            "OPTION_LIQUIDITY_FIT_SCORE_BY_HORIZON": "8_option_liquidity_fit_score_<horizon>",
+            "OPTION_IV_FIT_SCORE_BY_HORIZON": "8_option_iv_fit_score_<horizon>",
+            "OPTION_GREEK_FIT_SCORE_BY_HORIZON": "8_option_greek_fit_score_<horizon>",
+            "OPTION_REWARD_RISK_SCORE_BY_HORIZON": "8_option_reward_risk_score_<horizon>",
+            "OPTION_THETA_RISK_SCORE_BY_HORIZON": "8_option_theta_risk_score_<horizon>",
+            "OPTION_FILL_QUALITY_SCORE_BY_HORIZON": "8_option_fill_quality_score_<horizon>",
+            "OPTION_EXPRESSION_CONFIDENCE_SCORE_BY_HORIZON": "8_option_expression_confidence_score_<horizon>",
         }
         self.assertEqual(state_vector_values.keys(), expected_state_vector_values.keys())
         for key, payload in expected_state_vector_values.items():
