@@ -119,9 +119,9 @@ Layer 4 is point-in-time event-context overlay. Current accepted shared names ar
 - `model_04_event_overlay` — future model-owned output/table surface;
 - `event_context_vector` — conceptual point-in-time event-context output.
 
-Accepted compact `4_*` state-vector values are event-context score-family tokens, not generic source columns and not alpha/trade/action outputs. Keep these axes separate: event presence, timing proximity, intensity, target-conditioned direction bias, target-context alignment, uncertainty, gap risk, reversal risk, liquidity disruption, contagion risk, evidence quality, impact scope, scope confidence, escalation risk, target relevance, and dominant impact scope.
+Accepted compact `4_*` state-vector values are scalar event-context score-family tokens, not generic source columns and not alpha/trade/action outputs. Keep these scalar axes separate: event presence, timing proximity, intensity, target-conditioned direction bias, target-context alignment, uncertainty, gap risk, reversal risk, liquidity disruption, contagion risk, evidence quality, impact scope, scope confidence, escalation risk, and target relevance.
 
-Event scope vocabulary must distinguish native event scope from impact scope. Source fields such as `scope_type` describe the event overview row; Layer 4 impact-scope score families describe modeled event impact by horizon. Do not register every artifact field, event lifecycle enum, event block name, or news/SEC/NLP detail as a shared registry row until implementation proves a durable cross-repository contract.
+Event scope vocabulary must distinguish native event scope from impact scope. Source fields such as `scope_type` describe the event overview row; Layer 4 impact-scope score families describe modeled event impact by horizon. Enum-like audit/routing families such as `4_event_dominant_impact_scope_<horizon>` remain model-local unless a later manager-phase interface review promotes them through a narrower non-scalar kind. Do not register every artifact field, event lifecycle enum, event block name, or news/SEC/NLP detail as a shared registry row until implementation proves a durable cross-repository contract.
 
 ## Registration Trigger
 
