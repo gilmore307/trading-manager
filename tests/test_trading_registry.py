@@ -198,8 +198,21 @@ class RegistryHelperTests(unittest.TestCase):
             rows["ALPHA_CONFIDENCE_VECTOR_OUTPUT_TIER_POLICY"]["payload"],
             "base_unadjusted_diagnostic_only;final_adjusted_layer_6_facing",
         )
-        self.assertEqual(rows["TRADING_PROJECTION_MODEL"]["payload"], "trading_projection_model")
-        self.assertEqual(rows["MODEL_06_TRADING_PROJECTION"]["payload"], "model_06_trading_projection")
+        self.assertEqual(rows["POSITION_PROJECTION_MODEL"]["payload"], "position_projection_model")
+        self.assertEqual(rows["MODEL_06_POSITION_PROJECTION"]["payload"], "model_06_position_projection")
+        self.assertEqual(rows["POSITION_PROJECTION_VECTOR"]["payload"], "position_projection_vector")
+        self.assertEqual(rows["POSITION_PROJECTION_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
+        self.assertIn("6_target_exposure_score_<horizon>", rows["POSITION_PROJECTION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("6_projection_confidence_score_<horizon>", rows["POSITION_PROJECTION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("6_resolved_target_exposure_score", rows["POSITION_PROJECTION_HANDOFF_SUMMARY_FIELD_FAMILIES"]["payload"])
+        self.assertIn("6_effective_current_exposure_score", rows["POSITION_PROJECTION_DIAGNOSTIC_FIELD_FAMILIES"]["payload"])
+        self.assertIn("target_exposure_not_order_quantity", rows["POSITION_PROJECTION_BOUNDARY_POLICY"]["payload"])
+        self.assertEqual(rows["CURRENT_POSITION_STATE"]["payload"], "current_position_state")
+        self.assertEqual(rows["PENDING_POSITION_STATE"]["payload"], "pending_position_state")
+        self.assertEqual(rows["EFFECTIVE_CURRENT_EXPOSURE"]["payload"], "effective_current_exposure")
+        self.assertNotIn("TRADING_PROJECTION_MODEL", rows)
+        self.assertNotIn("MODEL_06_TRADING_PROJECTION", rows)
+        self.assertNotIn("TRADING_SIGNAL_VECTOR", rows)
         self.assertEqual(rows["MARKET_DIRECTION_SCORE"]["payload"], "1_market_direction_score")
         self.assertEqual(rows["MARKET_TREND_QUALITY_SCORE"]["payload"], "1_market_trend_quality_score")
         self.assertEqual(rows["MARKET_LIQUIDITY_SUPPORT_SCORE"]["payload"], "1_market_liquidity_support_score")
@@ -785,6 +798,16 @@ class RegistryHelperTests(unittest.TestCase):
             "REVERSAL_RISK_SCORE_BY_HORIZON": "5_reversal_risk_score_<horizon>",
             "DRAWDOWN_RISK_SCORE_BY_HORIZON": "5_drawdown_risk_score_<horizon>",
             "ALPHA_TRADABILITY_SCORE_BY_HORIZON": "5_alpha_tradability_score_<horizon>",
+            "POSITION_TARGET_POSITION_BIAS_SCORE_BY_HORIZON": "6_target_position_bias_score_<horizon>",
+            "POSITION_TARGET_EXPOSURE_SCORE_BY_HORIZON": "6_target_exposure_score_<horizon>",
+            "CURRENT_POSITION_ALIGNMENT_SCORE_BY_HORIZON": "6_current_position_alignment_score_<horizon>",
+            "POSITION_GAP_SCORE_BY_HORIZON": "6_position_gap_score_<horizon>",
+            "POSITION_GAP_MAGNITUDE_SCORE_BY_HORIZON": "6_position_gap_magnitude_score_<horizon>",
+            "EXPECTED_POSITION_UTILITY_SCORE_BY_HORIZON": "6_expected_position_utility_score_<horizon>",
+            "COST_TO_ADJUST_POSITION_SCORE_BY_HORIZON": "6_cost_to_adjust_position_score_<horizon>",
+            "RISK_BUDGET_FIT_SCORE_BY_HORIZON": "6_risk_budget_fit_score_<horizon>",
+            "POSITION_STATE_STABILITY_SCORE_BY_HORIZON": "6_position_state_stability_score_<horizon>",
+            "POSITION_PROJECTION_CONFIDENCE_SCORE_BY_HORIZON": "6_projection_confidence_score_<horizon>",
         }
         self.assertEqual(state_vector_values.keys(), expected_state_vector_values.keys())
         for key, payload in expected_state_vector_values.items():
@@ -820,6 +843,8 @@ class RegistryHelperTests(unittest.TestCase):
             "TARGET_STATE_UNRESOLVED_STRESS_COST_IDENTIFIER",
             "TARGET_STATE_UNRESOLVED_OPTIONABILITY_COST_IDENTIFIER",
             "EVENT_DOMINANT_IMPACT_SCOPE_BY_HORIZON",
+            "POSITION_PROJECTION_HANDOFF_SUMMARY_FIELD_FAMILIES",
+            "POSITION_PROJECTION_DIAGNOSTIC_FIELD_FAMILIES",
         }:
             self.assertNotIn(diagnostic_or_routing_key, state_vector_values)
 

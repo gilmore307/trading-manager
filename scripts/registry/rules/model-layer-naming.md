@@ -34,7 +34,7 @@ Accepted examples:
 - `source_04_event_overlay`
 - `model_04_event_overlay`
 - `model_05_alpha_confidence`
-- `model_06_trading_projection`
+- `model_06_position_projection`
 
 Rules:
 
@@ -53,6 +53,7 @@ Layer-owned fields use compact numeric prefixes only when the field is specific 
 3_*
 4_*
 5_*
+6_*
 ```
 
 Generic identity, lineage, timestamp, receipt, run, and registry metadata fields should stay generic and should not receive a layer prefix.
@@ -68,10 +69,10 @@ For accepted model state/context outputs, only reviewed core scalar score tokens
 Current accepted model-layer intent is direction-neutral tradability first:
 
 ```text
-market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> event_context_vector -> alpha_confidence_model -> trading_projection_model
+market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> event_context_vector -> alpha_confidence_model -> position_projection_model
 ```
 
-Layer 3 direction evidence is not Layer 5 alpha confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns final adjusted alpha direction, strength, expected residual return, confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha remains diagnostic unless separately promoted. Layer 6 `trading_projection_model` owns offline trading intent and target exposure. Event evidence and alpha confidence are context/model layers, not final action or execution surfaces.
+Layer 3 direction evidence is not Layer 5 alpha confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns final adjusted alpha direction, strength, expected residual return, confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha remains diagnostic unless separately promoted. Layer 6 `position_projection_model` owns target holding-state projection from final adjusted alpha plus current/pending position, cost, portfolio exposure, and risk-budget context. Event evidence, alpha confidence, and position projection are context/model layers, not final action or execution surfaces.
 
 ## Layer 1 Boundary
 
@@ -135,7 +136,21 @@ Layer 5 is calibrated alpha-confidence modeling. Current accepted shared names a
 
 Accepted compact `5_*` state-vector values are final adjusted scalar alpha-confidence score-family tokens, not target-state evidence, event-context evidence, trading-projection fields, option-expression fields, or final-action outputs. Keep these scalar axes separate: alpha direction, alpha strength, expected residual return, alpha confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha fields remain diagnostics unless separately promoted.
 
-Do not register action/routing fields, no-trade decisions, position size, target exposure, account-risk allocation, option contract, strike, DTE, delta, or final verdict as Layer 5 state-vector values. Those belong to later reviewed TradingProjectionModel / expression / final-action boundaries.
+Do not register action/routing fields, no-trade decisions, position size, target exposure, account-risk allocation, option contract, strike, DTE, delta, or final verdict as Layer 5 state-vector values. Target holding-state projection belongs to Layer 6; expression and operation details belong to Layer 7/final-action boundaries.
+
+## Layer 6 Position-Projection Boundary
+
+Layer 6 is target holding-state projection. Current accepted shared names are:
+
+- `position_projection_model` — canonical Layer 6 model id;
+- `model_06_position_projection` — future model-owned output/table surface;
+- `position_projection_vector` — conceptual point-in-time target holding-state output.
+
+Accepted compact `6_*` state-vector values are scalar position-projection score-family tokens, not buy/sell/hold actions, option-expression fields, order quantities, or execution outputs. Keep these axes separate: target position bias, target exposure, current-position alignment, position gap, position gap magnitude, expected position utility, cost-to-adjust pressure, risk-budget fit, position-state stability, and projection confidence.
+
+`6_target_exposure_score_<horizon>` is abstract normalized risk exposure, not shares/contracts/order quantity. `6_position_gap_score_<horizon>` is target exposure minus effective current exposure, where effective current exposure includes pending exposure adjusted by fill probability. It is not an execution instruction.
+
+Layer 6 must not output buy/sell/hold/open/close/reverse, choose instruments, read option chains, choose strike/DTE/Greeks, route orders, or mutate broker/account state. Those belong to the expression/final-action and execution boundaries.
 
 ## Registration Trigger
 
