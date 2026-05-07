@@ -210,6 +210,30 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["CURRENT_POSITION_STATE"]["payload"], "current_position_state")
         self.assertEqual(rows["PENDING_POSITION_STATE"]["payload"], "pending_position_state")
         self.assertEqual(rows["EFFECTIVE_CURRENT_EXPOSURE"]["payload"], "effective_current_exposure")
+        self.assertEqual(rows["UNDERLYING_ACTION_MODEL"]["payload"], "underlying_action_model")
+        self.assertEqual(rows["MODEL_07_UNDERLYING_ACTION"]["payload"], "model_07_underlying_action")
+        self.assertEqual(rows["UNDERLYING_ACTION_PLAN"]["payload"], "underlying_action_plan")
+        self.assertEqual(rows["UNDERLYING_ACTION_VECTOR"]["payload"], "underlying_action_vector")
+        self.assertEqual(rows["UNDERLYING_ACTION_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
+        self.assertIn(
+            "7_underlying_trade_eligibility_score_<horizon>",
+            rows["UNDERLYING_ACTION_VECTOR_SCORE_FAMILIES"]["payload"],
+        )
+        self.assertIn(
+            "7_underlying_action_confidence_score_<horizon>",
+            rows["UNDERLYING_ACTION_VECTOR_SCORE_FAMILIES"]["payload"],
+        )
+        self.assertIn("7_resolved_underlying_action_type", rows["UNDERLYING_ACTION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("open_long", rows["UNDERLYING_ACTION_PLANNED_ACTION_TYPES"]["payload"])
+        self.assertIn("bearish_underlying_path_but_no_short_allowed", rows["UNDERLYING_ACTION_PLANNED_ACTION_TYPES"]["payload"])
+        self.assertIn("planned_quantity_not_final_order_quantity", rows["UNDERLYING_ACTION_BOUNDARY_POLICY"]["payload"])
+        self.assertEqual(rows["CURRENT_UNDERLYING_POSITION_STATE"]["payload"], "current_underlying_position_state")
+        self.assertEqual(rows["PENDING_UNDERLYING_ORDER_STATE"]["payload"], "pending_underlying_order_state")
+        self.assertEqual(rows["EFFECTIVE_CURRENT_UNDERLYING_EXPOSURE"]["payload"], "effective_current_underlying_exposure")
+        self.assertEqual(rows["OPTION_EXPRESSION_MODEL"]["payload"], "option_expression_model")
+        self.assertEqual(rows["MODEL_08_OPTION_EXPRESSION"]["payload"], "model_08_option_expression")
+        self.assertIn("layer_08_after_underlying_action", rows["OPTION_EXPRESSION_MODEL_LAYER_POLICY"]["payload"])
+        self.assertNotIn("MODEL_07_OPTION_EXPRESSION", rows)
         self.assertNotIn("TRADING_PROJECTION_MODEL", rows)
         self.assertNotIn("MODEL_06_TRADING_PROJECTION", rows)
         self.assertNotIn("TRADING_SIGNAL_VECTOR", rows)
@@ -813,6 +837,16 @@ class RegistryHelperTests(unittest.TestCase):
             "RISK_BUDGET_FIT_SCORE_BY_HORIZON": "6_risk_budget_fit_score_<horizon>",
             "POSITION_STATE_STABILITY_SCORE_BY_HORIZON": "6_position_state_stability_score_<horizon>",
             "POSITION_PROJECTION_CONFIDENCE_SCORE_BY_HORIZON": "6_projection_confidence_score_<horizon>",
+            "UNDERLYING_TRADE_ELIGIBILITY_SCORE_BY_HORIZON": "7_underlying_trade_eligibility_score_<horizon>",
+            "UNDERLYING_ACTION_DIRECTION_SCORE_BY_HORIZON": "7_underlying_action_direction_score_<horizon>",
+            "UNDERLYING_TRADE_INTENSITY_SCORE_BY_HORIZON": "7_underlying_trade_intensity_score_<horizon>",
+            "UNDERLYING_ENTRY_QUALITY_SCORE_BY_HORIZON": "7_underlying_entry_quality_score_<horizon>",
+            "UNDERLYING_EXPECTED_RETURN_SCORE_BY_HORIZON": "7_underlying_expected_return_score_<horizon>",
+            "UNDERLYING_ADVERSE_RISK_SCORE_BY_HORIZON": "7_underlying_adverse_risk_score_<horizon>",
+            "UNDERLYING_REWARD_RISK_SCORE_BY_HORIZON": "7_underlying_reward_risk_score_<horizon>",
+            "UNDERLYING_LIQUIDITY_FIT_SCORE_BY_HORIZON": "7_underlying_liquidity_fit_score_<horizon>",
+            "UNDERLYING_HOLDING_TIME_FIT_SCORE_BY_HORIZON": "7_underlying_holding_time_fit_score_<horizon>",
+            "UNDERLYING_ACTION_CONFIDENCE_SCORE_BY_HORIZON": "7_underlying_action_confidence_score_<horizon>",
         }
         self.assertEqual(state_vector_values.keys(), expected_state_vector_values.keys())
         for key, payload in expected_state_vector_values.items():

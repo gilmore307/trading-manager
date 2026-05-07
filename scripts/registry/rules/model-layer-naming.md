@@ -134,9 +134,9 @@ Layer 5 is calibrated alpha-confidence modeling. Current accepted shared names a
 - `model_05_alpha_confidence` — future model-owned output/table surface;
 - `alpha_confidence_vector` — conceptual point-in-time confidence/EV/risk output.
 
-Accepted compact `5_*` state-vector values are final adjusted scalar alpha-confidence score-family tokens, not target-state evidence, event-context evidence, trading-projection fields, option-expression fields, or final-action outputs. Keep these scalar axes separate: alpha direction, alpha strength, expected residual return, alpha confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha fields remain diagnostics unless separately promoted.
+Accepted compact `5_*` state-vector values are final adjusted scalar alpha-confidence score-family tokens, not target-state evidence, event-context evidence, position-projection fields, underlying-action fields, option-expression fields, or final-action outputs. Keep these scalar axes separate: alpha direction, alpha strength, expected residual return, alpha confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha fields remain diagnostics unless separately promoted.
 
-Do not register action/routing fields, no-trade decisions, position size, target exposure, account-risk allocation, option contract, strike, DTE, delta, or final verdict as Layer 5 state-vector values. Target holding-state projection belongs to Layer 6; expression and operation details belong to Layer 7/final-action boundaries.
+Do not register action/routing fields, no-trade decisions, position size, target exposure, account-risk allocation, option contract, strike, DTE, delta, or final verdict as Layer 5 state-vector values. Target holding-state projection belongs to Layer 6; planned direct-underlying action belongs to Layer 7; option expression belongs to Layer 8.
 
 ## Layer 6 Position-Projection Boundary
 
@@ -150,7 +150,31 @@ Accepted compact `6_*` state-vector values are scalar position-projection score-
 
 `6_target_exposure_score_<horizon>` is abstract normalized risk exposure, not shares/contracts/order quantity. `6_position_gap_score_<horizon>` is target exposure minus effective current exposure, where effective current exposure includes pending exposure adjusted by fill probability. It is not an execution instruction.
 
-Layer 6 must not output buy/sell/hold/open/close/reverse, choose instruments, read option chains, choose strike/DTE/Greeks, route orders, or mutate broker/account state. Those belong to the expression/final-action and execution boundaries.
+Layer 6 must not output buy/sell/hold/open/close/reverse, choose instruments, read option chains, choose strike/DTE/Greeks, route orders, or mutate broker/account state. Planned direct-underlying action belongs to Layer 7; option expression belongs to Layer 8; execution belongs outside `trading-model`.
+
+## Layer 7 Underlying-Action Boundary
+
+Layer 7 is direct stock/ETF planned action modeling. Current accepted shared names are:
+
+- `underlying_action_model` — canonical Layer 7 model id;
+- `model_07_underlying_action` — future model-owned output/table surface;
+- `underlying_action_plan` — conceptual point-in-time direct-underlying action plan output;
+- `underlying_action_vector` — conceptual point-in-time score/vector output for Layer 7.
+
+Accepted compact `7_*` state-vector values are scalar underlying-action score-family tokens, not broker orders, option-contract fields, or execution outputs. Keep these axes separate: trade eligibility, signed action direction, trade intensity, entry quality, expected return, adverse risk, reward/risk, liquidity fit, holding-time fit, and action confidence.
+
+`planned_quantity` and `planned_notional_usd` are plan payload fields, not final order quantities. `entry_plan` is not order type. `stop_loss_price` and `take_profit_price` are thesis fields, not broker stop/limit orders.
+
+Layer 7 must not emit broker order fields, route orders, mutate broker/account state, or choose option symbol/right/strike/expiration/DTE/delta/Greeks/specific contract refs. Option expression belongs to Layer 8; execution belongs outside `trading-model`.
+
+## Layer 8 Option-Expression Boundary
+
+Layer 8 is option-expression modeling after Layer 7. Current accepted shared names are:
+
+- `option_expression_model` — canonical Layer 8 model id;
+- `model_08_option_expression` — future model-owned output/table surface.
+
+Layer 8 may use Layer 7 underlying price-path assumptions plus point-in-time option-chain context to choose option-expression and contract constraints. It still must not place orders or mutate broker/account state.
 
 ## Registration Trigger
 
