@@ -1,11 +1,12 @@
 # state_vector_value
 
-Use this kind only for reviewed **core scalar score tokens** that belong to an accepted model state-vector contract.
+Use this kind only for reviewed **core scalar score tokens** that belong to an accepted model state/context-vector contract.
 
 A `state_vector_value` row may represent:
 
 - Layer 1/2 compact scalar score names such as `1_market_direction_score` or `2_sector_relative_direction_score`;
-- Layer 3 score-family names such as `3_target_direction_score_<window>` or `3_tradability_score_<window>`.
+- Layer 3 score-family names such as `3_target_direction_score_<window>` or `3_tradability_score_<window>`;
+- Layer 4 event-context score-family names such as `4_event_gap_risk_score_<horizon>` or `4_event_market_impact_score_<horizon>`.
 
 Payloads must match the reviewed model contract exactly. Use compact numeric prefixes because core score tokens carry layer ownership directly.
 
@@ -14,7 +15,7 @@ Do not register every state-vector payload part here. Block names, group names, 
 Reject from this kind:
 
 - storage-only table columns, request parameters, ids, references, timestamps, paths, free-text fields, and ordinary schema slots; use the narrowest field-like kind instead;
-- state-vector block/group names such as `market_state_features`, `target_state_features`, or `target_price_state`;
+- state/context-vector block/group names such as `market_state_features`, `target_state_features`, `target_price_state`, `event_timing_context`, or `event_impact_scope_context`;
 - diagnostic values such as coverage/data-quality/state-quality/evidence-count payloads;
 - routing/audit values such as handoff, eligibility, reason-code, rank, enum, or window tokens;
 - research-only payloads such as embeddings or cluster ids;

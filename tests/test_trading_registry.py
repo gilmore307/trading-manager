@@ -175,6 +175,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EVENT_OVERLAY_MODEL"]["payload"], "event_overlay_model")
         self.assertEqual(rows["MODEL_04_EVENT_OVERLAY"]["payload"], "model_04_event_overlay")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR"]["payload"], "event_context_vector")
+        self.assertEqual(rows["EVENT_CONTEXT_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
+        self.assertIn("4_event_presence_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("4_event_target_relevance_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertEqual(rows["ALPHA_CONFIDENCE_MODEL"]["payload"], "alpha_confidence_model")
         self.assertEqual(rows["MODEL_05_ALPHA_CONFIDENCE"]["payload"], "model_05_alpha_confidence")
         self.assertEqual(rows["TRADING_PROJECTION_MODEL"]["payload"], "trading_projection_model")
@@ -734,6 +737,27 @@ class RegistryHelperTests(unittest.TestCase):
             "TARGET_STATE_TRADABILITY_SCORE_BY_WINDOW": "3_tradability_score_<window>",
             "TARGET_TRANSITION_RISK_SCORE_BY_WINDOW": "3_target_transition_risk_score_<window>",
             "TARGET_TREND_QUALITY_SCORE_BY_WINDOW": "3_target_trend_quality_score_<window>",
+            "EVENT_PRESENCE_SCORE_BY_HORIZON": "4_event_presence_score_<horizon>",
+            "EVENT_TIMING_PROXIMITY_SCORE_BY_HORIZON": "4_event_timing_proximity_score_<horizon>",
+            "EVENT_INTENSITY_SCORE_BY_HORIZON": "4_event_intensity_score_<horizon>",
+            "EVENT_DIRECTION_BIAS_SCORE_BY_HORIZON": "4_event_direction_bias_score_<horizon>",
+            "EVENT_CONTEXT_ALIGNMENT_SCORE_BY_HORIZON": "4_event_context_alignment_score_<horizon>",
+            "EVENT_UNCERTAINTY_SCORE_BY_HORIZON": "4_event_uncertainty_score_<horizon>",
+            "EVENT_GAP_RISK_SCORE_BY_HORIZON": "4_event_gap_risk_score_<horizon>",
+            "EVENT_REVERSAL_RISK_SCORE_BY_HORIZON": "4_event_reversal_risk_score_<horizon>",
+            "EVENT_LIQUIDITY_DISRUPTION_SCORE_BY_HORIZON": "4_event_liquidity_disruption_score_<horizon>",
+            "EVENT_CONTAGION_RISK_SCORE_BY_HORIZON": "4_event_contagion_risk_score_<horizon>",
+            "EVENT_CONTEXT_QUALITY_SCORE_BY_HORIZON": "4_event_context_quality_score_<horizon>",
+            "EVENT_MARKET_IMPACT_SCORE_BY_HORIZON": "4_event_market_impact_score_<horizon>",
+            "EVENT_SECTOR_IMPACT_SCORE_BY_HORIZON": "4_event_sector_impact_score_<horizon>",
+            "EVENT_INDUSTRY_IMPACT_SCORE_BY_HORIZON": "4_event_industry_impact_score_<horizon>",
+            "EVENT_THEME_FACTOR_IMPACT_SCORE_BY_HORIZON": "4_event_theme_factor_impact_score_<horizon>",
+            "EVENT_PEER_GROUP_IMPACT_SCORE_BY_HORIZON": "4_event_peer_group_impact_score_<horizon>",
+            "EVENT_SYMBOL_IMPACT_SCORE_BY_HORIZON": "4_event_symbol_impact_score_<horizon>",
+            "EVENT_MICROSTRUCTURE_IMPACT_SCORE_BY_HORIZON": "4_event_microstructure_impact_score_<horizon>",
+            "EVENT_SCOPE_CONFIDENCE_SCORE_BY_HORIZON": "4_event_scope_confidence_score_<horizon>",
+            "EVENT_SCOPE_ESCALATION_RISK_SCORE_BY_HORIZON": "4_event_scope_escalation_risk_score_<horizon>",
+            "EVENT_TARGET_RELEVANCE_SCORE_BY_HORIZON": "4_event_target_relevance_score_<horizon>",
         }
         self.assertEqual(state_vector_values.keys(), expected_state_vector_values.keys())
         for key, payload in expected_state_vector_values.items():
@@ -768,6 +792,7 @@ class RegistryHelperTests(unittest.TestCase):
             "TARGET_STATE_UNRESOLVED_IMPLIED_RANGE_IDENTIFIER",
             "TARGET_STATE_UNRESOLVED_STRESS_COST_IDENTIFIER",
             "TARGET_STATE_UNRESOLVED_OPTIONABILITY_COST_IDENTIFIER",
+            "EVENT_DOMINANT_IMPACT_SCOPE_BY_HORIZON",
         }:
             self.assertNotIn(diagnostic_or_routing_key, state_vector_values)
 

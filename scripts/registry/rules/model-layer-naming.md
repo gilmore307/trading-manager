@@ -59,7 +59,7 @@ Do not register generated feature columns merely because a model emits them. Reg
 
 When a reviewed model contract makes a compact numeric-prefixed field the canonical downstream name, any active `field` row for that shared field should use the same compact payload. Do not leave downstream code split between an unprefixed registry field such as `market_direction_score` and a canonical physical/model field such as `1_market_direction_score`. If an unprefixed phrase is still useful as human concept language, keep it in notes or register it as a separate explanatory `term`, not as the canonical model-output `field`.
 
-For accepted model state outputs, only reviewed core scalar score tokens belong in `state_vector_value`. Do not duplicate them as generic `field` rows. State-vector block/group names, diagnostics, routing/audit fields, windows, enum values, research payloads, and unresolved placeholders remain model-local docs/contracts unless later promoted by manager-phase durable interface review.
+For accepted model state/context outputs, only reviewed core scalar score tokens belong in `state_vector_value`. Do not duplicate them as generic `field` rows. State/context-vector block/group names, diagnostics, routing/audit fields, windows, enum values, research payloads, and unresolved placeholders remain model-local docs/contracts unless later promoted by manager-phase durable interface review.
 
 ## V2.2 Direction-Neutral Flow
 
@@ -109,6 +109,19 @@ Shared TargetStateVector V1 row keys and top-level feature-block names are regis
 Direction-neutral TargetStateVector names must keep signed direction evidence separate from quality/tradability. Use `*_direction_*` names for signed long/short state evidence, `*_trend_quality_*` / `*_path_stability_*` for structural quality, `*_liquidity_tradability_*` for practical tradability, and `*_residual_direction` for beta/context-adjusted relative direction. Do not revive generic `strength`, `readiness`, or `cost` names when the contract distinguishes direction, quality, transition risk, and tradability.
 
 Layer 3 target-state fields may use compact `3_*` payloads only after the target-state contract requires concrete shared fields. Do not register generated feature columns, model-local feature-group internals, label families, embedding names, or cluster labels merely because they appear in TargetStateVectorModel design notes. Layer 3 preprocessing vector block names such as `target_behavior_vector`, `event_risk_context_vector`, and `candidate_quality_vector` remain model-local until implementation/evaluation proves a reviewed cross-repository contract needs them.
+
+## Layer 4 Event-Overlay Boundary
+
+Layer 4 is point-in-time event-context overlay. Current accepted shared names are:
+
+- `source_04_event_overlay` — event overview source/index table owned by `trading-data`;
+- `event_overlay_model` — canonical Layer 4 model id;
+- `model_04_event_overlay` — future model-owned output/table surface;
+- `event_context_vector` — conceptual point-in-time event-context output.
+
+Accepted compact `4_*` state-vector values are event-context score-family tokens, not generic source columns and not alpha/trade/action outputs. Keep these axes separate: event presence, timing proximity, intensity, target-conditioned direction bias, target-context alignment, uncertainty, gap risk, reversal risk, liquidity disruption, contagion risk, evidence quality, impact scope, scope confidence, escalation risk, target relevance, and dominant impact scope.
+
+Event scope vocabulary must distinguish native event scope from impact scope. Source fields such as `scope_type` describe the event overview row; Layer 4 impact-scope score families describe modeled event impact by horizon. Do not register every artifact field, event lifecycle enum, event block name, or news/SEC/NLP detail as a shared registry row until implementation proves a durable cross-repository contract.
 
 ## Registration Trigger
 
