@@ -50,7 +50,9 @@ Layer-owned fields use compact numeric prefixes only when the field is specific 
 ```text
 1_*
 2_*
-3_*  # only after a Layer 3 contract is accepted for registry promotion
+3_*
+4_*
+5_*
 ```
 
 Generic identity, lineage, timestamp, receipt, run, and registry metadata fields should stay generic and should not receive a layer prefix.
@@ -69,7 +71,7 @@ Current accepted model-layer intent is direction-neutral tradability first:
 market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> event_context_vector -> alpha_confidence_model -> trading_projection_model
 ```
 
-Layer 3 direction evidence is not Layer 5 alpha/direction confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns long/short confidence, expected value, risk, and uncertainty. Layer 6 `trading_projection_model` owns offline trading intent and target exposure. Event evidence is a context model layer, not a final action or execution surface.
+Layer 3 direction evidence is not Layer 5 alpha/direction confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns long/short confidence, expected return/value, downside/tail/path risk, uncertainty, context support, event adjustment, and calibration quality. Layer 6 `trading_projection_model` owns offline trading intent and target exposure. Event evidence and alpha confidence are context/model layers, not final action or execution surfaces.
 
 ## Layer 1 Boundary
 
@@ -122,6 +124,18 @@ Layer 4 is point-in-time event-context overlay. Current accepted shared names ar
 Accepted compact `4_*` state-vector values are scalar event-context score-family tokens, not generic source columns and not alpha/trade/action outputs. Keep these scalar axes separate: event presence, timing proximity, intensity, target-conditioned direction bias, target-context alignment, uncertainty, gap risk, reversal risk, liquidity disruption, contagion risk, evidence quality, impact scope, scope confidence, escalation risk, and target relevance.
 
 Event scope vocabulary must distinguish native event scope from impact scope. Source fields such as `scope_type` describe the event overview row; Layer 4 impact-scope score families describe modeled event impact by horizon. Enum-like audit/routing families such as `4_event_dominant_impact_scope_<horizon>` remain model-local unless a later manager-phase interface review promotes them through a narrower non-scalar kind. Do not register every artifact field, event lifecycle enum, event block name, or news/SEC/NLP detail as a shared registry row until implementation proves a durable cross-repository contract.
+
+## Layer 5 Alpha-Confidence Boundary
+
+Layer 5 is calibrated alpha-confidence modeling. Current accepted shared names are:
+
+- `alpha_confidence_model` — canonical Layer 5 model id;
+- `model_05_alpha_confidence` — future model-owned output/table surface;
+- `alpha_confidence_vector` — conceptual point-in-time confidence/EV/risk output.
+
+Accepted compact `5_*` state-vector values are scalar alpha-confidence score-family tokens, not target-state evidence, event-context evidence, trading-projection fields, option-expression fields, or final-action outputs. Keep these scalar axes separate: direction confidence, direction strength, expected return, expected value, downside risk, tail risk, path stability, uncertainty, context support, event adjustment, and calibration quality.
+
+Do not register action/routing fields, no-trade decisions, position size, target exposure, account-risk allocation, option contract, strike, DTE, delta, or final verdict as Layer 5 state-vector values. Those belong to later reviewed TradingProjectionModel / expression / final-action boundaries.
 
 ## Registration Trigger
 

@@ -180,6 +180,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("4_event_target_relevance_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertEqual(rows["ALPHA_CONFIDENCE_MODEL"]["payload"], "alpha_confidence_model")
         self.assertEqual(rows["MODEL_05_ALPHA_CONFIDENCE"]["payload"], "model_05_alpha_confidence")
+        self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR"]["payload"], "alpha_confidence_vector")
+        self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
+        self.assertIn("5_alpha_direction_confidence_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("5_alpha_expected_value_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertEqual(rows["TRADING_PROJECTION_MODEL"]["payload"], "trading_projection_model")
         self.assertEqual(rows["MODEL_06_TRADING_PROJECTION"]["payload"], "model_06_trading_projection")
         self.assertEqual(rows["MARKET_DIRECTION_SCORE"]["payload"], "1_market_direction_score")
@@ -758,6 +762,17 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_SCOPE_CONFIDENCE_SCORE_BY_HORIZON": "4_event_scope_confidence_score_<horizon>",
             "EVENT_SCOPE_ESCALATION_RISK_SCORE_BY_HORIZON": "4_event_scope_escalation_risk_score_<horizon>",
             "EVENT_TARGET_RELEVANCE_SCORE_BY_HORIZON": "4_event_target_relevance_score_<horizon>",
+            "ALPHA_DIRECTION_CONFIDENCE_SCORE_BY_HORIZON": "5_alpha_direction_confidence_score_<horizon>",
+            "ALPHA_DIRECTION_STRENGTH_SCORE_BY_HORIZON": "5_alpha_direction_strength_score_<horizon>",
+            "ALPHA_EXPECTED_RETURN_SCORE_BY_HORIZON": "5_alpha_expected_return_score_<horizon>",
+            "ALPHA_EXPECTED_VALUE_SCORE_BY_HORIZON": "5_alpha_expected_value_score_<horizon>",
+            "ALPHA_DOWNSIDE_RISK_SCORE_BY_HORIZON": "5_alpha_downside_risk_score_<horizon>",
+            "ALPHA_TAIL_RISK_SCORE_BY_HORIZON": "5_alpha_tail_risk_score_<horizon>",
+            "ALPHA_PATH_STABILITY_SCORE_BY_HORIZON": "5_alpha_path_stability_score_<horizon>",
+            "ALPHA_UNCERTAINTY_SCORE_BY_HORIZON": "5_alpha_uncertainty_score_<horizon>",
+            "ALPHA_CONTEXT_SUPPORT_SCORE_BY_HORIZON": "5_alpha_context_support_score_<horizon>",
+            "ALPHA_EVENT_ADJUSTMENT_SCORE_BY_HORIZON": "5_alpha_event_adjustment_score_<horizon>",
+            "ALPHA_CALIBRATION_QUALITY_SCORE_BY_HORIZON": "5_alpha_calibration_quality_score_<horizon>",
         }
         self.assertEqual(state_vector_values.keys(), expected_state_vector_values.keys())
         for key, payload in expected_state_vector_values.items():
