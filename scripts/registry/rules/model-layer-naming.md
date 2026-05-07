@@ -71,7 +71,7 @@ Current accepted model-layer intent is direction-neutral tradability first:
 market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> event_context_vector -> alpha_confidence_model -> trading_projection_model
 ```
 
-Layer 3 direction evidence is not Layer 5 alpha/direction confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns long/short confidence, expected return/value, downside/tail/path risk, uncertainty, context support, event adjustment, and calibration quality. Layer 6 `trading_projection_model` owns offline trading intent and target exposure. Event evidence and alpha confidence are context/model layers, not final action or execution surfaces.
+Layer 3 direction evidence is not Layer 5 alpha confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns final adjusted alpha direction, strength, expected residual return, confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha remains diagnostic unless separately promoted. Layer 6 `trading_projection_model` owns offline trading intent and target exposure. Event evidence and alpha confidence are context/model layers, not final action or execution surfaces.
 
 ## Layer 1 Boundary
 
@@ -133,7 +133,7 @@ Layer 5 is calibrated alpha-confidence modeling. Current accepted shared names a
 - `model_05_alpha_confidence` — future model-owned output/table surface;
 - `alpha_confidence_vector` — conceptual point-in-time confidence/EV/risk output.
 
-Accepted compact `5_*` state-vector values are scalar alpha-confidence score-family tokens, not target-state evidence, event-context evidence, trading-projection fields, option-expression fields, or final-action outputs. Keep these scalar axes separate: direction confidence, direction strength, expected return, expected value, downside risk, tail risk, path stability, uncertainty, context support, event adjustment, and calibration quality.
+Accepted compact `5_*` state-vector values are final adjusted scalar alpha-confidence score-family tokens, not target-state evidence, event-context evidence, trading-projection fields, option-expression fields, or final-action outputs. Keep these scalar axes separate: alpha direction, alpha strength, expected residual return, alpha confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha fields remain diagnostics unless separately promoted.
 
 Do not register action/routing fields, no-trade decisions, position size, target exposure, account-risk allocation, option contract, strike, DTE, delta, or final verdict as Layer 5 state-vector values. Those belong to later reviewed TradingProjectionModel / expression / final-action boundaries.
 
