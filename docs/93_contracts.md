@@ -24,6 +24,72 @@ Contracts here are generic platform contracts. They must work across data, model
 7. **UTC in contracts.** Human planning may use US Eastern time, but contract timestamps use UTC ISO-8601 strings.
 8. **No secrets.** Contracts may reference secret aliases or config ids, but must never contain credential material.
 
+## Persistence Policy
+
+Contract persistence follows one rule:
+
+```text
+SQL stores durable control-plane facts and audit state.
+Storage stores bulky payloads, transient evidence, and retention-managed files.
+Temp scratch stores run-local material that never becomes a contract artifact.
+```
+
+Do not decide table shape by asking whether a contract name exists. Decide by asking whether the system must later query, audit, resume, retry, review, supersede, or prove that fact.
+
+### SQL Durable Control Plane
+
+Use SQL tables for facts that must survive payload cleanup:
+
+- manager requests;
+- run manifests;
+- run steps when step-level evidence matters;
+- input bindings;
+- artifact reference metadata;
+- ready signals;
+- dataset snapshot metadata;
+- evaluation runs;
+- metric results;
+- promotion candidates;
+- review decisions;
+- activation records;
+- downstream handoff metadata.
+
+SQL rows may point at storage payloads, but they must not store large payloads, raw provider bodies, model vector bodies, logs, or secret material.
+
+### Storage Retention-Managed Payloads
+
+Use storage for payloads that may be large, component-owned, or retention-managed:
+
+- raw logs;
+- stdout and stderr captures;
+- intermediate JSON, CSV, parquet, or bundle files;
+- large model output payloads;
+- diagnostics reports;
+- source evidence bundles;
+- temporary evaluation reports;
+- replay bundles;
+- scratch snapshots that were promoted to evidence.
+
+If a storage payload participates in a formal request, run, evaluation, review, activation, or handoff, SQL must keep the durable reference metadata: artifact id, URI, hash or fingerprint, producer run, schema reference, retention policy, and current lifecycle state such as active, superseded, archived, deleted, or expired.
+
+### Pure Temp Scratch
+
+Use pure temp storage only for material that never becomes evidence:
+
+- provider probes that are not accepted as source evidence;
+- retry-local partial files;
+- local debug dumps;
+- component-private scratch files;
+- failed fragments that are not needed for later review.
+
+Pure temp scratch should not receive contract ids. It may be deleted when the run ends or by routine cleanup.
+
+### Practical Table Rule
+
+Not every contract becomes one SQL table. Some contracts are embedded references, registry-backed values, or JSON substructures inside a durable table. A contract should become a first-class SQL table when it has its own lifecycle, query surface, relationship fan-out, retention state, or audit obligation.
+
+The MVP implementation should therefore start with SQL tables for request, input binding, run, step, artifact reference, and ready-signal state. Component identity can initially be registry-backed fields on those tables instead of a separate component catalog table. Add a component catalog only when real query or lifecycle needs require it.
+
 ## Contract Inventory
 
 ### Core MVP Contracts

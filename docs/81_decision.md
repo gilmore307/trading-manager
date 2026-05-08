@@ -2396,3 +2396,36 @@ This decision defines shared vocabulary and contract shape. It does not implemen
 - Future manager/storage implementation must follow these V1 contract names instead of reviving local-only completion receipt drafts as final interfaces.
 - `trading-data` production hardening can refer to the same request/manifest/artifact/ready-signal vocabulary without waiting for model promotion.
 - `trading-model` production artifacts remain model-owned until manager/storage persistence and ready-signal implementation are accepted.
+
+## D106 - Split durable SQL facts from retention-managed payloads
+
+Date: 2026-05-08
+Status: Accepted
+
+### Context
+
+The first-principles manager contract inventory includes more contract names than should become immediate first-class SQL tables. Some contracts describe durable control-plane facts that must be queryable and auditable. Others are references, payloads, or temporary evidence that can live in storage with retention rules.
+
+### Decision
+
+Use SQL for durable control-plane facts and audit state. Use storage for bulky payloads, transient evidence, and retention-managed files. Use pure temp scratch for run-local material that never becomes contract evidence.
+
+The MVP SQL implementation should start with tables for:
+
+- `manager_request_v1`
+- `input_binding_v1`
+- `run_manifest_v1`
+- `run_step_v1`
+- `artifact_ref_v1`
+- `ready_signal_v1`
+
+`component_ref_v1` should initially be registry-backed fields on those SQL rows, not a separate component catalog table. Add a component catalog only when real query or lifecycle needs require it.
+
+If a storage payload participates in a formal request, run, evaluation, review, activation, or handoff, SQL must retain durable reference metadata such as artifact id, URI, hash/fingerprint, producer run, schema reference, retention policy, and lifecycle state. Payload cleanup must not erase the audit trail that the artifact existed and was used.
+
+### Consequences
+
+- Contract names do not automatically imply one SQL table per contract.
+- Large logs, raw provider bodies, model vector payloads, diagnostics reports, and replay bundles stay out of manager SQL and are referenced through artifact metadata.
+- Storage cleanup can delete or archive payloads without breaking manager audit history.
+- Later evaluation/promotion SQL tables should follow the same rule: make first-class tables only for facts with lifecycle, query, relationship, retention, or audit obligations.
