@@ -6,7 +6,7 @@
 
 ## Queued Tasks
 
-- None that should be started before the remaining model layers are designed.
+- Execute manager/control-plane contracts now that Layers 1-8 model design is closed: production-promotion routing, unified decision records, artifact/ready-signal contracts, and execution handoff validation.
 
 ## Deferred Until Manager Phase
 
@@ -16,10 +16,12 @@
 
 ## Open Gaps
 
-- None for the current model-design phase; durable manager/storage interface gaps are intentionally deferred above.
+- Concrete unified decision-record artifact schema remains to be implemented after the newly registered readiness/risk-cap vocabulary.
+- Durable manager/storage interface gaps remain intentionally deferred above.
 
 ## Recently Accepted
 
+- Registered production-promotion readiness checklist/status matrix terms for Layers 1-8 and mandatory `trade_risk_cap` execution-safety vocabulary. This starts the manager/control-plane phase without implying production model approval or live execution enablement.
 - Registered all current `task_key.json` and `completion_receipt.json` field names as `kind=field` rows.
 - Updated task key/receipt templates so stable task keys can have multiple run entries in completion receipts.
 - Simplified `task_key.json` and `completion_receipt.json` to minimal operational fields.

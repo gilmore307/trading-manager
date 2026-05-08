@@ -2259,3 +2259,26 @@ Diagnostics, coverage/data-quality/state-quality/evidence-count fields, block/gr
 - Registry state-vector rows remain compact and focused on cross-repository score naming.
 - Model-local contracts can continue documenting diagnostics and auxiliary payload structure without forcing every internal value into the registry.
 - Manager-phase interface promotion can still register non-score payloads later when there is a concrete durable storage/request/API need.
+
+## D100 - Promotion readiness and trade-risk-cap contracts start the manager phase
+
+Date: 2026-05-07
+Status: Accepted
+
+### Context
+
+The `trading-model` stack is now closed for Layers 1-8 model design. The next boundary is production hardening and manager/control-plane integration, not another model layer.
+
+### Decision
+
+Register the shared governance terms for Layer 1-8 production-promotion readiness and mandatory execution-side trade-risk caps.
+
+Production-promotion readiness requires the full evidence package: dataset snapshot, chronological split, labels, eval run, promotion metrics, promotion candidate, thresholds, baseline comparison, split stability, leakage/no-future checks, calibration report, and decision receipt. Missing evidence or failed gates require a deferred promotion decision.
+
+Every executable trade must include a valid `trade_risk_cap` before order construction or placement. Missing or invalid caps must reject the order; warn-only behavior is not accepted.
+
+### Consequences
+
+- The registry may expose the shared checklist and risk-cap vocabulary without implying any model is production-approved or any live execution is enabled.
+- Model evidence remains model-owned until promoted through reviewed manager/control-plane contracts.
+- Execution implementation must call equivalent risk-cap validation before broker/account mutation.
