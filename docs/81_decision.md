@@ -2344,3 +2344,24 @@ Register `REVIEW_LAYERS_03_08_PROMOTION_CLOSEOUT` as the stable callable script 
 - Layers 3-8 closeout is now explicitly agent-reviewed instead of only mechanically deferred.
 - The registry points to the callable script path and current reviewed decision receipts.
 - Missing production eval substrate still blocks approval; the new entrypoint changes the review path, not the outcome.
+
+## D104 - Register Layer 3 real production-evaluation substrate without approval
+
+Date: 2026-05-08
+Status: Accepted
+
+### Context
+
+Layer 3 was originally grouped with Layers 4-8 as missing production-evaluation substrate. A follow-up run built real Layer 3 PostgreSQL feature/model rows, labels, metrics, and a reviewer-agent decision.
+
+### Decision
+
+Register `REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE` as the stable callable Layer 3 substrate/review entrypoint and update the promotion closeout receipts so Layer 3 points to eval run `mdevrun_327616bb447ceb5b`, candidate `mpcand_1b077bca49a18dbf`, and decision `mpdec_70fef0f31847cc1c`.
+
+This registration does not approve Layer 3 production use. The decision remains deferred because Layer 1 and Layer 2 are not production-approved/active and Layer 3 calibration evidence is missing.
+
+### Consequences
+
+- Layer 3 is no longer blocked for missing evaluation substrate; it is blocked for upstream approvals and calibration.
+- Layers 4-8 remain blocked for missing production eval runs, labels, and metrics.
+- No deferred decision may create a production activation row or active config pointer.
