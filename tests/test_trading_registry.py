@@ -269,6 +269,29 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("review_layers_03_08_promotion_closeout.py", rows["REVIEW_LAYERS_03_08_PROMOTION_CLOSEOUT"]["path"])
         self.assertEqual(rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["kind"], "script")
         self.assertIn("review_target_state_vector_production_substrate.py", rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["path"])
+        expected_layer_script_paths = {
+            "MODEL_04_EVENT_OVERLAY_GENERATE": "scripts/models/model_04_event_overlay/generate_model_04_event_overlay.py",
+            "MODEL_04_EVENT_OVERLAY_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_04_event_overlay/evaluate_model_04_event_overlay.py",
+            "MODEL_04_EVENT_OVERLAY_REVIEW_PROMOTION": "scripts/models/model_04_event_overlay/review_event_overlay_promotion.py",
+            "MODEL_05_ALPHA_CONFIDENCE_GENERATE": "scripts/models/model_05_alpha_confidence/generate_model_05_alpha_confidence.py",
+            "MODEL_05_ALPHA_CONFIDENCE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_05_alpha_confidence/evaluate_model_05_alpha_confidence.py",
+            "MODEL_05_ALPHA_CONFIDENCE_REVIEW_PROMOTION": "scripts/models/model_05_alpha_confidence/review_alpha_confidence_promotion.py",
+            "MODEL_06_POSITION_PROJECTION_GENERATE": "scripts/models/model_06_position_projection/generate_model_06_position_projection.py",
+            "MODEL_06_POSITION_PROJECTION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_06_position_projection/evaluate_model_06_position_projection.py",
+            "MODEL_06_POSITION_PROJECTION_REVIEW_PROMOTION": "scripts/models/model_06_position_projection/review_position_projection_promotion.py",
+            "MODEL_07_UNDERLYING_ACTION_GENERATE": "scripts/models/model_07_underlying_action/generate_model_07_underlying_action.py",
+            "MODEL_07_UNDERLYING_ACTION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_07_underlying_action/evaluate_model_07_underlying_action.py",
+            "MODEL_07_UNDERLYING_ACTION_REVIEW_PROMOTION": "scripts/models/model_07_underlying_action/review_underlying_action_promotion.py",
+            "MODEL_08_OPTION_EXPRESSION_GENERATE": "scripts/models/model_08_option_expression/generate_model_08_option_expression.py",
+            "MODEL_08_OPTION_EXPRESSION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_08_option_expression/evaluate_model_08_option_expression.py",
+            "MODEL_08_OPTION_EXPRESSION_REVIEW_PROMOTION": "scripts/models/model_08_option_expression/review_option_expression_promotion.py",
+        }
+        for key, expected_path in expected_layer_script_paths.items():
+            self.assertEqual(rows[key]["kind"], "script")
+            self.assertEqual(rows[key]["payload_format"], "command")
+            self.assertIn(expected_path, rows[key]["path"])
+        self.assertIn("option_expression_model", rows["SOURCE_06_POSITION_EXECUTION"]["applies_to"])
+        self.assertNotIn("position_execution_model", rows["SOURCE_06_POSITION_EXECUTION"]["applies_to"])
         self.assertIn("layer_3_real_eval_deferred_upstream_layer_1_2_not_active_and_calibration_missing", rows["MODEL_PROMOTION_CLOSEOUT_BLOCKERS"]["payload"])
         self.assertIn("layers_4_8_agent_reviewed_missing_production_eval_run_labels_metrics", rows["MODEL_PROMOTION_CLOSEOUT_BLOCKERS"]["payload"])
         self.assertIn("data_source_model_input_design_closed", rows["TRADING_DATA_STACK_CLOSEOUT_STATUS"]["payload"])
