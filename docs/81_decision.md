@@ -2303,3 +2303,25 @@ Without explicit source/task `available_time`, ETF holdings candidate-preparatio
 - Data closeout does not approve unattended production orchestration or final storage contracts.
 - Production labels or promoted gates must cite reviewed calibration evidence before relying on equity abnormal activity thresholds.
 - Manager/storage implementation still owns durable task, manifest, ready-signal, and storage contracts.
+
+## D102 - Register promotion closeout decision receipts
+
+Date: 2026-05-08
+Status: Accepted
+
+### Context
+
+The model-design closeout and readiness checklist were not sufficient as a promotion closeout. The control-plane registry needs to expose the actual current promotion disposition.
+
+### Decision
+
+Register the current production-promotion closeout state:
+
+- Layer 1 has real PostgreSQL evaluation evidence and persisted deferred decision `mpdec_d743cb5dbc8159f2`.
+- Layer 2 has real PostgreSQL evaluation evidence and persisted deferred decision `mpdec_3ab83ea1f423326d`.
+- Layers 3-8 are blocked before promotion decision persistence because no production evaluation run exists for their accepted contracts.
+- No production activation is approved by these rows.
+
+### Consequences
+
+Promotion work is no longer described as merely pending in generic terms. It is either durably deferred with a decision receipt or explicitly blocked on missing production evaluation substrate.
