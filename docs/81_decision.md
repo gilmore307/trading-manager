@@ -2282,3 +2282,24 @@ Every executable trade must include a valid `trade_risk_cap` before order constr
 - The registry may expose the shared checklist and risk-cap vocabulary without implying any model is production-approved or any live execution is enabled.
 - Model evidence remains model-owned until promoted through reviewed manager/control-plane contracts.
 - Execution implementation must call equivalent risk-cap validation before broker/account mutation.
+
+## D101 - Register trading-data closeout readiness policies
+
+Date: 2026-05-08
+Status: Accepted
+
+### Context
+
+`trading-data` has closed the current feed/source/feature model-input design phase, while production orchestration and durable storage contracts remain separate manager/storage work.
+
+### Decision
+
+Register the data closeout status, ETF holdings availability-time policy, and equity abnormal activity conservative model-standard/calibration status.
+
+Without explicit source/task `available_time`, ETF holdings candidate-preparation rows become visible at the next regular US session open after `as_of_date`. `equity_abnormal_activity_conservative_v1` is accepted as a conservative local standard, not as production-calibrated label evidence.
+
+### Consequences
+
+- Data closeout does not approve unattended production orchestration or final storage contracts.
+- Production labels or promoted gates must cite reviewed calibration evidence before relying on equity abnormal activity thresholds.
+- Manager/storage implementation still owns durable task, manifest, ready-signal, and storage contracts.

@@ -21,6 +21,7 @@
 
 ## Recently Accepted
 
+- Registered `trading-data` closeout readiness policies: data-source/model-input design closed, ETF holdings default visibility at next regular US session open after `as_of_date`, and `equity_abnormal_activity_conservative_v1` as conservative/non-production-calibrated until reviewed historical evidence exists.
 - Registered production-promotion readiness checklist/status matrix terms for Layers 1-8 and mandatory `trade_risk_cap` execution-safety vocabulary. This starts the manager/control-plane phase without implying production model approval or live execution enablement.
 - Registered all current `task_key.json` and `completion_receipt.json` field names as `kind=field` rows.
 - Updated task key/receipt templates so stable task keys can have multiple run entries in completion receipts.
