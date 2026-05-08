@@ -285,6 +285,8 @@ class RegistryHelperTests(unittest.TestCase):
             "MODEL_08_OPTION_EXPRESSION_GENERATE": "scripts/models/model_08_option_expression/generate_model_08_option_expression.py",
             "MODEL_08_OPTION_EXPRESSION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_08_option_expression/evaluate_model_08_option_expression.py",
             "MODEL_08_OPTION_EXPRESSION_REVIEW_PROMOTION": "scripts/models/model_08_option_expression/review_option_expression_promotion.py",
+            "FEATURE_04_EVENT_OVERLAY_GENERATE": "src/data_feature/feature_04_event_overlay/__main__.py",
+            "FEATURE_08_OPTION_EXPRESSION_GENERATE": "src/data_feature/feature_08_option_expression/__main__.py",
         }
         for key, expected_path in expected_layer_script_paths.items():
             self.assertEqual(rows[key]["kind"], "script")
@@ -423,6 +425,8 @@ class RegistryHelperTests(unittest.TestCase):
                 "FEATURE_01_MARKET_REGIME",
                 "FEATURE_02_SECTOR_CONTEXT",
                 "FEATURE_03_TARGET_STATE_VECTOR",
+                "FEATURE_04_EVENT_OVERLAY",
+                "FEATURE_08_OPTION_EXPRESSION",
             },
         )
         self.assertEqual(data_features["FEATURE_01_MARKET_REGIME"]["payload"], "feature_01_market_regime")
@@ -437,6 +441,10 @@ class RegistryHelperTests(unittest.TestCase):
             "data_feature/feature_03_target_state_vector",
             data_features["FEATURE_03_TARGET_STATE_VECTOR"]["path"],
         )
+        self.assertEqual(data_features["FEATURE_04_EVENT_OVERLAY"]["payload"], "feature_04_event_overlay")
+        self.assertIn("data_feature/feature_04_event_overlay", data_features["FEATURE_04_EVENT_OVERLAY"]["path"])
+        self.assertEqual(data_features["FEATURE_08_OPTION_EXPRESSION"]["payload"], "feature_08_option_expression")
+        self.assertIn("data_feature/feature_08_option_expression", data_features["FEATURE_08_OPTION_EXPRESSION"]["path"])
         self.assertIn("trading-data", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("market_regime_model", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         self.assertIn("source_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
@@ -444,6 +452,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("source_01_market_regime", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
         self.assertIn("model_03_target_state_vector", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
         self.assertIn("target_state_vector_model", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
+        self.assertIn("source_04_event_overlay", data_features["FEATURE_04_EVENT_OVERLAY"]["applies_to"])
+        self.assertIn("event_overlay_model", data_features["FEATURE_04_EVENT_OVERLAY"]["applies_to"])
+        self.assertIn("source_05_option_expression", data_features["FEATURE_08_OPTION_EXPRESSION"]["applies_to"])
+        self.assertIn("option_expression_model", data_features["FEATURE_08_OPTION_EXPRESSION"]["applies_to"])
         self.assertNotIn("feature_snapshots", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
