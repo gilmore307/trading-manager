@@ -88,7 +88,7 @@ Pure temp scratch should not receive contract ids. It may be deleted when the ru
 
 Not every contract becomes one SQL table. Some contracts are embedded references, registry-backed values, or JSON substructures inside a durable table. A contract should become a first-class SQL table when it has its own lifecycle, query surface, relationship fan-out, retention state, or audit obligation.
 
-The MVP implementation should therefore start with SQL tables for request, input binding, run, step, artifact reference, and ready-signal state. Component identity can initially be registry-backed fields on those tables instead of a separate component catalog table. Add a component catalog only when real query or lifecycle needs require it.
+The MVP implementation starts with SQL tables for request, input binding, run, step, artifact reference, and ready-signal state. Component identity is initially registry-backed fields on those tables instead of a separate component catalog table. Add a component catalog only when real query or lifecycle needs require it.
 
 ## Contract Inventory
 
@@ -505,14 +505,27 @@ The following must not be introduced as manager contracts unless a separate arch
 - secrets, tokens, private keys, or credential payloads;
 - component-local debug logs except as `artifact_ref_v1` references.
 
-## MVP Implementation Order
+## MVP Implementation Status
 
-1. Freeze `component_ref_v1`, `manager_request_v1`, `input_binding_v1`, `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` as the first implementation slice.
-2. Add schema validation helpers only after the field sets are accepted.
-3. Register any new contract type names, field names, and lifecycle statuses through SQL migrations.
-4. Implement persistence and validation for the MVP contracts.
-5. Add evaluation/promotion contracts once run/artifact/ready persistence is stable.
-6. Add downstream handoff contracts before connecting Layer 8 outputs to execution-owned workflows.
+The first implementation slice is intentionally small:
+
+| Contract | SQL table |
+|---|---|
+| `manager_request_v1` | `trading_manager.manager_request` |
+| `input_binding_v1` | `trading_manager.input_binding` |
+| `run_manifest_v1` | `trading_manager.run_manifest` |
+| `run_step_v1` | `trading_manager.run_step` |
+| `artifact_ref_v1` | `trading_manager.artifact_ref` |
+| `ready_signal_v1` | `trading_manager.ready_signal` |
+
+`component_ref_v1` is not a table yet. It is represented by registry-backed component/repo/version/entrypoint fields on the durable tables.
+
+Next implementation order:
+
+1. Add lightweight validation/helper code after the first real consumer appears.
+2. Add evaluation/promotion SQL tables once run/artifact/ready persistence is exercised.
+3. Add downstream handoff tables before connecting Layer 8 outputs to execution-owned workflows.
+4. Add a component catalog only if query or lifecycle pressure proves it is needed.
 
 ## Acceptance Checklist
 

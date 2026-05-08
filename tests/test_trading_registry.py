@@ -350,6 +350,42 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS", rows)
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS_BUNDLE_CONFIG", rows)
 
+    def test_manager_control_plane_contracts_are_registered_concisely(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        contract_payload = rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"]
+        for contract_name in {
+            "component_ref_v1",
+            "manager_request_v1",
+            "input_binding_v1",
+            "run_manifest_v1",
+            "run_step_v1",
+            "artifact_ref_v1",
+            "ready_signal_v1",
+        }:
+            self.assertIn(contract_name, contract_payload)
+
+        self.assertEqual(
+            rows["MANAGER_CONTRACT_SQL_TABLES"]["payload"],
+            "trading_manager.manager_request;trading_manager.input_binding;trading_manager.run_manifest;trading_manager.run_step;trading_manager.artifact_ref;trading_manager.ready_signal",
+        )
+        self.assertIn("contract_type;binding_id;input_role", rows["INPUT_BINDING_V1_REQUIRED_FIELDS"]["payload"])
+        self.assertIn("contract_type;step_id;run_id", rows["RUN_STEP_V1_REQUIRED_FIELDS"]["payload"])
+        self.assertIn("requested", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
+        self.assertIn("deleted", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
+
+        migration = Path("scripts/registry/sql/schema_migrations/249_create_manager_control_plane_contract_tables.sql").read_text()
+        for table_name in {
+            "manager_request",
+            "input_binding",
+            "run_manifest",
+            "run_step",
+            "artifact_ref",
+            "ready_signal",
+        }:
+            self.assertIn(f"trading_manager.{table_name}", migration)
+
     def test_event_database_scope_is_not_active(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             offenders = [
@@ -742,7 +778,15 @@ class RegistryHelperTests(unittest.TestCase):
             "maintenance_status",
             "docs_status",
         }
-        expected_domains = {"artifact_sync_policy_type"}
+        expected_domains = {
+            "artifact_sync_policy_type",
+            "manager_contract_lifecycle_status",
+            "manager_request_v1",
+            "run_manifest_v1",
+            "run_step_v1",
+            "artifact_ref_v1",
+            "ready_signal_v1",
+        }
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))

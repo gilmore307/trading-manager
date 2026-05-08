@@ -6,8 +6,7 @@
 
 ## Queued Tasks
 
-- Freeze and register the MVP manager contract type/field vocabulary from `docs/93_contracts.md`: SQL-backed `manager_request_v1`, `input_binding_v1`, `run_manifest_v1`, `run_step_v1`, `artifact_ref_v1`, and `ready_signal_v1`, with `component_ref_v1` initially registry-backed instead of a separate component catalog table.
-- Implement the first manager/control-plane execution slice for the accepted MVP contracts: request persistence, manifest persistence, artifact-ref persistence, ready-signal persistence, and validation.
+- Implement lightweight validation/helper code for the accepted MVP manager contract tables after the first real consumer appears.
 - Implement execution handoff validation for mandatory `trade_risk_cap` before any broker/order mutation path.
 
 ## Deferred Until Manager Phase
@@ -24,6 +23,7 @@
 
 ## Recently Accepted
 
+- Implemented and registered the concise MVP manager/control-plane SQL tables: `trading_manager.manager_request`, `trading_manager.input_binding`, `trading_manager.run_manifest`, `trading_manager.run_step`, `trading_manager.artifact_ref`, and `trading_manager.ready_signal`. `component_ref_v1` remains registry-backed fields rather than a separate component catalog table.
 - Added first-principles manager contract design in `docs/93_contracts.md`, including core MVP contracts, evaluation/promotion contracts, downstream handoff contracts, ownership boundaries, lifecycle relationships, persistence policy, and implementation order.
 - Registered manager/storage V1 handoff contracts and hardening policies: `manager_request_v1`, `run_manifest_v1`, `artifact_ref_v1`, `ready_signal_v1`, live-call guardrails, checkpoint/resume policy, and data-production hardening policy.
 - Registered full production-promotion closeout decisions: Layers 1-2 have real database evidence and persisted deferred decisions; Layer 3 now has real production-evaluation substrate but remains deferred by upstream approvals/calibration; Layers 4-8 have persisted blocked eval runs, metrics, candidates, and reviewer-agent deferred decisions for missing production eval substrate; no production activation is approved.
