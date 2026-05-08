@@ -21,7 +21,7 @@
 
 ## Recently Accepted
 
-- Registered full production-promotion closeout decisions: Layers 1-2 have real database evidence and persisted deferred decisions; Layers 3-8 have persisted blocked eval runs, metrics, candidates, and deferred decisions for missing production eval substrate; no production activation is approved.
+- Registered full production-promotion closeout decisions: Layers 1-2 have real database evidence and persisted deferred decisions; Layers 3-8 have persisted blocked eval runs, metrics, candidates, and reviewer-agent deferred decisions for missing production eval substrate; no production activation is approved.
 - Registered `trading-data` closeout readiness policies: data-source/model-input design closed, ETF holdings default visibility at next regular US session open after `as_of_date`, and `equity_abnormal_activity_conservative_v1` as conservative/non-production-calibrated until reviewed historical evidence exists.
 - Registered production-promotion readiness checklist/status matrix terms for Layers 1-8 and mandatory `trade_risk_cap` execution-safety vocabulary. This starts the manager/control-plane phase without implying production model approval or live execution enablement.
 - Registered all current `task_key.json` and `completion_receipt.json` field names as `kind=field` rows.

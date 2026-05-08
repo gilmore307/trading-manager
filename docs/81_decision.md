@@ -2319,9 +2319,28 @@ Register the current production-promotion closeout state:
 
 - Layer 1 has real PostgreSQL evaluation evidence and persisted deferred decision `mpdec_d743cb5dbc8159f2`.
 - Layer 2 has real PostgreSQL evaluation evidence and persisted deferred decision `mpdec_3ab83ea1f423326d`.
-- Layers 3-8 have persisted blocked eval runs, `production_eval_run_available = 0` metrics, candidates, and deferred decisions for missing production evaluation substrate: `mpdec_31899733788d324d`, `mpdec_c118afa20c4e9bf2`, `mpdec_dc408c9914a4723a`, `mpdec_7b9d7279fecfdf6a`, `mpdec_5e6e83b02ccda12e`, and `mpdec_90721592be6591c8`.
+- Layers 3-8 have persisted blocked eval runs, `production_eval_run_available = 0` metrics, candidates, and reviewer-agent deferred decisions for missing production evaluation substrate: `mpdec_d8e027dd9b5aa939`, `mpdec_76b07ea01a3f525b`, `mpdec_9c3e19d6559ef55b`, `mpdec_b118232e76fae092`, `mpdec_fabc9c709149a698`, and `mpdec_e7448aaab1334345`.
 - No production activation is approved by these rows.
 
 ### Consequences
 
 Promotion work is no longer described as merely pending in generic terms. Every Layer 1-8 model now has a durable deferred decision receipt; Layers 3-8 receipts identify missing production evaluation substrate as the blocker.
+
+## D103 - Register Layer 3-8 agent-reviewed promotion closeout entrypoint
+
+Date: 2026-05-08
+Status: Accepted
+
+### Context
+
+Layers 3-8 originally had formal blocked receipts, but Chentong clarified that they should follow the same promotion principle as Layers 1-2: the script must call the reviewer agent for the final audit before persisting the closeout decision.
+
+### Decision
+
+Register `REVIEW_LAYERS_03_08_PROMOTION_CLOSEOUT` as the stable callable script for Layer 3-8 promotion closeout. The script builds blocked evaluation artifacts when production eval substrate is missing, creates candidates, calls the reviewer agent, persists deferred decisions, and does not activate configs.
+
+### Consequences
+
+- Layers 3-8 closeout is now explicitly agent-reviewed instead of only mechanically deferred.
+- The registry points to the callable script path and current reviewed decision receipts.
+- Missing production eval substrate still blocks approval; the new entrypoint changes the review path, not the outcome.
