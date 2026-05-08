@@ -6,22 +6,25 @@
 
 ## Queued Tasks
 
-- Execute manager/control-plane contracts now that Layers 1-8 model design is closed: production-promotion routing, unified decision records, artifact/ready-signal contracts, and execution handoff validation.
+- Implement the first manager/control-plane execution slice for the registered V1 handoff contracts: request persistence, manifest persistence, artifact-ref persistence, ready-signal persistence, and validation.
+- Implement execution handoff validation for mandatory `trade_risk_cap` before any broker/order mutation path.
 
 ## Deferred Until Manager Phase
 
-- Define data task key/request schemas, completion-receipt schemas, artifact references, manifests, ready signals, request schemas, shared storage root, and migration criteria from legacy local data-production staging files into durable `trading-storage` SQL/artifact contracts.
-- Promote concrete templates from `trading-storage/main/templates/contracts/` only after all model layers are designed and the `trading-manager` development phase begins.
-- Until then, keep current registry rows as reviewed naming/state-vector semantics, not as final durable manager/storage interface contracts.
+- Physical queue/storage implementation for `manager_request_v1`, `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1`.
+- Migration criteria from legacy local data-production staging files into durable `trading-storage` SQL/artifact contracts.
+- Exact unified decision-record artifact implementation beyond the registered readiness/risk-cap vocabulary.
 
 ## Open Gaps
 
-- Concrete unified decision-record artifact schema remains to be implemented after the newly registered readiness/risk-cap vocabulary.
-- Durable manager/storage interface gaps remain intentionally deferred above.
+- Concrete SQL/storage implementation for the registered V1 handoff contracts.
+- Concrete unified decision-record artifact implementation.
+- Execution-side risk-cap validator integration in `trading-execution`.
 
 ## Recently Accepted
 
-- Registered full production-promotion closeout decisions: Layers 1-2 have real database evidence and persisted deferred decisions; Layers 3-8 have persisted blocked eval runs, metrics, candidates, and reviewer-agent deferred decisions for missing production eval substrate; no production activation is approved.
+- Registered manager/storage V1 handoff contracts and hardening policies: `manager_request_v1`, `run_manifest_v1`, `artifact_ref_v1`, `ready_signal_v1`, live-call guardrails, checkpoint/resume policy, and data-production hardening policy.
+- Registered full production-promotion closeout decisions: Layers 1-2 have real database evidence and persisted deferred decisions; Layer 3 now has real production-evaluation substrate but remains deferred by upstream approvals/calibration; Layers 4-8 have persisted blocked eval runs, metrics, candidates, and reviewer-agent deferred decisions for missing production eval substrate; no production activation is approved.
 - Registered `trading-data` closeout readiness policies: data-source/model-input design closed, ETF holdings default visibility at next regular US session open after `as_of_date`, and `equity_abnormal_activity_conservative_v1` as conservative/non-production-calibrated until reviewed historical evidence exists.
 - Registered production-promotion readiness checklist/status matrix terms for Layers 1-8 and mandatory `trade_risk_cap` execution-safety vocabulary. This starts the manager/control-plane phase without implying production model approval or live execution enablement.
 - Registered all current `task_key.json` and `completion_receipt.json` field names as `kind=field` rows.

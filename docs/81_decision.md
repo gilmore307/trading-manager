@@ -2365,3 +2365,34 @@ This registration does not approve Layer 3 production use. The decision remains 
 - Layer 3 is no longer blocked for missing evaluation substrate; it is blocked for upstream approvals and calibration.
 - Layers 4-8 remain blocked for missing production eval runs, labels, and metrics.
 - No deferred decision may create a production activation row or active config pointer.
+
+## D105 - Register manager/storage V1 handoff contracts
+
+Date: 2026-05-08
+Status: Accepted
+
+### Context
+
+Some remaining work does not depend on accumulated production trading data: request shape, manifest evidence, artifact references, ready signals, live-call guardrails, and checkpoint/resume evidence can be defined now.
+
+### Decision
+
+Register the storage-owned V1 logical handoff contracts and hardening policies:
+
+- `manager_request_v1`
+- `run_manifest_v1`
+- `artifact_ref_v1`
+- `ready_signal_v1`
+- live-call guardrails policy
+- checkpoint/resume policy
+- data-production hardening policy
+
+Register initial request, manifest, artifact, and ready-signal type vocabulary for data-source, data-feature, model-generate, model-evaluate, model-review, registry-snapshot, and promotion-review handoffs.
+
+This decision defines shared vocabulary and contract shape. It does not implement physical SQL queues/storage, authorize unattended live provider calls, approve model promotion, or enable broker execution.
+
+### Consequences
+
+- Future manager/storage implementation must follow these V1 contract names instead of reviving local-only completion receipt drafts as final interfaces.
+- `trading-data` production hardening can refer to the same request/manifest/artifact/ready-signal vocabulary without waiting for model promotion.
+- `trading-model` production artifacts remain model-owned until manager/storage persistence and ready-signal implementation are accepted.
