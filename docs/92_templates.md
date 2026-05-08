@@ -9,7 +9,7 @@ The earlier docs stay project-wide:
 - `00_scope.md`, `01_context.md`, and `80_`/`81_`/`82_` describe the whole trading platform repository and its governance; `02_`/`03_` layer docs own layer workflow and acceptance.
 - This file describes the `trading-storage/main/templates/` platform function specifically.
 
-Templates exist to keep drafting consistent without mistaking drafts for accepted contracts or concrete registry entries. `trading-storage` owns the checked-in non-code asset location; `trading-manager` owns the registry and operating rules for shared names introduced by those assets.
+Templates exist to keep drafting consistent without mistaking drafts for accepted contracts or concrete registry entries. `trading-storage` owns the checked-in non-code asset location; `trading-manager` owns the registry, contract design, and operating rules for shared names introduced by those assets. See `93_contracts.md` for the first-principles manager contract inventory and field skeletons.
 
 ## What Templates Own
 
@@ -89,12 +89,13 @@ Rules:
 
 Normal flow for a shared contract shape:
 
-1. Draft the shape in `trading-storage/main/templates/contracts/`.
-2. Identify fields, type values, and status values that need registry entries.
-3. Register shared names through SQL migrations under `scripts/registry/sql/schema_migrations/`.
-4. Regenerate `scripts/registry/current.csv`.
-5. Update workflow and acceptance docs if the contract becomes binding.
-6. Route implementation work to the owning component repositories.
+1. Design the contract boundary and field skeleton in `docs/93_contracts.md` when it is trading-wide manager/control-plane vocabulary.
+2. Draft reusable format examples in `trading-storage/main/templates/contracts/` when a non-code template is useful.
+3. Identify fields, type values, and status values that need registry entries.
+4. Register shared names through SQL migrations under `scripts/registry/sql/schema_migrations/`.
+5. Regenerate `scripts/registry/current.csv`.
+6. Update workflow and acceptance docs if the contract becomes binding.
+7. Route implementation work to the owning component repositories.
 
 ## Data Task Template Status
 

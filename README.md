@@ -34,9 +34,10 @@ docs/
   90_helpers.md
   91_registry.md
   92_templates.md
+  93_contracts.md
 ```
 
-Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` and `01_context.md` own the platform boundary, `02_`/`03_` layer docs own current cross-repository naming/control-plane workflows plus acceptance gates, `80_`/`81_`/`82_` own task/decision/memory, and `90_helpers.md`, `91_registry.md`, and `92_templates.md` explain the three platform functions this repository owns.
+Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` and `01_context.md` own the platform boundary, `02_`/`03_` layer docs own current cross-repository naming/control-plane workflows plus acceptance gates, `80_`/`81_`/`82_` own task/decision/memory, and `90_helpers.md`, `91_registry.md`, `92_templates.md`, and `93_contracts.md` explain the platform functions this repository owns.
 
 ## Registry Rule
 
@@ -48,7 +49,7 @@ Concrete registry entries live in the SQL-backed `trading_registry` table. The n
 
 Registry ids are stable automation references. Registry keys are human-readable labels and may be renamed by reviewed migrations. Use id-based helpers in code.
 
-See `docs/90_helpers.md`, `docs/91_registry.md`, and `docs/92_templates.md` for platform-function guides.
+See `docs/90_helpers.md`, `docs/91_registry.md`, `docs/92_templates.md`, and `docs/93_contracts.md` for platform-function guides.
 
 ## Shared Environment Rule
 
