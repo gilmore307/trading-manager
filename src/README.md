@@ -38,6 +38,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - artifact path/reference helpers;
 - manifest helpers;
 - request and ready-signal helpers;
+- component completion receipt normalization helpers;
 - shared validation utilities;
 - reusable Python packages consumed by component repositories.
 

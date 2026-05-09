@@ -6,8 +6,7 @@
 
 ## Queued Tasks
 
-- Use `docs/94_monthly_backfill.md` and `scripts/tasks/plan_monthly_backfill.py` to review the first bounded monthly backfill batch before enabling live provider calls.
-- Implement lightweight validation/helper code for the accepted MVP manager contract tables after the first real consumer appears.
+- Use `docs/94_monthly_backfill.md`, `scripts/tasks/plan_monthly_backfill.py`, `scripts/tasks/submit_manager_requests.py`, and `scripts/tasks/record_completion_receipt.py` to review the first bounded monthly backfill request/receipt batch before enabling live provider calls.
 - Implement execution handoff validation for mandatory `trade_risk_cap` before any broker/order mutation path.
 
 ## Deferred Until Manager Phase
@@ -18,12 +17,13 @@
 
 ## Open Gaps
 
-- Storage-owned artifact payload implementation for the registered V1 handoff contracts.
+- Storage-owned artifact payload implementation for bulky request parameter bodies and completion receipt payloads.
 - Concrete unified decision-record artifact implementation.
 - Execution-side risk-cap validator integration in `trading-execution`.
 
 ## Recently Accepted
 
+- Added unified manager task-system request/receipt handling: manager requests are validated/persisted centrally, and component completion receipts normalize into run-manifest, artifact-ref, and ready-signal facts.
 - Added monthly historical backfill planning: common start `2016-01`, OKX crypto joins at `2018-01`, and current-only feeds stay out of historical point-in-time backfill until a new route is accepted.
 - Implemented and registered the concise MVP manager/control-plane SQL tables: `trading_manager.manager_request`, `trading_manager.input_binding`, `trading_manager.run_manifest`, `trading_manager.run_step`, `trading_manager.artifact_ref`, and `trading_manager.ready_signal`. `component_ref_v1` remains registry-backed fields rather than a separate component catalog table.
 - Added first-principles manager contract design in `docs/93_contracts.md`, including core MVP contracts, evaluation/promotion contracts, downstream handoff contracts, ownership boundaries, lifecycle relationships, persistence policy, and implementation order.

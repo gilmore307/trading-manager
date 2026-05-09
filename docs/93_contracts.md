@@ -460,8 +460,11 @@ This is a reference to execution-owned intent handling. It must not include brok
 
 ## Lifecycle Relationship
 
+All component work uses the same task-system skeleton. Manager issues requests; components return completion receipts; manager records the durable receipt summary as run, artifact, and ready-signal facts.
+
 ```text
 manager_request_v1
+  -> component completion receipt
   -> input_binding_v1[]
   -> run_manifest_v1
        -> run_step_v1[]
@@ -520,9 +523,11 @@ The first implementation slice is intentionally small:
 
 `component_ref_v1` is not a table yet. It is represented by registry-backed component/repo/version/entrypoint fields on the durable tables.
 
+The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, and `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows.
+
 Next implementation order:
 
-1. Add lightweight validation/helper code after the first real consumer appears.
+1. Exercise the request/receipt scripts on the first reviewed monthly backfill batch before enabling live provider calls.
 2. Add evaluation/promotion SQL tables once run/artifact/ready persistence is exercised.
 3. Add downstream handoff tables before connecting Layer 8 outputs to execution-owned workflows.
 4. Add a component catalog only if query or lifecycle pressure proves it is needed.

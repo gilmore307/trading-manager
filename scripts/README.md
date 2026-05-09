@@ -22,6 +22,8 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `registry/rules/` — normative registry table, kind-routing, and naming rules that constrain SQL row shape.
 - `registry/sql/schema_migrations/` — append-only SQL migrations for registry schema and active row changes.
 - `tasks/plan_monthly_backfill.py` — emits deterministic dry-run `manager_request_v1` rows for monthly historical data backfill planning.
+- `tasks/submit_manager_requests.py` — validates or persists manager request rows.
+- `tasks/record_completion_receipt.py` — normalizes or persists component completion receipts into manager run/artifact/ready rows.
 
 ## Run
 
@@ -30,6 +32,8 @@ python3 scripts/registry/apply_registry_migrations.py
 python3 scripts/registry/apply_registry_migrations.py --dry-run
 python3 scripts/registry/apply_registry_migrations.py --export-only
 PYTHONPATH=src python3 scripts/tasks/plan_monthly_backfill.py --start-month 2016-01 --end-month 2016-03 --format jsonl
+PYTHONPATH=src python3 scripts/tasks/submit_manager_requests.py requests.jsonl
+PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_receipt.json --request-id mgrreq_example --component-id component --repo-id trading-data --receipt-uri storage://example/completion_receipt.json
 ```
 
 The SQL `trading_registry.kind` constraint and `scripts/registry/kinds/*.md` files must stay aligned. Tests compare those sources directly.

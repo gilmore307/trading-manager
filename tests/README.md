@@ -18,6 +18,13 @@
   - current-only feeds staying out of historical backfill requests;
   - dry-run `manager_request_v1` JSONL shape.
 
+- `test_task_control_plane.py` verifies:
+  - generic `manager_request_v1` validation;
+  - component completion receipt normalization into run/artifact/ready rows;
+  - failed receipts do not emit ready status;
+  - malformed receipts are rejected;
+  - JSONL request loading.
+
 - `test_trading_bigquery.py` verifies:
   - BigQuery query-result metadata parsing for dry-run byte estimates;
   - query request payload handling for `maximumBytesBilled` and dry-run flags.

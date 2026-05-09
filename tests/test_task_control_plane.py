@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from trading_manager_tasks.control_plane import (
+    TaskSystemError,
+    load_json_or_jsonl,
+    normalize_completion_receipt,
+    validate_manager_request,
+)
+
+
+class TaskControlPlaneTests(unittest.TestCase):
+    def test_validate_manager_request_keeps_component_request_shape(self):
+        row = validate_manager_request(
+            {
+                "request_id": "mgrreq_sample",
+                "request_kind": "data_backfill_month_v1",
+                "requested_by": "openclaw",
+                "target_component_id": "01_feed_alpaca_bars",
+                "target_component_kind": "data_feed",
+                "target_repo_id": "trading-data",
+                "expected_outputs": "storage://example/output/",
+                "policy_refs": ["monthly_backfill_v1"],
+                "parameter_ref": "storage://example/task_key.json",
+            }
+        )
+
+        self.assertEqual(row["contract_type"], "manager_request_v1")
+        self.assertEqual(row["status"], "requested")
+        self.assertEqual(row["expected_outputs"], ["storage://example/output/"])
+        self.assertTrue(row["dry_run"])
+
+    def test_completion_receipt_normalizes_to_run_artifact_and_ready_signal(self):
+        receipt = {
+            "task_id": "task_001",
+            "bundle": "alpaca_bars",
+            "runs": [
+                {
+                    "run_id": "run_001",
+                    "status": "succeeded",
+                    "started_at": "2026-05-09T01:00:00Z",
+                    "completed_at": "2026-05-09T01:01:00Z",
+                    "outputs": ["storage://example/equity_bar.csv"],
+                    "row_counts": {"equity_bar": 10},
+                    "error": None,
+                }
+            ],
+        }
+
+        rows = normalize_completion_receipt(
+            receipt,
+            request_id="mgrreq_001",
+            component_id="01_feed_alpaca_bars",
+            component_kind="data_feed",
+            repo_id="trading-data",
+            receipt_uri="storage://example/completion_receipt.json",
+            receipt_hash="sha256:abc",
+            parameter_ref="storage://example/task_key.json",
+        )
+
+        self.assertEqual(rows.run_manifests[0]["run_id"], "run_001")
+        self.assertEqual(rows.run_manifests[0]["status"], "succeeded")
+        self.assertEqual(rows.artifact_refs[0]["artifact_kind"], "component_completion_receipt")
+        self.assertEqual(rows.artifact_refs[0]["row_count"], 10)
+        self.assertEqual(rows.artifact_refs[1]["artifact_kind"], "component_output")
+        self.assertEqual(rows.artifact_refs[1]["uri"], "storage://example/equity_bar.csv")
+        self.assertEqual(rows.ready_signals[0]["signal_kind"], "component_task_ready")
+        self.assertEqual(rows.ready_signals[0]["status"], "ready")
+        self.assertEqual(rows.ready_signals[0]["artifact_refs"], ["art_receipt_run_001", "art_output_run_001_001"])
+
+    def test_failed_receipt_does_not_emit_ready_status(self):
+        receipt = {
+            "run_id": "run_failed",
+            "status": "failed",
+            "started_at": "2026-05-09T01:00:00Z",
+            "completed_at": "2026-05-09T01:01:00Z",
+            "error": {"type": "ProviderError", "message": "rate limited"},
+        }
+
+        rows = normalize_completion_receipt(
+            receipt,
+            request_id="mgrreq_failed",
+            component_id="05_feed_gdelt_news",
+            component_kind="data_feed",
+            repo_id="trading-data",
+            receipt_uri="storage://example/failed_receipt.json",
+        )
+
+        self.assertEqual(rows.run_manifests[0]["status"], "failed")
+        self.assertEqual(rows.ready_signals[0]["status"], "failed")
+        self.assertIn("rate limited", rows.ready_signals[0]["blocking_reason"])
+
+    def test_missing_started_at_is_rejected(self):
+        with self.assertRaises(TaskSystemError):
+            normalize_completion_receipt(
+                {"run_id": "run_missing", "status": "succeeded"},
+                request_id="mgrreq_missing",
+                component_id="component",
+                component_kind="data_feed",
+                repo_id="trading-data",
+                receipt_uri="storage://example/receipt.json",
+            )
+
+    def test_jsonl_loader_accepts_planner_output_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "requests.jsonl"
+            path.write_text(
+                json.dumps(
+                    {
+                        "request_id": "mgrreq_one",
+                        "request_kind": "data_backfill_month_v1",
+                        "requested_by": "openclaw",
+                        "target_component_id": "01_feed_alpaca_bars",
+                        "target_repo_id": "trading-data",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            rows = load_json_or_jsonl(path)
+
+        self.assertEqual(rows[0]["request_id"], "mgrreq_one")
+
+
+if __name__ == "__main__":
+    unittest.main()
