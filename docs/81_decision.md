@@ -2473,3 +2473,12 @@ No active manager-phase tasks remain. Future work is deferred until a concrete c
 - `trading-manager` remains the control-plane owner, but it must not pretend to own component runtime implementation.
 - The closeout does not approve production model activation, live broker execution, or unattended provider orchestration.
 - New manager work should start from a specific consumer and acceptance gate, not from broad cleanup.
+
+## D109 - Register price-action event overlay contract
+
+Date: 2026-05-09
+Status: Accepted
+
+The registry owns the shared Layer 4 price-action vocabulary: `price_action` as an `event_category_type` value and canonical event tokens `false_breakout`, `false_breakdown`, `liquidity_sweep_high`, `liquidity_sweep_low`, `bull_trap`, and `bear_trap`.
+
+The registry policy is explicit: price-action evidence is Layer 4 event-overlay evidence and optional Layer 3/5 context. It is not a new model layer, not an action signal, and not execution permission.
