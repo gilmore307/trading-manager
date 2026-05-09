@@ -4,6 +4,7 @@ from .control_plane import (
     CompletionReceiptRows,
     TASK_PRIORITY_RANKS,
     TASK_SUMMARY_ORDER_BY,
+    fetch_input_bindings,
     fetch_manager_requests,
     fetch_task_summary,
     normalize_completion_receipt,
@@ -30,6 +31,11 @@ from .request_payloads import (
     materialize_request_payload,
     materialize_request_payloads,
 )
+from .request_handoff import (
+    RequestHandoffValidation,
+    validate_request_handoff,
+    validate_request_handoffs,
+)
 from .task_rehearsal import (
     build_rehearsal_receipt,
     build_rehearsal_task_summary,
@@ -53,6 +59,7 @@ __all__ = [
     "build_rehearsal_task_summary",
     "PARAMETER_SCHEMA_REF",
     "build_request_task_payload",
+    "fetch_input_bindings",
     "fetch_manager_requests",
     "fetch_task_summary",
     "iter_monthly_windows",
@@ -63,5 +70,8 @@ __all__ = [
     "persist_rehearsal",
     "plan_monthly_backfill_requests",
     "rehearse_monthly_backfill_task_system",
+    "RequestHandoffValidation",
     "validate_manager_request",
+    "validate_request_handoff",
+    "validate_request_handoffs",
 ]

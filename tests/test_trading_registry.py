@@ -387,6 +387,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MANAGER_REQUEST_PARAMETER_PAYLOAD_V1"]["payload"], "manager_request_parameter_payload_v1")
         self.assertNotEqual(rows["COMPONENT_OUTPUT_ARTIFACT"]["id"], rows["MANAGER_REQUEST_PARAMETER_PAYLOAD_V1"]["id"])
         self.assertIn("materialize_request_payloads.py", rows["MANAGER_REQUEST_PAYLOAD_MATERIALIZE"]["path"])
+        self.assertIn("validate_request_handoff.py", rows["MANAGER_REQUEST_HANDOFF_VALIDATE"]["path"])
         self.assertIn("contract_type;binding_id;input_role", rows["INPUT_BINDING_V1_REQUIRED_FIELDS"]["payload"])
         self.assertIn("contract_type;step_id;run_id", rows["RUN_STEP_V1_REQUIRED_FIELDS"]["payload"])
         self.assertIn("requested", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
@@ -410,6 +411,9 @@ class RegistryHelperTests(unittest.TestCase):
         payload_migration = Path("scripts/registry/sql/schema_migrations/258_register_request_payload_materialization.sql").read_text()
         self.assertIn("MANAGER_REQUEST_PARAMETER_PAYLOAD_V1", payload_migration)
         self.assertIn("MANAGER_REQUEST_PAYLOAD_MATERIALIZE", payload_migration)
+
+        handoff_migration = Path("scripts/registry/sql/schema_migrations/260_register_request_handoff_validation.sql").read_text()
+        self.assertIn("MANAGER_REQUEST_HANDOFF_VALIDATE", handoff_migration)
 
     def test_event_database_scope_is_not_active(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:

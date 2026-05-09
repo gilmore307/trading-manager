@@ -96,6 +96,16 @@ PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py \
 
 The second command is still handoff preparation only: it writes local task-key payloads and request-scoped input bindings, but it does not call providers or dispatch component work.
 
+Validate that a materialized payload is component-readable before dispatching work:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py \
+  --from-db \
+  --request-id mgrreq_backfill_alpaca_bars_2016_01
+```
+
+This imports the target `trading-data` feed pipeline and calls only `build_context`. It verifies the request, payload, hash-backed `input_binding_v1`, dry-run live-call policy, and component task-key shape. It does not call component `run`, does not call providers, does not write completion receipts, and does not change task status.
+
 Run a deterministic in-memory rehearsal of the request/receipt/summary lifecycle without provider calls or SQL writes:
 
 ```bash

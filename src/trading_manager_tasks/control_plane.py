@@ -481,6 +481,37 @@ def fetch_manager_requests(
             return [dict(row) for row in cursor.fetchall()]
 
 
+def fetch_input_bindings(
+    *,
+    database_url: str | None = None,
+    request_ids: Sequence[str] | None = None,
+    input_role: str | None = None,
+    schema_ref: str | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch input_binding rows for request handoff validation."""
+
+    import psycopg
+    from psycopg.rows import dict_row
+
+    predicates = []
+    params: list[Any] = []
+    if request_ids:
+        predicates.append("request_id = ANY(%s)")
+        params.append(list(request_ids))
+    if input_role:
+        predicates.append("input_role = %s")
+        params.append(input_role)
+    if schema_ref:
+        predicates.append("schema_ref = %s")
+        params.append(schema_ref)
+    where_sql = " WHERE " + " AND ".join(predicates) if predicates else ""
+    sql = f"SELECT {', '.join(INPUT_BINDING_COLUMNS)} FROM trading_manager.input_binding{where_sql} ORDER BY request_id ASC, binding_id ASC"
+    with psycopg.connect(_db_url(database_url), row_factory=dict_row) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            return [dict(row) for row in cursor.fetchall()]
+
+
 def persist_completion_rows(rows: CompletionReceiptRows, *, database_url: str | None = None) -> None:
     url = _db_url(database_url)
     _execute_many(url, "trading_manager.run_manifest", RUN_MANIFEST_COLUMNS, rows.run_manifests)

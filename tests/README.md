@@ -29,6 +29,11 @@
   - request-scoped `input_binding_v1` metadata captures parameter payload refs and hashes;
   - all default `2016-01` monthly backfill feeds receive required starter params.
 
+- `test_request_handoff.py` verifies:
+  - materialized request payloads load through component `build_context` without dispatch/provider calls;
+  - hash-backed `input_binding_v1` metadata must match the local payload;
+  - live-call-enabled payloads are rejected by the dry-run handoff validator.
+
 - `test_task_control_plane.py` verifies:
   - generic `manager_request_v1` validation;
   - component completion receipt normalization into run/artifact/ready rows;
