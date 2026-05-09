@@ -6,8 +6,8 @@
 
 ## Queued Tasks
 
-- Review the remaining six bounded monthly backfill dry-run requests through the same request payload, handoff, storage receipt-payload, and manager receipt closeout path before enabling live provider calls.
 - Use `docs/96_model_promotion.md`, `scripts/tasks/plan_model_promotion_review.py`, and `scripts/tasks/build_review_decision.py` as the single manager-side route for every model-layer promotion review request/decision artifact.
+- Before enabling live provider calls, define and review the live-call approval gate that converts dry-run backfill requests into actual component dispatch.
 
 ## Deferred Until Manager Phase
 
@@ -21,7 +21,7 @@
 
 ## Recently Accepted
 
-- Closed the first bounded real dry-run monthly request/receipt path for `mgrreq_backfill_alpaca_bars_2016_01`: storage-owned receipt payload was materialized in `trading-storage`, manager normalized it into SQL run/artifact/ready rows, and `task_summary` now reports the dry-run request as `ready` with `artifact_count=1`; no provider calls, component run, or production data output occurred.
+- Closed all seven bounded `2016-01` dry-run monthly request/receipt paths: storage-owned receipt payloads were materialized in `trading-storage`, manager normalized them into SQL run/artifact/ready rows, and `task_summary` now reports each dry-run request as `ready` with `artifact_count=1`; no provider calls, component runs, or production data outputs occurred.
 - Registered storage receipt-payload and execution risk-cap validation entrypoints through migration `262_register_storage_receipt_and_risk_cap_entrypoints.sql`.
 - Added concrete unified review decision artifacts: `review_decision_v1` and `activation_record_v1` builders/tests, plus script `scripts/tasks/build_review_decision.py`. Activation records require an approving review decision.
 - Added component-facing handoff validation: `scripts/tasks/validate_request_handoff.py` loads materialized request payloads, verifies hash-backed input bindings and dry-run policy, and calls only target component `build_context` without dispatching work or calling providers.
