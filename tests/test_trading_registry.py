@@ -388,6 +388,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotEqual(rows["COMPONENT_OUTPUT_ARTIFACT"]["id"], rows["MANAGER_REQUEST_PARAMETER_PAYLOAD_V1"]["id"])
         self.assertIn("materialize_request_payloads.py", rows["MANAGER_REQUEST_PAYLOAD_MATERIALIZE"]["path"])
         self.assertIn("validate_request_handoff.py", rows["MANAGER_REQUEST_HANDOFF_VALIDATE"]["path"])
+        self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision_v1")
+        self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "activation_record_v1")
+        self.assertIn("build_review_decision.py", rows["MANAGER_REVIEW_DECISION_BUILD"]["path"])
+        self.assertEqual(rows["COMPONENT_COMPLETION_RECEIPT_PAYLOAD_V1"]["payload"], "component_completion_receipt_payload_v1")
+        self.assertIn("store_completion_receipt_payload.py", rows["STORAGE_COMPLETION_RECEIPT_PAYLOAD_STORE"]["path"])
+        self.assertIn("validate_trade_risk_cap.py", rows["TRADE_RISK_CAP_VALIDATE"]["path"])
         self.assertIn("contract_type;binding_id;input_role", rows["INPUT_BINDING_V1_REQUIRED_FIELDS"]["payload"])
         self.assertIn("contract_type;step_id;run_id", rows["RUN_STEP_V1_REQUIRED_FIELDS"]["payload"])
         self.assertIn("requested", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
@@ -414,6 +420,14 @@ class RegistryHelperTests(unittest.TestCase):
 
         handoff_migration = Path("scripts/registry/sql/schema_migrations/260_register_request_handoff_validation.sql").read_text()
         self.assertIn("MANAGER_REQUEST_HANDOFF_VALIDATE", handoff_migration)
+
+        decision_migration = Path("scripts/registry/sql/schema_migrations/261_register_review_decision_artifacts.sql").read_text()
+        self.assertIn("REVIEW_DECISION_ARTIFACT", decision_migration)
+        self.assertIn("MANAGER_REVIEW_DECISION_BUILD", decision_migration)
+
+        integration_migration = Path("scripts/registry/sql/schema_migrations/262_register_storage_receipt_and_risk_cap_entrypoints.sql").read_text()
+        self.assertIn("STORAGE_COMPLETION_RECEIPT_PAYLOAD_STORE", integration_migration)
+        self.assertIn("TRADE_RISK_CAP_VALIDATE", integration_migration)
 
     def test_event_database_scope_is_not_active(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:

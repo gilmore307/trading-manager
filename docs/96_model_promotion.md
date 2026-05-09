@@ -37,7 +37,7 @@ The request carries concise control-plane facts:
 
 The full review payload belongs behind `parameter_ref`, not inside manager SQL.
 
-## Script
+## Scripts
 
 Plan review requests without mutating SQL:
 
@@ -58,6 +58,18 @@ PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py \
 ```
 
 Add `--write` only after the request payload has been reviewed. `--write` persists the request rows to `trading_manager.manager_request`; it does not approve promotion and does not activate configs.
+
+Build a generic review decision artifact:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/build_review_decision.py \
+  --review-target-ref storage://trading-model/promotion-candidates/mpcand_example.json \
+  --decision-status defer \
+  --decision-reason "missing production calibration evidence" \
+  --condition supply_real_sample_eval
+```
+
+`review_decision_v1` is an artifact-level decision record. Only `decision_status=approve` can be used to build an `activation_record_v1`; deferred, rejected, failed, partial, revoked, or superseded decisions cannot activate configs.
 
 ## Boundary
 

@@ -29,6 +29,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/list_task_summary.py` — lists global task summary rows in priority order.
 - `tasks/rehearse_task_system.py` — runs a deterministic request/receipt/summary rehearsal without provider calls; add `--write` only to persist rehearsal-only rows to manager SQL.
 - `tasks/plan_model_promotion_review.py` — plans one unified manager-side promotion-review request shape for any model layer.
+- `tasks/build_review_decision.py` — builds generic `review_decision_v1` artifacts without activation side effects.
 
 ## Run
 
@@ -44,6 +45,7 @@ PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_rec
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl
 PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_08_option_expression --candidate-ref trading-model://promotion-candidates/mpcand_example
+PYTHONPATH=src python3 scripts/tasks/build_review_decision.py --review-target-ref storage://trading-model/promotion-candidates/mpcand_example.json --decision-status defer --decision-reason "missing production calibration evidence"
 ```
 
 The SQL `trading_registry.kind` constraint and `scripts/registry/kinds/*.md` files must stay aligned. Tests compare those sources directly.

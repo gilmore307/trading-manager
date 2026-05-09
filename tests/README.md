@@ -34,6 +34,11 @@
   - hash-backed `input_binding_v1` metadata must match the local payload;
   - live-call-enabled payloads are rejected by the dry-run handoff validator.
 
+- `test_review_decision.py` verifies:
+  - unified `review_decision_v1` artifact construction;
+  - activation records require approving review decisions;
+  - `activation_record_v1` links to its approved decision.
+
 - `test_task_control_plane.py` verifies:
   - generic `manager_request_v1` validation;
   - component completion receipt normalization into run/artifact/ready rows;

@@ -36,6 +36,12 @@ from .request_handoff import (
     validate_request_handoff,
     validate_request_handoffs,
 )
+from .review_decision import (
+    build_activation_record,
+    build_review_decision,
+    validate_activation_record,
+    validate_review_decision,
+)
 from .task_rehearsal import (
     build_rehearsal_receipt,
     build_rehearsal_task_summary,
@@ -54,8 +60,10 @@ __all__ = [
     "ModelPromotionTarget",
     "SourceAvailability",
     "build_model_promotion_review_request",
+    "build_activation_record",
     "build_model_promotion_review_requests",
     "build_rehearsal_receipt",
+    "build_review_decision",
     "build_rehearsal_task_summary",
     "PARAMETER_SCHEMA_REF",
     "build_request_task_payload",
@@ -71,7 +79,9 @@ __all__ = [
     "plan_monthly_backfill_requests",
     "rehearse_monthly_backfill_task_system",
     "RequestHandoffValidation",
+    "validate_activation_record",
     "validate_manager_request",
     "validate_request_handoff",
     "validate_request_handoffs",
+    "validate_review_decision",
 ]

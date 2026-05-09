@@ -66,6 +66,8 @@ The component receipt payload may remain component/storage-owned JSON. Manager r
 
 Manager stores concise output references only. It does not copy large output lists, raw provider payloads, model vectors, logs, or broker payloads into SQL.
 
+`trading-storage` provides `scripts/artifacts/store_completion_receipt_payload.py` for storage-owned receipt payload materialization. The emitted `artifact_ref_v1` metadata is what manager consumes through `record_completion_receipt.py`.
+
 ## Scripts
 
 Validate or persist manager requests:
@@ -141,9 +143,17 @@ PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py \
   --candidate-ref trading-model://promotion-candidates/mpcand_example
 ```
 
-Normalize or persist a component receipt:
+Store a receipt payload in `trading-storage`, then normalize or persist the manager rows:
 
 ```bash
+# run from trading-storage
+PYTHONPATH=src python3 scripts/artifacts/store_completion_receipt_payload.py completion_receipt.json \
+  --request-id mgrreq_example \
+  --run-id run_example \
+  --producer-repo trading-data \
+  --workflow-id 01_feed_alpaca_bars
+
+# run from trading-manager
 PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_receipt.json \
   --request-id mgrreq_example \
   --component-id 01_feed_alpaca_bars \

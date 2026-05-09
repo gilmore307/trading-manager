@@ -6,24 +6,24 @@
 
 ## Queued Tasks
 
-- Use `docs/94_monthly_backfill.md`, `scripts/tasks/plan_monthly_backfill.py`, `scripts/tasks/submit_manager_requests.py`, `scripts/tasks/materialize_request_payloads.py`, `scripts/tasks/validate_request_handoff.py`, `scripts/tasks/record_completion_receipt.py`, `scripts/tasks/list_task_summary.py`, and `scripts/tasks/rehearse_task_system.py` to review the first bounded monthly backfill request/receipt batch before enabling live provider calls.
-- Use `docs/96_model_promotion.md` and `scripts/tasks/plan_model_promotion_review.py` as the single manager-side entrypoint for every model-layer promotion review request.
-- Implement execution handoff validation for mandatory `trade_risk_cap` before any broker/order mutation path.
+- Review the remaining six bounded monthly backfill dry-run requests through the same request payload, handoff, storage receipt-payload, and manager receipt closeout path before enabling live provider calls.
+- Use `docs/96_model_promotion.md`, `scripts/tasks/plan_model_promotion_review.py`, and `scripts/tasks/build_review_decision.py` as the single manager-side route for every model-layer promotion review request/decision artifact.
 
 ## Deferred Until Manager Phase
 
 - Physical execution queue and worker implementation beyond durable `manager_request_v1` / run-manifest SQL facts.
 - Migration criteria from legacy local data-production staging files into durable `trading-storage` SQL/artifact contracts.
-- Exact unified decision-record artifact implementation beyond the registered readiness/risk-cap vocabulary.
 
 ## Open Gaps
 
-- Storage-owned completion receipt payload implementation beyond local/development request parameter materialization.
-- Concrete unified decision-record artifact implementation.
-- Execution-side risk-cap validator integration in `trading-execution`.
+- Broker/order-construction implementation after execution-side `trade_risk_cap` validation.
+- Durable object-store/SQL partitioning details beyond current storage-owned filesystem payload helper and manager SQL summary rows.
 
 ## Recently Accepted
 
+- Closed the first bounded real dry-run monthly request/receipt path for `mgrreq_backfill_alpaca_bars_2016_01`: storage-owned receipt payload was materialized in `trading-storage`, manager normalized it into SQL run/artifact/ready rows, and `task_summary` now reports the dry-run request as `ready` with `artifact_count=1`; no provider calls, component run, or production data output occurred.
+- Registered storage receipt-payload and execution risk-cap validation entrypoints through migration `262_register_storage_receipt_and_risk_cap_entrypoints.sql`.
+- Added concrete unified review decision artifacts: `review_decision_v1` and `activation_record_v1` builders/tests, plus script `scripts/tasks/build_review_decision.py`. Activation records require an approving review decision.
 - Added component-facing handoff validation: `scripts/tasks/validate_request_handoff.py` loads materialized request payloads, verifies hash-backed input bindings and dry-run policy, and calls only target component `build_context` without dispatching work or calling providers.
 - Added request payload materialization: `scripts/tasks/materialize_request_payloads.py` writes component-readable `task_key.json` payloads behind `manager_request.parameter_ref` and can persist request-scoped `input_binding_v1` metadata without provider calls or component dispatch.
 - Added deterministic task-system rehearsal entrypoint: `scripts/tasks/rehearse_task_system.py` exercises manager request, component receipt, run manifest, artifact ref, ready signal, and task-summary-like rows without provider calls or SQL writes.
