@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Literal, Mapping, Sequence, TextIO
 
+from .monthly_backfill import load_market_regime_universe
 from .control_plane import (
     INPUT_BINDING_COLUMNS,
     TaskSystemError,
@@ -117,13 +118,30 @@ class MaterializedRequestPayload:
         }
 
 
-def _source_from_parameter_ref(parameter_ref: str) -> str | None:
+def _parameter_ref_parts(parameter_ref: str) -> list[str]:
     marker = "storage://trading-manager/monthly_backfill_v1/"
     if not parameter_ref.startswith(marker):
-        return None
-    rest = parameter_ref[len(marker) :]
-    parts = rest.split("/")
+        return []
+    return parameter_ref[len(marker) :].split("/")
+
+
+def _source_from_parameter_ref(parameter_ref: str) -> str | None:
+    parts = _parameter_ref_parts(parameter_ref)
     return parts[0] if len(parts) >= 3 else None
+
+
+def _symbol_from_parameter_ref(parameter_ref: str) -> str | None:
+    parts = _parameter_ref_parts(parameter_ref)
+    if len(parts) >= 4 and parts[0] == "alpaca_bars" and parts[-1] == "task_key.json":
+        return parts[1].upper()
+    return None
+
+
+def _layer_one_timeframe(symbol: str) -> str | None:
+    for member in load_market_regime_universe():
+        if member.symbol == symbol.upper():
+            return member.timeframe
+    return None
 
 
 def _month_from_request(row: Mapping[str, Any]) -> str:
@@ -171,6 +189,11 @@ def _canonical_bytes(payload: Mapping[str, Any]) -> bytes:
 def _task_params(row: Mapping[str, Any], defaults: FeedTaskDefaults, start_date: str, end_date_exclusive: str) -> dict[str, Any]:
     params = dict(defaults.params)
     feed_id = defaults.feed_id
+    if feed_id == "01_feed_alpaca_bars":
+        if row.get("symbol"):
+            params["symbol"] = str(row["symbol"]).upper()
+        if row.get("timeframe"):
+            params["timeframe"] = str(row["timeframe"])
     if feed_id in {"01_feed_alpaca_bars", "02_feed_alpaca_liquidity", "03_feed_alpaca_news"}:
         params.setdefault("start", start_date)
         params.setdefault("end", end_date_exclusive)
@@ -204,7 +227,17 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
     month = _month_from_request(row)
     start_date, end_date_exclusive = _window_from_request(row, month)
     expected_outputs = list(request.get("expected_outputs") or [])
-    output_root = f"storage/monthly_backfill_v1/{defaults.source_id}/{month}"
+    symbol = row.get("symbol") or _symbol_from_parameter_ref(parameter_ref)
+    enriched_row = dict(request)
+    enriched_row.update(dict(row))
+    if symbol:
+        enriched_row["symbol"] = str(symbol).upper()
+        enriched_row.setdefault("timeframe", _layer_one_timeframe(str(symbol)) or defaults.params.get("timeframe"))
+    output_root = (
+        f"storage/monthly_backfill_v1/{defaults.source_id}/{str(symbol).upper()}/{month}"
+        if symbol and feed_id == "01_feed_alpaca_bars"
+        else f"storage/monthly_backfill_v1/{defaults.source_id}/{month}"
+    )
     return {
         "contract_type": PARAMETER_SCHEMA_REF,
         "task_id": request["request_id"],
@@ -218,7 +251,7 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
         "dry_run": bool(request.get("dry_run", True)),
         "month": month,
         "window": {"start_date": start_date, "end_date_exclusive": end_date_exclusive},
-        "params": _task_params(request | dict(row), defaults, start_date, end_date_exclusive),
+        "params": _task_params(enriched_row, defaults, start_date, end_date_exclusive),
         "output_root": output_root,
         "expected_outputs": expected_outputs,
         "policy_refs": list(request.get("policy_refs") or []),

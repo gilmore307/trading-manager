@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from trading_manager_tasks.monthly_backfill import plan_monthly_backfill_requests
+from trading_manager_tasks.monthly_backfill import load_market_regime_universe, plan_monthly_backfill_requests
 from trading_manager_tasks.request_payloads import (
     PARAMETER_SCHEMA_REF,
     build_request_task_payload,
@@ -14,17 +14,25 @@ from trading_manager_tasks.request_payloads import (
 )
 
 
+def _spy_layer_one_request() -> dict[str, object]:
+    return next(
+        row
+        for row in plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")
+        if row["target_component_id"] == "01_feed_alpaca_bars" and row.get("symbol") == "SPY"
+    )
+
+
 class RequestPayloadMaterializationTests(unittest.TestCase):
     def test_storage_uri_resolves_under_storage_root(self):
         path = storage_uri_to_local_path(
-            "storage://trading-manager/monthly_backfill_v1/alpaca_bars/2016-01/task_key.json",
+            "storage://trading-manager/monthly_backfill_v1/alpaca_bars/SPY/2016-01/task_key.json",
             storage_root=Path("/tmp/manager-storage"),
         )
 
-        self.assertEqual(path, Path("/tmp/manager-storage/monthly_backfill_v1/alpaca_bars/2016-01/task_key.json"))
+        self.assertEqual(path, Path("/tmp/manager-storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/task_key.json"))
 
     def test_monthly_backfill_payload_uses_component_task_key_shape(self):
-        request = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")[0]
+        request = _spy_layer_one_request()
 
         payload = build_request_task_payload(request)
 
@@ -35,13 +43,15 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
         self.assertTrue(payload["dry_run"])
         self.assertEqual(payload["window"], {"start_date": "2016-01-01", "end_date_exclusive": "2016-02-01"})
         self.assertEqual(payload["params"]["symbol"], "SPY")
+        self.assertEqual(payload["params"]["timeframe"], request["timeframe"])
         self.assertEqual(payload["params"]["start"], "2016-01-01")
         self.assertEqual(payload["params"]["end"], "2016-02-01")
+        self.assertEqual(payload["output_root"], "storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01")
         self.assertFalse(payload["live_call_policy"]["allow_live_calls"])
         self.assertEqual(payload["live_call_policy"]["max_requests"], 0)
 
     def test_materialization_writes_payload_and_request_input_binding(self):
-        request = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")[0]
+        request = _spy_layer_one_request()
         with tempfile.TemporaryDirectory() as tmp:
             materialized = materialize_request_payload(request, storage_root=Path(tmp), write_file=True)
             payload = json.loads(materialized.local_path.read_text(encoding="utf-8"))
@@ -59,7 +69,12 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
     def test_all_2016_01_default_sources_emit_required_component_params(self):
         requests = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")
         by_component = {row["target_component_id"]: build_request_task_payload(row) for row in requests}
+        layer_one_bar_payloads = [
+            build_request_task_payload(row) for row in requests if row["target_component_id"] == "01_feed_alpaca_bars"
+        ]
 
+        self.assertEqual(len(layer_one_bar_payloads), len(load_market_regime_universe()))
+        self.assertIn("SPY", {payload["params"]["symbol"] for payload in layer_one_bar_payloads})
         self.assertEqual(by_component["02_feed_alpaca_liquidity"]["params"]["symbol"], "SPY")
         self.assertIn("symbols", by_component["03_feed_alpaca_news"]["params"])
         self.assertIn("topic_categories", by_component["05_feed_gdelt_news"]["params"])

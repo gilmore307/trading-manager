@@ -14,12 +14,19 @@ import json
 import sys
 from dataclasses import asdict, dataclass
 from datetime import date
+from pathlib import Path
 from typing import Iterable, Iterator, Literal, TextIO
 
 DEFAULT_REQUESTED_BY = "openclaw"
 DEFAULT_START_MONTH = "2016-01"
 OKX_START_MONTH = "2018-01"
 DEFAULT_POLICY_REFS = ("monthly_backfill_v1", "live_call_policy_required")
+DEFAULT_PROJECTS_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
+    DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "market_regime_etf_universe.csv"
+)
+LAYER_ONE_MODEL_LAYER = "layer_01_market_regime"
+BAR_GRAIN_TO_ALPACA_TIMEFRAME = {"1m": "1Min", "30m": "30Min", "1d": "1Day"}
 
 
 @dataclass(frozen=True, order=True)
@@ -64,6 +71,17 @@ class MonthlyWindow:
     month: str
     start_date: str
     end_date_exclusive: str
+
+
+@dataclass(frozen=True)
+class MarketRegimeUniverseMember:
+    """One reviewed Layer 1 market-regime ETF universe member."""
+
+    symbol: str
+    bar_grain: str
+    timeframe: str
+    exposure_type: str
+    universe_type: str
 
 
 @dataclass(frozen=True)
@@ -185,16 +203,97 @@ def iter_monthly_windows(start_month: str, end_month: str) -> Iterator[MonthlyWi
         current = current.next()
 
 
-def _request_id(source_id: str, month: str) -> str:
-    return "mgrreq_backfill_" + source_id.replace("-", "_") + "_" + month.replace("-", "_")
+def _path_token(value: str) -> str:
+    return value.lower().replace("-", "_").replace("/", "_")
 
 
-def _parameter_ref(source_id: str, month: str) -> str:
+def _request_id(source_id: str, month: str, *, symbol: str | None = None) -> str:
+    parts = ["mgrreq", "backfill", _path_token(source_id)]
+    if symbol:
+        parts.append(_path_token(symbol))
+    parts.append(month.replace("-", "_"))
+    return "_".join(parts)
+
+
+def _parameter_ref(source_id: str, month: str, *, symbol: str | None = None) -> str:
+    if symbol:
+        return f"storage://trading-manager/monthly_backfill_v1/{source_id}/{symbol.upper()}/{month}/task_key.json"
     return f"storage://trading-manager/monthly_backfill_v1/{source_id}/{month}/task_key.json"
 
 
-def _expected_outputs(source_id: str, month: str) -> list[str]:
+def _expected_outputs(source_id: str, month: str, *, symbol: str | None = None) -> list[str]:
+    if symbol:
+        return [f"storage://trading-data/monthly_backfill_v1/{source_id}/{symbol.upper()}/{month}/"]
     return [f"storage://trading-data/monthly_backfill_v1/{source_id}/{month}/"]
+
+
+def load_market_regime_universe(
+    path: Path = DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH,
+) -> tuple[MarketRegimeUniverseMember, ...]:
+    """Load the reviewed Layer 1 ETF universe from trading-storage."""
+
+    rows: list[MarketRegimeUniverseMember] = []
+    with path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            if row.get("model_layer") != LAYER_ONE_MODEL_LAYER:
+                continue
+            symbol = str(row.get("symbol") or "").upper()
+            bar_grain = str(row.get("bar_grain") or "")
+            timeframe = BAR_GRAIN_TO_ALPACA_TIMEFRAME.get(bar_grain)
+            if not symbol or timeframe is None:
+                raise ValueError(f"unsupported Layer 1 universe row: {row}")
+            rows.append(
+                MarketRegimeUniverseMember(
+                    symbol=symbol,
+                    bar_grain=bar_grain,
+                    timeframe=timeframe,
+                    exposure_type=str(row.get("exposure_type") or ""),
+                    universe_type=str(row.get("universe_type") or ""),
+                )
+            )
+    return tuple(sorted(rows, key=lambda item: item.symbol))
+
+
+def _plan_source_window(
+    *,
+    source: SourceAvailability,
+    window: MonthlyWindow,
+    requested_by: str,
+    universe_member: MarketRegimeUniverseMember | None = None,
+) -> dict[str, object]:
+    symbol = universe_member.symbol if universe_member else None
+    request: dict[str, object] = {
+        "request_id": _request_id(source.source_id, window.month, symbol=symbol),
+        "contract_type": "manager_request_v1",
+        "request_kind": source.request_kind,
+        "status": "requested",
+        "requested_by": requested_by,
+        "target_component_id": source.target_component_id,
+        "target_component_kind": "data_feed",
+        "target_repo_id": source.target_repo_id,
+        "expected_outputs": _expected_outputs(source.source_id, window.month, symbol=symbol),
+        "policy_refs": list(DEFAULT_POLICY_REFS),
+        "priority": "normal",
+        "parameter_ref": _parameter_ref(source.source_id, window.month, symbol=symbol),
+        "dry_run": True,
+        "month": window.month,
+        "start_date": window.start_date,
+        "end_date_exclusive": window.end_date_exclusive,
+        "availability_note": source.note,
+    }
+    if universe_member:
+        request.update(
+            {
+                "symbol": universe_member.symbol,
+                "timeframe": universe_member.timeframe,
+                "bar_grain": universe_member.bar_grain,
+                "model_layer": LAYER_ONE_MODEL_LAYER,
+                "universe_ref": "trading-storage/main/shared/market_regime_etf_universe.csv",
+                "universe_type": universe_member.universe_type,
+                "exposure_type": universe_member.exposure_type,
+            }
+        )
+    return request
 
 
 def plan_monthly_backfill_requests(
@@ -204,6 +303,7 @@ def plan_monthly_backfill_requests(
     sources: Iterable[SourceAvailability] = DEFAULT_SOURCES,
     include_crypto: bool = True,
     requested_by: str = DEFAULT_REQUESTED_BY,
+    market_regime_universe_path: Path = DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH,
 ) -> list[dict[str, object]]:
     """Plan deterministic `manager_request_v1` dictionaries.
 
@@ -217,6 +317,7 @@ def plan_monthly_backfill_requests(
     if requested_end < requested_start:
         raise ValueError("end_month must be >= start_month")
 
+    layer_one_universe = load_market_regime_universe(market_regime_universe_path)
     planned: list[dict[str, object]] = []
     for source in sources:
         if not source.include_by_default:
@@ -227,27 +328,13 @@ def plan_monthly_backfill_requests(
         if effective_start is None or effective_start > requested_end:
             continue
         for window in iter_monthly_windows(str(effective_start), str(requested_end)):
-            planned.append(
-                {
-                    "request_id": _request_id(source.source_id, window.month),
-                    "contract_type": "manager_request_v1",
-                    "request_kind": source.request_kind,
-                    "status": "requested",
-                    "requested_by": requested_by,
-                    "target_component_id": source.target_component_id,
-                    "target_component_kind": "data_feed",
-                    "target_repo_id": source.target_repo_id,
-                    "expected_outputs": _expected_outputs(source.source_id, window.month),
-                    "policy_refs": list(DEFAULT_POLICY_REFS),
-                    "priority": "normal",
-                    "parameter_ref": _parameter_ref(source.source_id, window.month),
-                    "dry_run": True,
-                    "month": window.month,
-                    "start_date": window.start_date,
-                    "end_date_exclusive": window.end_date_exclusive,
-                    "availability_note": source.note,
-                }
-            )
+            if source.target_component_id == "01_feed_alpaca_bars":
+                for member in layer_one_universe:
+                    planned.append(
+                        _plan_source_window(source=source, window=window, requested_by=requested_by, universe_member=member)
+                    )
+            else:
+                planned.append(_plan_source_window(source=source, window=window, requested_by=requested_by))
     return planned
 
 

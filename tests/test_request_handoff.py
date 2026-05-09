@@ -58,7 +58,10 @@ class RequestHandoffValidationTests(unittest.TestCase):
         self.assertTrue(result.content_hash.startswith("sha256:"))
         self.assertEqual(result.provider_calls, 0)
         self.assertFalse(result.dispatch_performed)
-        self.assertEqual(result.context_run_dir, "storage/monthly_backfill_v1/alpaca_bars/2016-01/runs/manager_handoff_validation")
+        self.assertEqual(
+            result.context_run_dir,
+            f"storage/monthly_backfill_v1/alpaca_bars/{request['symbol']}/2016-01/runs/manager_handoff_validation",
+        )
 
     def test_rejects_input_binding_hash_mismatch(self):
         request = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")[0]

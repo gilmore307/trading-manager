@@ -6,7 +6,9 @@ import unittest
 
 from trading_manager_tasks.monthly_backfill import (
     DEFAULT_SOURCES,
+    LAYER_ONE_MODEL_LAYER,
     iter_monthly_windows,
+    load_market_regime_universe,
     plan_monthly_backfill_requests,
     write_requests,
 )
@@ -24,6 +26,11 @@ class MonthlyBackfillPlannerTests(unittest.TestCase):
     def test_common_start_includes_historical_sources_at_2016_01(self):
         requests = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")
         by_component = {request["target_component_id"]: request for request in requests}
+        layer_one_bars = [request for request in requests if request["target_component_id"] == "01_feed_alpaca_bars"]
+
+        self.assertEqual(len(layer_one_bars), len(load_market_regime_universe()))
+        self.assertIn("SPY", {request["symbol"] for request in layer_one_bars})
+        self.assertTrue(all(request["model_layer"] == LAYER_ONE_MODEL_LAYER for request in layer_one_bars))
 
         for component_id in {
             "01_feed_alpaca_bars",
@@ -67,7 +74,11 @@ class MonthlyBackfillPlannerTests(unittest.TestCase):
         )
 
     def test_write_jsonl_keeps_expected_manager_request_shape(self):
-        request = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")[0]
+        request = next(
+            row
+            for row in plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")
+            if row["target_component_id"] == "01_feed_alpaca_bars" and row.get("symbol") == "SPY"
+        )
         buffer = io.StringIO()
 
         write_requests([request], output=buffer, output_format="jsonl")
