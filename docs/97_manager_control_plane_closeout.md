@@ -66,9 +66,9 @@ This closeout does not enable or claim:
 
 Those are component production phases, not manager closeout blockers.
 
-## Deferred Beyond This Closeout
+## Not Current Historical-Training Scope
 
-Future work should begin only when a concrete consumer requires it:
+There are no active manager/control-plane work items for the current no-broker historical-training preparation boundary. Future work should begin only when a concrete consumer requires it:
 
 - live provider dispatch worker implementation after a validated `live_call_approval_v1` exists;
 - durable object-store/SQL partitioning beyond current payload-reference helpers;
