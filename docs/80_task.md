@@ -6,7 +6,7 @@
 
 ## Queued Tasks
 
-- Use `docs/94_monthly_backfill.md`, `scripts/tasks/plan_monthly_backfill.py`, `scripts/tasks/submit_manager_requests.py`, `scripts/tasks/record_completion_receipt.py`, and `scripts/tasks/list_task_summary.py` to review the first bounded monthly backfill request/receipt batch before enabling live provider calls.
+- Use `docs/94_monthly_backfill.md`, `scripts/tasks/plan_monthly_backfill.py`, `scripts/tasks/submit_manager_requests.py`, `scripts/tasks/record_completion_receipt.py`, `scripts/tasks/list_task_summary.py`, and `scripts/tasks/rehearse_task_system.py` to review the first bounded monthly backfill request/receipt batch before enabling live provider calls.
 - Use `docs/96_model_promotion.md` and `scripts/tasks/plan_model_promotion_review.py` as the single manager-side entrypoint for every model-layer promotion review request.
 - Implement execution handoff validation for mandatory `trade_risk_cap` before any broker/order mutation path.
 
@@ -18,12 +18,14 @@
 
 ## Open Gaps
 
+- SQL-backed first request/receipt write exercise after the in-memory task-system rehearsal is accepted.
 - Storage-owned artifact payload implementation for bulky request parameter bodies and completion receipt payloads.
 - Concrete unified decision-record artifact implementation.
 - Execution-side risk-cap validator integration in `trading-execution`.
 
 ## Recently Accepted
 
+- Added deterministic task-system rehearsal entrypoint: `scripts/tasks/rehearse_task_system.py` exercises manager request, component receipt, run manifest, artifact ref, ready signal, and task-summary-like rows without provider calls or SQL writes.
 - Added unified model promotion review entrypoint: all model layers now use `model_promotion_review_v1` manager requests through `scripts/tasks/plan_model_promotion_review.py`; model-specific code only produces evidence/adapters.
 - Added global task summary: `trading_manager.task_summary` derives every manager request's current status, latest run, latest ready signal, artifact count, priority, and priority rank for ordered dashboards/CLIs.
 - Added unified manager task-system request/receipt handling: manager requests are validated/persisted centrally, and component completion receipts normalize into run-manifest, artifact-ref, and ready-signal facts.

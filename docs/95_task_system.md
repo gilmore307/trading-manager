@@ -81,6 +81,18 @@ List the global task summary in priority order:
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 ```
 
+Run a deterministic in-memory rehearsal of the request/receipt/summary lifecycle without provider calls or SQL writes:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py \
+  --end-month 2016-01 \
+  --limit 3 \
+  --scenario mixed \
+  --format jsonl
+```
+
+The mixed rehearsal emits one ready task, one partial task requiring review, and one failed task with a blocking reason. It is the first safe exercise before writing requests to SQL or dispatching live component runs.
+
 Plan a unified model promotion review request:
 
 ```bash

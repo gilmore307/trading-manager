@@ -32,6 +32,11 @@
   - malformed receipts are rejected;
   - JSONL request loading.
 
+- `test_task_rehearsal.py` verifies:
+  - deterministic in-memory task-system rehearsals;
+  - ready, partial/review-required, and failed task-summary paths;
+  - rehearsal CLI JSONL output shape.
+
 - `test_trading_bigquery.py` verifies:
   - BigQuery query-result metadata parsing for dry-run byte estimates;
   - query request payload handling for `maximumBytesBilled` and dry-run flags.

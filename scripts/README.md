@@ -25,6 +25,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/submit_manager_requests.py` — validates or persists manager request rows.
 - `tasks/record_completion_receipt.py` — normalizes or persists component completion receipts into manager run/artifact/ready rows.
 - `tasks/list_task_summary.py` — lists global task summary rows in priority order.
+- `tasks/rehearse_task_system.py` — runs a deterministic in-memory request/receipt/summary rehearsal without provider calls or SQL writes.
 - `tasks/plan_model_promotion_review.py` — plans one unified manager-side promotion-review request shape for any model layer.
 
 ## Run
@@ -37,6 +38,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_monthly_backfill.py --start-month 2016
 PYTHONPATH=src python3 scripts/tasks/submit_manager_requests.py requests.jsonl
 PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_receipt.json --request-id mgrreq_example --component-id component --repo-id trading-data --receipt-uri storage://example/completion_receipt.json
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
+PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl
 PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_08_option_expression --candidate-ref trading-model://promotion-candidates/mpcand_example
 ```
 

@@ -22,6 +22,11 @@ from .model_promotion import (
     build_model_promotion_review_request,
     build_model_promotion_review_requests,
 )
+from .task_rehearsal import (
+    build_rehearsal_receipt,
+    build_rehearsal_task_summary,
+    rehearse_monthly_backfill_task_system,
+)
 
 __all__ = [
     "CompletionReceiptRows",
@@ -35,9 +40,12 @@ __all__ = [
     "SourceAvailability",
     "build_model_promotion_review_request",
     "build_model_promotion_review_requests",
+    "build_rehearsal_receipt",
+    "build_rehearsal_task_summary",
     "fetch_task_summary",
     "iter_monthly_windows",
     "normalize_completion_receipt",
     "plan_monthly_backfill_requests",
+    "rehearse_monthly_backfill_task_system",
     "validate_manager_request",
 ]
