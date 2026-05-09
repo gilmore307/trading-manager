@@ -25,6 +25,7 @@ from .model_promotion import (
 from .task_rehearsal import (
     build_rehearsal_receipt,
     build_rehearsal_task_summary,
+    persist_rehearsal,
     rehearse_monthly_backfill_task_system,
 )
 
@@ -45,6 +46,7 @@ __all__ = [
     "fetch_task_summary",
     "iter_monthly_windows",
     "normalize_completion_receipt",
+    "persist_rehearsal",
     "plan_monthly_backfill_requests",
     "rehearse_monthly_backfill_task_system",
     "validate_manager_request",

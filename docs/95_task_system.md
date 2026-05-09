@@ -91,7 +91,22 @@ PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py \
   --format jsonl
 ```
 
-The mixed rehearsal emits one ready task, one partial task requiring review, and one failed task with a blocking reason. It is the first safe exercise before writing requests to SQL or dispatching live component runs.
+The mixed rehearsal emits one ready task, one partial task requiring review, and one failed task with a blocking reason. Rehearsal request ids are prefixed with `mgrreq_rehearsal_` and output refs stay under `storage://trading-manager/rehearsals/...` so they do not collide with future live request ids.
+
+After reviewing the dry-run output, add `--write` to persist the same rehearsal-only rows to manager SQL tables and inspect them through `task_summary`:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py \
+  --end-month 2016-01 \
+  --limit 3 \
+  --scenario mixed \
+  --format jsonl \
+  --write
+
+PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
+```
+
+This is still not live component dispatch. It only exercises SQL persistence for rehearsal request/run/artifact/ready rows.
 
 Plan a unified model promotion review request:
 

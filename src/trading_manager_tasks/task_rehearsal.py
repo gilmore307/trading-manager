@@ -15,7 +15,15 @@ import sys
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal, TextIO
 
-from .control_plane import TASK_PRIORITY_RANKS, normalize_completion_receipt, validate_manager_request, write_jsonl
+from .control_plane import (
+    TASK_PRIORITY_RANKS,
+    CompletionReceiptRows,
+    normalize_completion_receipt,
+    persist_completion_rows,
+    persist_manager_requests,
+    validate_manager_request,
+    write_jsonl,
+)
 from .monthly_backfill import DEFAULT_START_MONTH, plan_monthly_backfill_requests
 
 DEFAULT_REHEARSAL_TS = "2026-05-09T06:00:00Z"
@@ -139,6 +147,24 @@ def build_rehearsal_task_summary(
     return sorted(summary, key=lambda row: (row["priority_rank"], row["deadline_at_utc"] or "9999-99-99T99:99:99Z", row["request_id"]))
 
 
+def _rehearsal_request(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a request copy with rehearsal-only ids/refs to avoid live collisions."""
+    normalized = validate_manager_request(request)
+    original_request_id = normalized["request_id"]
+    rehearsal_id = "mgrreq_rehearsal_" + original_request_id.removeprefix("mgrreq_")
+    output_source = _source_id_from_request(normalized)
+    output_month = str(request.get("month") or "unknown_month")
+    normalized.update(
+        {
+            "request_id": rehearsal_id,
+            "expected_outputs": [f"storage://trading-manager/rehearsals/monthly_backfill/{output_source}/{output_month}/outputs/"],
+            "parameter_ref": f"storage://trading-manager/rehearsals/monthly_backfill/{output_source}/{output_month}/task_key.json",
+            "dry_run": True,
+        }
+    )
+    return normalized
+
+
 def rehearse_monthly_backfill_task_system(
     *,
     start_month: str = DEFAULT_START_MONTH,
@@ -151,7 +177,7 @@ def rehearse_monthly_backfill_task_system(
     if limit < 1:
         raise ValueError("limit must be >= 1")
     planned = plan_monthly_backfill_requests(start_month=start_month, end_month=end_month, requested_by=requested_by)[:limit]
-    requests = [validate_manager_request(request) for request in planned]
+    requests = [_rehearsal_request(request) for request in planned]
     run_rows: list[dict[str, Any]] = []
     artifact_rows: list[dict[str, Any]] = []
     ready_signal_rows: list[dict[str, Any]] = []
@@ -189,6 +215,19 @@ def rehearse_monthly_backfill_task_system(
     }
 
 
+def persist_rehearsal(rehearsal: Mapping[str, Any], *, database_url: str | None = None) -> None:
+    """Persist rehearsal-only request and completion rows to manager SQL tables."""
+    persist_manager_requests(rehearsal["requests"], database_url=database_url)
+    persist_completion_rows(
+        CompletionReceiptRows(
+            run_manifests=list(rehearsal["run_manifests"]),
+            artifact_refs=list(rehearsal["artifact_refs"]),
+            ready_signals=list(rehearsal["ready_signals"]),
+        ),
+        database_url=database_url,
+    )
+
+
 def write_rehearsal_output(rehearsal: Mapping[str, Any], *, output: TextIO, output_format: Literal["json", "jsonl"] = "json") -> None:
     if output_format == "jsonl":
         rows: list[dict[str, Any]] = []
@@ -211,6 +250,8 @@ def rehearsal_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scenario", choices=["success", "mixed"], default="mixed")
     parser.add_argument("--requested-by", default="openclaw")
     parser.add_argument("--format", choices=["json", "jsonl"], default="json")
+    parser.add_argument("--write", action="store_true", help="Persist rehearsal-only rows to manager SQL tables.")
+    parser.add_argument("--database-url")
     args = parser.parse_args(argv)
     rehearsal = rehearse_monthly_backfill_task_system(
         start_month=args.start_month,
@@ -219,6 +260,8 @@ def rehearsal_main(argv: list[str] | None = None) -> int:
         scenario=args.scenario,
         requested_by=args.requested_by,
     )
+    if args.write:
+        persist_rehearsal(rehearsal, database_url=args.database_url)
     write_rehearsal_output(rehearsal, output=sys.stdout, output_format=args.format)
     return 0
 
@@ -227,6 +270,7 @@ __all__ = [
     "build_rehearsal_receipt",
     "build_rehearsal_task_summary",
     "rehearse_monthly_backfill_task_system",
+    "persist_rehearsal",
     "rehearsal_main",
     "write_rehearsal_output",
 ]

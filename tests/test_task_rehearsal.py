@@ -4,9 +4,10 @@ import json
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
-from trading_manager_tasks.task_rehearsal import rehearse_monthly_backfill_task_system
+from trading_manager_tasks.task_rehearsal import persist_rehearsal, rehearse_monthly_backfill_task_system
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "tasks" / "rehearse_task_system.py"
@@ -19,6 +20,7 @@ class TaskSystemRehearsalTests(unittest.TestCase):
         self.assertEqual(rehearsal["contract_type"], "manager_task_system_rehearsal_v1")
         self.assertTrue(rehearsal["rehearsal_only"])
         self.assertEqual(rehearsal["request_count"], 3)
+        self.assertTrue(all(row["request_id"].startswith("mgrreq_rehearsal_") for row in rehearsal["requests"]))
         statuses = [row["task_status"] for row in rehearsal["task_summary"]]
         self.assertEqual(statuses, ["ready", "partial", "failed"])
         partial = next(row for row in rehearsal["task_summary"] if row["task_status"] == "partial")
@@ -32,6 +34,19 @@ class TaskSystemRehearsalTests(unittest.TestCase):
 
         self.assertEqual([row["task_status"] for row in rehearsal["task_summary"]], ["ready", "ready"])
         self.assertTrue(all(not row["latest_ready_signal_review_required"] for row in rehearsal["task_summary"]))
+
+    def test_persist_rehearsal_writes_requests_then_completion_rows(self) -> None:
+        rehearsal = rehearse_monthly_backfill_task_system(end_month="2016-01", limit=1, scenario="success")
+
+        with patch("trading_manager_tasks.task_rehearsal.persist_manager_requests") as persist_requests, patch(
+            "trading_manager_tasks.task_rehearsal.persist_completion_rows"
+        ) as persist_completion:
+            persist_rehearsal(rehearsal, database_url="postgresql://example")
+
+        persist_requests.assert_called_once()
+        persist_completion.assert_called_once()
+        self.assertEqual(persist_requests.call_args.kwargs["database_url"], "postgresql://example")
+        self.assertEqual(persist_completion.call_args.kwargs["database_url"], "postgresql://example")
 
     def test_rehearsal_cli_emits_task_summary_rows(self) -> None:
         result = subprocess.run(

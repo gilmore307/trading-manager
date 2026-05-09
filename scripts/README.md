@@ -25,7 +25,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/submit_manager_requests.py` — validates or persists manager request rows.
 - `tasks/record_completion_receipt.py` — normalizes or persists component completion receipts into manager run/artifact/ready rows.
 - `tasks/list_task_summary.py` — lists global task summary rows in priority order.
-- `tasks/rehearse_task_system.py` — runs a deterministic in-memory request/receipt/summary rehearsal without provider calls or SQL writes.
+- `tasks/rehearse_task_system.py` — runs a deterministic request/receipt/summary rehearsal without provider calls; add `--write` only to persist rehearsal-only rows to manager SQL.
 - `tasks/plan_model_promotion_review.py` — plans one unified manager-side promotion-review request shape for any model layer.
 
 ## Run

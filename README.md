@@ -52,7 +52,7 @@ Concrete registry entries live in the SQL-backed `trading_registry` table. The n
 
 Registry ids are stable automation references. Registry keys are human-readable labels and may be renamed by reviewed migrations. Use id-based helpers in code.
 
-See `docs/90_helpers.md`, `docs/91_registry.md`, `docs/92_templates.md`, `docs/93_contracts.md`, `docs/94_monthly_backfill.md`, `docs/95_task_system.md`, and `docs/96_model_promotion.md` for platform-function guides. Use `PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl` for a safe request/receipt/summary rehearsal before SQL writes or live component dispatch.
+See `docs/90_helpers.md`, `docs/91_registry.md`, `docs/92_templates.md`, `docs/93_contracts.md`, `docs/94_monthly_backfill.md`, `docs/95_task_system.md`, and `docs/96_model_promotion.md` for platform-function guides. Use `PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl` for a safe request/receipt/summary rehearsal before live component dispatch; add `--write` only for rehearsal-prefixed SQL rows.
 
 ## Shared Environment Rule
 
