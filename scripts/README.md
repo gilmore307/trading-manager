@@ -2,7 +2,7 @@
 
 `scripts/` stores executable maintenance and operational entrypoints for `trading-manager`.
 
-Registry maintenance is intentionally grouped under `scripts/registry/` so future non-registry maintenance commands can be added under `scripts/` without mixing boundaries.
+Registry maintenance is grouped under `scripts/registry/`. Task-planning commands live under `scripts/tasks/` so control-plane planning does not mix with registry migration mechanics.
 
 For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_registry.md).
 
@@ -21,6 +21,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `registry/kinds/` — one Markdown boundary file per registry kind. These files define scope/range/rejection boundaries only, not concrete active row lists.
 - `registry/rules/` — normative registry table, kind-routing, and naming rules that constrain SQL row shape.
 - `registry/sql/schema_migrations/` — append-only SQL migrations for registry schema and active row changes.
+- `tasks/plan_monthly_backfill.py` — emits deterministic dry-run `manager_request_v1` rows for monthly historical data backfill planning.
 
 ## Run
 
@@ -28,6 +29,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 python3 scripts/registry/apply_registry_migrations.py
 python3 scripts/registry/apply_registry_migrations.py --dry-run
 python3 scripts/registry/apply_registry_migrations.py --export-only
+PYTHONPATH=src python3 scripts/tasks/plan_monthly_backfill.py --start-month 2016-01 --end-month 2016-03 --format jsonl
 ```
 
 The SQL `trading_registry.kind` constraint and `scripts/registry/kinds/*.md` files must stay aligned. Tests compare those sources directly.

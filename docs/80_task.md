@@ -6,23 +6,25 @@
 
 ## Queued Tasks
 
+- Use `docs/94_monthly_backfill.md` and `scripts/tasks/plan_monthly_backfill.py` to review the first bounded monthly backfill batch before enabling live provider calls.
 - Implement lightweight validation/helper code for the accepted MVP manager contract tables after the first real consumer appears.
 - Implement execution handoff validation for mandatory `trade_risk_cap` before any broker/order mutation path.
 
 ## Deferred Until Manager Phase
 
-- Physical queue/storage implementation for `manager_request_v1`, `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1`.
+- Physical execution queue and worker implementation beyond durable `manager_request_v1` / run-manifest SQL facts.
 - Migration criteria from legacy local data-production staging files into durable `trading-storage` SQL/artifact contracts.
 - Exact unified decision-record artifact implementation beyond the registered readiness/risk-cap vocabulary.
 
 ## Open Gaps
 
-- Concrete SQL/storage implementation for the registered V1 handoff contracts.
+- Storage-owned artifact payload implementation for the registered V1 handoff contracts.
 - Concrete unified decision-record artifact implementation.
 - Execution-side risk-cap validator integration in `trading-execution`.
 
 ## Recently Accepted
 
+- Added monthly historical backfill planning: common start `2016-01`, OKX crypto joins at `2018-01`, and current-only feeds stay out of historical point-in-time backfill until a new route is accepted.
 - Implemented and registered the concise MVP manager/control-plane SQL tables: `trading_manager.manager_request`, `trading_manager.input_binding`, `trading_manager.run_manifest`, `trading_manager.run_step`, `trading_manager.artifact_ref`, and `trading_manager.ready_signal`. `component_ref_v1` remains registry-backed fields rather than a separate component catalog table.
 - Added first-principles manager contract design in `docs/93_contracts.md`, including core MVP contracts, evaluation/promotion contracts, downstream handoff contracts, ownership boundaries, lifecycle relationships, persistence policy, and implementation order.
 - Registered manager/storage V1 handoff contracts and hardening policies: `manager_request_v1`, `run_manifest_v1`, `artifact_ref_v1`, `ready_signal_v1`, live-call guardrails, checkpoint/resume policy, and data-production hardening policy.

@@ -11,6 +11,13 @@
 
 ## Inventory
 
+- `test_monthly_backfill.py` verifies:
+  - monthly window generation;
+  - accepted `2016-01` common start behavior;
+  - OKX crypto joining later at `2018-01`;
+  - current-only feeds staying out of historical backfill requests;
+  - dry-run `manager_request_v1` JSONL shape.
+
 - `test_trading_bigquery.py` verifies:
   - BigQuery query-result metadata parsing for dry-run byte estimates;
   - query request payload handling for `maximumBytesBilled` and dry-run flags.

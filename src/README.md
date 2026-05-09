@@ -9,9 +9,10 @@ The formal cross-repository helper runtime surface is Python. Package metadata l
 ```text
 src/
   README.md
-  trading_scripts/     Python registry reader and secret-resolution package.
-  trading_web_search/   Python web-search helper package backed by Brave Search.
-  trading_bigquery/     Dependency-light BigQuery REST helper using registry secret aliases.
+  trading_registry/      Python registry reader and secret-resolution package.
+  trading_manager_tasks/ Manager-owned request planning helpers.
+  trading_web_search/    Python web-search helper package backed by Brave Search.
+  trading_bigquery/      Dependency-light BigQuery REST helper using registry secret aliases.
 ```
 
 Tests live under `tests/`. Executable maintenance entrypoints live under `scripts/`.
