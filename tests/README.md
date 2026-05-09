@@ -18,7 +18,12 @@
 
 - `test_live_call_gate.py` verifies:
   - `live_call_approval_v1` validation for bounded non-dry-run provider acquisition requests;
-  - rejection of dry-run requests, missing live-call gate policy, wrong provider scope, over-wide windows, and broker-execution approval.
+  - rejection of dry-run requests, missing live-call gate policy, wrong provider scope, over-wide windows, over-count batches, and broker-execution approval.
+
+- `test_historical_training.py` verifies:
+  - manager-owned Layer 1 historical-training batch preparation;
+  - full market-regime ETF universe request expansion;
+  - task-key payload materialization and handoff validation without provider calls, model activation, or broker execution.
 
 - `test_monthly_backfill.py` verifies:
   - monthly window generation;

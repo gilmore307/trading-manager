@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import UTC, datetime
 
-from trading_manager_tasks.live_call_gate import validate_live_call_approval
+from trading_manager_tasks.live_call_gate import validate_live_call_approval, validate_live_call_approvals
 from trading_manager_tasks.monthly_backfill import plan_monthly_backfill_requests
 
 
@@ -13,6 +13,13 @@ class LiveCallGateTests(unittest.TestCase):
         request["dry_run"] = False
         request["policy_refs"] = ["monthly_backfill_v1", "live_call_policy_required", "live_call_approval_gate_v1"]
         return request
+
+    def _live_requests(self, count: int):
+        rows = [dict(row) for row in plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")[:count]]
+        for row in rows:
+            row["dry_run"] = False
+            row["policy_refs"] = ["monthly_backfill_v1", "live_call_policy_required", "live_call_approval_gate_v1"]
+        return rows
 
     def _approval(self, request_id: str):
         return {
@@ -100,6 +107,19 @@ class LiveCallGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "broker_execution_allowed"):
             validate_live_call_approval(
                 request,
+                approval,
+                now_utc=datetime(2026, 5, 9, 12, 0, tzinfo=UTC),
+            )
+
+    def test_batch_validation_enforces_max_requests(self):
+        requests = self._live_requests(2)
+        approval = self._approval(requests[0]["request_id"])
+        approval["request_ids"] = [row["request_id"] for row in requests]
+        approval["max_requests"] = 1
+
+        with self.assertRaisesRegex(ValueError, "max_requests"):
+            validate_live_call_approvals(
+                requests,
                 approval,
                 now_utc=datetime(2026, 5, 9, 12, 0, tzinfo=UTC),
             )

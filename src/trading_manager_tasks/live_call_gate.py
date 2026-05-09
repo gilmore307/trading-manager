@@ -210,7 +210,17 @@ def validate_live_call_approvals(
     *,
     now_utc: datetime | None = None,
 ) -> list[LiveCallApprovalValidation]:
-    return [validate_live_call_approval(row, approval, now_utc=now_utc) for row in request_rows]
+    rows = list(request_rows)
+    validations = [validate_live_call_approval(row, approval, now_utc=now_utc) for row in rows]
+    if validations:
+        max_requests = validations[0].max_requests
+        if len(validations) > max_requests:
+            raise TaskSystemError("approved request batch exceeds approval.max_requests")
+        request_ids = {str(item) for item in _list(approval.get("request_ids") or approval.get("request_id"))}
+        missing = [validation.request_id for validation in validations if validation.request_id not in request_ids]
+        if missing:
+            raise TaskSystemError("approval.request_ids must include every manager request_id in the batch")
+    return validations
 
 
 def write_live_call_gate_output(

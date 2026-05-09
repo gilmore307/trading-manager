@@ -62,6 +62,27 @@ Each planned request keeps only concise control-plane facts:
 
 Provider task-key bodies and bulky runtime evidence belong behind storage refs, not inside manager request rows.
 
+## Layer 1 Historical-Training Preparation
+
+Layer 1 training should be prepared by manager as a complete batch, not as individual operator-prompted ETF tasks:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --write-files-only \
+  --format json
+```
+
+The batch preparation performs these manager-owned steps together:
+
+1. plan `01_feed_alpaca_bars` requests for every reviewed Layer 1 market-regime ETF symbol;
+2. build component-readable `task_key.json` payloads behind each `parameter_ref`;
+3. validate the payload handoff against the `trading-data` feed `build_context` boundary;
+4. report a batch summary showing zero provider calls, zero dispatch, zero model activation, and zero broker execution.
+
+Use `--write` only when the reviewed batch should be persisted to manager SQL as active control-plane requests and request-scoped input bindings. Even then, provider dispatch still requires a validated `live_call_approval_v1`.
+
 ## Payload Materialization
 
 After request rows are reviewed or persisted, materialize the component-readable `task_key.json` bodies behind each `parameter_ref`:

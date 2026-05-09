@@ -54,7 +54,7 @@ Concrete registry entries live in the SQL-backed `trading_registry` table. The n
 
 Registry ids are stable automation references. Registry keys are human-readable labels and may be renamed by reviewed migrations. Use id-based helpers in code.
 
-See `docs/04_model_stack_control_plane.md`, `docs/90_helpers.md`, `docs/91_registry.md`, `docs/92_templates.md`, `docs/93_contracts.md`, `docs/94_monthly_backfill.md`, `docs/95_task_system.md`, `docs/96_model_promotion.md`, and `docs/97_manager_control_plane_closeout.md` for platform-function guides and closeout status. Use `PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl` for a safe request/receipt/summary rehearsal before live component dispatch; add `--write` only for rehearsal-prefixed SQL rows.
+See `docs/04_model_stack_control_plane.md`, `docs/90_helpers.md`, `docs/91_registry.md`, `docs/92_templates.md`, `docs/93_contracts.md`, `docs/94_monthly_backfill.md`, `docs/95_task_system.md`, `docs/96_model_promotion.md`, and `docs/97_manager_control_plane_closeout.md` for platform-function guides and closeout status. Use `PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl` for a safe request/receipt/summary rehearsal before live component dispatch; add `--write` only for rehearsal-prefixed SQL rows. Use `PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py --start-month 2016-01 --end-month 2016-01 --write-files-only --format json` to let manager prepare the full Layer 1 historical-training handoff batch in one operation without provider calls.
 
 ## Shared Environment Rule
 
