@@ -21,6 +21,7 @@
 - `test_task_control_plane.py` verifies:
   - generic `manager_request_v1` validation;
   - component completion receipt normalization into run/artifact/ready rows;
+  - priority validation and global task-summary sort policy;
   - failed receipts do not emit ready status;
   - malformed receipts are rejected;
   - JSONL request loading.

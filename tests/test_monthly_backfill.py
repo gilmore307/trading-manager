@@ -37,6 +37,7 @@ class MonthlyBackfillPlannerTests(unittest.TestCase):
             self.assertIn(component_id, by_component)
             self.assertEqual(by_component[component_id]["month"], "2016-01")
             self.assertEqual(by_component[component_id]["contract_type"], "manager_request_v1")
+            self.assertEqual(by_component[component_id]["priority"], "normal")
             self.assertTrue(by_component[component_id]["dry_run"])
 
     def test_crypto_joins_later_than_common_start(self):

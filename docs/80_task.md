@@ -6,7 +6,7 @@
 
 ## Queued Tasks
 
-- Use `docs/94_monthly_backfill.md`, `scripts/tasks/plan_monthly_backfill.py`, `scripts/tasks/submit_manager_requests.py`, and `scripts/tasks/record_completion_receipt.py` to review the first bounded monthly backfill request/receipt batch before enabling live provider calls.
+- Use `docs/94_monthly_backfill.md`, `scripts/tasks/plan_monthly_backfill.py`, `scripts/tasks/submit_manager_requests.py`, `scripts/tasks/record_completion_receipt.py`, and `scripts/tasks/list_task_summary.py` to review the first bounded monthly backfill request/receipt batch before enabling live provider calls.
 - Implement execution handoff validation for mandatory `trade_risk_cap` before any broker/order mutation path.
 
 ## Deferred Until Manager Phase
@@ -23,6 +23,7 @@
 
 ## Recently Accepted
 
+- Added global task summary: `trading_manager.task_summary` derives every manager request's current status, latest run, latest ready signal, artifact count, priority, and priority rank for ordered dashboards/CLIs.
 - Added unified manager task-system request/receipt handling: manager requests are validated/persisted centrally, and component completion receipts normalize into run-manifest, artifact-ref, and ready-signal facts.
 - Added monthly historical backfill planning: common start `2016-01`, OKX crypto joins at `2018-01`, and current-only feeds stay out of historical point-in-time backfill until a new route is accepted.
 - Implemented and registered the concise MVP manager/control-plane SQL tables: `trading_manager.manager_request`, `trading_manager.input_binding`, `trading_manager.run_manifest`, `trading_manager.run_step`, `trading_manager.artifact_ref`, and `trading_manager.ready_signal`. `component_ref_v1` remains registry-backed fields rather than a separate component catalog table.

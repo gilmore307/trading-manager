@@ -22,6 +22,8 @@ manager_request_v1
 
 The manager uses the same lifecycle for data, model, storage, execution, and dashboard work. Component-local task queues may exist, but their private queue schemas do not become shared contracts.
 
+`trading_manager.task_summary` is the global read model for all requests. It joins request, latest run, latest ready signal, and artifact counts so dashboards and operators can see every task in one priority-ordered surface.
+
 ## Request Ownership
 
 Every cross-component request starts as `manager_request_v1` in `trading_manager.manager_request`.
@@ -33,10 +35,23 @@ The request row stores concise control-plane facts only:
 - target component/repository;
 - expected output refs;
 - policy refs;
+- priority and optional deadline;
 - optional parameter ref;
 - dry-run/live intent.
 
 The parameter body belongs in storage behind `parameter_ref`; it is not embedded in manager SQL.
+
+Accepted priority values, in descending order, are:
+
+```text
+critical
+high
+normal
+low
+backlog
+```
+
+`normal` is the default. The global summary sort order is `priority_rank`, then `deadline_at_utc`, then `created_at_utc`, then `request_id`.
 
 ## Completion Receipt Ownership
 
@@ -58,6 +73,12 @@ Validate or persist manager requests:
 ```bash
 PYTHONPATH=src python3 scripts/tasks/submit_manager_requests.py requests.jsonl
 PYTHONPATH=src python3 scripts/tasks/submit_manager_requests.py requests.jsonl --write
+```
+
+List the global task summary in priority order:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 ```
 
 Normalize or persist a component receipt:
@@ -86,5 +107,6 @@ By default these scripts print normalized rows and do not mutate SQL. `--write` 
 - A request is not proof that work happened.
 - A receipt is not downstream approval unless it produces a compatible `ready_signal_v1`.
 - `partial` receipts require review before downstream consumers rely on them.
+- `task_summary` is derived state; update the underlying request/run/ready rows rather than editing summary output.
 - Failed receipts must remain queryable for audit, but they must not emit `ready` status.
 - Secrets must be aliases/config refs only.

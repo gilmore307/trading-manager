@@ -239,6 +239,7 @@ def plan_monthly_backfill_requests(
                     "target_repo_id": source.target_repo_id,
                     "expected_outputs": _expected_outputs(source.source_id, window.month),
                     "policy_refs": list(DEFAULT_POLICY_REFS),
+                    "priority": "normal",
                     "parameter_ref": _parameter_ref(source.source_id, window.month),
                     "dry_run": True,
                     "month": window.month,

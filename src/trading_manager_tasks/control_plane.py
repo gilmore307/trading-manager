@@ -32,9 +32,21 @@ REQUEST_COLUMNS = (
     "target_repo_id",
     "expected_outputs",
     "policy_refs",
+    "priority",
+    "deadline_at_utc",
     "parameter_ref",
     "dry_run",
 )
+
+TASK_PRIORITY_RANKS = {
+    "critical": 10,
+    "high": 20,
+    "normal": 30,
+    "low": 40,
+    "backlog": 50,
+}
+
+TASK_SUMMARY_ORDER_BY = "priority_rank ASC, deadline_at_utc ASC NULLS LAST, created_at_utc ASC, request_id ASC"
 
 RUN_MANIFEST_COLUMNS = (
     "run_id",
@@ -209,6 +221,11 @@ def validate_manager_request(row: Mapping[str, Any]) -> dict[str, Any]:
     normalized["target_repo_id"] = str(_required(row, "target_repo_id"))
     normalized["expected_outputs"] = _list(row.get("expected_outputs"))
     normalized["policy_refs"] = _list(row.get("policy_refs"))
+    priority = str(row.get("priority") or "normal").strip().lower()
+    if priority not in TASK_PRIORITY_RANKS:
+        raise TaskSystemError(f"priority must be one of: {', '.join(TASK_PRIORITY_RANKS)}")
+    normalized["priority"] = priority
+    normalized["deadline_at_utc"] = row.get("deadline_at_utc")
     normalized["parameter_ref"] = row.get("parameter_ref")
     normalized["dry_run"] = bool(row.get("dry_run", True))
     return normalized
@@ -327,7 +344,9 @@ def normalize_completion_receipt(
 
 
 def _json_default(value: Any) -> Any:
-    return value
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
 
 
 def write_jsonl(rows: Iterable[Mapping[str, Any]], output: TextIO) -> None:
@@ -407,6 +426,36 @@ def persist_completion_rows(rows: CompletionReceiptRows, *, database_url: str | 
     _execute_many(url, "trading_manager.ready_signal", READY_SIGNAL_COLUMNS, rows.ready_signals)
 
 
+def fetch_task_summary(
+    *,
+    database_url: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch global manager task summary rows sorted by accepted priority order."""
+
+    import psycopg
+    from psycopg.rows import dict_row
+
+    predicates = []
+    params: list[Any] = []
+    if status:
+        predicates.append("task_status = %s")
+        params.append(status)
+    where_sql = " WHERE " + " AND ".join(predicates) if predicates else ""
+    limit_sql = ""
+    if limit is not None:
+        if limit < 1:
+            raise TaskSystemError("limit must be >= 1")
+        limit_sql = " LIMIT %s"
+        params.append(limit)
+    sql = f"SELECT * FROM trading_manager.task_summary{where_sql} ORDER BY {TASK_SUMMARY_ORDER_BY}{limit_sql}"
+    with psycopg.connect(_db_url(database_url), row_factory=dict_row) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            return [dict(row) for row in cursor.fetchall()]
+
+
 def submit_requests_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate or persist manager_request_v1 rows.")
     parser.add_argument("path", type=Path, help="JSON, JSON array, or JSONL request rows.")
@@ -418,6 +467,17 @@ def submit_requests_main(argv: list[str] | None = None) -> int:
         persist_manager_requests(rows, database_url=args.database_url)
     else:
         write_jsonl(rows, sys.stdout)
+    return 0
+
+
+def list_task_summary_main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="List global manager task summary rows by priority.")
+    parser.add_argument("--database-url")
+    parser.add_argument("--status", help="Optional task_status filter.")
+    parser.add_argument("--limit", type=int)
+    args = parser.parse_args(argv)
+    rows = fetch_task_summary(database_url=args.database_url, status=args.status, limit=args.limit)
+    write_jsonl(rows, sys.stdout)
     return 0
 
 

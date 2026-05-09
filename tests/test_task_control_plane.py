@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.control_plane import (
+    TASK_PRIORITY_RANKS,
+    TASK_SUMMARY_ORDER_BY,
     TaskSystemError,
     load_json_or_jsonl,
     normalize_completion_receipt,
@@ -25,6 +27,8 @@ class TaskControlPlaneTests(unittest.TestCase):
                 "target_repo_id": "trading-data",
                 "expected_outputs": "storage://example/output/",
                 "policy_refs": ["monthly_backfill_v1"],
+                "priority": "high",
+                "deadline_at_utc": "2026-05-09T14:30:00Z",
                 "parameter_ref": "storage://example/task_key.json",
             }
         )
@@ -32,7 +36,27 @@ class TaskControlPlaneTests(unittest.TestCase):
         self.assertEqual(row["contract_type"], "manager_request_v1")
         self.assertEqual(row["status"], "requested")
         self.assertEqual(row["expected_outputs"], ["storage://example/output/"])
+        self.assertEqual(row["priority"], "high")
+        self.assertEqual(row["deadline_at_utc"], "2026-05-09T14:30:00Z")
         self.assertTrue(row["dry_run"])
+
+    def test_rejects_unknown_priority(self):
+        with self.assertRaises(TaskSystemError):
+            validate_manager_request(
+                {
+                    "request_id": "mgrreq_bad_priority",
+                    "request_kind": "data_backfill_month_v1",
+                    "requested_by": "openclaw",
+                    "target_component_id": "01_feed_alpaca_bars",
+                    "target_repo_id": "trading-data",
+                    "priority": "whenever",
+                }
+            )
+
+    def test_task_summary_sort_policy_is_priority_first(self):
+        self.assertEqual(list(TASK_PRIORITY_RANKS), ["critical", "high", "normal", "low", "backlog"])
+        self.assertTrue(TASK_SUMMARY_ORDER_BY.startswith("priority_rank ASC"))
+        self.assertIn("deadline_at_utc ASC NULLS LAST", TASK_SUMMARY_ORDER_BY)
 
     def test_completion_receipt_normalizes_to_run_artifact_and_ready_signal(self):
         receipt = {

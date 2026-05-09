@@ -523,7 +523,7 @@ The first implementation slice is intentionally small:
 
 `component_ref_v1` is not a table yet. It is represented by registry-backed component/repo/version/entrypoint fields on the durable tables.
 
-The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, and `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows.
+The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows, and `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary.
 
 Next implementation order:
 

@@ -368,8 +368,10 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             rows["MANAGER_CONTRACT_SQL_TABLES"]["payload"],
-            "trading_manager.manager_request;trading_manager.input_binding;trading_manager.run_manifest;trading_manager.run_step;trading_manager.artifact_ref;trading_manager.ready_signal",
+            "trading_manager.manager_request;trading_manager.input_binding;trading_manager.run_manifest;trading_manager.run_step;trading_manager.artifact_ref;trading_manager.ready_signal;trading_manager.task_summary",
         )
+        self.assertEqual(rows["MANAGER_GLOBAL_TASK_SUMMARY_VIEW"]["payload"], "trading_manager.task_summary")
+        self.assertEqual(rows["MANAGER_TASK_PRIORITY_VALUES"]["payload"], "critical;high;normal;low;backlog")
         self.assertIn("contract_type;binding_id;input_role", rows["INPUT_BINDING_V1_REQUIRED_FIELDS"]["payload"])
         self.assertIn("contract_type;step_id;run_id", rows["RUN_STEP_V1_REQUIRED_FIELDS"]["payload"])
         self.assertIn("requested", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
@@ -385,6 +387,10 @@ class RegistryHelperTests(unittest.TestCase):
             "ready_signal",
         }:
             self.assertIn(f"trading_manager.{table_name}", migration)
+
+        summary_migration = Path("scripts/registry/sql/schema_migrations/253_create_global_task_summary.sql").read_text()
+        self.assertIn("CREATE OR REPLACE VIEW trading_manager.task_summary", summary_migration)
+        self.assertIn("priority_rank", summary_migration)
 
     def test_event_database_scope_is_not_active(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
