@@ -108,6 +108,16 @@ PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py \
 
 This imports the target `trading-data` feed pipeline and calls only `build_context`. It verifies the request, payload, hash-backed `input_binding_v1`, dry-run live-call policy, and component task-key shape. It does not call component `run`, does not call providers, does not write completion receipts, and does not change task status.
 
+Validate a reviewed live-call approval artifact before converting a request into live provider handoff:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval.py \
+  live_requests.jsonl \
+  --approval live_call_approval.json
+```
+
+`validate_live_call_approval.py` validates only the manager-side gate. It requires a non-dry-run `manager_request_v1` with `live_call_policy_required` and `live_call_approval_gate_v1` policy refs plus a `live_call_approval_v1` artifact with explicit approved request ids, provider allowlist, max request count, max window days, expiry, `approval_scope=provider_data_acquisition_only`, and `broker_execution_allowed=false`. It does not dispatch components, call providers, approve model promotion, or enable broker execution.
+
 Run a deterministic in-memory rehearsal of the request/receipt/summary lifecycle without provider calls or SQL writes:
 
 ```bash
@@ -179,4 +189,6 @@ By default these scripts print normalized rows and do not mutate SQL. `--write` 
 - `partial` receipts require review before downstream consumers rely on them.
 - `task_summary` is derived state; update the underlying request/run/ready rows rather than editing summary output.
 - Failed receipts must remain queryable for audit, but they must not emit `ready` status.
+- Live provider acquisition requires a validated `live_call_approval_v1`; dry-run planning, payload materialization, and handoff validation are not approval.
+- Live-call approval is data-acquisition-only; it must not permit broker orders, fills, account mutation, model activation, or execution-side lifecycle changes.
 - Secrets must be aliases/config refs only.

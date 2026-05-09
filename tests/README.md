@@ -16,6 +16,10 @@
   - registered model target coverage across Layers 1-8;
   - one shared `model_promotion_review_v1` request kind for all model layers.
 
+- `test_live_call_gate.py` verifies:
+  - `live_call_approval_v1` validation for bounded non-dry-run provider acquisition requests;
+  - rejection of dry-run requests, missing live-call gate policy, wrong provider scope, over-wide windows, and broker-execution approval.
+
 - `test_monthly_backfill.py` verifies:
   - monthly window generation;
   - accepted `2016-01` common start behavior;

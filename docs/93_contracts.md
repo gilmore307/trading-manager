@@ -120,6 +120,16 @@ These layer on top of the MVP contracts once runs and artifacts can be reference
 | `review_decision_v1` | Human/agent review outcome. | Automatic mutation of runtime configs. |
 | `activation_record_v1` | Approved activation/change record with rollback reference. | Broker or order execution. |
 
+### Live-Call Approval Contracts
+
+These contracts gate provider/API calls after dry-run planning and before component dispatch.
+
+| Contract | Owns | Does Not Own |
+|---|---|---|
+| `live_call_approval_v1` | Reviewed permission for a bounded non-dry-run provider acquisition request. | Provider implementation, component dispatch, broker/order execution, or model promotion approval. |
+
+A valid `live_call_approval_v1` must be explicit and narrow: it names approved `request_ids`, has `decision_status=approve`, uses `approval_scope=provider_data_acquisition_only`, sets `allowed_providers`, `max_requests`, `max_window_days`, `expires_at_utc`, and keeps `broker_execution_allowed=false`.
+
 ### Downstream Handoff Contracts
 
 These prevent manager/model outputs from pretending to be execution, storage, or dashboard implementation.
@@ -526,14 +536,15 @@ The first implementation slice is intentionally small:
 
 `component_ref_v1` is not a table yet. It is represented by registry-backed component/repo/version/entrypoint fields on the durable tables.
 
-The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows, `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary, and `scripts/tasks/plan_model_promotion_review.py` plans the single manager-side promotion review request kind for all model layers.
+The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows, `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary, `scripts/tasks/plan_model_promotion_review.py` plans the single manager-side promotion review request kind for all model layers, and `scripts/tasks/validate_live_call_approval.py` validates reviewed live-call approval artifacts before any provider dispatch.
 
-Next implementation order:
+Current manager closeout stance:
 
-1. Exercise the request/receipt scripts on the first reviewed monthly backfill batch before enabling live provider calls.
-2. Add evaluation/promotion SQL tables behind the unified `model_promotion_review_v1` entrypoint once run/artifact/ready persistence is exercised.
-3. Add downstream handoff tables before connecting Layer 8 outputs to execution-owned workflows.
-4. Add a component catalog only if query or lifecycle pressure proves it is needed.
+1. Request/receipt/task-summary MVP is implemented and rehearsed.
+2. Model-promotion review routing and decision/activation artifact builders are implemented.
+3. Live-call approval gate is defined and registered, but no provider dispatch is enabled by this repository.
+4. Broker/order/fill/account lifecycle remains outside `trading-manager` and must stay execution-owned.
+5. A component catalog or additional SQL tables should be added only when real query or lifecycle pressure proves they are needed.
 
 ## Acceptance Checklist
 

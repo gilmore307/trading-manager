@@ -388,6 +388,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotEqual(rows["COMPONENT_OUTPUT_ARTIFACT"]["id"], rows["MANAGER_REQUEST_PARAMETER_PAYLOAD_V1"]["id"])
         self.assertIn("materialize_request_payloads.py", rows["MANAGER_REQUEST_PAYLOAD_MATERIALIZE"]["path"])
         self.assertIn("validate_request_handoff.py", rows["MANAGER_REQUEST_HANDOFF_VALIDATE"]["path"])
+        self.assertEqual(rows["LIVE_CALL_APPROVAL_V1"]["payload"], "live_call_approval_v1")
+        self.assertIn("provider_data_acquisition_only", rows["LIVE_CALL_APPROVAL_GATE_V1"]["payload"])
+        self.assertIn("broker_execution_forbidden", rows["LIVE_CALL_APPROVAL_GATE_V1"]["payload"])
+        self.assertIn("validate_live_call_approval.py", rows["MANAGER_LIVE_CALL_APPROVAL_VALIDATE"]["path"])
+        self.assertIn("current_manager_control_plane_phase_closed", rows["TRADING_MANAGER_CONTROL_PLANE_CLOSEOUT_STATUS"]["payload"])
+        self.assertIn("no_broker_execution_enabled", rows["TRADING_MANAGER_CONTROL_PLANE_CLOSEOUT_STATUS"]["payload"])
         self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision_v1")
         self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "activation_record_v1")
         self.assertIn("build_review_decision.py", rows["MANAGER_REVIEW_DECISION_BUILD"]["path"])
@@ -428,6 +434,11 @@ class RegistryHelperTests(unittest.TestCase):
         integration_migration = Path("scripts/registry/sql/schema_migrations/262_register_storage_receipt_and_risk_cap_entrypoints.sql").read_text()
         self.assertIn("STORAGE_COMPLETION_RECEIPT_PAYLOAD_STORE", integration_migration)
         self.assertIn("TRADE_RISK_CAP_VALIDATE", integration_migration)
+
+        live_call_migration = Path("scripts/registry/sql/schema_migrations/263_register_live_call_gate_and_manager_closeout.sql").read_text()
+        self.assertIn("LIVE_CALL_APPROVAL_V1", live_call_migration)
+        self.assertIn("MANAGER_LIVE_CALL_APPROVAL_VALIDATE", live_call_migration)
+        self.assertIn("TRADING_MANAGER_CONTROL_PLANE_CLOSEOUT_STATUS", live_call_migration)
 
     def test_event_database_scope_is_not_active(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:

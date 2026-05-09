@@ -85,4 +85,4 @@ This still does not dispatch components or call providers. It only makes the req
 
 ## Guardrail
 
-A generated request or materialized task key is not approval to run live acquisition. Provider calls still require the live-call policy from `docs/93_contracts.md` and `trading-data/docs/96_production_hardening.md`.
+A generated request or materialized task key is not approval to run live acquisition. Provider calls require a separately reviewed `live_call_approval_v1` artifact validated through `scripts/tasks/validate_live_call_approval.py`. The gate is data-acquisition-only and must not approve broker execution, model activation, or account mutation.

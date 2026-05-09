@@ -2429,3 +2429,47 @@ If a storage payload participates in a formal request, run, evaluation, review, 
 - Large logs, raw provider bodies, model vector payloads, diagnostics reports, and replay bundles stay out of manager SQL and are referenced through artifact metadata.
 - Storage cleanup can delete or archive payloads without breaking manager audit history.
 - Later evaluation/promotion SQL tables should follow the same rule: make first-class tables only for facts with lifecycle, query, relationship, retention, or audit obligations.
+
+## D107 - Live-call approval gate is required before provider dispatch
+
+Date: 2026-05-09
+Status: Accepted
+
+### Context
+
+The manager task system can plan monthly backfill requests, materialize component-readable payloads, and validate dry-run handoff shape. Those steps are intentionally not approval to call live providers.
+
+### Decision
+
+Define `live_call_approval_v1` as the reviewed artifact required before a non-dry-run provider acquisition request can move toward component dispatch.
+
+A valid approval must name approved `request_ids`, have `decision_status=approve`, use `approval_scope=provider_data_acquisition_only`, list `allowed_providers`, set `max_requests`, set `max_window_days`, set `expires_at_utc`, and keep `broker_execution_allowed=false`.
+
+Register `LIVE_CALL_APPROVAL_GATE_V1`, `LIVE_CALL_APPROVAL_V1`, and `MANAGER_LIVE_CALL_APPROVAL_VALIDATE`. The validation helper checks the manager request and approval artifact only; it performs no provider calls, component dispatch, SQL mutation, model activation, broker order construction, or account mutation.
+
+### Consequences
+
+- Dry-run planning, payload materialization, and handoff validation remain safe preparation steps.
+- Live provider acquisition now has a manager-owned approval boundary without enabling unattended production orchestration.
+- Broker/order/fill/account lifecycle remains execution-owned and cannot be approved through this gate.
+
+## D108 - Current manager/control-plane phase is closed
+
+Date: 2026-05-09
+Status: Accepted
+
+### Context
+
+The manager repository now has the shared registry, MVP control-plane SQL contracts, request/receipt/task summary lifecycle, monthly backfill planning, request payload materialization, dry-run handoff validation, unified model-promotion review route, review decision/activation artifact builders, storage receipt payload reference flow, and live-call approval gate.
+
+### Decision
+
+Close the current manager/control-plane design-and-MVP phase. `docs/97_manager_control_plane_closeout.md` is the authoritative closeout receipt.
+
+No active manager-phase tasks remain. Future work is deferred until a concrete component production consumer requires it: live provider dispatch workers, durable object-store/SQL partitioning details, execution-owned broker/order/fill/account lifecycle, dashboard implementation, extra SQL tables, or a component catalog.
+
+### Consequences
+
+- `trading-manager` remains the control-plane owner, but it must not pretend to own component runtime implementation.
+- The closeout does not approve production model activation, live broker execution, or unattended provider orchestration.
+- New manager work should start from a specific consumer and acceptance gate, not from broad cleanup.

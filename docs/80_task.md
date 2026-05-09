@@ -6,20 +6,21 @@
 
 ## Queued Tasks
 
-- Use `docs/96_model_promotion.md`, `scripts/tasks/plan_model_promotion_review.py`, and `scripts/tasks/build_review_decision.py` as the single manager-side route for every model-layer promotion review request/decision artifact.
-- Before enabling live provider calls, define and review the live-call approval gate that converts dry-run backfill requests into actual component dispatch.
+- None for the current manager/control-plane closeout phase.
 
-## Deferred Until Manager Phase
+## Deferred Beyond Current Closeout
 
-- Physical execution queue and worker implementation beyond durable `manager_request_v1` / run-manifest SQL facts.
-- Migration criteria from legacy local data-production staging files into durable `trading-storage` SQL/artifact contracts.
-
-## Open Gaps
-
+- Live provider dispatch worker implementation after a validated `live_call_approval_v1` exists.
 - Broker/order-construction implementation after execution-side `trade_risk_cap` validation.
 - Durable object-store/SQL partitioning details beyond current storage-owned filesystem payload helper and manager SQL summary rows.
+- Migration criteria from legacy local data-production staging files into durable `trading-storage` SQL/artifact contracts.
+
+These are component production-phase tasks, not blockers for the current manager/control-plane closeout.
 
 ## Recently Accepted
+
+- Closed the current manager/control-plane phase in `docs/97_manager_control_plane_closeout.md`: request/run/artifact/ready MVP, task summary, monthly backfill planning, request payload materialization, dry-run handoff validation, unified model-promotion route, review decision/activation artifact builders, storage receipt payload reference flow, and live-call approval gate are accepted. No provider dispatch, broker execution, or production activation is enabled by this closeout.
+- Added `live_call_approval_v1` and `scripts/tasks/validate_live_call_approval.py` as the explicit data-acquisition-only gate before any non-dry-run provider handoff. The gate requires bounded approved request ids, provider allowlist, max request count, max window days, expiry, and `broker_execution_allowed=false`.
 
 - Closed all seven bounded `2016-01` dry-run monthly request/receipt paths: storage-owned receipt payloads were materialized in `trading-storage`, manager normalized them into SQL run/artifact/ready rows, and `task_summary` now reports each dry-run request as `ready` with `artifact_count=1`; no provider calls, component runs, or production data outputs occurred.
 - Registered storage receipt-payload and execution risk-cap validation entrypoints through migration `262_register_storage_receipt_and_risk_cap_entrypoints.sql`.
