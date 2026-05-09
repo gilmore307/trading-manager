@@ -299,8 +299,9 @@ class RegistryHelperTests(unittest.TestCase):
             "MODEL_08_OPTION_EXPRESSION_GENERATE": "scripts/models/model_08_option_expression/generate_model_08_option_expression.py",
             "MODEL_08_OPTION_EXPRESSION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_08_option_expression/evaluate_model_08_option_expression.py",
             "MODEL_08_OPTION_EXPRESSION_REVIEW_PROMOTION": "scripts/models/model_08_option_expression/review_option_expression_promotion.py",
-            "FEATURE_04_EVENT_OVERLAY_GENERATE": "src/data_feature/feature_04_event_overlay/__main__.py",
-            "FEATURE_08_OPTION_EXPRESSION_GENERATE": "src/data_feature/feature_08_option_expression/__main__.py",
+            "FEATURE_03_TARGET_STATE_VECTOR_GENERATE": "scripts/generate_feature_03_target_state_vector.py",
+            "FEATURE_04_EVENT_OVERLAY_GENERATE": "scripts/generate_feature_04_event_overlay.py",
+            "FEATURE_08_OPTION_EXPRESSION_GENERATE": "scripts/generate_feature_08_option_expression.py",
         }
         for key, expected_path in expected_layer_script_paths.items():
             self.assertEqual(rows[key]["kind"], "script")
