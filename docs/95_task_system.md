@@ -81,6 +81,14 @@ List the global task summary in priority order:
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 ```
 
+Plan a unified model promotion review request:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py \
+  --model model_08_option_expression \
+  --candidate-ref trading-model://promotion-candidates/mpcand_example
+```
+
 Normalize or persist a component receipt:
 
 ```bash
@@ -97,7 +105,7 @@ By default these scripts print normalized rows and do not mutate SQL. `--write` 
 ## Component Rules
 
 - `trading-data` emits feed/source/feature receipts; manager records run/artifact/ready facts.
-- `trading-model` emits generation/evaluation/review receipts; manager records run/artifact/ready facts.
+- `trading-model` emits generation/evaluation/review evidence receipts; manager records run/artifact/ready facts and owns the unified `model_promotion_review_v1` request entrypoint.
 - `trading-storage` owns durable payload storage, retention, backup, and rehydrate mechanics.
 - `trading-execution` may receive manager requests, but broker order/fill/account payloads remain execution-owned.
 - `trading-dashboard` receives ready/reviewed outputs for display, but dashboard widget schemas remain dashboard-owned.

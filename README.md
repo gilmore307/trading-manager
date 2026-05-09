@@ -37,9 +37,10 @@ docs/
   93_contracts.md
   94_monthly_backfill.md
   95_task_system.md
+  96_model_promotion.md
 ```
 
-Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` and `01_context.md` own the platform boundary, `02_`/`03_` layer docs own current cross-repository naming/control-plane workflows plus acceptance gates, `80_`/`81_`/`82_` own task/decision/memory, and `90_helpers.md`, `91_registry.md`, `92_templates.md`, `93_contracts.md`, `94_monthly_backfill.md`, and `95_task_system.md` explain the platform functions this repository owns.
+Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` and `01_context.md` own the platform boundary, `02_`/`03_` layer docs own current cross-repository naming/control-plane workflows plus acceptance gates, `80_`/`81_`/`82_` own task/decision/memory, and `90_helpers.md`, `91_registry.md`, `92_templates.md`, `93_contracts.md`, `94_monthly_backfill.md`, `95_task_system.md`, and `96_model_promotion.md` explain the platform functions this repository owns.
 
 ## Registry Rule
 

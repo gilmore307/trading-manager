@@ -15,14 +15,26 @@ from .monthly_backfill import (
     iter_monthly_windows,
     plan_monthly_backfill_requests,
 )
+from .model_promotion import (
+    MODEL_PROMOTION_TARGETS,
+    REQUEST_KIND as MODEL_PROMOTION_REVIEW_REQUEST_KIND,
+    ModelPromotionTarget,
+    build_model_promotion_review_request,
+    build_model_promotion_review_requests,
+)
 
 __all__ = [
     "CompletionReceiptRows",
     "DEFAULT_SOURCES",
     "TASK_PRIORITY_RANKS",
     "TASK_SUMMARY_ORDER_BY",
+    "MODEL_PROMOTION_REVIEW_REQUEST_KIND",
+    "MODEL_PROMOTION_TARGETS",
     "MonthlyWindow",
+    "ModelPromotionTarget",
     "SourceAvailability",
+    "build_model_promotion_review_request",
+    "build_model_promotion_review_requests",
     "fetch_task_summary",
     "iter_monthly_windows",
     "normalize_completion_receipt",

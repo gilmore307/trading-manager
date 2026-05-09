@@ -11,6 +11,11 @@
 
 ## Inventory
 
+- `test_model_promotion.py` verifies:
+  - unified model promotion review request planning;
+  - registered model target coverage across Layers 1-8;
+  - one shared `model_promotion_review_v1` request kind for all model layers.
+
 - `test_monthly_backfill.py` verifies:
   - monthly window generation;
   - accepted `2016-01` common start behavior;
@@ -22,6 +27,7 @@
   - generic `manager_request_v1` validation;
   - component completion receipt normalization into run/artifact/ready rows;
   - priority validation and global task-summary sort policy;
+  - unified model-promotion review entrypoint policy;
   - failed receipts do not emit ready status;
   - malformed receipts are rejected;
   - JSONL request loading.

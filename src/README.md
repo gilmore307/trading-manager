@@ -37,7 +37,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - generic SQL helpers;
 - artifact path/reference helpers;
 - manifest helpers;
-- request, ready-signal, and task-summary helpers;
+- request, ready-signal, task-summary, and unified model-promotion request helpers;
 - component completion receipt normalization helpers;
 - shared validation utilities;
 - reusable Python packages consumed by component repositories.

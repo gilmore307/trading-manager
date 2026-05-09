@@ -474,7 +474,8 @@ manager_request_v1
 
 For model evaluation/promotion:
 
-run_manifest_v1
+model_promotion_review_v1 manager request
+  -> run_manifest_v1
   -> dataset_snapshot_v1
   -> model_output_envelope_v1[]
   -> evaluation_run_v1
@@ -483,6 +484,8 @@ run_manifest_v1
             -> review_decision_v1
                  -> activation_record_v1
 ```
+
+`model_promotion_review_v1` is the single manager-side entrypoint for every model layer. Layer-specific differences belong in evidence adapters, labels, metrics, baseline ladders, and gate policy refs, not in separate promotion mechanisms.
 
 ## Cross-Repository Ownership
 
@@ -523,12 +526,12 @@ The first implementation slice is intentionally small:
 
 `component_ref_v1` is not a table yet. It is represented by registry-backed component/repo/version/entrypoint fields on the durable tables.
 
-The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows, and `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary.
+The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows, `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary, and `scripts/tasks/plan_model_promotion_review.py` plans the single manager-side promotion review request kind for all model layers.
 
 Next implementation order:
 
 1. Exercise the request/receipt scripts on the first reviewed monthly backfill batch before enabling live provider calls.
-2. Add evaluation/promotion SQL tables once run/artifact/ready persistence is exercised.
+2. Add evaluation/promotion SQL tables behind the unified `model_promotion_review_v1` entrypoint once run/artifact/ready persistence is exercised.
 3. Add downstream handoff tables before connecting Layer 8 outputs to execution-owned workflows.
 4. Add a component catalog only if query or lifecycle pressure proves it is needed.
 
