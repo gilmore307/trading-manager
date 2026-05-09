@@ -383,6 +383,10 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(rows["MANAGER_GLOBAL_TASK_SUMMARY_VIEW"]["payload"], "trading_manager.task_summary")
         self.assertEqual(rows["MANAGER_TASK_PRIORITY_VALUES"]["payload"], "critical;high;normal;low;backlog")
+        self.assertEqual(rows["COMPONENT_OUTPUT_ARTIFACT"]["payload"], "component_output")
+        self.assertEqual(rows["MANAGER_REQUEST_PARAMETER_PAYLOAD_V1"]["payload"], "manager_request_parameter_payload_v1")
+        self.assertNotEqual(rows["COMPONENT_OUTPUT_ARTIFACT"]["id"], rows["MANAGER_REQUEST_PARAMETER_PAYLOAD_V1"]["id"])
+        self.assertIn("materialize_request_payloads.py", rows["MANAGER_REQUEST_PAYLOAD_MATERIALIZE"]["path"])
         self.assertIn("contract_type;binding_id;input_role", rows["INPUT_BINDING_V1_REQUIRED_FIELDS"]["payload"])
         self.assertIn("contract_type;step_id;run_id", rows["RUN_STEP_V1_REQUIRED_FIELDS"]["payload"])
         self.assertIn("requested", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
@@ -402,6 +406,10 @@ class RegistryHelperTests(unittest.TestCase):
         summary_migration = Path("scripts/registry/sql/schema_migrations/253_create_global_task_summary.sql").read_text()
         self.assertIn("CREATE OR REPLACE VIEW trading_manager.task_summary", summary_migration)
         self.assertIn("priority_rank", summary_migration)
+
+        payload_migration = Path("scripts/registry/sql/schema_migrations/258_register_request_payload_materialization.sql").read_text()
+        self.assertIn("MANAGER_REQUEST_PARAMETER_PAYLOAD_V1", payload_migration)
+        self.assertIn("MANAGER_REQUEST_PAYLOAD_MATERIALIZE", payload_migration)
 
     def test_event_database_scope_is_not_active(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:

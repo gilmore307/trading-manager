@@ -23,6 +23,12 @@
   - current-only feeds staying out of historical backfill requests;
   - dry-run `manager_request_v1` JSONL shape.
 
+- `test_request_payloads.py` verifies:
+  - `storage://trading-manager/...` parameter refs resolve to local storage-root paths;
+  - monthly backfill requests materialize component-readable `task_key.json` payloads;
+  - request-scoped `input_binding_v1` metadata captures parameter payload refs and hashes;
+  - all default `2016-01` monthly backfill feeds receive required starter params.
+
 - `test_task_control_plane.py` verifies:
   - generic `manager_request_v1` validation;
   - component completion receipt normalization into run/artifact/ready rows;

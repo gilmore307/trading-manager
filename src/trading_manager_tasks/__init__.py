@@ -4,8 +4,10 @@ from .control_plane import (
     CompletionReceiptRows,
     TASK_PRIORITY_RANKS,
     TASK_SUMMARY_ORDER_BY,
+    fetch_manager_requests,
     fetch_task_summary,
     normalize_completion_receipt,
+    persist_input_bindings,
     validate_manager_request,
 )
 from .monthly_backfill import (
@@ -21,6 +23,12 @@ from .model_promotion import (
     ModelPromotionTarget,
     build_model_promotion_review_request,
     build_model_promotion_review_requests,
+)
+from .request_payloads import (
+    PARAMETER_SCHEMA_REF,
+    build_request_task_payload,
+    materialize_request_payload,
+    materialize_request_payloads,
 )
 from .task_rehearsal import (
     build_rehearsal_receipt,
@@ -43,9 +51,15 @@ __all__ = [
     "build_model_promotion_review_requests",
     "build_rehearsal_receipt",
     "build_rehearsal_task_summary",
+    "PARAMETER_SCHEMA_REF",
+    "build_request_task_payload",
+    "fetch_manager_requests",
     "fetch_task_summary",
     "iter_monthly_windows",
+    "materialize_request_payload",
+    "materialize_request_payloads",
     "normalize_completion_receipt",
+    "persist_input_bindings",
     "persist_rehearsal",
     "plan_monthly_backfill_requests",
     "rehearse_monthly_backfill_task_system",

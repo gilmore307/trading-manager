@@ -38,6 +38,23 @@ REQUEST_COLUMNS = (
     "dry_run",
 )
 
+INPUT_BINDING_COLUMNS = (
+    "binding_id",
+    "contract_type",
+    "request_id",
+    "run_id",
+    "input_role",
+    "input_ref",
+    "available_at_utc",
+    "as_of_utc",
+    "version_ref",
+    "entity_scope",
+    "time_window",
+    "schema_ref",
+    "quality_ref",
+    "lineage_ref",
+)
+
 TASK_PRIORITY_RANKS = {
     "critical": 10,
     "high": 20,
@@ -417,6 +434,51 @@ def _execute_many(database_url: str, table: str, columns: Sequence[str], rows: S
 def persist_manager_requests(rows: Sequence[Mapping[str, Any]], *, database_url: str | None = None) -> None:
     normalized = [validate_manager_request(row) for row in rows]
     _execute_many(_db_url(database_url), "trading_manager.manager_request", REQUEST_COLUMNS, normalized)
+
+
+def persist_input_bindings(rows: Sequence[Mapping[str, Any]], *, database_url: str | None = None) -> None:
+    _execute_many(_db_url(database_url), "trading_manager.input_binding", INPUT_BINDING_COLUMNS, rows)
+
+
+def fetch_manager_requests(
+    *,
+    database_url: str | None = None,
+    request_kind: str | None = None,
+    status: str | None = None,
+    request_ids: Sequence[str] | None = None,
+    limit: int | None = None,
+    include_rehearsals: bool = False,
+) -> list[dict[str, Any]]:
+    """Fetch manager_request rows for downstream helper scripts."""
+
+    import psycopg
+    from psycopg.rows import dict_row
+
+    predicates = []
+    params: list[Any] = []
+    if request_kind:
+        predicates.append("request_kind = %s")
+        params.append(request_kind)
+    if status:
+        predicates.append("status = %s")
+        params.append(status)
+    if request_ids:
+        predicates.append("request_id = ANY(%s)")
+        params.append(list(request_ids))
+    if not include_rehearsals:
+        predicates.append("request_id NOT LIKE 'mgrreq_rehearsal_%%'")
+    where_sql = " WHERE " + " AND ".join(predicates) if predicates else ""
+    limit_sql = ""
+    if limit is not None:
+        if limit < 1:
+            raise TaskSystemError("limit must be >= 1")
+        limit_sql = " LIMIT %s"
+        params.append(limit)
+    sql = f"SELECT {', '.join(REQUEST_COLUMNS)} FROM trading_manager.manager_request{where_sql} ORDER BY created_at_utc ASC, request_id ASC{limit_sql}"
+    with psycopg.connect(_db_url(database_url), row_factory=dict_row) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            return [dict(row) for row in cursor.fetchall()]
 
 
 def persist_completion_rows(rows: CompletionReceiptRows, *, database_url: str | None = None) -> None:

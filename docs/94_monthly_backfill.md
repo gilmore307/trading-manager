@@ -57,8 +57,32 @@ Each planned request keeps only concise control-plane facts:
 - month window fields
 - `dry_run = true`
 
-Provider task-key bodies and bulky runtime evidence belong in storage artifacts referenced later by `artifact_ref_v1`.
+Provider task-key bodies and bulky runtime evidence belong behind storage refs, not inside manager request rows.
+
+## Payload Materialization
+
+After request rows are reviewed or persisted, materialize the component-readable `task_key.json` bodies behind each `parameter_ref`:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py requests.jsonl \
+  --write-files
+```
+
+For SQL-backed request rows, fetch and materialize directly from `trading_manager.manager_request`:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py \
+  --from-db \
+  --request-kind data_backfill_month_v1 \
+  --status requested \
+  --write-files \
+  --write-bindings
+```
+
+The materializer writes local development payloads under `storage/monthly_backfill_v1/.../task_key.json` by resolving `storage://trading-manager/...` URIs. It also emits or persists request-scoped `input_binding_v1` rows with the payload URI, schema ref, byte size summary, and canonical SHA-256 hash.
+
+This still does not dispatch components or call providers. It only makes the request package concrete enough for a later component-facing dry-run handoff.
 
 ## Guardrail
 
-A generated request is not approval to run live acquisition. Provider calls still require the live-call policy from `docs/93_contracts.md` and `trading-data/docs/96_production_hardening.md`.
+A generated request or materialized task key is not approval to run live acquisition. Provider calls still require the live-call policy from `docs/93_contracts.md` and `trading-data/docs/96_production_hardening.md`.

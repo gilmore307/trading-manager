@@ -39,7 +39,7 @@ The request row stores concise control-plane facts only:
 - optional parameter ref;
 - dry-run/live intent.
 
-The parameter body belongs in storage behind `parameter_ref`; it is not embedded in manager SQL.
+The parameter body belongs in storage behind `parameter_ref`; it is not embedded in manager SQL. When a parameter payload is materialized, manager records the request-scoped payload reference as an `input_binding_v1` row rather than changing task state or pretending component execution has happened.
 
 Accepted priority values, in descending order, are:
 
@@ -80,6 +80,21 @@ List the global task summary in priority order:
 ```bash
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 ```
+
+Materialize request parameter payloads behind `parameter_ref` and optionally persist `input_binding_v1` metadata:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py requests.jsonl --write-files
+
+PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py \
+  --from-db \
+  --request-kind data_backfill_month_v1 \
+  --status requested \
+  --write-files \
+  --write-bindings
+```
+
+The second command is still handoff preparation only: it writes local task-key payloads and request-scoped input bindings, but it does not call providers or dispatch component work.
 
 Run a deterministic in-memory rehearsal of the request/receipt/summary lifecycle without provider calls or SQL writes:
 
