@@ -7,7 +7,10 @@ A `state_vector_value` row may represent:
 - Layer 1/2 compact scalar score names such as `1_market_direction_score` or `2_sector_relative_direction_score`;
 - Layer 3 score-family names such as `3_target_direction_score_<window>` or `3_tradability_score_<window>`;
 - Layer 4 event-context score-family names such as `4_event_gap_risk_score_<horizon>` or `4_event_market_impact_score_<horizon>`;
-- Layer 5 final adjusted alpha-confidence score-family names such as `5_alpha_direction_score_<horizon>` or `5_alpha_tradability_score_<horizon>`.
+- Layer 5 final adjusted alpha-confidence score-family names such as `5_alpha_direction_score_<horizon>` or `5_alpha_tradability_score_<horizon>`;
+- Layer 6 position-projection score-family names such as `6_target_exposure_score_<horizon>` or `6_position_gap_score_<horizon>`;
+- Layer 7 underlying-action score-family names such as `7_underlying_trade_eligibility_score_<horizon>` or `7_underlying_action_confidence_score_<horizon>`;
+- Layer 8 option-expression score-family names such as `8_option_contract_fit_score_<horizon>` or `8_option_expression_confidence_score_<horizon>`.
 
 Payloads must match the reviewed model contract exactly. Use compact numeric prefixes because core score tokens carry layer ownership directly.
 
@@ -23,7 +26,7 @@ Reject from this kind:
 - unresolved source/feature mapping placeholders;
 - model ids, data-feature names, data-source names, scripts, templates, or repository names;
 - generic lifecycle/review/test/docs/status values;
-- non-reviewed experiment labels or downstream action/strategy/position-sizing values;
-- Layer 5-adjacent action/routing concepts such as no-trade decision, target exposure, position size, account-risk allocation, option contract, strike, DTE, delta, or final verdict.
+- non-reviewed experiment labels, strategy labels, or concrete execution/routing values;
+- concrete planned-action enums, no-trade decisions, order quantities, account-risk allocations, option-contract identifiers, strike/DTE/delta selections, order types, broker fields, fill/account state, or final verdicts. Reviewed Layer 6/7/8 scalar score-family tokens are allowed here only when they remain score tokens rather than executable instructions.
 
 A state-vector value may later be stored in tables, files, or feature/model rows, but the registry row owns only the reviewed core score token. Other contract payloads remain documented in their model-local contracts until manager-phase interface promotion.

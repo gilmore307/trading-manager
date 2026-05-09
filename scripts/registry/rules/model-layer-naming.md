@@ -8,15 +8,17 @@ It replaces dated watch-list notes with durable rules. Candidate names should be
 
 ## Canonical Surface Pattern
 
-Use compact numeric layer prefixes:
+Use compact numeric prefixes:
 
 ```text
-source_NN_<layer_slug>
-feature_NN_<layer_slug>
+source_NN_<surface_slug>
+feature_NN_<surface_slug>
 model_NN_<layer_slug>
 model_NN_<layer_slug>_explainability
 model_NN_<layer_slug>_diagnostics
 ```
+
+For `model_NN_*`, `NN` is the accepted model-layer number. For `source_NN_*` and `feature_NN_*`, `NN` follows the registered data-source or feature-surface contract; it often matches the consuming model layer, but it is not automatically the model-layer number.
 
 Accepted examples:
 
@@ -35,6 +37,11 @@ Accepted examples:
 - `model_04_event_overlay`
 - `model_05_alpha_confidence`
 - `model_06_position_projection`
+- `model_07_underlying_action`
+- `model_08_option_expression`
+- `source_05_option_expression`
+- `feature_08_option_expression`
+- `source_06_position_execution`
 
 Rules:
 
@@ -54,6 +61,8 @@ Layer-owned fields use compact numeric prefixes only when the field is specific 
 4_*
 5_*
 6_*
+7_*
+8_*
 ```
 
 Generic identity, lineage, timestamp, receipt, run, and registry metadata fields should stay generic and should not receive a layer prefix.
@@ -69,10 +78,10 @@ For accepted model state/context outputs, only reviewed core scalar score tokens
 Current accepted model-layer intent is direction-neutral tradability first:
 
 ```text
-market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> event_context_vector -> alpha_confidence_model -> position_projection_model
+market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> event_context_vector -> alpha_confidence_vector -> position_projection_vector -> underlying_action_plan/vector -> option_expression_plan/expression_vector
 ```
 
-Layer 3 direction evidence is not Layer 5 alpha confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns final adjusted alpha direction, strength, expected residual return, confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha remains diagnostic unless separately promoted. Layer 6 `position_projection_model` owns target holding-state projection from final adjusted alpha plus current/pending position, cost, portfolio exposure, and risk-budget context. Event evidence, alpha confidence, and position projection are context/model layers, not final action or execution surfaces.
+Layer 3 direction evidence is not Layer 5 alpha confidence. Layer 4 `event_overlay_model` owns point-in-time event context/risk before confidence. Layer 5 `alpha_confidence_model` owns final adjusted alpha direction, strength, expected residual return, confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha remains diagnostic unless separately promoted. Layer 6 `position_projection_model` owns target holding-state projection from final adjusted alpha plus current/pending position, cost, portfolio exposure, and risk-budget context. Layer 7 `underlying_action_model` owns offline direct-underlying action thesis outputs. Layer 8 `option_expression_model` owns offline option-expression thesis outputs. Event evidence, alpha confidence, position projection, underlying-action planning, and option-expression planning are model/control-plane review surfaces, not broker execution surfaces.
 
 ## Layer 1 Boundary
 
@@ -172,9 +181,14 @@ Layer 7 must not emit broker order fields, route orders, mutate broker/account s
 Layer 8 is option-expression modeling after Layer 7. Current accepted shared names are:
 
 - `option_expression_model` — canonical Layer 8 model id;
-- `model_08_option_expression` — future model-owned output/table surface.
+- `model_08_option_expression` — future model-owned output/table surface;
+- `option_expression_plan` — primary offline option-expression plan output;
+- `expression_vector` — scalar/vector score output for option-expression quality by horizon;
+- `source_05_option_expression` — option-expression input source surface owned by `trading-data`, despite the source-family number `05`;
+- `feature_08_option_expression` — deterministic model-facing Layer 8 option-expression feature surface;
+- `source_06_position_execution` — selected-contract/position-execution context source used by option-expression review, despite the source-family number `06`.
 
-Layer 8 may use Layer 7 underlying price-path assumptions plus point-in-time option-chain context to choose option-expression and contract constraints. It still must not place orders or mutate broker/account state.
+Layer 8 may use Layer 7 underlying price-path assumptions plus point-in-time option-chain context to choose option-expression and contract constraints. It still must not place orders, emit broker order instructions, process fills, or mutate broker/account state. Source-family numbers such as `source_05_*` and `source_06_*` are not automatically model-layer numbers; check the registered row and accepted model boundary before inferring ownership.
 
 ## Registration Trigger
 
