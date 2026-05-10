@@ -150,6 +150,22 @@ PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py \
 
 This imports the target `trading-data` feed pipeline and calls only `build_context`. It verifies the request, payload, hash-backed `input_binding_v1`, dry-run live-call policy, and component task-key shape. It does not call component `run`, does not call providers, does not write completion receipts, and does not change task status.
 
+Plan the exact request ids for a reviewed live-call approval before creating or editing an approval artifact:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/plan_live_call_approval.py \
+  --model-layer layer_02_sector_context \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --symbol XLB \
+  --symbol XLK \
+  --symbol XLE \
+  --write \
+  --output-path storage/runtime/approvals/layer_02_sector_context/live_call_approval_proposal_layer_02_smoke_xlb_xlk_xle_2016-01.json
+```
+
+The proposal excludes `accepted_skip` rows from `trading_manager.failure_register`, emits a deliberately invalid `live_call_approval_v1` template with review placeholders, and prints plan/execute command templates. It does not approve, dispatch, call providers, activate models, or mutate broker/storage lifecycle state.
+
 Validate a reviewed live-call approval artifact before converting a request into live provider handoff:
 
 ```bash

@@ -72,6 +72,11 @@
   - `live_call_approval_v1` validation for bounded non-dry-run provider acquisition requests;
   - rejection of dry-run requests, missing live-call gate policy, wrong provider scope, over-wide windows, over-count batches, and broker-execution approval.
 
+- `test_live_call_planning.py` verifies:
+  - skip-aware `manager_live_call_approval_proposal_v1` review-template planning;
+  - exclusion of registered accepted skips before approval;
+  - proposal outputs stay non-dispatching with zero provider calls.
+
 - `test_historical_training.py` verifies:
   - manager-owned Layer 1 historical-training batch preparation;
   - full market-regime ETF universe request expansion;

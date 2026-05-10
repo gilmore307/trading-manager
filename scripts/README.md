@@ -26,6 +26,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/collect_dataset_evidence.py` — collects current snapshot/split/label/eval/control-plane evidence into `manager_dataset_evidence_v1` for expansion planning without provider calls.
 - `tasks/plan_dataset_expansion.py` — lets manager choose the next dataset role/layer to expand, and with `--write` prepares the selected safe artifacts/payloads without provider calls.
 - `tasks/advance_model_training_workflow.py` — refreshes the durable Layer 1-8 workflow checkpoint, ingests component receipts, records reviewed approval refs, and selects the next safe/gated stage.
+- `tasks/plan_live_call_approval.py` — creates a skip-aware live-call approval review proposal/template without approving, dispatching, or calling providers.
 - `tasks/dispatch_approved_provider_acquisition.py` — validates `live_call_approval_v1` for Layer 1/2 Alpaca-bars provider acquisition selected by `--model-layer` and, only with `--execute-approved-provider-calls`, runs the approved trading-data commands.
 - `tasks/validate_live_call_approval.py` — validates reviewed `live_call_approval_v1` artifacts before any non-dry-run provider handoff is considered.
 - `tasks/execute_model_training_stage.py` — executes one ready safe offline workflow stage, writes stdout/stderr logs and a component receipt, and refuses provider-gated stages.
