@@ -81,7 +81,8 @@
 - `test_live_call_planning.py` verifies:
   - skip-aware `manager_live_call_approval_proposal_v1` review-template planning;
   - exclusion of registered accepted skips before approval;
-  - proposal outputs stay non-dispatching with zero provider calls.
+  - exact proposal-bound validation of reviewed `live_call_approval_v1` request ids, skip exclusion, and max request bounds;
+  - proposal/validation outputs stay non-dispatching with zero provider calls.
 
 - `test_historical_training.py` verifies:
   - manager-owned Layer 1 historical-training batch preparation;

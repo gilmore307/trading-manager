@@ -166,6 +166,16 @@ PYTHONPATH=src python3 scripts/tasks/plan_live_call_approval.py \
 
 The proposal excludes `accepted_skip` rows from `trading_manager.failure_register`, emits a deliberately invalid `live_call_approval_v1` template with review placeholders, and prints plan/execute command templates. It does not approve, dispatch, call providers, activate models, or mutate broker/storage lifecycle state.
 
+After review fills in a real approval artifact, validate it exactly against the proposal before any dispatch attempt:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval_proposal.py \
+  --proposal storage/runtime/approvals/layer_02_sector_context/live_call_approval_proposal_layer_02_smoke_xlb_xlk_xle_2016-01.json \
+  --approval storage/runtime/approvals/layer_02_sector_context/live_call_approval_layer_02_smoke_xlb_xlk_xle_2016-01.json
+```
+
+This proposal-bound validation requires `approval.request_ids` to exactly equal `proposal.request_ids`, rejects any request id listed as a registered skip in the proposal, requires `max_requests` to equal the proposal request count, and then runs the normal live-call gate validation on regenerated non-dry-run manager requests. It is still plan-only: no provider dispatch or mutation occurs.
+
 Validate a reviewed live-call approval artifact before converting a request into live provider handoff:
 
 ```bash
