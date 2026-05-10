@@ -58,6 +58,7 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertFalse(dispatch.dispatch_performed)
         self.assertEqual(dispatch.items[0].status, "validated_not_dispatched")
         self.assertIn("data_feed.01_feed_alpaca_bars", dispatch.items[0].command)
+        self.assertTrue(Path(dispatch.items[0].task_key_path).is_absolute())
 
     def test_layer_one_dispatch_can_limit_to_symbol_allowlist(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -154,6 +155,49 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(dispatch.request_count, 2)
         self.assertEqual(dispatch.validation_count, 2)
         self.assertEqual(len(dispatch.items), 2)
+
+    def test_layer_one_dispatch_reports_absolute_source_task_key_paths(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            summary, requests, _payloads, _validations = prepare_layer_one_historical_training_batch(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                write=True,
+                validate_handoff=False,
+            )
+            approval = tmp / "approval.json"
+            approval.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "live_call_approval_v1",
+                        "approval_id": "approval_layer1_absolute_path_test",
+                        "decision_status": "approved",
+                        "approved_by": "unit-test",
+                        "approved_at_utc": datetime.now(UTC).isoformat(),
+                        "expires_at_utc": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+                        "request_ids": [request["request_id"] for request in requests],
+                        "approval_scope": "provider_data_acquisition_only",
+                        "broker_execution_allowed": False,
+                        "allowed_providers": ["alpaca"],
+                        "max_requests": summary.request_count,
+                        "max_window_days": 31,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            dispatch = dispatch_layer_one_provider_acquisition(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                approval_path=approval,
+                symbols=("SPY",),
+                execute_approved_provider_calls=False,
+            )
+
+        self.assertTrue(Path(dispatch.items[0].task_key_path).is_absolute())
 
 
 if __name__ == "__main__":

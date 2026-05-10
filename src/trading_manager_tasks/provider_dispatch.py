@@ -185,20 +185,21 @@ def dispatch_layer_one_provider_acquisition(
     items: list[ProviderDispatchItem] = []
     dispatch_count = 0
     for request in live_requests:
-        source_path = _task_key_path(storage_root, request)
+        source_path = _task_key_path(storage_root, request).resolve()
         if not source_path.exists():
             raise TaskSystemError(f"task key does not exist: {source_path}")
         task_key = json.loads(source_path.read_text(encoding="utf-8"))
         if not isinstance(task_key, Mapping):
             raise TaskSystemError(f"task key must be a JSON object: {source_path}")
-        runtime_task_key = storage_root / "runtime" / "approved_provider_task_keys" / request["request_id"] / "task_key.json"
+        runtime_task_key = (storage_root / "runtime" / "approved_provider_task_keys" / request["request_id"] / "task_key.json").resolve()
         command_path = source_path
         if execute_approved_provider_calls:
             runtime_task_key.parent.mkdir(parents=True, exist_ok=True)
             runtime_task_key.write_text(json.dumps(_approved_task_key(task_key, approval), indent=2, sort_keys=True) + "\n", encoding="utf-8")
             command_path = runtime_task_key
         command = _command(command_path, str(request["request_id"]))
-        receipt_path = str(Path(str(task_key.get("output_root") or "storage")) / "completion_receipt.json")
+        relative_receipt_path = Path(str(task_key.get("output_root") or "storage")) / "completion_receipt.json"
+        receipt_path = str((trading_data_root / relative_receipt_path).resolve()) if execute_approved_provider_calls else str(relative_receipt_path)
         status = "validated_not_dispatched"
         return_code = None
         if execute_approved_provider_calls:
@@ -214,7 +215,8 @@ def dispatch_layer_one_provider_acquisition(
             status = "dispatched_succeeded" if result.returncode == 0 else "dispatched_failed"
             dispatch_count += 1
             if result.returncode != 0:
-                raise TaskSystemError(f"provider dispatch failed for {request['request_id']}: {result.stderr[-500:]}")
+                error_tail = "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part)
+                raise TaskSystemError(f"provider dispatch failed for {request['request_id']}: {error_tail}")
         items.append(
             ProviderDispatchItem(
                 request_id=str(request["request_id"]),
