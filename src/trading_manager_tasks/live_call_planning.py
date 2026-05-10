@@ -344,6 +344,8 @@ def validate_proposal_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate a reviewed live_call_approval_v1 exactly against a manager proposal without dispatch.")
     parser.add_argument("--proposal", required=True, type=Path, help="manager_live_call_approval_proposal_v1 JSON.")
     parser.add_argument("--approval", required=True, type=Path, help="Reviewed live_call_approval_v1 JSON artifact.")
+    parser.add_argument("--output-path", type=Path, help="Optional path for the validation artifact.")
+    parser.add_argument("--write", action="store_true", help="Write the validation artifact to --output-path.")
     args = parser.parse_args(argv)
     proposal = json.loads(args.proposal.read_text(encoding="utf-8"))
     approval = json.loads(args.approval.read_text(encoding="utf-8"))
@@ -352,6 +354,11 @@ def validate_proposal_main(argv: list[str] | None = None) -> int:
     if not isinstance(approval, Mapping):
         raise TaskSystemError("approval artifact must be a JSON object")
     validation = validate_live_call_approval_against_proposal(proposal, approval)
+    if args.write:
+        if args.output_path is None:
+            raise TaskSystemError("--write requires --output-path")
+        args.output_path.parent.mkdir(parents=True, exist_ok=True)
+        args.output_path.write_text(json.dumps(validation.summary_row(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     write_live_call_approval_proposal_validation(validation, output=sys.stdout)
     return 0
 

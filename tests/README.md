@@ -85,6 +85,11 @@
   - exact proposal-bound validation of reviewed `live_call_approval_v1` request ids, skip exclusion, and max request bounds;
   - proposal/validation outputs stay non-dispatching with zero provider calls.
 
+- `test_live_call_packet.py` verifies:
+  - complete `manager_live_call_approval_packet_v1` bundle generation;
+  - packet files for proposal, reviewed-approval placeholder, validation output, dispatch templates, and reconcile templates;
+  - registered skip exclusion before packet command construction.
+
 - `test_historical_training.py` verifies:
   - manager-owned Layer 1 historical-training batch preparation;
   - full market-regime ETF universe request expansion;

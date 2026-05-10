@@ -150,6 +150,21 @@ PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py \
 
 This imports the target `trading-data` feed pipeline and calls only `build_context`. It verifies the request, payload, hash-backed `input_binding_v1`, dry-run live-call policy, and component task-key shape. It does not call component `run`, does not call providers, does not write completion receipts, and does not change task status.
 
+Create a complete local approval packet when preparing a reviewed live-call batch:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/create_live_call_approval_packet.py \
+  --model-layer layer_02_sector_context \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --symbol XLB \
+  --symbol XLK \
+  --symbol XLE \
+  --write
+```
+
+The packet writes a proposal, deliberately invalid reviewed-approval placeholder, validation output target, dispatch plan/execute command templates, and reconcile command template under `storage/runtime/approvals/...`. It is a local runtime bundle only: packet creation does not approve, validate as reviewed, dispatch, or call providers.
+
 Plan the exact request ids for a reviewed live-call approval before creating or editing an approval artifact:
 
 ```bash
