@@ -2550,3 +2550,25 @@ Historical provider acquisition is part of the historical-data model-training li
 - Scheduler decisions should expose the next internal stage and required approval gate instead of stopping at preparation.
 - Layer 1 Alpaca bar acquisition is tracked as historical-training work, while provider calls remain bounded and reviewable.
 - Offline preparation, feature generation, training, and evaluation continue automatically whenever their inputs and gates are satisfied.
+
+## D113 - Historical scheduler runtime must be resident and resumable
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+Historical-data model training is not a chat-session task or a one-shot maintenance script. It needs production-like operational behavior: long-running background residency, restart tolerance, checkpointed continuation, single-instance safety, boot integration, logs, and explicit maintenance surfaces.
+
+### Decision
+
+Add a persistent historical-training scheduler runtime around the existing scheduler tick. The runtime must persist `manager_scheduler_daemon_state_v1` after every tick, append scheduler decisions to JSONL, enforce a single-instance lock, and expose a service-manager-compatible entrypoint for always-on operation.
+
+Host autostart is supported through reviewed templates under `deploy/`, but installing/enabling those templates is an operator action. The repository owns the runtime capability and documentation; the host owner controls activation.
+
+### Consequences
+
+- The historical model-training scheduler can run as a resident background daemon and resume after process restart or host reboot.
+- State, lock, and decision logs live under ignored `storage/runtime/` by default and must not rely on OpenClaw chat memory.
+- Duplicate daemon instances over the same state path are rejected.
+- Provider calls, model activation, and broker execution remain gated exactly as before; residency does not imply permission escalation.

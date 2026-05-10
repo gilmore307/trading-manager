@@ -90,7 +90,9 @@ The scheduler implementation should behave like a durable work loop:
 
 If no safe work exists, the scheduler should report why: waiting for approval, regular-trading-day market-hours protection, resource pressure, missing upstream artifact, failed dependency, provider quota, or promotion review.
 
-The current scheduler tick implements the first safe step: it evaluates regular-trading-day market-hours protection and host resource pressure, then either reports `prepare_layer_one_historical_training_batch` as the next safe internal work item or executes that preparation with `--execute-safe-preparation`. Execution writes task-key payloads and validates handoff shape only. The next internal stage is `approval_gated_provider_acquisition`; the approval gate is a safety control inside historical training, not an external dependency or manual task request.
+The current one-shot scheduler tick implements the first safe step: it evaluates regular-trading-day market-hours protection and host resource pressure, then either reports `prepare_layer_one_historical_training_batch` as the next safe internal work item or executes that preparation with `--execute-safe-preparation`. Execution writes task-key payloads and validates handoff shape only. The next internal stage is `approval_gated_provider_acquisition`; the approval gate is a safety control inside historical training, not an external dependency or manual task request.
+
+The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_daemon.py`. It wraps the tick in a resident loop with a `manager_scheduler_daemon_state_v1` checkpoint, single-instance lock, decision JSONL log, and service-manager-ready template under `deploy/systemd/`. See [`99_historical_scheduler_runtime.md`](99_historical_scheduler_runtime.md) for boot, resume, and maintenance expectations.
 
 ## Non-Goals
 
@@ -100,4 +102,5 @@ This policy does not authorize:
 - production model activation without promotion review approval;
 - broker execution or account mutation;
 - hiding long-running jobs from receipts/artifacts/summary;
+- running duplicate scheduler daemons over the same lock/state path;
 - saturating the host just because historical backlog exists.

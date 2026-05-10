@@ -1,0 +1,20 @@
+[Unit]
+Description=Trading Manager Historical Training Scheduler
+Documentation=file:/root/projects/trading-manager/docs/99_historical_scheduler_runtime.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/projects/trading-manager
+Environment=PYTHONPATH=/root/projects/trading-manager/src
+ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py --start-month 2016-01 --end-month 2016-01 --execute-safe-preparation
+Restart=always
+RestartSec=30
+KillSignal=SIGTERM
+TimeoutStopSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

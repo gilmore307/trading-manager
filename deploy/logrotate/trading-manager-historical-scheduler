@@ -1,0 +1,8 @@
+/root/projects/trading-manager/storage/runtime/historical_scheduler_decisions.jsonl {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

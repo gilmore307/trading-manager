@@ -2,7 +2,7 @@
 
 ## Active Tasks
 
-- Extend the implemented scheduler tick beyond safe Layer 1 preparation into internal approval-gated provider acquisition, receipt ingestion, ready-signal progression, offline feature/model/evaluation dispatch, and promotion-review preparation.
+- Extend the implemented persistent scheduler runtime beyond safe Layer 1 preparation into internal approval-gated provider acquisition, receipt ingestion, ready-signal progression, offline feature/model/evaluation dispatch, and promotion-review preparation.
 
 The manager/control-plane MVP is closed for no-broker historical training: planning, request persistence, payload materialization, dry-run handoff validation, receipt normalization, task summary, review-decision artifacts, and live-call approval validation are accepted. Scheduler automation has begun with a gated one-tick implementation; the next manager phase is expanding the scheduler, not ad hoc manual task prompting.
 
@@ -11,7 +11,7 @@ The manager/control-plane MVP is closed for no-broker historical training: plann
 - Seven bounded `2016-01` dry-run monthly request/receipt paths are closed as `ready` with one artifact each.
 - Provider acquisition is an internal historical-training stage and is intentionally gated: non-dry-run historical data calls require reviewed `live_call_approval_v1` and validation before any component dispatch is considered.
 - Scheduler automation target: keep safe historical work moving continuously, but pause or throttle historical work during the `09:20-16:10 ET` protection window only on regular US equity trading days and under live-system resource pressure.
-- Implemented first scheduler tick: `scripts/tasks/run_automation_scheduler.py` evaluates market-day/time and resource gates, reports explicit backoff/ready reasons, can execute safe Layer 1 task-key preparation without provider calls, and reports `approval_gated_provider_acquisition` as the next internal stage.
+- Implemented first scheduler tick and persistent runtime: `scripts/tasks/run_automation_scheduler.py` evaluates market-day/time and resource gates, and `scripts/tasks/run_automation_scheduler_daemon.py` provides checkpointed resident operation with lock/state/decision log support. Both preserve zero provider calls until approval-gated acquisition is implemented.
 - Model promotion requests can be planned through `model_promotion_review_v1`, but production activation requires an approving `review_decision_v1` and remains out of the current no-broker training scope.
 
 ## Not Current Historical-Training Scope

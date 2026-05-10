@@ -49,6 +49,12 @@
   - resource-pressure gating that reserves live-system capacity;
   - scheduler ready/backoff/executed decisions for safe offline Layer 1 preparation without provider dispatch.
 
+- `test_scheduler_daemon.py` verifies:
+  - `manager_scheduler_daemon_state_v1` checkpoint round-tripping and resume-scope updates;
+  - single-instance lock behavior;
+  - error checkpointing for restart-safe failure visibility;
+  - persistent daemon loop state/log writing without provider dispatch.
+
 - `test_review_decision.py` verifies:
   - unified `review_decision_v1` artifact construction;
   - activation records require approving review decisions;
