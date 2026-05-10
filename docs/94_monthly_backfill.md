@@ -6,6 +6,8 @@
 
 The common historical start month is `2016-01`.
 
+Formal historical operation is chronological-forward: start at the accepted earliest common month (`2016-01`) and advance month by month from old to new. Do not run nearer months ahead of older eligible months unless a reviewed operator exception is recorded. Request planning clamps any earlier requested month to `2016-01`, even when a provider has older raw availability, so formal evidence begins from the reviewed common start.
+
 Crypto is allowed to join later. The current OKX BTC/USDT evidence supports starting OKX monthly backfill at `2018-01`; this does not block the equity/news/SEC/options route from beginning at `2016-01`.
 
 ## Default Historical Sources

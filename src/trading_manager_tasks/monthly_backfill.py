@@ -20,7 +20,8 @@ from typing import Iterable, Iterator, Literal, TextIO
 DEFAULT_REQUESTED_BY = "openclaw"
 DEFAULT_START_MONTH = "2016-01"
 OKX_START_MONTH = "2018-01"
-DEFAULT_POLICY_REFS = ("monthly_backfill_v1", "live_call_policy_required")
+CHRONOLOGICAL_FORWARD_POLICY_REF = "chronological_forward_backfill_policy_v1"
+DEFAULT_POLICY_REFS = ("monthly_backfill_v1", CHRONOLOGICAL_FORWARD_POLICY_REF, "live_call_policy_required")
 DEFAULT_PROJECTS_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
     DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "market_regime_etf_universe.csv"
@@ -313,21 +314,32 @@ def plan_monthly_backfill_requests(
     """
 
     requested_start = Month.parse(start_month)
+    accepted_start = Month.parse(DEFAULT_START_MONTH)
+    effective_global_start = accepted_start if requested_start < accepted_start else requested_start
     requested_end = Month.parse(end_month)
     if requested_end < requested_start:
         raise ValueError("end_month must be >= start_month")
+    if requested_end < effective_global_start:
+        return []
 
     layer_one_universe = load_market_regime_universe(market_regime_universe_path)
-    planned: list[dict[str, object]] = []
+    eligible_sources: list[tuple[SourceAvailability, Month]] = []
     for source in sources:
         if not source.include_by_default:
             continue
         if source.source_id == "okx_crypto_market_data" and not include_crypto:
             continue
-        effective_start = source.effective_start(requested_start)
-        if effective_start is None or effective_start > requested_end:
+        source_start = source.effective_start(effective_global_start)
+        if source_start is None or source_start > requested_end:
             continue
-        for window in iter_monthly_windows(str(effective_start), str(requested_end)):
+        eligible_sources.append((source, source_start))
+
+    planned: list[dict[str, object]] = []
+    for window in iter_monthly_windows(str(effective_global_start), str(requested_end)):
+        window_month = Month.parse(window.month)
+        for source, source_start in eligible_sources:
+            if window_month < source_start:
+                continue
             if source.target_component_id == "01_feed_alpaca_bars":
                 for member in layer_one_universe:
                     planned.append(
@@ -377,7 +389,7 @@ def source_inventory() -> list[dict[str, object]]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Plan dry-run manager_request_v1 rows for monthly data backfill.")
-    parser.add_argument("--start-month", default=DEFAULT_START_MONTH, help="Inclusive YYYY-MM start month; accepted default is 2016-01.")
+    parser.add_argument("--start-month", default=DEFAULT_START_MONTH, help="Inclusive YYYY-MM start month; values earlier than the accepted 2016-01 common start are clamped to 2016-01.")
     parser.add_argument("--end-month", required=True, help="Inclusive YYYY-MM end month.")
     parser.add_argument("--exclude-crypto", action="store_true", help="Skip OKX crypto; by default it joins at its later 2018-01 start.")
     parser.add_argument("--requested-by", default=DEFAULT_REQUESTED_BY)

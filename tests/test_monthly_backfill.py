@@ -87,7 +87,16 @@ class MonthlyBackfillPlannerTests(unittest.TestCase):
         self.assertEqual(payload["contract_type"], "manager_request_v1")
         self.assertEqual(payload["status"], "requested")
         self.assertIn("monthly_backfill_v1", payload["policy_refs"])
+        self.assertIn("chronological_forward_backfill_policy_v1", payload["policy_refs"])
         self.assertTrue(payload["parameter_ref"].endswith("/task_key.json"))
+
+    def test_planner_clamps_to_common_start_and_orders_months_forward(self):
+        requests = plan_monthly_backfill_requests(start_month="2015-01", end_month="2016-02")
+        months = [row["month"] for row in requests]
+
+        self.assertEqual(min(months), "2016-01")
+        self.assertEqual(months, sorted(months))
+        self.assertIn("2016-02", set(months))
 
 
 if __name__ == "__main__":
