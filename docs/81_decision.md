@@ -2506,3 +2506,26 @@ Approval gates remain hard: live provider acquisition requires validated `live_c
 - Historical training becomes background automation relative to live monitoring and execution.
 - Scheduler pauses/backoff reasons must be explicit: approval wait, regular-trading-day market-hours protection, resource pressure, dependency block, provider quota, or promotion review.
 - Automation does not authorize live provider calls, model activation, or broker execution by implication.
+
+## D111 - Implement scheduler tick before live dispatch
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+The accepted scheduler direction needs implementation without prematurely enabling provider dispatch, production model activation, or broker execution. The safest first step is a scheduler tick that proves gate behavior and executes only already-safe offline preparation.
+
+### Decision
+
+Implement `scripts/tasks/run_automation_scheduler.py` backed by `trading_manager_tasks.scheduler` as the first scheduler work-loop increment.
+
+The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes only Layer 1 task-key payload materialization and handoff validation through the existing preparation path.
+
+The tick must emit safety counters proving `provider_calls=0`, `dispatch_performed=false`, `model_activation_performed=false`, and `broker_execution_performed=false` for this phase.
+
+### Consequences
+
+- Scheduler automation is now implemented enough to decide and perform safe offline preparation.
+- Provider dispatch, receipt-driven progression, feature/model/evaluation runners, and promotion-review automation remain the next scheduler increments.
+- Live provider dispatch still requires validated `live_call_approval_v1`; production activation still requires approving `review_decision_v1`; broker execution remains execution-owned.

@@ -2,7 +2,7 @@
 
 `trading-manager` should become the always-on automation control plane for historical model training and maintenance while preserving capacity for live trading operations.
 
-This policy is accepted as the target scheduler shape. It does not by itself enable live provider calls, model activation, broker orders, fills, position mutation, or unattended production trading.
+This policy is accepted as the target scheduler shape. The first implementation is `scripts/tasks/run_automation_scheduler.py`, which runs one gated scheduler tick and can execute safe offline Layer 1 preparation only. It does not enable live provider calls, model activation, broker orders, fills, position mutation, or unattended production trading.
 
 ## Responsibility
 
@@ -79,7 +79,7 @@ Automation does not weaken gates:
 
 ## Work-Loop Semantics
 
-A future scheduler implementation should behave like a durable work loop:
+The scheduler implementation should behave like a durable work loop:
 
 1. inspect `task_summary`, receipts, ready signals, and artifact refs;
 2. find the next safe blocked/ready work item by priority and dependency state;
@@ -88,7 +88,9 @@ A future scheduler implementation should behave like a durable work loop:
 5. record receipts and update manager summary surfaces;
 6. continue until no safe work exists, then sleep/backoff instead of spinning.
 
-If no safe work exists, the scheduler should report why: waiting for approval, market-hours protection, resource pressure, missing upstream artifact, failed dependency, provider quota, or promotion review.
+If no safe work exists, the scheduler should report why: waiting for approval, regular-trading-day market-hours protection, resource pressure, missing upstream artifact, failed dependency, provider quota, or promotion review.
+
+The current scheduler tick implements the first safe step: it evaluates regular-trading-day market-hours protection and host resource pressure, then either reports `prepare_layer_one_historical_training_batch` as the next safe offline work item or executes that preparation with `--execute-safe-preparation`. Execution writes task-key payloads and validates handoff shape only; provider dispatch remains a later approved step.
 
 ## Non-Goals
 

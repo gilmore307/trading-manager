@@ -43,6 +43,12 @@
   - hash-backed `input_binding_v1` metadata must match the local payload;
   - live-call-enabled payloads are rejected by the dry-run handoff validator.
 
+- `test_scheduler.py` verifies:
+  - regular-trading-day-only market-hours protection;
+  - weekend and market-holiday exemptions from the 09:20-16:10 ET pause window;
+  - resource-pressure gating that reserves live-system capacity;
+  - scheduler ready/backoff/executed decisions for safe offline Layer 1 preparation without provider dispatch.
+
 - `test_review_decision.py` verifies:
   - unified `review_decision_v1` artifact construction;
   - activation records require approving review decisions;

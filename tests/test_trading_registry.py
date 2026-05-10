@@ -408,6 +408,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("pause_cpu_heavy_feature_model_eval", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
         self.assertIn("non_trading_days_do_not_trigger_time_window_pause", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
         self.assertIn("check_gates", rows["MANAGER_SCHEDULER_WORK_LOOP"]["payload"])
+        self.assertIn("run_automation_scheduler.py", rows["MANAGER_AUTOMATION_SCHEDULER_RUN"]["path"])
+        self.assertEqual(rows["MANAGER_SCHEDULER_DECISION_V1"]["payload"], "manager_scheduler_decision_v1")
         self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision_v1")
         self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "activation_record_v1")
         self.assertIn("build_review_decision.py", rows["MANAGER_REVIEW_DECISION_BUILD"]["path"])

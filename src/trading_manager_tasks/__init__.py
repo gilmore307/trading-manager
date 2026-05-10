@@ -42,6 +42,15 @@ from .review_decision import (
     validate_activation_record,
     validate_review_decision,
 )
+from .scheduler import (
+    ResourceSnapshot,
+    SchedulerConfig,
+    SchedulerDecision,
+    is_regular_us_equity_trading_day,
+    market_hours_gate,
+    resource_gate,
+    run_scheduler_once,
+)
 from .task_rehearsal import (
     build_rehearsal_receipt,
     build_rehearsal_task_summary,
@@ -78,8 +87,15 @@ __all__ = [
     "persist_rehearsal",
     "plan_monthly_backfill_requests",
     "rehearse_monthly_backfill_task_system",
+    "ResourceSnapshot",
     "RequestHandoffValidation",
+    "SchedulerConfig",
+    "SchedulerDecision",
+    "run_scheduler_once",
     "validate_activation_record",
+    "is_regular_us_equity_trading_day",
+    "market_hours_gate",
+    "resource_gate",
     "validate_manager_request",
     "validate_request_handoff",
     "validate_request_handoffs",
