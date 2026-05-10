@@ -333,6 +333,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["DELETION_RECEIPT_V1"]["payload"], "deletion_receipt_v1")
         self.assertEqual(rows["ARTIFACT_TOMBSTONE_V1"]["kind"], "artifact_type")
         self.assertIn("artifact_index", rows["STORAGE_ARTIFACT_INDEX"]["payload"])
+        self.assertIn("manager_unified_request_task_summary_surface", rows["STORAGE_LIFECYCLE_MANAGER_CONTROL_POLICY"]["payload"])
+        self.assertIn("trading_storage_protected_set_physical_execution", rows["STORAGE_LIFECYCLE_MANAGER_CONTROL_POLICY"]["payload"])
         self.assertIn("live_calls_disabled_by_default", rows["DATA_PRODUCTION_HARDENING_POLICY"]["payload"])
         self.assertIn("checkpoint_resume_required_for_segmented_runs", rows["DATA_PRODUCTION_HARDENING_POLICY"]["payload"])
         self.assertIn("provider_allowlist_required", rows["LIVE_CALL_GUARDRAILS_POLICY"]["payload"])
