@@ -2,21 +2,22 @@
 
 ## Active Tasks
 
-- None for the historical-data training preparation boundary.
+- Define and implement the always-on automation scheduler that advances historical data acquisition, feature generation, model training, evaluation, promotion-review preparation, and maintenance while respecting approval gates, resource budgets, and market-hours live-trading protection.
 
-The manager/control-plane MVP is closed for no-broker historical training: planning, request persistence, payload materialization, dry-run handoff validation, receipt normalization, task summary, review-decision artifacts, and live-call approval validation are accepted.
+The manager/control-plane MVP is closed for no-broker historical training: planning, request persistence, payload materialization, dry-run handoff validation, receipt normalization, task summary, review-decision artifacts, and live-call approval validation are accepted. The next manager phase is scheduler automation, not ad hoc manual task prompting.
 
 ## Historical-Training Todo Status
 
 - Seven bounded `2016-01` dry-run monthly request/receipt paths are closed as `ready` with one artifact each.
 - Provider acquisition is intentionally gated: non-dry-run historical data calls require reviewed `live_call_approval_v1` and validation before any component dispatch is considered.
+- Scheduler automation target: keep safe historical work moving continuously, but pause or throttle historical work during regular US equity market protection windows and under live-system resource pressure.
 - Model promotion requests can be planned through `model_promotion_review_v1`, but production activation requires an approving `review_decision_v1` and remains out of the current no-broker training scope.
 
 ## Not Current Historical-Training Scope
 
 These items are intentionally outside the current no-broker historical-training run and must not be treated as active manager work items:
 
-- live provider dispatch workers without validated `live_call_approval_v1` artifacts;
+- live provider dispatch workers that bypass validated `live_call_approval_v1` artifacts;
 - broker/order-construction implementation;
 - execution-owned order/fill/account lifecycle;
 - durable object-store and high-volume SQL partitioning beyond the current storage-owned payload helper and manager SQL summary rows;

@@ -66,9 +66,9 @@ This closeout does not enable or claim:
 
 Those are component production phases, not manager closeout blockers.
 
-## Not Current Historical-Training Scope
+## Not Included In This Closeout
 
-There are no active manager/control-plane work items for the current no-broker historical-training preparation boundary. Future work should begin only when a concrete consumer requires it:
+The manager/control-plane closeout did not include an always-on production scheduler. Future scheduler work should begin from concrete lifecycle pressure and preserve these boundaries:
 
 - live provider dispatch worker implementation after a validated `live_call_approval_v1` exists;
 - durable object-store/SQL partitioning beyond current payload-reference helpers;
@@ -76,6 +76,8 @@ There are no active manager/control-plane work items for the current no-broker h
 - dashboard surfaces over `task_summary`, promotion decisions, and ready signals;
 - additional manager SQL tables only when lifecycle/query/audit pressure justifies them;
 - component catalog only if registry-backed component fields become insufficient.
+
+The target direction after closeout is not a passive script pile: `trading-manager` should grow into the always-on automation scheduler described in `docs/98_automation_scheduler.md`, with historical training/maintenance progressing continuously whenever approvals, resources, dependencies, and market-hours protection permit.
 
 ## Acceptance Evidence
 

@@ -2482,3 +2482,27 @@ Status: Accepted
 The registry owns the shared Layer 4 price-action vocabulary: `price_action` as an `event_category_type` value and canonical event tokens `false_breakout`, `false_breakdown`, `liquidity_sweep_high`, `liquidity_sweep_low`, `bull_trap`, and `bear_trap`.
 
 The registry policy is explicit: price-action evidence is Layer 4 event-overlay evidence and optional Layer 3/5 context. It is not a new model layer, not an action signal, and not execution permission.
+
+## D110 - Manager scheduler should automate historical training while protecting live capacity
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+The manager should not remain a passive collection of scripts that waits for manual prompting after each step. The intended platform needs historical data acquisition, feature generation, model training, evaluation, promotion-review preparation, and maintenance to progress continuously, while future live trading monitoring and realtime order systems retain priority.
+
+### Decision
+
+Adopt the always-on automation scheduler policy in `docs/98_automation_scheduler.md`.
+
+Manager-owned scheduler automation should keep safe historical work moving whenever dependencies, approvals, resource budgets, and market-hours policy allow. Historical work may use concurrency, but only after reserving capacity for live monitoring and execution. During regular US equity market protection windows, default behavior is to pause or heavily throttle historical provider acquisition and CPU-heavy modeling work.
+
+Approval gates remain hard: live provider acquisition requires validated `live_call_approval_v1`, model activation requires an approving `review_decision_v1`, and broker/order/fill/account mutation remains execution-owned.
+
+### Consequences
+
+- The next manager phase is scheduler implementation, not manual one-task-at-a-time prompting.
+- Historical training becomes background automation relative to live monitoring and execution.
+- Scheduler pauses/backoff reasons must be explicit: approval wait, market-hours protection, resource pressure, dependency block, provider quota, or promotion review.
+- Automation does not authorize live provider calls, model activation, or broker execution by implication.

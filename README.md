@@ -40,9 +40,10 @@ docs/
   95_task_system.md
   96_model_promotion.md
   97_manager_control_plane_closeout.md
+  98_automation_scheduler.md
 ```
 
-Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` and `01_context.md` own the platform boundary, `02_`/`03_` layer docs own retained Layer 1/2 cross-repository naming/control-plane workflows plus acceptance gates, `04_model_stack_control_plane.md` owns the concise manager-side Layer 1-8 control-plane overview, `80_`/`81_`/`82_` own task/decision/memory, and `90_helpers.md`, `91_registry.md`, `92_templates.md`, `93_contracts.md`, `94_monthly_backfill.md`, `95_task_system.md`, and `96_model_promotion.md` explain the platform functions this repository owns.
+Component repositories keep their own docs spine. In `trading-manager`, `00_scope.md` and `01_context.md` own the platform boundary, `02_`/`03_` layer docs own retained Layer 1/2 cross-repository naming/control-plane workflows plus acceptance gates, `04_model_stack_control_plane.md` owns the concise manager-side Layer 1-8 control-plane overview, `80_`/`81_`/`82_` own task/decision/memory, and `90_helpers.md`, `91_registry.md`, `92_templates.md`, `93_contracts.md`, `94_monthly_backfill.md`, `95_task_system.md`, `96_model_promotion.md`, and `98_automation_scheduler.md` explain the platform functions this repository owns.
 
 ## Registry Rule
 
@@ -54,7 +55,7 @@ Concrete registry entries live in the SQL-backed `trading_registry` table. The n
 
 Registry ids are stable automation references. Registry keys are human-readable labels and may be renamed by reviewed migrations. Use id-based helpers in code.
 
-See `docs/04_model_stack_control_plane.md`, `docs/90_helpers.md`, `docs/91_registry.md`, `docs/92_templates.md`, `docs/93_contracts.md`, `docs/94_monthly_backfill.md`, `docs/95_task_system.md`, `docs/96_model_promotion.md`, and `docs/97_manager_control_plane_closeout.md` for platform-function guides and closeout status. Use `PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl` for a safe request/receipt/summary rehearsal before live component dispatch; add `--write` only for rehearsal-prefixed SQL rows. Use `PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py --start-month 2016-01 --end-month 2016-01 --write-files-only --format json` to let manager prepare the full Layer 1 historical-training handoff batch in one operation without provider calls.
+See `docs/04_model_stack_control_plane.md`, `docs/90_helpers.md`, `docs/91_registry.md`, `docs/92_templates.md`, `docs/93_contracts.md`, `docs/94_monthly_backfill.md`, `docs/95_task_system.md`, `docs/96_model_promotion.md`, `docs/97_manager_control_plane_closeout.md`, and `docs/98_automation_scheduler.md` for platform-function guides and closeout status. Use `PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl` for a safe request/receipt/summary rehearsal before live component dispatch; add `--write` only for rehearsal-prefixed SQL rows. Use `PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py --start-month 2016-01 --end-month 2016-01 --write-files-only --format json` to let manager prepare the full Layer 1 historical-training handoff batch in one operation without provider calls.
 
 ## Shared Environment Rule
 

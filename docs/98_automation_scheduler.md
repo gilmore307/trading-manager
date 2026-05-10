@@ -1,0 +1,101 @@
+# Automation Scheduler Policy
+
+`trading-manager` should become the always-on automation control plane for historical model training and maintenance while preserving capacity for live trading operations.
+
+This policy is accepted as the target scheduler shape. It does not by itself enable live provider calls, model activation, broker orders, fills, position mutation, or unattended production trading.
+
+## Responsibility
+
+The manager scheduler owns continuous orchestration across the full offline training lifecycle:
+
+```text
+data acquisition planning
+  -> approved provider acquisition dispatch
+  -> source normalization
+  -> feature generation
+  -> model training/generation
+  -> evaluation and label evidence
+  -> promotion-review request
+  -> approved activation artifact only after review approval
+```
+
+The scheduler should not sit idle when safe offline work exists. If provider calls are not approved or market-hours throttles are active, it should shift to work that does not violate gates: payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle review.
+
+## Priority Order
+
+The scheduler must preserve this priority order:
+
+1. live trading monitoring, risk checks, and execution-owned order/fill/account lifecycle;
+2. provider-call safety gates, approval expiry checks, and dispatch guardrails;
+3. urgent production incident or data-integrity repair;
+4. historical data acquisition that has a valid `live_call_approval_v1`;
+5. offline feature generation, model training, evaluation, and promotion evidence;
+6. maintenance, cleanup, documentation, and registry hygiene.
+
+Historical training is important, but it is background work relative to live monitoring and execution.
+
+## Resource Budget
+
+Historical work may use concurrency, but it must be capacity-aware.
+
+Default target posture:
+
+- reserve a live-trading headroom budget before starting historical jobs;
+- size historical worker concurrency from observed host capacity, not from a fixed constant;
+- reduce or pause historical workers under CPU, memory, disk I/O, database pressure, provider rate-limit pressure, or live-system alerts;
+- prefer fewer larger batches when provider/API rate limits are relevant;
+- keep task boundaries restartable and receipt-backed so paused work can resume without guessing.
+
+Until measured production capacity exists, the conservative planning assumption is that live monitoring and order-routing capacity is reserved first, and historical work runs only in the remaining budget.
+
+## Market-Hours Policy
+
+During regular US equity market hours, manager should pause or heavily throttle historical data/modeling jobs by default.
+
+Default window:
+
+```text
+America/New_York regular session protection:
+09:20-16:10 ET on regular US equity trading days
+```
+
+The buffer covers pre-open checks and post-close reconciliation. During that protected window:
+
+- do not start new historical provider acquisition batches;
+- do not start CPU-heavy feature/model/evaluation batches;
+- allow lightweight bookkeeping only when it does not contend with live systems;
+- allow urgent manual override only through reviewed policy, not as a hidden default.
+
+Outside the protected window, the scheduler should resume safe queued historical work automatically subject to resource budgets and approval gates.
+
+## Approval Gates Stay Hard
+
+Automation does not weaken gates:
+
+- live historical provider calls still require reviewed `live_call_approval_v1` and validation;
+- model activation still requires an approving `review_decision_v1` before activation artifacts are valid;
+- broker/order/fill/account mutation remains execution-owned and must not be inferred from model-training progress;
+- secrets remain alias/config references only.
+
+## Work-Loop Semantics
+
+A future scheduler implementation should behave like a durable work loop:
+
+1. inspect `task_summary`, receipts, ready signals, and artifact refs;
+2. find the next safe blocked/ready work item by priority and dependency state;
+3. check market-hours/resource/provider/promotion/execution gates;
+4. dispatch only the allowed component request type;
+5. record receipts and update manager summary surfaces;
+6. continue until no safe work exists, then sleep/backoff instead of spinning.
+
+If no safe work exists, the scheduler should report why: waiting for approval, market-hours protection, resource pressure, missing upstream artifact, failed dependency, provider quota, or promotion review.
+
+## Non-Goals
+
+This policy does not authorize:
+
+- unattended live provider dispatch without approval;
+- production model activation without promotion review approval;
+- broker execution or account mutation;
+- hiding long-running jobs from receipts/artifacts/summary;
+- saturating the host just because historical backlog exists.
