@@ -27,6 +27,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/plan_dataset_expansion.py` — lets manager choose the next dataset role/layer to expand, and with `--write` prepares the selected safe artifacts/payloads without provider calls.
 - `tasks/advance_model_training_workflow.py` — refreshes the durable Layer 1-8 workflow checkpoint, ingests component receipts, records reviewed approval refs, and selects the next safe/gated stage.
 - `tasks/dispatch_approved_provider_acquisition.py` — validates `live_call_approval_v1` for Layer 1 provider acquisition and, only with `--execute-approved-provider-calls`, runs the approved trading-data Alpaca bars commands.
+- `tasks/validate_live_call_approval.py` — validates reviewed `live_call_approval_v1` artifacts before any non-dry-run provider handoff is considered.
 - `tasks/execute_model_training_stage.py` — executes one ready safe offline workflow stage, writes stdout/stderr logs and a component receipt, and refuses provider-gated stages.
 - `tasks/prepare_layer_one_historical_training.py` — manager-owned Layer 1 batch preparation: plans the full market-regime ETF universe, materializes payloads, and validates handoff boundaries without provider dispatch.
 - `tasks/run_automation_scheduler.py` — runs one capacity-aware scheduler tick: applies regular-trading-day market-hours protection, resource gates, and either reports or executes safe offline Layer 1 preparation without provider dispatch.
@@ -53,6 +54,7 @@ PYTHONPATH=src python3 scripts/tasks/collect_dataset_evidence.py --write --outpu
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --collect-evidence-from-db --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/dispatch_approved_provider_acquisition.py --start-month 2016-01 --end-month 2016-01 --approval storage/runtime/live_call_approval_layer_01.json
+PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval.py live_requests.jsonl --approval live_call_approval.json
 PYTHONPATH=src python3 scripts/tasks/execute_model_training_stage.py --start-month 2016-01 --end-month 2016-01 --write
 PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py --start-month 2016-01 --end-month 2016-01 --write-files-only --format json
 PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py --start-month 2016-01 --end-month 2016-01

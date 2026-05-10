@@ -39,9 +39,13 @@ Helpers must not own:
 ```text
 src/
   README.md                 Source boundary summary.
-  trading_scripts/         Formal Python registry helper package source.
+  trading_registry/         Python registry reader and secret-resolution package.
+  trading_manager_tasks/    Manager-owned request planning and scheduler helpers.
+  trading_web_search/       Brave Search helper package.
+  trading_bigquery/         Dependency-light BigQuery REST helper.
 scripts/
-  apply_registry_migrations.py  Executable registry maintenance command.
+  registry/                 Executable registry maintenance commands and SQL migrations.
+  tasks/                    Executable manager task, scheduler, and review commands.
 tests/
   README.md                 Test boundary and inventory.
   test_trading_registry.py  Python helper and registry governance tests.
@@ -103,7 +107,7 @@ Registry kind and payload-format vocabularies are scripts/schema concerns, not r
 
 Source secret configs should point to one source-level JSON file per provider/source. The secret resolver can return either the raw JSON text or one named JSON string field.
 
-The official Python helper source lives under `src/trading_scripts/`.
+The official Python registry helper source lives under `src/trading_registry/`. Other shared helper packages are inventoried in `src/README.md` and registered as stable `script` rows when automation-facing.
 
 Registry maintenance commands, such as regenerating `scripts/registry/current.csv`, are registry operations. They may be referenced by helpers, but their operating guide lives in `docs/91_registry.md`.
 
