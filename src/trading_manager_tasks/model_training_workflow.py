@@ -240,7 +240,7 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
 
 FEATURE_MODULES: dict[str, str] = {
     "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime.from_feed_artifacts",
-    "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context",
+    "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context.from_feed_artifacts",
     "trading-data-feature-03-target-state-vector": "data_feature.feature_03_target_state_vector",
     "trading-data-feature-04-event-overlay": "data_feature.feature_04_event_overlay",
     "trading-data-feature-08-option-expression": "data_feature.feature_08_option_expression",
@@ -251,7 +251,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
-    if feature_cli == "trading-data-feature-01-market-regime":
+    if feature_cli in {"trading-data-feature-01-market-regime", "trading-data-feature-02-sector-context"}:
         command.extend(["--month", "${START_MONTH}"])
     return command
 

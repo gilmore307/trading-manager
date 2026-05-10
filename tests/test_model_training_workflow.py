@@ -115,6 +115,16 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
 
+    def test_layer_two_feature_generation_materializes_feed_artifacts_first(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        command = plan.layers[1].feature_command
+
+        self.assertIn("data_feature.feature_02_sector_context.from_feed_artifacts", command)
+        self.assertIn("--month", command)
+        self.assertIn("${START_MONTH}", command)
+
     def test_progression_modes_encode_background_panels_target_chain_and_option_gate(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
