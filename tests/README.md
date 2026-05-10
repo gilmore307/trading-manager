@@ -11,6 +11,28 @@
 
 ## Inventory
 
+- `test_model_training_workflow.py` verifies:
+  - full Layer 1-8 manager workflow graph coverage;
+  - per-layer data acquisition, feature, model generation, evaluation, promotion-review, and maintenance stages;
+  - Layer 1 task-key preparation to live-call approval gate progression;
+  - explicit no-dedicated-feature handling for Layers 5-7.
+
+- `test_model_training_state.py` verifies:
+  - durable `manager_model_training_workflow_state_v1` initialization;
+  - approval-ref and receipt-driven stage advancement;
+  - downstream readiness after upstream stage completion;
+  - not-applicable feature/source stages for Layers 5-7.
+
+- `test_provider_dispatch.py` verifies:
+  - Layer 1 provider-dispatch approval validation;
+  - default plan-only behavior with zero provider calls;
+  - concrete trading-data command planning after `live_call_approval_v1` validation.
+
+- `test_stage_executor.py` verifies:
+  - ready safe offline stage execution;
+  - receipt/log creation;
+  - refusal to execute approval-gated provider stages through the offline executor.
+
 - `test_model_promotion.py` verifies:
   - unified model promotion review request planning;
   - registered model target coverage across Layers 1-8;

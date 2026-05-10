@@ -59,6 +59,16 @@ The historical scheduler runtime must provide:
 - **Gate preservation:** provider calls, model activation, and broker execution remain blocked unless their explicit gates are satisfied.
 - **Recoverability:** runtime logs/state are local operational evidence; canonical provider/model receipts still belong in manager/storage contracts as those stages are implemented.
 
-## Current Limit
+## Current Full-Stack Workflow Graph
 
-The daemon currently repeats the implemented safe Layer 1 preparation work loop and reports `approval_gated_provider_acquisition` as the next internal stage. The next implementation increment should make the daemon dependency-aware across approval preparation, approved provider dispatch, receipt ingestion, feature generation, model training/evaluation, and promotion-review preparation.
+The daemon now carries a manager-owned `manager_model_training_workflow_plan_v1` for all eight model layers plus a durable `manager_model_training_workflow_state_v1` checkpoint. Each layer has explicit stages for data acquisition, feature/input preparation, model generation, model evaluation, promotion-review preparation, and maintenance. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
+
+`advance_model_training_workflow.py` refreshes this state, ingests component receipts with `manager_stage_id` / `stage_id`, records reviewed approval references for gated stages, and selects the next ready or approval-blocked stage. Scheduler decisions include both the static graph and durable state so resident operation can resume after restarts.
+
+Current execution still preserves gates: when Layer 1 task keys exist, the next stage becomes `layer_01_market_regime.data_acquisition` with `approval_gate_required=live_call_approval_v1`. The daemon does not perform provider calls, model activation, or broker execution until the corresponding reviewed gate is implemented and satisfied.
+
+`dispatch_approved_provider_acquisition.py` is the first approved dispatch adapter. It validates `live_call_approval_v1` against the prepared Layer 1 request set, prints the exact trading-data commands in plan-only mode, and only performs provider calls when `--execute-approved-provider-calls` is present. Successful component receipts can then be ingested by `advance_model_training_workflow.py` to unlock downstream offline feature/model/evaluation stages.
+
+`execute_model_training_stage.py` handles the other side of the loop: it executes one ready safe offline stage, writes stdout/stderr logs and a `component_completion_receipt_v1`, updates workflow state when requested, and refuses approval-gated provider stages. The scheduler/daemon expose `--execute-safe-offline-stages` to admit at most one such stage per tick after market/resource gates pass.
+
+The remaining implementation boundary is broader component execution coverage for non-Layer-1 source acquisitions and richer artifact discovery from each component command.

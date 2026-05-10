@@ -22,6 +22,10 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `registry/rules/` — normative registry table, kind-routing, and naming rules that constrain SQL row shape.
 - `registry/sql/schema_migrations/` — append-only SQL migrations for registry schema and active row changes.
 - `tasks/plan_monthly_backfill.py` — emits deterministic dry-run `manager_request_v1` rows for monthly historical data backfill planning.
+- `tasks/plan_model_training_workflow.py` — emits the manager-owned Layer 1-8 historical model-training workflow graph, including data acquisition, feature, generation, evaluation, review, and maintenance stages.
+- `tasks/advance_model_training_workflow.py` — refreshes the durable Layer 1-8 workflow checkpoint, ingests component receipts, records reviewed approval refs, and selects the next safe/gated stage.
+- `tasks/dispatch_approved_provider_acquisition.py` — validates `live_call_approval_v1` for Layer 1 provider acquisition and, only with `--execute-approved-provider-calls`, runs the approved trading-data Alpaca bars commands.
+- `tasks/execute_model_training_stage.py` — executes one ready safe offline workflow stage, writes stdout/stderr logs and a component receipt, and refuses provider-gated stages.
 - `tasks/prepare_layer_one_historical_training.py` — manager-owned Layer 1 batch preparation: plans the full market-regime ETF universe, materializes payloads, and validates handoff boundaries without provider dispatch.
 - `tasks/run_automation_scheduler.py` — runs one capacity-aware scheduler tick: applies regular-trading-day market-hours protection, resource gates, and either reports or executes safe offline Layer 1 preparation without provider dispatch.
 - `tasks/run_automation_scheduler_daemon.py` — runs the persistent checkpointed historical-training scheduler daemon for resident background operation under a service manager.
@@ -41,6 +45,10 @@ python3 scripts/registry/apply_registry_migrations.py
 python3 scripts/registry/apply_registry_migrations.py --dry-run
 python3 scripts/registry/apply_registry_migrations.py --export-only
 PYTHONPATH=src python3 scripts/tasks/plan_monthly_backfill.py --start-month 2016-01 --end-month 2016-03 --format jsonl
+PYTHONPATH=src python3 scripts/tasks/plan_model_training_workflow.py --start-month 2016-01 --end-month 2016-01
+PYTHONPATH=src python3 scripts/tasks/advance_model_training_workflow.py --start-month 2016-01 --end-month 2016-01 --write
+PYTHONPATH=src python3 scripts/tasks/dispatch_approved_provider_acquisition.py --start-month 2016-01 --end-month 2016-01 --approval storage/runtime/live_call_approval_layer_01.json
+PYTHONPATH=src python3 scripts/tasks/execute_model_training_stage.py --start-month 2016-01 --end-month 2016-01 --write
 PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py --start-month 2016-01 --end-month 2016-01 --write-files-only --format json
 PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py --start-month 2016-01 --end-month 2016-01 --execute-safe-preparation

@@ -79,16 +79,20 @@ class SchedulerTests(unittest.TestCase):
         self.assertIn("free_disk_gb", result.reason)
 
     def test_scheduler_reports_ready_safe_work_without_side_effects(self):
-        decision = run_scheduler_once(
-            now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
-            resource_snapshot=self._healthy_resource_snapshot(),
-            execute_safe_preparation=False,
-        )
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            decision = run_scheduler_once(
+                now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
+                resource_snapshot=self._healthy_resource_snapshot(),
+                storage_root=Path(raw_tmp),
+                execute_safe_preparation=False,
+            )
         self.assertEqual(decision.decision_status, "ready")
         self.assertEqual(decision.reason_code, "safe_offline_work_ready")
         self.assertEqual(decision.selected_work, "prepare_layer_one_historical_training_batch")
         self.assertEqual(decision.next_internal_stage, "approval_gated_provider_acquisition")
         self.assertEqual(decision.approval_gate_required, "live_call_approval_v1")
+        self.assertIsNotNone(decision.execution_summary)
+        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], 8)
         self.assertFalse(decision.dispatch_performed)
         self.assertEqual(decision.provider_calls, 0)
 
@@ -123,6 +127,27 @@ class SchedulerTests(unittest.TestCase):
         self.assertIsNotNone(decision.execution_summary)
         self.assertEqual(decision.execution_summary["request_count"], 22)
         self.assertEqual(decision.execution_summary["handoff_validation_count"], 22)
+        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], 8)
+        self.assertEqual(decision.execution_summary["workflow_plan"]["next_stage"]["stage_id"], "layer_01_market_regime.data_acquisition")
+
+    def test_scheduler_progresses_to_approval_gate_after_layer_one_payloads_exist(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            for index in range(22):
+                path = tmp / "manager-storage" / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
+                path.parent.mkdir(parents=True)
+                path.write_text("{}\n", encoding="utf-8")
+            decision = run_scheduler_once(
+                now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
+                resource_snapshot=self._healthy_resource_snapshot(),
+                storage_root=tmp / "manager-storage",
+                execute_safe_preparation=True,
+            )
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "waiting_live_call_approval")
+        self.assertEqual(decision.selected_work, "layer_01_market_regime.data_acquisition")
+        self.assertEqual(decision.approval_gate_required, "live_call_approval_v1")
+        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], 8)
 
 
 if __name__ == "__main__":

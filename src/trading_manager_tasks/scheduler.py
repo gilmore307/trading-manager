@@ -22,7 +22,10 @@ from typing import Any, Literal, TextIO
 from zoneinfo import ZoneInfo
 
 from .historical_training import prepare_layer_one_historical_training_batch
+from .model_training_state import advance_workflow_state, next_ready_or_blocked_stage
+from .model_training_workflow import LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS, build_model_training_workflow_plan
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
+from .stage_executor import execute_next_ready_stage
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 NEW_YORK = ZoneInfo("America/New_York")
@@ -262,6 +265,7 @@ def run_scheduler_once(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     component_src_root: Path = DEFAULT_TRADING_DATA_SRC,
     execute_safe_preparation: bool = False,
+    execute_safe_offline_stages: bool = False,
 ) -> SchedulerDecision:
     """Run one scheduler tick.
 
@@ -305,6 +309,79 @@ def run_scheduler_once(
             next_internal_stage="historical_training_work_loop",
         )
 
+    workflow_plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
+    workflow_state = advance_workflow_state(
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        state_path=storage_root / "runtime" / "model_training_workflow_state.json",
+        write=False,
+    )
+    workflow_next_stage = next_ready_or_blocked_stage(workflow_state)
+    if workflow_next_stage and workflow_next_stage.status == "ready":
+        if not execute_safe_offline_stages:
+            return SchedulerDecision(
+                contract_type="manager_scheduler_decision_v1",
+                now_utc=now.isoformat(),
+                now_et=now_et.isoformat(),
+                decision_status="ready",
+                reason_code="safe_offline_stage_ready",
+                reason="safe offline workflow stage is ready; rerun with --execute-safe-offline-stages to execute it",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work=workflow_next_stage.stage_id,
+                command=workflow_next_stage.command,
+                next_internal_stage=workflow_next_stage.stage_type,
+                execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+            )
+        execution, updated_workflow_state = execute_next_ready_stage(
+            start_month=start_month,
+            end_month=end_month,
+            storage_root=storage_root,
+            state_path=storage_root / "runtime" / "model_training_workflow_state.json",
+            receipt_root=storage_root / "runtime" / "model_training_stage_receipts",
+            log_root=storage_root / "runtime" / "model_training_stage_logs",
+            write=True,
+        )
+        return SchedulerDecision(
+            contract_type="manager_scheduler_decision_v1",
+            now_utc=now.isoformat(),
+            now_et=now_et.isoformat(),
+            decision_status="executed",
+            reason_code="safe_offline_stage_executed",
+            reason="executed one ready safe offline workflow stage and recorded its receipt/state",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work=workflow_next_stage.stage_id,
+            command=workflow_next_stage.command,
+            next_internal_stage=workflow_next_stage.stage_type,
+            provider_calls=execution.provider_calls,
+            model_activation_performed=execution.model_activation_performed,
+            broker_execution_performed=execution.broker_execution_performed,
+            execution_summary={
+                "stage_execution": execution.summary_row(),
+                "workflow_plan": workflow_plan.summary_row(),
+                "workflow_state": updated_workflow_state.summary_row(),
+            },
+        )
+    if workflow_plan.layer_one_task_key_count >= LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS:
+        next_stage = workflow_next_stage or workflow_plan.next_stage
+        return SchedulerDecision(
+            contract_type="manager_scheduler_decision_v1",
+            now_utc=now.isoformat(),
+            now_et=now_et.isoformat(),
+            decision_status="backoff",
+            reason_code="waiting_live_call_approval",
+            reason="Layer 1 provider acquisition is the next internal historical-training stage and requires live_call_approval_v1",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work=next_stage.stage_id if next_stage else "model_training_workflow",
+            command=next_stage.command if next_stage else [],
+            next_internal_stage="approval_gated_provider_acquisition",
+            approval_gate_required="live_call_approval_v1",
+            execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+        )
+
     selected_work = "prepare_layer_one_historical_training_batch"
     command = _safe_prep_command(start_month, end_month, execute=execute_safe_preparation)
     if not execute_safe_preparation:
@@ -321,6 +398,7 @@ def run_scheduler_once(
             command=command,
             next_internal_stage="approval_gated_provider_acquisition",
             approval_gate_required="live_call_approval_v1",
+            execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
         )
 
     summary, _requests, _payloads, _validations = prepare_layer_one_historical_training_batch(
@@ -331,6 +409,14 @@ def run_scheduler_once(
         write=True,
         persist_sql=False,
         validate_handoff=True,
+    )
+    refreshed_workflow_plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
+    refreshed_workflow_state = advance_workflow_state(
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        state_path=storage_root / "runtime" / "model_training_workflow_state.json",
+        write=False,
     )
     return SchedulerDecision(
         contract_type="manager_scheduler_decision_v1",
@@ -345,7 +431,8 @@ def run_scheduler_once(
         command=command,
         next_internal_stage="approval_gated_provider_acquisition",
         approval_gate_required="live_call_approval_v1",
-        execution_summary=summary.summary_row(),
+        execution_summary=summary.summary_row()
+        | {"workflow_plan": refreshed_workflow_plan.summary_row(), "workflow_state": refreshed_workflow_state.summary_row()},
     )
 
 
@@ -362,6 +449,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--component-src-root", type=Path, default=DEFAULT_TRADING_DATA_SRC)
     parser.add_argument("--execute-safe-preparation", action="store_true", help="Write Layer 1 task-key payload files and validate handoff shape. No provider calls are performed.")
+    parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Execute one ready offline workflow stage and record its receipt/state. No provider calls or activation are performed.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
     parser.add_argument("--max-load-per-cpu", type=float, default=DEFAULT_MAX_LOAD_PER_CPU)
@@ -386,6 +474,7 @@ def main(argv: list[str] | None = None) -> int:
         storage_root=args.storage_root,
         component_src_root=args.component_src_root,
         execute_safe_preparation=args.execute_safe_preparation,
+        execute_safe_offline_stages=args.execute_safe_offline_stages,
     )
     write_scheduler_decision(decision, output=sys.stdout)
     return 0

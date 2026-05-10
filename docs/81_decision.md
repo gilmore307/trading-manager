@@ -2572,3 +2572,82 @@ Host autostart is supported through reviewed templates under `deploy/`, but inst
 - State, lock, and decision logs live under ignored `storage/runtime/` by default and must not rely on OpenClaw chat memory.
 - Duplicate daemon instances over the same state path are rejected.
 - Provider calls, model activation, and broker execution remain gated exactly as before; residency does not imply permission escalation.
+
+## D114 - Manager owns the full Layer 1-8 historical-training workflow graph
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+The historical scheduler daemon must not remain a Layer 1-only loop. The current phase requires all eight models to be automatically orchestrable by manager for data/input preparation, training/generation, evaluation, review preparation, and maintenance, while preserving provider, activation, and broker gates.
+
+### Decision
+
+Add `manager_model_training_workflow_plan_v1` as the manager-owned full-stack workflow graph. The graph covers Layers 1-8 and defines six stages per layer: data acquisition, feature/input generation, model generation, model evaluation, promotion-review preparation, and maintenance.
+
+Layer-specific data surfaces remain honest: Layers 5-7 do not invent trading-data feature surfaces; they consume upstream model/control-plane/position-risk artifacts. Provider-backed stages remain blocked behind `live_call_approval_v1`; model activation remains blocked behind an approving `review_decision_v1`; broker execution remains outside manager.
+
+### Consequences
+
+- Scheduler decisions now carry the full eight-layer workflow plan instead of only a Layer 1 preparation summary.
+- Once Layer 1 task keys exist, the scheduler advances to the internal stage `layer_01_market_regime.data_acquisition` and reports `live_call_approval_v1` as the blocking gate.
+- The next implementation boundary is durable stage completion from approved provider dispatch and component receipts, not more ad hoc layer-specific scripting.
+
+## D115 - Historical workflow progression is durable and receipt-driven
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+A full Layer 1-8 graph is not enough by itself; the manager needs a durable checkpoint that can survive resident-daemon restarts, consume component receipts, and resume at the next safe or gated stage without human prompting.
+
+### Decision
+
+Add `manager_model_training_workflow_state_v1` as the durable state checkpoint for the Layer 1-8 historical-training workflow. The state records every stage status, command, blockers, approval refs, receipt refs, and artifact refs. `advance_model_training_workflow.py` refreshes the checkpoint, ingests receipts containing `manager_stage_id` / `stage_id`, records reviewed approval references, and selects the next ready or approval-blocked stage.
+
+### Consequences
+
+- The resident scheduler can report both the static workflow graph and current resumable progress.
+- Component receipts are the accepted evidence for marking workflow stages complete.
+- Approval satisfaction is recorded as an artifact reference on the gated stage; it does not itself perform provider dispatch.
+- The remaining implementation boundary is an approved dispatch adapter that validates `live_call_approval_v1`, performs the allowed provider work, and emits receipts for this state machine.
+
+## D116 - Provider acquisition dispatch requires explicit approved execution
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+The manager must be able to move from safe preparation into historical provider acquisition, but provider calls remain live external calls and must not happen from ordinary scheduler planning.
+
+### Decision
+
+Add a narrow Layer 1 provider-dispatch adapter. `dispatch_approved_provider_acquisition.py` validates `live_call_approval_v1` against the prepared Alpaca bars request set and defaults to plan-only validation. It performs provider calls only when `--execute-approved-provider-calls` is present, and it still performs no model activation or broker execution.
+
+### Consequences
+
+- The scheduler can point the Layer 1 data-acquisition stage at a concrete manager script instead of a placeholder.
+- Approval validation and provider execution are separate, inspectable steps.
+- Downstream workflow progression remains receipt-driven through `manager_model_training_workflow_state_v1`.
+
+## D117 - Ready offline stages may be executed one-at-a-time after scheduler gates
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+After provider-backed acquisition receipts unlock downstream work, feature generation, model generation, model evaluation, promotion-review preparation, and maintenance are local/offline stages. They still need controlled admission, receipts, and checkpointing; they must not share the provider-dispatch path.
+
+### Decision
+
+Add `execute_model_training_stage.py` and `manager_stage_execution_summary_v1`. The executor runs only `ready` stages of safe offline types, refuses approval-gated stages, writes stdout/stderr logs plus a `component_completion_receipt_v1`, and can persist successful stage progress to `manager_model_training_workflow_state_v1`. The scheduler and daemon accept `--execute-safe-offline-stages` to admit at most one safe offline stage per tick after market/resource gates pass.
+
+### Consequences
+
+- Offline work can progress automatically once durable receipts make a stage ready.
+- Provider calls remain isolated in approval-gated dispatch adapters.
+- Model activation and broker execution remain outside this executor.

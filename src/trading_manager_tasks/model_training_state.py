@@ -1,0 +1,422 @@
+"""Durable state progression for the Layer 1-8 model-training workflow."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from dataclasses import asdict, dataclass, replace
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, Iterable, Literal, Mapping, TextIO
+
+from .model_training_workflow import ModelTrainingWorkflowPlan, WorkflowStage, build_model_training_workflow_plan
+from .request_payloads import DEFAULT_STORAGE_ROOT
+
+DEFAULT_WORKFLOW_STATE_PATH = Path("storage/runtime/model_training_workflow_state.json")
+StageProgressStatus = Literal["pending", "blocked", "ready", "succeeded", "failed", "not_applicable"]
+
+
+@dataclass(frozen=True)
+class StageProgress:
+    """Durable progress for one workflow stage."""
+
+    stage_id: str
+    layer: int
+    layer_key: str
+    stage_type: str
+    status: StageProgressStatus
+    command: list[str]
+    blockers: tuple[str, ...]
+    approval_gate_required: str | None = None
+    approval_status: str | None = None
+    artifact_refs: tuple[str, ...] = ()
+    receipt_refs: tuple[str, ...] = ()
+    last_reason: str | None = None
+    updated_utc: str | None = None
+
+    def summary_row(self) -> dict[str, Any]:
+        row = asdict(self)
+        row["blockers"] = list(self.blockers)
+        row["artifact_refs"] = list(self.artifact_refs)
+        row["receipt_refs"] = list(self.receipt_refs)
+        return row
+
+
+@dataclass(frozen=True)
+class WorkflowState:
+    """Durable manager-owned workflow checkpoint."""
+
+    contract_type: str
+    start_month: str
+    end_month: str
+    stages: tuple[StageProgress, ...]
+    updated_utc: str
+    provider_calls: int = 0
+    model_activation_performed: bool = False
+    broker_execution_performed: bool = False
+
+    def summary_row(self) -> dict[str, Any]:
+        return {
+            "contract_type": self.contract_type,
+            "start_month": self.start_month,
+            "end_month": self.end_month,
+            "stages": [stage.summary_row() for stage in self.stages],
+            "next_stage": next_ready_or_blocked_stage(self).summary_row() if next_ready_or_blocked_stage(self) else None,
+            "updated_utc": self.updated_utc,
+            "provider_calls": self.provider_calls,
+            "model_activation_performed": self.model_activation_performed,
+            "broker_execution_performed": self.broker_execution_performed,
+        }
+
+
+def utc_now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _stage_from_plan(stage: WorkflowStage, *, now: str) -> StageProgress:
+    status: StageProgressStatus = "not_applicable" if stage.status == "not_applicable" else "pending"
+    return StageProgress(
+        stage_id=stage.stage_id,
+        layer=stage.layer,
+        layer_key=stage.layer_key,
+        stage_type=stage.stage_type,
+        status=status,
+        command=stage.command,
+        blockers=stage.blockers,
+        approval_gate_required=stage.approval_gate_required,
+        updated_utc=now,
+    )
+
+
+def initial_workflow_state(plan: ModelTrainingWorkflowPlan) -> WorkflowState:
+    now = utc_now_iso()
+    stages = tuple(_stage_from_plan(stage, now=now) for layer in plan.layers for stage in layer.stages)
+    return refresh_workflow_state(
+        WorkflowState(
+            contract_type="manager_model_training_workflow_state_v1",
+            start_month=plan.start_month,
+            end_month=plan.end_month,
+            stages=stages,
+            updated_utc=now,
+        ),
+        plan=plan,
+    )
+
+
+def load_workflow_state(path: Path, plan: ModelTrainingWorkflowPlan) -> WorkflowState:
+    if not path.exists():
+        return initial_workflow_state(plan)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("start_month") != plan.start_month or payload.get("end_month") != plan.end_month:
+        return initial_workflow_state(plan)
+    by_plan = {stage.stage_id: stage for layer in plan.layers for stage in layer.stages}
+    loaded = {}
+    for row in payload.get("stages", []):
+        if not isinstance(row, Mapping) or row.get("stage_id") not in by_plan:
+            continue
+        stage = by_plan[str(row["stage_id"])]
+        loaded[stage.stage_id] = StageProgress(
+            stage_id=stage.stage_id,
+            layer=stage.layer,
+            layer_key=stage.layer_key,
+            stage_type=stage.stage_type,
+            status=str(row.get("status") or "pending"),  # type: ignore[arg-type]
+            command=stage.command,
+            blockers=stage.blockers,
+            approval_gate_required=stage.approval_gate_required,
+            approval_status=row.get("approval_status"),
+            artifact_refs=tuple(str(item) for item in row.get("artifact_refs") or []),
+            receipt_refs=tuple(str(item) for item in row.get("receipt_refs") or []),
+            last_reason=row.get("last_reason"),
+            updated_utc=row.get("updated_utc"),
+        )
+    now = utc_now_iso()
+    stages = tuple(loaded.get(stage.stage_id) or _stage_from_plan(stage, now=now) for layer in plan.layers for stage in layer.stages)
+    state = WorkflowState(
+        contract_type="manager_model_training_workflow_state_v1",
+        start_month=plan.start_month,
+        end_month=plan.end_month,
+        stages=stages,
+        updated_utc=str(payload.get("updated_utc") or now),
+        provider_calls=int(payload.get("provider_calls") or 0),
+        model_activation_performed=bool(payload.get("model_activation_performed", False)),
+        broker_execution_performed=bool(payload.get("broker_execution_performed", False)),
+    )
+    return refresh_workflow_state(state, plan=plan)
+
+
+def write_workflow_state(path: Path, state: WorkflowState) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(state.summary_row(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def _stage_map(state: WorkflowState) -> dict[str, StageProgress]:
+    return {stage.stage_id: stage for stage in state.stages}
+
+
+def _layer_stage_ids(state: WorkflowState, layer: int) -> list[str]:
+    return [stage.stage_id for stage in state.stages if stage.layer == layer]
+
+
+def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
+    if blocker == "live_call_approval_v1":
+        return False
+    if blocker == "layer_01_task_key_preparation":
+        return False
+    if blocker.startswith("upstream_layer_") and blocker.endswith("_complete"):
+        layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_complete"))
+        layer_stages = [stage for stage in stages.values() if stage.layer == layer_number]
+        return bool(layer_stages) and all(stage.status in {"succeeded", "not_applicable"} for stage in layer_stages)
+    if blocker.endswith("_complete"):
+        stage_id = blocker.removesuffix("_complete")
+        stage = stages.get(stage_id)
+        return stage is not None and stage.status in {"succeeded", "not_applicable"}
+    if blocker.endswith(".feature_or_input_ready"):
+        layer_key = blocker.removesuffix(".feature_or_input_ready")
+        feature = stages.get(f"{layer_key}.feature_generation")
+        acquisition = stages.get(f"{layer_key}.data_acquisition")
+        return (feature is not None and feature.status in {"succeeded", "not_applicable"}) or (
+            acquisition is not None and acquisition.status == "not_applicable"
+        )
+    return False
+
+
+def _blocker_reason(stage: StageProgress, stages: Mapping[str, StageProgress]) -> str | None:
+    missing = []
+    for blocker in stage.blockers:
+        if blocker == stage.approval_gate_required and stage.approval_status == "approved":
+            continue
+        if not _is_satisfied(blocker, stages):
+            missing.append(blocker)
+    if not missing:
+        return None
+    if stage.approval_gate_required and missing == [stage.approval_gate_required]:
+        return f"waiting for {stage.approval_gate_required}"
+    return "waiting for " + ",".join(missing)
+
+
+def refresh_workflow_state(state: WorkflowState, *, plan: ModelTrainingWorkflowPlan) -> WorkflowState:
+    """Refresh ready/blocked status from durable completions and current plan."""
+
+    plan_stages = {stage.stage_id: stage for layer in plan.layers for stage in layer.stages}
+    current = _stage_map(state)
+    refreshed: list[StageProgress] = []
+    now = utc_now_iso()
+    working = dict(current)
+    for plan_stage in plan_stages.values():
+        stage = working.get(plan_stage.stage_id) or _stage_from_plan(plan_stage, now=now)
+        stage = replace(stage, command=plan_stage.command, blockers=plan_stage.blockers, approval_gate_required=plan_stage.approval_gate_required)
+        if stage.status in {"succeeded", "failed", "not_applicable"}:
+            refreshed.append(stage)
+            working[stage.stage_id] = stage
+            continue
+        reason = _blocker_reason(stage, working)
+        if reason is None:
+            status: StageProgressStatus = "ready"
+            approval_status = stage.approval_status
+            if stage.approval_gate_required and approval_status != "approved":
+                status = "blocked"
+                reason = f"waiting for {stage.approval_gate_required}"
+            stage = replace(stage, status=status, last_reason=reason, updated_utc=now)
+        else:
+            stage = replace(stage, status="blocked", last_reason=reason, updated_utc=now)
+        refreshed.append(stage)
+        working[stage.stage_id] = stage
+    return replace(state, stages=tuple(refreshed), updated_utc=now)
+
+
+def next_ready_or_blocked_stage(state: WorkflowState) -> StageProgress | None:
+    for stage in state.stages:
+        if stage.status == "ready":
+            return stage
+    for stage in state.stages:
+        if (
+            stage.status == "blocked"
+            and stage.approval_gate_required
+            and stage.last_reason == f"waiting for {stage.approval_gate_required}"
+        ):
+            return stage
+    return None
+
+
+def mark_stage_succeeded(
+    state: WorkflowState,
+    *,
+    stage_id: str,
+    receipt_ref: str | None = None,
+    artifact_refs: Iterable[str] = (),
+    reason: str | None = None,
+) -> WorkflowState:
+    now = utc_now_iso()
+    changed = []
+    found = False
+    for stage in state.stages:
+        if stage.stage_id != stage_id:
+            changed.append(stage)
+            continue
+        found = True
+        receipts = tuple(dict.fromkeys([*stage.receipt_refs, *([receipt_ref] if receipt_ref else [])]))
+        artifacts = tuple(dict.fromkeys([*stage.artifact_refs, *[str(item) for item in artifact_refs]]))
+        changed.append(
+            replace(
+                stage,
+                status="succeeded",
+                receipt_refs=receipts,
+                artifact_refs=artifacts,
+                last_reason=reason or "stage completed from manager evidence",
+                updated_utc=now,
+            )
+        )
+    if not found:
+        raise ValueError(f"unknown workflow stage: {stage_id}")
+    return replace(state, stages=tuple(changed), updated_utc=now)
+
+
+def mark_stage_approved(state: WorkflowState, *, stage_id: str, approval_ref: str) -> WorkflowState:
+    now = utc_now_iso()
+    changed = []
+    found = False
+    for stage in state.stages:
+        if stage.stage_id != stage_id:
+            changed.append(stage)
+            continue
+        found = True
+        changed.append(
+            replace(
+                stage,
+                approval_status="approved",
+                artifact_refs=tuple(dict.fromkeys([*stage.artifact_refs, approval_ref])),
+                last_reason="approval gate satisfied",
+                updated_utc=now,
+            )
+        )
+    if not found:
+        raise ValueError(f"unknown workflow stage: {stage_id}")
+    return replace(state, stages=tuple(changed), updated_utc=now)
+
+
+def _receipt_stage_id(receipt: Mapping[str, Any]) -> str | None:
+    for key in ("manager_stage_id", "stage_id", "workflow_stage_id"):
+        if receipt.get(key):
+            return str(receipt[key])
+    for run in receipt.get("runs") or []:
+        if isinstance(run, Mapping):
+            for key in ("manager_stage_id", "stage_id", "workflow_stage_id"):
+                if run.get(key):
+                    return str(run[key])
+    return None
+
+
+def _receipt_artifacts(receipt: Mapping[str, Any]) -> list[str]:
+    refs: list[str] = []
+    for run in receipt.get("runs") or ([receipt] if receipt.get("run_id") else []):
+        if not isinstance(run, Mapping):
+            continue
+        for output in run.get("output_refs") or run.get("outputs") or run.get("artifacts") or []:
+            if isinstance(output, str):
+                refs.append(output)
+            elif isinstance(output, Mapping):
+                value = output.get("uri") or output.get("ref") or output.get("path")
+                if value:
+                    refs.append(str(value))
+    return refs
+
+
+def ingest_completion_receipts(state: WorkflowState, receipt_paths: Iterable[Path]) -> WorkflowState:
+    updated = state
+    for path in receipt_paths:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(receipt, Mapping):
+            raise ValueError(f"receipt must be a JSON object: {path}")
+        stage_id = _receipt_stage_id(receipt)
+        if not stage_id:
+            raise ValueError(f"receipt missing manager_stage_id/stage_id: {path}")
+        updated = mark_stage_succeeded(
+            updated,
+            stage_id=stage_id,
+            receipt_ref=str(path),
+            artifact_refs=_receipt_artifacts(receipt),
+            reason="stage completed from component receipt",
+        )
+    return updated
+
+
+def advance_workflow_state(
+    *,
+    start_month: str = "2016-01",
+    end_month: str = "2016-01",
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    state_path: Path = DEFAULT_WORKFLOW_STATE_PATH,
+    receipt_paths: Iterable[Path] = (),
+    completed_stage_ids: Iterable[str] = (),
+    approved_stage_refs: Iterable[str] = (),
+    write: bool = False,
+) -> WorkflowState:
+    plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
+    state = load_workflow_state(state_path, plan)
+    state = ingest_completion_receipts(state, receipt_paths)
+    for stage_id in completed_stage_ids:
+        state = mark_stage_succeeded(state, stage_id=stage_id, reason="stage completed from manager operator evidence")
+    for raw in approved_stage_refs:
+        if "=" in raw:
+            stage_id, approval_ref = raw.split("=", 1)
+        else:
+            stage_id, approval_ref = raw, "live_call_approval_v1"
+        state = mark_stage_approved(state, stage_id=stage_id, approval_ref=approval_ref)
+    state = refresh_workflow_state(state, plan=plan)
+    if write:
+        write_workflow_state(state_path, state)
+    return state
+
+
+def write_state_output(state: WorkflowState, *, output: TextIO) -> None:
+    json.dump(state.summary_row(), output, indent=2, sort_keys=True)
+    output.write("\n")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Advance the durable Layer 1-8 model-training workflow state.")
+    parser.add_argument("--start-month", default="2016-01")
+    parser.add_argument("--end-month", default="2016-01")
+    parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
+    parser.add_argument("--state-path", type=Path, default=DEFAULT_WORKFLOW_STATE_PATH)
+    parser.add_argument("--receipt", action="append", type=Path, default=[], help="Component receipt JSON with manager_stage_id/stage_id to ingest.")
+    parser.add_argument("--complete-stage", action="append", default=[], help="Mark a workflow stage succeeded from manager evidence.")
+    parser.add_argument("--approve-stage", action="append", default=[], help="Mark stage approval as satisfied: stage_id=approval_ref.")
+    parser.add_argument("--write", action="store_true", help="Persist the refreshed workflow state checkpoint.")
+    args = parser.parse_args(argv)
+    state = advance_workflow_state(
+        start_month=args.start_month,
+        end_month=args.end_month,
+        storage_root=args.storage_root,
+        state_path=args.state_path,
+        receipt_paths=args.receipt,
+        completed_stage_ids=args.complete_stage,
+        approved_stage_refs=args.approve_stage,
+        write=args.write,
+    )
+    write_state_output(state, output=sys.stdout)
+    return 0
+
+
+__all__ = [
+    "DEFAULT_WORKFLOW_STATE_PATH",
+    "StageProgress",
+    "WorkflowState",
+    "advance_workflow_state",
+    "initial_workflow_state",
+    "ingest_completion_receipts",
+    "load_workflow_state",
+    "mark_stage_approved",
+    "mark_stage_succeeded",
+    "next_ready_or_blocked_stage",
+    "refresh_workflow_state",
+    "write_workflow_state",
+]
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())
