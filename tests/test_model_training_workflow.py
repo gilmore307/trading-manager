@@ -81,6 +81,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertIn("live_call_approval_v1", layer_two_acquisition.blockers)
             self.assertIn("--model-layer", layer_two_acquisition.command)
             self.assertIn("layer_02_sector_context", layer_two_acquisition.command)
+            self.assertIn("--skip-registered-failures", layer_two_acquisition.command)
+            self.assertNotIn("--execute-approved-provider-calls", layer_two_acquisition.command)
 
     def test_layer_one_model_evaluation_reads_database_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -348,6 +348,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
             "${LIVE_CALL_APPROVAL_JSON}",
             "--model-layer",
             key,
+            "--skip-registered-failures",
         ]
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
