@@ -113,6 +113,40 @@ def _command(task_key_path: Path, request_id: str) -> list[str]:
     ]
 
 
+def _filter_requests(
+    requests: Sequence[Mapping[str, Any]],
+    *,
+    symbols: Sequence[str] = (),
+    request_ids: Sequence[str] = (),
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    symbol_filter = {item.strip().upper() for item in symbols if item.strip()}
+    request_filter = {item.strip() for item in request_ids if item.strip()}
+    filtered = []
+    for row in requests:
+        symbol_ok = not symbol_filter or str(row.get("symbol") or "").upper() in symbol_filter
+        request_ok = not request_filter or str(row.get("request_id") or "") in request_filter
+        if symbol_ok and request_ok:
+            filtered.append(dict(row))
+    if symbol_filter:
+        found = {str(row.get("symbol") or "").upper() for row in filtered}
+        missing = sorted(symbol_filter - found)
+        if missing:
+            raise TaskSystemError("requested symbols are not in the planned Layer 1 batch: " + ",".join(missing))
+    if request_filter:
+        found_ids = {str(row.get("request_id") or "") for row in filtered}
+        missing_ids = sorted(request_filter - found_ids)
+        if missing_ids:
+            raise TaskSystemError("requested ids are not in the planned Layer 1 batch: " + ",".join(missing_ids))
+    if limit is not None:
+        if limit <= 0:
+            raise TaskSystemError("limit must be positive")
+        filtered = filtered[:limit]
+    if not filtered:
+        raise TaskSystemError("provider dispatch filter selected no requests")
+    return filtered
+
+
 def dispatch_layer_one_provider_acquisition(
     *,
     start_month: str = "2016-01",
@@ -120,6 +154,9 @@ def dispatch_layer_one_provider_acquisition(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     approval_path: Path,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
+    symbols: Sequence[str] = (),
+    request_ids: Sequence[str] = (),
+    limit: int | None = None,
     execute_approved_provider_calls: bool = False,
 ) -> ProviderDispatchSummary:
     """Validate approval and optionally dispatch Layer 1 Alpaca bars acquisition."""
@@ -135,8 +172,9 @@ def dispatch_layer_one_provider_acquisition(
     approval = json.loads(approval_path.read_text(encoding="utf-8"))
     if not isinstance(approval, Mapping):
         raise TaskSystemError("approval artifact must be a JSON object")
+    selected_requests = _filter_requests(requests, symbols=symbols, request_ids=request_ids, limit=limit)
     live_requests = []
-    for row in requests:
+    for row in selected_requests:
         policy_refs = list(row.get("policy_refs") or [])
         for required_policy in ("live_call_policy_required", "live_call_approval_gate_v1"):
             if required_policy not in policy_refs:
@@ -191,7 +229,7 @@ def dispatch_layer_one_provider_acquisition(
     return ProviderDispatchSummary(
         contract_type="manager_provider_dispatch_summary_v1",
         stage_id="layer_01_market_regime.data_acquisition",
-        request_count=summary.request_count,
+        request_count=len(live_requests),
         approval_id=str(approval.get("approval_id")) if approval.get("approval_id") else None,
         validation_count=len(validations),
         dispatch_count=dispatch_count,
@@ -215,6 +253,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--approval", required=True, type=Path, help="Reviewed live_call_approval_v1 JSON artifact.")
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
+    parser.add_argument("--symbol", action="append", default=[], help="Limit dispatch to one symbol; repeat for multiple symbols.")
+    parser.add_argument("--request-id", action="append", default=[], help="Limit dispatch to one request id; repeat for multiple ids.")
+    parser.add_argument("--limit", type=int, help="Limit dispatch to the first N selected requests after symbol/request filtering.")
     parser.add_argument(
         "--execute-approved-provider-calls",
         action="store_true",
@@ -227,6 +268,9 @@ def main(argv: list[str] | None = None) -> int:
         storage_root=args.storage_root,
         approval_path=args.approval,
         trading_data_root=args.trading_data_root,
+        symbols=args.symbol,
+        request_ids=args.request_id,
+        limit=args.limit,
         execute_approved_provider_calls=args.execute_approved_provider_calls,
     )
     write_dispatch_summary(summary, output=sys.stdout)
