@@ -186,7 +186,7 @@ PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval.py \
 
 `validate_live_call_approval.py` validates only the manager-side gate. It requires a non-dry-run `manager_request_v1` with `live_call_policy_required` and `live_call_approval_gate_v1` policy refs plus a `live_call_approval_v1` artifact with explicit approved request ids, provider allowlist, max request count, max window days, expiry, `approval_scope=provider_data_acquisition_only`, and `broker_execution_allowed=false`. It does not dispatch components, call providers, approve model promotion, or enable broker execution.
 
-Provider dispatch is batch-aware. Use `--continue-on-error` only after the approval gate passes when individual provider/feed misses should become failed component receipts instead of aborting the entire approved batch. This keeps per-request failure evidence queryable in manager SQL while preserving the same approval scope and broker/model prohibitions.
+Provider dispatch is batch-aware. Plan-only dispatch can validate the approval and print commands, but actual `--execute-approved-provider-calls` now also requires `--approval-validation` pointing to a `manager_live_call_approval_proposal_validation_v1` artifact for the exact executable live request ids. Use `--continue-on-error` only after both gates pass when individual provider/feed misses should become failed component receipts instead of aborting the entire approved batch. This keeps per-request failure evidence queryable in manager SQL while preserving the same approval scope and broker/model prohibitions.
 
 Run a deterministic in-memory rehearsal of the request/receipt/summary lifecycle without provider calls or SQL writes:
 

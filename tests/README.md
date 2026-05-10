@@ -44,6 +44,7 @@
   - Layer 1 provider-dispatch approval validation;
   - default plan-only behavior with zero provider calls;
   - concrete trading-data command planning after `live_call_approval_v1` validation;
+  - execution requiring exact `manager_live_call_approval_proposal_validation_v1` evidence;
   - optional per-request failure continuation for approved batches;
   - registered accepted-failure skips with zero repeated provider calls.
 

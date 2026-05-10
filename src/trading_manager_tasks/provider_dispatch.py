@@ -48,6 +48,7 @@ class ProviderDispatchSummary:
     stage_id: str
     request_count: int
     approval_id: str | None
+    approval_validation_ref: str | None
     validation_count: int
     dispatch_count: int
     provider_calls: int
@@ -62,6 +63,7 @@ class ProviderDispatchSummary:
             "stage_id": self.stage_id,
             "request_count": self.request_count,
             "approval_id": self.approval_id,
+            "approval_validation_ref": self.approval_validation_ref,
             "validation_count": self.validation_count,
             "dispatch_count": self.dispatch_count,
             "provider_calls": self.provider_calls,
@@ -150,6 +152,46 @@ def _filter_requests(
     return filtered
 
 
+def _validate_approval_validation_artifact(
+    *,
+    approval_validation_path: Path | None,
+    approval: Mapping[str, Any],
+    model_layer: str,
+    live_requests: Sequence[Mapping[str, Any]],
+    execute_approved_provider_calls: bool,
+) -> str | None:
+    if not live_requests:
+        return None
+    if approval_validation_path is None:
+        if execute_approved_provider_calls:
+            raise TaskSystemError("executing provider calls requires --approval-validation from validate_live_call_approval_proposal.py")
+        return None
+    validation = json.loads(approval_validation_path.read_text(encoding="utf-8"))
+    if not isinstance(validation, Mapping):
+        raise TaskSystemError("approval validation artifact must be a JSON object")
+    if validation.get("contract_type") != "manager_live_call_approval_proposal_validation_v1":
+        raise TaskSystemError("approval validation contract_type must be manager_live_call_approval_proposal_validation_v1")
+    if validation.get("approval_id") != approval.get("approval_id"):
+        raise TaskSystemError("approval validation approval_id must match approval.approval_id")
+    expected_stage_id = f"{model_layer}.data_acquisition"
+    if validation.get("stage_id") != expected_stage_id:
+        raise TaskSystemError("approval validation stage_id must match provider dispatch stage")
+    expected_ids = tuple(str(row.get("request_id") or "") for row in live_requests)
+    validation_ids = tuple(str(item) for item in validation.get("request_ids") or [])
+    if set(expected_ids) != set(validation_ids) or len(expected_ids) != len(validation_ids):
+        raise TaskSystemError("approval validation request_ids must exactly match executable live requests")
+    skipped_overlap = sorted(set(validation_ids).intersection(str(item) for item in validation.get("skipped_registered_request_ids") or []))
+    if skipped_overlap:
+        raise TaskSystemError("approval validation includes registered skip ids: " + ",".join(skipped_overlap))
+    if int(validation.get("gate_validation_count") or -1) != len(live_requests):
+        raise TaskSystemError("approval validation gate_validation_count must match executable live request count")
+    if validation.get("provider_calls") not in (0, None):
+        raise TaskSystemError("approval validation must be plan-only with provider_calls=0")
+    if validation.get("dispatch_performed") not in (False, None):
+        raise TaskSystemError("approval validation must be plan-only with dispatch_performed=false")
+    return str(approval_validation_path)
+
+
 def dispatch_layer_provider_acquisition(
     *,
     model_layer: str = LAYER_ONE_MODEL_LAYER,
@@ -157,6 +199,7 @@ def dispatch_layer_provider_acquisition(
     end_month: str = "2016-01",
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     approval_path: Path,
+    approval_validation_path: Path | None = None,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
     symbols: Sequence[str] = (),
     request_ids: Sequence[str] = (),
@@ -205,6 +248,13 @@ def dispatch_layer_provider_acquisition(
                 policy_refs.append(required_policy)
         live_requests.append(dict(row) | {"dry_run": False, "policy_refs": policy_refs})
     validations = validate_live_call_approvals(live_requests, approval) if live_requests else []
+    approval_validation_ref = _validate_approval_validation_artifact(
+        approval_validation_path=approval_validation_path,
+        approval=approval,
+        model_layer=model_layer,
+        live_requests=live_requests,
+        execute_approved_provider_calls=execute_approved_provider_calls,
+    )
 
     items: list[ProviderDispatchItem] = [
         ProviderDispatchItem(
@@ -271,6 +321,7 @@ def dispatch_layer_provider_acquisition(
         stage_id=f"{model_layer}.data_acquisition",
         request_count=len(selected_requests),
         approval_id=str(approval.get("approval_id")) if approval.get("approval_id") else None,
+        approval_validation_ref=approval_validation_ref,
         validation_count=len(validations),
         dispatch_count=dispatch_count,
         provider_calls=dispatch_count,
@@ -299,6 +350,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--approval", required=True, type=Path, help="Reviewed live_call_approval_v1 JSON artifact.")
+    parser.add_argument("--approval-validation", type=Path, help="manager_live_call_approval_proposal_validation_v1 artifact required when executing provider calls.")
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
     parser.add_argument("--symbol", action="append", default=[], help="Limit dispatch to one symbol; repeat for multiple symbols.")
     parser.add_argument("--request-id", action="append", default=[], help="Limit dispatch to one request id; repeat for multiple ids.")
@@ -322,6 +374,7 @@ def main(argv: list[str] | None = None) -> int:
         end_month=args.end_month,
         storage_root=args.storage_root,
         approval_path=args.approval,
+        approval_validation_path=args.approval_validation,
         trading_data_root=args.trading_data_root,
         symbols=args.symbol,
         request_ids=args.request_id,
