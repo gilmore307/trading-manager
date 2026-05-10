@@ -38,6 +38,25 @@ shadow_monitoring=1 month
 
 These defaults are manager planning thresholds, not promotion approval by themselves.
 
+## Historical sampling vs live routing
+
+Dataset expansion must distinguish two universes:
+
+| Universe | Meaning | Manager behavior |
+|---|---|---|
+| Historical training sampling universe | Rows collected to fit, calibrate, validate, and test a layer. | May be broader than live routing when broader sampling improves regime, sector, event, liquidity, or edge-case coverage. |
+| Live inference routing universe | Rows that reach a layer in actual decision flow after upstream gates and prioritization. | May be narrower and must preserve the accepted live model handoff boundaries. |
+
+The manager must not assume that historical expansion for a downstream layer is limited to the rows that upstream layers would route in live operation. Upstream model outputs can be attached as point-in-time context without being used as hard historical-training filters.
+
+Layer 3 is the main rule: live routing may send targets from Layer 2 selected/prioritized sector baskets, but historical dataset expansion may sample anonymous targets across other sectors, industries, styles, market caps, liquidity tiers, and ETF/stock exposure paths. This allows the model to learn sector-confirmed, sector-divergent, strong-in-weak-sector, and weak-in-strong-sector target behavior.
+
+When the historical sampling universe is broader than live routing, manager evidence should preserve both views:
+
+- broad historical generalization evidence;
+- live-route simulation evidence using the accepted upstream routing policy;
+- subpopulation/stress slices by sector, liquidity tier, regime, event type, and routed-vs-unrouted membership where available.
+
 ## Decision discipline
 
 The manager walks layers in dependency order and expands the earliest layer with a blocking evidence gap.

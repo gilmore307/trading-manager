@@ -2692,3 +2692,24 @@ This is an evidence collection layer, not a second decision-rule system. The pla
 - Manager can determine missing train/calibration/validation/test/forward-holdout evidence from durable records instead of relying on absent-evidence defaults.
 - `plan_dataset_expansion.py --collect-evidence-from-db` can collect evidence and plan in one run.
 - Provider calls remain gated by `live_call_approval_v1`; model activation remains gated by approving `review_decision_v1`; broker/order/fill/account mutation remains execution-owned.
+
+## D120 - Historical sampling universe can be broader than live routing
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+The dataset expansion planner and evidence collector should not mistake live inference routing constraints for historical-training sampling constraints. A live route may narrow candidates through upstream model gates, but historical model construction may need broader samples to learn contrast and avoid overfitting to already-selected candidates.
+
+### Decision
+
+Adopt the `historical training sampling universe != live inference routing universe` rule for manager-owned dataset expansion.
+
+Manager may expand historical datasets using broader point-in-time samples than the live route would pass downstream, provided the rows preserve `available_time`/`tradeable_time`, no-future leakage, identity-safety where required, and layer-boundary constraints. Layer 3 historical expansion may sample anonymous targets outside Layer 2 selected/prioritized sector baskets while keeping Layer 2 context attached to each row.
+
+### Consequences
+
+- Dataset expansion planning may include broad historical samples and live-route simulation as separate evidence views.
+- Layer 3 target data collection is not limited to the sectors that Layer 2 would select in live routing.
+- Broader historical sampling does not authorize live routing bypass, provider-call bypass, model activation, or broker execution.
