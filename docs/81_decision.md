@@ -2498,7 +2498,7 @@ Adopt the always-on automation scheduler policy in `docs/98_automation_scheduler
 
 Manager-owned scheduler automation should keep safe historical work moving whenever dependencies, approvals, resource budgets, and market-hours policy allow. Historical work may use concurrency, but only after reserving capacity for live monitoring and execution. During the `09:20-16:10 ET` protection window on actual regular US equity trading days, default behavior is to pause or heavily throttle historical provider acquisition and CPU-heavy modeling work. Non-trading days must not trigger this pause merely because the wall clock is inside that time range.
 
-Approval gates remain hard: live provider acquisition requires validated `live_call_approval_v1`, model activation requires an approving `review_decision_v1`, and broker/order/fill/account mutation remains execution-owned.
+Approval gates remain hard: live provider acquisition requires validated `live_call_approval_v1`, model activation requires an approving `review_decision_v1`, and broker/order/fill/account mutation remains execution-owned. The approval gate is an internal safety control for the historical-training acquisition stage, not an external manual dependency.
 
 ### Consequences
 
@@ -2514,18 +2514,39 @@ Status: Accepted
 
 ### Context
 
-The accepted scheduler direction needs implementation without prematurely enabling provider dispatch, production model activation, or broker execution. The safest first step is a scheduler tick that proves gate behavior and executes only already-safe offline preparation.
+The accepted scheduler direction needs implementation without prematurely enabling provider dispatch, production model activation, or broker execution. The safest first step is a scheduler tick that proves gate behavior and executes only already-safe preparation while still treating provider acquisition as the next internal historical-training stage.
 
 ### Decision
 
 Implement `scripts/tasks/run_automation_scheduler.py` backed by `trading_manager_tasks.scheduler` as the first scheduler work-loop increment.
 
-The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes only Layer 1 task-key payload materialization and handoff validation through the existing preparation path.
+The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes only Layer 1 task-key payload materialization and handoff validation through the existing preparation path, then reports `approval_gated_provider_acquisition` as the next internal stage.
 
 The tick must emit safety counters proving `provider_calls=0`, `dispatch_performed=false`, `model_activation_performed=false`, and `broker_execution_performed=false` for this phase.
 
 ### Consequences
 
 - Scheduler automation is now implemented enough to decide and perform safe offline preparation.
-- Provider dispatch, receipt-driven progression, feature/model/evaluation runners, and promotion-review automation remain the next scheduler increments.
+- Approval-gated provider acquisition, receipt-driven progression, feature/model/evaluation runners, and promotion-review automation remain the next scheduler increments.
 - Live provider dispatch still requires validated `live_call_approval_v1`; production activation still requires approving `review_decision_v1`; broker execution remains execution-owned.
+
+## D112 - Treat provider acquisition as an internal historical-training stage
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+Layer 1 historical model training cannot honestly begin at feature/model code alone; it includes acquiring the required historical Alpaca bar inputs for the reviewed ETF universe. Treating those provider pulls as an external dependency would make manager passive and would contradict the accepted scheduler responsibility.
+
+### Decision
+
+Historical provider acquisition is part of the historical-data model-training lifecycle. `trading-manager` must plan and advance it as an internal scheduler stage: prepare requests, prepare/validate the required `live_call_approval_v1` safety artifact, dispatch approved acquisition through `trading-data`, and then continue through receipts, feature generation, model training, evaluation, and promotion-review preparation.
+
+`live_call_approval_v1` remains mandatory for non-dry-run provider/API calls, but it is a safety gate inside the workflow, not a reason to classify data acquisition as an external requirement or manual operator task.
+
+### Consequences
+
+- Scheduler decisions should expose the next internal stage and required approval gate instead of stopping at preparation.
+- Layer 1 Alpaca bar acquisition is tracked as historical-training work, while provider calls remain bounded and reviewable.
+- Offline preparation, feature generation, training, and evaluation continue automatically whenever their inputs and gates are satisfied.

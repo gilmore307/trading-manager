@@ -6,11 +6,11 @@ This policy is accepted as the target scheduler shape. The first implementation 
 
 ## Responsibility
 
-The manager scheduler owns continuous orchestration across the full offline training lifecycle:
+The manager scheduler owns continuous orchestration across the full offline training lifecycle. Historical provider acquisition is part of that lifecycle, not an external manual requirement:
 
 ```text
 data acquisition planning
-  -> approved provider acquisition dispatch
+  -> approval-gated provider acquisition dispatch
   -> source normalization
   -> feature generation
   -> model training/generation
@@ -19,7 +19,7 @@ data acquisition planning
   -> approved activation artifact only after review approval
 ```
 
-The scheduler should not sit idle when safe offline work exists. If provider calls are not approved, or if a regular-trading-day market-hours throttle is active, it should shift to work that does not violate gates: payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle review.
+The scheduler should not sit idle when safe work exists. If provider calls are not yet approved, or if a regular-trading-day market-hours throttle is active, it should shift to work that does not violate gates: approval-artifact preparation, payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle review.
 
 ## Priority Order
 
@@ -90,7 +90,7 @@ The scheduler implementation should behave like a durable work loop:
 
 If no safe work exists, the scheduler should report why: waiting for approval, regular-trading-day market-hours protection, resource pressure, missing upstream artifact, failed dependency, provider quota, or promotion review.
 
-The current scheduler tick implements the first safe step: it evaluates regular-trading-day market-hours protection and host resource pressure, then either reports `prepare_layer_one_historical_training_batch` as the next safe offline work item or executes that preparation with `--execute-safe-preparation`. Execution writes task-key payloads and validates handoff shape only; provider dispatch remains a later approved step.
+The current scheduler tick implements the first safe step: it evaluates regular-trading-day market-hours protection and host resource pressure, then either reports `prepare_layer_one_historical_training_batch` as the next safe internal work item or executes that preparation with `--execute-safe-preparation`. Execution writes task-key payloads and validates handoff shape only. The next internal stage is `approval_gated_provider_acquisition`; the approval gate is a safety control inside historical training, not an external dependency or manual task request.
 
 ## Non-Goals
 

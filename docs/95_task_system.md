@@ -100,7 +100,7 @@ PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py \
 
 The second command is still handoff preparation only: it writes local task-key payloads and request-scoped input bindings, but it does not call providers or dispatch component work.
 
-Run one scheduler tick to decide whether safe historical work can proceed under market-hours and resource gates:
+Run one scheduler tick to decide whether safe historical-training work can proceed under market-hours and resource gates:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py \
@@ -108,7 +108,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py \
   --end-month 2016-01
 ```
 
-By default this is plan-only and reports the next safe work item or explicit backoff reason. Add `--execute-safe-preparation` to let the scheduler write Layer 1 task-key payload files and validate handoff shape. This still performs no provider calls, model activation, or broker/execution work.
+By default this is plan-only and reports the next safe internal work item or explicit backoff reason. Add `--execute-safe-preparation` to let the scheduler write Layer 1 task-key payload files and validate handoff shape. This still performs no provider calls, model activation, or broker/execution work. Layer 1 Alpaca bar acquisition is the next internal historical-training stage; `live_call_approval_v1` is the safety gate for that stage, not an external manual dependency.
 
 Prepare the first Layer 1 historical-training batch directly as one manager-owned operation:
 

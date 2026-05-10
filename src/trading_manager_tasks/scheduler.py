@@ -1,10 +1,11 @@
 """Capacity-aware manager scheduler gates and first safe work loop.
 
-The scheduler is intentionally conservative. It can plan or execute safe offline
-preparation work, but it does not call live providers, activate models, or touch
-broker/execution state. Live provider dispatch remains gated by
-``live_call_approval_v1`` and model activation remains gated by an approving
-review decision.
+The scheduler is intentionally conservative. Historical provider acquisition is
+an internal training stage, not an external dependency, but provider/API calls
+still pass through the internal ``live_call_approval_v1`` safety gate. This tick
+can plan or execute safe offline preparation work, but it does not call live
+providers, activate models, or touch broker/execution state. Model activation
+remains gated by an approving review decision.
 """
 
 from __future__ import annotations
@@ -76,6 +77,8 @@ class SchedulerDecision:
     resource_pressure_active: bool
     selected_work: str | None
     command: list[str]
+    next_internal_stage: str | None = None
+    approval_gate_required: str | None = None
     provider_calls: int = 0
     dispatch_performed: bool = False
     model_activation_performed: bool = False
@@ -285,6 +288,7 @@ def run_scheduler_once(
             resource_pressure_active=not res_gate.allowed,
             selected_work=None,
             command=[],
+            next_internal_stage="historical_training_work_loop",
         )
     if not res_gate.allowed:
         return SchedulerDecision(
@@ -298,6 +302,7 @@ def run_scheduler_once(
             resource_pressure_active=True,
             selected_work=None,
             command=[],
+            next_internal_stage="historical_training_work_loop",
         )
 
     selected_work = "prepare_layer_one_historical_training_batch"
@@ -314,6 +319,8 @@ def run_scheduler_once(
             resource_pressure_active=False,
             selected_work=selected_work,
             command=command,
+            next_internal_stage="approval_gated_provider_acquisition",
+            approval_gate_required="live_call_approval_v1",
         )
 
     summary, _requests, _payloads, _validations = prepare_layer_one_historical_training_batch(
@@ -331,11 +338,13 @@ def run_scheduler_once(
         now_et=now_et.isoformat(),
         decision_status="executed",
         reason_code="safe_offline_preparation_executed",
-        reason="wrote Layer 1 task-key payloads and validated handoff shape without provider calls",
+        reason="completed Layer 1 internal acquisition preparation; next internal stage is approval-gated provider acquisition",
         market_protection_active=False,
         resource_pressure_active=False,
         selected_work=selected_work,
         command=command,
+        next_internal_stage="approval_gated_provider_acquisition",
+        approval_gate_required="live_call_approval_v1",
         execution_summary=summary.summary_row(),
     )
 
