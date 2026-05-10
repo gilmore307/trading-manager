@@ -2671,3 +2671,24 @@ Add `manager_dataset_expansion_plan_v1` and `scripts/tasks/plan_dataset_expansio
 - Dataset expansion plans remain evidence artifacts, not promotion approval and not provider-call approval.
 - Provider calls, model activation, and broker execution remain gated exactly as before.
 - The next improvement is to feed real dataset snapshot/split/label/evaluation evidence into the planner instead of relying on absent-evidence defaults.
+
+## D119 - Dataset expansion planning uses collected evidence
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+The dataset expansion planner can choose the next layer/role, but absent an evidence input it conservatively defaults to missing Layer 1 train evidence. That is safe, but it is not sufficient for a resident manager: manager should inventory the actual dataset snapshot, split, label, evaluation, artifact, and ready-signal evidence before deciding which dataset role is missing.
+
+### Decision
+
+Add `manager_dataset_evidence_v1` and `scripts/tasks/collect_dataset_evidence.py`. The collector reads existing model-governance and manager-control-plane evidence, summarizes per-layer/per-role coverage, records promotion gaps, and feeds the existing dataset expansion planner.
+
+This is an evidence collection layer, not a second decision-rule system. The planner remains responsible for selecting the next expansion target from the evidence. Collection is read-only and performs no provider calls, model activation, or broker execution.
+
+### Consequences
+
+- Manager can determine missing train/calibration/validation/test/forward-holdout evidence from durable records instead of relying on absent-evidence defaults.
+- `plan_dataset_expansion.py --collect-evidence-from-db` can collect evidence and plan in one run.
+- Provider calls remain gated by `live_call_approval_v1`; model activation remains gated by approving `review_decision_v1`; broker/order/fill/account mutation remains execution-owned.

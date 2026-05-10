@@ -49,9 +49,32 @@ The manager walks layers in dependency order and expands the earliest layer with
 5. Every expansion plan must preserve point-in-time/no-future/no-downstream-leakage discipline.
 6. Dataset snapshots and splits remain frozen evidence; if expansion changes the sample universe, it creates a new snapshot/split lineage rather than silently rewriting reviewed evidence.
 
+## Evidence collection
+
+The expansion planner consumes manager-visible evidence; it must not invent missing-dataset status from a second decision-rule system.
+
+The evidence collector emits `manager_dataset_evidence_v1` by inventorying existing durable evidence where available:
+
+- `trading_model.model_dataset_snapshot`;
+- `trading_model.model_dataset_split`;
+- `trading_model.model_eval_label`;
+- `trading_model.model_eval_run`;
+- `trading_model.model_promotion_metric`;
+- manager `artifact_ref_v1` / `ready_signal_v1` records.
+
+The collector summarizes per-layer/per-role coverage with month counts, sample counts, snapshot/split refs, label/eval coverage, artifact/ready-signal counts, and promotion gaps. It performs no provider calls, no model activation, and no broker/order/fill/account mutation.
+
 ## Implementation surface
 
-The manager entrypoint is:
+The manager evidence entrypoint is:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/collect_dataset_evidence.py \
+  --write \
+  --output-path storage/runtime/dataset_expansion/evidence.json
+```
+
+The manager planner entrypoint is:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py \
@@ -66,9 +89,18 @@ PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py \
   --evidence storage/runtime/dataset_expansion/evidence.json
 ```
 
+Or collected directly from SQL immediately before planning:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py \
+  --collect-evidence-from-db \
+  --start-month 2016-01 \
+  --end-month 2016-01
+```
+
 Add `--write` only to let manager prepare the selected safe expansion artifacts/payloads. For Layer 1, this writes the full Alpaca ETF task-key payload set and handoff validation evidence, but still performs zero provider calls. Actual provider dispatch remains blocked until `live_call_approval_v1` is validated and `dispatch_approved_provider_acquisition.py --execute-approved-provider-calls` is explicitly used.
 
-The emitted contract is `manager_dataset_expansion_plan_v1`.
+The emitted contracts are `manager_dataset_evidence_v1` and `manager_dataset_expansion_plan_v1`.
 
 ## Non-goals
 

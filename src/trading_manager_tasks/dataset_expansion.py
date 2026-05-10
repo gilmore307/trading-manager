@@ -376,12 +376,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--evidence", type=Path, help="Optional manager-visible dataset evidence JSON.")
+    parser.add_argument("--collect-evidence-from-db", action="store_true", help="Collect current dataset evidence from SQL before planning.")
+    parser.add_argument("--database-url")
+    parser.add_argument("--model-schema", default="trading_model")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_DATASET_EXPANSION_PATH)
     parser.add_argument("--write", action="store_true", help="Prepare the selected safe expansion artifact/payloads without provider calls.")
     args = parser.parse_args(argv)
 
-    evidence = load_dataset_evidence(args.evidence)
+    if args.evidence and args.collect_evidence_from_db:
+        parser.error("use either --evidence or --collect-evidence-from-db, not both")
+    if args.collect_evidence_from_db:
+        from .dataset_evidence import collect_dataset_evidence_from_database
+
+        collected = collect_dataset_evidence_from_database(database_url_value=args.database_url, model_schema=args.model_schema)
+        evidence_path = args.output_path.with_name("evidence.json") if args.write else None
+        if evidence_path is not None:
+            evidence_path.parent.mkdir(parents=True, exist_ok=True)
+            evidence_path.write_text(json.dumps(collected.summary_row(), indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+        evidence = load_dataset_evidence(evidence_path) if evidence_path is not None else tuple(
+            _coerce_layer_evidence(layer.layer, layer.summary_row()) for layer in collected.layers
+        )
+    else:
+        evidence = load_dataset_evidence(args.evidence)
     plan = build_dataset_expansion_plan(
         start_month=args.start_month,
         end_month=args.end_month,

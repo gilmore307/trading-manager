@@ -11,6 +11,13 @@ from .control_plane import (
     persist_input_bindings,
     validate_manager_request,
 )
+from .dataset_evidence import (
+    DatasetEvidenceCollection,
+    DatasetEvidenceLayerSummary,
+    DatasetEvidenceRoleSummary,
+    collect_dataset_evidence_from_database,
+    collect_dataset_evidence_from_rows,
+)
 from .dataset_expansion import (
     DatasetExpansionDecision,
     DatasetExpansionPlan,
@@ -69,6 +76,9 @@ from .task_rehearsal import (
 __all__ = [
     "CompletionReceiptRows",
     "DEFAULT_SOURCES",
+    "DatasetEvidenceCollection",
+    "DatasetEvidenceLayerSummary",
+    "DatasetEvidenceRoleSummary",
     "DatasetExpansionDecision",
     "DatasetExpansionPlan",
     "DatasetRoleEvidence",
@@ -82,6 +92,8 @@ __all__ = [
     "SourceAvailability",
     "build_dataset_expansion_plan",
     "build_model_promotion_review_request",
+    "collect_dataset_evidence_from_database",
+    "collect_dataset_evidence_from_rows",
     "build_activation_record",
     "build_model_promotion_review_requests",
     "build_rehearsal_receipt",

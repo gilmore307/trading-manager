@@ -11,6 +11,12 @@
 
 ## Inventory
 
+- `test_dataset_evidence.py` verifies:
+  - manager-visible dataset evidence collection from model governance rows;
+  - split-role normalization and chronological month coverage;
+  - collected evidence feeding dataset expansion decisions;
+  - promotion metric failures surfacing forward-holdout gaps.
+
 - `test_dataset_expansion.py` verifies:
   - manager-owned dataset expansion role selection across train, calibration, validation, test, and forward holdout;
   - upstream dependency ordering before downstream layer expansion;
