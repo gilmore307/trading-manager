@@ -44,7 +44,13 @@
   - Layer 1 provider-dispatch approval validation;
   - default plan-only behavior with zero provider calls;
   - concrete trading-data command planning after `live_call_approval_v1` validation;
-  - optional per-request failure continuation for approved batches.
+  - optional per-request failure continuation for approved batches;
+  - registered accepted-failure skips with zero repeated provider calls.
+
+- `test_failure_register.py` verifies:
+  - `manager_failure_register_v1` validation;
+  - accepted-skip and corrected failures requiring agent review evidence;
+  - durable skip disposition for reviewed normal historical absences.
 
 - `test_stage_coverage.py` verifies:
   - `manager_stage_coverage_v1` classification from `task_summary` rows;

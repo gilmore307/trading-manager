@@ -2,7 +2,7 @@
 
 ## Active Tasks
 
-- Continue mechanism hardening before expanding provider volume: Stage coverage now gates downstream unlock from SQL `task_summary`; component-specific artifact discovery now captures output and supporting receipt references; accepted-failure coverage exceptions preserve failed task state while allowing agent-reviewed normal historical absences to pass.
+- Continue mechanism hardening before expanding provider volume: Stage coverage now gates downstream unlock from SQL `task_summary`; component-specific artifact discovery now captures output and supporting receipt references; accepted-failure coverage exceptions preserve failed task state while allowing agent-reviewed normal historical absences to pass; all failures now belong in `trading_manager.failure_register` with current status and skip/correction disposition.
 - Extend approved provider-dispatch coverage beyond Layer 1 source acquisition as durable ready-signal inputs become available.
 - Run/refresh `manager_dataset_evidence_v1` as real snapshot/split/label/evaluation evidence becomes available so expansion planning remains evidence-driven.
 

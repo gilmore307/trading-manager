@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Literal, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError, fetch_task_summary
+from .failure_register import accepted_failure_request_ids_from_register
 
 StageCoverageStatus = Literal["blocked", "partial_ready", "ready", "failed"]
 DEFAULT_STAGE_COVERAGE_PATH = Path("storage/runtime/stage_coverage/layer_01_market_regime_data_acquisition_2016-01.json")
@@ -178,14 +179,20 @@ def collect_stage_coverage(
     accepted_failure_refs: Sequence[str] = (),
 ) -> StageCoverageReport:
     rows = fetch_task_summary(database_url=database_url)
+    registered_request_ids, registered_refs = accepted_failure_request_ids_from_register(
+        database_url=database_url,
+        stage_id=stage_id,
+        start_month=start_month,
+        end_month=end_month,
+    )
     return summarize_stage_coverage_from_rows(
         rows,
         stage_id=stage_id,
         start_month=start_month,
         end_month=end_month,
         expected_count=expected_count,
-        accepted_failure_request_ids=accepted_failure_request_ids,
-        accepted_failure_refs=accepted_failure_refs,
+        accepted_failure_request_ids=tuple(dict.fromkeys([*accepted_failure_request_ids, *registered_request_ids])),
+        accepted_failure_refs=tuple(dict.fromkeys([*accepted_failure_refs, *registered_refs])),
     )
 
 

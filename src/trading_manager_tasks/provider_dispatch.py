@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
+from .failure_register import accepted_failure_request_ids_from_register
 from .historical_training import prepare_layer_one_historical_training_batch
 from .live_call_gate import validate_live_call_approvals
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -160,6 +161,8 @@ def dispatch_layer_one_provider_acquisition(
     limit: int | None = None,
     execute_approved_provider_calls: bool = False,
     continue_on_error: bool = False,
+    skip_registered_failures: bool = False,
+    database_url: str | None = None,
 ) -> ProviderDispatchSummary:
     """Validate approval and optionally dispatch Layer 1 Alpaca bars acquisition."""
 
@@ -175,16 +178,42 @@ def dispatch_layer_one_provider_acquisition(
     if not isinstance(approval, Mapping):
         raise TaskSystemError("approval artifact must be a JSON object")
     selected_requests = _filter_requests(requests, symbols=symbols, request_ids=request_ids, limit=limit)
+    registered_skip_ids: set[str] = set()
+    registered_skip_refs: tuple[str, ...] = ()
+    if skip_registered_failures:
+        skip_ids, registered_skip_refs = accepted_failure_request_ids_from_register(
+            database_url=database_url,
+            stage_id="layer_01_market_regime.data_acquisition",
+            start_month=start_month,
+            end_month=end_month,
+        )
+        registered_skip_ids = set(skip_ids)
     live_requests = []
+    skipped_requests = []
     for row in selected_requests:
+        if str(row.get("request_id") or "") in registered_skip_ids:
+            skipped_requests.append(dict(row))
+            continue
         policy_refs = list(row.get("policy_refs") or [])
         for required_policy in ("live_call_policy_required", "live_call_approval_gate_v1"):
             if required_policy not in policy_refs:
                 policy_refs.append(required_policy)
         live_requests.append(dict(row) | {"dry_run": False, "policy_refs": policy_refs})
-    validations = validate_live_call_approvals(live_requests, approval)
+    validations = validate_live_call_approvals(live_requests, approval) if live_requests else []
 
-    items: list[ProviderDispatchItem] = []
+    items: list[ProviderDispatchItem] = [
+        ProviderDispatchItem(
+            request_id=str(request["request_id"]),
+            task_key_path=str(_task_key_path(storage_root, request).resolve()),
+            runtime_task_key_path=None,
+            command=[],
+            receipt_path="",
+            status="skipped_registered_accepted_failure",
+            return_code=None,
+            error_summary=";".join(registered_skip_refs) if registered_skip_refs else "registered accepted failure",
+        )
+        for request in skipped_requests
+    ]
     dispatch_count = 0
     for request in live_requests:
         source_path = _task_key_path(storage_root, request).resolve()
@@ -235,7 +264,7 @@ def dispatch_layer_one_provider_acquisition(
     return ProviderDispatchSummary(
         contract_type="manager_provider_dispatch_summary_v1",
         stage_id="layer_01_market_regime.data_acquisition",
-        request_count=len(live_requests),
+        request_count=len(selected_requests),
         approval_id=str(approval.get("approval_id")) if approval.get("approval_id") else None,
         validation_count=len(validations),
         dispatch_count=dispatch_count,
@@ -272,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Continue the approved batch after an individual provider command fails, preserving per-request failure receipts for control-plane ingestion.",
     )
+    parser.add_argument("--skip-registered-failures", action="store_true", help="Skip requests with accepted_skip entries in the manager failure register.")
+    parser.add_argument("--database-url")
     args = parser.parse_args(argv)
     summary = dispatch_layer_one_provider_acquisition(
         start_month=args.start_month,
@@ -284,6 +315,8 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
         execute_approved_provider_calls=args.execute_approved_provider_calls,
         continue_on_error=args.continue_on_error,
+        skip_registered_failures=args.skip_registered_failures,
+        database_url=args.database_url,
     )
     write_dispatch_summary(summary, output=sys.stdout)
     return 0
