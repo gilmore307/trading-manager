@@ -72,7 +72,7 @@ Artifact discovery is component-receipt-driven. Final `outputs` become downstrea
 
 A task-level `ready_signal_v1` is not enough to unlock a workflow stage. Stage advancement must pass a `manager_stage_coverage_v1` gate over `task_summary`: for example, Layer 1 January 2016 data acquisition remains `partial_ready` at `3/22` ready requests and may unlock feature generation only at full expected coverage with `can_unlock_downstream=true`. Coverage accounting must preserve observed terminal states: an actual failed request remains in `failed_count`, even when later review accepts it as a normal historical absence. A stage may pass with `ready_count + accepted_failed_count >= expected_count` only when every failed request is covered by explicit agent failure-review evidence plus any required operator approval; it must not rewrite failures into ready rows. Accepted failed requests without an agent review reference are invalid.
 
-Failed requests also belong in `trading_manager.failure_register`. The register records current state (`observed`, `agent_review_required`, `retry_required`, `corrected`, `accepted_skip`, or `unresolved`), the agent review artifact, correction evidence when applicable, and whether future matching requests should be skipped. A fixable failure should move to `corrected` only after the agent-reviewed fix evidence exists. A normal historical absence such as a not-yet-listed symbol may move to `accepted_skip`; future provider dispatch can then skip that exact registered request instead of repeating a known-useless call.
+Failed requests also belong in `trading_manager.failure_register`. The register records current state (`observed`, `agent_review_required`, `retry_required`, `corrected`, `accepted_skip`, or `unresolved`), the agent review artifact, correction evidence when applicable, and whether future matching requests should be skipped. A fixable failure should move to `corrected` only after the agent-reviewed fix evidence exists. A normal historical absence such as a not-yet-listed symbol may move to `accepted_skip`; future provider dispatch can then skip that exact registered request instead of repeating a known-useless call. When the not-yet-listed fact is clear before dispatch, a preflight agent review may register `accepted_skip` without making the known-useless provider call; stage coverage counts that row as a reviewed terminal skip, not as a ready output.
 
 `trading-storage` provides `scripts/artifacts/store_completion_receipt_payload.py` for storage-owned receipt payload materialization. The emitted `artifact_ref_v1` metadata is what manager consumes through `record_completion_receipt.py`.
 
@@ -127,6 +127,18 @@ PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py \
 ```
 
 This expands the reviewed Layer 1 market-regime ETF universe, materializes all `01_feed_alpaca_bars` task-key payloads, and validates component handoff shape in one batch. `--write` additionally persists manager request rows and input bindings to SQL. Neither mode calls providers, activates models, or touches broker/execution state.
+
+Prepare the Layer 2 sector-context historical-training batch through the same no-provider boundary:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/prepare_layer_two_historical_training.py \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --write-files-only \
+  --format json
+```
+
+Layer 2 stage coverage is separate from Layer 1 even though both use `01_feed_alpaca_bars`; coverage matches the reviewed model-layer universe/request ids so same-month Layer 1 and Layer 2 rows cannot contaminate each other.
 
 Validate that a materialized payload is component-readable before dispatching work:
 

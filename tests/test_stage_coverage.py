@@ -7,7 +7,7 @@ from pathlib import Path
 
 from trading_manager_tasks.model_training_state import advance_workflow_state
 from trading_manager_tasks.control_plane import TaskSystemError
-from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
+from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 from trading_manager_tasks.stage_coverage import summarize_stage_coverage_from_rows
 
 
@@ -16,6 +16,10 @@ def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") ->
         task_key = root / "monthly_backfill_v1" / "alpaca_bars" / member.symbol / month / "task_key.json"
         task_key.parent.mkdir(parents=True, exist_ok=True)
         task_key.write_text("{}\n", encoding="utf-8")
+
+
+def _symbols(model_layer: str) -> list[str]:
+    return [member.symbol for member in load_market_regime_universe(model_layers=(model_layer,))]
 
 
 def _summary_row(symbol: str, *, ready: bool = False, failed: bool = False) -> dict[str, object]:
@@ -45,9 +49,10 @@ def _summary_row(symbol: str, *, ready: bool = False, failed: bool = False) -> d
 
 class StageCoverageTests(unittest.TestCase):
     def test_three_ready_of_twenty_two_is_partial_and_cannot_unlock(self):
+        layer_one_symbols = _symbols(LAYER_ONE_MODEL_LAYER)
         rows = [
             *[_summary_row(symbol, ready=True) for symbol in ("QQQ", "SPY", "TLT")],
-            *[_summary_row(f"SYM{index:02d}") for index in range(19)],
+            *[_summary_row(symbol) for symbol in layer_one_symbols if symbol not in {"QQQ", "SPY", "TLT"}],
         ]
 
         report = summarize_stage_coverage_from_rows(
@@ -65,7 +70,7 @@ class StageCoverageTests(unittest.TestCase):
         self.assertIn("3 ready", report.reason)
 
     def test_full_coverage_can_unlock_downstream(self):
-        rows = [_summary_row(f"SYM{index:02d}", ready=True) for index in range(22)]
+        rows = [_summary_row(symbol, ready=True) for symbol in _symbols(LAYER_ONE_MODEL_LAYER)]
 
         report = summarize_stage_coverage_from_rows(
             rows,
@@ -78,6 +83,45 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.status, "ready")
         self.assertEqual(report.ready_count, 22)
         self.assertTrue(report.can_unlock_downstream)
+
+    def test_layer_one_stage_coverage_ignores_layer_two_rows_for_same_month(self):
+        rows = [
+            *[_summary_row(symbol, ready=True) for symbol in _symbols(LAYER_ONE_MODEL_LAYER)],
+            *[_summary_row(symbol) for symbol in _symbols(LAYER_TWO_MODEL_LAYER)],
+        ]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="layer_01_market_regime.data_acquisition",
+            start_month="2016-01",
+            end_month="2016-01",
+            expected_count=22,
+        )
+
+        self.assertEqual(report.observed_count, 22)
+        self.assertEqual(report.ready_count, 22)
+        self.assertEqual(report.pending_count, 0)
+
+    def test_layer_two_stage_coverage_uses_sector_context_universe(self):
+        layer_two_symbols = _symbols(LAYER_TWO_MODEL_LAYER)
+        rows = [
+            *[_summary_row(symbol, ready=True) for symbol in layer_two_symbols[:2]],
+            *[_summary_row(symbol) for symbol in layer_two_symbols[2:]],
+            _summary_row("SPY", ready=True),
+        ]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="layer_02_sector_context.data_acquisition",
+            start_month="2016-01",
+            end_month="2016-01",
+            expected_count=25,
+        )
+
+        self.assertEqual(report.observed_count, 25)
+        self.assertEqual(report.ready_count, 2)
+        self.assertEqual(report.pending_count, 23)
+        self.assertEqual(report.status, "partial_ready")
 
     def test_failed_coverage_blocks_downstream_unlock(self):
         rows = [_summary_row("SPY", ready=True), _summary_row("QQQ", failed=True)]
@@ -127,7 +171,48 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.accepted_failed_count, 1)
         self.assertEqual(report.accepted_failed_request_ids, ("mgrreq_backfill_alpaca_bars_bitw_2016_01",))
         self.assertTrue(report.can_unlock_downstream)
-        self.assertIn("1 ready + 1 reviewed failed / 2", report.reason)
+        self.assertIn("1 ready + 1 reviewed failed/skip / 2", report.reason)
+
+    def test_reviewed_preflight_skip_counts_as_terminal_without_rewriting_ready(self):
+        rows = [_summary_row("SPY", ready=True), _summary_row("BITW")]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="layer_01_market_regime.data_acquisition",
+            start_month="2016-01",
+            end_month="2016-01",
+            expected_count=2,
+            accepted_failure_request_ids=["mgrreq_backfill_alpaca_bars_bitw_2016_01"],
+            accepted_failure_refs=["review://not-yet-listed"],
+        )
+
+        self.assertEqual(report.status, "ready")
+        self.assertEqual(report.ready_count, 1)
+        self.assertEqual(report.failed_count, 0)
+        self.assertEqual(report.accepted_failed_count, 1)
+        self.assertEqual(report.pending_count, 0)
+        self.assertEqual(report.accepted_failed_request_ids, ("mgrreq_backfill_alpaca_bars_bitw_2016_01",))
+        self.assertIn("reviewed failed/skip", report.reason)
+
+    def test_only_reviewed_preflight_skips_are_partial_without_unlock(self):
+        rows = [_summary_row("BITW")]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="layer_01_market_regime.data_acquisition",
+            start_month="2016-01",
+            end_month="2016-01",
+            expected_count=2,
+            accepted_failure_request_ids=["mgrreq_backfill_alpaca_bars_bitw_2016_01"],
+            accepted_failure_refs=["review://not-yet-listed"],
+        )
+
+        self.assertEqual(report.status, "partial_ready")
+        self.assertEqual(report.ready_count, 0)
+        self.assertEqual(report.accepted_failed_count, 1)
+        self.assertEqual(report.pending_count, 1)
+        self.assertFalse(report.can_unlock_downstream)
+        self.assertIn("0 ready + 1 reviewed failed/skip / 2", report.reason)
 
     def test_partial_coverage_report_does_not_complete_workflow_stage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

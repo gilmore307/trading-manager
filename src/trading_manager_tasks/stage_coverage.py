@@ -17,6 +17,7 @@ from typing import Any, Literal, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError, fetch_task_summary
 from .failure_register import accepted_failure_request_ids_from_register
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 
 StageCoverageStatus = Literal["blocked", "partial_ready", "ready", "failed"]
 DEFAULT_STAGE_COVERAGE_PATH = Path("storage/runtime/stage_coverage/layer_01_market_regime_data_acquisition_2016-01.json")
@@ -66,16 +67,33 @@ def _row_text(row: Mapping[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str) -> bool:
+def _model_layer_for_stage(stage_id: str) -> str:
     if stage_id == "layer_01_market_regime.data_acquisition":
-        if row.get("target_component_id") != "01_feed_alpaca_bars":
-            return False
-        if row.get("request_kind") != "data_backfill_month_v1":
-            return False
-        if start_month == end_month:
-            return start_month in _row_text(row)
-        return start_month in _row_text(row) or end_month in _row_text(row)
+        return LAYER_ONE_MODEL_LAYER
+    if stage_id == "layer_02_sector_context.data_acquisition":
+        return LAYER_TWO_MODEL_LAYER
     raise TaskSystemError(f"unsupported stage coverage gate: {stage_id}")
+
+
+def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
+    model_layer = _model_layer_for_stage(stage_id)
+    return {
+        f"mgrreq_backfill_alpaca_bars_{member.symbol.lower()}_{start_month.replace('-', '_')}"
+        for member in load_market_regime_universe(model_layers=(model_layer,))
+    }
+
+
+def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str) -> bool:
+    if row.get("target_component_id") != "01_feed_alpaca_bars":
+        return False
+    if row.get("request_kind") != "data_backfill_month_v1":
+        return False
+    request_id = str(row.get("request_id") or "")
+    if request_id not in _stage_request_ids(stage_id=stage_id, start_month=start_month):
+        return False
+    if start_month == end_month:
+        return start_month in _row_text(row)
+    return start_month in _row_text(row) or end_month in _row_text(row)
 
 
 def _is_ready(row: Mapping[str, Any]) -> bool:
@@ -120,28 +138,30 @@ def summarize_stage_coverage_from_rows(
     accepted_failure_set = {str(request_id) for request_id in accepted_failure_request_ids}
     if accepted_failure_set and not accepted_failure_refs:
         raise TaskSystemError("accepted failed requests require at least one agent failure review evidence ref")
-    failed_set = set(failed)
-    unknown_accepted = sorted(accepted_failure_set - failed_set)
+    matched_set = {str(row["request_id"]) for row in matched}
+    unknown_accepted = sorted(accepted_failure_set - matched_set)
     if unknown_accepted:
-        raise TaskSystemError("accepted failure request ids are not failed matched requests: " + ",".join(unknown_accepted))
+        raise TaskSystemError("accepted failure request ids are not matched stage requests: " + ",".join(unknown_accepted))
     accepted_failed = [request_id for request_id in failed if request_id in accepted_failure_set]
+    accepted_skipped = sorted(accepted_failure_set - set(failed))
+    accepted_terminal = [*accepted_failed, *accepted_skipped]
     unaccepted_failed = [request_id for request_id in failed if request_id not in accepted_failure_set]
-    terminal_covered = len(ready) + len(accepted_failed)
+    terminal_covered = len(ready) + len(accepted_terminal)
     if unaccepted_failed:
         status: StageCoverageStatus = "failed"
         reason = f"{len(unaccepted_failed)}/{expected_count} requests failed without accepted review; downstream remains blocked"
     elif terminal_covered >= expected_count:
         status = "ready"
-        if accepted_failed:
+        if accepted_terminal:
             reason = (
-                f"stage coverage accepted {len(ready)} ready + {len(accepted_failed)} reviewed failed / {expected_count}; "
+                f"stage coverage accepted {len(ready)} ready + {len(accepted_terminal)} reviewed failed/skip / {expected_count}; "
                 "downstream may unlock"
             )
         else:
             reason = f"stage coverage complete {len(ready)}/{expected_count}; downstream may unlock"
-    elif ready:
+    elif terminal_covered:
         status = "partial_ready"
-        reason = f"stage coverage partial {len(ready)} ready + {len(accepted_failed)} reviewed failed / {expected_count}; downstream remains blocked"
+        reason = f"stage coverage partial {len(ready)} ready + {len(accepted_terminal)} reviewed failed/skip / {expected_count}; downstream remains blocked"
     else:
         status = "blocked"
         reason = f"stage coverage not ready 0/{expected_count}; downstream remains blocked"
@@ -155,14 +175,14 @@ def summarize_stage_coverage_from_rows(
         observed_count=len(matched),
         ready_count=len(ready),
         failed_count=len(failed),
-        pending_count=max(expected_count - terminal_covered - len(unaccepted_failed), len(pending)),
-        accepted_failed_count=len(accepted_failed),
+        pending_count=max(expected_count - terminal_covered - len(unaccepted_failed), len([request_id for request_id in pending if request_id not in accepted_failure_set])),
+        accepted_failed_count=len(accepted_terminal),
         status=status,
         can_unlock_downstream=status == "ready",
         ready_request_ids=tuple(ready),
         failed_request_ids=tuple(failed),
-        accepted_failed_request_ids=tuple(accepted_failed),
-        pending_request_ids=tuple(pending),
+        accepted_failed_request_ids=tuple(accepted_terminal),
+        pending_request_ids=tuple(request_id for request_id in pending if request_id not in accepted_failure_set),
         accepted_failure_refs=tuple(str(ref) for ref in accepted_failure_refs),
         reason=reason,
     )
