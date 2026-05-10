@@ -14,7 +14,7 @@ Crypto is allowed to join later. The current OKX BTC/USDT evidence supports star
 
 | Source | Component | Effective month | Stance |
 |---|---:|---:|---|
-| Alpaca bars | `01_feed_alpaca_bars` | `2016-01` | included as one request per Layer 1 ETF universe symbol |
+| Alpaca bars | `01_feed_alpaca_bars` | `2016-01` | included as one request per selected reviewed ETF universe symbol; defaults to Layer 1 and can explicitly plan Layer 2 sector-context rows |
 | Alpaca liquidity | `02_feed_alpaca_liquidity` | `2016-01` | included |
 | Alpaca news | `03_feed_alpaca_news` | `2016-01` | included from common start |
 | GDELT news | `05_feed_gdelt_news` | `2016-01` | included from common start |
@@ -48,6 +48,8 @@ The planner emits deterministic dry-run `manager_request_v1` dictionaries. It do
 
 For Layer 1 `MarketRegimeModel` training, `01_feed_alpaca_bars` expands over every `model_layer = layer_01_market_regime` row in `trading-storage/main/shared/market_regime_etf_universe.csv`. Each ETF symbol gets its own monthly request and storage path so missing history, provider errors, and receipts stay isolated by symbol. The current reviewed Layer 1 universe has 22 market-state ETFs.
 
+For Layer 2 `SectorContextModel` training, pass `--model-layer layer_02_sector_context` to the planner or use the dedicated Layer 2 preparation command below. Layer 2 expands over the reviewed sector/industry ETF rows from the same shared universe file. The current reviewed Layer 2 universe has 25 sector/industry ETFs and remains approval-gated before any live provider dispatch.
+
 Each planned request keeps only concise control-plane facts:
 
 - `request_id`
@@ -55,7 +57,7 @@ Each planned request keeps only concise control-plane facts:
 - `request_kind = data_backfill_month_v1`
 - `status = requested`
 - target component/repo fields
-- Layer 1 ETF symbol/timeframe/universe metadata for `01_feed_alpaca_bars`
+- selected ETF symbol/timeframe/universe metadata for `01_feed_alpaca_bars`
 - `expected_outputs`
 - `policy_refs`
 - `parameter_ref`
@@ -64,9 +66,9 @@ Each planned request keeps only concise control-plane facts:
 
 Provider task-key bodies and bulky runtime evidence belong behind storage refs, not inside manager request rows.
 
-## Layer 1 Historical-Training Preparation
+## Layer 1 and Layer 2 Historical-Training Preparation
 
-Layer 1 training should be prepared by manager as a complete batch, not as individual operator-prompted ETF tasks:
+Layer 1 and Layer 2 training should be prepared by manager as complete batches, not as individual operator-prompted ETF tasks. Layer 1 prepares the market-regime ETF universe:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py \
@@ -76,9 +78,19 @@ PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py \
   --format json
 ```
 
+Layer 2 prepares the sector-context ETF universe with the same no-provider safety boundary:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/prepare_layer_two_historical_training.py \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --write-files-only \
+  --format json
+```
+
 The batch preparation performs these manager-owned steps together:
 
-1. plan `01_feed_alpaca_bars` requests for every reviewed Layer 1 market-regime ETF symbol;
+1. plan `01_feed_alpaca_bars` requests for every reviewed symbol in the selected model layer universe;
 2. build component-readable `task_key.json` payloads behind each `parameter_ref`;
 3. validate the payload handoff against the `trading-data` feed `build_context` boundary;
 4. report a batch summary showing zero provider calls, zero dispatch, zero model activation, and zero broker execution.
@@ -105,7 +117,7 @@ PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py \
   --write-bindings
 ```
 
-The materializer writes local development payloads under `storage/monthly_backfill_v1/.../task_key.json` by resolving `storage://trading-manager/...` URIs. Layer 1 bar payloads use `storage/monthly_backfill_v1/alpaca_bars/<SYMBOL>/<MONTH>/task_key.json` and set the component `params.symbol` / `params.timeframe` from the reviewed ETF universe. It also emits or persists request-scoped `input_binding_v1` rows with the payload URI, schema ref, byte size summary, and canonical SHA-256 hash.
+The materializer writes local development payloads under `storage/monthly_backfill_v1/.../task_key.json` by resolving `storage://trading-manager/...` URIs. Layer 1 and Layer 2 Alpaca bar payloads use `storage/monthly_backfill_v1/alpaca_bars/<SYMBOL>/<MONTH>/task_key.json` and set the component `params.symbol` / `params.timeframe` from the reviewed ETF universe row for the request model layer. It also emits or persists request-scoped `input_binding_v1` rows with the payload URI, schema ref, byte size summary, and canonical SHA-256 hash.
 
 This still does not dispatch components or call providers. It only makes the request package concrete enough for a later component-facing dry-run handoff.
 

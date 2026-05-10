@@ -14,12 +14,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal, TextIO
 
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
 FULL_LAYER_COUNT = 8
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 22
+LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
 
 
 @dataclass(frozen=True)
@@ -91,6 +93,7 @@ class ModelTrainingWorkflowPlan:
     end_month: str
     layer_count: int
     layer_one_task_key_count: int
+    layer_two_task_key_count: int
     layers: tuple[LayerWorkflow, ...]
     next_stage: WorkflowStage | None
     provider_calls: int = 0
@@ -104,6 +107,7 @@ class ModelTrainingWorkflowPlan:
             "end_month": self.end_month,
             "layer_count": self.layer_count,
             "layer_one_task_key_count": self.layer_one_task_key_count,
+            "layer_two_task_key_count": self.layer_two_task_key_count,
             "layers": [layer.summary_row() for layer in self.layers],
             "next_stage": self.next_stage.summary_row() if self.next_stage else None,
             "provider_calls": self.provider_calls,
@@ -132,7 +136,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "month;sector_or_industry_symbol",
         "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each chronological month once Layer 1 context exists, then continue forward without waiting for Layers 3-8",
-        "data_surface": "feature_02_sector_context over materialized market/sector inputs",
+        "data_surface": "approval-gated Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
     {
@@ -264,20 +268,38 @@ def maintenance_command(layer: int, slug: str) -> list[str]:
     ]
 
 
-def count_layer_one_task_keys(storage_root: Path, *, start_month: str) -> int:
+def _symbols_for_model_layer(model_layer: str) -> tuple[str, ...]:
+    return tuple(member.symbol for member in load_market_regime_universe(model_layers=(model_layer,)))
+
+
+def count_alpaca_bar_task_keys(storage_root: Path, *, start_month: str, model_layer: str) -> int:
     root = storage_root / "monthly_backfill_v1" / "alpaca_bars"
     if not root.exists():
         return 0
-    return len(list(root.glob(f"*/{start_month}/task_key.json")))
+    symbols = set(_symbols_for_model_layer(model_layer))
+    return sum(1 for symbol in symbols if (root / symbol / start_month / "task_key.json").exists())
 
 
-def _stage_status_for_layer_one_acquisition(task_key_count: int) -> tuple[StageStatus, tuple[str, ...], str | None]:
-    if task_key_count < LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS:
-        return "blocked", ("layer_01_task_key_preparation",), None
+def count_layer_one_task_keys(storage_root: Path, *, start_month: str) -> int:
+    return count_alpaca_bar_task_keys(storage_root, start_month=start_month, model_layer=LAYER_ONE_MODEL_LAYER)
+
+
+def count_layer_two_task_keys(storage_root: Path, *, start_month: str) -> int:
+    return count_alpaca_bar_task_keys(storage_root, start_month=start_month, model_layer=LAYER_TWO_MODEL_LAYER)
+
+
+def _stage_status_for_approval_gated_acquisition(
+    *,
+    task_key_count: int,
+    required_count: int,
+    preparation_blocker: str,
+) -> tuple[StageStatus, tuple[str, ...], str | None]:
+    if task_key_count < required_count:
+        return "blocked", (preparation_blocker,), None
     return "blocked", ("live_call_approval_v1",), "live_call_approval_v1"
 
 
-def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int) -> LayerWorkflow:
+def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int, layer_two_task_key_count: int) -> LayerWorkflow:
     layer = int(meta["layer"])
     slug = str(meta["slug"])
     key = layer_key(layer, slug)
@@ -288,7 +310,17 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
     maintenance = maintenance_command(layer, slug)
 
     if layer == 1:
-        acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_layer_one_acquisition(layer_one_task_key_count)
+        acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_approval_gated_acquisition(
+            task_key_count=layer_one_task_key_count,
+            required_count=LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
+            preparation_blocker="layer_01_task_key_preparation",
+        )
+    elif layer == 2:
+        acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_approval_gated_acquisition(
+            task_key_count=layer_two_task_key_count,
+            required_count=LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
+            preparation_blocker="layer_02_task_key_preparation",
+        )
     elif layer == 8:
         acquisition_status, acquisition_blockers, acquisition_gate = "blocked", (
             "upstream_layers_01_07_complete",
@@ -303,7 +335,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
         ), None
 
     acquisition_command = ["manager", "advance-local-input-stage", key]
-    if layer == 1:
+    if layer in {1, 2}:
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
@@ -314,6 +346,8 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
             "${END_MONTH}",
             "--approval",
             "${LIVE_CALL_APPROVAL_JSON}",
+            "--model-layer",
+            key,
         ]
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
@@ -329,7 +363,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
             command=acquisition_command,
             blockers=acquisition_blockers,
             approval_gate_required=acquisition_gate,
-            safe_without_provider_calls=not (layer in {1, 8} or acquisition_gate is not None),
+            safe_without_provider_calls=not (layer in {1, 2, 8} or acquisition_gate is not None),
             provider_calls_allowed=False,
         )
     ]
@@ -421,7 +455,15 @@ def build_model_training_workflow_plan(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
 ) -> ModelTrainingWorkflowPlan:
     task_key_count = count_layer_one_task_keys(storage_root, start_month=start_month)
-    layers = tuple(_build_layer_workflow(meta, layer_one_task_key_count=task_key_count) for meta in LAYER_METADATA)
+    layer_two_task_key_count = count_layer_two_task_keys(storage_root, start_month=start_month)
+    layers = tuple(
+        _build_layer_workflow(
+            meta,
+            layer_one_task_key_count=task_key_count,
+            layer_two_task_key_count=layer_two_task_key_count,
+        )
+        for meta in LAYER_METADATA
+    )
     next_stage = None
     for layer in layers:
         for stage in layer.stages:
@@ -441,6 +483,7 @@ def build_model_training_workflow_plan(
         end_month=end_month,
         layer_count=len(layers),
         layer_one_task_key_count=task_key_count,
+        layer_two_task_key_count=layer_two_task_key_count,
         layers=layers,
         next_stage=next_stage,
     )
@@ -471,11 +514,14 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "FULL_LAYER_COUNT",
     "LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS",
+    "LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS",
     "LayerWorkflow",
     "ModelTrainingWorkflowPlan",
     "WorkflowStage",
     "build_model_training_workflow_plan",
+    "count_alpaca_bar_task_keys",
     "count_layer_one_task_keys",
+    "count_layer_two_task_keys",
     "write_workflow_plan",
 ]
 

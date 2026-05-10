@@ -6,6 +6,7 @@ import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 
+from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 from trading_manager_tasks.scheduler import (
     ResourceSnapshot,
     SchedulerConfig,
@@ -19,6 +20,12 @@ from trading_manager_tasks.scheduler import (
 class SchedulerTests(unittest.TestCase):
     def _healthy_resource_snapshot(self) -> ResourceSnapshot:
         return ResourceSnapshot(cpu_count=8, load_1m=1.0, available_memory_mb=32768, free_disk_gb=500.0)
+
+    def _write_task_keys(self, root: Path, *, model_layer: str, month: str = "2016-01") -> None:
+        for member in load_market_regime_universe(model_layers=(model_layer,)):
+            path = root / "monthly_backfill_v1" / "alpaca_bars" / member.symbol / month / "task_key.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{}\n", encoding="utf-8")
 
     def _fake_data_src(self, tmp: Path) -> Path:
         src = tmp / "trading-data-src"
@@ -133,10 +140,7 @@ class SchedulerTests(unittest.TestCase):
     def test_scheduler_progresses_to_approval_gate_after_layer_one_payloads_exist(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
-            for index in range(22):
-                path = tmp / "manager-storage" / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
-                path.parent.mkdir(parents=True)
-                path.write_text("{}\n", encoding="utf-8")
+            self._write_task_keys(tmp / "manager-storage", model_layer=LAYER_ONE_MODEL_LAYER)
             decision = run_scheduler_once(
                 now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
                 resource_snapshot=self._healthy_resource_snapshot(),

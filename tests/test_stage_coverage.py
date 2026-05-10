@@ -7,7 +7,15 @@ from pathlib import Path
 
 from trading_manager_tasks.model_training_state import advance_workflow_state
 from trading_manager_tasks.control_plane import TaskSystemError
+from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 from trading_manager_tasks.stage_coverage import summarize_stage_coverage_from_rows
+
+
+def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
+    for member in load_market_regime_universe(model_layers=(model_layer,)):
+        task_key = root / "monthly_backfill_v1" / "alpaca_bars" / member.symbol / month / "task_key.json"
+        task_key.parent.mkdir(parents=True, exist_ok=True)
+        task_key.write_text("{}\n", encoding="utf-8")
 
 
 def _summary_row(symbol: str, *, ready: bool = False, failed: bool = False) -> dict[str, object]:
@@ -125,10 +133,7 @@ class StageCoverageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage = tmp / "storage"
-            for index in range(22):
-                task_key = storage / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
-                task_key.parent.mkdir(parents=True)
-                task_key.write_text("{}\n", encoding="utf-8")
+            _write_task_keys(storage, model_layer=LAYER_ONE_MODEL_LAYER)
             report_path = tmp / "coverage.json"
             report_path.write_text(
                 json.dumps(
@@ -173,10 +178,7 @@ class StageCoverageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage = tmp / "storage"
-            for index in range(22):
-                task_key = storage / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
-                task_key.parent.mkdir(parents=True)
-                task_key.write_text("{}\n", encoding="utf-8")
+            _write_task_keys(storage, model_layer=LAYER_ONE_MODEL_LAYER)
             report_path = tmp / "coverage.json"
             report_path.write_text(
                 json.dumps(
@@ -224,10 +226,7 @@ class StageCoverageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage = tmp / "storage"
-            for index in range(22):
-                task_key = storage / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
-                task_key.parent.mkdir(parents=True)
-                task_key.write_text("{}\n", encoding="utf-8")
+            _write_task_keys(storage, model_layer=LAYER_ONE_MODEL_LAYER)
             report_path = tmp / "coverage.json"
             report_path.write_text(
                 json.dumps(

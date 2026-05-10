@@ -12,15 +12,20 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Mapping, Sequence, TextIO
+from typing import Any, Iterable, Literal, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError, persist_input_bindings, persist_manager_requests
-from .monthly_backfill import plan_monthly_backfill_requests
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, plan_monthly_backfill_requests
 from .request_handoff import DEFAULT_TRADING_DATA_SRC, validate_request_handoffs
 from .request_payloads import DEFAULT_STORAGE_ROOT, materialize_request_payloads
 
 LAYER_ONE_PHASE = "layer_01_market_regime_historical_training_v1"
-LAYER_ONE_COMPONENT_ID = "01_feed_alpaca_bars"
+LAYER_TWO_PHASE = "layer_02_sector_context_historical_training_v1"
+LAYER_ALPACA_BARS_COMPONENT_ID = "01_feed_alpaca_bars"
+LAYER_PHASES = {
+    LAYER_ONE_MODEL_LAYER: LAYER_ONE_PHASE,
+    LAYER_TWO_MODEL_LAYER: LAYER_TWO_PHASE,
+}
 
 
 @dataclass(frozen=True)
@@ -66,12 +71,73 @@ class HistoricalTrainingBatchPreparation:
         }
 
 
-def _layer_one_requests(*, start_month: str, end_month: str) -> list[dict[str, Any]]:
-    rows = plan_monthly_backfill_requests(start_month=start_month, end_month=end_month, include_crypto=False)
-    selected = [dict(row) for row in rows if row.get("target_component_id") == LAYER_ONE_COMPONENT_ID]
+def _layer_requests(*, model_layer: str, start_month: str, end_month: str) -> list[dict[str, Any]]:
+    if model_layer not in LAYER_PHASES:
+        raise TaskSystemError(f"unsupported historical-training model layer: {model_layer}")
+    rows = plan_monthly_backfill_requests(
+        start_month=start_month,
+        end_month=end_month,
+        include_crypto=False,
+        model_layers=(model_layer,),
+    )
+    selected = [dict(row) for row in rows if row.get("target_component_id") == LAYER_ALPACA_BARS_COMPONENT_ID]
     if not selected:
-        raise TaskSystemError("no Layer 1 market-regime ETF bar requests were planned")
+        raise TaskSystemError(f"no {model_layer} ETF bar requests were planned")
     return selected
+
+
+def prepare_layer_historical_training_batch(
+    *,
+    model_layer: str,
+    start_month: str,
+    end_month: str,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    component_src_root: Path = DEFAULT_TRADING_DATA_SRC,
+    write: bool = False,
+    persist_sql: bool = False,
+    validate_handoff: bool = True,
+    database_url: str | None = None,
+) -> tuple[HistoricalTrainingBatchPreparation, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Prepare a complete layer historical-training request batch without provider dispatch."""
+
+    requests = _layer_requests(model_layer=model_layer, start_month=start_month, end_month=end_month)
+    if persist_sql:
+        persist_manager_requests(requests, database_url=database_url)
+    materialized = materialize_request_payloads(requests, storage_root=storage_root, write_files=write)
+    bindings = [item.input_binding for item in materialized]
+    if persist_sql:
+        persist_input_bindings(bindings, database_url=database_url)
+
+    validations = []
+    if validate_handoff:
+        if not write:
+            validations = []
+        else:
+            validations = validate_request_handoffs(
+                requests,
+                storage_root=storage_root,
+                component_src_root=component_src_root,
+                input_bindings=bindings,
+                require_input_binding=True,
+            )
+
+    summary = HistoricalTrainingBatchPreparation(
+        phase=LAYER_PHASES[model_layer],
+        model_layer=model_layer,
+        month_start=start_month,
+        month_end=end_month,
+        request_count=len(requests),
+        payload_count=len(materialized),
+        handoff_validation_count=len(validations),
+        symbols=tuple(str(row["symbol"]) for row in requests),
+        request_ids=tuple(str(row["request_id"]) for row in requests),
+        wrote_manager_sql=persist_sql,
+        wrote_payload_files=write,
+        persisted_input_bindings=persist_sql,
+    )
+    return summary, requests, [item.summary_row() | {"input_binding": item.input_binding} for item in materialized], [
+        item.summary_row() for item in validations
+    ]
 
 
 def prepare_layer_one_historical_training_batch(
@@ -92,46 +158,43 @@ def prepare_layer_one_historical_training_batch(
     provider/component dispatch is performed.
     """
 
-    requests = _layer_one_requests(start_month=start_month, end_month=end_month)
-    if persist_sql:
-        persist_manager_requests(requests, database_url=database_url)
-    materialized = materialize_request_payloads(requests, storage_root=storage_root, write_files=write)
-    bindings = [item.input_binding for item in materialized]
-    if persist_sql:
-        persist_input_bindings(bindings, database_url=database_url)
-
-    validations = []
-    if validate_handoff:
-        if not write:
-            # Handoff validation needs concrete payload files. Keep dry-run planning
-            # side-effect free unless the caller explicitly asks manager to write.
-            validations = []
-        else:
-            validations = validate_request_handoffs(
-                requests,
-                storage_root=storage_root,
-                component_src_root=component_src_root,
-                input_bindings=bindings,
-                require_input_binding=True,
-            )
-
-    summary = HistoricalTrainingBatchPreparation(
-        phase=LAYER_ONE_PHASE,
-        model_layer="layer_01_market_regime",
-        month_start=start_month,
-        month_end=end_month,
-        request_count=len(requests),
-        payload_count=len(materialized),
-        handoff_validation_count=len(validations),
-        symbols=tuple(str(row["symbol"]) for row in requests),
-        request_ids=tuple(str(row["request_id"]) for row in requests),
-        wrote_manager_sql=persist_sql,
-        wrote_payload_files=write,
-        persisted_input_bindings=persist_sql,
+    return prepare_layer_historical_training_batch(
+        model_layer=LAYER_ONE_MODEL_LAYER,
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        component_src_root=component_src_root,
+        write=write,
+        persist_sql=persist_sql,
+        validate_handoff=validate_handoff,
+        database_url=database_url,
     )
-    return summary, requests, [item.summary_row() | {"input_binding": item.input_binding} for item in materialized], [
-        item.summary_row() for item in validations
-    ]
+
+
+def prepare_layer_two_historical_training_batch(
+    *,
+    start_month: str,
+    end_month: str,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    component_src_root: Path = DEFAULT_TRADING_DATA_SRC,
+    write: bool = False,
+    persist_sql: bool = False,
+    validate_handoff: bool = True,
+    database_url: str | None = None,
+) -> tuple[HistoricalTrainingBatchPreparation, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Prepare Layer 2 sector-context ETF bar requests without provider dispatch."""
+
+    return prepare_layer_historical_training_batch(
+        model_layer=LAYER_TWO_MODEL_LAYER,
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        component_src_root=component_src_root,
+        write=write,
+        persist_sql=persist_sql,
+        validate_handoff=validate_handoff,
+        database_url=database_url,
+    )
 
 
 def write_batch_output(
@@ -197,8 +260,11 @@ def main(argv: list[str] | None = None) -> int:
 
 __all__ = [
     "LAYER_ONE_PHASE",
+    "LAYER_TWO_PHASE",
     "HistoricalTrainingBatchPreparation",
+    "prepare_layer_historical_training_batch",
     "prepare_layer_one_historical_training_batch",
+    "prepare_layer_two_historical_training_batch",
     "write_batch_output",
 ]
 

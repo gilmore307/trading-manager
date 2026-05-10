@@ -19,7 +19,8 @@ from typing import Any, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
 from .failure_register import accepted_failure_request_ids_from_register
-from .historical_training import prepare_layer_one_historical_training_batch
+from .historical_training import prepare_layer_historical_training_batch
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .live_call_gate import validate_live_call_approvals
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
@@ -134,12 +135,12 @@ def _filter_requests(
         found = {str(row.get("symbol") or "").upper() for row in filtered}
         missing = sorted(symbol_filter - found)
         if missing:
-            raise TaskSystemError("requested symbols are not in the planned Layer 1 batch: " + ",".join(missing))
+            raise TaskSystemError("requested symbols are not in the planned provider batch: " + ",".join(missing))
     if request_filter:
         found_ids = {str(row.get("request_id") or "") for row in filtered}
         missing_ids = sorted(request_filter - found_ids)
         if missing_ids:
-            raise TaskSystemError("requested ids are not in the planned Layer 1 batch: " + ",".join(missing_ids))
+            raise TaskSystemError("requested ids are not in the planned provider batch: " + ",".join(missing_ids))
     if limit is not None:
         if limit <= 0:
             raise TaskSystemError("limit must be positive")
@@ -149,8 +150,9 @@ def _filter_requests(
     return filtered
 
 
-def dispatch_layer_one_provider_acquisition(
+def dispatch_layer_provider_acquisition(
     *,
+    model_layer: str = LAYER_ONE_MODEL_LAYER,
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     storage_root: Path = DEFAULT_STORAGE_ROOT,
@@ -164,9 +166,12 @@ def dispatch_layer_one_provider_acquisition(
     skip_registered_failures: bool = False,
     database_url: str | None = None,
 ) -> ProviderDispatchSummary:
-    """Validate approval and optionally dispatch Layer 1 Alpaca bars acquisition."""
+    """Validate approval and optionally dispatch a layer Alpaca-bars acquisition batch."""
 
-    summary, requests, _payloads, _validations = prepare_layer_one_historical_training_batch(
+    if model_layer not in {LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER}:
+        raise TaskSystemError(f"unsupported provider dispatch model_layer: {model_layer}")
+    summary, requests, _payloads, _validations = prepare_layer_historical_training_batch(
+        model_layer=model_layer,
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
@@ -183,7 +188,7 @@ def dispatch_layer_one_provider_acquisition(
     if skip_registered_failures:
         skip_ids, registered_skip_refs = accepted_failure_request_ids_from_register(
             database_url=database_url,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id=f"{model_layer}.data_acquisition",
             start_month=start_month,
             end_month=end_month,
         )
@@ -263,7 +268,7 @@ def dispatch_layer_one_provider_acquisition(
         )
     return ProviderDispatchSummary(
         contract_type="manager_provider_dispatch_summary_v1",
-        stage_id="layer_01_market_regime.data_acquisition",
+        stage_id=f"{model_layer}.data_acquisition",
         request_count=len(selected_requests),
         approval_id=str(approval.get("approval_id")) if approval.get("approval_id") else None,
         validation_count=len(validations),
@@ -276,13 +281,20 @@ def dispatch_layer_one_provider_acquisition(
     )
 
 
+def dispatch_layer_one_provider_acquisition(**kwargs: Any) -> ProviderDispatchSummary:
+    """Backward-compatible wrapper for Layer 1 provider dispatch."""
+
+    return dispatch_layer_provider_acquisition(model_layer=LAYER_ONE_MODEL_LAYER, **kwargs)
+
+
 def write_dispatch_summary(summary: ProviderDispatchSummary, *, output: TextIO) -> None:
     json.dump(summary.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate and optionally dispatch approved Layer 1 provider acquisition.")
+    parser = argparse.ArgumentParser(description="Validate and optionally dispatch approved layer provider acquisition.")
+    parser.add_argument("--model-layer", default=LAYER_ONE_MODEL_LAYER, choices=(LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER))
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
@@ -304,7 +316,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skip-registered-failures", action="store_true", help="Skip requests with accepted_skip entries in the manager failure register.")
     parser.add_argument("--database-url")
     args = parser.parse_args(argv)
-    summary = dispatch_layer_one_provider_acquisition(
+    summary = dispatch_layer_provider_acquisition(
+        model_layer=args.model_layer,
         start_month=args.start_month,
         end_month=args.end_month,
         storage_root=args.storage_root,
@@ -325,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "ProviderDispatchItem",
     "ProviderDispatchSummary",
+    "dispatch_layer_provider_acquisition",
     "dispatch_layer_one_provider_acquisition",
     "write_dispatch_summary",
 ]

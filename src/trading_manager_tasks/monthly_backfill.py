@@ -27,6 +27,8 @@ DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
     DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "market_regime_etf_universe.csv"
 )
 LAYER_ONE_MODEL_LAYER = "layer_01_market_regime"
+LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
+SUPPORTED_MARKET_REGIME_MODEL_LAYERS = (LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER)
 BAR_GRAIN_TO_ALPACA_TIMEFRAME = {"1m": "1Min", "30m": "30Min", "1d": "1Day"}
 
 
@@ -76,9 +78,10 @@ class MonthlyWindow:
 
 @dataclass(frozen=True)
 class MarketRegimeUniverseMember:
-    """One reviewed Layer 1 market-regime ETF universe member."""
+    """One reviewed market-regime/sector-context ETF universe member."""
 
     symbol: str
+    model_layer: str
     bar_grain: str
     timeframe: str
     exposure_type: str
@@ -230,29 +233,37 @@ def _expected_outputs(source_id: str, month: str, *, symbol: str | None = None) 
 
 def load_market_regime_universe(
     path: Path = DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH,
+    *,
+    model_layers: Iterable[str] | None = None,
 ) -> tuple[MarketRegimeUniverseMember, ...]:
-    """Load the reviewed Layer 1 ETF universe from trading-storage."""
+    """Load reviewed ETF universe rows for the requested model layers."""
 
+    layer_filter = set(model_layers or [LAYER_ONE_MODEL_LAYER])
+    unsupported = sorted(layer_filter - set(SUPPORTED_MARKET_REGIME_MODEL_LAYERS))
+    if unsupported:
+        raise ValueError("unsupported model_layer values: " + ",".join(unsupported))
     rows: list[MarketRegimeUniverseMember] = []
     with path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
-            if row.get("model_layer") != LAYER_ONE_MODEL_LAYER:
+            model_layer = str(row.get("model_layer") or "")
+            if model_layer not in layer_filter:
                 continue
             symbol = str(row.get("symbol") or "").upper()
             bar_grain = str(row.get("bar_grain") or "")
             timeframe = BAR_GRAIN_TO_ALPACA_TIMEFRAME.get(bar_grain)
             if not symbol or timeframe is None:
-                raise ValueError(f"unsupported Layer 1 universe row: {row}")
+                raise ValueError(f"unsupported universe row: {row}")
             rows.append(
                 MarketRegimeUniverseMember(
                     symbol=symbol,
+                    model_layer=model_layer,
                     bar_grain=bar_grain,
                     timeframe=timeframe,
                     exposure_type=str(row.get("exposure_type") or ""),
                     universe_type=str(row.get("universe_type") or ""),
                 )
             )
-    return tuple(sorted(rows, key=lambda item: item.symbol))
+    return tuple(sorted(rows, key=lambda item: (item.model_layer, item.symbol)))
 
 
 def _plan_source_window(
@@ -288,7 +299,7 @@ def _plan_source_window(
                 "symbol": universe_member.symbol,
                 "timeframe": universe_member.timeframe,
                 "bar_grain": universe_member.bar_grain,
-                "model_layer": LAYER_ONE_MODEL_LAYER,
+                "model_layer": universe_member.model_layer,
                 "universe_ref": "trading-storage/main/shared/market_regime_etf_universe.csv",
                 "universe_type": universe_member.universe_type,
                 "exposure_type": universe_member.exposure_type,
@@ -305,6 +316,7 @@ def plan_monthly_backfill_requests(
     include_crypto: bool = True,
     requested_by: str = DEFAULT_REQUESTED_BY,
     market_regime_universe_path: Path = DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH,
+    model_layers: Iterable[str] = (LAYER_ONE_MODEL_LAYER,),
 ) -> list[dict[str, object]]:
     """Plan deterministic `manager_request_v1` dictionaries.
 
@@ -322,7 +334,8 @@ def plan_monthly_backfill_requests(
     if requested_end < effective_global_start:
         return []
 
-    layer_one_universe = load_market_regime_universe(market_regime_universe_path)
+    selected_model_layers = tuple(dict.fromkeys(model_layers))
+    market_regime_universe = load_market_regime_universe(market_regime_universe_path, model_layers=selected_model_layers)
     eligible_sources: list[tuple[SourceAvailability, Month]] = []
     for source in sources:
         if not source.include_by_default:
@@ -341,7 +354,7 @@ def plan_monthly_backfill_requests(
             if window_month < source_start:
                 continue
             if source.target_component_id == "01_feed_alpaca_bars":
-                for member in layer_one_universe:
+                for member in market_regime_universe:
                     planned.append(
                         _plan_source_window(source=source, window=window, requested_by=requested_by, universe_member=member)
                     )
@@ -393,6 +406,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", required=True, help="Inclusive YYYY-MM end month.")
     parser.add_argument("--exclude-crypto", action="store_true", help="Skip OKX crypto; by default it joins at its later 2018-01 start.")
     parser.add_argument("--requested-by", default=DEFAULT_REQUESTED_BY)
+    parser.add_argument("--model-layer", action="append", choices=SUPPORTED_MARKET_REGIME_MODEL_LAYERS, default=[], help="Universe model_layer to plan for Alpaca bars. Defaults to Layer 1 for backward compatibility; repeat for multiple layers.")
     parser.add_argument("--format", choices=("jsonl", "json", "csv"), default="jsonl")
     parser.add_argument("--inventory", action="store_true", help="Print source availability inventory instead of requests.")
     args = parser.parse_args(argv)
@@ -407,6 +421,7 @@ def main(argv: list[str] | None = None) -> int:
         end_month=args.end_month,
         include_crypto=not args.exclude_crypto,
         requested_by=args.requested_by,
+        model_layers=tuple(args.model_layer) if args.model_layer else (LAYER_ONE_MODEL_LAYER,),
     )
     write_requests(requests, output=sys.stdout, output_format=args.format)
     return 0

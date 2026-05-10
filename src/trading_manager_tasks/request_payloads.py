@@ -137,8 +137,9 @@ def _symbol_from_parameter_ref(parameter_ref: str) -> str | None:
     return None
 
 
-def _layer_one_timeframe(symbol: str) -> str | None:
-    for member in load_market_regime_universe():
+def _market_regime_timeframe(symbol: str, *, model_layer: str | None = None) -> str | None:
+    layers = [model_layer] if model_layer else None
+    for member in load_market_regime_universe(model_layers=layers):
         if member.symbol == symbol.upper():
             return member.timeframe
     return None
@@ -232,7 +233,7 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
     enriched_row.update(dict(row))
     if symbol:
         enriched_row["symbol"] = str(symbol).upper()
-        enriched_row.setdefault("timeframe", _layer_one_timeframe(str(symbol)) or defaults.params.get("timeframe"))
+        enriched_row.setdefault("timeframe", _market_regime_timeframe(str(symbol), model_layer=str(row.get("model_layer") or "") or None) or defaults.params.get("timeframe"))
     output_root = (
         f"storage/monthly_backfill_v1/{defaults.source_id}/{str(symbol).upper()}/{month}"
         if symbol and feed_id == "01_feed_alpaca_bars"

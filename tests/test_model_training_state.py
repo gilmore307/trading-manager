@@ -11,6 +11,14 @@ from trading_manager_tasks.model_training_state import (
     next_ready_or_blocked_stage,
 )
 from trading_manager_tasks.model_training_workflow import build_model_training_workflow_plan
+from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
+
+
+def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
+    for member in load_market_regime_universe(model_layers=(model_layer,)):
+        task_key = root / "monthly_backfill_v1" / "alpaca_bars" / member.symbol / month / "task_key.json"
+        task_key.parent.mkdir(parents=True, exist_ok=True)
+        task_key.write_text("{}\n", encoding="utf-8")
 
 
 class ModelTrainingWorkflowStateTests(unittest.TestCase):
@@ -29,10 +37,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage = tmp / "storage"
-            for index in range(22):
-                task_key = storage / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
-                task_key.parent.mkdir(parents=True)
-                task_key.write_text("{}\n", encoding="utf-8")
+            _write_task_keys(storage, model_layer=LAYER_ONE_MODEL_LAYER)
 
             state_path = tmp / "workflow_state.json"
             state = advance_workflow_state(
@@ -81,10 +86,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage = tmp / "storage"
-            for index in range(22):
-                task_key = storage / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
-                task_key.parent.mkdir(parents=True)
-                task_key.write_text("{}\n", encoding="utf-8")
+            _write_task_keys(storage, model_layer=LAYER_ONE_MODEL_LAYER)
             receipts = []
             for index in range(3):
                 receipt = tmp / f"receipt_{index}.json"

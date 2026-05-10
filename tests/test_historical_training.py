@@ -7,7 +7,9 @@ from pathlib import Path
 
 from trading_manager_tasks.historical_training import (
     LAYER_ONE_PHASE,
+    LAYER_TWO_PHASE,
     prepare_layer_one_historical_training_batch,
+    prepare_layer_two_historical_training_batch,
 )
 
 
@@ -64,6 +66,29 @@ class HistoricalTrainingPreparationTests(unittest.TestCase):
         self.assertFalse(summary.dispatch_performed)
         self.assertFalse(summary.model_activation_performed)
         self.assertFalse(summary.broker_execution_performed)
+
+    def test_layer_two_batch_preparation_uses_sector_context_universe(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            summary, requests, payloads, validations = prepare_layer_two_historical_training_batch(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp / "manager-storage",
+                component_src_root=self._fake_data_src(tmp),
+                write=True,
+            )
+
+        self.assertEqual(summary.phase, LAYER_TWO_PHASE)
+        self.assertEqual(summary.model_layer, "layer_02_sector_context")
+        self.assertEqual(summary.request_count, 25)
+        self.assertEqual(summary.payload_count, 25)
+        self.assertEqual(summary.handoff_validation_count, 25)
+        self.assertIn("XLK", summary.symbols)
+        self.assertNotIn("SPY", summary.symbols)
+        self.assertTrue(all(row["model_layer"] == "layer_02_sector_context" for row in requests))
+        self.assertTrue(any(row["symbol"] == "XLB" and row["timeframe"] == "30Min" for row in requests))
+        self.assertTrue(any(row["symbol"] == "AIQ" and row["timeframe"] == "1Day" for row in requests))
+        self.assertTrue(all(row["provider_calls"] == 0 for row in validations))
 
     def test_default_preview_does_not_write_or_validate_handoff(self):
         summary, _requests, payloads, validations = prepare_layer_one_historical_training_batch(

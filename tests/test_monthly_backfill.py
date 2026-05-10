@@ -7,6 +7,7 @@ import unittest
 from trading_manager_tasks.monthly_backfill import (
     DEFAULT_SOURCES,
     LAYER_ONE_MODEL_LAYER,
+    LAYER_TWO_MODEL_LAYER,
     iter_monthly_windows,
     load_market_regime_universe,
     plan_monthly_backfill_requests,
@@ -46,6 +47,20 @@ class MonthlyBackfillPlannerTests(unittest.TestCase):
             self.assertEqual(by_component[component_id]["contract_type"], "manager_request_v1")
             self.assertEqual(by_component[component_id]["priority"], "normal")
             self.assertTrue(by_component[component_id]["dry_run"])
+
+    def test_layer_two_model_layer_selects_sector_context_universe(self):
+        requests = plan_monthly_backfill_requests(
+            start_month="2016-01",
+            end_month="2016-01",
+            include_crypto=False,
+            model_layers=(LAYER_TWO_MODEL_LAYER,),
+        )
+        bars = [request for request in requests if request["target_component_id"] == "01_feed_alpaca_bars"]
+
+        self.assertEqual(len(bars), 25)
+        self.assertTrue(all(request["model_layer"] == LAYER_TWO_MODEL_LAYER for request in bars))
+        self.assertIn("XLK", {request["symbol"] for request in bars})
+        self.assertNotIn("SPY", {request["symbol"] for request in bars})
 
     def test_crypto_joins_later_than_common_start(self):
         requests_2016 = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-12")

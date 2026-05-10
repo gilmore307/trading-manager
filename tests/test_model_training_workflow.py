@@ -7,8 +7,17 @@ from pathlib import Path
 from trading_manager_tasks.model_training_workflow import (
     FULL_LAYER_COUNT,
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
+    LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
     build_model_training_workflow_plan,
 )
+from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+
+
+def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
+    for member in load_market_regime_universe(model_layers=(model_layer,)):
+        path = root / "monthly_backfill_v1" / "alpaca_bars" / member.symbol / month / "task_key.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}\n", encoding="utf-8")
 
 
 class ModelTrainingWorkflowTests(unittest.TestCase):
@@ -46,16 +55,32 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertIn("layer_01_task_key_preparation", layer_one_acquisition.blockers)
             self.assertIsNone(layer_one_acquisition.approval_gate_required)
 
-            for index in range(LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS):
-                path = root / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
-                path.parent.mkdir(parents=True)
-                path.write_text("{}\n", encoding="utf-8")
+            _write_task_keys(root, model_layer=LAYER_ONE_MODEL_LAYER)
             plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
             layer_one_acquisition = plan.layers[0].stages[0]
             self.assertEqual(plan.layer_one_task_key_count, LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS)
             self.assertEqual(layer_one_acquisition.approval_gate_required, "live_call_approval_v1")
             self.assertIn("live_call_approval_v1", layer_one_acquisition.blockers)
             self.assertEqual(plan.next_stage, layer_one_acquisition)
+
+    def test_layer_two_acquisition_waits_for_own_task_key_preparation_then_approval(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            _write_task_keys(root, model_layer=LAYER_ONE_MODEL_LAYER)
+            plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
+            layer_two_acquisition = plan.layers[1].stages[0]
+            self.assertEqual(layer_two_acquisition.status, "blocked")
+            self.assertIn("layer_02_task_key_preparation", layer_two_acquisition.blockers)
+            self.assertIsNone(layer_two_acquisition.approval_gate_required)
+
+            _write_task_keys(root, model_layer=LAYER_TWO_MODEL_LAYER)
+            plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
+            layer_two_acquisition = plan.layers[1].stages[0]
+            self.assertEqual(plan.layer_two_task_key_count, LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS)
+            self.assertEqual(layer_two_acquisition.approval_gate_required, "live_call_approval_v1")
+            self.assertIn("live_call_approval_v1", layer_two_acquisition.blockers)
+            self.assertIn("--model-layer", layer_two_acquisition.command)
+            self.assertIn("layer_02_sector_context", layer_two_acquisition.command)
 
     def test_layer_one_model_evaluation_reads_database_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
