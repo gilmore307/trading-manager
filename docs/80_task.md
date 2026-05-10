@@ -2,7 +2,7 @@
 
 ## Active Tasks
 
-- Run the 2016-01 controlled information pass through `scripts/tasks/plan_controlled_information_pass.py` before accepting broader scheduler/provider/concurrency/target/artifact/storage defaults.
+- Use the 2016-01 controlled information pass and small-batch provider receipts to harden the manager mechanism before expanding data volume: receipt ingestion must attach partial evidence without unlocking downstream stages until expected successful receipt coverage is met.
 - Extend approved provider-dispatch coverage beyond Layer 1 source acquisition and add richer artifact discovery for component-specific outputs as durable ready-signal inputs become available.
 - Run/refresh `manager_dataset_evidence_v1` as real snapshot/split/label/evaluation evidence becomes available so expansion planning remains evidence-driven.
 

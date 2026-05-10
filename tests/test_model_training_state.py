@@ -77,6 +77,99 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "ready")
             self.assertEqual(next_ready_or_blocked_stage(state).stage_id, "layer_01_market_regime.feature_generation")
 
+    def test_stage_receipts_attach_partial_evidence_without_unlocking_downstream(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage = tmp / "storage"
+            for index in range(22):
+                task_key = storage / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
+                task_key.parent.mkdir(parents=True)
+                task_key.write_text("{}\n", encoding="utf-8")
+            receipts = []
+            for index in range(3):
+                receipt = tmp / f"receipt_{index}.json"
+                receipt.write_text(
+                    json.dumps(
+                        {
+                            "task_id": f"mgrreq_{index}",
+                            "feed": "01_feed_alpaca_bars",
+                            "runs": [
+                                {
+                                    "run_id": f"run_{index}",
+                                    "status": "succeeded",
+                                    "started_at": "2026-05-10T00:00:00+00:00",
+                                    "completed_at": "2026-05-10T00:01:00+00:00",
+                                    "outputs": [f"storage://bars/{index}.csv"],
+                                }
+                            ],
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                receipts.append(receipt)
+
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage,
+                state_path=tmp / "workflow_state.json",
+                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                stage_receipts=[("layer_01_market_regime.data_acquisition", receipt) for receipt in receipts],
+                write=False,
+            )
+
+            stage_by_id = {stage.stage_id: stage for stage in state.stages}
+            acquisition = stage_by_id["layer_01_market_regime.data_acquisition"]
+            self.assertEqual(acquisition.status, "ready")
+            self.assertEqual(len(acquisition.receipt_refs), 3)
+            self.assertIn("partial component receipt coverage 3/22", acquisition.last_reason)
+            self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "blocked")
+            self.assertIn("layer_01_market_regime.data_acquisition_complete", stage_by_id["layer_01_market_regime.feature_generation"].last_reason)
+
+    def test_stage_receipts_complete_stage_after_expected_coverage(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            receipts = []
+            for index in range(2):
+                receipt = tmp / f"receipt_{index}.json"
+                receipt.write_text(
+                    json.dumps(
+                        {
+                            "runs": [
+                                {
+                                    "run_id": f"run_{index}",
+                                    "status": "succeeded",
+                                    "started_at": "2026-05-10T00:00:00+00:00",
+                                    "completed_at": "2026-05-10T00:01:00+00:00",
+                                    "outputs": [f"storage://bars/{index}.csv"],
+                                }
+                            ]
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                receipts.append(receipt)
+
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                state_path=tmp / "workflow_state.json",
+                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                stage_receipts=[("layer_01_market_regime.data_acquisition", receipt) for receipt in receipts],
+                expected_receipt_counts={"layer_01_market_regime.data_acquisition": 2},
+                write=False,
+            )
+
+            stage_by_id = {stage.stage_id: stage for stage in state.stages}
+            acquisition = stage_by_id["layer_01_market_regime.data_acquisition"]
+            self.assertEqual(acquisition.status, "succeeded")
+            self.assertEqual(len(acquisition.receipt_refs), 2)
+            self.assertIn("storage://bars/0.csv", acquisition.artifact_refs)
+            self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "ready")
+
     def test_layer_eight_waits_for_complete_upstream_target_chain_and_approval(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

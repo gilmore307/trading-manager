@@ -8,7 +8,7 @@ import sys
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Literal, Mapping, TextIO
+from typing import Any, Iterable, Literal, Mapping, Sequence, TextIO
 
 from .model_training_workflow import ModelTrainingWorkflowPlan, WorkflowStage, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -228,7 +228,7 @@ def refresh_workflow_state(state: WorkflowState, *, plan: ModelTrainingWorkflowP
             if stage.approval_gate_required and approval_status != "approved":
                 status = "blocked"
                 reason = f"waiting for {stage.approval_gate_required}"
-            stage = replace(stage, status=status, last_reason=reason, updated_utc=now)
+            stage = replace(stage, status=status, last_reason=reason or stage.last_reason, updated_utc=now)
         else:
             stage = replace(stage, status="blocked", last_reason=reason, updated_utc=now)
         refreshed.append(stage)
@@ -248,6 +248,64 @@ def next_ready_or_blocked_stage(state: WorkflowState) -> StageProgress | None:
         ):
             return stage
     return None
+
+
+def _terminal_receipt_success(receipt: Mapping[str, Any]) -> bool:
+    runs = receipt.get("runs")
+    if isinstance(runs, list) and runs:
+        latest = [run for run in runs if isinstance(run, Mapping)]
+        if not latest:
+            return False
+        return str(latest[-1].get("status") or "").lower() in {"succeeded", "success", "completed", "complete", "ready"}
+    return str(receipt.get("status") or "").lower() in {"succeeded", "success", "completed", "complete", "ready"}
+
+
+def _task_key_count_for_stage(stage_id: str, *, storage_root: Path, start_month: str, end_month: str) -> int | None:
+    if start_month != end_month:
+        return None
+    if stage_id == "layer_01_market_regime.data_acquisition":
+        return len(list((storage_root / "monthly_backfill_v1" / "alpaca_bars").glob(f"*/{start_month}/task_key.json")))
+    return None
+
+
+def _expected_receipt_count(
+    stage_id: str,
+    *,
+    storage_root: Path,
+    start_month: str,
+    end_month: str,
+    explicit_counts: Mapping[str, int] | None = None,
+) -> int:
+    if explicit_counts and stage_id in explicit_counts:
+        return explicit_counts[stage_id]
+    discovered = _task_key_count_for_stage(stage_id, storage_root=storage_root, start_month=start_month, end_month=end_month)
+    if discovered:
+        return discovered
+    return 1
+
+
+def _attach_stage_evidence(
+    state: WorkflowState,
+    *,
+    stage_id: str,
+    receipt_refs: Iterable[str] = (),
+    artifact_refs: Iterable[str] = (),
+    reason: str | None = None,
+) -> WorkflowState:
+    now = utc_now_iso()
+    changed = []
+    found = False
+    for stage in state.stages:
+        if stage.stage_id != stage_id:
+            changed.append(stage)
+            continue
+        found = True
+        receipts = tuple(dict.fromkeys([*stage.receipt_refs, *[str(item) for item in receipt_refs]]))
+        artifacts = tuple(dict.fromkeys([*stage.artifact_refs, *[str(item) for item in artifact_refs]]))
+        changed.append(replace(stage, receipt_refs=receipts, artifact_refs=artifacts, last_reason=reason or stage.last_reason, updated_utc=now))
+    if not found:
+        raise ValueError(f"unknown workflow stage: {stage_id}")
+    return replace(state, stages=tuple(changed), updated_utc=now)
 
 
 def mark_stage_succeeded(
@@ -342,6 +400,15 @@ def ingest_completion_receipts(state: WorkflowState, receipt_paths: Iterable[Pat
         stage_id = _receipt_stage_id(receipt)
         if not stage_id:
             raise ValueError(f"receipt missing manager_stage_id/stage_id: {path}")
+        if not _terminal_receipt_success(receipt):
+            updated = _attach_stage_evidence(
+                updated,
+                stage_id=stage_id,
+                receipt_refs=[str(path)],
+                artifact_refs=_receipt_artifacts(receipt),
+                reason="component receipt observed but not successful",
+            )
+            continue
         updated = mark_stage_succeeded(
             updated,
             stage_id=stage_id,
@@ -352,6 +419,93 @@ def ingest_completion_receipts(state: WorkflowState, receipt_paths: Iterable[Pat
     return updated
 
 
+def parse_stage_receipt_arg(raw: str) -> tuple[str, Path]:
+    if "=" not in raw:
+        raise ValueError("stage receipt must use STAGE_ID=PATH")
+    stage_id, path = raw.split("=", 1)
+    if not stage_id.strip() or not path.strip():
+        raise ValueError("stage receipt must use STAGE_ID=PATH")
+    return stage_id.strip(), Path(path)
+
+
+def parse_expected_count_arg(raw: str) -> tuple[str, int]:
+    if "=" not in raw:
+        raise ValueError("expected count must use STAGE_ID=COUNT")
+    stage_id, count_text = raw.split("=", 1)
+    count = int(count_text)
+    if count <= 0:
+        raise ValueError("expected receipt count must be positive")
+    return stage_id.strip(), count
+
+
+def ingest_stage_receipts(
+    state: WorkflowState,
+    stage_receipts: Sequence[tuple[str, Path]],
+    *,
+    storage_root: Path,
+    start_month: str,
+    end_month: str,
+    expected_counts: Mapping[str, int] | None = None,
+) -> WorkflowState:
+    """Attach component receipts to explicit workflow stages.
+
+    Component-local receipts do not always include manager workflow stage ids.
+    This path lets manager bind those receipts without prematurely marking a
+    stage complete. A stage succeeds only when successful receipt coverage meets
+    the expected count for that stage.
+    """
+
+    updated = state
+    by_stage: dict[str, list[Path]] = {}
+    for stage_id, path in stage_receipts:
+        by_stage.setdefault(stage_id, []).append(path)
+    for stage_id, paths in by_stage.items():
+        successful_receipts = []
+        artifact_refs: list[str] = []
+        observed_receipts = []
+        failed_receipts = []
+        for path in paths:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(receipt, Mapping):
+                raise ValueError(f"receipt must be a JSON object: {path}")
+            observed_receipts.append(str(path))
+            artifact_refs.extend(_receipt_artifacts(receipt))
+            if _terminal_receipt_success(receipt):
+                successful_receipts.append(str(path))
+            else:
+                failed_receipts.append(str(path))
+        updated = _attach_stage_evidence(
+            updated,
+            stage_id=stage_id,
+            receipt_refs=observed_receipts,
+            artifact_refs=artifact_refs,
+            reason="component receipt evidence attached",
+        )
+        stage = _stage_map(updated)[stage_id]
+        expected = _expected_receipt_count(
+            stage_id,
+            storage_root=storage_root,
+            start_month=start_month,
+            end_month=end_month,
+            explicit_counts=expected_counts,
+        )
+        successful_total = len([ref for ref in stage.receipt_refs if ref not in failed_receipts])
+        if successful_total >= expected:
+            updated = mark_stage_succeeded(
+                updated,
+                stage_id=stage_id,
+                artifact_refs=stage.artifact_refs,
+                reason=f"stage completed from component receipt coverage {successful_total}/{expected}",
+            )
+        else:
+            updated = _attach_stage_evidence(
+                updated,
+                stage_id=stage_id,
+                reason=f"partial component receipt coverage {successful_total}/{expected}; waiting for remaining receipts",
+            )
+    return updated
+
+
 def advance_workflow_state(
     *,
     start_month: str = "2016-01",
@@ -359,6 +513,8 @@ def advance_workflow_state(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     state_path: Path = DEFAULT_WORKFLOW_STATE_PATH,
     receipt_paths: Iterable[Path] = (),
+    stage_receipts: Sequence[tuple[str, Path]] = (),
+    expected_receipt_counts: Mapping[str, int] | None = None,
     completed_stage_ids: Iterable[str] = (),
     approved_stage_refs: Iterable[str] = (),
     write: bool = False,
@@ -366,14 +522,22 @@ def advance_workflow_state(
     plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
     state = load_workflow_state(state_path, plan)
     state = ingest_completion_receipts(state, receipt_paths)
-    for stage_id in completed_stage_ids:
-        state = mark_stage_succeeded(state, stage_id=stage_id, reason="stage completed from manager operator evidence")
     for raw in approved_stage_refs:
         if "=" in raw:
             stage_id, approval_ref = raw.split("=", 1)
         else:
             stage_id, approval_ref = raw, "live_call_approval_v1"
         state = mark_stage_approved(state, stage_id=stage_id, approval_ref=approval_ref)
+    state = ingest_stage_receipts(
+        state,
+        stage_receipts,
+        storage_root=storage_root,
+        start_month=start_month,
+        end_month=end_month,
+        expected_counts=expected_receipt_counts,
+    )
+    for stage_id in completed_stage_ids:
+        state = mark_stage_succeeded(state, stage_id=stage_id, reason="stage completed from manager operator evidence")
     state = refresh_workflow_state(state, plan=plan)
     if write:
         write_workflow_state(state_path, state)
@@ -392,6 +556,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--state-path", type=Path, default=DEFAULT_WORKFLOW_STATE_PATH)
     parser.add_argument("--receipt", action="append", type=Path, default=[], help="Component receipt JSON with manager_stage_id/stage_id to ingest.")
+    parser.add_argument("--stage-receipt", action="append", default=[], help="Bind a component receipt to a stage without requiring embedded stage id: STAGE_ID=PATH.")
+    parser.add_argument("--expected-receipt-count", action="append", default=[], help="Override expected successful receipt count for a stage: STAGE_ID=COUNT.")
     parser.add_argument("--complete-stage", action="append", default=[], help="Mark a workflow stage succeeded from manager evidence.")
     parser.add_argument("--approve-stage", action="append", default=[], help="Mark stage approval as satisfied: stage_id=approval_ref.")
     parser.add_argument("--write", action="store_true", help="Persist the refreshed workflow state checkpoint.")
@@ -402,6 +568,8 @@ def main(argv: list[str] | None = None) -> int:
         storage_root=args.storage_root,
         state_path=args.state_path,
         receipt_paths=args.receipt,
+        stage_receipts=[parse_stage_receipt_arg(item) for item in args.stage_receipt],
+        expected_receipt_counts=dict(parse_expected_count_arg(item) for item in args.expected_receipt_count),
         completed_stage_ids=args.complete_stage,
         approved_stage_refs=args.approve_stage,
         write=args.write,
@@ -417,6 +585,7 @@ __all__ = [
     "advance_workflow_state",
     "initial_workflow_state",
     "ingest_completion_receipts",
+    "ingest_stage_receipts",
     "load_workflow_state",
     "mark_stage_approved",
     "mark_stage_succeeded",

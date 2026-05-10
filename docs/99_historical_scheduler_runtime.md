@@ -74,7 +74,7 @@ The workflow is intentionally not a synchronized all-layers-per-month loop:
 
 This preserves the finite-panel nature of Layers 1-2 while preventing the open Layer 3+ candidate space from exploding into unbounded parallel target/contract expansion.
 
-`advance_model_training_workflow.py` refreshes this state, ingests component receipts with `manager_stage_id` / `stage_id`, records reviewed approval references for gated stages, and selects the next ready or approval-blocked stage. Scheduler decisions include both the static graph and durable state so resident operation can resume after restarts.
+`advance_model_training_workflow.py` refreshes this state, ingests component receipts with `manager_stage_id` / `stage_id`, records reviewed approval references for gated stages, and selects the next ready or approval-blocked stage. For component-local receipts that do not embed a manager stage id, use `--stage-receipt STAGE_ID=PATH`; manager attaches receipt/artifact evidence but does not mark the stage complete until expected successful receipt coverage is met. Scheduler decisions include both the static graph and durable state so resident operation can resume after restarts.
 
 Current execution still preserves gates: when Layer 1 task keys exist, the next stage becomes `layer_01_market_regime.data_acquisition` with `approval_gate_required=live_call_approval_v1`. The daemon does not perform provider calls, model activation, or broker execution until the corresponding reviewed gate is implemented and satisfied.
 
