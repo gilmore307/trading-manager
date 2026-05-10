@@ -66,7 +66,7 @@ The component receipt payload may remain component/storage-owned JSON. Manager r
 - optional `artifact_ref_v1` rows for generic output refs listed by the receipt;
 - `ready_signal_v1` row when the output is ready, partial, blocked, or failed.
 
-Manager stores concise output references only. It does not copy large output lists, raw provider payloads, model vectors, logs, or broker payloads into SQL.
+Manager stores concise output references only. It does not copy large output lists, raw provider payloads, model vectors, logs, or broker payloads into SQL. When component receipts report local `storage/...` output paths, manager normalizes them to repo-scoped `storage://<repo>/...` URIs and infers simple output metadata such as CSV media type and row count from receipt `row_counts` when explicit artifact objects are absent.
 
 `trading-storage` provides `scripts/artifacts/store_completion_receipt_payload.py` for storage-owned receipt payload materialization. The emitted `artifact_ref_v1` metadata is what manager consumes through `record_completion_receipt.py`.
 

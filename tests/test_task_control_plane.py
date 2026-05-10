@@ -90,11 +90,42 @@ class TaskControlPlaneTests(unittest.TestCase):
         self.assertEqual(rows.run_manifests[0]["status"], "succeeded")
         self.assertEqual(rows.artifact_refs[0]["artifact_kind"], "component_completion_receipt")
         self.assertEqual(rows.artifact_refs[0]["row_count"], 10)
-        self.assertEqual(rows.artifact_refs[1]["artifact_kind"], "component_output")
+        self.assertEqual(rows.artifact_refs[1]["artifact_kind"], "equity_bar")
         self.assertEqual(rows.artifact_refs[1]["uri"], "storage://example/equity_bar.csv")
+        self.assertEqual(rows.artifact_refs[1]["row_count"], 10)
+        self.assertEqual(rows.artifact_refs[1]["media_type"], "text/csv")
         self.assertEqual(rows.ready_signals[0]["signal_kind"], "component_task_ready")
         self.assertEqual(rows.ready_signals[0]["status"], "ready")
         self.assertEqual(rows.ready_signals[0]["artifact_refs"], ["art_receipt_run_001", "art_output_run_001_001"])
+
+    def test_relative_storage_output_refs_are_canonicalized_to_repo_storage_uris(self):
+        receipt = {
+            "runs": [
+                {
+                    "run_id": "run_001",
+                    "status": "succeeded",
+                    "started_at": "2026-05-09T01:00:00Z",
+                    "completed_at": "2026-05-09T01:01:00Z",
+                    "outputs": ["storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/saved/equity_bar.csv"],
+                    "row_counts": {"equity_bar": 1000},
+                }
+            ]
+        }
+
+        rows = normalize_completion_receipt(
+            receipt,
+            request_id="mgrreq_spy",
+            component_id="01_feed_alpaca_bars",
+            component_kind="data_feed",
+            repo_id="trading-data",
+            receipt_uri="storage://trading-data/monthly_backfill_v1/alpaca_bars/SPY/2016-01/completion_receipt.json",
+        )
+
+        output = rows.artifact_refs[1]
+        self.assertEqual(output["uri"], "storage://trading-data/monthly_backfill_v1/alpaca_bars/SPY/2016-01/saved/equity_bar.csv")
+        self.assertEqual(output["artifact_kind"], "equity_bar")
+        self.assertEqual(output["row_count"], 1000)
+        self.assertEqual(output["media_type"], "text/csv")
 
     def test_failed_receipt_does_not_emit_ready_status(self):
         receipt = {

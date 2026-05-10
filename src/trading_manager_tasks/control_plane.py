@@ -166,33 +166,71 @@ def _output_refs(run: Mapping[str, Any]) -> list[Any]:
     return []
 
 
-def _output_uri(output: Any) -> str | None:
+def _canonical_storage_uri(value: str, *, repo_id: str) -> str:
+    text = value.strip()
+    if text.startswith("storage://"):
+        return text
+    if text.startswith("storage/"):
+        return f"storage://{repo_id}/{text.removeprefix('storage/')}"
+    return text
+
+
+def _output_uri(output: Any, *, repo_id: str) -> str | None:
     if isinstance(output, str):
-        return output
+        return _canonical_storage_uri(output, repo_id=repo_id)
     if isinstance(output, Mapping):
         for key in ("uri", "ref", "path"):
             value = output.get(key)
             if value:
-                return str(value)
+                return _canonical_storage_uri(str(value), repo_id=repo_id)
     return None
 
 
-def _output_artifact_row(run_id: str, index: int, output: Any, ready_status: str) -> dict[str, Any] | None:
-    uri = _output_uri(output)
+def _media_type_from_uri(uri: str) -> str | None:
+    suffix = Path(uri).suffix.lower()
+    return {
+        ".csv": "text/csv",
+        ".json": "application/json",
+        ".jsonl": "application/jsonl",
+        ".parquet": "application/vnd.apache.parquet",
+    }.get(suffix)
+
+
+def _row_count_for_output(run: Mapping[str, Any], output: Any, uri: str) -> Any:
+    if isinstance(output, Mapping) and output.get("row_count") is not None:
+        return output.get("row_count")
+    row_counts = run.get("row_counts")
+    if not isinstance(row_counts, Mapping) or not row_counts:
+        return None
+    name = Path(uri).stem
+    if name in row_counts:
+        return row_counts[name]
+    numeric_values = [value for value in row_counts.values() if isinstance(value, int)]
+    return numeric_values[0] if len(numeric_values) == 1 else None
+
+
+def _artifact_kind_for_output(output: Any, uri: str) -> str:
+    if isinstance(output, Mapping):
+        return str(output.get("artifact_kind") or output.get("kind") or Path(uri).stem or "component_output")
+    return Path(uri).stem or "component_output"
+
+
+def _output_artifact_row(run_id: str, index: int, output: Any, ready_status: str, *, run: Mapping[str, Any], repo_id: str) -> dict[str, Any] | None:
+    uri = _output_uri(output, repo_id=repo_id)
     if not uri:
         return None
     if isinstance(output, Mapping):
-        artifact_kind = str(output.get("artifact_kind") or output.get("kind") or "component_output")
+        artifact_kind = _artifact_kind_for_output(output, uri)
         content_hash = output.get("content_hash") or output.get("hash")
         schema_ref = str(output.get("schema_ref") or "component_output_ref_v1")
-        row_count = output.get("row_count")
-        media_type = output.get("media_type") or output.get("mime_type")
+        row_count = _row_count_for_output(run, output, uri)
+        media_type = output.get("media_type") or output.get("mime_type") or _media_type_from_uri(uri)
     else:
-        artifact_kind = "component_output"
+        artifact_kind = _artifact_kind_for_output(output, uri)
         content_hash = None
         schema_ref = "component_output_ref_v1"
-        row_count = None
-        media_type = None
+        row_count = _row_count_for_output(run, output, uri)
+        media_type = _media_type_from_uri(uri)
     return {
         "artifact_id": f"art_output_{run_id}_{index:03d}",
         "contract_type": "artifact_ref_v1",
@@ -338,7 +376,7 @@ def normalize_completion_receipt(
         )
         signal_artifact_refs = [artifact_id]
         for output_index, output in enumerate(_output_refs(run), start=1):
-            output_row = _output_artifact_row(run_id, output_index, output, ready_status)
+            output_row = _output_artifact_row(run_id, output_index, output, ready_status, run=run, repo_id=repo_id)
             if output_row is None:
                 continue
             artifacts.append(output_row)
