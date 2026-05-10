@@ -77,6 +77,52 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "ready")
             self.assertEqual(next_ready_or_blocked_stage(state).stage_id, "layer_01_market_regime.feature_generation")
 
+    def test_layer_eight_waits_for_complete_upstream_target_chain_and_approval(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state_path = tmp / "workflow_state.json"
+            completions = []
+            layer_slugs = {
+                1: "market_regime",
+                2: "sector_context",
+                3: "target_state_vector",
+                4: "event_overlay",
+                5: "alpha_confidence",
+                6: "position_projection",
+                7: "underlying_action",
+            }
+            for layer, key in layer_slugs.items():
+                prefix = f"layer_{layer:02d}_{key}"
+                completions.extend(
+                    [
+                        f"{prefix}.data_acquisition",
+                        f"{prefix}.feature_generation",
+                        f"{prefix}.model_generation",
+                        f"{prefix}.model_evaluation",
+                        f"{prefix}.promotion_review_preparation",
+                        f"{prefix}.maintenance",
+                    ]
+                )
+            state = advance_workflow_state(
+                storage_root=tmp,
+                state_path=state_path,
+                completed_stage_ids=completions,
+                write=False,
+            )
+            layer_eight_acquisition = {stage.stage_id: stage for stage in state.stages}["layer_08_option_expression.data_acquisition"]
+            self.assertEqual(layer_eight_acquisition.status, "blocked")
+            self.assertEqual(layer_eight_acquisition.last_reason, "waiting for live_call_approval_v1")
+
+            state = advance_workflow_state(
+                storage_root=tmp,
+                state_path=state_path,
+                completed_stage_ids=completions,
+                approved_stage_refs=["layer_08_option_expression.data_acquisition=approval://layer8"],
+                write=False,
+            )
+            layer_eight_acquisition = {stage.stage_id: stage for stage in state.stages}["layer_08_option_expression.data_acquisition"]
+            self.assertEqual(layer_eight_acquisition.status, "ready")
+
     def test_not_applicable_layers_can_progress_from_upstream_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

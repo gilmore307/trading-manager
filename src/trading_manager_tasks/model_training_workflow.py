@@ -52,6 +52,9 @@ class LayerWorkflow:
     layer_key: str
     model_name: str
     depends_on_layers: tuple[int, ...]
+    progression_mode: str
+    candidate_axis: str
+    candidate_progression_policy: str
     data_surface: str
     feature_command: list[str]
     model_generate_command: list[str]
@@ -66,6 +69,9 @@ class LayerWorkflow:
             "layer_key": self.layer_key,
             "model_name": self.model_name,
             "depends_on_layers": list(self.depends_on_layers),
+            "progression_mode": self.progression_mode,
+            "candidate_axis": self.candidate_axis,
+            "candidate_progression_policy": self.candidate_progression_policy,
             "data_surface": self.data_surface,
             "feature_command": self.feature_command,
             "model_generate_command": self.model_generate_command,
@@ -112,6 +118,9 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "slug": "market_regime",
         "model_name": "MarketRegimeModel",
         "depends_on_layers": (),
+        "progression_mode": "background_panel_continuous",
+        "candidate_axis": "month",
+        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each chronological month, then continue to the next month without waiting for downstream layers",
         "data_surface": "approval-gated Alpaca ETF bars acquisition plus feature_01_market_regime",
         "feature_cli": "trading-data-feature-01-market-regime",
     },
@@ -120,6 +129,9 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "slug": "sector_context",
         "model_name": "SectorContextModel",
         "depends_on_layers": (1,),
+        "progression_mode": "sector_panel_continuous",
+        "candidate_axis": "month;sector_or_industry_symbol",
+        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each chronological month once Layer 1 context exists, then continue forward without waiting for Layers 3-8",
         "data_surface": "feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
@@ -128,6 +140,9 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "slug": "target_state_vector",
         "model_name": "TargetStateVectorModel",
         "depends_on_layers": (1, 2),
+        "progression_mode": "target_major_serial_chain",
+        "candidate_axis": "month;target_candidate_id",
+        "candidate_progression_policy": "for each selected target candidate, complete Layers 3-7 in order before admitting the next target candidate unless a reviewed coverage exception is recorded",
         "data_surface": "target candidate/source_03 inputs plus feature_03_target_state_vector",
         "feature_cli": "trading-data-feature-03-target-state-vector",
     },
@@ -135,7 +150,10 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "layer": 4,
         "slug": "event_overlay",
         "model_name": "EventOverlayModel",
-        "depends_on_layers": (1, 2, 3),
+        "depends_on_layers": (3,),
+        "progression_mode": "target_major_serial_chain",
+        "candidate_axis": "month;target_candidate_id;event_context_id",
+        "candidate_progression_policy": "continue the active target candidate chain after Layer 3 target state is ready; do not fan out to unrelated targets mid-chain",
         "data_surface": "source_04_event_overlay plus feature_04_event_overlay",
         "feature_cli": "trading-data-feature-04-event-overlay",
     },
@@ -143,7 +161,10 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "layer": 5,
         "slug": "alpha_confidence",
         "model_name": "AlphaConfidenceModel",
-        "depends_on_layers": (1, 2, 3, 4),
+        "depends_on_layers": (4,),
+        "progression_mode": "target_major_serial_chain",
+        "candidate_axis": "month;target_candidate_id;event_context_id",
+        "candidate_progression_policy": "continue the active target candidate chain after Layer 4 event context is ready",
         "data_surface": "upstream state/event vectors plus labels; no dedicated trading-data source",
         "feature_cli": None,
     },
@@ -152,6 +173,9 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "slug": "position_projection",
         "model_name": "PositionProjectionModel",
         "depends_on_layers": (5,),
+        "progression_mode": "target_major_serial_chain",
+        "candidate_axis": "month;target_candidate_id;position_context_id",
+        "candidate_progression_policy": "continue the active target candidate chain after Layer 5 alpha confidence is ready",
         "data_surface": "alpha confidence plus position/risk/cost context; no dedicated trading-data source",
         "feature_cli": None,
     },
@@ -159,7 +183,10 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "layer": 7,
         "slug": "underlying_action",
         "model_name": "UnderlyingActionModel",
-        "depends_on_layers": (5, 6),
+        "depends_on_layers": (6,),
+        "progression_mode": "target_major_serial_chain",
+        "candidate_axis": "month;target_candidate_id;underlying_action_context_id",
+        "candidate_progression_policy": "finish the active target candidate chain through Layer 7 before admitting the next target candidate",
         "data_surface": "model/control-plane action context; no dedicated trading-data source",
         "feature_cli": None,
     },
@@ -167,7 +194,10 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "layer": 8,
         "slug": "option_expression",
         "model_name": "OptionExpressionModel",
-        "depends_on_layers": (7,),
+        "depends_on_layers": (1, 2, 3, 4, 5, 6, 7),
+        "progression_mode": "option_expression_after_target_chain_complete",
+        "candidate_axis": "month;target_candidate_id;option_contract_bucket",
+        "candidate_progression_policy": "admit option-expression contract/bucket expansion only after the upstream Layer 1-7 context/target chain is complete for the selected target",
         "data_surface": "approval-gated option-expression sources plus feature_08_option_expression",
         "feature_cli": "trading-data-feature-08-option-expression",
     },
@@ -252,7 +282,11 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
     if layer == 1:
         acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_layer_one_acquisition(layer_one_task_key_count)
     elif layer == 8:
-        acquisition_status, acquisition_blockers, acquisition_gate = "blocked", ("upstream_layer_07_complete", "live_call_approval_v1"), "live_call_approval_v1"
+        acquisition_status, acquisition_blockers, acquisition_gate = "blocked", (
+            "upstream_layers_01_07_complete",
+            "active_target_chain_complete",
+            "live_call_approval_v1",
+        ), "live_call_approval_v1"
     elif meta.get("feature_cli") is None:
         acquisition_status, acquisition_blockers, acquisition_gate = "not_applicable", (), None
     else:
@@ -359,6 +393,9 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
         layer_key=key,
         model_name=str(meta["model_name"]),
         depends_on_layers=tuple(meta["depends_on_layers"]),
+        progression_mode=str(meta["progression_mode"]),
+        candidate_axis=str(meta["candidate_axis"]),
+        candidate_progression_policy=str(meta["candidate_progression_policy"]),
         data_surface=str(meta["data_surface"]),
         feature_command=feature,
         model_generate_command=generate,

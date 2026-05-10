@@ -161,15 +161,23 @@ def _layer_stage_ids(state: WorkflowState, layer: int) -> list[str]:
     return [stage.stage_id for stage in state.stages if stage.layer == layer]
 
 
+def _layer_complete(layer_number: int, stages: Mapping[str, StageProgress]) -> bool:
+    layer_stages = [stage for stage in stages.values() if stage.layer == layer_number]
+    return bool(layer_stages) and all(stage.status in {"succeeded", "not_applicable"} for stage in layer_stages)
+
+
 def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     if blocker == "live_call_approval_v1":
         return False
     if blocker == "layer_01_task_key_preparation":
         return False
+    if blocker == "upstream_layers_01_07_complete":
+        return all(_layer_complete(layer_number, stages) for layer_number in range(1, 8))
+    if blocker == "active_target_chain_complete":
+        return _layer_complete(7, stages)
     if blocker.startswith("upstream_layer_") and blocker.endswith("_complete"):
         layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_complete"))
-        layer_stages = [stage for stage in stages.values() if stage.layer == layer_number]
-        return bool(layer_stages) and all(stage.status in {"succeeded", "not_applicable"} for stage in layer_stages)
+        return _layer_complete(layer_number, stages)
     if blocker.endswith("_complete"):
         stage_id = blocker.removesuffix("_complete")
         stage = stages.get(stage_id)

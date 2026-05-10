@@ -63,6 +63,17 @@ The historical scheduler runtime must provide:
 
 The daemon now carries a manager-owned `manager_model_training_workflow_plan_v1` for all eight model layers plus a durable `manager_model_training_workflow_state_v1` checkpoint. Each layer has explicit stages for data acquisition, feature/input preparation, model generation, model evaluation, promotion-review preparation, and maintenance. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
 
+The workflow is intentionally not a synchronized all-layers-per-month loop:
+
+| Segment | Progression policy |
+| --- | --- |
+| Layer 1 | Fixed market/cross-asset panel; continue chronological months independently after each month is complete. |
+| Layer 2 | Fixed sector/industry panel; continue chronological months once Layer 1 context exists, without waiting for downstream layers. |
+| Layers 3-7 | Target-major serial chain; for one selected target candidate, complete Layers 3 -> 4 -> 5 -> 6 -> 7 before admitting the next target candidate unless a reviewed coverage exception is recorded. |
+| Layer 8 | Option-expression expansion begins only after the upstream Layer 1-7 context/target chain is complete for the selected target. |
+
+This preserves the finite-panel nature of Layers 1-2 while preventing the open Layer 3+ candidate space from exploding into unbounded parallel target/contract expansion.
+
 `advance_model_training_workflow.py` refreshes this state, ingests component receipts with `manager_stage_id` / `stage_id`, records reviewed approval references for gated stages, and selects the next ready or approval-blocked stage. Scheduler decisions include both the static graph and durable state so resident operation can resume after restarts.
 
 Current execution still preserves gates: when Layer 1 task keys exist, the next stage becomes `layer_01_market_regime.data_acquisition` with `approval_gate_required=live_call_approval_v1`. The daemon does not perform provider calls, model activation, or broker execution until the corresponding reviewed gate is implemented and satisfied.

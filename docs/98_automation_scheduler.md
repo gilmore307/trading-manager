@@ -23,6 +23,8 @@ The scheduler should not sit idle when safe work exists. If provider calls are n
 
 Dataset expansion is manager-owned. The manager decides whether the next expansion should target train, calibration, validation, test, forward holdout, or shadow-monitoring evidence for the earliest blocked layer. Operators may provide evidence inputs, but should not have to manually choose the dataset role. See [`100_dataset_expansion.md`](100_dataset_expansion.md).
 
+Layer progression is segmented rather than synchronized across all models. Layers 1-2 are finite background panels and may keep moving forward by month after their own receipts are ready. Layers 3-7 are a target-major chain: complete one selected target candidate through Layer 7 before opening the next target candidate by default. Layer 8 waits for the upstream target chain before expanding option-expression contract buckets. This is the default scheduler posture unless a reviewed coverage/exception artifact says otherwise.
+
 ## Priority Order
 
 The scheduler must preserve this priority order:

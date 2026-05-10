@@ -33,6 +33,9 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
             self.assertIn(f"model_{layer.layer:02d}_", " ".join(layer.model_generate_command))
             self.assertIn(f"model_{layer.layer:02d}_", " ".join(layer.model_evaluate_command))
+            self.assertTrue(layer.progression_mode)
+            self.assertTrue(layer.candidate_axis)
+            self.assertTrue(layer.candidate_progression_policy)
 
     def test_layer_one_acquisition_waits_for_task_key_preparation_then_approval(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -53,6 +56,17 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertEqual(layer_one_acquisition.approval_gate_required, "live_call_approval_v1")
             self.assertIn("live_call_approval_v1", layer_one_acquisition.blockers)
             self.assertEqual(plan.next_stage, layer_one_acquisition)
+
+    def test_progression_modes_encode_background_panels_target_chain_and_option_gate(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        self.assertEqual(plan.layers[0].progression_mode, "background_panel_continuous")
+        self.assertEqual(plan.layers[1].progression_mode, "sector_panel_continuous")
+        self.assertTrue(all(plan.layers[index].progression_mode == "target_major_serial_chain" for index in range(2, 7)))
+        self.assertEqual(plan.layers[7].progression_mode, "option_expression_after_target_chain_complete")
+        self.assertEqual(plan.layers[7].depends_on_layers, (1, 2, 3, 4, 5, 6, 7))
+        self.assertIn("active_target_chain_complete", plan.layers[7].stages[0].blockers)
 
     def test_layers_without_dedicated_data_features_are_explicit_not_applicable(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

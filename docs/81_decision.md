@@ -2713,3 +2713,28 @@ Manager may expand historical datasets using broader point-in-time samples than 
 - Dataset expansion planning may include broad historical samples and live-route simulation as separate evidence views.
 - Layer 3 target data collection is not limited to the sectors that Layer 2 would select in live routing.
 - Broader historical sampling does not authorize live routing bypass, provider-call bypass, model activation, or broker execution.
+
+## D121 - Formal workflow progression is segmented by layer space
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. Layers 3-7 operate over an open target-candidate space, and Layer 8 expands into an even larger option-contract/expression space. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
+
+### Decision
+
+Use segmented workflow progression:
+
+- Layer 1 continues chronological month-by-month after its own month-level receipts are ready; it does not wait for downstream layers.
+- Layer 2 continues chronological month-by-month once Layer 1 context exists; it does not wait for Layers 3-8.
+- Layers 3-7 run target-major by default: select one target candidate and complete Layers 3 -> 4 -> 5 -> 6 -> 7 before admitting the next target candidate, unless a reviewed coverage exception is recorded.
+- Layer 8 starts option-expression contract/bucket expansion only after the selected target's upstream Layer 1-7 context/target chain is complete.
+
+### Consequences
+
+- Finite background panels can keep accumulating historical depth.
+- Open target and option spaces are controlled by serial candidate completion rather than unbounded fan-out.
+- Scheduler metadata must expose each layer's progression mode and candidate axis so future admission logic can enforce the policy.
+- This policy does not weaken provider-call, model-activation, or broker-execution gates.

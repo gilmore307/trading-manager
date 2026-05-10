@@ -59,14 +59,16 @@ When the historical sampling universe is broader than live routing, manager evid
 
 ## Decision discipline
 
-The manager walks layers in dependency order and expands the earliest layer with a blocking evidence gap.
+The manager walks layers in dependency order and expands the earliest layer with a blocking evidence gap, but the unit of expansion differs by layer segment.
 
-1. Do not expand downstream layer datasets before required upstream train/calibration/validation/test coverage exists.
-2. Fill train, then calibration, then validation, then test.
-3. Use `forward_holdout` only after the base split ladder exists and evidence gaps such as coverage, drift, split stability, stale holdout, regime coverage, or baseline instability remain.
-4. Use `shadow_monitoring` only for production-approved layers, and never as a substitute for offline promotion evidence.
-5. Every expansion plan must preserve point-in-time/no-future/no-downstream-leakage discipline.
-6. Dataset snapshots and splits remain frozen evidence; if expansion changes the sample universe, it creates a new snapshot/split lineage rather than silently rewriting reviewed evidence.
+1. Layers 1-2 are finite panel flows: continue chronological months after each layer's own month-level receipts are ready; do not wait for downstream Layers 3-8.
+2. Layers 3-7 are target-major serial flows: select one target candidate, complete Layers 3 -> 4 -> 5 -> 6 -> 7 for that target, then admit the next target candidate unless a reviewed coverage exception is recorded.
+3. Layer 8 is option-expression expansion and begins only after the selected target's upstream Layer 1-7 context/target chain is complete.
+4. Fill train, then calibration, then validation, then test.
+5. Use `forward_holdout` only after the base split ladder exists and evidence gaps such as coverage, drift, split stability, stale holdout, regime coverage, or baseline instability remain.
+6. Use `shadow_monitoring` only for production-approved layers, and never as a substitute for offline promotion evidence.
+7. Every expansion plan must preserve point-in-time/no-future/no-downstream-leakage discipline.
+8. Dataset snapshots and splits remain frozen evidence; if expansion changes the sample universe, it creates a new snapshot/split lineage rather than silently rewriting reviewed evidence.
 
 ## Evidence collection
 
