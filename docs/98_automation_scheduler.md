@@ -25,6 +25,8 @@ Dataset expansion is manager-owned. The manager decides whether the next expansi
 
 Layer progression is segmented rather than synchronized across all models. Layers 1-2 are finite background panels and may keep moving forward by month after their own receipts are ready. Layers 3-7 are a target-major chain: complete one selected target candidate through Layer 7 before opening the next target candidate by default. Layer 8 waits for the upstream target chain before expanding option-expression contract buckets. This is the default scheduler posture unless a reviewed coverage/exception artifact says otherwise.
 
+Layer 8 option buckets expand from near expirations to farther expirations: current listed week first, then next listed week, then the following listed week, continuing outward only when coverage policy requires it. For each selected target, the strike bucket is the listed-strike corridor from current underlying reference price to Layer 7 target price plus three listed strike levels below the corridor and three listed strike levels above it. Example: current `95`, target `100`, one-dollar listed strikes -> `92` through `103`. Historical model-construction buckets intentionally do not prefilter out illiquid, wide-spread, low-OI, high-IV, deep ITM/OTM, or otherwise extreme contracts; those observations are needed for robustness and should become features/labels/reason codes rather than acquisition-time exclusions. V1 expression coverage is single-leg only: long call, long put, or no-option expression.
+
 ## Priority Order
 
 The scheduler must preserve this priority order:

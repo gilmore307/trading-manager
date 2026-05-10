@@ -197,7 +197,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1, 2, 3, 4, 5, 6, 7),
         "progression_mode": "option_expression_after_target_chain_complete",
         "candidate_axis": "month;target_candidate_id;option_contract_bucket",
-        "candidate_progression_policy": "admit option-expression contract/bucket expansion only after the upstream Layer 1-7 context/target chain is complete for the selected target",
+        "candidate_progression_policy": "admit option-expression contract/bucket expansion only after the upstream Layer 1-7 context/target chain is complete for the selected target; expand expirations near-to-far by listed expiry week and include current-to-target strike corridor plus three listed strike levels on each side without prefiltering illiquid/extreme contracts for model-construction coverage; V1 expression candidates are single-leg only",
         "data_surface": "approval-gated option-expression sources plus feature_08_option_expression",
         "feature_cli": "trading-data-feature-08-option-expression",
     },

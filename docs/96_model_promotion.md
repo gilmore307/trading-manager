@@ -92,6 +92,20 @@ PYTHONPATH=src python3 scripts/tasks/build_review_decision.py \
 
 `trading-storage` owns bulky evidence payloads and retained review artifacts.
 
+## Promotion and storage lifecycle boundary
+
+Promotion scripts and review helpers may classify artifact retention intent, but they must not run file cleanup, compression, archive, SQL detach/drop, or deletion executors.
+
+Accepted boundary:
+
+```text
+promotion classifies artifacts
+manager schedules lifecycle
+storage executes lifecycle
+```
+
+Promotion outputs should mark promoted model bodies and required lineage as permanently retained, and may emit retention hints for regenerable intermediates. Any storage lifecycle work created by promotion must enter the manager task system as `storage_lifecycle_request_v1`, where it can be prioritized, scheduled, summarized, and observed. `trading-storage` remains the owner of protected-set checks, physical compression/archive/restore/delete actions, receipts, and tombstones.
+
 ## Registered Models
 
 This table is the manager-side promotion target map. It records review targets and expected output/handoff contracts; it does not activate any model.

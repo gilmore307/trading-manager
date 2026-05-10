@@ -66,6 +66,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertTrue(all(plan.layers[index].progression_mode == "target_major_serial_chain" for index in range(2, 7)))
         self.assertEqual(plan.layers[7].progression_mode, "option_expression_after_target_chain_complete")
         self.assertEqual(plan.layers[7].depends_on_layers, (1, 2, 3, 4, 5, 6, 7))
+        self.assertIn("near-to-far", plan.layers[7].candidate_progression_policy)
+        self.assertIn("three listed strike levels", plan.layers[7].candidate_progression_policy)
+        self.assertIn("without prefiltering", plan.layers[7].candidate_progression_policy)
+        self.assertIn("single-leg", plan.layers[7].candidate_progression_policy)
         self.assertIn("active_target_chain_complete", plan.layers[7].stages[0].blockers)
 
     def test_layers_without_dedicated_data_features_are_explicit_not_applicable(self):
