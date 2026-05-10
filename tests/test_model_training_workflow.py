@@ -57,6 +57,37 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertIn("live_call_approval_v1", layer_one_acquisition.blockers)
             self.assertEqual(plan.next_stage, layer_one_acquisition)
 
+    def test_layer_one_model_evaluation_reads_database_rows(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        command = plan.layers[0].model_evaluate_command
+
+        self.assertIn("evaluate_model_01_market_regime.py", " ".join(command))
+        self.assertIn("--from-database", command)
+        self.assertIn("--output-json", command)
+        self.assertTrue(any("evaluation_summary_${START_MONTH}.json" in item for item in command))
+
+    def test_layer_one_promotion_review_uses_evaluation_summary_artifact(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        command = plan.layers[0].promotion_review_command
+
+        self.assertIn("review_market_regime_promotion.py", " ".join(command))
+        self.assertIn("--evaluation-summary-json", command)
+        self.assertIn("--local-fallback-review", command)
+
+    def test_layer_one_feature_generation_materializes_feed_artifacts_first(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        command = plan.layers[0].feature_command
+
+        self.assertIn("data_feature.feature_01_market_regime.from_feed_artifacts", command)
+        self.assertIn("--month", command)
+        self.assertIn("${START_MONTH}", command)
+
     def test_progression_modes_encode_background_panels_target_chain_and_option_gate(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")

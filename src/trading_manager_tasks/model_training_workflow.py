@@ -222,15 +222,20 @@ REVIEW_SCRIPT_NAMES: dict[int, str] = {
 
 def model_script(layer: int, slug: str, verb: str) -> list[str]:
     script_name = REVIEW_SCRIPT_NAMES[layer] if verb == "review" else f"{verb}_model_{layer:02d}_{slug}.py"
-    return [
+    command = [
         "PYTHONPATH=/root/projects/trading-model/src",
         "python3",
         f"/root/projects/trading-model/scripts/models/model_{layer:02d}_{slug}/{script_name}",
     ]
+    if layer == 1 and verb == "evaluate":
+        command.extend(["--from-database", "--output-json", "/root/projects/trading-model/storage/runtime/model_01_market_regime/evaluation_summary_${START_MONTH}.json"])
+    if layer == 1 and verb == "review":
+        command.extend(["--evaluation-summary-json", "/root/projects/trading-model/storage/runtime/model_01_market_regime/evaluation_summary_${START_MONTH}.json", "--local-fallback-review"])
+    return command
 
 
 FEATURE_MODULES: dict[str, str] = {
-    "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime",
+    "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime.from_feed_artifacts",
     "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context",
     "trading-data-feature-03-target-state-vector": "data_feature.feature_03_target_state_vector",
     "trading-data-feature-04-event-overlay": "data_feature.feature_04_event_overlay",
@@ -241,7 +246,10 @@ FEATURE_MODULES: dict[str, str] = {
 def feature_command(feature_cli: str | None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
-    return ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
+    command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
+    if feature_cli == "trading-data-feature-01-market-regime":
+        command.extend(["--month", "${START_MONTH}"])
+    return command
 
 
 def maintenance_command(layer: int, slug: str) -> list[str]:

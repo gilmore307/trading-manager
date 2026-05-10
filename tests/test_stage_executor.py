@@ -6,7 +6,7 @@ from pathlib import Path
 
 from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.model_training_state import StageProgress
-from trading_manager_tasks.stage_executor import execute_stage_process
+from trading_manager_tasks.stage_executor import _cwd_for_stage, _resolve_command_placeholders, execute_stage_process
 
 
 class StageExecutorTests(unittest.TestCase):
@@ -37,6 +37,27 @@ class StageExecutorTests(unittest.TestCase):
             self.assertFalse(summary.broker_execution_performed)
             self.assertTrue(Path(summary.receipt_path or "").exists())
             self.assertIn("offline ok", Path(summary.stdout_path or "").read_text(encoding="utf-8"))
+
+
+    def test_resolves_runtime_month_placeholders_before_execution(self):
+        command = _resolve_command_placeholders(["runner", "--month", "${START_MONTH}", "--path", "summary_${END_MONTH}.json"], start_month="2016-01", end_month="2016-02")
+
+        self.assertEqual(command, ["runner", "--month", "2016-01", "--path", "summary_2016-02.json"])
+
+    def test_manager_task_scripts_run_from_manager_root_even_with_trading_model_refs(self):
+        stage = StageProgress(
+            stage_id="layer_01_market_regime.maintenance",
+            layer=1,
+            layer_key="layer_01_market_regime",
+            stage_type="maintenance",
+            status="ready",
+            command=["PYTHONPATH=src", "python3", "scripts/tasks/plan_model_promotion_review.py", "--candidate-ref", "storage://trading-model/example.json"],
+            blockers=(),
+        )
+
+        cwd = _cwd_for_stage(stage, manager_root=Path("/manager"), trading_data_root=Path("/data"), trading_model_root=Path("/model"))
+
+        self.assertEqual(cwd, Path("/manager"))
 
     def test_refuses_approval_gated_stage(self):
         stage = StageProgress(

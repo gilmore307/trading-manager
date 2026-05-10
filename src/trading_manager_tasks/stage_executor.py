@@ -7,7 +7,7 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping, TextIO
@@ -58,6 +58,17 @@ class StageExecutionSummary:
         return asdict(self)
 
 
+def _resolve_command_placeholders(command: list[str], *, start_month: str, end_month: str) -> list[str]:
+    replacements = {"${START_MONTH}": start_month, "${END_MONTH}": end_month}
+    resolved = []
+    for token in command:
+        text = token
+        for placeholder, value in replacements.items():
+            text = text.replace(placeholder, value)
+        resolved.append(text)
+    return resolved
+
+
 def _split_env(command: list[str]) -> tuple[dict[str, str], list[str]]:
     env: dict[str, str] = {}
     argv: list[str] = []
@@ -73,6 +84,9 @@ def _split_env(command: list[str]) -> tuple[dict[str, str], list[str]]:
 
 def _cwd_for_stage(stage: StageProgress, *, manager_root: Path, trading_data_root: Path, trading_model_root: Path) -> Path:
     command_text = " ".join(stage.command)
+    argv = _split_env(stage.command)[1]
+    if len(argv) >= 2 and argv[1].startswith("scripts/tasks/"):
+        return manager_root
     if "trading-data" in command_text or stage.stage_type == "feature_generation":
         return trading_data_root
     if "trading-model" in command_text or stage.stage_type in {"model_generation", "model_evaluation", "promotion_review_preparation"}:
@@ -205,6 +219,7 @@ def execute_next_ready_stage(
         raise TaskSystemError("no ready or approval-blocked workflow stage")
     if stage.status != "ready":
         raise TaskSystemError(f"next stage is not executable without approval: {stage.stage_id}")
+    stage = replace(stage, command=_resolve_command_placeholders(stage.command, start_month=start_month, end_month=end_month))
     summary = execute_stage_process(
         stage,
         manager_root=manager_root,
@@ -265,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "SAFE_OFFLINE_STAGE_TYPES",
     "StageExecutionSummary",
+    "_resolve_command_placeholders",
     "execute_next_ready_stage",
     "execute_stage_process",
     "write_stage_execution_summary",

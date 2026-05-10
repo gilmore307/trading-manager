@@ -192,6 +192,16 @@ def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     return False
 
 
+def _ready_last_reason(stage: StageProgress) -> str | None:
+    """Keep evidence reasons on ready stages while clearing stale blocker text."""
+
+    if not stage.last_reason:
+        return None
+    if stage.last_reason.startswith("waiting for ") or stage.last_reason == "approval gate satisfied":
+        return None
+    return stage.last_reason
+
+
 def _blocker_reason(stage: StageProgress, stages: Mapping[str, StageProgress]) -> str | None:
     missing = []
     for blocker in stage.blockers:
@@ -228,7 +238,7 @@ def refresh_workflow_state(state: WorkflowState, *, plan: ModelTrainingWorkflowP
             if stage.approval_gate_required and approval_status != "approved":
                 status = "blocked"
                 reason = f"waiting for {stage.approval_gate_required}"
-            stage = replace(stage, status=status, last_reason=reason or stage.last_reason, updated_utc=now)
+            stage = replace(stage, status=status, last_reason=reason if status == "blocked" else _ready_last_reason(stage), updated_utc=now)
         else:
             stage = replace(stage, status="blocked", last_reason=reason, updated_utc=now)
         refreshed.append(stage)

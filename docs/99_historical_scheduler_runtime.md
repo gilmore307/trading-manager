@@ -82,4 +82,6 @@ Current execution still preserves gates: when Layer 1 task keys exist, the next 
 
 `execute_model_training_stage.py` handles the other side of the loop: it executes one ready safe offline stage, writes stdout/stderr logs and a `component_completion_receipt_v1`, updates workflow state when requested, and refuses approval-gated provider stages. The scheduler/daemon expose `--execute-safe-offline-stages` to admit at most one such stage per tick after market/resource gates pass.
 
+For `layer_01_market_regime.feature_generation`, the safe offline command first materializes already-acquired `01_feed_alpaca_bars` `equity_bar.csv` artifacts into `trading_data.source_01_market_regime`, then generates `trading_data.feature_01_market_regime`. This stage is allowed to write deterministic SQL source/feature rows, but it must keep `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`. Known accepted no-data symbols stay represented by failure-register rows rather than fabricated bars.
+
 The remaining implementation boundary is broader component execution coverage for non-Layer-1 source acquisitions and richer artifact discovery from each component command.
