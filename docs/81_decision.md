@@ -2738,3 +2738,24 @@ Use segmented workflow progression:
 - Open target and option spaces are controlled by serial candidate completion rather than unbounded fan-out.
 - Scheduler metadata must expose each layer's progression mode and candidate axis so future admission logic can enforce the policy.
 - This policy does not weaken provider-call, model-activation, or broker-execution gates.
+
+## D122 - 2016-01 controlled information pass before widening defaults
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+The remaining scheduler defaults need measured evidence rather than guesswork. Provider dispatch coverage, concurrency defaults, L3-L7 target queue ordering, dataset thresholds, artifact discovery, and storage lifecycle implementation all depend on real 2016-01 request/receipt/artifact behavior.
+
+### Decision
+
+Add `manager_controlled_information_pass_v1` and `scripts/tasks/plan_controlled_information_pass.py` as the safe first-month information-gathering report for formal historical operation from `2016-01`.
+
+The pass may write a report and safe preparation artifacts, including Layer 1 task-key payloads and plan-only approval validation. It must not call providers, activate models, mutate broker/execution state, or execute storage cleanup/compression/archive/delete/restore. It names the evidence required to close six open areas: provider dispatch expansion, concurrency defaults, L3-L7 target queue rules, dataset thresholds, artifact discovery, and storage lifecycle implementation.
+
+### Consequences
+
+- The next phase is evidence collection, not broad default hardening.
+- Provider calls remain outside the information-pass boundary and still require validated `live_call_approval_v1` plus explicit provider-dispatch execution.
+- Storage lifecycle remains dry-run/protected-set-first until artifact index and restore/protection evidence exists.

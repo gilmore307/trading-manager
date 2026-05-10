@@ -22,6 +22,12 @@
   - upstream dependency ordering before downstream layer expansion;
   - safe Layer 1 task-key preparation with zero provider calls, model activation, or broker execution.
 
+- `test_information_pass.py` verifies:
+  - `manager_controlled_information_pass_v1` report construction;
+  - safe 2016-01 information-pass writes with zero provider calls, model activation, broker execution, or storage lifecycle mutation;
+  - optional `live_call_approval_v1` plan-only validation without dispatch;
+  - non-stressful host resource snapshot collection.
+
 - `test_model_training_workflow.py` verifies:
   - full Layer 1-8 manager workflow graph coverage;
   - per-layer data acquisition, feature, model generation, evaluation, promotion-review, and maintenance stages;
