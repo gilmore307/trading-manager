@@ -53,7 +53,7 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.ready_count, 3)
         self.assertEqual(report.pending_count, 19)
         self.assertFalse(report.can_unlock_downstream)
-        self.assertIn("3/22", report.reason)
+        self.assertIn("3 ready", report.reason)
 
     def test_full_coverage_can_unlock_downstream(self):
         rows = [_summary_row(f"SYM{index:02d}", ready=True) for index in range(22)]
@@ -85,6 +85,27 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.ready_count, 1)
         self.assertEqual(report.failed_count, 1)
         self.assertFalse(report.can_unlock_downstream)
+
+    def test_reviewed_failed_requests_preserve_failed_count_but_allow_unlock(self):
+        rows = [_summary_row("SPY", ready=True), _summary_row("BITW", failed=True)]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="layer_01_market_regime.data_acquisition",
+            start_month="2016-01",
+            end_month="2016-01",
+            expected_count=2,
+            accepted_failure_request_ids=["mgrreq_backfill_alpaca_bars_bitw_2016_01"],
+            accepted_failure_refs=["review://not-yet-listed"],
+        )
+
+        self.assertEqual(report.status, "ready")
+        self.assertEqual(report.ready_count, 1)
+        self.assertEqual(report.failed_count, 1)
+        self.assertEqual(report.accepted_failed_count, 1)
+        self.assertEqual(report.accepted_failed_request_ids, ("mgrreq_backfill_alpaca_bars_bitw_2016_01",))
+        self.assertTrue(report.can_unlock_downstream)
+        self.assertIn("1 ready + 1 reviewed failed / 2", report.reason)
 
     def test_partial_coverage_report_does_not_complete_workflow_stage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -133,6 +154,57 @@ class StageCoverageTests(unittest.TestCase):
             self.assertEqual(stages["layer_01_market_regime.data_acquisition"].status, "ready")
             self.assertIn("3/22", stages["layer_01_market_regime.data_acquisition"].last_reason or "")
             self.assertEqual(stages["layer_01_market_regime.feature_generation"].status, "blocked")
+
+    def test_accepted_failure_coverage_report_completes_stage_and_unlocks_feature_generation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage = tmp / "storage"
+            for index in range(22):
+                task_key = storage / "monthly_backfill_v1" / "alpaca_bars" / f"SYM{index:02d}" / "2016-01" / "task_key.json"
+                task_key.parent.mkdir(parents=True)
+                task_key.write_text("{}\n", encoding="utf-8")
+            report_path = tmp / "coverage.json"
+            report_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_stage_coverage_v1",
+                        "stage_id": "layer_01_market_regime.data_acquisition",
+                        "start_month": "2016-01",
+                        "end_month": "2016-01",
+                        "expected_count": 22,
+                        "observed_count": 22,
+                        "ready_count": 18,
+                        "failed_count": 4,
+                        "accepted_failed_count": 4,
+                        "pending_count": 0,
+                        "status": "ready",
+                        "can_unlock_downstream": True,
+                        "ready_request_ids": [],
+                        "failed_request_ids": ["mgrreq_backfill_alpaca_bars_bitw_2016_01"],
+                        "accepted_failed_request_ids": ["mgrreq_backfill_alpaca_bars_bitw_2016_01"],
+                        "pending_request_ids": [],
+                        "accepted_failure_refs": ["review://not-yet-listed"],
+                        "reason": "stage coverage accepted 18 ready + 4 reviewed failed / 22; downstream may unlock",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage,
+                state_path=tmp / "workflow_state.json",
+                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                stage_coverage_reports=[report_path],
+                write=False,
+            )
+
+            stages = {stage.stage_id: stage for stage in state.stages}
+            self.assertEqual(stages["layer_01_market_regime.data_acquisition"].status, "succeeded")
+            self.assertIn("reviewed failed", stages["layer_01_market_regime.data_acquisition"].last_reason or "")
+            self.assertEqual(stages["layer_01_market_regime.feature_generation"].status, "ready")
 
     def test_complete_coverage_report_completes_stage_and_unlocks_feature_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

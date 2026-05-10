@@ -34,11 +34,14 @@ class StageCoverageReport:
     ready_count: int
     failed_count: int
     pending_count: int
+    accepted_failed_count: int
     status: StageCoverageStatus
     can_unlock_downstream: bool
     ready_request_ids: tuple[str, ...]
     failed_request_ids: tuple[str, ...]
+    accepted_failed_request_ids: tuple[str, ...]
     pending_request_ids: tuple[str, ...]
+    accepted_failure_refs: tuple[str, ...]
     reason: str
     provider_calls: int = 0
     model_activation_performed: bool = False
@@ -49,7 +52,9 @@ class StageCoverageReport:
         row = asdict(self)
         row["ready_request_ids"] = list(self.ready_request_ids)
         row["failed_request_ids"] = list(self.failed_request_ids)
+        row["accepted_failed_request_ids"] = list(self.accepted_failed_request_ids)
         row["pending_request_ids"] = list(self.pending_request_ids)
+        row["accepted_failure_refs"] = list(self.accepted_failure_refs)
         return row
 
 
@@ -94,6 +99,8 @@ def summarize_stage_coverage_from_rows(
     start_month: str,
     end_month: str,
     expected_count: int | None = None,
+    accepted_failure_request_ids: Sequence[str] = (),
+    accepted_failure_refs: Sequence[str] = (),
 ) -> StageCoverageReport:
     """Summarize stage readiness from task-summary-like rows."""
 
@@ -109,15 +116,29 @@ def summarize_stage_coverage_from_rows(
     ready = [str(row["request_id"]) for row in matched if _is_ready(row)]
     failed = [str(row["request_id"]) for row in matched if _is_failed(row)]
     pending = [str(row["request_id"]) for row in matched if not _is_ready(row) and not _is_failed(row)]
-    if failed:
+    accepted_failure_set = {str(request_id) for request_id in accepted_failure_request_ids}
+    failed_set = set(failed)
+    unknown_accepted = sorted(accepted_failure_set - failed_set)
+    if unknown_accepted:
+        raise TaskSystemError("accepted failure request ids are not failed matched requests: " + ",".join(unknown_accepted))
+    accepted_failed = [request_id for request_id in failed if request_id in accepted_failure_set]
+    unaccepted_failed = [request_id for request_id in failed if request_id not in accepted_failure_set]
+    terminal_covered = len(ready) + len(accepted_failed)
+    if unaccepted_failed:
         status: StageCoverageStatus = "failed"
-        reason = f"{len(failed)}/{expected_count} requests failed; downstream remains blocked"
-    elif len(ready) >= expected_count:
+        reason = f"{len(unaccepted_failed)}/{expected_count} requests failed without accepted review; downstream remains blocked"
+    elif terminal_covered >= expected_count:
         status = "ready"
-        reason = f"stage coverage complete {len(ready)}/{expected_count}; downstream may unlock"
+        if accepted_failed:
+            reason = (
+                f"stage coverage accepted {len(ready)} ready + {len(accepted_failed)} reviewed failed / {expected_count}; "
+                "downstream may unlock"
+            )
+        else:
+            reason = f"stage coverage complete {len(ready)}/{expected_count}; downstream may unlock"
     elif ready:
         status = "partial_ready"
-        reason = f"stage coverage partial {len(ready)}/{expected_count}; downstream remains blocked"
+        reason = f"stage coverage partial {len(ready)} ready + {len(accepted_failed)} reviewed failed / {expected_count}; downstream remains blocked"
     else:
         status = "blocked"
         reason = f"stage coverage not ready 0/{expected_count}; downstream remains blocked"
@@ -131,12 +152,15 @@ def summarize_stage_coverage_from_rows(
         observed_count=len(matched),
         ready_count=len(ready),
         failed_count=len(failed),
-        pending_count=max(expected_count - len(ready) - len(failed), len(pending)),
+        pending_count=max(expected_count - terminal_covered - len(unaccepted_failed), len(pending)),
+        accepted_failed_count=len(accepted_failed),
         status=status,
         can_unlock_downstream=status == "ready",
         ready_request_ids=tuple(ready),
         failed_request_ids=tuple(failed),
+        accepted_failed_request_ids=tuple(accepted_failed),
         pending_request_ids=tuple(pending),
+        accepted_failure_refs=tuple(str(ref) for ref in accepted_failure_refs),
         reason=reason,
     )
 
@@ -148,6 +172,8 @@ def collect_stage_coverage(
     end_month: str = "2016-01",
     expected_count: int | None = None,
     database_url: str | None = None,
+    accepted_failure_request_ids: Sequence[str] = (),
+    accepted_failure_refs: Sequence[str] = (),
 ) -> StageCoverageReport:
     rows = fetch_task_summary(database_url=database_url)
     return summarize_stage_coverage_from_rows(
@@ -156,6 +182,8 @@ def collect_stage_coverage(
         start_month=start_month,
         end_month=end_month,
         expected_count=expected_count,
+        accepted_failure_request_ids=accepted_failure_request_ids,
+        accepted_failure_refs=accepted_failure_refs,
     )
 
 
@@ -171,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--expected-count", type=int)
     parser.add_argument("--database-url")
+    parser.add_argument("--accepted-failure-request-id", action="append", default=[], help="Failed request id accepted by reviewed evidence; preserves failed_count but may satisfy terminal coverage.")
+    parser.add_argument("--accepted-failure-ref", action="append", default=[], help="Review/agent/operator evidence reference for accepted failed requests.")
     parser.add_argument("--output-path", type=Path, default=DEFAULT_STAGE_COVERAGE_PATH)
     parser.add_argument("--write", action="store_true", help="Write the stage coverage report artifact. Does not mutate workflow state.")
     args = parser.parse_args(argv)
@@ -181,6 +211,8 @@ def main(argv: list[str] | None = None) -> int:
         end_month=args.end_month,
         expected_count=args.expected_count,
         database_url=args.database_url,
+        accepted_failure_request_ids=args.accepted_failure_request_id,
+        accepted_failure_refs=args.accepted_failure_ref,
     )
     if args.write:
         args.output_path.parent.mkdir(parents=True, exist_ok=True)
