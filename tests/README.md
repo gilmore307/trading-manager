@@ -43,7 +43,8 @@
 - `test_provider_dispatch.py` verifies:
   - Layer 1 provider-dispatch approval validation;
   - default plan-only behavior with zero provider calls;
-  - concrete trading-data command planning after `live_call_approval_v1` validation.
+  - concrete trading-data command planning after `live_call_approval_v1` validation;
+  - optional per-request failure continuation for approved batches.
 
 - `test_stage_coverage.py` verifies:
   - `manager_stage_coverage_v1` classification from `task_summary` rows;

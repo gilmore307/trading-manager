@@ -34,6 +34,7 @@ class ProviderDispatchItem:
     receipt_path: str
     status: str
     return_code: int | None = None
+    error_summary: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -158,6 +159,7 @@ def dispatch_layer_one_provider_acquisition(
     request_ids: Sequence[str] = (),
     limit: int | None = None,
     execute_approved_provider_calls: bool = False,
+    continue_on_error: bool = False,
 ) -> ProviderDispatchSummary:
     """Validate approval and optionally dispatch Layer 1 Alpaca bars acquisition."""
 
@@ -202,6 +204,7 @@ def dispatch_layer_one_provider_acquisition(
         receipt_path = str((trading_data_root / relative_receipt_path).resolve()) if execute_approved_provider_calls else str(relative_receipt_path)
         status = "validated_not_dispatched"
         return_code = None
+        error_tail = None
         if execute_approved_provider_calls:
             result = subprocess.run(
                 command,
@@ -214,8 +217,8 @@ def dispatch_layer_one_provider_acquisition(
             return_code = result.returncode
             status = "dispatched_succeeded" if result.returncode == 0 else "dispatched_failed"
             dispatch_count += 1
-            if result.returncode != 0:
-                error_tail = "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part)
+            error_tail = "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part) if result.returncode != 0 else None
+            if result.returncode != 0 and not continue_on_error:
                 raise TaskSystemError(f"provider dispatch failed for {request['request_id']}: {error_tail}")
         items.append(
             ProviderDispatchItem(
@@ -226,6 +229,7 @@ def dispatch_layer_one_provider_acquisition(
                 receipt_path=receipt_path,
                 status=status,
                 return_code=return_code,
+                error_summary=error_tail,
             )
         )
     return ProviderDispatchSummary(
@@ -263,6 +267,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Actually run approved trading-data provider commands. Omit for validation/plan-only mode.",
     )
+    parser.add_argument(
+        "--continue-on-error",
+        action="store_true",
+        help="Continue the approved batch after an individual provider command fails, preserving per-request failure receipts for control-plane ingestion.",
+    )
     args = parser.parse_args(argv)
     summary = dispatch_layer_one_provider_acquisition(
         start_month=args.start_month,
@@ -274,6 +283,7 @@ def main(argv: list[str] | None = None) -> int:
         request_ids=args.request_id,
         limit=args.limit,
         execute_approved_provider_calls=args.execute_approved_provider_calls,
+        continue_on_error=args.continue_on_error,
     )
     write_dispatch_summary(summary, output=sys.stdout)
     return 0

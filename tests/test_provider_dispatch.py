@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from trading_manager_tasks.historical_training import prepare_layer_one_historical_training_batch
 from trading_manager_tasks.provider_dispatch import dispatch_layer_one_provider_acquisition
@@ -155,6 +157,59 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(dispatch.request_count, 2)
         self.assertEqual(dispatch.validation_count, 2)
         self.assertEqual(len(dispatch.items), 2)
+
+    def test_execute_dispatch_can_continue_after_individual_failure(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            summary, requests, _payloads, _validations = prepare_layer_one_historical_training_batch(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                write=True,
+                validate_handoff=False,
+            )
+            approval = tmp / "approval.json"
+            approval.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "live_call_approval_v1",
+                        "approval_id": "approval_layer1_continue_test",
+                        "decision_status": "approved",
+                        "approved_by": "unit-test",
+                        "approved_at_utc": datetime.now(UTC).isoformat(),
+                        "expires_at_utc": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+                        "request_ids": [request["request_id"] for request in requests],
+                        "approval_scope": "provider_data_acquisition_only",
+                        "broker_execution_allowed": False,
+                        "allowed_providers": ["alpaca"],
+                        "max_requests": summary.request_count,
+                        "max_window_days": 31,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "trading_manager_tasks.provider_dispatch.subprocess.run",
+                return_value=SimpleNamespace(returncode=1, stdout="", stderr="component failed"),
+            ):
+                dispatch = dispatch_layer_one_provider_acquisition(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp,
+                    approval_path=approval,
+                    trading_data_root=tmp,
+                    symbols=("SPY",),
+                    execute_approved_provider_calls=True,
+                    continue_on_error=True,
+                )
+
+        self.assertEqual(dispatch.dispatch_count, 1)
+        self.assertEqual(dispatch.provider_calls, 1)
+        self.assertEqual(dispatch.items[0].status, "dispatched_failed")
+        self.assertEqual(dispatch.items[0].return_code, 1)
+        self.assertIn("component failed", dispatch.items[0].error_summary or "")
 
     def test_layer_one_dispatch_reports_absolute_source_task_key_paths(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
