@@ -234,6 +234,22 @@ PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_rec
 
 By default these scripts print normalized rows and do not mutate SQL. `--write` persists to the manager control-plane tables.
 
+After an approved provider batch has produced component receipts, reconcile the stage in one safe offline pass:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/reconcile_provider_stage.py \
+  --stage-id layer_02_sector_context.data_acquisition \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --write-control-plane \
+  --write-coverage-report \
+  --coverage-report-path storage/runtime/stage_coverage/layer_02_sector_context_data_acquisition_2016-01.json \
+  --advance-workflow \
+  --write-workflow-state
+```
+
+`reconcile_provider_stage.py` discovers existing completion receipts, normalizes `run_manifest_v1` / `artifact_ref_v1` / `ready_signal_v1` rows, refreshes `manager_stage_coverage_v1`, and can ingest that written coverage report into workflow state. It never dispatches components, calls providers, activates models, mutates broker state, or executes storage lifecycle actions.
+
 Check stage-level coverage before advancing downstream workflow stages:
 
 ```bash
