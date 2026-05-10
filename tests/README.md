@@ -45,6 +45,12 @@
   - default plan-only behavior with zero provider calls;
   - concrete trading-data command planning after `live_call_approval_v1` validation.
 
+- `test_stage_coverage.py` verifies:
+  - `manager_stage_coverage_v1` classification from `task_summary` rows;
+  - partial coverage such as `3/22` remaining blocked from downstream unlock;
+  - full expected coverage allowing workflow stage completion;
+  - failed coverage preventing downstream unlock.
+
 - `test_stage_executor.py` verifies:
   - ready safe offline stage execution;
   - receipt/log creation;

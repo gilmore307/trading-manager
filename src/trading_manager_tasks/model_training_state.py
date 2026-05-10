@@ -506,6 +506,36 @@ def ingest_stage_receipts(
     return updated
 
 
+def ingest_stage_coverage_reports(state: WorkflowState, coverage_report_paths: Iterable[Path]) -> WorkflowState:
+    """Apply manager_stage_coverage_v1 reports without bypassing coverage.
+
+    A coverage report can attach SQL-derived control-plane evidence to a stage.
+    It may mark the stage succeeded only when the report explicitly says the
+    full stage is ready and downstream unlock is allowed.
+    """
+
+    updated = state
+    for path in coverage_report_paths:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(report, Mapping):
+            raise ValueError(f"stage coverage report must be a JSON object: {path}")
+        if report.get("contract_type") != "manager_stage_coverage_v1":
+            raise ValueError(f"stage coverage report has unsupported contract_type: {path}")
+        stage_id = str(report.get("stage_id") or "")
+        if not stage_id:
+            raise ValueError(f"stage coverage report missing stage_id: {path}")
+        reason = str(report.get("reason") or "stage coverage evidence attached")
+        updated = _attach_stage_evidence(updated, stage_id=stage_id, receipt_refs=[str(path)], reason=reason)
+        if report.get("status") == "ready" and report.get("can_unlock_downstream") is True:
+            updated = mark_stage_succeeded(
+                updated,
+                stage_id=stage_id,
+                receipt_ref=str(path),
+                reason=reason,
+            )
+    return updated
+
+
 def advance_workflow_state(
     *,
     start_month: str = "2016-01",
@@ -514,6 +544,7 @@ def advance_workflow_state(
     state_path: Path = DEFAULT_WORKFLOW_STATE_PATH,
     receipt_paths: Iterable[Path] = (),
     stage_receipts: Sequence[tuple[str, Path]] = (),
+    stage_coverage_reports: Iterable[Path] = (),
     expected_receipt_counts: Mapping[str, int] | None = None,
     completed_stage_ids: Iterable[str] = (),
     approved_stage_refs: Iterable[str] = (),
@@ -536,6 +567,7 @@ def advance_workflow_state(
         end_month=end_month,
         expected_counts=expected_receipt_counts,
     )
+    state = ingest_stage_coverage_reports(state, stage_coverage_reports)
     for stage_id in completed_stage_ids:
         state = mark_stage_succeeded(state, stage_id=stage_id, reason="stage completed from manager operator evidence")
     state = refresh_workflow_state(state, plan=plan)
@@ -558,6 +590,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--receipt", action="append", type=Path, default=[], help="Component receipt JSON with manager_stage_id/stage_id to ingest.")
     parser.add_argument("--stage-receipt", action="append", default=[], help="Bind a component receipt to a stage without requiring embedded stage id: STAGE_ID=PATH.")
     parser.add_argument("--expected-receipt-count", action="append", default=[], help="Override expected successful receipt count for a stage: STAGE_ID=COUNT.")
+    parser.add_argument("--stage-coverage-report", action="append", type=Path, default=[], help="Ingest manager_stage_coverage_v1 report; only ready/full coverage may complete a stage.")
     parser.add_argument("--complete-stage", action="append", default=[], help="Mark a workflow stage succeeded from manager evidence.")
     parser.add_argument("--approve-stage", action="append", default=[], help="Mark stage approval as satisfied: stage_id=approval_ref.")
     parser.add_argument("--write", action="store_true", help="Persist the refreshed workflow state checkpoint.")
@@ -569,6 +602,7 @@ def main(argv: list[str] | None = None) -> int:
         state_path=args.state_path,
         receipt_paths=args.receipt,
         stage_receipts=[parse_stage_receipt_arg(item) for item in args.stage_receipt],
+        stage_coverage_reports=args.stage_coverage_report,
         expected_receipt_counts=dict(parse_expected_count_arg(item) for item in args.expected_receipt_count),
         completed_stage_ids=args.complete_stage,
         approved_stage_refs=args.approve_stage,
@@ -586,6 +620,7 @@ __all__ = [
     "initial_workflow_state",
     "ingest_completion_receipts",
     "ingest_stage_receipts",
+    "ingest_stage_coverage_reports",
     "load_workflow_state",
     "mark_stage_approved",
     "mark_stage_succeeded",

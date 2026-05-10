@@ -68,6 +68,8 @@ The component receipt payload may remain component/storage-owned JSON. Manager r
 
 Manager stores concise output references only. It does not copy large output lists, raw provider payloads, model vectors, logs, or broker payloads into SQL. When component receipts report local `storage/...` output paths, manager normalizes them to repo-scoped `storage://<repo>/...` URIs and infers simple output metadata such as CSV media type and row count from receipt `row_counts` when explicit artifact objects are absent.
 
+A task-level `ready_signal_v1` is not enough to unlock a workflow stage. Stage advancement must pass a `manager_stage_coverage_v1` gate over `task_summary`: for example, Layer 1 January 2016 data acquisition remains `partial_ready` at `3/22` ready requests and may unlock feature generation only at full expected coverage (`22/22`) with `can_unlock_downstream=true`.
+
 `trading-storage` provides `scripts/artifacts/store_completion_receipt_payload.py` for storage-owned receipt payload materialization. The emitted `artifact_ref_v1` metadata is what manager consumes through `record_completion_receipt.py`.
 
 ## Scripts
@@ -197,6 +199,23 @@ PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_rec
 ```
 
 By default these scripts print normalized rows and do not mutate SQL. `--write` persists to the manager control-plane tables.
+
+Check stage-level coverage before advancing downstream workflow stages:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/check_stage_coverage.py \
+  --stage-id layer_01_market_regime.data_acquisition \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --expected-count 22 \
+  --write
+
+PYTHONPATH=src python3 scripts/tasks/advance_model_training_workflow.py \
+  --stage-coverage-report storage/runtime/stage_coverage/layer_01_market_regime_data_acquisition_2016-01.json \
+  --write
+```
+
+The coverage report is evidence only when partial. It marks a workflow stage succeeded only when the report status is `ready` and `can_unlock_downstream=true`.
 
 ## Component Rules
 

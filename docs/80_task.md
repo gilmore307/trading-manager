@@ -2,7 +2,7 @@
 
 ## Active Tasks
 
-- Use the 2016-01 controlled information pass and small-batch provider receipts to harden the manager mechanism before expanding data volume: receipt ingestion must attach partial evidence without unlocking downstream stages until expected successful receipt coverage is met.
+- Continue mechanism hardening before expanding provider volume: Stage coverage now gates downstream unlock from SQL `task_summary`; next work should enrich component-specific artifact discovery and then decide whether to dispatch the remaining approved Layer 1 requests.
 - Extend approved provider-dispatch coverage beyond Layer 1 source acquisition and add richer artifact discovery for component-specific outputs as durable ready-signal inputs become available.
 - Run/refresh `manager_dataset_evidence_v1` as real snapshot/split/label/evaluation evidence becomes available so expansion planning remains evidence-driven.
 
@@ -28,6 +28,7 @@ These items are intentionally outside the current no-broker historical-training 
 
 ## Recently Accepted
 
+- Added `manager_stage_coverage_v1` and `scripts/tasks/check_stage_coverage.py` so task-level ready signals cannot unlock a workflow stage until expected coverage is complete. The current Layer 1 January 2016 state is explicitly `partial_ready` at `3/22`, and feature generation remains blocked until `22/22` ready coverage is observed.
 - Added `manager_controlled_information_pass_v1` and `scripts/tasks/plan_controlled_information_pass.py` as the safe 2016-01 evidence-gathering pass for remaining provider-dispatch, concurrency, L3-L7 target-queue, dataset-threshold, artifact-discovery, and storage-lifecycle decisions. It may write report/preparation artifacts but performs no provider calls, model activation, broker execution, or storage lifecycle mutation.
 - Registered promotion/storage and Layer 8 option-bucket decisions through migration `284_register_promotion_lifecycle_and_l8_option_bucket_policy.sql`: promotion classifies artifacts, manager schedules lifecycle, storage executes lifecycle; Layer 8 option buckets expand near-to-far by listed expirations, use the current-to-target listed-strike corridor plus three listed strike levels on both sides, retain extreme/illiquid contracts for model-construction robustness, and remain single-leg only in V1.
 - Registered storage lifecycle contract names through migration `282_register_storage_lifecycle_contracts.sql`: lifecycle policy, protected-set policy, lifecycle states, retention policy format, read modes, reproducibility classes, summarize-then-archive policy, `storage_lifecycle_request_v1`, compression/archive/deletion/restore receipts, compression/SQL-archive/restore manifests, artifact tombstone, and storage artifact index. Manager owns the unified lifecycle request/task-summary surface and may request, prioritize, schedule, and observe lifecycle work; `trading-storage` owns protected-set checks and physical lifecycle execution.
