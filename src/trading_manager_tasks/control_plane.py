@@ -196,10 +196,7 @@ def _media_type_from_uri(uri: str) -> str | None:
     }.get(suffix)
 
 
-def _row_count_for_output(run: Mapping[str, Any], output: Any, uri: str) -> Any:
-    if isinstance(output, Mapping) and output.get("row_count") is not None:
-        return output.get("row_count")
-    row_counts = run.get("row_counts")
+def _matching_row_count(row_counts: Any, uri: str) -> Any:
     if not isinstance(row_counts, Mapping) or not row_counts:
         return None
     name = Path(uri).stem
@@ -209,10 +206,75 @@ def _row_count_for_output(run: Mapping[str, Any], output: Any, uri: str) -> Any:
     return numeric_values[0] if len(numeric_values) == 1 else None
 
 
+def _row_count_for_output(run: Mapping[str, Any], output: Any, uri: str) -> Any:
+    if isinstance(output, Mapping) and output.get("row_count") is not None:
+        return output.get("row_count")
+    return _matching_row_count(run.get("row_counts"), uri)
+
+
 def _artifact_kind_for_output(output: Any, uri: str) -> str:
     if isinstance(output, Mapping):
         return str(output.get("artifact_kind") or output.get("kind") or Path(uri).stem or "component_output")
     return Path(uri).stem or "component_output"
+
+
+def _artifact_id_token(value: str) -> str:
+    token = "".join(char.lower() if char.isalnum() else "_" for char in value)
+    token = "_".join(part for part in token.split("_") if part)
+    return token[:80] or "artifact"
+
+
+def _step_reference_artifact_kind(step_name: str, uri: str) -> str:
+    stem = Path(uri).stem
+    if stem == "schema":
+        return f"{_artifact_id_token(step_name)}_schema"
+    if stem == "request_manifest":
+        return "request_manifest"
+    if step_name:
+        return f"{_artifact_id_token(step_name)}_{_artifact_id_token(stem)}"
+    return _artifact_id_token(stem)
+
+
+def _step_reference_artifact_rows(
+    run_id: str,
+    *,
+    run: Mapping[str, Any],
+    ready_status: str,
+    repo_id: str,
+    known_uris: set[str],
+    start_index: int = 1,
+) -> list[dict[str, Any]]:
+    steps = run.get("steps")
+    if not isinstance(steps, Mapping):
+        return []
+    rows: list[dict[str, Any]] = []
+    index = start_index
+    for step_name, step_payload in sorted(steps.items(), key=lambda item: str(item[0])):
+        if not isinstance(step_payload, Mapping):
+            continue
+        row_counts = step_payload.get("row_counts")
+        for reference in _list(step_payload.get("references")):
+            uri = _output_uri(reference, repo_id=repo_id)
+            if not uri or uri in known_uris:
+                continue
+            known_uris.add(uri)
+            artifact_kind = _step_reference_artifact_kind(str(step_name), uri)
+            rows.append(
+                {
+                    "artifact_id": f"art_step_{run_id}_{index:03d}",
+                    "contract_type": "artifact_ref_v1",
+                    "artifact_kind": artifact_kind,
+                    "producer_run_id": run_id,
+                    "uri": uri,
+                    "content_hash": None,
+                    "schema_ref": "component_step_reference_v1",
+                    "row_count": _matching_row_count(row_counts, uri),
+                    "lifecycle_status": "active" if ready_status in {"ready", "partial"} else "failed",
+                    "media_type": _media_type_from_uri(uri),
+                }
+            )
+            index += 1
+    return rows
 
 
 def _output_artifact_row(run_id: str, index: int, output: Any, ready_status: str, *, run: Mapping[str, Any], repo_id: str) -> dict[str, Any] | None:
@@ -375,12 +437,23 @@ def normalize_completion_receipt(
             }
         )
         signal_artifact_refs = [artifact_id]
+        known_uris = {receipt_uri}
         for output_index, output in enumerate(_output_refs(run), start=1):
             output_row = _output_artifact_row(run_id, output_index, output, ready_status, run=run, repo_id=repo_id)
             if output_row is None:
                 continue
+            known_uris.add(str(output_row["uri"]))
             artifacts.append(output_row)
             signal_artifact_refs.append(output_row["artifact_id"])
+        step_rows = _step_reference_artifact_rows(
+            run_id,
+            run=run,
+            ready_status=ready_status,
+            repo_id=repo_id,
+            known_uris=known_uris,
+        )
+        artifacts.extend(step_rows)
+        signal_artifact_refs.extend(row["artifact_id"] for row in step_rows)
         signals.append(
             {
                 "ready_signal_id": ready_signal_id,

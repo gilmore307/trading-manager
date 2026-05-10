@@ -127,6 +127,57 @@ class TaskControlPlaneTests(unittest.TestCase):
         self.assertEqual(output["row_count"], 1000)
         self.assertEqual(output["media_type"], "text/csv")
 
+    def test_step_references_are_discovered_as_component_artifacts(self):
+        receipt = {
+            "runs": [
+                {
+                    "run_id": "run_spy",
+                    "status": "succeeded",
+                    "started_at": "2026-05-09T01:00:00Z",
+                    "completed_at": "2026-05-09T01:01:00Z",
+                    "outputs": ["storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/saved/equity_bar.csv"],
+                    "row_counts": {"equity_bar": 1000},
+                    "steps": {
+                        "fetch": {
+                            "references": ["storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/request_manifest.json"],
+                            "row_counts": {"raw_bars_transient": 1000},
+                        },
+                        "clean": {
+                            "references": [
+                                "storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/cleaned/equity_bar.jsonl",
+                                "storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/cleaned/schema.json",
+                            ],
+                            "row_counts": {"equity_bar": 1000},
+                        },
+                        "save": {
+                            "references": ["storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/saved/equity_bar.csv"],
+                            "row_counts": {"equity_bar": 1000},
+                        },
+                    },
+                }
+            ]
+        }
+
+        rows = normalize_completion_receipt(
+            receipt,
+            request_id="mgrreq_spy",
+            component_id="01_feed_alpaca_bars",
+            component_kind="data_feed",
+            repo_id="trading-data",
+            receipt_uri="storage://trading-data/monthly_backfill_v1/alpaca_bars/SPY/2016-01/completion_receipt.json",
+        )
+
+        by_kind = {row["artifact_kind"]: row for row in rows.artifact_refs}
+        self.assertEqual(len(rows.artifact_refs), 5)
+        self.assertIn("equity_bar", by_kind)
+        self.assertIn("request_manifest", by_kind)
+        self.assertIn("clean_equity_bar", by_kind)
+        self.assertIn("clean_schema", by_kind)
+        self.assertEqual(by_kind["clean_equity_bar"]["row_count"], 1000)
+        self.assertEqual(by_kind["clean_equity_bar"]["media_type"], "application/jsonl")
+        self.assertEqual(by_kind["clean_schema"]["media_type"], "application/json")
+        self.assertEqual(len(rows.ready_signals[0]["artifact_refs"]), 5)
+
     def test_failed_receipt_does_not_emit_ready_status(self):
         receipt = {
             "run_id": "run_failed",

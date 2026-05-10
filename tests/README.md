@@ -108,6 +108,7 @@
 - `test_task_control_plane.py` verifies:
   - generic `manager_request_v1` validation;
   - component completion receipt normalization into run/artifact/ready rows;
+  - component output and step-reference artifact discovery with duplicate collapse;
   - priority validation and global task-summary sort policy;
   - unified model-promotion review entrypoint policy;
   - failed receipts do not emit ready status;

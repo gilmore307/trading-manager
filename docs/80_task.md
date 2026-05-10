@@ -2,8 +2,8 @@
 
 ## Active Tasks
 
-- Continue mechanism hardening before expanding provider volume: Stage coverage now gates downstream unlock from SQL `task_summary`; next work should enrich component-specific artifact discovery and then decide whether to dispatch the remaining approved Layer 1 requests.
-- Extend approved provider-dispatch coverage beyond Layer 1 source acquisition and add richer artifact discovery for component-specific outputs as durable ready-signal inputs become available.
+- Continue mechanism hardening before expanding provider volume: Stage coverage now gates downstream unlock from SQL `task_summary`; component-specific artifact discovery now captures output and supporting receipt references. Next decide whether to dispatch the remaining approved Layer 1 requests.
+- Extend approved provider-dispatch coverage beyond Layer 1 source acquisition as durable ready-signal inputs become available.
 - Run/refresh `manager_dataset_evidence_v1` as real snapshot/split/label/evaluation evidence becomes available so expansion planning remains evidence-driven.
 
 The manager/control-plane MVP is closed for no-broker historical training: planning, request persistence, payload materialization, dry-run handoff validation, receipt normalization, task summary, review-decision artifacts, and live-call approval validation are accepted. Scheduler automation has begun with a gated one-tick implementation; the next manager phase is expanding the scheduler, not ad hoc manual task prompting.
@@ -28,6 +28,7 @@ These items are intentionally outside the current no-broker historical-training 
 
 ## Recently Accepted
 
+- Enhanced component receipt artifact discovery: final `outputs` and supporting `steps.*.references` now normalize into artifact refs with repo-scoped storage URIs, inferred kind/media type/row count, duplicate collapse, and ready-signal traceability.
 - Added `manager_stage_coverage_v1` and `scripts/tasks/check_stage_coverage.py` so task-level ready signals cannot unlock a workflow stage until expected coverage is complete. The current Layer 1 January 2016 state is explicitly `partial_ready` at `3/22`, and feature generation remains blocked until `22/22` ready coverage is observed.
 - Added `manager_controlled_information_pass_v1` and `scripts/tasks/plan_controlled_information_pass.py` as the safe 2016-01 evidence-gathering pass for remaining provider-dispatch, concurrency, L3-L7 target-queue, dataset-threshold, artifact-discovery, and storage-lifecycle decisions. It may write report/preparation artifacts but performs no provider calls, model activation, broker execution, or storage lifecycle mutation.
 - Registered promotion/storage and Layer 8 option-bucket decisions through migration `284_register_promotion_lifecycle_and_l8_option_bucket_policy.sql`: promotion classifies artifacts, manager schedules lifecycle, storage executes lifecycle; Layer 8 option buckets expand near-to-far by listed expirations, use the current-to-target listed-strike corridor plus three listed strike levels on both sides, retain extreme/illiquid contracts for model-construction robustness, and remain single-leg only in V1.
