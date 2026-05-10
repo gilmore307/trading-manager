@@ -117,6 +117,8 @@ def summarize_stage_coverage_from_rows(
     failed = [str(row["request_id"]) for row in matched if _is_failed(row)]
     pending = [str(row["request_id"]) for row in matched if not _is_ready(row) and not _is_failed(row)]
     accepted_failure_set = {str(request_id) for request_id in accepted_failure_request_ids}
+    if accepted_failure_set and not accepted_failure_refs:
+        raise TaskSystemError("accepted failed requests require at least one agent failure review evidence ref")
     failed_set = set(failed)
     unknown_accepted = sorted(accepted_failure_set - failed_set)
     if unknown_accepted:

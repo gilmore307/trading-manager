@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.model_training_state import advance_workflow_state
+from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.stage_coverage import summarize_stage_coverage_from_rows
 
 
@@ -85,6 +86,19 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.ready_count, 1)
         self.assertEqual(report.failed_count, 1)
         self.assertFalse(report.can_unlock_downstream)
+
+    def test_accepted_failed_requests_require_agent_review_ref(self):
+        rows = [_summary_row("SPY", ready=True), _summary_row("BITW", failed=True)]
+
+        with self.assertRaisesRegex(TaskSystemError, "agent failure review"):
+            summarize_stage_coverage_from_rows(
+                rows,
+                stage_id="layer_01_market_regime.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+                expected_count=2,
+                accepted_failure_request_ids=["mgrreq_backfill_alpaca_bars_bitw_2016_01"],
+            )
 
     def test_reviewed_failed_requests_preserve_failed_count_but_allow_unlock(self):
         rows = [_summary_row("SPY", ready=True), _summary_row("BITW", failed=True)]
