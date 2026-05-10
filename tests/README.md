@@ -61,7 +61,8 @@
 - `test_stage_reconcile.py` verifies:
   - provider-stage receipt discovery by reviewed universe/request id;
   - completion receipt normalization without provider calls or default writes;
-  - optional control-plane persistence, coverage report writing, and workflow advancement from written coverage evidence.
+  - failed receipt proposal rows with `failure_status=agent_review_required`, not accepted/skip disposition;
+  - optional control-plane persistence, failure-register persistence, coverage report writing, and workflow advancement from written coverage evidence.
 
 - `test_stage_executor.py` verifies:
   - ready safe offline stage execution;

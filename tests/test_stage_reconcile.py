@@ -7,10 +7,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from trading_manager_tasks.stage_coverage import StageCoverageReport
-from trading_manager_tasks.stage_reconcile import discover_stage_receipts, reconcile_provider_stage
+from trading_manager_tasks.stage_reconcile import discover_stage_receipts, propose_failure_register_rows, reconcile_provider_stage
 
 
-def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01") -> Path:
+def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01", status: str = "succeeded") -> Path:
     path = root / "monthly_backfill_v1" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -19,11 +19,12 @@ def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01") -
                 "runs": [
                     {
                         "run_id": f"run_{symbol.lower()}_{month.replace('-', '_')}",
-                        "status": "succeeded",
+                        "status": status,
                         "started_at": "2026-05-10T00:00:00Z",
                         "completed_at": "2026-05-10T00:00:01Z",
                         "outputs": [f"storage/monthly_backfill_v1/alpaca_bars/{symbol}/{month}/runs/run_1/saved/equity_bar.csv"],
                         "row_counts": {"equity_bar": 10},
+                        "error": {"type": "AlpacaBarsError", "message": "bars unavailable"} if status != "succeeded" else None,
                     }
                 ]
             }
@@ -111,6 +112,58 @@ class StageReconcileTests(unittest.TestCase):
         self.assertFalse(summary.storage_lifecycle_mutation_performed)
         persist_mock.assert_not_called()
         collect_mock.assert_called_once()
+
+    def test_failed_receipts_generate_agent_review_required_failure_proposals(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            _write_receipt(root, symbol="XLK", status="failed")
+            refs = discover_stage_receipts(
+                stage_id="layer_02_sector_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+                component_storage_root=root,
+            )
+            rows = propose_failure_register_rows(
+                refs,
+                stage_id="layer_02_sector_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["contract_type"], "manager_failure_register_v1")
+        self.assertEqual(rows[0]["request_id"], "mgrreq_backfill_alpaca_bars_xlk_2016_01")
+        self.assertEqual(rows[0]["failure_status"], "agent_review_required")
+        self.assertEqual(rows[0]["failure_kind"], "unclassified_provider_failure")
+        self.assertFalse(rows[0]["skip_future_matching"])
+        self.assertIsNone(rows[0]["agent_review_ref"])
+        self.assertIn("AlpacaBarsError", rows[0]["error_summary"])
+
+    def test_reconcile_can_write_failure_proposal_without_accepting_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.stage_reconcile.collect_stage_coverage",
+            return_value=_coverage(),
+        ), patch("trading_manager_tasks.stage_reconcile.persist_failure_register_rows") as failure_persist_mock:
+            root = Path(raw_tmp)
+            _write_receipt(root, symbol="XLK", status="failed")
+            proposal_path = root / "failure_proposals.jsonl"
+            summary = reconcile_provider_stage(
+                stage_id="layer_02_sector_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+                component_storage_root=root,
+                failure_proposal_path=proposal_path,
+                write_failure_proposal=True,
+                persist_failure_register=True,
+            )
+
+            self.assertEqual(summary.failure_proposal_count, 1)
+            self.assertEqual(summary.failure_proposal_path, str(proposal_path))
+            self.assertTrue(summary.persisted_failure_register)
+            row = json.loads(proposal_path.read_text(encoding="utf-8").strip())
+            self.assertEqual(row["failure_status"], "agent_review_required")
+            self.assertFalse(row["skip_future_matching"])
+            failure_persist_mock.assert_called_once()
 
     def test_reconcile_can_write_coverage_and_advance_workflow_only_from_written_report(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch(

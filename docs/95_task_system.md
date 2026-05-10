@@ -248,7 +248,7 @@ PYTHONPATH=src python3 scripts/tasks/reconcile_provider_stage.py \
   --write-workflow-state
 ```
 
-`reconcile_provider_stage.py` discovers existing completion receipts, normalizes `run_manifest_v1` / `artifact_ref_v1` / `ready_signal_v1` rows, refreshes `manager_stage_coverage_v1`, and can ingest that written coverage report into workflow state. It never dispatches components, calls providers, activates models, mutates broker state, or executes storage lifecycle actions.
+`reconcile_provider_stage.py` discovers existing completion receipts, normalizes `run_manifest_v1` / `artifact_ref_v1` / `ready_signal_v1` rows, refreshes `manager_stage_coverage_v1`, and can ingest that written coverage report into workflow state. With `--write-failure-proposal`, failed receipts also produce JSONL `manager_failure_register_v1` proposal rows with `failure_status=agent_review_required`; with `--write-failure-register`, those observed failures may be persisted for review. This preserves failed facts but does not accept, skip, correct, or retry any failure until a later agent review changes the disposition. The reconcile script never dispatches components, calls providers, activates models, mutates broker state, or executes storage lifecycle actions.
 
 Check stage-level coverage before advancing downstream workflow stages:
 
