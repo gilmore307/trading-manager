@@ -77,7 +77,7 @@ The manager/control-plane closeout did not include an always-on production sched
 - additional manager SQL tables only when lifecycle/query/audit pressure justifies them;
 - component catalog only if registry-backed component fields become insufficient.
 
-The target direction after closeout is not a passive script pile: `trading-manager` should grow into the always-on automation scheduler described in `docs/98_automation_scheduler.md`, with historical training/maintenance progressing continuously whenever approvals, resources, dependencies, and market-hours protection permit.
+The target direction after closeout is not a passive script pile: `trading-manager` should grow into the always-on automation scheduler described in `docs/98_automation_scheduler.md`, with historical training/maintenance progressing continuously whenever approvals, resources, dependencies, and regular-trading-day market-hours protection permit.
 
 ## Acceptance Evidence
 

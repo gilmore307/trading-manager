@@ -2496,7 +2496,7 @@ The manager should not remain a passive collection of scripts that waits for man
 
 Adopt the always-on automation scheduler policy in `docs/98_automation_scheduler.md`.
 
-Manager-owned scheduler automation should keep safe historical work moving whenever dependencies, approvals, resource budgets, and market-hours policy allow. Historical work may use concurrency, but only after reserving capacity for live monitoring and execution. During regular US equity market protection windows, default behavior is to pause or heavily throttle historical provider acquisition and CPU-heavy modeling work.
+Manager-owned scheduler automation should keep safe historical work moving whenever dependencies, approvals, resource budgets, and market-hours policy allow. Historical work may use concurrency, but only after reserving capacity for live monitoring and execution. During the `09:20-16:10 ET` protection window on actual regular US equity trading days, default behavior is to pause or heavily throttle historical provider acquisition and CPU-heavy modeling work. Non-trading days must not trigger this pause merely because the wall clock is inside that time range.
 
 Approval gates remain hard: live provider acquisition requires validated `live_call_approval_v1`, model activation requires an approving `review_decision_v1`, and broker/order/fill/account mutation remains execution-owned.
 
@@ -2504,5 +2504,5 @@ Approval gates remain hard: live provider acquisition requires validated `live_c
 
 - The next manager phase is scheduler implementation, not manual one-task-at-a-time prompting.
 - Historical training becomes background automation relative to live monitoring and execution.
-- Scheduler pauses/backoff reasons must be explicit: approval wait, market-hours protection, resource pressure, dependency block, provider quota, or promotion review.
+- Scheduler pauses/backoff reasons must be explicit: approval wait, regular-trading-day market-hours protection, resource pressure, dependency block, provider quota, or promotion review.
 - Automation does not authorize live provider calls, model activation, or broker execution by implication.

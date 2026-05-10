@@ -19,7 +19,7 @@ data acquisition planning
   -> approved activation artifact only after review approval
 ```
 
-The scheduler should not sit idle when safe offline work exists. If provider calls are not approved or market-hours throttles are active, it should shift to work that does not violate gates: payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle review.
+The scheduler should not sit idle when safe offline work exists. If provider calls are not approved, or if a regular-trading-day market-hours throttle is active, it should shift to work that does not violate gates: payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle review.
 
 ## Priority Order
 
@@ -50,23 +50,23 @@ Until measured production capacity exists, the conservative planning assumption 
 
 ## Market-Hours Policy
 
-During regular US equity market hours, manager should pause or heavily throttle historical data/modeling jobs by default.
+During regular US equity market hours on actual regular US equity trading days, manager should pause or heavily throttle historical data/modeling jobs by default.
 
 Default window:
 
 ```text
-America/New_York regular session protection:
-09:20-16:10 ET on regular US equity trading days
+America/New_York regular-session trading-day protection:
+09:20-16:10 ET only on regular US equity trading days
 ```
 
-The buffer covers pre-open checks and post-close reconciliation. During that protected window:
+The buffer covers pre-open checks and post-close reconciliation. The protection applies only when the US equity regular session is open that day; weekends, NYSE holidays, and other non-trading days must not trigger this pause merely because the wall clock is between 09:20 and 16:10 ET. During the protected window:
 
 - do not start new historical provider acquisition batches;
 - do not start CPU-heavy feature/model/evaluation batches;
 - allow lightweight bookkeeping only when it does not contend with live systems;
 - allow urgent manual override only through reviewed policy, not as a hidden default.
 
-Outside the protected window, the scheduler should resume safe queued historical work automatically subject to resource budgets and approval gates.
+Outside the protected window, including non-trading days, the scheduler should resume safe queued historical work automatically subject to resource budgets and approval gates.
 
 ## Approval Gates Stay Hard
 

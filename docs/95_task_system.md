@@ -22,7 +22,7 @@ manager_request_v1
 
 The manager uses the same lifecycle for data, model, storage, execution, and dashboard work. Component-local task queues may exist, but their private queue schemas do not become shared contracts.
 
-For historical model training, manager is the scheduler/orchestrator. It should prepare and issue the layer-scoped component request set itself, not wait for an operator to manually prompt each feed, feature, or model step. Operator review is reserved for boundary approvals such as live provider acquisition, promotion approval, or execution enablement. The long-running scheduler policy is defined in [`98_automation_scheduler.md`](98_automation_scheduler.md): keep safe historical work moving, but reserve capacity and market-hours priority for live monitoring/execution.
+For historical model training, manager is the scheduler/orchestrator. It should prepare and issue the layer-scoped component request set itself, not wait for an operator to manually prompt each feed, feature, or model step. Operator review is reserved for boundary approvals such as live provider acquisition, promotion approval, or execution enablement. The long-running scheduler policy is defined in [`98_automation_scheduler.md`](98_automation_scheduler.md): keep safe historical work moving, but reserve capacity and regular-trading-day market-hours priority for live monitoring/execution.
 
 `trading_manager.task_summary` is the global read model for all requests. It joins request, latest run, latest ready signal, and artifact counts so dashboards and operators can see every task in one priority-ordered surface.
 
@@ -204,7 +204,7 @@ By default these scripts print normalized rows and do not mutate SQL. `--write` 
 - `task_summary` is derived state; update the underlying request/run/ready rows rather than editing summary output.
 - Failed receipts must remain queryable for audit, but they must not emit `ready` status.
 - Manager-owned historical-training orchestration prepares whole layer batches; it must not degrade into manual one-request-at-a-time prompting.
-- Historical work is background work relative to live monitoring/execution; the scheduler must respect resource budgets and market-hours protection.
+- Historical work is background work relative to live monitoring/execution; the scheduler must respect resource budgets and market-hours protection only on regular US equity trading days during the protected window.
 - Live provider acquisition requires a validated `live_call_approval_v1`; dry-run planning, payload materialization, and handoff validation are not approval.
 - Live-call approval is data-acquisition-only; it must not permit broker orders, fills, account mutation, model activation, or execution-side lifecycle changes.
 - Secrets must be aliases/config refs only.
