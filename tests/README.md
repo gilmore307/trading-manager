@@ -11,6 +11,11 @@
 
 ## Inventory
 
+- `test_dataset_expansion.py` verifies:
+  - manager-owned dataset expansion role selection across train, calibration, validation, test, and forward holdout;
+  - upstream dependency ordering before downstream layer expansion;
+  - safe Layer 1 task-key preparation with zero provider calls, model activation, or broker execution.
+
 - `test_model_training_workflow.py` verifies:
   - full Layer 1-8 manager workflow graph coverage;
   - per-layer data acquisition, feature, model generation, evaluation, promotion-review, and maintenance stages;

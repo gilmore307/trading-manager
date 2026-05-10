@@ -2651,3 +2651,23 @@ Add `execute_model_training_stage.py` and `manager_stage_execution_summary_v1`. 
 - Offline work can progress automatically once durable receipts make a stage ready.
 - Provider calls remain isolated in approval-gated dispatch adapters.
 - Model activation and broker execution remain outside this executor.
+
+## D118 - Manager decides and prepares dataset expansion
+
+Date: 2026-05-10
+Status: Accepted
+
+### Context
+
+Historical model-training expansion should not require an operator to manually choose whether the next batch expands training, calibration, validation, test, forward holdout, or shadow-monitoring evidence. The manager already owns the Layer 1-8 training workflow, scheduler, state checkpoint, and promotion-review routing; dataset expansion selection belongs in the same control plane.
+
+### Decision
+
+Add `manager_dataset_expansion_plan_v1` and `scripts/tasks/plan_dataset_expansion.py`. The planner walks model layers in dependency order, fills train -> calibration -> validation -> test minimums first, expands forward holdout when promotion evidence shows coverage/drift/split-stability/regime/baseline gaps, and selects shadow monitoring only after production approval. With `--write`, manager prepares the selected safe artifacts/payloads. For Layer 1 this means writing Alpaca ETF task-key payloads and handoff validation evidence only; provider dispatch still requires validated `live_call_approval_v1` and explicit execution.
+
+### Consequences
+
+- Manager now owns the decision about which dataset role/layer to expand next.
+- Dataset expansion plans remain evidence artifacts, not promotion approval and not provider-call approval.
+- Provider calls, model activation, and broker execution remain gated exactly as before.
+- The next improvement is to feed real dataset snapshot/split/label/evaluation evidence into the planner instead of relying on absent-evidence defaults.

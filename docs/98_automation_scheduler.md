@@ -19,7 +19,9 @@ data acquisition planning
   -> approved activation artifact only after review approval
 ```
 
-The scheduler should not sit idle when safe work exists. If provider calls are not yet approved, or if a regular-trading-day market-hours throttle is active, it should shift to work that does not violate gates: approval-artifact preparation, payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle review.
+The scheduler should not sit idle when safe work exists. If provider calls are not yet approved, or if a regular-trading-day market-hours throttle is active, it should shift to work that does not violate gates: dataset expansion planning, approval-artifact preparation, payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle review.
+
+Dataset expansion is manager-owned. The manager decides whether the next expansion should target train, calibration, validation, test, forward holdout, or shadow-monitoring evidence for the earliest blocked layer. Operators may provide evidence inputs, but should not have to manually choose the dataset role. See [`100_dataset_expansion.md`](100_dataset_expansion.md).
 
 ## Priority Order
 
@@ -92,7 +94,7 @@ If no safe work exists, the scheduler should report why: waiting for approval, r
 
 The current one-shot scheduler tick implements the first safe step: it evaluates regular-trading-day market-hours protection and host resource pressure, then either reports `prepare_layer_one_historical_training_batch` as the next safe internal work item or executes that preparation with `--execute-safe-preparation`. Execution writes task-key payloads and validates handoff shape only. The next internal stage is `approval_gated_provider_acquisition`; the approval gate is a safety control inside historical training, not an external dependency or manual task request.
 
-The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_daemon.py`. It wraps the tick in a resident loop with a `manager_scheduler_daemon_state_v1` checkpoint, single-instance lock, decision JSONL log, and service-manager-ready template under `deploy/systemd/`. See [`99_historical_scheduler_runtime.md`](99_historical_scheduler_runtime.md) for boot, resume, and maintenance expectations.
+The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_daemon.py`. It wraps the tick in a resident loop with a `manager_scheduler_daemon_state_v1` checkpoint, single-instance lock, decision JSONL log, and service-manager-ready template under `deploy/systemd/`. `scripts/tasks/plan_dataset_expansion.py` provides the explicit dataset-expansion decision surface used by the scheduler policy: plan-only by default, and `--write` prepares only safe artifacts/payloads while preserving provider, promotion, and execution gates. See [`99_historical_scheduler_runtime.md`](99_historical_scheduler_runtime.md) for boot, resume, and maintenance expectations.
 
 ## Non-Goals
 

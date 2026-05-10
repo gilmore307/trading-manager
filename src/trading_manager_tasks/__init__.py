@@ -11,6 +11,14 @@ from .control_plane import (
     persist_input_bindings,
     validate_manager_request,
 )
+from .dataset_expansion import (
+    DatasetExpansionDecision,
+    DatasetExpansionPlan,
+    DatasetRoleEvidence,
+    LayerDatasetEvidence,
+    build_dataset_expansion_plan,
+    decide_dataset_expansion,
+)
 from .monthly_backfill import (
     DEFAULT_SOURCES,
     MonthlyWindow,
@@ -61,6 +69,10 @@ from .task_rehearsal import (
 __all__ = [
     "CompletionReceiptRows",
     "DEFAULT_SOURCES",
+    "DatasetExpansionDecision",
+    "DatasetExpansionPlan",
+    "DatasetRoleEvidence",
+    "LayerDatasetEvidence",
     "TASK_PRIORITY_RANKS",
     "TASK_SUMMARY_ORDER_BY",
     "MODEL_PROMOTION_REVIEW_REQUEST_KIND",
@@ -68,6 +80,7 @@ __all__ = [
     "MonthlyWindow",
     "ModelPromotionTarget",
     "SourceAvailability",
+    "build_dataset_expansion_plan",
     "build_model_promotion_review_request",
     "build_activation_record",
     "build_model_promotion_review_requests",
@@ -79,6 +92,7 @@ __all__ = [
     "fetch_input_bindings",
     "fetch_manager_requests",
     "fetch_task_summary",
+    "decide_dataset_expansion",
     "iter_monthly_windows",
     "materialize_request_payload",
     "materialize_request_payloads",
