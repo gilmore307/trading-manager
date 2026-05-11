@@ -49,7 +49,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/materialize_request_payloads.py` — writes component-readable parameter payloads behind `parameter_ref` and can persist request-scoped `input_binding_v1` metadata.
 - `tasks/validate_request_handoff.py` — validates materialized request payloads against component `build_context` paths without dispatching work or calling providers.
 - `tasks/record_completion_receipt.py` — normalizes or persists component completion receipts into manager run/artifact/ready rows.
-- `tasks/record_realtime_shadow_handoff.py` — validates paired realtime execution decision-input and model route-plan artifacts, then emits a standard receipt and normalized run/artifact/ready rows without persistence or mutation.
+- `tasks/record_realtime_shadow_handoff.py` — validates paired realtime execution decision-input and model route-plan artifacts, then emits a standard receipt and normalized run/artifact/ready rows; add `--persist-normalized-rows` only with reviewed durable receipt/database context.
 - `tasks/rehearse_realtime_shadow_handoff.py` — runs the full execution fixture -> model route-plan -> manager receipt realtime shadow handoff chain without provider calls, model activation, broker calls, order construction, persistence, or account mutation.
 - `tasks/list_task_summary.py` — lists global task summary rows in priority order.
 - `tasks/rehearse_task_system.py` — runs a deterministic request/receipt/summary rehearsal without provider calls; add `--write` only to persist rehearsal-only rows to manager SQL.
@@ -86,6 +86,7 @@ PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py requests.js
 PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py --from-db --request-id mgrreq_backfill_alpaca_bars_2016_01
 PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_receipt.json --request-id mgrreq_example --component-id component --repo-id trading-data --receipt-uri storage://example/completion_receipt.json
 PYTHONPATH=src python3 scripts/tasks/record_realtime_shadow_handoff.py --decision-input decision_input.json --route-plan route_plan.json
+PYTHONPATH=src python3 scripts/tasks/record_realtime_shadow_handoff.py --decision-input decision_input.json --route-plan route_plan.json --receipt-uri storage://trading-manager/realtime/receipt.json --persist-normalized-rows
 PYTHONPATH=src python3 scripts/tasks/rehearse_realtime_shadow_handoff.py --decision-time 2026-05-11T13:30:00+00:00 --historical-dataset-snapshot-ref trading-model://snapshots/historical/unit --frozen-model-config-ref trading-model://configs/frozen/unit
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl

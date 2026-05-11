@@ -1603,6 +1603,29 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("record_realtime_shadow_handoff.py", rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECORD"]["path"])
         self.assertIn("no_model_activation", rows["MANAGER_REALTIME_SHADOW_HANDOFF_POLICY"]["payload"])
 
+    def test_execution_order_construction_gate_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(rows["EXECUTION_ORDER_CONSTRUCTION_APPROVAL"]["payload"], "execution_order_construction_approval_v1")
+        self.assertEqual(rows["EXECUTION_ORDER_CONSTRUCTION_APPROVAL_VALIDATION"]["payload"], "execution_order_construction_approval_validation_v1")
+        self.assertEqual(rows["EXECUTION_BROKER_ORDER_INTENT"]["payload"], "execution_broker_order_intent_v1")
+        self.assertEqual(rows["EXECUTION_BROKER_ORDER_INTENT_RESULT"]["payload"], "execution_broker_order_intent_result_v1")
+        self.assertIn("build_broker_order_intent.py", rows["EXECUTION_BROKER_ORDER_INTENT_BUILD"]["path"])
+        self.assertIn("broker_submission_requires_separate_execution_gate", rows["EXECUTION_ORDER_CONSTRUCTION_POLICY"]["payload"])
+
+    def test_realtime_formal_live_observe_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(rows["REALTIME_LIVE_OBSERVE_APPROVAL"]["payload"], "realtime_live_observe_approval_v1")
+        self.assertEqual(rows["REALTIME_LIVE_OBSERVE_APPROVAL_VALIDATION"]["payload"], "realtime_live_observe_approval_validation_v1")
+        self.assertEqual(rows["EXECUTION_REALTIME_LIVE_OBSERVE_RESULT"]["payload"], "execution_realtime_live_observe_result_v1")
+        self.assertEqual(rows["REALTIME_LIVE_OBSERVATION"]["payload"], "realtime_live_observation_v1")
+        self.assertIn("execute_live_observe.py", rows["EXECUTION_REALTIME_LIVE_OBSERVE_EXECUTE"]["path"])
+        self.assertIn("separate_execution_gate", rows["REALTIME_FORMAL_INTEGRATION_POLICY"]["payload"])
+        self.assertIn("persist_completion_rows", rows["MANAGER_REALTIME_SHADOW_HANDOFF_PERSISTENCE"]["applies_to"])
+
     def test_realtime_live_observe_fixture_scaffold_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}

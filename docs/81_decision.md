@@ -2937,3 +2937,27 @@ The handoff remains fixture/shadow only. It performs no provider calls, model ac
 - Realtime shadow handoff progress can be observed through manager control-plane rows once a durable receipt URI is accepted.
 - The receipt does not bypass promotion review, production activation, or execution gates.
 - Generic receipt persistence remains an explicit follow-up action, not an automatic side effect of validation.
+
+## D131 - Formal realtime integration separates provider observe, manager persistence, model activation, and execution mutation
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+Fixture-only realtime scaffolds are not enough for formal integration. At the same time, a single live switch would be unsafe because read-only provider observation, manager SQL persistence, model/production activation, order construction, broker execution, and account mutation have different review and rollback requirements.
+
+### Decision
+
+Formal realtime integration begins with two explicit live paths:
+
+- `realtime_live_observe_approval_v1` permits bounded read-only provider market-data observation in `trading-execution`.
+- `record_realtime_shadow_handoff.py --persist-normalized-rows` permits explicit manager SQL persistence of normalized realtime shadow handoff run/artifact/ready rows when a reviewed durable receipt/database context exists.
+
+These paths do not imply model activation or broker authority. Production model activation still requires the accepted model-promotion decision path. Broker order construction, execution, fill/reconcile, and account mutation require separate execution-owned risk, idempotency, receipt, and reconcile gates.
+
+### Consequences
+
+- Provider observation and manager visibility are no longer fixture-only when their explicit gates are supplied.
+- Manager persistence is opt-in and reviewable instead of hidden behind validation.
+- Model activation and broker/account mutation remain separate formal integration stages, not accidental consequences of realtime observation.

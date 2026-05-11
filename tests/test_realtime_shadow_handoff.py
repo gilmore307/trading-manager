@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from trading_manager_tasks import realtime_shadow_handoff as handoff_module
 from trading_manager_tasks.realtime_shadow_handoff import (
     build_realtime_shadow_handoff_control_plane_bundle,
     build_realtime_shadow_handoff_receipt,
@@ -131,6 +132,31 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
         ready_rows = [row for row in bundle["normalized_rows"] if row["table"] == "trading_manager.ready_signal"]
         self.assertEqual(ready_rows[0]["signal_kind"], "realtime_shadow_decision_handoff_ready")
         self.assertEqual(ready_rows[0]["status"], "ready")
+
+    def test_build_control_plane_bundle_can_persist_rows_when_explicit(self) -> None:
+        captured = []
+
+        def fake_persist(rows, *, database_url=None):
+            captured.extend(rows.jsonl_rows())
+            self.assertEqual(database_url, "postgresql://unit")
+
+        original = handoff_module.persist_completion_rows
+        handoff_module.persist_completion_rows = fake_persist
+        try:
+            bundle = build_realtime_shadow_handoff_control_plane_bundle(
+                decision_input=_decision_input_snapshot(),
+                route_plan=_route_plan(),
+                request_id="mgrreq_unit",
+                receipt_uri="artifact://trading-manager/mgrreq_unit/receipt.json",
+                persist_rows=True,
+                database_url="postgresql://unit",
+            )
+        finally:
+            handoff_module.persist_completion_rows = original
+
+        self.assertTrue(bundle["persistence_performed"])
+        self.assertGreaterEqual(len(captured), 4)
+        self.assertTrue(any(row["table"] == "trading_manager.ready_signal" for row in captured))
 
     def test_forbidden_model_activation_blocks_validation(self) -> None:
         decision = _decision_input_snapshot()

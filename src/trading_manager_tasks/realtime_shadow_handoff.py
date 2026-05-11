@@ -18,7 +18,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .control_plane import CompletionReceiptRows, TaskSystemError, normalize_completion_receipt
+from .control_plane import CompletionReceiptRows, TaskSystemError, normalize_completion_receipt, persist_completion_rows
 
 MODEL_LAYER_ORDER = (
     "layer_01_market_regime",
@@ -265,8 +265,10 @@ def build_realtime_shadow_handoff_control_plane_bundle(
     decision_input_ref: str | None = None,
     route_plan_ref: str | None = None,
     validation_ref: str | None = None,
+    persist_rows: bool = False,
+    database_url: str | None = None,
 ) -> dict[str, Any]:
-    """Build receipt and normalized control-plane rows without persistence."""
+    """Build receipt and normalized control-plane rows, optionally persisting rows."""
 
     receipt = build_realtime_shadow_handoff_receipt(
         decision_input=decision_input,
@@ -289,10 +291,13 @@ def build_realtime_shadow_handoff_control_plane_bundle(
         receipt_schema_ref="manager_realtime_shadow_handoff_receipt_v1",
         consumer_hint="fixture_or_shadow_model_decision_route",
     )
+    if persist_rows:
+        persist_completion_rows(rows, database_url=database_url)
     return {
         "contract_type": "manager_realtime_shadow_handoff_control_plane_bundle_v1",
         "receipt": receipt,
         "normalized_rows": rows.jsonl_rows(),
+        "persistence_performed": bool(persist_rows),
         "run_manifest_count": len(rows.run_manifests),
         "artifact_ref_count": len(rows.artifact_refs),
         "ready_signal_count": len(rows.ready_signals),
@@ -321,6 +326,8 @@ def realtime_shadow_handoff_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--route-plan-ref")
     parser.add_argument("--validation-ref")
     parser.add_argument("--output", choices=("bundle", "receipt", "normalized_rows", "validation"), default="bundle")
+    parser.add_argument("--persist-normalized-rows", action="store_true", help="Persist normalized run/artifact/ready rows to manager SQL.")
+    parser.add_argument("--database-url", help="Database URL for --persist-normalized-rows; defaults to DATABASE_URL or local secret.")
     args = parser.parse_args(argv)
 
     decision_input = _read_json(args.decision_input)
@@ -341,6 +348,8 @@ def realtime_shadow_handoff_main(argv: list[str] | None = None) -> int:
             decision_input_ref=args.decision_input_ref,
             route_plan_ref=args.route_plan_ref,
             validation_ref=args.validation_ref,
+            persist_rows=args.persist_normalized_rows,
+            database_url=args.database_url,
         )
         payload = bundle if args.output == "bundle" else bundle[args.output]
     json.dump(payload, sys.stdout, indent=2, sort_keys=True)
