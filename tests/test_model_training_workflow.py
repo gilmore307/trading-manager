@@ -84,26 +84,26 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertIn("--skip-registered-failures", layer_two_acquisition.command)
             self.assertNotIn("--execute-approved-provider-calls", layer_two_acquisition.command)
 
-    def test_layer_one_model_evaluation_reads_database_rows(self):
+    def test_layer_one_and_two_model_evaluation_read_database_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
 
-        command = plan.layers[0].model_evaluate_command
+        for index, script_name in ((0, "evaluate_model_01_market_regime.py"), (1, "evaluate_model_02_sector_context.py")):
+            command = plan.layers[index].model_evaluate_command
+            self.assertIn(script_name, " ".join(command))
+            self.assertIn("--from-database", command)
+            self.assertIn("--output-json", command)
+            self.assertTrue(any("evaluation_summary_${START_MONTH}.json" in item for item in command))
 
-        self.assertIn("evaluate_model_01_market_regime.py", " ".join(command))
-        self.assertIn("--from-database", command)
-        self.assertIn("--output-json", command)
-        self.assertTrue(any("evaluation_summary_${START_MONTH}.json" in item for item in command))
-
-    def test_layer_one_promotion_review_uses_evaluation_summary_artifact(self):
+    def test_layer_one_and_two_promotion_review_use_evaluation_summary_artifact(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
 
-        command = plan.layers[0].promotion_review_command
-
-        self.assertIn("review_market_regime_promotion.py", " ".join(command))
-        self.assertIn("--evaluation-summary-json", command)
-        self.assertIn("--local-fallback-review", command)
+        for index, script_name in ((0, "review_market_regime_promotion.py"), (1, "review_sector_context_promotion.py")):
+            command = plan.layers[index].promotion_review_command
+            self.assertIn(script_name, " ".join(command))
+            self.assertIn("--evaluation-summary-json", command)
+            self.assertIn("--local-fallback-review", command)
 
     def test_layer_one_feature_generation_materializes_feed_artifacts_first(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

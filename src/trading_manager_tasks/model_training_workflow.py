@@ -231,10 +231,18 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
         "python3",
         f"/root/projects/trading-model/scripts/models/model_{layer:02d}_{slug}/{script_name}",
     ]
-    if layer == 1 and verb == "evaluate":
-        command.extend(["--from-database", "--output-json", "/root/projects/trading-model/storage/runtime/model_01_market_regime/evaluation_summary_${START_MONTH}.json"])
-    if layer == 1 and verb == "review":
-        command.extend(["--evaluation-summary-json", "/root/projects/trading-model/storage/runtime/model_01_market_regime/evaluation_summary_${START_MONTH}.json", "--local-fallback-review"])
+    if layer in {1, 2} and verb == "evaluate":
+        command.extend([
+            "--from-database",
+            "--output-json",
+            f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/evaluation_summary_${{START_MONTH}}.json",
+        ])
+    if layer in {1, 2} and verb == "review":
+        command.extend([
+            "--evaluation-summary-json",
+            f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/evaluation_summary_${{START_MONTH}}.json",
+            "--local-fallback-review",
+        ])
     return command
 
 
