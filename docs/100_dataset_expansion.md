@@ -47,6 +47,8 @@ Manager evidence should therefore report three separate views when available:
 
 Promotion can move toward realtime-forward evidence as the primary production monitor, but a model that only passes a short realtime window and lacks historical split/baseline/leakage/calibration evidence must still be deferred.
 
+The execution-side realtime coverage surface is `execution_realtime_input_coverage_v1`, and the append-only validation handoff surface is `realtime_capture_contract_v1`. Manager planning should treat those as coverage/gap contracts, not as provider-stream authorization.
+
 Default planning minimums are intentionally conservative placeholders until measured production evidence supersedes them:
 
 ```text

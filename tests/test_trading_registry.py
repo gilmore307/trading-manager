@@ -1504,6 +1504,23 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("does_not_authorize_provider_streams_or_broker_mutation", rows["EXECUTION_REALTIME_CAPTURE_FOR_VALIDATION_BOUNDARY"]["payload"])
 
 
+    def test_execution_realtime_coverage_contracts_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(
+            rows["EXECUTION_REALTIME_INPUT_COVERAGE_MATRIX"]["payload"],
+            "execution_realtime_input_coverage_v1",
+        )
+        self.assertIn("model_08_option_expression", rows["EXECUTION_REALTIME_INPUT_COVERAGE_MATRIX"]["applies_to"])
+        self.assertEqual(rows["REALTIME_CAPTURE_CONTRACT"]["payload"], "realtime_capture_contract_v1")
+        self.assertIn("forward_holdout", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
+        self.assertIn("ready_signal_v1", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
+        self.assertIn("zero_provider_calls", rows["EXECUTION_REALTIME_COVERAGE_GAP_POLICY"]["payload"])
+        self.assertIn("layer_06_broker_account_route_deferred", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
+        self.assertIn("layer_08_thetadata_terminal_required", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
