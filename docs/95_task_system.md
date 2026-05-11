@@ -190,6 +190,19 @@ PYTHONPATH=src python3 scripts/tasks/summarize_stage_run.py \
 
 The dashboard artifact is `manager_stage_run_dashboard_v1`. It summarizes stage coverage, packet statuses, observed provider calls, evidence refs, the next pending-only packet preview, and the next safe action. Lower-level artifacts remain the audit trail, but operators should normally inspect this dashboard first instead of manually opening proposal/validation/dispatch/reconcile/coverage files.
 
+For the simplest safe control loop, run one conservative controller step:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/run_stage_controller.py \
+  --stage-id layer_02_sector_context.data_acquisition \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --next-limit 5 \
+  --write
+```
+
+The controller emits `manager_stage_run_controller_receipt_v1`, refreshes the dashboard, and may create the next pending-only packet when no packet already needs review. It never executes provider calls. It stops at human approval review, provider execution review, failure review, model activation, broker execution, and storage lifecycle gates.
+
 Before any human-reviewed approval is written, rehearse the packet mechanics without changing persistent packet state:
 
 ```bash

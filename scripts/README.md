@@ -27,6 +27,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/plan_dataset_expansion.py` — lets manager choose the next dataset role/layer to expand, and with `--write` prepares the selected safe artifacts/payloads without provider calls.
 - `tasks/advance_model_training_workflow.py` — refreshes the durable Layer 1-8 workflow checkpoint, ingests component receipts, records reviewed approval refs, and selects the next safe/gated stage.
 - `tasks/summarize_stage_run.py` — writes or prints the single `manager_stage_run_dashboard_v1` human-facing receipt for stage coverage, packets, next pending-only packet preview, and next safe action.
+- `tasks/run_stage_controller.py` — runs one conservative no-provider stage-control step, creating the next pending-only packet when safe and stopping at human/external gates.
 - `tasks/plan_live_call_approval.py` — creates a skip-aware live-call approval review proposal/template without approving, dispatching, or calling providers; `--pending-only` excludes ready/reviewed-terminal stage requests.
 - `tasks/create_live_call_approval_packet.py` — writes a complete local approval packet bundle with proposal, reviewed-approval placeholder, validation/dispatch/reconcile command templates, status command, and zero provider calls; use `--pending-only` for normal runtime packets.
 - `tasks/inspect_live_call_approval_packet.py` — inspects packet lifecycle status (`template_pending_review` through `reconciled`) without approving, dispatching, or calling providers.

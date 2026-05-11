@@ -53,6 +53,11 @@
   - accepted-skip and corrected failures requiring agent review evidence;
   - durable skip disposition for reviewed normal historical absences.
 
+- `test_stage_run_controller.py` verifies:
+  - one-step conservative `manager_stage_run_controller_receipt_v1` behavior;
+  - automatic pending-only packet creation when the dashboard requests it;
+  - hard stops at provider-execution and dry-run/no-write gates.
+
 - `test_stage_run_dashboard.py` verifies:
   - single `manager_stage_run_dashboard_v1` receipt construction from coverage, packet statuses, and pending-only next-packet preview;
   - packet status discovery under the approval packet runtime root;
