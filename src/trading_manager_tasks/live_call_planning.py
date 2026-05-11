@@ -2,7 +2,8 @@
 
 The output is deliberately a proposal/template, not an approval. It selects the
 exact request ids that a future `live_call_approval_v1` could cover, excludes
-registered accepted skips, and keeps provider_calls at zero.
+registered accepted skips, can exclude already terminal stage-coverage requests,
+and keeps provider_calls at zero.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from .historical_training import prepare_layer_historical_training_batch
 from .live_call_gate import LIVE_CALL_APPROVAL_CONTRACT, validate_live_call_approvals
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .stage_coverage import collect_stage_coverage
 
 SUPPORTED_PROVIDER_APPROVAL_MODEL_LAYERS = (LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER)
 
@@ -37,8 +39,10 @@ class LiveCallApprovalProposal:
     target_component_id: str
     request_count: int
     skipped_registered_count: int
+    skipped_terminal_count: int
     request_ids: tuple[str, ...]
     skipped_registered_request_ids: tuple[str, ...]
+    skipped_terminal_request_ids: tuple[str, ...]
     approval_template: dict[str, Any]
     dispatch_plan_command: tuple[str, ...]
     dispatch_execute_command_template: tuple[str, ...]
@@ -52,6 +56,7 @@ class LiveCallApprovalProposal:
         row = asdict(self)
         row["request_ids"] = list(self.request_ids)
         row["skipped_registered_request_ids"] = list(self.skipped_registered_request_ids)
+        row["skipped_terminal_request_ids"] = list(self.skipped_terminal_request_ids)
         row["dispatch_plan_command"] = list(self.dispatch_plan_command)
         row["dispatch_execute_command_template"] = list(self.dispatch_execute_command_template)
         return row
@@ -111,10 +116,8 @@ def _select_requests(
         missing_ids = sorted(request_filter - found_ids)
         if missing_ids:
             raise TaskSystemError("requested ids are not in the approval-planning batch: " + ",".join(missing_ids))
-    if limit is not None:
-        if limit <= 0:
-            raise TaskSystemError("limit must be positive")
-        selected = selected[:limit]
+    if limit is not None and limit <= 0:
+        raise TaskSystemError("limit must be positive")
     if not selected:
         raise TaskSystemError("approval proposal selected no requests")
     return selected
@@ -143,7 +146,7 @@ def _dispatch_command(*, model_layer: str, start_month: str, end_month: str, req
     for request_id in request_ids:
         command.extend(["--request-id", request_id])
     if execute:
-        command.extend(["--execute-approved-provider-calls", "--continue-on-error"])
+        command.extend(["--execute-approved-provider-calls", "--continue-on-error", "--reject-terminal-coverage"])
     return tuple(command)
 
 
@@ -180,6 +183,7 @@ def plan_live_call_approval_proposal(
     request_ids: Sequence[str] = (),
     limit: int | None = None,
     skip_registered_failures: bool = True,
+    skip_terminal_coverage: bool = False,
     database_url: str | None = None,
 ) -> LiveCallApprovalProposal:
     """Plan a skip-aware approval proposal without approving or dispatching calls."""
@@ -210,6 +214,26 @@ def plan_live_call_approval_proposal(
         selected = [row for row in selected if str(row.get("request_id") or "") not in registered_set]
     if not selected:
         raise TaskSystemError("all selected requests are registered accepted skips; no live-call approval proposal needed")
+    skipped_terminal_ids: tuple[str, ...] = ()
+    if skip_terminal_coverage:
+        report = collect_stage_coverage(
+            stage_id=stage_id,
+            start_month=start_month,
+            end_month=end_month,
+            database_url=database_url,
+        )
+        if report.failed_request_ids:
+            raise TaskSystemError("stage has unreviewed failed requests; review/register failures before planning more live calls: " + ",".join(report.failed_request_ids))
+        terminal_set = {str(item) for item in (*report.ready_request_ids, *report.accepted_failed_request_ids)}
+        pending_set = {str(item) for item in report.pending_request_ids}
+        skipped_terminal_ids = tuple(str(row["request_id"]) for row in selected if str(row.get("request_id") or "") in terminal_set)
+        selected = [row for row in selected if str(row.get("request_id") or "") in pending_set]
+        if not selected:
+            raise TaskSystemError("selected requests are already terminal or not pending in stage coverage; no live-call approval proposal needed")
+    if limit is not None:
+        selected = selected[:limit]
+    if not selected:
+        raise TaskSystemError("all selected requests are terminal, registered skips, or outside pending coverage; no live-call approval proposal needed")
     selected_ids = tuple(str(row["request_id"]) for row in selected)
     return LiveCallApprovalProposal(
         contract_type="manager_live_call_approval_proposal_v1",
@@ -220,8 +244,10 @@ def plan_live_call_approval_proposal(
         target_component_id="01_feed_alpaca_bars",
         request_count=len(selected_ids),
         skipped_registered_count=len(skipped_ids),
+        skipped_terminal_count=len(skipped_terminal_ids),
         request_ids=selected_ids,
         skipped_registered_request_ids=skipped_ids,
+        skipped_terminal_request_ids=skipped_terminal_ids,
         approval_template=_approval_template(model_layer=model_layer, start_month=start_month, end_month=end_month, request_ids=selected_ids),
         dispatch_plan_command=_dispatch_command(model_layer=model_layer, start_month=start_month, end_month=end_month, request_ids=selected_ids, execute=False),
         dispatch_execute_command_template=_dispatch_command(model_layer=model_layer, start_month=start_month, end_month=end_month, request_ids=selected_ids, execute=True),
@@ -373,6 +399,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--request-id", action="append", default=[], help="Limit to one request id; repeatable.")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--include-registered-failures", action="store_true", help="Do not exclude accepted_skip rows from failure_register.")
+    parser.add_argument("--pending-only", action="store_true", help="Use stage coverage to exclude already ready/reviewed-terminal requests and plan only pending work.")
     parser.add_argument("--database-url")
     parser.add_argument("--output-path", type=Path)
     parser.add_argument("--write", action="store_true", help="Write the proposal JSON to --output-path.")
@@ -387,6 +414,7 @@ def main(argv: list[str] | None = None) -> int:
         request_ids=args.request_id,
         limit=args.limit,
         skip_registered_failures=not args.include_registered_failures,
+        skip_terminal_coverage=args.pending_only,
         database_url=args.database_url,
     )
     if args.write:

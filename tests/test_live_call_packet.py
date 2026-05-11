@@ -199,6 +199,51 @@ class LiveCallApprovalPacketTests(unittest.TestCase):
         self.assertEqual(status.status, "packet_inconsistent")
         self.assertTrue(status.inconsistent_reasons)
 
+    def test_packet_pending_only_excludes_terminal_stage_requests(self):
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.live_call_planning.accepted_failure_request_ids_from_register",
+            return_value=((), ()),
+        ), patch(
+            "trading_manager_tasks.live_call_planning.collect_stage_coverage",
+            return_value=__import__("trading_manager_tasks.stage_coverage", fromlist=["StageCoverageReport"]).StageCoverageReport(
+                contract_type="manager_stage_coverage_v1",
+                stage_id="layer_02_sector_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+                expected_count=25,
+                observed_count=3,
+                ready_count=1,
+                failed_count=0,
+                pending_count=2,
+                accepted_failed_count=0,
+                status="partial_ready",
+                can_unlock_downstream=False,
+                ready_request_ids=("mgrreq_backfill_alpaca_bars_xlb_2016_01",),
+                failed_request_ids=(),
+                accepted_failed_request_ids=(),
+                pending_request_ids=("mgrreq_backfill_alpaca_bars_xle_2016_01", "mgrreq_backfill_alpaca_bars_xlk_2016_01"),
+                accepted_failure_refs=(),
+                reason="unit-test",
+            ),
+        ):
+            root = Path(raw_tmp)
+            packet = create_live_call_approval_packet(
+                model_layer=LAYER_TWO_MODEL_LAYER,
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=root / "manager_storage",
+                packet_root=root / "packets",
+                symbols=("XLB", "XLE", "XLK"),
+                pending_only=True,
+                write=True,
+            )
+
+        self.assertEqual(packet.proposal_request_ids, ("mgrreq_backfill_alpaca_bars_xle_2016_01", "mgrreq_backfill_alpaca_bars_xlk_2016_01"))
+        self.assertEqual(packet.skipped_registered_request_ids, ())
+        self.assertEqual(packet.skipped_terminal_count, 1)
+        self.assertEqual(packet.skipped_terminal_request_ids, ("mgrreq_backfill_alpaca_bars_xlb_2016_01",))
+        self.assertIn("--reject-terminal-coverage", packet.dispatch_execute_command_template)
+
     def test_packet_rehearsal_validates_and_plans_without_persistent_approval_or_provider_calls(self):
         with tempfile.TemporaryDirectory() as raw_tmp, patch(
             "trading_manager_tasks.live_call_planning.accepted_failure_request_ids_from_register",

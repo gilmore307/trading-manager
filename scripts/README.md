@@ -26,8 +26,8 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/collect_dataset_evidence.py` — collects current snapshot/split/label/eval/control-plane evidence into `manager_dataset_evidence_v1` for expansion planning without provider calls.
 - `tasks/plan_dataset_expansion.py` — lets manager choose the next dataset role/layer to expand, and with `--write` prepares the selected safe artifacts/payloads without provider calls.
 - `tasks/advance_model_training_workflow.py` — refreshes the durable Layer 1-8 workflow checkpoint, ingests component receipts, records reviewed approval refs, and selects the next safe/gated stage.
-- `tasks/plan_live_call_approval.py` — creates a skip-aware live-call approval review proposal/template without approving, dispatching, or calling providers.
-- `tasks/create_live_call_approval_packet.py` — writes a complete local approval packet bundle with proposal, reviewed-approval placeholder, validation/dispatch/reconcile command templates, status command, and zero provider calls.
+- `tasks/plan_live_call_approval.py` — creates a skip-aware live-call approval review proposal/template without approving, dispatching, or calling providers; `--pending-only` excludes ready/reviewed-terminal stage requests.
+- `tasks/create_live_call_approval_packet.py` — writes a complete local approval packet bundle with proposal, reviewed-approval placeholder, validation/dispatch/reconcile command templates, status command, and zero provider calls; use `--pending-only` for normal runtime packets.
 - `tasks/inspect_live_call_approval_packet.py` — inspects packet lifecycle status (`template_pending_review` through `reconciled`) without approving, dispatching, or calling providers.
 - `tasks/rehearse_live_call_approval_packet.py` — rehearses proposal validation plus plan-only dispatch through ephemeral approval files, leaving persistent packet state unchanged and provider calls at zero.
 - `tasks/validate_live_call_approval_proposal.py` — validates a reviewed `live_call_approval_v1` exactly against a manager proposal before any dispatch attempt.

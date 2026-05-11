@@ -234,6 +234,65 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(dispatch.validation_count, 2)
         self.assertEqual(len(dispatch.items), 2)
 
+    def test_execute_dispatch_rejects_terminal_coverage_when_enabled(self):
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.provider_dispatch.collect_stage_coverage",
+            return_value=SimpleNamespace(
+                failed_request_ids=(),
+                ready_request_ids=("mgrreq_backfill_alpaca_bars_xlk_2016_01",),
+                accepted_failed_request_ids=(),
+            ),
+        ):
+            tmp = Path(raw_tmp)
+            _summary, requests, _payloads, _validations = prepare_layer_two_historical_training_batch(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                write=True,
+                validate_handoff=False,
+            )
+            selected_id = "mgrreq_backfill_alpaca_bars_xlk_2016_01"
+            approval = tmp / "approval.json"
+            approval.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "live_call_approval_v1",
+                        "approval_id": "approval_layer2_terminal_test",
+                        "decision_status": "approved",
+                        "approved_by": "unit-test",
+                        "approved_at_utc": datetime.now(UTC).isoformat(),
+                        "expires_at_utc": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+                        "request_ids": [selected_id],
+                        "approval_scope": "provider_data_acquisition_only",
+                        "broker_execution_allowed": False,
+                        "allowed_providers": ["alpaca"],
+                        "max_requests": 1,
+                        "max_window_days": 31,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            validation = _approval_validation(
+                tmp / "validation.json",
+                approval_id="approval_layer2_terminal_test",
+                stage_id="layer_02_sector_context.data_acquisition",
+                request_ids=[selected_id],
+            )
+
+            with self.assertRaisesRegex(Exception, "terminal stage requests"):
+                dispatch_layer_provider_acquisition(
+                    model_layer=LAYER_TWO_MODEL_LAYER,
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp,
+                    approval_path=approval,
+                    approval_validation_path=validation,
+                    request_ids=(selected_id,),
+                    execute_approved_provider_calls=True,
+                    reject_terminal_coverage=True,
+                )
+
     def test_execute_dispatch_can_continue_after_individual_failure(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

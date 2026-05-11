@@ -23,6 +23,7 @@ from .historical_training import prepare_layer_historical_training_batch
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .live_call_gate import validate_live_call_approvals
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .stage_coverage import collect_stage_coverage
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 
@@ -207,6 +208,7 @@ def dispatch_layer_provider_acquisition(
     execute_approved_provider_calls: bool = False,
     continue_on_error: bool = False,
     skip_registered_failures: bool = False,
+    reject_terminal_coverage: bool = False,
     database_url: str | None = None,
 ) -> ProviderDispatchSummary:
     """Validate approval and optionally dispatch a layer Alpaca-bars acquisition batch."""
@@ -247,6 +249,19 @@ def dispatch_layer_provider_acquisition(
             if required_policy not in policy_refs:
                 policy_refs.append(required_policy)
         live_requests.append(dict(row) | {"dry_run": False, "policy_refs": policy_refs})
+    if execute_approved_provider_calls and reject_terminal_coverage and live_requests:
+        report = collect_stage_coverage(
+            stage_id=f"{model_layer}.data_acquisition",
+            start_month=start_month,
+            end_month=end_month,
+            database_url=database_url,
+        )
+        if report.failed_request_ids:
+            raise TaskSystemError("stage has unreviewed failed requests; review/register failures before executing more live calls: " + ",".join(report.failed_request_ids))
+        terminal_ids = {str(item) for item in (*report.ready_request_ids, *report.accepted_failed_request_ids)}
+        repeated_ids = sorted(str(row.get("request_id") or "") for row in live_requests if str(row.get("request_id") or "") in terminal_ids)
+        if repeated_ids:
+            raise TaskSystemError("refusing to execute provider calls for terminal stage requests: " + ",".join(repeated_ids))
     validations = validate_live_call_approvals(live_requests, approval) if live_requests else []
     approval_validation_ref = _validate_approval_validation_artifact(
         approval_validation_path=approval_validation_path,
@@ -367,6 +382,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--skip-registered-failures", action="store_true", help="Skip requests with accepted_skip entries in the manager failure register.")
     parser.add_argument("--database-url")
+    parser.add_argument("--reject-terminal-coverage", action="store_true", help="When executing, reject request ids already ready or reviewed-terminal in stage coverage.")
     parser.add_argument("--write", action="store_true", help="Write dispatch summary JSON to --output-path.")
     parser.add_argument("--output-path", type=Path, help="Optional dispatch summary output path.")
     args = parser.parse_args(argv)
@@ -384,6 +400,7 @@ def main(argv: list[str] | None = None) -> int:
         execute_approved_provider_calls=args.execute_approved_provider_calls,
         continue_on_error=args.continue_on_error,
         skip_registered_failures=args.skip_registered_failures,
+        reject_terminal_coverage=args.reject_terminal_coverage,
         database_url=args.database_url,
     )
     if args.write:

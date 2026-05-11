@@ -83,14 +83,16 @@
   - skip-aware `manager_live_call_approval_proposal_v1` review-template planning;
   - exclusion of registered accepted skips before approval;
   - exact proposal-bound validation of reviewed `live_call_approval_v1` request ids, skip exclusion, and max request bounds;
-  - proposal/validation outputs stay non-dispatching with zero provider calls.
+  - proposal/validation outputs stay non-dispatching with zero provider calls;
+  - pending-only planning excludes already ready/reviewed-terminal requests and blocks unreviewed failed stage requests.
 
 - `test_live_call_packet.py` verifies:
   - complete `manager_live_call_approval_packet_v1` bundle generation;
   - packet files for proposal, reviewed-approval placeholder, validation output, dispatch templates, reconcile templates, and status templates;
   - registered skip exclusion before packet command construction;
   - read-only packet lifecycle/status transitions from review template through validation, plan, execute, reconcile, and inconsistency detection;
-  - packet rehearsal with ephemeral approval files, no persistent approval/validation/dispatch artifacts, and zero provider calls.
+  - packet rehearsal with ephemeral approval files, no persistent approval/validation/dispatch artifacts, and zero provider calls;
+  - pending-only packets exclude terminal stage requests before command construction.
 
 - `test_historical_training.py` verifies:
   - manager-owned Layer 1 historical-training batch preparation;

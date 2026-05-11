@@ -46,6 +46,7 @@ class LiveCallApprovalPacket:
     end_month: str
     request_count: int
     skipped_registered_count: int
+    skipped_terminal_count: int
     packet_dir: str
     manager_storage_root: str
     proposal_path: str
@@ -59,6 +60,7 @@ class LiveCallApprovalPacket:
     status_output_path: str
     proposal_request_ids: tuple[str, ...]
     skipped_registered_request_ids: tuple[str, ...]
+    skipped_terminal_request_ids: tuple[str, ...]
     validate_approval_command: tuple[str, ...]
     dispatch_plan_command: tuple[str, ...]
     dispatch_execute_command_template: tuple[str, ...]
@@ -75,6 +77,7 @@ class LiveCallApprovalPacket:
         for key in (
             "proposal_request_ids",
             "skipped_registered_request_ids",
+            "skipped_terminal_request_ids",
             "validate_approval_command",
             "dispatch_plan_command",
             "dispatch_execute_command_template",
@@ -309,6 +312,7 @@ def create_live_call_approval_packet(
     request_ids: Sequence[str] = (),
     limit: int | None = None,
     skip_registered_failures: bool = True,
+    pending_only: bool = False,
     database_url: str | None = None,
     write: bool = False,
 ) -> LiveCallApprovalPacket:
@@ -325,6 +329,7 @@ def create_live_call_approval_packet(
         request_ids=request_ids,
         limit=limit,
         skip_registered_failures=skip_registered_failures,
+        skip_terminal_coverage=pending_only,
         database_url=database_url,
     )
     packet_id = _packet_id(model_layer=model_layer, start_month=start_month, end_month=end_month, request_ids=proposal.request_ids)
@@ -356,6 +361,7 @@ def create_live_call_approval_packet(
         end_month=end_month,
         request_count=proposal.request_count,
         skipped_registered_count=proposal.skipped_registered_count,
+        skipped_terminal_count=proposal.skipped_terminal_count,
         packet_dir=str(packet_dir),
         manager_storage_root=str(storage_root),
         proposal_path=str(proposal_path),
@@ -369,6 +375,7 @@ def create_live_call_approval_packet(
         status_output_path=str(status_path),
         proposal_request_ids=proposal.request_ids,
         skipped_registered_request_ids=proposal.skipped_registered_request_ids,
+        skipped_terminal_request_ids=proposal.skipped_terminal_request_ids,
         validate_approval_command=_validation_command(proposal_path=str(proposal_path), approval_path=str(approval_path), validation_path=str(validation_path)),
         dispatch_plan_command=dispatch_plan_command,
         dispatch_execute_command_template=dispatch_execute_command,
@@ -716,6 +723,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--request-id", action="append", default=[], help="Limit to one request id; repeatable.")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--include-registered-failures", action="store_true")
+    parser.add_argument("--pending-only", action="store_true", help="Use stage coverage to exclude already ready/reviewed-terminal requests and packet only pending work.")
     parser.add_argument("--database-url")
     parser.add_argument("--write", action="store_true", help="Write packet files under --packet-root.")
     args = parser.parse_args(argv)
@@ -729,6 +737,7 @@ def main(argv: list[str] | None = None) -> int:
         request_ids=args.request_id,
         limit=args.limit,
         skip_registered_failures=not args.include_registered_failures,
+        pending_only=args.pending_only,
         database_url=args.database_url,
         write=args.write,
     )

@@ -157,11 +157,12 @@ PYTHONPATH=src python3 scripts/tasks/create_live_call_approval_packet.py \
   --model-layer layer_02_sector_context \
   --start-month 2016-01 \
   --end-month 2016-01 \
-  --symbol XLB \
-  --symbol XLK \
-  --symbol XLE \
+  --pending-only \
+  --limit 3 \
   --write
 ```
+
+Use `--pending-only` for normal runtime packets. It reads `manager_stage_coverage_v1`, excludes already ready requests and reviewed terminal accepted skips/failures, and blocks planning while unreviewed failed requests exist. Explicit `--symbol`/`--request-id` filters may still be used, but terminal requests are removed before proposal creation. The generated execute command includes `--reject-terminal-coverage` so provider execution refuses already terminal request ids if coverage changed after packet creation.
 
 The packet writes a proposal, deliberately invalid reviewed-approval placeholder, validation output target, dispatch plan/execute summary targets, reconcile summary/failure-proposal/coverage targets, and a status command under `storage/runtime/approvals/...`. It is a local runtime bundle only: packet creation does not approve, validate as reviewed, dispatch, or call providers.
 
@@ -194,9 +195,8 @@ PYTHONPATH=src python3 scripts/tasks/plan_live_call_approval.py \
   --model-layer layer_02_sector_context \
   --start-month 2016-01 \
   --end-month 2016-01 \
-  --symbol XLB \
-  --symbol XLK \
-  --symbol XLE \
+  --pending-only \
+  --limit 3 \
   --write \
   --output-path storage/runtime/approvals/layer_02_sector_context/live_call_approval_proposal_layer_02_smoke_xlb_xlk_xle_2016-01.json
 ```
