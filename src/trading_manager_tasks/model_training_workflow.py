@@ -231,14 +231,14 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
         "python3",
         f"/root/projects/trading-model/scripts/models/model_{layer:02d}_{slug}/{script_name}",
     ]
-    if layer in {3, 4, 5, 6, 7} and verb == "generate":
+    if layer in {3, 4, 5, 6, 7, 8} and verb == "generate":
         command.extend([
             "--from-database",
             "--source-start",
             "${START_MONTH_START_ET}",
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
-            "--output-jsonl" if layer in {4, 5, 6, 7} else "--output",
+            "--output-jsonl" if layer in {4, 5, 6, 7, 8} else "--output",
             f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/model_rows_${{START_MONTH}}.jsonl",
         ])
     if layer in {1, 2} and verb == "evaluate":
@@ -247,7 +247,7 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--output-json",
             f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/evaluation_summary_${{START_MONTH}}.json",
         ])
-    if layer in {3, 4, 5, 6, 7} and verb == "evaluate":
+    if layer in {3, 4, 5, 6, 7, 8} and verb == "evaluate":
         command.extend([
             "--from-database",
             "--source-start",
@@ -257,7 +257,7 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--output-json",
             f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/evaluation_summary_${{START_MONTH}}.json",
         ])
-        if layer in {4, 5, 6, 7}:
+        if layer in {4, 5, 6, 7, 8}:
             command.extend(["--evidence-source", "database_rows_fixture_outcomes"])
     if layer in {1, 2} and verb == "review":
         command.extend([
@@ -273,7 +273,7 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "real_database_evaluation",
             "--local-fallback-review",
         ])
-    if layer in {4, 5, 6, 7} and verb == "review":
+    if layer in {4, 5, 6, 7, 8} and verb == "review":
         command.extend([
             "--evaluation-summary-json",
             f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/evaluation_summary_${{START_MONTH}}.json",

@@ -44,6 +44,11 @@
   - detector/source task-key evidence generation for `source_04_event_overlay` without provider dispatch;
   - zero provider calls, model activation, or broker execution in dry-run materialization.
 
+- `test_layer_eight_option_expression.py` verifies:
+  - Layer 8 option-expression gate review over completed Layer 7 rows;
+  - reviewed no-provider skip behavior when all Layer 7 rows are no-trade/maintain/neutral;
+  - active Layer 7 target chains producing ThetaData/source_05 option-snapshot request previews without provider calls.
+
 - `test_model_training_state.py` verifies:
   - durable `manager_model_training_workflow_state_v1` initialization;
   - approval-ref and receipt-driven stage advancement;

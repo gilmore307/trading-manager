@@ -170,6 +170,17 @@ After Layer 4 is complete, Layers 5-7 may advance through the safe offline execu
 
 These stages remain safe only while the stage receipts show `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`; promotion review output remains deferred until separate approval.
 
+Before Layer 8 option-expression acquisition, review the completed Layer 7 target chain without calling providers:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.py \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --write
+```
+
+The artifact is `manager_layer_08_option_expression_gate_review_v1`. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active Layer 7 action chains, and records a reviewed no-provider skip when all Layer 7 rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action remains approval-packet review; plain `继续` must still not dispatch Layer 8 provider calls.
+
 Validate that a materialized payload is component-readable before dispatching work:
 
 ```bash

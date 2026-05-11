@@ -173,11 +173,12 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
 
-    def test_layers_five_to_seven_use_database_model_rows_and_conservative_review(self):
+    def test_layers_five_to_eight_use_database_model_rows_and_conservative_review(self):
         expected_scripts = {
             4: "generate_model_05_alpha_confidence.py",
             5: "generate_model_06_position_projection.py",
             6: "generate_model_07_underlying_action.py",
+            7: "generate_model_08_option_expression.py",
         }
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
