@@ -13,13 +13,20 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import UTC, datetime, timedelta
+from tempfile import TemporaryDirectory
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
-from .live_call_planning import SUPPORTED_PROVIDER_APPROVAL_MODEL_LAYERS, plan_live_call_approval_proposal
+from .live_call_planning import (
+    SUPPORTED_PROVIDER_APPROVAL_MODEL_LAYERS,
+    plan_live_call_approval_proposal,
+    validate_live_call_approval_against_proposal,
+)
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
+from .provider_dispatch import dispatch_layer_provider_acquisition
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_APPROVAL_PACKET_ROOT = Path("storage/runtime/approvals")
@@ -40,6 +47,7 @@ class LiveCallApprovalPacket:
     request_count: int
     skipped_registered_count: int
     packet_dir: str
+    manager_storage_root: str
     proposal_path: str
     reviewed_approval_template_path: str
     validation_output_path: str
@@ -115,6 +123,38 @@ class LiveCallApprovalPacketStatus:
         row["missing_files"] = list(self.missing_files)
         row["inconsistent_reasons"] = list(self.inconsistent_reasons)
         return row
+
+
+@dataclass(frozen=True)
+class LiveCallApprovalPacketRehearsal:
+    """Plan-only rehearsal result for a packet using ephemeral approval files."""
+
+    contract_type: str
+    packet_id: str
+    packet_dir: str
+    model_layer: str
+    stage_id: str
+    start_month: str
+    end_month: str
+    request_count: int
+    validation_count: int
+    dispatch_count: int
+    status_before: str
+    status_after: str
+    approval_id: str
+    rehearsal_only: bool
+    persistent_approval_written: bool
+    persistent_validation_written: bool
+    persistent_dispatch_plan_written: bool
+    provider_calls: int
+    dispatch_performed: bool
+    model_activation_performed: bool
+    broker_execution_performed: bool
+    storage_lifecycle_mutation_performed: bool
+    next_action: str
+
+    def summary_row(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 def _token(value: str) -> str:
@@ -317,6 +357,7 @@ def create_live_call_approval_packet(
         request_count=proposal.request_count,
         skipped_registered_count=proposal.skipped_registered_count,
         packet_dir=str(packet_dir),
+        manager_storage_root=str(storage_root),
         proposal_path=str(proposal_path),
         reviewed_approval_template_path=str(approval_path),
         validation_output_path=str(validation_path),
@@ -559,6 +600,101 @@ def inspect_live_call_approval_packet(*, packet_path: Path) -> LiveCallApprovalP
     )
 
 
+def _rehearsal_approval(*, packet: Mapping[str, Any], proposal: Mapping[str, Any], now_utc: datetime) -> dict[str, Any]:
+    template = proposal.get("approval_template")
+    if not isinstance(template, Mapping):
+        raise TaskSystemError("proposal.approval_template must be present for packet rehearsal")
+    approval = dict(template)
+    approval_id = str(approval.get("approval_id") or f"lcav1_{packet.get('packet_id')}_REVIEW_REQUIRED")
+    approval["approval_id"] = approval_id.replace("REVIEW_REQUIRED", "REHEARSAL_ONLY")
+    approval["decision_status"] = "approved"
+    approval["approved_by"] = "packet-rehearsal"
+    approval["approved_at_utc"] = now_utc.isoformat().replace("+00:00", "Z")
+    approval["expires_at_utc"] = (now_utc + timedelta(days=1)).isoformat().replace("+00:00", "Z")
+    approval["request_ids"] = list(str(item) for item in packet.get("proposal_request_ids") or proposal.get("request_ids") or [])
+    approval["rehearsal_only"] = True
+    approval["review_note"] = "Ephemeral in-memory rehearsal approval; never written as the packet approval artifact and not a real live-call approval."
+    return approval
+
+
+def rehearse_live_call_approval_packet(
+    *,
+    packet_path: Path,
+    database_url: str | None = None,
+    now_utc: datetime | None = None,
+) -> LiveCallApprovalPacketRehearsal:
+    """Run validation plus plan-only dispatch through temporary approval files.
+
+    This verifies the packet mechanics without writing a persistent approval,
+    validation artifact, dispatch plan, or provider execution artifact into the
+    packet. It never dispatches providers.
+    """
+
+    packet_file = _resolve_packet_file(packet_path)
+    packet_dir = packet_file.parent
+    packet = _read_json(packet_file)
+    if packet is None:
+        raise TaskSystemError(f"packet does not exist: {packet_file}")
+    if packet.get("contract_type") != "manager_live_call_approval_packet_v1":
+        raise TaskSystemError("packet contract_type must be manager_live_call_approval_packet_v1")
+    proposal = _read_json(Path(str(packet.get("proposal_path") or "")))
+    if proposal is None:
+        raise TaskSystemError("packet proposal_path does not exist")
+    status_before = inspect_live_call_approval_packet(packet_path=packet_file)
+    now = (now_utc or datetime.now(UTC)).astimezone(UTC)
+    approval = _rehearsal_approval(packet=packet, proposal=proposal, now_utc=now)
+    validation = validate_live_call_approval_against_proposal(proposal, approval, now_utc=now)
+    with TemporaryDirectory() as raw_tmp:
+        tmp = Path(raw_tmp)
+        approval_path = tmp / "reviewed_approval_REHEARSAL_ONLY.json"
+        validation_path = tmp / "proposal_validation_REHEARSAL_ONLY.json"
+        approval_path.write_text(json.dumps(approval, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        validation_path.write_text(json.dumps(validation.summary_row(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        dispatch = dispatch_layer_provider_acquisition(
+            model_layer=str(packet.get("model_layer") or ""),
+            start_month=str(packet.get("start_month") or ""),
+            end_month=str(packet.get("end_month") or ""),
+            storage_root=Path(str(packet.get("manager_storage_root") or DEFAULT_STORAGE_ROOT)),
+            approval_path=approval_path,
+            approval_validation_path=validation_path,
+            request_ids=tuple(str(item) for item in packet.get("proposal_request_ids") or []),
+            execute_approved_provider_calls=False,
+            skip_registered_failures=True,
+            database_url=database_url,
+        )
+    status_after = inspect_live_call_approval_packet(packet_path=packet_file)
+    return LiveCallApprovalPacketRehearsal(
+        contract_type="manager_live_call_approval_packet_rehearsal_v1",
+        packet_id=str(packet.get("packet_id") or ""),
+        packet_dir=str(packet_dir),
+        model_layer=str(packet.get("model_layer") or ""),
+        stage_id=str(packet.get("stage_id") or ""),
+        start_month=str(packet.get("start_month") or ""),
+        end_month=str(packet.get("end_month") or ""),
+        request_count=int(packet.get("request_count") or 0),
+        validation_count=validation.gate_validation_count,
+        dispatch_count=dispatch.dispatch_count,
+        status_before=status_before.status,
+        status_after=status_after.status,
+        approval_id=validation.approval_id,
+        rehearsal_only=True,
+        persistent_approval_written=False,
+        persistent_validation_written=False,
+        persistent_dispatch_plan_written=False,
+        provider_calls=0,
+        dispatch_performed=False,
+        model_activation_performed=False,
+        broker_execution_performed=False,
+        storage_lifecycle_mutation_performed=False,
+        next_action="real human review must fill the packet approval template before normal packet state can advance",
+    )
+
+
+def write_live_call_approval_packet_rehearsal(rehearsal: LiveCallApprovalPacketRehearsal, *, output: TextIO) -> None:
+    json.dump(rehearsal.summary_row(), output, indent=2, sort_keys=True)
+    output.write("\n")
+
+
 def write_live_call_approval_packet(packet: LiveCallApprovalPacket, *, output: TextIO) -> None:
     json.dump(packet.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
@@ -617,14 +753,34 @@ def status_main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def rehearsal_main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Rehearse packet validation plus plan-only dispatch with ephemeral approval files and zero provider calls.")
+    parser.add_argument("--packet", required=True, type=Path, help="Path to packet.json or its containing packet directory.")
+    parser.add_argument("--database-url")
+    parser.add_argument("--write", action="store_true", help="Write rehearsal JSON to --output-path.")
+    parser.add_argument("--output-path", type=Path, help="Optional rehearsal output path.")
+    args = parser.parse_args(argv)
+    rehearsal = rehearse_live_call_approval_packet(packet_path=args.packet, database_url=args.database_url)
+    if args.write:
+        if args.output_path is None:
+            args.output_path = Path(rehearsal.packet_dir) / "packet_rehearsal.json"
+        args.output_path.parent.mkdir(parents=True, exist_ok=True)
+        args.output_path.write_text(json.dumps(rehearsal.summary_row(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_live_call_approval_packet_rehearsal(rehearsal, output=sys.stdout)
+    return 0
+
+
 __all__ = [
     "DEFAULT_APPROVAL_PACKET_ROOT",
     "LiveCallApprovalPacket",
     "LiveCallApprovalPacketStatus",
+    "LiveCallApprovalPacketRehearsal",
     "create_live_call_approval_packet",
     "inspect_live_call_approval_packet",
+    "rehearse_live_call_approval_packet",
     "write_live_call_approval_packet",
     "write_live_call_approval_packet_status",
+    "write_live_call_approval_packet_rehearsal",
 ]
 
 

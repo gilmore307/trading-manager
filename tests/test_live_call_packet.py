@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from trading_manager_tasks.live_call_packet import create_live_call_approval_packet, inspect_live_call_approval_packet
+from trading_manager_tasks.live_call_packet import create_live_call_approval_packet, inspect_live_call_approval_packet, rehearse_live_call_approval_packet
+from trading_manager_tasks.historical_training import prepare_layer_two_historical_training_batch
 from trading_manager_tasks.monthly_backfill import LAYER_TWO_MODEL_LAYER
 
 
@@ -197,6 +198,50 @@ class LiveCallApprovalPacketTests(unittest.TestCase):
 
         self.assertEqual(status.status, "packet_inconsistent")
         self.assertTrue(status.inconsistent_reasons)
+
+    def test_packet_rehearsal_validates_and_plans_without_persistent_approval_or_provider_calls(self):
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.live_call_planning.accepted_failure_request_ids_from_register",
+            return_value=((), ()),
+        ), patch(
+            "trading_manager_tasks.provider_dispatch.accepted_failure_request_ids_from_register",
+            return_value=((), ()),
+        ):
+            root = Path(raw_tmp)
+            manager_storage = root / "manager_storage"
+            prepare_layer_two_historical_training_batch(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=manager_storage,
+                write=True,
+                validate_handoff=False,
+            )
+            packet = create_live_call_approval_packet(
+                model_layer=LAYER_TWO_MODEL_LAYER,
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=manager_storage,
+                packet_root=root / "packets",
+                symbols=("XLK", "XLE"),
+                write=True,
+            )
+
+            rehearsal = rehearse_live_call_approval_packet(packet_path=Path(packet.packet_dir) / "packet.json")
+            status = inspect_live_call_approval_packet(packet_path=Path(packet.packet_dir) / "packet.json")
+
+        self.assertEqual(rehearsal.contract_type, "manager_live_call_approval_packet_rehearsal_v1")
+        self.assertEqual(rehearsal.request_count, 2)
+        self.assertEqual(rehearsal.validation_count, 2)
+        self.assertEqual(rehearsal.dispatch_count, 0)
+        self.assertEqual(rehearsal.provider_calls, 0)
+        self.assertFalse(rehearsal.dispatch_performed)
+        self.assertTrue(rehearsal.rehearsal_only)
+        self.assertFalse(rehearsal.persistent_approval_written)
+        self.assertFalse(rehearsal.persistent_validation_written)
+        self.assertFalse(rehearsal.persistent_dispatch_plan_written)
+        self.assertEqual(rehearsal.status_before, "template_pending_review")
+        self.assertEqual(rehearsal.status_after, "template_pending_review")
+        self.assertEqual(status.status, "template_pending_review")
 
     def test_packet_excludes_registered_skips_before_building_commands(self):
         with tempfile.TemporaryDirectory() as raw_tmp, patch(

@@ -176,6 +176,17 @@ PYTHONPATH=src python3 scripts/tasks/inspect_live_call_approval_packet.py \
 
 The status artifact is `manager_live_call_approval_packet_status_v1`. It reports the local lifecycle as `template_pending_review`, `approval_ready_pending_validation`, `approval_validated_pending_dispatch_plan`, `dispatch_plan_ready_pending_execute`, `executed_pending_reconcile`, `reconciled`, or `packet_inconsistent`. Status inspection is read-only and also reports the next safe action.
 
+Before any human-reviewed approval is written, rehearse the packet mechanics without changing persistent packet state:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/rehearse_live_call_approval_packet.py \
+  --packet storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet.json \
+  --write \
+  --output-path storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet_rehearsal.json
+```
+
+The rehearsal artifact is `manager_live_call_approval_packet_rehearsal_v1`. It uses temporary in-memory/on-disk approval files to validate the proposal and run plan-only dispatch, but it does not write a persistent approval, validation, dispatch-plan, or execute artifact into the packet and does not advance packet status. It must report `provider_calls=0` and `dispatch_performed=false`.
+
 Plan the exact request ids for a reviewed live-call approval before creating or editing an approval artifact:
 
 ```bash
