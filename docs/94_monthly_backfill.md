@@ -48,7 +48,7 @@ The planner emits deterministic dry-run `manager_request_v1` dictionaries. It do
 
 For Layer 1 `MarketRegimeModel` training, `01_feed_alpaca_bars` expands over every `model_layer = layer_01_market_regime` row in `trading-storage/main/shared/market_regime_etf_universe.csv`. Each ETF symbol gets its own monthly request and storage path so missing history, provider errors, and receipts stay isolated by symbol. The current reviewed Layer 1 universe has 22 market-state ETFs.
 
-For Layer 2 `SectorContextModel` training, pass `--model-layer layer_02_sector_context` to the planner or use the dedicated Layer 2 preparation command below. Layer 2 expands over the reviewed sector/industry ETF rows from the same shared universe file. The current reviewed Layer 2 universe has 25 sector/industry ETFs and remains approval-gated before any live provider dispatch.
+For Layer 2 `SectorContextModel` training, pass `--model-layer layer_02_sector_context` to the planner or use the dedicated Layer 2 preparation command below. Layer 2 expands over the reviewed sector/industry ETF rows from the same shared universe file. The current reviewed Layer 2 universe has 25 sector/industry ETFs and requires owner-observed agent review plus proposal validation before live provider dispatch.
 
 Each planned request keeps only concise control-plane facts:
 

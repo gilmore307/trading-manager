@@ -38,8 +38,8 @@ The accepted promotion route is:
 ```text
 model evidence package
   -> model_promotion_review_v1 manager request
-  -> review_decision_v1
-  -> activation_record_v1 only after approve
+  -> agent_model_promotion_decision_v1
+  -> activation_record_v1 only after agent approve
 ```
 
 The accepted live-provider gate is:
@@ -47,8 +47,8 @@ The accepted live-provider gate is:
 ```text
 dry-run request/payload/handoff evidence
   -> non-dry-run manager_request_v1 with live-call policy refs
-  -> reviewed live_call_approval_v1
-  -> validate_live_call_approval.py
+  -> owner-observed agent-reviewed live_call_approval_v1
+  -> validate_live_call_approval.py / proposal validation
   -> component dispatch may be considered outside this closeout
 ```
 

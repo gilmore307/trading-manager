@@ -96,7 +96,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, "ready")
         self.assertEqual(decision.reason_code, "safe_offline_work_ready")
         self.assertEqual(decision.selected_work, "prepare_layer_one_historical_training_batch")
-        self.assertEqual(decision.next_internal_stage, "approval_gated_provider_acquisition")
+        self.assertEqual(decision.next_internal_stage, "owner_observed_agent_reviewed_provider_acquisition")
         self.assertEqual(decision.approval_gate_required, "live_call_approval_v1")
         self.assertIsNotNone(decision.execution_summary)
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], 8)
@@ -125,7 +125,7 @@ class SchedulerTests(unittest.TestCase):
 
         self.assertEqual(decision.decision_status, "executed")
         self.assertEqual(decision.reason_code, "safe_offline_preparation_executed")
-        self.assertEqual(decision.next_internal_stage, "approval_gated_provider_acquisition")
+        self.assertEqual(decision.next_internal_stage, "owner_observed_agent_reviewed_provider_acquisition")
         self.assertEqual(decision.approval_gate_required, "live_call_approval_v1")
         self.assertEqual(decision.provider_calls, 0)
         self.assertFalse(decision.dispatch_performed)
@@ -148,7 +148,7 @@ class SchedulerTests(unittest.TestCase):
                 execute_safe_preparation=True,
             )
         self.assertEqual(decision.decision_status, "backoff")
-        self.assertEqual(decision.reason_code, "waiting_live_call_approval")
+        self.assertEqual(decision.reason_code, "waiting_owner_observed_agent_review")
         self.assertEqual(decision.selected_work, "layer_01_market_regime.data_acquisition")
         self.assertEqual(decision.approval_gate_required, "live_call_approval_v1")
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], 8)

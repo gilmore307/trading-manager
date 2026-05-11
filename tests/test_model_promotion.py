@@ -55,7 +55,10 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertEqual(request["candidate_ref"], "trading-model://promotion-candidates/mpcand_example")
         self.assertEqual(request["evaluation_run_refs"], ["trading-model://eval-runs/mdevrun_example"])
         self.assertIn("model_promotion_unified_review_v1", request["policy_refs"])
-        self.assertIn("activation_record_v1_if_approved", request["expected_outputs"])
+        self.assertIn("model_promotion_script_called_agent_decision_v1", request["policy_refs"])
+        self.assertIn("model_promotion_no_activation_without_agent_decision", request["policy_refs"])
+        self.assertIn("agent_model_promotion_decision_v1", request["expected_outputs"])
+        self.assertIn("activation_record_v1_if_agent_approved", request["expected_outputs"])
 
     def test_rejects_unknown_model_target(self):
         with self.assertRaises(TaskSystemError):

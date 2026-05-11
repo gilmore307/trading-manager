@@ -124,10 +124,12 @@ def _validate_safe_stage(stage: StageProgress) -> None:
     if stage.stage_type not in SAFE_OFFLINE_STAGE_TYPES:
         raise TaskSystemError(f"stage type is not safe offline executable: {stage.stage_type}")
     if stage.stage_type == "data_acquisition" and not any(
-        token.endswith("materialize_layer_three_target_state_inputs.py") or token.endswith("materialize_layer_four_event_overlay_inputs.py")
+        token.endswith("materialize_layer_three_target_state_inputs.py")
+        or token.endswith("materialize_layer_four_event_overlay_inputs.py")
+        or token.endswith("review_layer_eight_option_expression_gate.py")
         for token in stage.command
     ):
-        raise TaskSystemError(f"data_acquisition stage is not an approved local materialization command: {stage.stage_id}")
+        raise TaskSystemError(f"data_acquisition stage is not an approved local materialization/review command: {stage.stage_id}")
     if not stage.command:
         raise TaskSystemError(f"stage has no command: {stage.stage_id}")
     if any("${" in token for token in stage.command):

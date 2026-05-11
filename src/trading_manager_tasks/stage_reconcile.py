@@ -1,7 +1,6 @@
 """Reconcile provider-stage receipts into manager coverage/workflow state.
 
-This module owns the safe post-dispatch side of an approval-gated provider
-stage. It discovers component completion receipts that already exist on disk,
+This module owns the safe post-dispatch side of an owner-observed agent-reviewed provider stage. It discovers component completion receipts that already exist on disk,
 normalizes them into manager control-plane rows, refreshes stage coverage, and
 optionally advances workflow state. It never dispatches components or calls
 providers.

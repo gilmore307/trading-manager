@@ -1,8 +1,8 @@
 """Layer 1-8 historical model-training workflow graph.
 
 The manager owns orchestration across all model layers. This module defines the
-current automation graph, command surfaces, safety gates, and dependency status
-without weakening provider/model/execution approvals.
+current automation graph, command surfaces, owner-observed automation gates, and
+dependency status without weakening broker/order/account boundaries.
 """
 
 from __future__ import annotations
@@ -125,7 +125,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "background_panel_continuous",
         "candidate_axis": "month",
         "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each chronological month, then continue to the next month without waiting for downstream layers",
-        "data_surface": "approval-gated Alpaca ETF bars acquisition plus feature_01_market_regime",
+        "data_surface": "agent-reviewed owner-observed Alpaca ETF bars acquisition plus feature_01_market_regime",
         "feature_cli": "trading-data-feature-01-market-regime",
     },
     {
@@ -136,7 +136,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "month;sector_or_industry_symbol",
         "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each chronological month once Layer 1 context exists, then continue forward without waiting for Layers 3-8",
-        "data_surface": "approval-gated Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
+        "data_surface": "agent-reviewed owner-observed Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
     {
@@ -202,7 +202,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "option_expression_after_target_chain_complete",
         "candidate_axis": "month;target_candidate_id;option_contract_bucket",
         "candidate_progression_policy": "admit option-expression contract/bucket expansion only after the upstream Layer 1-7 context/target chain is complete for the selected target; expand expirations near-to-far by listed expiry week and include current-to-target strike corridor plus three listed strike levels on each side without prefiltering illiquid/extreme contracts for model-construction coverage; V1 expression candidates are single-leg only",
-        "data_surface": "approval-gated option-expression sources plus feature_08_option_expression",
+        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active Layer 7 target chains exist plus feature_08_option_expression",
         "feature_cli": "trading-data-feature-08-option-expression",
     },
 )
@@ -389,8 +389,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
         acquisition_status, acquisition_blockers, acquisition_gate = "blocked", (
             "upstream_layers_01_07_complete",
             "active_target_chain_complete",
-            "live_call_approval_v1",
-        ), "live_call_approval_v1"
+        ), None
     elif meta.get("feature_cli") is None:
         acquisition_status, acquisition_blockers, acquisition_gate = "not_applicable", (), None
     else:
@@ -436,6 +435,17 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
             "${END_MONTH}",
             "--write",
         ]
+    elif layer == 8:
+        acquisition_command = [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/review_layer_eight_option_expression_gate.py",
+            "--start-month",
+            "${START_MONTH}",
+            "--end-month",
+            "${END_MONTH}",
+            "--write",
+        ]
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
 
@@ -450,7 +460,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
             command=acquisition_command,
             blockers=acquisition_blockers,
             approval_gate_required=acquisition_gate,
-            safe_without_provider_calls=not (layer in {1, 2, 8} or acquisition_gate is not None),
+            safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
             provider_calls_allowed=False,
         )
     ]

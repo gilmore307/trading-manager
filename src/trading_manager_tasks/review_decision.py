@@ -1,4 +1,4 @@
-"""Build and validate unified review decision and activation artifacts."""
+"""Build advisory review, agent promotion-decision, and activation artifacts."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from typing import Any, Iterable, Literal, Mapping, TextIO
 from .control_plane import TaskSystemError
 
 REVIEW_DECISION_CONTRACT = "review_decision_v1"
+AGENT_MODEL_PROMOTION_DECISION_CONTRACT = "agent_model_promotion_decision_v1"
 ACTIVATION_RECORD_CONTRACT = "activation_record_v1"
 APPROVING_STATUS = "approve"
 ALLOWED_DECISION_STATUSES = {"approve", "defer", "reject", "revoke", "supersede"}
@@ -42,7 +43,11 @@ def build_review_decision(
     review_decision_id: str | None = None,
     created_at_utc: str | None = None,
 ) -> dict[str, Any]:
-    """Build a generic review_decision_v1 artifact."""
+    """Build an advisory review_decision_v1 artifact.
+
+    This artifact may support promotion evidence, but it is not sufficient for
+    production activation. Activation requires `agent_model_promotion_decision_v1`.
+    """
 
     if decision_status not in ALLOWED_DECISION_STATUSES:
         raise TaskSystemError(f"decision_status must be one of: {', '.join(sorted(ALLOWED_DECISION_STATUSES))}")
@@ -101,9 +106,93 @@ def validate_review_decision(decision: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def build_agent_model_promotion_decision(
+    *,
+    promotion_request_ref: str,
+    agent_ref: str,
+    decision_status: Literal["approve", "defer", "reject", "revoke", "supersede"],
+    decision_reason: str,
+    evidence_refs: Iterable[str] | None = None,
+    advisory_review_refs: Iterable[str] | None = None,
+    conditions: Iterable[str] | None = None,
+    decision_id: str | None = None,
+    created_at_utc: str | None = None,
+) -> dict[str, Any]:
+    """Build the required script-called agent decision for model promotion."""
+
+    if decision_status not in ALLOWED_DECISION_STATUSES:
+        raise TaskSystemError(f"decision_status must be one of: {', '.join(sorted(ALLOWED_DECISION_STATUSES))}")
+    if not promotion_request_ref:
+        raise TaskSystemError("promotion_request_ref is required")
+    if not agent_ref:
+        raise TaskSystemError("agent_ref is required")
+    if not decision_reason:
+        raise TaskSystemError("decision_reason is required")
+    normalized_evidence = _as_list(evidence_refs)
+    normalized_reviews = _as_list(advisory_review_refs)
+    normalized_conditions = _as_list(conditions)
+    stable_decision_id = decision_id or _stable_id(
+        "agpromodec",
+        promotion_request_ref,
+        agent_ref,
+        decision_status,
+        decision_reason,
+        normalized_evidence,
+        normalized_reviews,
+        normalized_conditions,
+    )
+    decision = {
+        "contract_type": AGENT_MODEL_PROMOTION_DECISION_CONTRACT,
+        "agent_model_promotion_decision_id": stable_decision_id,
+        "promotion_request_ref": promotion_request_ref,
+        "agent_ref": agent_ref,
+        "decision_status": decision_status,
+        "decision_reason": decision_reason,
+        "evidence_refs": normalized_evidence,
+        "advisory_review_refs": normalized_reviews,
+        "conditions": normalized_conditions,
+        "owner_observed_automation": True,
+        "created_at_utc": created_at_utc or _now_utc(),
+    }
+    validate_agent_model_promotion_decision(decision)
+    return decision
+
+
+def validate_agent_model_promotion_decision(decision: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate an agent_model_promotion_decision_v1 artifact."""
+
+    required = (
+        "contract_type",
+        "agent_model_promotion_decision_id",
+        "promotion_request_ref",
+        "agent_ref",
+        "decision_status",
+        "decision_reason",
+        "evidence_refs",
+        "conditions",
+        "created_at_utc",
+    )
+    normalized = dict(decision)
+    for field in required:
+        value = normalized.get(field)
+        if value in (None, ""):
+            raise TaskSystemError(f"missing required agent model promotion decision field: {field}")
+    if normalized["contract_type"] != AGENT_MODEL_PROMOTION_DECISION_CONTRACT:
+        raise TaskSystemError(f"contract_type must be {AGENT_MODEL_PROMOTION_DECISION_CONTRACT}")
+    if normalized["decision_status"] not in ALLOWED_DECISION_STATUSES:
+        raise TaskSystemError(f"unsupported decision_status: {normalized['decision_status']}")
+    for field in ("evidence_refs", "advisory_review_refs", "conditions"):
+        if field not in normalized:
+            normalized[field] = []
+        if not isinstance(normalized[field], list):
+            raise TaskSystemError(f"{field} must be a list")
+    normalized["owner_observed_automation"] = bool(normalized.get("owner_observed_automation", False))
+    return normalized
+
+
 def build_activation_record(
     *,
-    review_decision: Mapping[str, Any],
+    agent_decision: Mapping[str, Any],
     activated_component: str,
     activated_config_ref: str,
     rollback_ref: str,
@@ -112,11 +201,11 @@ def build_activation_record(
     activation_record_id: str | None = None,
     activated_at_utc: str | None = None,
 ) -> dict[str, Any]:
-    """Build an activation_record_v1 only from an approving review decision."""
+    """Build an activation_record_v1 only from an approving agent decision."""
 
-    decision = validate_review_decision(review_decision)
+    decision = validate_agent_model_promotion_decision(agent_decision)
     if decision["decision_status"] != APPROVING_STATUS:
-        raise TaskSystemError("activation_record_v1 requires approving review_decision_v1")
+        raise TaskSystemError("activation_record_v1 requires approving agent_model_promotion_decision_v1")
     for field_name, value in {
         "activated_component": activated_component,
         "activated_config_ref": activated_config_ref,
@@ -127,7 +216,7 @@ def build_activation_record(
             raise TaskSystemError(f"{field_name} is required")
     activation_id = activation_record_id or _stable_id(
         "actrec",
-        decision["review_decision_id"],
+        decision["agent_model_promotion_decision_id"],
         activated_component,
         activated_config_ref,
         replaced_config_ref,
@@ -137,18 +226,18 @@ def build_activation_record(
         "contract_type": ACTIVATION_RECORD_CONTRACT,
         "activation_record_id": activation_id,
         "activated_component": activated_component,
-        "approved_review_decision_ref": decision["review_decision_id"],
+        "approved_agent_model_promotion_decision_ref": decision["agent_model_promotion_decision_id"],
         "activated_config_ref": activated_config_ref,
         "replaced_config_ref": replaced_config_ref,
         "rollback_ref": rollback_ref,
         "activated_at_utc": activated_at_utc or _now_utc(),
         "activated_by": activated_by,
     }
-    validate_activation_record(activation, review_decision=decision)
+    validate_activation_record(activation, agent_decision=decision)
     return activation
 
 
-def validate_activation_record(activation: Mapping[str, Any], *, review_decision: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def validate_activation_record(activation: Mapping[str, Any], *, agent_decision: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Validate activation_record_v1 boundary rules."""
 
     normalized = dict(activation)
@@ -156,7 +245,7 @@ def validate_activation_record(activation: Mapping[str, Any], *, review_decision
         "contract_type",
         "activation_record_id",
         "activated_component",
-        "approved_review_decision_ref",
+        "approved_agent_model_promotion_decision_ref",
         "activated_config_ref",
         "rollback_ref",
         "activated_at_utc",
@@ -167,12 +256,12 @@ def validate_activation_record(activation: Mapping[str, Any], *, review_decision
             raise TaskSystemError(f"missing required activation record field: {field}")
     if normalized["contract_type"] != ACTIVATION_RECORD_CONTRACT:
         raise TaskSystemError(f"contract_type must be {ACTIVATION_RECORD_CONTRACT}")
-    if review_decision is not None:
-        decision = validate_review_decision(review_decision)
+    if agent_decision is not None:
+        decision = validate_agent_model_promotion_decision(agent_decision)
         if decision["decision_status"] != APPROVING_STATUS:
-            raise TaskSystemError("activation_record_v1 requires approving review_decision_v1")
-        if normalized["approved_review_decision_ref"] != decision["review_decision_id"]:
-            raise TaskSystemError("activation approved_review_decision_ref does not match review decision")
+            raise TaskSystemError("activation_record_v1 requires approving agent_model_promotion_decision_v1")
+        if normalized["approved_agent_model_promotion_decision_ref"] != decision["agent_model_promotion_decision_id"]:
+            raise TaskSystemError("activation approved_agent_model_promotion_decision_ref does not match agent decision")
     return normalized
 
 
@@ -186,7 +275,7 @@ def write_artifact(payload: Mapping[str, Any], *, output: TextIO | None = None, 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build unified review_decision_v1 artifacts without activation side effects.")
+    parser = argparse.ArgumentParser(description="Build advisory review_decision_v1 artifacts without activation side effects.")
     parser.add_argument("--review-target-ref", required=True)
     parser.add_argument("--reviewer-ref", default="openclaw")
     parser.add_argument("--decision-status", required=True, choices=tuple(sorted(ALLOWED_DECISION_STATUSES)))
@@ -209,11 +298,14 @@ def main(argv: list[str] | None = None) -> int:
 
 __all__ = [
     "ACTIVATION_RECORD_CONTRACT",
+    "AGENT_MODEL_PROMOTION_DECISION_CONTRACT",
     "ALLOWED_DECISION_STATUSES",
     "REVIEW_DECISION_CONTRACT",
     "build_activation_record",
+    "build_agent_model_promotion_decision",
     "build_review_decision",
     "validate_activation_record",
+    "validate_agent_model_promotion_decision",
     "validate_review_decision",
     "write_artifact",
 ]

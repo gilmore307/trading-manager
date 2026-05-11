@@ -3,7 +3,9 @@
 This module owns the common control-plane entrypoint for promotion review requests.
 Model repositories still produce model-specific evidence, labels, metrics, and
 candidate artifacts; the manager owns the request shape and review/activation
-boundary.
+boundary. Production promotion/activation decisions are made by a
+script-called agent decision artifact under owner observation; they are not a
+routine manual approval gate.
 """
 
 from __future__ import annotations
@@ -30,11 +32,12 @@ TARGET_REPO_ID = "trading-manager"
 DEFAULT_REQUESTED_BY = "openclaw"
 DEFAULT_POLICY_REFS = (
     "model_promotion_unified_review_v1",
-    "model_promotion_no_activation_without_approved_decision",
+    "model_promotion_script_called_agent_decision_v1",
+    "model_promotion_no_activation_without_agent_decision",
 )
 DEFAULT_EXPECTED_OUTPUTS = (
-    "review_decision_v1",
-    "activation_record_v1_if_approved",
+    "agent_model_promotion_decision_v1",
+    "activation_record_v1_if_agent_approved",
     "promotion_review_ready_signal",
 )
 

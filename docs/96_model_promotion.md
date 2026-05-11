@@ -2,16 +2,16 @@
 
 `trading-manager` owns one promotion review entrypoint for every model layer.
 
-The model repositories produce evidence. The manager records and reviews that evidence through one control-plane path.
+The model repositories produce evidence. The manager records and reviews that evidence through one control-plane path, then calls an agent decision step under owner observation.
 
 ```text
 model-specific evidence producer
   -> model_promotion_review_v1 manager request
-  -> review_decision_v1
-  -> activation_record_v1 only if approved
+  -> agent_model_promotion_decision_v1
+  -> activation_record_v1 only if agent-approved
 ```
 
-Do not create one promotion system per model. Layer-specific semantics belong in evidence adapters, metric names, labels, baseline ladders, and gate policy refs. The request/review/decision/activation skeleton is shared.
+Do not create one promotion system per model. Layer-specific semantics belong in evidence adapters, metric names, labels, baseline ladders, and gate policy refs. The request/evidence/agent-decision/activation skeleton is shared.
 
 ## Unified Request
 
@@ -57,9 +57,9 @@ PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py \
   --candidate-ref trading-model://promotion-candidates/mpcand_example
 ```
 
-Add `--write` only after the request payload has been reviewed. `--write` persists the request rows to `trading_manager.manager_request`; it does not approve promotion and does not activate configs.
+Add `--write` only after the request payload is ready for owner-observed automation. `--write` persists the request rows to `trading_manager.manager_request`; it does not approve promotion and does not activate configs.
 
-Build a generic review decision artifact:
+Build a generic decision artifact only through the script-called agent promotion-decision path. Until that agent decision surface exists, legacy `review_decision_v1` builders are evidence/advisory scaffolding only and must not activate configs:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/build_review_decision.py \
@@ -69,7 +69,7 @@ PYTHONPATH=src python3 scripts/tasks/build_review_decision.py \
   --condition supply_real_sample_eval
 ```
 
-`review_decision_v1` is an artifact-level decision record. Only `decision_status=approve` can be used to build an `activation_record_v1`; deferred, rejected, failed, partial, revoked, or superseded decisions cannot activate configs.
+The accepted production boundary is `agent_model_promotion_decision_v1`. Only an agent decision with approved activation scope may be used to build an `activation_record_v1`; deferred, rejected, failed, partial, revoked, superseded, or legacy advisory review decisions cannot activate configs.
 
 ## Boundary
 
@@ -85,7 +85,7 @@ PYTHONPATH=src python3 scripts/tasks/build_review_decision.py \
 
 - the generic promotion review request;
 - review policy and checklist;
-- reviewed decision records;
+- script-called agent decision records;
 - activation records;
 - cross-layer dependency gates;
 - the rule that deferred or rejected decisions cannot activate configs.
@@ -104,7 +104,7 @@ manager schedules lifecycle
 storage executes lifecycle
 ```
 
-Promotion outputs should mark promoted model bodies and required lineage as permanently retained, and may emit retention hints for regenerable intermediates. Any storage lifecycle work created by promotion must enter the manager task system as `storage_lifecycle_request_v1`, where it can be prioritized, scheduled, summarized, and observed. `trading-storage` remains the owner of protected-set checks, physical compression/archive/restore/delete actions, receipts, and tombstones.
+Promotion outputs should mark promoted model bodies and required lineage as permanently retained, and may emit retention hints for regenerable intermediates. Any storage lifecycle work created by promotion must enter the manager task system as `storage_lifecycle_request_v1`, where it can be prioritized, scheduled, summarized, and decided by a script-called agent lifecycle-decision artifact under owner observation. `scripts/tasks/build_agent_storage_lifecycle_decision.py` records that decision without mutating storage. `trading-storage` remains the owner of protected-set checks, physical compression/archive/restore/delete actions, receipts, and tombstones.
 
 ## Registered Models
 
@@ -123,8 +123,8 @@ This table is the manager-side promotion target map. It records review targets a
 
 ## Guardrails
 
-- A promotion request is not a promotion approval.
+- A promotion request is not a promotion decision.
 - Evidence generation does not imply activation.
-- Activation requires an approving `review_decision_v1`.
-- Deferred, rejected, failed, or partial reviews must not move production pointers.
+- Activation requires an approving `agent_model_promotion_decision_v1`.
+- Deferred, rejected, failed, partial, legacy advisory, or missing agent decisions must not move production pointers.
 - Model-specific fields stay in model evidence; manager only stores refs and generic review facts.

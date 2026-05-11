@@ -1,8 +1,8 @@
 """Validate manager live-call approval artifacts before provider dispatch.
 
 The manager gate is intentionally a validator, not a dispatcher. It proves that a
-non-dry-run request has an explicit reviewed approval boundary before any
-component is allowed to perform provider/API calls.
+non-dry-run request has an owner-observed agent-reviewed approval boundary before
+any component is allowed to perform provider/API calls.
 """
 
 from __future__ import annotations

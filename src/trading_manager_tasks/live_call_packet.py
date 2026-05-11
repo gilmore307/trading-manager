@@ -276,7 +276,7 @@ def _write_readme(path: Path, packet: LiveCallApprovalPacket) -> None:
         "Safety boundary:",
         "- Packet creation does not approve provider calls.",
         "- Packet creation does not dispatch providers.",
-        "- Execution still requires a reviewed approval artifact plus proposal-bound validation.",
+        "- Execution still requires owner-observed agent review plus proposal-bound validation.",
         "- Broker execution, model activation, and storage lifecycle mutation remain disabled.",
         "",
         "Lifecycle:",

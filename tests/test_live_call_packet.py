@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import tempfile
 import unittest
@@ -289,6 +290,54 @@ class LiveCallApprovalPacketTests(unittest.TestCase):
         self.assertEqual(rehearsal.status_before, "template_pending_review")
         self.assertEqual(rehearsal.status_after, "template_pending_review")
         self.assertEqual(status.status, "template_pending_review")
+
+    def test_agent_review_script_writes_persistent_approval_validation_and_plan_without_provider_calls(self):
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.live_call_planning.accepted_failure_request_ids_from_register",
+            return_value=((), ()),
+        ), patch(
+            "trading_manager_tasks.provider_dispatch.accepted_failure_request_ids_from_register",
+            return_value=((), ()),
+        ):
+            root = Path(raw_tmp)
+            manager_storage = root / "manager_storage"
+            prepare_layer_two_historical_training_batch(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=manager_storage,
+                write=True,
+                validate_handoff=False,
+            )
+            packet = create_live_call_approval_packet(
+                model_layer=LAYER_TWO_MODEL_LAYER,
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=manager_storage,
+                packet_root=root / "packets",
+                symbols=("XLK", "XLE"),
+                write=True,
+            )
+            script_path = Path(__file__).resolve().parents[1] / "scripts" / "tasks" / "agent_review_live_call_approval_packet.py"
+            spec = importlib.util.spec_from_file_location("agent_review_live_call_approval_packet", script_path)
+            self.assertIsNotNone(spec)
+            module = importlib.util.module_from_spec(spec)
+            assert spec and spec.loader
+            spec.loader.exec_module(module)
+
+            receipt = module.agent_review_packet(packet_path=Path(packet.packet_dir) / "packet.json", reviewed_by="unit-agent", valid_hours=4)
+            status = inspect_live_call_approval_packet(packet_path=Path(packet.packet_dir) / "packet.json")
+            approval = json.loads(Path(packet.reviewed_approval_path).read_text(encoding="utf-8"))
+
+            self.assertEqual(receipt["contract_type"], "manager_live_call_approval_packet_agent_review_v1")
+            self.assertEqual(receipt["request_count"], 2)
+            self.assertEqual(receipt["validation_count"], 2)
+            self.assertEqual(receipt["provider_calls"], 0)
+            self.assertFalse(receipt["dispatch_performed"])
+            self.assertEqual(status.status, "dispatch_plan_ready_pending_execute")
+            self.assertEqual(approval["approved_by"], "unit-agent")
+            self.assertTrue(approval["owner_observed_automation"])
+            self.assertEqual(approval["approval_scope"], "provider_data_acquisition_only")
+            self.assertFalse(approval["broker_execution_allowed"])
 
     def test_packet_excludes_registered_skips_before_building_commands(self):
         with tempfile.TemporaryDirectory() as raw_tmp, patch(

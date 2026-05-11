@@ -300,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
         review_path, receipt_path = write_gate_review_artifacts(review, output_root=args.output_root)
         review = LayerEightGateReview(**{**review.summary_row(), "request_previews": review.request_previews, "evidence_refs": (*review.evidence_refs, str(review_path), str(receipt_path))})
     write_gate_review(review, output=sys.stdout)
-    return 0
+    return 0 if review.status == "no_provider_skip_accepted" else 2
 
 
 __all__ = [

@@ -39,19 +39,19 @@ When a source/feature/model name crosses repository boundaries, the canonical sh
 - plan manager requests for data/model/storage/execution/dashboard review paths;
 - validate request payload shape and live-call approvals;
 - maintain registry names, kind boundaries, and naming rules;
-- record promotion-review requests, review-decision artifacts, and activation-record artifacts;
-- enforce that deferred/rejected/failed/partial reviews cannot activate configs.
+- record promotion-review requests, script-called agent decision artifacts, and activation-record artifacts;
+- enforce that deferred/rejected/failed/partial/missing agent decisions cannot activate configs.
 
 `trading-manager` must not:
 
 - fetch provider data;
 - run feature generation, model training, or model inference as production behavior;
-- activate a model without an approving `review_decision_v1`;
-- dispatch live provider calls without `live_call_approval_v1`;
+- activate a model without an approving `agent_model_promotion_decision_v1`;
+- dispatch live provider calls without owner-observed agent-reviewed `live_call_approval_v1` plus proposal validation;
 - construct/place broker orders, process fills, mutate positions, or mutate account state.
 
 ## Registry and Promotion Relationship
 
 Registry rows make shared names visible and reviewable. They do not make a model production-active.
 
-Promotion remains governed by `docs/96_model_promotion.md`: model repositories produce evidence, `trading-manager` records/reviews promotion requests and decisions, and activation requires an approved review decision plus an activation record. Closeout documentation does not override those gates.
+Promotion remains governed by `docs/96_model_promotion.md`: model repositories produce evidence, `trading-manager` records promotion requests and script-called agent decisions, and activation requires an approved agent decision plus an activation record. Closeout documentation does not override those gates.

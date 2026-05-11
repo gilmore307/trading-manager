@@ -146,6 +146,16 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("${START_MONTH}", command)
         self.assertIn("--end-month", command)
 
+    def test_layer_eight_data_acquisition_runs_gate_review_without_live_call_gate(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        stage = plan.layers[7].stages[0]
+
+        self.assertIsNone(stage.approval_gate_required)
+        self.assertIn("scripts/tasks/review_layer_eight_option_expression_gate.py", stage.command)
+        self.assertIn("--write", stage.command)
+
     def test_layer_three_feature_generation_reads_month_scoped_source_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")

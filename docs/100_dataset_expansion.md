@@ -1,6 +1,6 @@
 # Dataset Expansion Policy
 
-Status: accepted manager-control policy for historical model training; no provider-call, promotion, or broker approval implied
+Status: accepted manager-control policy for historical model training; no provider-call, promotion, storage lifecycle, or broker mutation implied
 
 ## Purpose
 
@@ -8,8 +8,9 @@ Status: accepted manager-control policy for historical model training; no provid
 
 The manager decision is still bounded by hard gates:
 
-- historical provider calls require reviewed `live_call_approval_v1`;
-- model activation requires an approving `review_decision_v1`;
+- historical provider calls require owner-observed agent-reviewed `live_call_approval_v1` plus proposal validation;
+- model activation requires an approving script-called `agent_model_promotion_decision_v1`;
+- storage lifecycle mutation requires a script-called `agent_storage_lifecycle_decision_v1`;
 - broker/order/fill/account mutation remains execution-owned and forbidden here.
 
 ## Dataset roles

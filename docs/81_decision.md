@@ -2520,7 +2520,7 @@ The accepted scheduler direction needs implementation without prematurely enabli
 
 Implement `scripts/tasks/run_automation_scheduler.py` backed by `trading_manager_tasks.scheduler` as the first scheduler work-loop increment.
 
-The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes only Layer 1 task-key payload materialization and handoff validation through the existing preparation path, then reports `approval_gated_provider_acquisition` as the next internal stage.
+The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes only Layer 1 task-key payload materialization and handoff validation through the existing preparation path, then reports `owner_observed_agent_reviewed_provider_acquisition` as the next internal stage.
 
 The tick must emit safety counters proving `provider_calls=0`, `dispatch_performed=false`, `model_activation_performed=false`, and `broker_execution_performed=false` for this phase.
 
@@ -2810,3 +2810,48 @@ Accept the accompanying mechanism-hardening changes before starting `2016-03`:
 - Production promotion remains deferred until reviewed evidence proves sufficient rows/labels, baseline improvement, split stability, no leakage, and approval.
 - Active Layer 8 provider acquisition remains approval-gated and must still stop at packet review unless explicit provider execution approval is supplied.
 - Storage lifecycle mutation remains outside this closeout and requires a separate lifecycle plan/approval.
+
+## D125 - Owner-observed agent automation replaces routine manual approval gates
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+Routine historical backfill work was too manually gated: provider calls still waited for a human approval plus an explicit execution instruction, production promotion was phrased as requiring reviewed approval, and storage lifecycle mutation was phrased as requiring a separate approval. Chentong clarified the intended operating model: OpenClaw/agent automation should make bounded decisions and execute them while the owner observes and intervenes if needed. Broker/order/fill/account mutation is execution-library scope and is not part of the current historical modeling workflow.
+
+### Decision
+
+Adopt owner-observed agent automation for the current historical modeling control plane:
+
+- Provider data acquisition may be automatically agent-reviewed, proposal-validated, dispatched, and reconciled when it is bounded to historical provider acquisition scope and keeps broker execution, model activation, and storage lifecycle mutation false.
+- Model activation / production promotion must be decided by a script-called agent decision artifact (`agent_model_promotion_decision_v1`) rather than a routine manual approval gate.
+- Storage lifecycle mutation must be decided by a script-called agent lifecycle decision artifact before storage executes archive/delete/compress/restore mutation.
+- Broker/order/fill/account mutation remains out of scope here and belongs to execution-library work.
+
+### Consequences
+
+- Historical provider packets still preserve proposal validation, expiry, exact request-id scope, terminal-coverage rejection, dispatch receipts, and reconcile coverage, but the agent can fill the approval/validation/plan artifacts and run dispatch under owner observation.
+- Existing “manual approval required” language should be replaced in active docs/code with owner-observed agent-review language.
+- Promotion and storage lifecycle decision paths remain blocked only until their script-called agent decision surfaces exist; they are not blocked on routine manual approval.
+
+## D126 - 2016-03 Layer 1-8 historical workflow closed
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+The March 2016 chronological historical workflow continued after January and February closeouts. Layer 1 and Layer 2 provider acquisition used the owner-observed agent automation precedent: bounded provider-data acquisition only, exact proposal validation, terminal-coverage rejection, reconcile coverage, and no broker/order/account mutation, model activation, or storage lifecycle mutation.
+
+### Evidence
+
+- Layer 1 coverage report: `storage/runtime/stage_coverage/layer_01_market_regime_data_acquisition_2016-03.json` has expected 22, ready 22, failed 0, pending 0.
+- Layer 2 coverage report: `storage/runtime/stage_coverage/layer_02_sector_context_data_acquisition_2016-03.json` has expected 25, ready 25, failed 0, pending 0.
+- Workflow checkpoint: `storage/runtime/model_training_workflow_state_2016-03.json` has `next_stage: null`, 42 succeeded stages, and 6 not-applicable stages.
+- Layer 8 gate review: `storage/runtime/layer_08_option_expression/gate_review/layer_08_option_expression_gate_review_2016-03.json` has `status: no_provider_skip_accepted`, `total_layer_7_rows: 318`, `active_request_count: 0`, and `active_target_chain_count: 0`.
+- Layer 8 feature generation has a no-provider/no-feature skip receipt at `storage/runtime/layer_08_option_expression/gate_review/layer_08_option_expression_feature_generation_no_provider_skip_receipt_2016-03.json`.
+
+### Decision
+
+Close the 2016-03 Layer 1-8 safe historical workflow section. March 2016 is complete for current no-broker historical modeling scope. Promotion/activation remains deferred to the script-called agent promotion decision path; storage lifecycle mutation remains deferred to the script-called agent lifecycle decision path.

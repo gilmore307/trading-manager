@@ -26,9 +26,9 @@ It must not:
 - run model activation;
 - route broker/paper/live execution;
 - delete, compress, archive, restore, or mutate storage lifecycle state;
-- weaken `live_call_approval_v1` or `review_decision_v1` gates.
+- weaken owner-observed `live_call_approval_v1`, `agent_model_promotion_decision_v1`, or `agent_storage_lifecycle_decision_v1` gates.
 
-Provider dispatch validation is plan-only unless a separate, reviewed command explicitly invokes the provider dispatch adapter with `--execute-approved-provider-calls`. That execution is outside the information-pass boundary.
+Provider dispatch validation is plan-only unless the owner-observed agent automation path invokes the provider dispatch adapter with `--execute-approved-provider-calls`. That execution is outside the information-pass boundary.
 
 ## Command
 
@@ -49,7 +49,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_controlled_information_pass.py \
   --write
 ```
 
-Optionally validate a reviewed approval artifact without dispatching providers:
+Optionally validate an agent-reviewed approval artifact without dispatching providers:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/plan_controlled_information_pass.py \

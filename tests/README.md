@@ -99,7 +99,7 @@
 - `test_stage_executor.py` verifies:
   - ready safe offline stage execution;
   - receipt/log creation;
-  - refusal to execute approval-gated provider stages through the offline executor.
+  - refusal to execute Layer 1/2 provider-dispatch stages through the offline executor.
 
 - `test_model_promotion.py` verifies:
   - unified model promotion review request planning;

@@ -117,7 +117,7 @@ These layer on top of the MVP contracts once runs and artifacts can be reference
 | `evaluation_run_v1` | Evaluation setup and evidence links. | Model training implementation. |
 | `metric_result_v1` | Individual metric result with threshold/evidence context. | Metric implementation code. |
 | `promotion_candidate_v1` | Candidate package for review. | Production activation. |
-| `review_decision_v1` | Human/agent review outcome. | Automatic mutation of runtime configs. |
+| `review_decision_v1` | Legacy/advisory review outcome. | Production activation. |
 | `activation_record_v1` | Approved activation/change record with rollback reference. | Broker or order execution. |
 
 ### Live-Call Approval Contracts
@@ -404,6 +404,23 @@ Required fields:
 
 A promotion candidate is reviewable evidence. It is not activation.
 
+### `agent_model_promotion_decision_v1`
+
+Required fields:
+
+- `contract_type`
+- `agent_model_promotion_decision_id`
+- `promotion_request_ref`
+- `agent_ref`
+- `decision_status`
+- `decision_reason`
+- `evidence_refs`
+- `conditions`
+- `owner_observed_automation`
+- `created_at_utc`
+
+Allowed statuses should remain registry vocabulary: approve, defer, reject, revoke, or supersede. This script-called agent decision is required before production model activation.
+
 ### `review_decision_v1`
 
 Required fields:
@@ -417,7 +434,7 @@ Required fields:
 - `conditions`
 - `created_at_utc`
 
-Allowed statuses should remain registry vocabulary: approve, defer, reject, revoke, or supersede.
+Allowed statuses should remain registry vocabulary: approve, defer, reject, revoke, or supersede. This contract is advisory evidence only; it is not sufficient for production activation.
 
 ### `activation_record_v1`
 
@@ -426,14 +443,14 @@ Required fields:
 - `contract_type`
 - `activation_record_id`
 - `activated_component`
-- `approved_review_decision_ref`
+- `approved_agent_model_promotion_decision_ref`
 - `activated_config_ref`
 - `replaced_config_ref`
 - `rollback_ref`
 - `activated_at_utc`
 - `activated_by`
 
-Activation records are only valid after an approving review decision. They do not execute broker or exchange actions.
+Activation records are only valid after an approving `agent_model_promotion_decision_v1`. They do not execute broker or exchange actions.
 
 ## Downstream Handoff Skeletons
 
@@ -491,7 +508,7 @@ model_promotion_review_v1 manager request
   -> evaluation_run_v1
        -> metric_result_v1[]
        -> promotion_candidate_v1
-            -> review_decision_v1
+            -> agent_model_promotion_decision_v1
                  -> activation_record_v1
 ```
 
@@ -542,7 +559,7 @@ Current manager closeout stance:
 
 1. Request/receipt/task-summary MVP is implemented and rehearsed.
 2. Model-promotion review routing and decision/activation artifact builders are implemented.
-3. Live-call approval gate is defined and registered, but no provider dispatch is enabled by this repository.
+3. Owner-observed live-call agent-review/validation is defined and registered; provider dispatch remains bounded to historical provider acquisition scope.
 4. Broker/order/fill/account lifecycle remains outside `trading-manager` and must stay execution-owned.
 5. A component catalog or additional SQL tables should be added only when real query or lifecycle pressure proves they are needed.
 
