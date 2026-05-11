@@ -84,6 +84,16 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertIn("--skip-registered-failures", layer_two_acquisition.command)
             self.assertNotIn("--execute-approved-provider-calls", layer_two_acquisition.command)
 
+    def test_layer_three_data_acquisition_uses_local_materializer_without_provider_dispatch(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        command = plan.layers[2].stages[0].command
+        self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", command)
+        self.assertIn("--write", command)
+        self.assertIsNone(plan.layers[2].stages[0].approval_gate_required)
+        self.assertFalse(plan.layers[2].stages[0].provider_calls_allowed)
+
     def test_layer_one_and_two_model_evaluation_read_database_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
@@ -124,6 +134,31 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("data_feature.feature_02_sector_context.from_feed_artifacts", command)
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
+
+    def test_layer_three_feature_generation_reads_month_scoped_source_rows(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        command = plan.layers[2].feature_command
+
+        self.assertIn("data_feature.feature_03_target_state_vector", command)
+        self.assertIn("--source-start", command)
+        self.assertIn("${START_MONTH_START_ET}", command)
+        self.assertIn("--source-end", command)
+        self.assertIn("${END_MONTH_EXCLUSIVE_START_ET}", command)
+
+    def test_layer_three_model_commands_use_database_rows_and_evaluation_summary(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        layer = plan.layers[2]
+        self.assertIn("--from-database", layer.model_generate_command)
+        self.assertIn("--source-end", layer.model_generate_command)
+        self.assertIn("--output", layer.model_generate_command)
+        self.assertIn("--from-database", layer.model_evaluate_command)
+        self.assertIn("--output-json", layer.model_evaluate_command)
+        self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
+        self.assertIn("real_database_evaluation", layer.promotion_review_command)
 
     def test_progression_modes_encode_background_panels_target_chain_and_option_gate(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

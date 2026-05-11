@@ -29,6 +29,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 DEFAULT_RECEIPT_ROOT = Path("storage/runtime/model_training_stage_receipts")
 DEFAULT_LOG_ROOT = Path("storage/runtime/model_training_stage_logs")
 SAFE_OFFLINE_STAGE_TYPES = {
+    "data_acquisition",
     "feature_generation",
     "model_generation",
     "model_evaluation",
@@ -58,8 +59,28 @@ class StageExecutionSummary:
         return asdict(self)
 
 
+def _exclusive_month_start(month: str) -> str:
+    year = int(month[:4])
+    month_number = int(month[5:])
+    if month_number == 12:
+        year += 1
+        month_number = 1
+    else:
+        month_number += 1
+    return f"{year:04d}-{month_number:02d}-01T00:00:00-05:00"
+
+
+def _month_start(month: str) -> str:
+    return f"{month}-01T00:00:00-05:00"
+
+
 def _resolve_command_placeholders(command: list[str], *, start_month: str, end_month: str) -> list[str]:
-    replacements = {"${START_MONTH}": start_month, "${END_MONTH}": end_month}
+    replacements = {
+        "${START_MONTH}": start_month,
+        "${END_MONTH}": end_month,
+        "${START_MONTH_START_ET}": _month_start(start_month),
+        "${END_MONTH_EXCLUSIVE_START_ET}": _exclusive_month_start(end_month),
+    }
     resolved = []
     for token in command:
         text = token
@@ -101,6 +122,10 @@ def _validate_safe_stage(stage: StageProgress) -> None:
         raise TaskSystemError(f"stage requires approval and cannot use safe offline executor: {stage.stage_id}")
     if stage.stage_type not in SAFE_OFFLINE_STAGE_TYPES:
         raise TaskSystemError(f"stage type is not safe offline executable: {stage.stage_type}")
+    if stage.stage_type == "data_acquisition" and not any(
+        token.endswith("materialize_layer_three_target_state_inputs.py") for token in stage.command
+    ):
+        raise TaskSystemError(f"data_acquisition stage is not an approved local materialization command: {stage.stage_id}")
     if not stage.command:
         raise TaskSystemError(f"stage has no command: {stage.stage_id}")
     if any("${" in token for token in stage.command):

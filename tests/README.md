@@ -34,6 +34,11 @@
   - Layer 1 task-key preparation to live-call approval gate progression;
   - explicit no-dedicated-feature handling for Layers 5-7.
 
+- `test_layer_three_target_state.py` verifies:
+  - local Layer 3 target-state source materialization from completed Layer 2 feed artifacts;
+  - source task-key, candidate, and merged-bar evidence generation without embedding large rows in the task key;
+  - zero provider calls, model activation, or broker execution in dry-run materialization.
+
 - `test_model_training_state.py` verifies:
   - durable `manager_model_training_workflow_state_v1` initialization;
   - approval-ref and receipt-driven stage advancement;

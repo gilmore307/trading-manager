@@ -140,6 +140,17 @@ PYTHONPATH=src python3 scripts/tasks/prepare_layer_two_historical_training.py \
 
 Layer 2 stage coverage is separate from Layer 1 even though both use `01_feed_alpaca_bars`; coverage matches the reviewed model-layer universe/request ids so same-month Layer 1 and Layer 2 rows cannot contaminate each other.
 
+Materialize Layer 3 target-state source inputs from already reviewed Layer 2 feed artifacts:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/materialize_layer_three_target_state_inputs.py \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --write
+```
+
+This emits `manager_layer_three_target_state_input_materialization_v1` evidence, merges completed Layer 2 Alpaca bar artifacts into a `source_03_target_state` task key, and delegates normalization to `trading-data`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation.
+
 Validate that a materialized payload is component-readable before dispatching work:
 
 ```bash
