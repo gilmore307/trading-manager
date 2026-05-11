@@ -12,6 +12,7 @@ from trading_manager_tasks.model_training_workflow import build_model_training_w
 from trading_manager_tasks.scheduler_daemon import (
     SchedulerDaemonState,
     acquire_daemon_lock,
+    apply_auto_work_selection,
     load_daemon_state,
     next_month,
     release_daemon_lock,
@@ -148,6 +149,40 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.reason_code, "resume_earliest_open_workflow_state")
         self.assertEqual(selection.completed_months, ("2016-01",))
         self.assertEqual(selection.open_months, ("2016-02",))
+
+    def test_auto_work_selection_jumps_past_externally_completed_months(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in ("2016-10", "2016-11", "2016-12"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=all_stage_ids,
+                    write=True,
+                )
+
+            state = apply_auto_work_selection(
+                SchedulerDaemonState(
+                    start_month="2016-10",
+                    end_month="2016-10",
+                    last_work_selection_reason="advance_after_latest_completed_workflow_state",
+                    last_completed_months=("2016-09",),
+                ),
+                storage_root=storage_root,
+                default_start_month="2016-10",
+                default_end_month="2016-10",
+            )
+
+        self.assertEqual(state.start_month, "2017-01")
+        self.assertEqual(state.end_month, "2017-01")
+        self.assertEqual(state.last_next_internal_stage, "historical_work_selected")
+        self.assertEqual(state.last_work_selection_reason, "advance_after_latest_completed_workflow_state")
+        self.assertEqual(state.last_completed_months, ("2016-10", "2016-11", "2016-12"))
+
 
     def test_daemon_auto_selects_next_work_without_user_month_instruction(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

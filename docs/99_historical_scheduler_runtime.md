@@ -16,7 +16,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py \
   --advance-month-on-complete
 ```
 
-The daemon first audits month-scoped workflow checkpoints to identify the earliest open month, or the next chronological month after the latest completed checkpoint, then repeatedly calls the capacity-aware scheduler tick. Each tick writes a checkpoint, appends one decision JSONL row, uses a single-instance lock so two historical schedulers do not race each other, and advances the month cursor when a month reaches terminal workflow completion.
+The daemon audits month-scoped workflow checkpoints to identify the earliest open month, or the next chronological month after the latest completed checkpoint, then repeatedly calls the capacity-aware scheduler tick. It re-applies that automatic work selection before each tick, so operator-reviewed provider dispatches, repair runs, or smoke runs that complete months while the daemon sleeps are folded back into the resident cursor instead of making the service walk one already-complete month per interval. Each tick writes a checkpoint, appends one decision JSONL row, uses a single-instance lock so two historical schedulers do not race each other, and advances the month cursor when a month reaches terminal workflow completion.
 
 ## Durable Runtime Files
 
@@ -84,7 +84,7 @@ The historical scheduler runtime must provide:
 - **Observable decisions:** every tick appends one decision row for review of ready/backoff/executed/error outcomes, and `inspect_historical_scheduler_status.py` summarizes the current service posture without mutating runtime state.
 - **Resource protection:** market-hours and host resource gates still run on every tick.
 - **Gate preservation:** provider calls, model activation, and broker execution remain blocked unless their explicit gates are satisfied.
-- **Automatic work selection:** on service start the daemon reviews completed/open month-scoped workflow states, resumes the earliest open month if one exists, otherwise selects the next chronological month after the latest completed checkpoint; the owner does not have to say where to continue.
+- **Automatic work selection:** on service start and before every tick, the daemon reviews completed/open month-scoped workflow states, resumes the earliest open month if one exists, otherwise selects the next chronological month after the latest completed checkpoint; the owner does not have to say where to continue, and externally completed months are skipped on the next service tick.
 - **Chronological cursor:** terminal month completion advances the daemon to the next YYYY-MM month under the chronological-forward policy.
 - **Recoverability:** runtime logs/state are local operational evidence; canonical provider/model receipts still belong in manager/storage contracts as those stages are implemented.
 - **Explicit deferred scopes:** production model activation, storage lifecycle mutation, and broker/order/fill/account mutation are visible as gated statuses rather than hidden scheduler todos.

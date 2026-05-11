@@ -235,6 +235,48 @@ def write_daemon_state(path: Path, state: SchedulerDaemonState) -> None:
     tmp.replace(path)
 
 
+def apply_auto_work_selection(
+    state: SchedulerDaemonState,
+    *,
+    storage_root: Path,
+    default_start_month: str,
+    default_end_month: str,
+) -> SchedulerDaemonState:
+    """Align daemon scope with the currently selected historical work.
+
+    The resident service is not the only actor allowed to complete safe
+    historical workflow stages. Operator-reviewed provider dispatches and
+    repair/smoke runs can advance month-scoped workflow checkpoints while the
+    daemon is sleeping. Re-select before each tick so the service resumes the
+    earliest open month or jumps past externally completed months instead of
+    walking one already-complete month per interval.
+    """
+
+    selection = select_next_historical_work(
+        storage_root=storage_root,
+        default_start_month=default_start_month,
+        default_end_month=default_end_month,
+    )
+    scope_changed = state.start_month != selection.start_month or state.end_month != selection.end_month
+    selection_changed = (
+        state.last_work_selection_reason != selection.reason_code
+        or state.last_completed_months != selection.completed_months
+        or state.last_open_months != selection.open_months
+    )
+    if not scope_changed and not selection_changed:
+        return state
+    return replace(
+        state,
+        start_month=selection.start_month,
+        end_month=selection.end_month,
+        last_next_internal_stage="historical_work_selected",
+        last_work_selection_reason=selection.reason_code,
+        last_completed_months=selection.completed_months,
+        last_open_months=selection.open_months,
+        updated_utc=utc_now_iso(),
+    )
+
+
 def append_decision_log(path: Path, decision: SchedulerDecision) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
@@ -359,26 +401,26 @@ def run_daemon_loop(
         resume_month_cursor=advance_month_on_complete,
     )
     if auto_select_next_work:
-        selection = select_next_historical_work(
+        state = apply_auto_work_selection(
+            state,
             storage_root=storage_root,
             default_start_month=start_month,
             default_end_month=end_month,
-        )
-        state = replace(
-            state,
-            start_month=selection.start_month,
-            end_month=selection.end_month,
-            last_next_internal_stage="historical_work_selected",
-            last_work_selection_reason=selection.reason_code,
-            last_completed_months=selection.completed_months,
-            last_open_months=selection.open_months,
-            updated_utc=utc_now_iso(),
         )
     active_start_month = state.start_month
     active_end_month = state.end_month
     iterations = 0
     try:
         while max_iterations is None or iterations < max_iterations:
+            if auto_select_next_work:
+                state = apply_auto_work_selection(
+                    state,
+                    storage_root=storage_root,
+                    default_start_month=active_start_month,
+                    default_end_month=active_end_month,
+                )
+                active_start_month = state.start_month
+                active_end_month = state.end_month
             started = utc_now_iso()
             try:
                 decision = run_scheduler_once(
@@ -481,6 +523,7 @@ __all__ = [
     "HistoricalWorkSelection",
     "SchedulerDaemonState",
     "acquire_daemon_lock",
+    "apply_auto_work_selection",
     "append_decision_log",
     "load_daemon_state",
     "release_daemon_lock",
