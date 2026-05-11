@@ -26,6 +26,27 @@ Manager treats dataset roles as an ordered evidence ladder:
 | `forward_holdout` | Out-of-time evidence for drift, regime coverage, and split stability. | Fill when promotion gaps require more out-of-time evidence after minimum train/calibration/validation/test coverage exists. |
 | `shadow_monitoring` | Post-approval observation evidence without broker mutation. | Only selected after a layer is production-approved. |
 
+## Realtime forward-validation rule
+
+Realtime data should cover the live inference feature set, but realtime observations do **not** let the manager skip the historical split ladder by default.
+
+Accepted rule:
+
+```text
+realtime forward validation supplements, then may eventually dominate production monitoring;
+it does not replace initial chronological train/calibration/validation/test evidence.
+```
+
+Realtime rows may be used as `forward_holdout` or `shadow_monitoring` evidence only when they are captured as an append-only, point-in-time dataset with frozen model/config refs, immutable prediction/output refs, mature outcome labels, and no training/refit use before the reviewed snapshot boundary. Until enough realtime rows and labels accumulate across regimes, historical validation/test splits remain mandatory for promotion review because they provide sample size, regime coverage, split stability, and baseline comparison evidence immediately.
+
+Manager evidence should therefore report three separate views when available:
+
+- historical broad-sample validation/test performance;
+- historical live-route simulation performance;
+- realtime shadow/forward performance after labels mature.
+
+Promotion can move toward realtime-forward evidence as the primary production monitor, but a model that only passes a short realtime window and lacks historical split/baseline/leakage/calibration evidence must still be deferred.
+
 Default planning minimums are intentionally conservative placeholders until measured production evidence supersedes them:
 
 ```text

@@ -1489,6 +1489,21 @@ class RegistryHelperTests(unittest.TestCase):
             resolver.load_secret_text_by_config_id("trm_OPENCLAW")
 
 
+    def test_realtime_forward_validation_policy_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertIn("REALTIME_FORWARD_VALIDATION_POLICY", rows)
+        self.assertIn("supplements_not_replaces_initial_historical_splits", rows["REALTIME_FORWARD_VALIDATION_POLICY"]["payload"])
+        self.assertIn("append_only_point_in_time_capture_required", rows["REALTIME_FORWARD_VALIDATION_POLICY"]["payload"])
+        self.assertIn("frozen_model_config_refs_required", rows["REALTIME_FORWARD_VALIDATION_POLICY"]["payload"])
+        self.assertEqual(rows["REALTIME_FORWARD_VALIDATION_DATASET"]["payload"], "realtime_forward_validation_dataset_v1")
+        self.assertIn("model_dataset_snapshot", rows["REALTIME_FORWARD_VALIDATION_DATASET"]["applies_to"])
+        self.assertIn("report_historical_live_route_simulation", rows["MODEL_VALIDATION_EVIDENCE_VIEW_POLICY"]["payload"])
+        self.assertIn("report_realtime_shadow_forward_after_label_maturity", rows["MODEL_VALIDATION_EVIDENCE_VIEW_POLICY"]["payload"])
+        self.assertIn("does_not_authorize_provider_streams_or_broker_mutation", rows["EXECUTION_REALTIME_CAPTURE_FOR_VALIDATION_BOUNDARY"]["payload"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
