@@ -2,6 +2,7 @@
 
 ## Active Tasks
 
+- Start the next chronological month from safe internal preparation only. For `2016-02`, use an explicit month-scoped workflow checkpoint path until scheduler-owned month checkpoint rotation is implemented.
 - Continue mechanism hardening before expanding provider volume: Stage coverage now gates downstream unlock from SQL `task_summary`; component-specific artifact discovery now captures output and supporting receipt references; accepted-failure coverage exceptions preserve failed task state while allowing agent-reviewed normal historical absences to pass; all failures now belong in `trading_manager.failure_register` with current status and skip/correction disposition.
 - Extend approved provider-dispatch coverage beyond the Alpaca-bars Layer 1/2 source-acquisition adapter as durable ready-signal inputs become available; Layer 8 now has a no-provider gate review that distinguishes active option-snapshot approval needs from reviewed no-active-target skips.
 - Run/refresh `manager_dataset_evidence_v1` as real snapshot/split/label/evaluation evidence becomes available so expansion planning remains evidence-driven.

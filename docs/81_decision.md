@@ -2759,3 +2759,27 @@ The pass may write a report and safe preparation artifacts, including Layer 1 ta
 - The next phase is evidence collection, not broad default hardening.
 - Provider calls remain outside the information-pass boundary and still require validated `live_call_approval_v1` plus explicit provider-dispatch execution.
 - Storage lifecycle remains dry-run/protected-set-first until artifact index and restore/protection evidence exists.
+
+## D123 - 2016-01 Layer 1-8 safe workflow is closed without provider expansion
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution requires explicit reviewed approval and an explicit execution instruction. Layers 1-7 reached safe/offline completion for the month. Layer 8 was blocked by the option-expression acquisition gate until the completed Layer 7 target chain could be reviewed.
+
+### Decision
+
+Close the current `2016-01` Layer 1-8 safe workflow section as complete for mechanism validation.
+
+Layer 8 option-expression acquisition is closed by reviewed no-provider skip for this month because every Layer 7 row resolved to `no_trade` / `none`; there were no active target chains and therefore no warranted option-chain provider request. Layer 8 generated 279 deterministic `no_option_expression` rows from completed Layer 7 database rows. The run made zero provider calls, performed no dispatch, did not activate a model, did not perform broker/order/account mutation, and did not mutate storage lifecycle state.
+
+Promotion decisions for Layers 1-8 remain deferred. This closeout validates workflow mechanics and safe offline progression only; it is not production model activation and not approval to execute future provider calls.
+
+### Consequences
+
+- The next chronological month can start from safe internal preparation and approval-packet review.
+- If a future month has active Layer 7 target chains, Layer 8 must stop at approval-packet review unless explicit provider execution approval is supplied.
+- Deferred promotion evidence remains a separate production-readiness track.
+- Runtime workflow checkpoints should be treated as month-scoped evidence when moving chronologically, so a later month should use an explicit month-specific state path unless/until the scheduler owns month checkpoint rotation.
