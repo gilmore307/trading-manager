@@ -1603,6 +1603,33 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("record_realtime_shadow_handoff.py", rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECORD"]["path"])
         self.assertIn("no_model_activation", rows["MANAGER_REALTIME_SHADOW_HANDOFF_POLICY"]["payload"])
 
+    def test_realtime_live_observe_fixture_scaffold_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(
+            rows["EXECUTION_REALTIME_LIVE_OBSERVE_ADAPTER_PLAN"]["payload"],
+            "execution_realtime_live_observe_adapter_plan_v1",
+        )
+        self.assertEqual(
+            rows["EXECUTION_REALTIME_LIVE_OBSERVE_ADAPTER_PLAN_SCRIPT"]["payload"],
+            "PYTHONPATH=src python3 scripts/execution/plan_live_observe_adapters.py --mode fixture_replay --instrument-ref ${INSTRUMENT_REF}",
+        )
+        self.assertEqual(
+            rows["EXECUTION_REALTIME_CAPTURE_FIXTURE_SET"]["payload"],
+            "execution_realtime_capture_fixture_set_v1",
+        )
+        self.assertEqual(
+            rows["EXECUTION_REALTIME_SHADOW_FIXTURE_BUNDLE"]["payload"],
+            "execution_realtime_shadow_fixture_bundle_v1",
+        )
+        self.assertEqual(
+            rows["MANAGER_REALTIME_SHADOW_HANDOFF_REHEARSAL"]["payload"],
+            "manager_realtime_shadow_handoff_rehearsal_v1",
+        )
+        self.assertIn("rehearse_realtime_shadow_handoff.py", rows["MANAGER_REALTIME_SHADOW_HANDOFF_REHEARSE"]["path"])
+        self.assertIn("live_observe_requires_reviewed_live_stream_approval_ref", rows["REALTIME_LIVE_OBSERVE_FIXTURE_POLICY"]["payload"])
+
 
 if __name__ == "__main__":
     unittest.main()

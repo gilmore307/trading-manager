@@ -173,6 +173,17 @@ PYTHONPATH=src python3 scripts/tasks/record_realtime_shadow_handoff.py \
 
 The output is `manager_realtime_shadow_handoff_control_plane_bundle_v1`: a standard component completion receipt plus normalized `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows. It makes the execution -> model realtime shadow handoff visible to manager/task-summary consumers without provider calls, model activation, broker calls, order construction, persistence, or account mutation. Use the generic `record_completion_receipt.py` only after a reviewed durable receipt URI exists and persistence is explicitly desired.
 
+Rehearse the full cross-repository fixture chain when validating realtime wiring:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/rehearse_realtime_shadow_handoff.py \
+  --decision-time 2026-05-11T13:30:00+00:00 \
+  --historical-dataset-snapshot-ref trading-model://snapshots/historical/unit \
+  --frozen-model-config-ref trading-model://configs/frozen/unit
+```
+
+The rehearsal invokes execution fixture builders, model route-plan validation, and manager receipt normalization, but still performs zero provider calls, model activation, broker calls, order construction, persistence, or account mutation.
+
 After Layer 4 is complete, Layers 5-7 may advance through the safe offline executor by reading already-persisted SQL rows:
 
 - Layer 5 reads Layer 1-4 context and writes `trading_model.model_05_alpha_confidence`.

@@ -2928,6 +2928,8 @@ Status: Accepted
 
 Add `manager_realtime_shadow_handoff_control_plane_bundle_v1` as the manager-visible receipt/normalization surface for realtime shadow decision handoffs. It validates the paired `execution_model_decision_input_snapshot_v1` and `model_realtime_decision_route_plan_v1`, emits a standard component completion receipt, and normalizes that receipt into run/artifact/ready rows for task-summary consumers.
 
+Add a full rehearsal path that can build execution-side realtime adapter/capture/feature/model-input fixture artifacts, route them through the model-side realtime decision route planner, and normalize the manager receipt in one command.
+
 The handoff remains fixture/shadow only. It performs no provider calls, model activation, production decision activation, broker calls, order construction, persistence by default, or account mutation.
 
 ### Consequences

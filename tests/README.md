@@ -176,6 +176,7 @@
   - paired realtime execution decision-input and model route-plan validation;
   - manager realtime shadow handoff receipt construction;
   - normalization into run/artifact/ready rows without provider calls, model activation, broker calls, or account mutation;
+  - full execution fixture -> model route-plan -> manager receipt rehearsal CLI behavior;
   - CLI bundle output and forbidden action blocking.
 
 - `test_task_control_plane.py` verifies:

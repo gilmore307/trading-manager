@@ -140,6 +140,36 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
         self.assertFalse(validation["valid"])
         self.assertIn("model_activation", validation["forbidden_actions_present"])
 
+    def test_rehearsal_cli_runs_execution_model_manager_chain(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/tasks/rehearse_realtime_shadow_handoff.py",
+                "--decision-time",
+                "2026-05-11T13:30:00+00:00",
+                "--available-time",
+                "2026-05-11T13:30:01+00:00",
+                "--tradeable-time",
+                "2026-05-11T13:30:02+00:00",
+                "--historical-dataset-snapshot-ref",
+                "trading-model://snapshots/historical/unit",
+                "--frozen-model-config-ref",
+                "trading-model://configs/frozen/unit",
+            ],
+            check=True,
+            cwd="/root/projects/trading-manager",
+            env={"PYTHONPATH": "src"},
+            text=True,
+            capture_output=True,
+        )
+        bundle = json.loads(result.stdout)
+        self.assertEqual(bundle["contract_type"], "manager_realtime_shadow_handoff_rehearsal_v1")
+        self.assertEqual(bundle["rehearsal_status"], "ready")
+        self.assertEqual(bundle["provider_calls_performed"], 0)
+        self.assertFalse(bundle["broker_order_construction_performed"])
+        self.assertEqual(len(bundle["route_plan"]["layer_routes"]), 8)
+        self.assertEqual(bundle["manager_handoff"]["receipt"]["status"], "succeeded")
+
     def test_cli_emits_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             decision_path = Path(temp_dir) / "decision.json"
