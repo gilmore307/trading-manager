@@ -1560,6 +1560,28 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("validate_realtime_model_input.py", rows["EXECUTION_REALTIME_MODEL_INPUT_VALIDATE"]["path"])
         self.assertIn("historical_feature_parity_required", rows["EXECUTION_REALTIME_MODEL_DECISION_HANDOFF_POLICY"]["payload"])
 
+    def test_model_realtime_decision_handoff_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_INPUT_VALIDATION"]["payload"],
+            "model_realtime_decision_input_validation_v1",
+        )
+        self.assertIn("execution_model_decision_input_snapshot_v1", rows["MODEL_REALTIME_DECISION_INPUT_VALIDATION"]["applies_to"])
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["payload"],
+            "model_realtime_decision_route_plan_v1",
+        )
+        self.assertIn("historical_model_decision_route", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_ROUTE_PLAN_VALIDATION"]["payload"],
+            "model_realtime_decision_route_plan_validation_v1",
+        )
+        self.assertIn("plan_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_PLAN"]["path"])
+        self.assertIn("validate_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_VALIDATE"]["path"])
+        self.assertIn("no_production_model_activation", rows["MODEL_REALTIME_DECISION_HANDOFF_POLICY"]["payload"])
+
 
 if __name__ == "__main__":
     unittest.main()
