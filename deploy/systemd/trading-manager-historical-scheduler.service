@@ -1,5 +1,5 @@
 [Unit]
-Description=Trading Manager Historical Training Scheduler
+Description=Trading Manager Historical Modeling Scheduler
 Documentation=file:/root/projects/trading-manager/docs/99_historical_scheduler_runtime.md
 After=network-online.target
 Wants=network-online.target
@@ -8,7 +8,17 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/root/projects/trading-manager
 Environment=PYTHONPATH=/root/projects/trading-manager/src
-ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py --start-month 2016-01 --end-month 2016-01 --execute-safe-preparation
+Environment=TRADING_MANAGER_HISTORICAL_START_MONTH=2016-01
+Environment=TRADING_MANAGER_HISTORICAL_END_MONTH=2016-01
+Environment=TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300
+EnvironmentFile=-/etc/default/trading-manager-historical-scheduler
+ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py \
+  --start-month ${TRADING_MANAGER_HISTORICAL_START_MONTH} \
+  --end-month ${TRADING_MANAGER_HISTORICAL_END_MONTH} \
+  --interval-seconds ${TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS} \
+  --execute-safe-preparation \
+  --execute-safe-offline-stages \
+  --advance-month-on-complete
 Restart=always
 RestartSec=30
 KillSignal=SIGTERM

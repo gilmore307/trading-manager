@@ -7,10 +7,13 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.scheduler import ResourceSnapshot, SchedulerConfig
+from trading_manager_tasks.model_training_state import advance_workflow_state, workflow_state_path_for_month
+from trading_manager_tasks.model_training_workflow import build_model_training_workflow_plan
 from trading_manager_tasks.scheduler_daemon import (
     SchedulerDaemonState,
     acquire_daemon_lock,
     load_daemon_state,
+    next_month,
     release_daemon_lock,
     run_daemon_loop,
     update_state_from_error,
@@ -63,6 +66,11 @@ class SchedulerDaemonTests(unittest.TestCase):
             self.assertEqual(changed_scope.start_month, "2016-02")
             self.assertEqual(changed_scope.end_month, "2016-02")
 
+            resumed_cursor = load_daemon_state(path, start_month="2015-12", end_month="2015-12", resume_month_cursor=True)
+            self.assertEqual(resumed_cursor.total_ticks, 3)
+            self.assertEqual(resumed_cursor.start_month, "2016-01")
+            self.assertEqual(resumed_cursor.end_month, "2016-01")
+
     def test_lock_prevents_duplicate_daemon_instance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             lock_path = Path(raw_tmp) / "scheduler.lock"
@@ -85,6 +93,44 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(state.consecutive_errors, 1)
         self.assertEqual(state.last_reason_code, "scheduler_iteration_error")
         self.assertIn("boom", state.last_error or "")
+
+    def test_next_month_rolls_year_boundary(self):
+        self.assertEqual(next_month("2016-01"), "2016-02")
+        self.assertEqual(next_month("2016-12"), "2017-01")
+
+    def test_daemon_advances_month_cursor_after_completed_workflow(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "manager-storage"
+            plan = build_model_training_workflow_plan(start_month="2016-01", end_month="2016-01", storage_root=storage_root)
+            all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2016-01", root=storage_root / "runtime"),
+                completed_stage_ids=all_stage_ids,
+                write=True,
+            )
+            state = run_daemon_loop(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage_root,
+                component_src_root=self._fake_data_src(tmp),
+                state_path=tmp / "runtime" / "state.json",
+                lock_path=tmp / "runtime" / "scheduler.lock",
+                decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                interval_seconds=0,
+                max_iterations=1,
+                advance_month_on_complete=True,
+                config=SchedulerConfig(min_free_disk_gb=0),
+            )
+
+        self.assertEqual(state.start_month, "2016-02")
+        self.assertEqual(state.end_month, "2016-02")
+        self.assertEqual(state.last_reason_code, "month_workflow_complete")
+        self.assertEqual(state.last_next_internal_stage, "chronological_month_advanced")
+        self.assertTrue(state.service_managed)
 
     def test_daemon_loop_persists_state_and_decision_log(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

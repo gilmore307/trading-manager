@@ -1,6 +1,6 @@
 # Historical Scheduler Runtime
 
-`trading-manager` treats historical-data model training as a maintained background runtime, not a manual script sequence. The runtime goal is continuous progress with hard owner-observed gates: provider calls require agent-reviewed `live_call_approval_v1` plus proposal validation, model activation requires an approving script-called `agent_model_promotion_decision_v1`, storage lifecycle mutation requires an agent lifecycle decision, and broker/order/fill/account mutation remains execution-owned.
+`trading-manager` treats historical-data model training as a maintained system-service runtime, not a manual script sequence. The canonical owner is the historical scheduler service; chat/manual CLI runs are debugging and recovery tools only. The runtime goal is continuous progress with hard owner-observed gates: provider calls require agent-reviewed `live_call_approval_v1` plus proposal validation, model activation requires an approving script-called `agent_model_promotion_decision_v1`, storage lifecycle mutation requires an agent lifecycle decision, and broker/order/fill/account mutation remains execution-owned.
 
 ## Runtime Shape
 
@@ -10,10 +10,12 @@ The persistent entrypoint is:
 PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py \
   --start-month 2016-01 \
   --end-month 2016-01 \
-  --execute-safe-preparation
+  --execute-safe-preparation \
+  --execute-safe-offline-stages \
+  --advance-month-on-complete
 ```
 
-The daemon repeatedly calls the capacity-aware scheduler tick, writes a checkpoint after every iteration, appends one decision JSONL row per tick, and uses a single-instance lock so two historical schedulers do not race each other.
+The daemon repeatedly calls the capacity-aware scheduler tick, writes a checkpoint after every iteration, appends one decision JSONL row per tick, uses a single-instance lock so two historical schedulers do not race each other, and advances the month cursor when a month reaches terminal workflow completion.
 
 ## Durable Runtime Files
 
@@ -21,7 +23,7 @@ Default local runtime files live under ignored `storage/runtime/`:
 
 | File | Contract | Purpose |
 | --- | --- | --- |
-| `historical_scheduler_state.json` | `manager_scheduler_daemon_state_v1` | Resume checkpoint: tick counters, last decision, last internal stage, last error, and month scope. |
+| `historical_scheduler_state.json` | `manager_scheduler_daemon_state_v1` | Resume checkpoint: tick counters, last decision, last internal stage, last error, service-management markers, and current month scope. |
 | `historical_scheduler.lock` | lock file | Single-instance guard; stale locks may be replaced only when the recorded process is gone and the lock is old. |
 | `historical_scheduler_decisions.jsonl` | `manager_scheduler_decision_v1` rows | Append-only operational log for scheduler decisions and gate outcomes. |
 
@@ -32,31 +34,34 @@ These files are runtime state, not Git artifacts. If the daemon restarts after h
 Reviewed host templates live in `deploy/`:
 
 - `deploy/systemd/trading-manager-historical-scheduler.service`
+- `deploy/systemd/trading-manager-historical-scheduler.env`
 - `deploy/logrotate/trading-manager-historical-scheduler`
 
-The systemd service is designed for `Restart=always` and `WantedBy=multi-user.target`, giving process supervision and boot autostart after an operator installs/enables it. Committing the template does not install or enable the service on this host.
+The systemd service is the canonical runtime owner. It is designed for `Restart=always` and `WantedBy=multi-user.target`, giving process supervision and boot autostart after an operator installs/enables it. The unit runs with safe preparation, safe offline stage execution, and chronological month-cursor advancement enabled. Committing the template does not install or enable the service on this host.
 
 Example operator flow after review:
 
 ```bash
 sudo cp deploy/systemd/trading-manager-historical-scheduler.service /etc/systemd/system/
+sudo cp deploy/systemd/trading-manager-historical-scheduler.env /etc/default/trading-manager-historical-scheduler
 sudo systemctl daemon-reload
 sudo systemctl enable --now trading-manager-historical-scheduler.service
 sudo systemctl status trading-manager-historical-scheduler.service
 ```
 
-Do not enable the service until the active host path, Python path, scheduler flags, resource policy, and approval-gate posture have been reviewed.
+Do not enable the service until the active host path, Python path, scheduler flags, resource policy, and owner-observed gate posture have been reviewed. Once enabled, do not drive the normal historical workflow by chat/manual script chains; use manual CLI only for inspection, repair, smoke tests, or emergency intervention.
 
 ## Maintenance Guarantees
 
 The historical scheduler runtime must provide:
 
-- **Residency:** the daemon is a long-running process supervised by a host service manager when enabled.
-- **Checkpoint/restart:** every tick updates `manager_scheduler_daemon_state_v1`; restart resumes from the latest checkpoint.
+- **Residency:** the daemon is a long-running process supervised by a host service manager when enabled; this is the normal production control path, not an optional convenience.
+- **Checkpoint/restart:** every tick updates `manager_scheduler_daemon_state_v1`; restart resumes from the latest checkpoint and current month cursor.
 - **Single-instance safety:** the lock prevents duplicate daemon loops from racing on the same task payloads and state.
 - **Observable decisions:** every tick appends one decision row for review of ready/backoff/executed/error outcomes.
 - **Resource protection:** market-hours and host resource gates still run on every tick.
 - **Gate preservation:** provider calls, model activation, and broker execution remain blocked unless their explicit gates are satisfied.
+- **Chronological cursor:** terminal month completion advances the daemon to the next YYYY-MM month under the chronological-forward policy.
 - **Recoverability:** runtime logs/state are local operational evidence; canonical provider/model receipts still belong in manager/storage contracts as those stages are implemented.
 
 ## Current Full-Stack Workflow Graph

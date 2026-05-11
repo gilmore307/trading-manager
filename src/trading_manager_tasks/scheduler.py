@@ -318,6 +318,21 @@ def run_scheduler_once(
         write=False,
     )
     workflow_next_stage = next_ready_or_blocked_stage(workflow_state)
+    if workflow_next_stage is None and all(stage.status in {"succeeded", "not_applicable"} for stage in workflow_state.stages):
+        return SchedulerDecision(
+            contract_type="manager_scheduler_decision_v1",
+            now_utc=now.isoformat(),
+            now_et=now_et.isoformat(),
+            decision_status="ready",
+            reason_code="month_workflow_complete",
+            reason="historical model-training workflow month is complete; service runtime may advance the chronological month cursor",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="advance_chronological_month_cursor",
+            command=[],
+            next_internal_stage="chronological_month_advance",
+            execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+        )
     if workflow_next_stage and workflow_next_stage.status == "ready":
         if not execute_safe_offline_stages:
             return SchedulerDecision(

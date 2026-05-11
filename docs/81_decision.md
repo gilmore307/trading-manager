@@ -2855,3 +2855,25 @@ The March 2016 chronological historical workflow continued after January and Feb
 ### Decision
 
 Close the 2016-03 Layer 1-8 safe historical workflow section. March 2016 is complete for current no-broker historical modeling scope. Promotion/activation remains deferred to the script-called agent promotion decision path; storage lifecycle mutation remains deferred to the script-called agent lifecycle decision path.
+
+## D127 - Historical modeling is system-service managed
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+The completed 2016-01 through 2016-03 historical workflow proved the Layer 1-8 mechanics, but the operating posture was still too script-by-script. Chentong clarified that historical data/modeling should be managed by an automatic resident system service, with owner observation and intervention, rather than by chat-driven manual command chaining.
+
+### Decision
+
+Make the historical scheduler daemon the canonical owner of the historical data/modeling runtime. The service owns the scheduler loop, checkpoint/resume state, single-instance lock, decision log, safe preparation, safe/offline stage execution, and chronological month-cursor advancement. Manual CLI/script invocation remains available only for inspection, repair, smoke testing, or emergency intervention.
+
+The service may continue safe/offline work automatically and may advance from one completed YYYY-MM month to the next under the chronological-forward policy. Provider acquisition still requires owner-observed agent review, exact proposal validation, terminal-coverage guards, dispatch receipts, and reconcile coverage. Model activation requires `agent_model_promotion_decision_v1`; storage lifecycle mutation requires `agent_storage_lifecycle_decision_v1`; broker/order/fill/account mutation remains out of scope.
+
+### Consequences
+
+- The default runtime is `trading-manager-historical-scheduler.service` / `run_automation_scheduler_daemon.py`, not ad hoc script sequencing.
+- Runtime state includes service-management markers and a durable month cursor.
+- A terminal month workflow emits `month_workflow_complete`; the daemon may then advance the cursor to the next chronological month.
+- Manual commands should be documented and treated as fallback/debug surfaces.

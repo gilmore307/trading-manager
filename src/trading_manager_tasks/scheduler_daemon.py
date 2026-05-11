@@ -37,6 +37,19 @@ DEFAULT_INTERVAL_SECONDS = 300.0
 DEFAULT_STALE_LOCK_SECONDS = 6 * 60 * 60
 
 
+def next_month(month: str) -> str:
+    """Return the next YYYY-MM month for chronological service progression."""
+
+    year_text, month_text = month.split("-", 1)
+    year = int(year_text)
+    month_number = int(month_text)
+    if month_number < 1 or month_number > 12:
+        raise ValueError(f"invalid month: {month}")
+    if month_number == 12:
+        return f"{year + 1:04d}-01"
+    return f"{year:04d}-{month_number + 1:02d}"
+
+
 @dataclass(frozen=True)
 class SchedulerDaemonState:
     """Durable checkpoint for the historical-training scheduler daemon."""
@@ -58,6 +71,8 @@ class SchedulerDaemonState:
     last_next_internal_stage: str | None = None
     last_error: str | None = None
     updated_utc: str | None = None
+    service_managed: bool = True
+    service_manager: str = "systemd"
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -67,13 +82,26 @@ def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def load_daemon_state(path: Path, *, start_month: str, end_month: str) -> SchedulerDaemonState:
-    """Load a checkpoint if present; otherwise create an initial state."""
+def load_daemon_state(
+    path: Path,
+    *,
+    start_month: str,
+    end_month: str,
+    resume_month_cursor: bool = False,
+) -> SchedulerDaemonState:
+    """Load a checkpoint if present; otherwise create an initial state.
+
+    ``resume_month_cursor`` preserves the checkpoint's month scope even when the
+    service template still carries the original bootstrap month. This is the
+    normal system-service mode after automatic chronological advancement.
+    """
 
     if not path.exists():
         return SchedulerDaemonState(start_month=start_month, end_month=end_month, updated_utc=utc_now_iso())
     payload = json.loads(path.read_text(encoding="utf-8"))
     state = SchedulerDaemonState(**payload)
+    if resume_month_cursor:
+        return state
     if state.start_month != start_month or state.end_month != end_month:
         return replace(state, start_month=start_month, end_month=end_month, updated_utc=utc_now_iso())
     return state
@@ -190,6 +218,7 @@ def run_daemon_loop(
     max_iterations: int | None = None,
     execute_safe_preparation: bool = False,
     execute_safe_offline_stages: bool = False,
+    advance_month_on_complete: bool = False,
     config: SchedulerConfig = SchedulerConfig(),
     output: TextIO | None = None,
 ) -> SchedulerDaemonState:
@@ -201,7 +230,14 @@ def run_daemon_loop(
     """
 
     acquire_daemon_lock(lock_path)
-    state = load_daemon_state(state_path, start_month=start_month, end_month=end_month)
+    state = load_daemon_state(
+        state_path,
+        start_month=start_month,
+        end_month=end_month,
+        resume_month_cursor=advance_month_on_complete,
+    )
+    active_start_month = state.start_month
+    active_end_month = state.end_month
     iterations = 0
     try:
         while max_iterations is None or iterations < max_iterations:
@@ -209,8 +245,8 @@ def run_daemon_loop(
             try:
                 decision = run_scheduler_once(
                     config=config,
-                    start_month=start_month,
-                    end_month=end_month,
+                    start_month=active_start_month,
+                    end_month=active_end_month,
                     storage_root=storage_root,
                     component_src_root=component_src_root,
                     execute_safe_preparation=execute_safe_preparation,
@@ -219,6 +255,17 @@ def run_daemon_loop(
                 append_decision_log(decision_log_path, decision)
                 completed = utc_now_iso()
                 state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=decision)
+                if advance_month_on_complete and decision.reason_code == "month_workflow_complete" and active_start_month == active_end_month:
+                    advanced_month = next_month(active_end_month)
+                    active_start_month = advanced_month
+                    active_end_month = advanced_month
+                    state = replace(
+                        state,
+                        start_month=advanced_month,
+                        end_month=advanced_month,
+                        last_next_internal_stage="chronological_month_advanced",
+                        updated_utc=completed,
+                    )
                 if output is not None:
                     output.write(json.dumps(decision.summary_row(), sort_keys=True) + "\n")
                     output.flush()
@@ -253,6 +300,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--once", action="store_true", help="Alias for --max-iterations 1.")
     parser.add_argument("--execute-safe-preparation", action="store_true", help="Allow safe Layer 1 task-key preparation. No provider calls are performed.")
     parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Allow one ready offline workflow stage per tick. No provider calls or activation are performed.")
+    parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
     parser.add_argument("--max-load-per-cpu", type=float, default=DEFAULT_MAX_LOAD_PER_CPU)
@@ -276,6 +324,7 @@ def main(argv: list[str] | None = None) -> int:
         max_iterations=max_iterations,
         execute_safe_preparation=args.execute_safe_preparation,
         execute_safe_offline_stages=args.execute_safe_offline_stages,
+        advance_month_on_complete=args.advance_month_on_complete,
         config=config,
         output=sys.stdout,
     )
@@ -294,6 +343,7 @@ __all__ = [
     "append_decision_log",
     "load_daemon_state",
     "release_daemon_lock",
+    "next_month",
     "run_daemon_loop",
     "update_state_from_decision",
     "update_state_from_error",
