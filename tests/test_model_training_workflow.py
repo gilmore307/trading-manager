@@ -160,6 +160,38 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
         self.assertIn("real_database_evaluation", layer.promotion_review_command)
 
+    def test_layer_four_uses_local_event_materializer_and_database_model_rows(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        layer = plan.layers[3]
+        self.assertIn("scripts/tasks/materialize_layer_four_event_overlay_inputs.py", layer.stages[0].command)
+        self.assertIsNone(layer.stages[0].approval_gate_required)
+        self.assertIn("--source-start", layer.feature_command)
+        self.assertIn("--from-database", layer.model_generate_command)
+        self.assertIn("--output-jsonl", layer.model_generate_command)
+        self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
+        self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
+
+    def test_layers_five_to_seven_use_database_model_rows_and_conservative_review(self):
+        expected_scripts = {
+            4: "generate_model_05_alpha_confidence.py",
+            5: "generate_model_06_position_projection.py",
+            6: "generate_model_07_underlying_action.py",
+        }
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        for index, script_name in expected_scripts.items():
+            layer = plan.layers[index]
+            self.assertIn(script_name, " ".join(layer.model_generate_command))
+            self.assertIn("--from-database", layer.model_generate_command)
+            self.assertIn("--output-jsonl", layer.model_generate_command)
+            self.assertIn("--from-database", layer.model_evaluate_command)
+            self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
+            self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
+            self.assertIn("--output-json", layer.promotion_review_command)
+
     def test_progression_modes_encode_background_panels_target_chain_and_option_gate(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")

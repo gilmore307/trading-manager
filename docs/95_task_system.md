@@ -151,6 +151,25 @@ PYTHONPATH=src python3 scripts/tasks/materialize_layer_three_target_state_inputs
 
 This emits `manager_layer_three_target_state_input_materialization_v1` evidence, merges completed Layer 2 Alpaca bar artifacts into a `source_03_target_state` task key, and delegates normalization to `trading-data`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation.
 
+Materialize Layer 4 event-overlay inputs from local source-detector outputs over already reviewed Layer 2 feed artifacts:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_overlay_inputs.py \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --write
+```
+
+This emits `manager_layer_four_event_overlay_input_materialization_v1` evidence, runs only the local `source_04_event_overlay.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes the resulting event overview rows through `source_04_event_overlay`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. If local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
+
+After Layer 4 is complete, Layers 5-7 may advance through the safe offline executor by reading already-persisted SQL rows:
+
+- Layer 5 reads Layer 1-4 context and writes `trading_model.model_05_alpha_confidence`.
+- Layer 6 reads Layer 5 alpha confidence and writes `trading_model.model_06_position_projection` using flat/no-pending position context defaults.
+- Layer 7 reads Layer 5/6 context and writes `trading_model.model_07_underlying_action` as offline planning evidence only.
+
+These stages remain safe only while the stage receipts show `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`; promotion review output remains deferred until separate approval.
+
 Validate that a materialized payload is component-readable before dispatching work:
 
 ```bash

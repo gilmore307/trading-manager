@@ -82,6 +82,29 @@ class StageExecutorTests(unittest.TestCase):
             self.assertEqual(summary.status, "failed")
             self.assertEqual(summary.provider_calls, 0)
 
+    def test_executes_approved_layer_four_local_data_acquisition_command(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            stage = StageProgress(
+                stage_id="layer_04_event_overlay.data_acquisition",
+                layer=4,
+                layer_key="layer_04_event_overlay",
+                stage_type="data_acquisition",
+                status="ready",
+                command=["python3", "materialize_layer_four_event_overlay_inputs.py"],
+                blockers=(),
+            )
+            summary = execute_stage_process(
+                stage,
+                manager_root=tmp,
+                trading_data_root=tmp,
+                trading_model_root=tmp,
+                receipt_root=tmp / "receipts",
+                log_root=tmp / "logs",
+            )
+            self.assertEqual(summary.status, "failed")
+            self.assertEqual(summary.provider_calls, 0)
+
     def test_refuses_unapproved_local_data_acquisition_command(self):
         stage = StageProgress(
             stage_id="layer_03_target_state_vector.data_acquisition",

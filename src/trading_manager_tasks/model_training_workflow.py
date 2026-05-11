@@ -231,14 +231,14 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
         "python3",
         f"/root/projects/trading-model/scripts/models/model_{layer:02d}_{slug}/{script_name}",
     ]
-    if layer == 3 and verb == "generate":
+    if layer in {3, 4, 5, 6, 7} and verb == "generate":
         command.extend([
             "--from-database",
             "--source-start",
             "${START_MONTH_START_ET}",
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
-            "--output",
+            "--output-jsonl" if layer in {4, 5, 6, 7} else "--output",
             f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/model_rows_${{START_MONTH}}.jsonl",
         ])
     if layer in {1, 2} and verb == "evaluate":
@@ -247,7 +247,7 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--output-json",
             f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/evaluation_summary_${{START_MONTH}}.json",
         ])
-    if layer == 3 and verb == "evaluate":
+    if layer in {3, 4, 5, 6, 7} and verb == "evaluate":
         command.extend([
             "--from-database",
             "--source-start",
@@ -257,6 +257,8 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--output-json",
             f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/evaluation_summary_${{START_MONTH}}.json",
         ])
+        if layer in {4, 5, 6, 7}:
+            command.extend(["--evidence-source", "database_rows_fixture_outcomes"])
     if layer in {1, 2} and verb == "review":
         command.extend([
             "--evaluation-summary-json",
@@ -270,6 +272,13 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--evidence-source",
             "real_database_evaluation",
             "--local-fallback-review",
+        ])
+    if layer in {4, 5, 6, 7} and verb == "review":
+        command.extend([
+            "--evaluation-summary-json",
+            f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/evaluation_summary_${{START_MONTH}}.json",
+            "--output-json",
+            f"/root/projects/trading-model/storage/runtime/model_{layer:02d}_{slug}/promotion_review_${{START_MONTH}}.json",
         ])
     return command
 
@@ -289,14 +298,14 @@ def feature_command(feature_cli: str | None) -> list[str]:
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-feature-01-market-regime", "trading-data-feature-02-sector-context"}:
         command.extend(["--month", "${START_MONTH}"])
-    if feature_cli == "trading-data-feature-03-target-state-vector":
+    if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-04-event-overlay"}:
         command.extend([
             "--source-start",
             "${START_MONTH_START_ET}",
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
             "--run-id",
-            "feature_03_target_state_vector_${START_MONTH}",
+            f"{FEATURE_MODULES[feature_cli].split('.')[-1]}_${{START_MONTH}}",
         ])
     return command
 
@@ -400,6 +409,17 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
             "PYTHONPATH=src",
             "python3",
             "scripts/tasks/materialize_layer_three_target_state_inputs.py",
+            "--start-month",
+            "${START_MONTH}",
+            "--end-month",
+            "${END_MONTH}",
+            "--write",
+        ]
+    elif layer == 4:
+        acquisition_command = [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/materialize_layer_four_event_overlay_inputs.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",

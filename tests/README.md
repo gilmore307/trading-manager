@@ -39,6 +39,11 @@
   - source task-key, candidate, and merged-bar evidence generation without embedding large rows in the task key;
   - zero provider calls, model activation, or broker execution in dry-run materialization.
 
+- `test_layer_four_event_overlay.py` verifies:
+  - local Layer 4 event-overlay source materialization from completed Layer 2 feed artifacts;
+  - detector/source task-key evidence generation for `source_04_event_overlay` without provider dispatch;
+  - zero provider calls, model activation, or broker execution in dry-run materialization.
+
 - `test_model_training_state.py` verifies:
   - durable `manager_model_training_workflow_state_v1` initialization;
   - approval-ref and receipt-driven stage advancement;
