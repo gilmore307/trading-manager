@@ -71,6 +71,12 @@ class SchedulerTests(unittest.TestCase):
         self.assertTrue(result.allowed)
         self.assertEqual(result.reason_code, "outside_market_hours_protection")
 
+    def test_market_gate_can_be_disabled_for_pre_promotion_full_training(self):
+        monday_market_time = datetime(2026, 5, 11, 14, 0, tzinfo=UTC)  # 10:00 ET Monday.
+        result = market_hours_gate(monday_market_time, SchedulerConfig(market_hours_protection_enabled=False))
+        self.assertTrue(result.allowed)
+        self.assertEqual(result.reason_code, "market_hours_protection_disabled_pre_promotion")
+
     def test_regular_trading_day_excludes_weekends_and_market_holidays(self):
         self.assertFalse(is_regular_us_equity_trading_day(datetime(2026, 5, 10, tzinfo=UTC).date()))
         self.assertFalse(is_regular_us_equity_trading_day(datetime(2026, 1, 1, tzinfo=UTC).date()))
@@ -111,6 +117,19 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, "backoff")
         self.assertTrue(decision.market_protection_active)
         self.assertEqual(decision.reason_code, "regular_trading_day_market_hours_protection")
+
+    def test_scheduler_allows_training_during_market_hours_when_pre_promotion_gate_disabled(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            decision = run_scheduler_once(
+                now_utc=datetime(2026, 5, 11, 14, 0, tzinfo=UTC),
+                config=SchedulerConfig(market_hours_protection_enabled=False),
+                resource_snapshot=self._healthy_resource_snapshot(),
+                storage_root=Path(raw_tmp),
+                execute_safe_preparation=False,
+            )
+        self.assertEqual(decision.decision_status, "ready")
+        self.assertFalse(decision.market_protection_active)
+        self.assertEqual(decision.reason_code, "safe_offline_work_ready")
 
     def test_scheduler_executes_safe_preparation_without_provider_dispatch(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

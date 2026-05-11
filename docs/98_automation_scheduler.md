@@ -58,7 +58,7 @@ Until measured production capacity exists, the conservative planning assumption 
 
 ## Market-Hours Policy
 
-During regular US equity market hours on actual regular US equity trading days, manager should pause or heavily throttle historical data/modeling jobs by default.
+During regular US equity market hours on actual regular US equity trading days, manager should pause or heavily throttle historical data/modeling jobs once there is a production model/live-monitoring capacity target to protect. During the current pre-promotion phase, no model is active yet, so the resident historical scheduler runs in full-training mode with market-hours historical-training protection disabled while provider, promotion, resource, and broker gates remain hard.
 
 Default window:
 
@@ -74,7 +74,7 @@ The buffer covers pre-open checks and post-close reconciliation. The protection 
 - allow lightweight bookkeeping only when it does not contend with live systems;
 - allow urgent manual override only through reviewed policy, not as a hidden default.
 
-Outside the protected window, including non-trading days, the scheduler should resume safe queued historical work automatically subject to resource budgets and owner-observed agent decision gates.
+Outside the protected window, including non-trading days, the scheduler should resume safe queued historical work automatically subject to resource budgets and owner-observed agent decision gates. Before production model activation or live trading is enabled, set `TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=true` in the service environment to restore market-hours protection.
 
 ## Agent Decision Gates Stay Hard
 

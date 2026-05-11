@@ -36,10 +36,21 @@ DEFAULT_MIN_FREE_DISK_GB = 10.0
 DEFAULT_MAX_LOAD_PER_CPU = 0.70
 
 
+def _env_bool(name: str, *, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off", "disabled"}
+
+
+DEFAULT_MARKET_HOURS_PROTECTION_ENABLED = _env_bool("TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED", default=True)
+
+
 @dataclass(frozen=True)
 class SchedulerConfig:
     """Runtime gates for one scheduler tick."""
 
+    market_hours_protection_enabled: bool = DEFAULT_MARKET_HOURS_PROTECTION_ENABLED
     protected_start_et: str = "09:20"
     protected_end_et: str = "16:10"
     min_available_memory_mb: int = DEFAULT_MIN_AVAILABLE_MEMORY_MB
@@ -176,6 +187,12 @@ def is_regular_us_equity_trading_day(day: date) -> bool:
 def market_hours_gate(now_utc: datetime, config: SchedulerConfig = SchedulerConfig()) -> GateResult:
     """Gate historical-heavy work during protected trading-day market hours."""
 
+    if not config.market_hours_protection_enabled:
+        return GateResult(
+            True,
+            "market_hours_protection_disabled_pre_promotion",
+            "market-hours historical-training protection is disabled while no production model is active",
+        )
     now_et = now_utc.astimezone(NEW_YORK)
     if not is_regular_us_equity_trading_day(now_et.date()):
         return GateResult(True, "not_regular_trading_day", "market-hours protection is inactive on non-trading days")
@@ -465,6 +482,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--component-src-root", type=Path, default=DEFAULT_TRADING_DATA_SRC)
     parser.add_argument("--execute-safe-preparation", action="store_true", help="Write Layer 1 task-key payload files and validate handoff shape. No provider calls are performed.")
     parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Execute one ready offline workflow stage and record its receipt/state. No provider calls or activation are performed.")
+    parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
     parser.add_argument("--max-load-per-cpu", type=float, default=DEFAULT_MAX_LOAD_PER_CPU)
@@ -477,6 +495,7 @@ def main(argv: list[str] | None = None) -> int:
             text = text[:-1] + "+00:00"
         now = datetime.fromisoformat(text).astimezone(UTC)
     config = SchedulerConfig(
+        market_hours_protection_enabled=not args.disable_market_hours_protection and DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
         min_available_memory_mb=args.min_available_memory_mb,
         min_free_disk_gb=args.min_free_disk_gb,
         max_load_per_cpu=args.max_load_per_cpu,
@@ -497,6 +516,7 @@ def main(argv: list[str] | None = None) -> int:
 
 __all__ = [
     "GateResult",
+    "DEFAULT_MARKET_HOURS_PROTECTION_ENABLED",
     "ResourceSnapshot",
     "SchedulerConfig",
     "SchedulerDecision",

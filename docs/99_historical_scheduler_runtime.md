@@ -82,7 +82,7 @@ The historical scheduler runtime must provide:
 - **Checkpoint/restart:** every tick updates `manager_scheduler_daemon_state_v1`; restart resumes from the latest checkpoint and current month cursor.
 - **Single-instance safety:** the lock prevents duplicate daemon loops from racing on the same task payloads and state.
 - **Observable decisions:** every tick appends one decision row for review of ready/backoff/executed/error outcomes, and `inspect_historical_scheduler_status.py` summarizes the current service posture without mutating runtime state.
-- **Resource protection:** market-hours and host resource gates still run on every tick.
+- **Resource protection:** host resource gates still run on every tick. Market-hours protection is configurable; in the current pre-promotion full-training phase `TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=false` disables market-hours backoff because no production model/live trading capacity is active yet.
 - **Gate preservation:** provider calls, model activation, and broker execution remain blocked unless their explicit gates are satisfied.
 - **Automatic work selection:** on service start and before every tick, the daemon reviews completed/open month-scoped workflow states, resumes the earliest open month if one exists, otherwise selects the next chronological month after the latest completed checkpoint; the owner does not have to say where to continue, and externally completed months are skipped on the next service tick.
 - **Chronological cursor:** terminal month completion advances the daemon to the next YYYY-MM month under the chronological-forward policy.

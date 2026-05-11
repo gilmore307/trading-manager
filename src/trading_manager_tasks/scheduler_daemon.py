@@ -21,6 +21,7 @@ from typing import Any, TextIO
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import (
+    DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
     DEFAULT_MAX_LOAD_PER_CPU,
     DEFAULT_MIN_AVAILABLE_MEMORY_MB,
     DEFAULT_MIN_FREE_DISK_GB,
@@ -482,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Allow one ready offline workflow stage per tick. No provider calls or activation are performed.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")
+    parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
     parser.add_argument("--max-load-per-cpu", type=float, default=DEFAULT_MAX_LOAD_PER_CPU)
@@ -489,6 +491,7 @@ def main(argv: list[str] | None = None) -> int:
 
     max_iterations = 1 if args.once else args.max_iterations
     config = SchedulerConfig(
+        market_hours_protection_enabled=not args.disable_market_hours_protection and DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
         min_available_memory_mb=args.min_available_memory_mb,
         min_free_disk_gb=args.min_free_disk_gb,
         max_load_per_cpu=args.max_load_per_cpu,
