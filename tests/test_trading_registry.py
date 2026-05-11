@@ -1521,6 +1521,26 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_08_thetadata_terminal_required", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
 
 
+    def test_execution_realtime_adapter_scaffold_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(
+            rows["EXECUTION_REALTIME_SUBSCRIPTION_PLAN"]["payload"],
+            "execution_realtime_subscription_plan_v1",
+        )
+        self.assertIn("no_provider_calls", rows["EXECUTION_REALTIME_SUBSCRIPTION_PLAN"]["applies_to"])
+        self.assertEqual(
+            rows["EXECUTION_REALTIME_SUBSCRIPTION_PLAN_SET"]["payload"],
+            "execution_realtime_subscription_plan_set_v1",
+        )
+        self.assertEqual(rows["REALTIME_CAPTURE_VALIDATION"]["payload"], "realtime_capture_validation_v1")
+        self.assertIn("no_model_activation", rows["REALTIME_CAPTURE_VALIDATION"]["applies_to"])
+        self.assertIn("plan_realtime_capture.py", rows["EXECUTION_REALTIME_CAPTURE_PLAN"]["path"])
+        self.assertIn("validate_realtime_capture.py", rows["EXECUTION_REALTIME_CAPTURE_VALIDATE"]["path"])
+        self.assertIn("live_observe_requires_live_stream_approval_ref", rows["EXECUTION_REALTIME_LIVE_OBSERVE_GATE_POLICY"]["payload"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
