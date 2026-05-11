@@ -160,7 +160,7 @@ PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_overlay_inputs
   --write
 ```
 
-This emits `manager_layer_four_event_overlay_input_materialization_v1` evidence, runs only the local `source_04_event_overlay.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes the resulting event overview rows through `source_04_event_overlay`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. If local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
+This emits `manager_layer_four_event_overlay_input_materialization_v1` evidence, runs only the local `source_04_event_overlay.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes the resulting event overview rows through `source_04_event_overlay`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. Layer 2 feed artifacts with zero saved bar rows are recorded as `skipped_zero_bar_rows` before detector execution; this preserves not-yet-listed/no-data evidence without failing the local detector. If all executed local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
 
 After Layer 4 is complete, Layers 5-7 may advance through the safe offline executor by reading already-persisted SQL rows:
 

@@ -104,6 +104,16 @@ def _run_detector(
     symbol = ref.symbol
     task_key_path = output_dir / "detectors" / symbol / "task_key.json"
     detector_output_root = trading_data_root / "storage" / "runtime" / DETECTOR_SOURCE.replace(".", "_") / symbol / output_dir.name
+    receipt_path = detector_output_root / "completion_receipt.json"
+    if ref.row_count <= 0:
+        return DetectorRunRef(
+            symbol=symbol,
+            task_key_path=str(task_key_path),
+            receipt_path=str(receipt_path),
+            saved_event_path=None,
+            event_count=0,
+            status="skipped_zero_bar_rows",
+        )
     task_key = {
         "task_id": f"layer_04_event_overlay_detector_{symbol}_{output_dir.name.replace('-', '_')}",
         "source": DETECTOR_SOURCE,
@@ -116,7 +126,6 @@ def _run_detector(
     }
     task_key_path.parent.mkdir(parents=True, exist_ok=True)
     task_key_path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    receipt_path = detector_output_root / "completion_receipt.json"
     saved_event_path: str | None = None
     event_count = 0
     status = "prepared"
