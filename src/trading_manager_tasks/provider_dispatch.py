@@ -367,6 +367,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--skip-registered-failures", action="store_true", help="Skip requests with accepted_skip entries in the manager failure register.")
     parser.add_argument("--database-url")
+    parser.add_argument("--write", action="store_true", help="Write dispatch summary JSON to --output-path.")
+    parser.add_argument("--output-path", type=Path, help="Optional dispatch summary output path.")
     args = parser.parse_args(argv)
     summary = dispatch_layer_provider_acquisition(
         model_layer=args.model_layer,
@@ -384,6 +386,11 @@ def main(argv: list[str] | None = None) -> int:
         skip_registered_failures=args.skip_registered_failures,
         database_url=args.database_url,
     )
+    if args.write:
+        if args.output_path is None:
+            raise TaskSystemError("--write requires --output-path")
+        args.output_path.parent.mkdir(parents=True, exist_ok=True)
+        args.output_path.write_text(json.dumps(summary.summary_row(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     write_dispatch_summary(summary, output=sys.stdout)
     return 0
 

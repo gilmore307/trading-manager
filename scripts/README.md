@@ -27,7 +27,8 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/plan_dataset_expansion.py` — lets manager choose the next dataset role/layer to expand, and with `--write` prepares the selected safe artifacts/payloads without provider calls.
 - `tasks/advance_model_training_workflow.py` — refreshes the durable Layer 1-8 workflow checkpoint, ingests component receipts, records reviewed approval refs, and selects the next safe/gated stage.
 - `tasks/plan_live_call_approval.py` — creates a skip-aware live-call approval review proposal/template without approving, dispatching, or calling providers.
-- `tasks/create_live_call_approval_packet.py` — writes a complete local approval packet bundle with proposal, reviewed-approval placeholder, validation/dispatch/reconcile command templates, and zero provider calls.
+- `tasks/create_live_call_approval_packet.py` — writes a complete local approval packet bundle with proposal, reviewed-approval placeholder, validation/dispatch/reconcile command templates, status command, and zero provider calls.
+- `tasks/inspect_live_call_approval_packet.py` — inspects packet lifecycle status (`template_pending_review` through `reconciled`) without approving, dispatching, or calling providers.
 - `tasks/validate_live_call_approval_proposal.py` — validates a reviewed `live_call_approval_v1` exactly against a manager proposal before any dispatch attempt.
 - `tasks/dispatch_approved_provider_acquisition.py` — validates `live_call_approval_v1` for Layer 1/2 Alpaca-bars provider acquisition selected by `--model-layer` and, only with both `--execute-approved-provider-calls` and exact `--approval-validation`, runs the approved trading-data commands.
 - `tasks/reconcile_provider_stage.py` — safely reconciles existing provider-stage completion receipts into manager control-plane rows, stage coverage, and workflow state without dispatching providers.

@@ -163,7 +163,18 @@ PYTHONPATH=src python3 scripts/tasks/create_live_call_approval_packet.py \
   --write
 ```
 
-The packet writes a proposal, deliberately invalid reviewed-approval placeholder, validation output target, dispatch plan/execute command templates, and reconcile command template under `storage/runtime/approvals/...`. It is a local runtime bundle only: packet creation does not approve, validate as reviewed, dispatch, or call providers.
+The packet writes a proposal, deliberately invalid reviewed-approval placeholder, validation output target, dispatch plan/execute summary targets, reconcile summary/failure-proposal/coverage targets, and a status command under `storage/runtime/approvals/...`. It is a local runtime bundle only: packet creation does not approve, validate as reviewed, dispatch, or call providers.
+
+Inspect packet status at any time:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/inspect_live_call_approval_packet.py \
+  --packet storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet.json \
+  --write \
+  --output-path storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet_status.json
+```
+
+The status artifact is `manager_live_call_approval_packet_status_v1`. It reports the local lifecycle as `template_pending_review`, `approval_ready_pending_validation`, `approval_validated_pending_dispatch_plan`, `dispatch_plan_ready_pending_execute`, `executed_pending_reconcile`, `reconciled`, or `packet_inconsistent`. Status inspection is read-only and also reports the next safe action.
 
 Plan the exact request ids for a reviewed live-call approval before creating or editing an approval artifact:
 
@@ -186,7 +197,9 @@ After review fills in a real approval artifact, validate it exactly against the 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval_proposal.py \
   --proposal storage/runtime/approvals/layer_02_sector_context/live_call_approval_proposal_layer_02_smoke_xlb_xlk_xle_2016-01.json \
-  --approval storage/runtime/approvals/layer_02_sector_context/live_call_approval_layer_02_smoke_xlb_xlk_xle_2016-01.json
+  --approval storage/runtime/approvals/layer_02_sector_context/live_call_approval_layer_02_smoke_xlb_xlk_xle_2016-01.json \
+  --write \
+  --output-path storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/proposal_validation.json
 ```
 
 This proposal-bound validation requires `approval.request_ids` to exactly equal `proposal.request_ids`, rejects any request id listed as a registered skip in the proposal, requires `max_requests` to equal the proposal request count, and then runs the normal live-call gate validation on regenerated non-dry-run manager requests. It is still plan-only: no provider dispatch or mutation occurs.

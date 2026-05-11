@@ -87,8 +87,9 @@
 
 - `test_live_call_packet.py` verifies:
   - complete `manager_live_call_approval_packet_v1` bundle generation;
-  - packet files for proposal, reviewed-approval placeholder, validation output, dispatch templates, and reconcile templates;
-  - registered skip exclusion before packet command construction.
+  - packet files for proposal, reviewed-approval placeholder, validation output, dispatch templates, reconcile templates, and status templates;
+  - registered skip exclusion before packet command construction;
+  - read-only packet lifecycle/status transitions from review template through validation, plan, execute, reconcile, and inconsistency detection.
 
 - `test_historical_training.py` verifies:
   - manager-owned Layer 1 historical-training batch preparation;

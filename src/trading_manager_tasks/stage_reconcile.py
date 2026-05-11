@@ -345,6 +345,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--advance-workflow", action="store_true", help="Ingest the written coverage report into workflow state.")
     parser.add_argument("--workflow-state-path", type=Path, default=DEFAULT_WORKFLOW_STATE_PATH)
     parser.add_argument("--write-workflow-state", action="store_true")
+    parser.add_argument("--write-summary", action="store_true", help="Write reconcile summary JSON to --summary-output-path.")
+    parser.add_argument("--summary-output-path", type=Path)
     args = parser.parse_args(argv)
 
     summary = reconcile_provider_stage(
@@ -365,6 +367,11 @@ def main(argv: list[str] | None = None) -> int:
         workflow_state_path=args.workflow_state_path,
         write_workflow_state=args.write_workflow_state,
     )
+    if args.write_summary:
+        if args.summary_output_path is None:
+            raise TaskSystemError("--write-summary requires --summary-output-path")
+        args.summary_output_path.parent.mkdir(parents=True, exist_ok=True)
+        args.summary_output_path.write_text(json.dumps(summary.summary_row(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     write_stage_reconcile_summary(summary, output=sys.stdout)
     return 0
 
