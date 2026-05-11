@@ -2898,3 +2898,19 @@ The selected month is then evaluated against the maintained Layer 1-8 workflow p
 - Operators enable the service; they do not tell it whether to continue at 2016-04 or another month.
 - Runtime state records automatic work-selection evidence: completed months, open months, and the selection reason.
 - Manual month arguments remain bootstrap/fallback defaults, not routine continuation instructions.
+
+## D129 - Historical scheduler system hardening status surface
+
+### Context
+After accepting the service-owned runtime and automatic next-work selection, Chentong asked whether system-level todos were gone and then requested that the remaining system-level items be solved in one pass. The remaining risk was not another manual workflow step; it was lack of a single read-only surface that proves service readiness, selected work, current stage/blocker, latest decision, provider posture, failure evidence, and deferred mutation boundaries.
+
+### Decision
+Add `manager_historical_scheduler_status_v1` as the canonical read-only status surface for the historical scheduler service. The status command inspects daemon state, decision logs, workflow checkpoints, lock state, deployment templates, local failure evidence, and explicit gated-scope states without mutating runtime state.
+
+`inspect_historical_scheduler_status.py` is the normal operator inspection command after host activation. It reports the next selected month when daemon state does not exist yet, confirms required systemd/runtime flags, surfaces stale locks, summarizes the latest scheduler decision and provider gate posture, and makes model activation, storage lifecycle mutation, and broker/order/account mutation visible as explicitly gated or out-of-scope states rather than hidden todos.
+
+### Implications
+- System-level service-control and observability work is closed for supervised historical operation.
+- Host-level install/enable remains an explicit operator action; committed code/templates/status checks do not install or start services.
+- Provider expansion beyond current adapters remains future source-specific extension work, not a missing generic scheduler mechanism.
+- Production model activation still requires `agent_model_promotion_decision_v1`; storage lifecycle mutation still requires `agent_storage_lifecycle_decision_v1` plus storage-owned protected checks and receipts; broker/order/fill/account mutation remains outside historical modeling.

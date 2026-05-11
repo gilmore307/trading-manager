@@ -27,8 +27,30 @@ Default local runtime files live under ignored `storage/runtime/`:
 | `historical_scheduler_state.json` | `manager_scheduler_daemon_state_v1` | Resume checkpoint: tick counters, last decision, last internal stage, last error, service-management markers, automatic work-selection evidence, and current month scope. |
 | `historical_scheduler.lock` | lock file | Single-instance guard; stale locks may be replaced only when the recorded process is gone and the lock is old. |
 | `historical_scheduler_decisions.jsonl` | `manager_scheduler_decision_v1` rows | Append-only operational log for scheduler decisions and gate outcomes. |
+| `model_training_workflow_state_YYYY-MM.json` | `manager_model_training_workflow_state_v1` | Month-scoped workflow checkpoint that the service uses for automatic next-work selection and resume. |
 
 These files are runtime state, not Git artifacts. If the daemon restarts after host reboot or process failure, it resumes from the checkpoint and re-enters the scheduler work loop instead of relying on chat/session memory.
+
+## Status and Readiness Surface
+
+The read-only status entrypoint is:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/inspect_historical_scheduler_status.py
+```
+
+It emits `manager_historical_scheduler_status_v1` and performs no provider calls, no model activation, no broker execution, and no storage lifecycle mutation. The status row summarizes:
+
+- service template/env/wrapper readiness and required service flags;
+- lock state (`absent`, `active`, or `stale`);
+- selected current month from daemon state or automatic checkpoint selection;
+- current workflow stage, blocked reason, and latest scheduler decision;
+- provider gate posture, latest provider-call accounting, and dispatch flag;
+- local failure evidence files/rows for failure-register review;
+- explicit gated-scope states for provider acquisition, model activation, storage lifecycle mutation, and broker/account mutation;
+- recommended next operator action, such as enabling the service, observing logs, or clearing a stale lock.
+
+This status surface is the normal observation tool after service activation. It exists so operators do not need to infer scheduler health by manually chaining workflow commands.
 
 ## Boot and Supervision
 
@@ -59,12 +81,13 @@ The historical scheduler runtime must provide:
 - **Residency:** the daemon is a long-running process supervised by a host service manager when enabled; this is the normal production control path, not an optional convenience.
 - **Checkpoint/restart:** every tick updates `manager_scheduler_daemon_state_v1`; restart resumes from the latest checkpoint and current month cursor.
 - **Single-instance safety:** the lock prevents duplicate daemon loops from racing on the same task payloads and state.
-- **Observable decisions:** every tick appends one decision row for review of ready/backoff/executed/error outcomes.
+- **Observable decisions:** every tick appends one decision row for review of ready/backoff/executed/error outcomes, and `inspect_historical_scheduler_status.py` summarizes the current service posture without mutating runtime state.
 - **Resource protection:** market-hours and host resource gates still run on every tick.
 - **Gate preservation:** provider calls, model activation, and broker execution remain blocked unless their explicit gates are satisfied.
 - **Automatic work selection:** on service start the daemon reviews completed/open month-scoped workflow states, resumes the earliest open month if one exists, otherwise selects the next chronological month after the latest completed checkpoint; the owner does not have to say where to continue.
 - **Chronological cursor:** terminal month completion advances the daemon to the next YYYY-MM month under the chronological-forward policy.
 - **Recoverability:** runtime logs/state are local operational evidence; canonical provider/model receipts still belong in manager/storage contracts as those stages are implemented.
+- **Explicit deferred scopes:** production model activation, storage lifecycle mutation, and broker/order/fill/account mutation are visible as gated statuses rather than hidden scheduler todos.
 
 ## Current Full-Stack Workflow Graph
 
@@ -95,4 +118,4 @@ Layer 2 data-acquisition preparation now reuses the same request/payload/handoff
 
 For `layer_02_sector_context.feature_generation`, the safe offline command first materializes already-acquired `01_feed_alpaca_bars` `equity_bar.csv` artifacts into the shared `trading_data.source_01_market_regime` bar table, then generates `trading_data.feature_02_sector_context`. Like Layer 1 feature generation, this deterministic stage must keep `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`.
 
-The remaining implementation boundary is broader component execution coverage beyond the Alpaca-bars adapter and richer artifact discovery from each component command.
+The resident scheduler/service-control boundary is closed enough for supervised operation. Broader component execution coverage beyond the Alpaca-bars adapter is future provider-extension work and must start from concrete source-ready evidence plus the same approval/reconcile contracts. Artifact discovery for component receipts now captures final outputs and supporting step references; richer component-specific indexing belongs with each new component adapter rather than as an open scheduler bypass.

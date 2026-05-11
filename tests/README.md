@@ -160,6 +160,13 @@
   - error checkpointing for restart-safe failure visibility;
   - persistent daemon loop state/log writing without provider dispatch.
 
+- `test_scheduler_status.py` verifies:
+  - read-only `manager_historical_scheduler_status_v1` collection;
+  - automatic next-month selection visibility when daemon state is absent;
+  - service template/env/wrapper readiness and required flag checks;
+  - latest decision/provider-gate status reporting;
+  - explicit deferred statuses for model activation, storage lifecycle mutation, and broker/account mutation.
+
 - `test_review_decision.py` verifies:
   - unified `review_decision_v1` artifact construction;
   - activation records require approving review decisions;

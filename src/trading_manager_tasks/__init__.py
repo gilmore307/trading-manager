@@ -68,6 +68,7 @@ from .scheduler import (
     resource_gate,
     run_scheduler_once,
 )
+from .scheduler_status import HistoricalSchedulerStatus, collect_historical_scheduler_status
 from .task_rehearsal import (
     build_rehearsal_receipt,
     build_rehearsal_task_summary,
@@ -85,6 +86,7 @@ __all__ = [
     "DatasetExpansionPlan",
     "DatasetRoleEvidence",
     "LayerDatasetEvidence",
+    "HistoricalSchedulerStatus",
     "TASK_PRIORITY_RANKS",
     "TASK_SUMMARY_ORDER_BY",
     "MODEL_PROMOTION_REVIEW_REQUEST_KIND",
@@ -94,6 +96,7 @@ __all__ = [
     "SourceAvailability",
     "build_dataset_expansion_plan",
     "build_model_promotion_review_request",
+    "collect_historical_scheduler_status",
     "collect_dataset_evidence_from_database",
     "collect_dataset_evidence_from_rows",
     "build_activation_record",
