@@ -1582,6 +1582,27 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("validate_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_VALIDATE"]["path"])
         self.assertIn("no_production_model_activation", rows["MODEL_REALTIME_DECISION_HANDOFF_POLICY"]["payload"])
 
+    def test_manager_realtime_shadow_handoff_receipt_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(
+            rows["MANAGER_REALTIME_SHADOW_HANDOFF_VALIDATION"]["payload"],
+            "manager_realtime_shadow_handoff_validation_v1",
+        )
+        self.assertIn("model_realtime_decision_route_plan_v1", rows["MANAGER_REALTIME_SHADOW_HANDOFF_VALIDATION"]["applies_to"])
+        self.assertEqual(
+            rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECEIPT"]["payload"],
+            "manager_realtime_shadow_handoff_receipt_v1",
+        )
+        self.assertIn("ready_signal_v1", rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECEIPT"]["applies_to"])
+        self.assertEqual(
+            rows["MANAGER_REALTIME_SHADOW_HANDOFF_CONTROL_PLANE_BUNDLE"]["payload"],
+            "manager_realtime_shadow_handoff_control_plane_bundle_v1",
+        )
+        self.assertIn("record_realtime_shadow_handoff.py", rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECORD"]["path"])
+        self.assertIn("no_model_activation", rows["MANAGER_REALTIME_SHADOW_HANDOFF_POLICY"]["payload"])
+
 
 if __name__ == "__main__":
     unittest.main()

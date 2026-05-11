@@ -2914,3 +2914,24 @@ Add `manager_historical_scheduler_status_v1` as the canonical read-only status s
 - Host-level install/enable remains an explicit operator action; committed code/templates/status checks do not install or start services.
 - Provider expansion beyond current adapters remains future source-specific extension work, not a missing generic scheduler mechanism.
 - Production model activation still requires `agent_model_promotion_decision_v1`; storage lifecycle mutation still requires `agent_storage_lifecycle_decision_v1` plus storage-owned protected checks and receipts; broker/order/fill/account mutation remains outside historical modeling.
+
+## D130 - Realtime shadow handoff receipts are manager-visible but non-mutating
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+`trading-execution` can now build realtime feature/model-input snapshots, and `trading-model` can build fixture/shadow route plans from those inputs. Manager needs visibility into that cross-repository handoff without treating it as production model activation or execution authority.
+
+### Decision
+
+Add `manager_realtime_shadow_handoff_control_plane_bundle_v1` as the manager-visible receipt/normalization surface for realtime shadow decision handoffs. It validates the paired `execution_model_decision_input_snapshot_v1` and `model_realtime_decision_route_plan_v1`, emits a standard component completion receipt, and normalizes that receipt into run/artifact/ready rows for task-summary consumers.
+
+The handoff remains fixture/shadow only. It performs no provider calls, model activation, production decision activation, broker calls, order construction, persistence by default, or account mutation.
+
+### Consequences
+
+- Realtime shadow handoff progress can be observed through manager control-plane rows once a durable receipt URI is accepted.
+- The receipt does not bypass promotion review, production activation, or execution gates.
+- Generic receipt persistence remains an explicit follow-up action, not an automatic side effect of validation.

@@ -162,6 +162,17 @@ PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_overlay_inputs
 
 This emits `manager_layer_four_event_overlay_input_materialization_v1` evidence, runs only the local `source_04_event_overlay.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes the resulting event overview rows through `source_04_event_overlay`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. Layer 2 feed artifacts with zero saved bar rows are recorded as `skipped_zero_bar_rows` before detector execution; this preserves not-yet-listed/no-data evidence without failing the local detector. If all executed local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
 
+Record a realtime shadow decision handoff receipt when execution/model scaffolds have produced a realtime decision input snapshot and model route plan:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/record_realtime_shadow_handoff.py \
+  --decision-input decision_input.json \
+  --route-plan route_plan.json \
+  --output bundle
+```
+
+The output is `manager_realtime_shadow_handoff_control_plane_bundle_v1`: a standard component completion receipt plus normalized `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows. It makes the execution -> model realtime shadow handoff visible to manager/task-summary consumers without provider calls, model activation, broker calls, order construction, persistence, or account mutation. Use the generic `record_completion_receipt.py` only after a reviewed durable receipt URI exists and persistence is explicitly desired.
+
 After Layer 4 is complete, Layers 5-7 may advance through the safe offline executor by reading already-persisted SQL rows:
 
 - Layer 5 reads Layer 1-4 context and writes `trading_model.model_05_alpha_confidence`.
