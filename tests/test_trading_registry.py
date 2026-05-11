@@ -1540,6 +1540,26 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("validate_realtime_capture.py", rows["EXECUTION_REALTIME_CAPTURE_VALIDATE"]["path"])
         self.assertIn("live_observe_requires_live_stream_approval_ref", rows["EXECUTION_REALTIME_LIVE_OBSERVE_GATE_POLICY"]["payload"])
 
+    def test_realtime_feature_decision_handoff_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(rows["REALTIME_FEATURE_SNAPSHOT"]["payload"], "realtime_feature_snapshot_v1")
+        self.assertIn("historical_feature_parity", rows["REALTIME_FEATURE_SNAPSHOT"]["applies_to"])
+        self.assertEqual(
+            rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["payload"],
+            "execution_model_decision_input_snapshot_v1",
+        )
+        self.assertIn("historical_model_decision_handoff", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
+        self.assertEqual(
+            rows["EXECUTION_MODEL_DECISION_INPUT_VALIDATION"]["payload"],
+            "execution_model_decision_input_validation_v1",
+        )
+        self.assertIn("build_realtime_feature_snapshot.py", rows["EXECUTION_REALTIME_FEATURE_SNAPSHOT_BUILD"]["path"])
+        self.assertIn("build_realtime_model_input.py", rows["EXECUTION_REALTIME_MODEL_INPUT_BUILD"]["path"])
+        self.assertIn("validate_realtime_model_input.py", rows["EXECUTION_REALTIME_MODEL_INPUT_VALIDATE"]["path"])
+        self.assertIn("historical_feature_parity_required", rows["EXECUTION_REALTIME_MODEL_DECISION_HANDOFF_POLICY"]["payload"])
+
 
 if __name__ == "__main__":
     unittest.main()
