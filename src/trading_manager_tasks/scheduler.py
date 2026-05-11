@@ -22,7 +22,7 @@ from typing import Any, Literal, TextIO
 from zoneinfo import ZoneInfo
 
 from .historical_training import prepare_layer_one_historical_training_batch
-from .model_training_state import advance_workflow_state, next_ready_or_blocked_stage
+from .model_training_state import advance_workflow_state, next_ready_or_blocked_stage, workflow_state_path_for_month
 from .model_training_workflow import LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS, build_model_training_workflow_plan
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .stage_executor import execute_next_ready_stage
@@ -314,7 +314,7 @@ def run_scheduler_once(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
-        state_path=storage_root / "runtime" / "model_training_workflow_state.json",
+        state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
         write=False,
     )
     workflow_next_stage = next_ready_or_blocked_stage(workflow_state)
@@ -338,7 +338,7 @@ def run_scheduler_once(
             start_month=start_month,
             end_month=end_month,
             storage_root=storage_root,
-            state_path=storage_root / "runtime" / "model_training_workflow_state.json",
+            state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
             receipt_root=storage_root / "runtime" / "model_training_stage_receipts",
             log_root=storage_root / "runtime" / "model_training_stage_logs",
             write=True,
@@ -415,7 +415,7 @@ def run_scheduler_once(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
-        state_path=storage_root / "runtime" / "model_training_workflow_state.json",
+        state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
         write=False,
     )
     return SchedulerDecision(

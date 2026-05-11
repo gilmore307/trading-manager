@@ -16,6 +16,7 @@ from .control_plane import TaskSystemError
 from .model_training_state import (
     DEFAULT_WORKFLOW_STATE_PATH,
     StageProgress,
+    resolve_workflow_state_path,
     WorkflowState,
     advance_workflow_state,
     mark_stage_succeeded,
@@ -225,7 +226,7 @@ def execute_next_ready_stage(
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     storage_root: Path = DEFAULT_STORAGE_ROOT,
-    state_path: Path = DEFAULT_WORKFLOW_STATE_PATH,
+    state_path: Path | None = None,
     manager_root: Path = Path("/root/projects/trading-manager"),
     trading_data_root: Path = Path("/root/projects/trading-data"),
     trading_model_root: Path = Path("/root/projects/trading-model"),
@@ -233,6 +234,7 @@ def execute_next_ready_stage(
     log_root: Path = DEFAULT_LOG_ROOT,
     write: bool = False,
 ) -> tuple[StageExecutionSummary, WorkflowState]:
+    state_path = resolve_workflow_state_path(start_month, state_path, storage_root=storage_root)
     state = advance_workflow_state(
         start_month=start_month,
         end_month=end_month,
@@ -279,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
-    parser.add_argument("--state-path", type=Path, default=DEFAULT_WORKFLOW_STATE_PATH)
+    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to storage/runtime/model_training_workflow_state_YYYY-MM.json.")
     parser.add_argument("--manager-root", type=Path, default=Path("/root/projects/trading-manager"))
     parser.add_argument("--trading-data-root", type=Path, default=Path("/root/projects/trading-data"))
     parser.add_argument("--trading-model-root", type=Path, default=Path("/root/projects/trading-model"))

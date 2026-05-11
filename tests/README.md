@@ -49,11 +49,17 @@
   - reviewed no-provider skip behavior when all Layer 7 rows are no-trade/maintain/neutral;
   - active Layer 7 target chains producing ThetaData/source_05 option-snapshot request previews without provider calls.
 
+- `test_layer_eight_feature_stage.py` verifies:
+  - manager-owned Layer 8 feature-stage adapter behavior;
+  - first-class no-provider/no-feature skip receipt generation after a reviewed zero-active-target gate;
+  - delegation to trading-data `feature_08_option_expression` with month-scoped source windows after active-path acquisition.
+
 - `test_model_training_state.py` verifies:
   - durable `manager_model_training_workflow_state_v1` initialization;
   - approval-ref and receipt-driven stage advancement;
   - downstream readiness after upstream stage completion;
-  - not-applicable feature/source stages for Layers 5-7.
+  - not-applicable feature/source stages for Layers 5-7;
+  - month-scoped checkpoint path derivation and separate `provider_calls_observed` accounting.
 
 - `test_provider_dispatch.py` verifies:
   - Layer 1 provider-dispatch approval validation;
@@ -113,7 +119,7 @@
 
 - `test_live_call_packet.py` verifies:
   - complete `manager_live_call_approval_packet_v1` bundle generation;
-  - packet files for proposal, reviewed-approval placeholder, validation output, dispatch templates, reconcile templates, and status templates;
+  - packet files for proposal, reviewed-approval template, editable reviewed approval, validation output, dispatch templates, reconcile templates, and status templates;
   - registered skip exclusion before packet command construction;
   - read-only packet lifecycle/status transitions from review template through validation, plan, execute, reconcile, and inconsistency detection;
   - packet rehearsal with ephemeral approval files, no persistent approval/validation/dispatch artifacts, and zero provider calls;

@@ -30,11 +30,13 @@ class LiveCallApprovalPacketTests(unittest.TestCase):
 
             packet_path = Path(packet.packet_dir) / "packet.json"
             proposal_path = Path(packet.proposal_path)
-            approval_path = Path(packet.reviewed_approval_template_path)
+            approval_template_path = Path(packet.reviewed_approval_template_path)
+            approval_path = Path(packet.reviewed_approval_path)
             readme_path = Path(packet.packet_dir) / "README.md"
 
             self.assertTrue(packet_path.exists())
             self.assertTrue(proposal_path.exists())
+            self.assertTrue(approval_template_path.exists())
             self.assertTrue(approval_path.exists())
             self.assertTrue(readme_path.exists())
             payload = json.loads(packet_path.read_text(encoding="utf-8"))
@@ -73,7 +75,7 @@ class LiveCallApprovalPacketTests(unittest.TestCase):
             self.assertEqual(status.status, "template_pending_review")
             self.assertFalse(status.can_validate_approval)
 
-            approval = json.loads(Path(packet.reviewed_approval_template_path).read_text(encoding="utf-8"))
+            approval = json.loads(Path(packet.reviewed_approval_path).read_text(encoding="utf-8"))
             approval.update(
                 {
                     "approval_id": "lcav1_layer2_packet_unit",
@@ -84,7 +86,7 @@ class LiveCallApprovalPacketTests(unittest.TestCase):
                 }
             )
             approval.pop("review_note", None)
-            Path(packet.reviewed_approval_template_path).write_text(json.dumps(approval, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            Path(packet.reviewed_approval_path).write_text(json.dumps(approval, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             status = inspect_live_call_approval_packet(packet_path=packet_path)
             self.assertEqual(status.status, "approval_ready_pending_validation")
             self.assertTrue(status.can_validate_approval)
@@ -171,7 +173,7 @@ class LiveCallApprovalPacketTests(unittest.TestCase):
                 symbols=("XLK",),
                 write=True,
             )
-            approval = json.loads(Path(packet.reviewed_approval_template_path).read_text(encoding="utf-8"))
+            approval = json.loads(Path(packet.reviewed_approval_path).read_text(encoding="utf-8"))
             approval.update(
                 {
                     "approval_id": "lcav1_layer2_packet_unit",
@@ -181,7 +183,7 @@ class LiveCallApprovalPacketTests(unittest.TestCase):
                     "expires_at_utc": "2026-05-11T00:00:00Z",
                 }
             )
-            Path(packet.reviewed_approval_template_path).write_text(json.dumps(approval, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            Path(packet.reviewed_approval_path).write_text(json.dumps(approval, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             Path(packet.validation_output_path).write_text(
                 json.dumps(
                     {

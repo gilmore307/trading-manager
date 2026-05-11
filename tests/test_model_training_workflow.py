@@ -135,6 +135,17 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
 
+    def test_layer_eight_feature_generation_uses_manager_adapter_with_no_provider_skip_support(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+
+        command = plan.layers[7].feature_command
+
+        self.assertIn("scripts/tasks/execute_layer_eight_option_feature_generation.py", command)
+        self.assertIn("--start-month", command)
+        self.assertIn("${START_MONTH}", command)
+        self.assertIn("--end-month", command)
+
     def test_layer_three_feature_generation_reads_month_scoped_source_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")

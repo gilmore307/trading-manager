@@ -295,6 +295,16 @@ FEATURE_MODULES: dict[str, str] = {
 def feature_command(feature_cli: str | None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
+    if feature_cli == "trading-data-feature-08-option-expression":
+        return [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/execute_layer_eight_option_feature_generation.py",
+            "--start-month",
+            "${START_MONTH}",
+            "--end-month",
+            "${END_MONTH}",
+        ]
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-feature-01-market-regime", "trading-data-feature-02-sector-context"}:
         command.extend(["--month", "${START_MONTH}"])

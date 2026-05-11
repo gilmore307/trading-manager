@@ -9,6 +9,7 @@ from trading_manager_tasks.model_training_state import (
     advance_workflow_state,
     initial_workflow_state,
     next_ready_or_blocked_stage,
+    workflow_state_path_for_month,
 )
 from trading_manager_tasks.model_training_workflow import build_model_training_workflow_plan
 from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
@@ -171,6 +172,63 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertEqual(len(acquisition.receipt_refs), 2)
             self.assertIn("storage://bars/0.csv", acquisition.artifact_refs)
             self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "ready")
+
+    def test_default_checkpoint_path_is_month_scoped(self):
+        path = workflow_state_path_for_month("2016-02", root=Path("storage/runtime"))
+
+        self.assertEqual(path, Path("storage/runtime/model_training_workflow_state_2016-02.json"))
+
+    def test_advance_default_checkpoint_path_follows_storage_root(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state = advance_workflow_state(
+                start_month="2016-03",
+                end_month="2016-03",
+                storage_root=tmp,
+                write=True,
+            )
+
+            self.assertEqual(state.start_month, "2016-03")
+            self.assertTrue((tmp / "runtime" / "model_training_workflow_state_2016-03.json").exists())
+
+    def test_provider_calls_observed_is_recorded_separately_from_offline_provider_calls(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state_path = tmp / "workflow_state.json"
+            receipt = tmp / "provider_receipt.json"
+            receipt.write_text(
+                json.dumps(
+                    {
+                        "manager_stage_id": "layer_01_market_regime.data_acquisition",
+                        "status": "succeeded",
+                        "provider_calls": 2,
+                        "output_refs": ["storage://bars/layer1"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                state_path=state_path,
+                receipt_paths=[receipt],
+                write=True,
+            )
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                state_path=state_path,
+                receipt_paths=[receipt],
+                write=False,
+            )
+
+            self.assertEqual(state.provider_calls, 0)
+            self.assertEqual(state.provider_calls_observed, 2)
+            self.assertEqual(state.summary_row()["provider_calls_observed"], 2)
 
     def test_layer_eight_waits_for_complete_upstream_target_chain_and_approval(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

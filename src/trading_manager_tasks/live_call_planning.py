@@ -125,7 +125,7 @@ def _select_requests(
 
 def _approval_id(model_layer: str, start_month: str, end_month: str, request_count: int) -> str:
     month_token = start_month.replace("-", "_") if start_month == end_month else f"{start_month.replace('-', '_')}_{end_month.replace('-', '_')}"
-    return f"lcav1_{model_layer}_{month_token}_alpaca_bars_{request_count}_requests_REVIEW_REQUIRED"
+    return f"lcav1_{model_layer}_{month_token}_alpaca_bars_{request_count}_requests"
 
 
 def _dispatch_command(*, model_layer: str, start_month: str, end_month: str, request_ids: Sequence[str], execute: bool) -> tuple[str, ...]:

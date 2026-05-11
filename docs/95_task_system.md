@@ -181,6 +181,8 @@ PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.p
 
 The artifact is `manager_layer_08_option_expression_gate_review_v1`. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active Layer 7 action chains, and records a reviewed no-provider skip when all Layer 7 rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action remains approval-packet review; plain `继续` must still not dispatch Layer 8 provider calls.
 
+Layer 8 feature generation now runs through the manager adapter `scripts/tasks/execute_layer_eight_option_feature_generation.py`. When the gate review is `no_provider_skip_accepted` with zero active requests, the adapter writes `layer_08_option_expression_feature_generation_no_provider_skip_receipt_YYYY-MM.json` and treats `feature_08_option_expression` as a reviewed no-op. When active option requests were approved and acquired, the same adapter delegates to trading-data `feature_08_option_expression` with month-scoped source windows.
+
 Validate that a materialized payload is component-readable before dispatching work:
 
 ```bash
@@ -205,7 +207,7 @@ PYTHONPATH=src python3 scripts/tasks/create_live_call_approval_packet.py \
 
 Use `--pending-only` for normal runtime packets. It reads `manager_stage_coverage_v1`, excludes already ready requests and reviewed terminal accepted skips/failures, and blocks planning while unreviewed failed requests exist. Explicit `--symbol`/`--request-id` filters may still be used, but terminal requests are removed before proposal creation. The generated execute command includes `--reject-terminal-coverage` so provider execution refuses already terminal request ids if coverage changed after packet creation.
 
-The packet writes a proposal, deliberately invalid reviewed-approval placeholder, validation output target, dispatch plan/execute summary targets, reconcile summary/failure-proposal/coverage targets, and a status command under `storage/runtime/approvals/...`. It is a local runtime bundle only: packet creation does not approve, validate as reviewed, dispatch, or call providers.
+The packet writes a proposal, a deliberately invalid `reviewed_approval_TEMPLATE.json`, a separate `reviewed_approval.json` working approval artifact, validation output target, dispatch plan/execute summary targets, reconcile summary/failure-proposal/coverage targets, and a status command under `storage/runtime/approvals/...`. It is a local runtime bundle only: packet creation does not approve, validate as reviewed, dispatch, or call providers. Operators should edit/review `reviewed_approval.json`, not the template. Generated approval ids are stable and do not include review-placeholder text; placeholder fields remain inside the invalid template/body until reviewed.
 
 Inspect packet status at any time:
 
@@ -230,6 +232,8 @@ PYTHONPATH=src python3 scripts/tasks/summarize_stage_run.py \
 ```
 
 The dashboard artifact is `manager_stage_run_dashboard_v1`. It summarizes stage coverage, packet statuses, observed provider calls, evidence refs, the next pending-only packet preview, and the next safe action. Lower-level artifacts remain the audit trail, but operators should normally inspect this dashboard first instead of manually opening proposal/validation/dispatch/reconcile/coverage files.
+
+Workflow checkpoints keep `provider_calls` as the safe/offline stage counter and record approved acquisition calls from ingested receipts in `provider_calls_observed`. This preserves the safety invariant that offline stages report zero provider calls while still making month-level acquisition volume visible to dashboards and audits.
 
 For the simplest safe control loop, run one conservative controller step:
 

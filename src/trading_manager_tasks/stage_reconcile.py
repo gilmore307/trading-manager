@@ -18,7 +18,7 @@ from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import CompletionReceiptRows, TaskSystemError, _error_summary, _receipt_runs, _status, normalize_completion_receipt, persist_completion_rows
 from .failure_register import persist_failure_register_rows, validate_failure_register_row
-from .model_training_state import DEFAULT_WORKFLOW_STATE_PATH, advance_workflow_state
+from .model_training_state import advance_workflow_state, resolve_workflow_state_path
 from .request_payloads import DEFAULT_STORAGE_ROOT as DEFAULT_MANAGER_STORAGE_ROOT
 from .stage_coverage import StageCoverageReport, collect_stage_coverage, write_stage_coverage
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
@@ -247,7 +247,7 @@ def reconcile_provider_stage(
     coverage_report_path: Path | None = None,
     write_coverage_report: bool = False,
     advance_workflow: bool = False,
-    workflow_state_path: Path = DEFAULT_WORKFLOW_STATE_PATH,
+    workflow_state_path: Path | None = None,
     write_workflow_state: bool = False,
 ) -> StageReconcileSummary:
     """Run safe offline receipt/control-plane/coverage reconciliation."""
@@ -285,6 +285,7 @@ def reconcile_provider_stage(
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with output_path.open("w", encoding="utf-8") as handle:
             write_stage_coverage(report, output=handle)
+    resolved_workflow_state_path = resolve_workflow_state_path(start_month, workflow_state_path, storage_root=manager_storage_root)
     if advance_workflow:
         if output_path is None or not output_path.exists():
             raise TaskSystemError("advance_workflow requires a written stage coverage report")
@@ -292,7 +293,7 @@ def reconcile_provider_stage(
             start_month=start_month,
             end_month=end_month,
             storage_root=manager_storage_root,
-            state_path=workflow_state_path,
+            state_path=resolved_workflow_state_path,
             stage_coverage_reports=(output_path,),
             write=write_workflow_state,
         )
@@ -316,7 +317,7 @@ def reconcile_provider_stage(
         coverage_failed_count=report.failed_count if report else None,
         coverage_accepted_failed_count=report.accepted_failed_count if report else None,
         coverage_pending_count=report.pending_count if report else None,
-        workflow_state_path=str(workflow_state_path) if advance_workflow else None,
+        workflow_state_path=str(resolved_workflow_state_path) if advance_workflow else None,
         workflow_advanced=advance_workflow,
         receipt_refs=refs,
     )
@@ -343,7 +344,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--coverage-report-path", type=Path)
     parser.add_argument("--write-coverage-report", action="store_true")
     parser.add_argument("--advance-workflow", action="store_true", help="Ingest the written coverage report into workflow state.")
-    parser.add_argument("--workflow-state-path", type=Path, default=DEFAULT_WORKFLOW_STATE_PATH)
+    parser.add_argument("--workflow-state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to storage/runtime/model_training_workflow_state_YYYY-MM.json.")
     parser.add_argument("--write-workflow-state", action="store_true")
     parser.add_argument("--write-summary", action="store_true", help="Write reconcile summary JSON to --summary-output-path.")
     parser.add_argument("--summary-output-path", type=Path)

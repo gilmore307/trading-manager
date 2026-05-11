@@ -29,13 +29,14 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/summarize_stage_run.py` — writes or prints the single `manager_stage_run_dashboard_v1` human-facing receipt for stage coverage, packets, next pending-only packet preview, and next safe action.
 - `tasks/run_stage_controller.py` — runs one conservative no-provider stage-control step, creating the next pending-only packet when safe and stopping at human/external gates.
 - `tasks/plan_live_call_approval.py` — creates a skip-aware live-call approval review proposal/template without approving, dispatching, or calling providers; `--pending-only` excludes ready/reviewed-terminal stage requests.
-- `tasks/create_live_call_approval_packet.py` — writes a complete local approval packet bundle with proposal, reviewed-approval placeholder, validation/dispatch/reconcile command templates, status command, and zero provider calls; use `--pending-only` for normal runtime packets.
+- `tasks/create_live_call_approval_packet.py` — writes a complete local approval packet bundle with proposal, invalid template, editable `reviewed_approval.json`, validation/dispatch/reconcile command templates, status command, and zero provider calls; use `--pending-only` for normal runtime packets.
 - `tasks/inspect_live_call_approval_packet.py` — inspects packet lifecycle status (`template_pending_review` through `reconciled`) without approving, dispatching, or calling providers.
 - `tasks/rehearse_live_call_approval_packet.py` — rehearses proposal validation plus plan-only dispatch through ephemeral approval files, leaving persistent packet state unchanged and provider calls at zero.
 - `tasks/validate_live_call_approval_proposal.py` — validates a reviewed `live_call_approval_v1` exactly against a manager proposal before any dispatch attempt.
 - `tasks/dispatch_approved_provider_acquisition.py` — validates `live_call_approval_v1` for Layer 1/2 Alpaca-bars provider acquisition selected by `--model-layer` and, only with both `--execute-approved-provider-calls` and exact `--approval-validation`, runs the approved trading-data commands.
 - `tasks/reconcile_provider_stage.py` — safely reconciles existing provider-stage completion receipts into manager control-plane rows, stage coverage, and workflow state without dispatching providers.
 - `tasks/review_layer_eight_option_expression_gate.py` — reviews completed Layer 7 rows for active option-expression target chains, emits Layer 8 approval-needed previews or a reviewed no-provider skip, and never calls providers.
+- `tasks/execute_layer_eight_option_feature_generation.py` — executes the Layer 8 feature stage by writing a reviewed no-provider/no-feature skip receipt or delegating to trading-data feature generation after approved acquisition.
 - `tasks/validate_live_call_approval.py` — validates reviewed `live_call_approval_v1` artifacts before any non-dry-run provider handoff is considered.
 - `tasks/execute_model_training_stage.py` — executes one ready safe offline workflow stage, writes stdout/stderr logs and a component receipt, and refuses provider-gated stages.
 - `tasks/prepare_layer_one_historical_training.py` — manager-owned Layer 1 batch preparation: plans the full market-regime ETF universe, materializes payloads, and validates handoff boundaries without provider dispatch.
@@ -66,6 +67,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --collect-evidenc
 PYTHONPATH=src python3 scripts/tasks/dispatch_approved_provider_acquisition.py --start-month 2016-01 --end-month 2016-01 --approval storage/runtime/live_call_approval_layer_01.json
 PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval.py live_requests.jsonl --approval live_call_approval.json
 PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.py --start-month 2016-01 --end-month 2016-01 --write
+PYTHONPATH=src python3 scripts/tasks/execute_layer_eight_option_feature_generation.py --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/execute_model_training_stage.py --start-month 2016-01 --end-month 2016-01 --write
 PYTHONPATH=src python3 scripts/tasks/prepare_layer_one_historical_training.py --start-month 2016-01 --end-month 2016-01 --write-files-only --format json
 PYTHONPATH=src python3 scripts/tasks/prepare_layer_two_historical_training.py --start-month 2016-01 --end-month 2016-01 --write-files-only --format json

@@ -2783,3 +2783,30 @@ Promotion decisions for Layers 1-8 remain deferred. This closeout validates work
 - If a future month has active Layer 7 target chains, Layer 8 must stop at approval-packet review unless explicit provider execution approval is supplied.
 - Deferred promotion evidence remains a separate production-readiness track.
 - Runtime workflow checkpoints should be treated as month-scoped evidence when moving chronologically, so a later month should use an explicit month-specific state path unless/until the scheduler owns month checkpoint rotation.
+
+## D124 - 2016-02 workflow closeout and mechanism-hardening pass
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+The `2016-02` historical workflow completed Layers 1-8 through safe/offline maintenance. Layer 1 and Layer 2 provider acquisition used reviewed approval and proposal-bound validation before execution; downstream Layers 3-8 advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and Layer 8 exposed a no-provider feature-stage skip gap.
+
+### Decision
+
+Close `2016-02` as complete for safe workflow mechanics. The final month-scoped state has no next stage, with all required stages succeeded or not applicable. Layer 7 produced only `no_trade` rows, and Layer 8 correctly produced deterministic `no_option_expression` rows without ThetaData/provider acquisition.
+
+Accept the accompanying mechanism-hardening changes before starting `2016-03`:
+
+- Layer 8 feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_08_option_expression` after approved active-path acquisition.
+- Workflow CLIs default to scheduler-owned month-scoped checkpoints: `storage/runtime/model_training_workflow_state_YYYY-MM.json`.
+- Workflow state records `provider_calls_observed` separately from safe/offline `provider_calls`, so approved acquisition calls are visible without misclassifying offline stages as provider-calling stages.
+- Live-call approval packets now create a separate editable `reviewed_approval.json` beside `reviewed_approval_TEMPLATE.json`; generated approval ids no longer include review-placeholder text.
+
+### Consequences
+
+- `2016-03` may begin from safe internal preparation after this hardening is committed and verified.
+- Production promotion remains deferred until reviewed evidence proves sufficient rows/labels, baseline improvement, split stability, no leakage, and approval.
+- Active Layer 8 provider acquisition remains approval-gated and must still stop at packet review unless explicit provider execution approval is supplied.
+- Storage lifecycle mutation remains outside this closeout and requires a separate lifecycle plan/approval.

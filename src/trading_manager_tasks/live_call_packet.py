@@ -51,6 +51,7 @@ class LiveCallApprovalPacket:
     manager_storage_root: str
     proposal_path: str
     reviewed_approval_template_path: str
+    reviewed_approval_path: str
     validation_output_path: str
     dispatch_plan_output_path: str
     dispatch_execute_output_path: str
@@ -279,7 +280,7 @@ def _write_readme(path: Path, packet: LiveCallApprovalPacket) -> None:
         "- Broker execution, model activation, and storage lifecycle mutation remain disabled.",
         "",
         "Lifecycle:",
-        "1. Fill and review the approval template in `reviewed_approval_TEMPLATE.json`.",
+        "1. Copy/fill the approval template into `reviewed_approval.json` and review it.",
         "2. Run the validation command recorded in `packet.json`.",
         "3. Run the plan-only dispatch command and inspect `dispatch_plan.json`.",
         "4. Only after explicit approval, run the execute command template.",
@@ -289,6 +290,7 @@ def _write_readme(path: Path, packet: LiveCallApprovalPacket) -> None:
         "Files:",
         f"- Proposal: `{Path(packet.proposal_path).name}`",
         f"- Reviewed approval placeholder: `{Path(packet.reviewed_approval_template_path).name}`",
+        f"- Reviewed approval artifact: `{Path(packet.reviewed_approval_path).name}`",
         f"- Validation output target: `{Path(packet.validation_output_path).name}`",
         f"- Dispatch plan output target: `{Path(packet.dispatch_plan_output_path).name}`",
         f"- Dispatch execute output target: `{Path(packet.dispatch_execute_output_path).name}`",
@@ -335,7 +337,8 @@ def create_live_call_approval_packet(
     packet_id = _packet_id(model_layer=model_layer, start_month=start_month, end_month=end_month, request_ids=proposal.request_ids)
     packet_dir = packet_root / model_layer / packet_id
     proposal_path = packet_dir / "proposal.json"
-    approval_path = packet_dir / "reviewed_approval_TEMPLATE.json"
+    approval_template_path = packet_dir / "reviewed_approval_TEMPLATE.json"
+    approval_path = packet_dir / "reviewed_approval.json"
     validation_path = packet_dir / "proposal_validation.json"
     dispatch_plan_path = packet_dir / "dispatch_plan.json"
     dispatch_execute_path = packet_dir / "dispatch_execute.json"
@@ -365,7 +368,8 @@ def create_live_call_approval_packet(
         packet_dir=str(packet_dir),
         manager_storage_root=str(storage_root),
         proposal_path=str(proposal_path),
-        reviewed_approval_template_path=str(approval_path),
+        reviewed_approval_template_path=str(approval_template_path),
+        reviewed_approval_path=str(approval_path),
         validation_output_path=str(validation_path),
         dispatch_plan_output_path=str(dispatch_plan_path),
         dispatch_execute_output_path=str(dispatch_execute_path),
@@ -392,6 +396,7 @@ def create_live_call_approval_packet(
     if write:
         packet_dir.mkdir(parents=True, exist_ok=True)
         _write_json(proposal_path, proposal.summary_row())
+        _write_json(approval_template_path, proposal.approval_template)
         _write_json(approval_path, proposal.approval_template)
         _write_json(packet_path, packet.summary_row())
         _write_readme(packet_dir / "README.md", packet)
@@ -484,7 +489,7 @@ def inspect_live_call_approval_packet(*, packet_path: Path) -> LiveCallApprovalP
         return path, payload
 
     _proposal_path, proposal = artifact("proposal_path")
-    _approval_path, approval = artifact("reviewed_approval_template_path")
+    _approval_path, approval = artifact("reviewed_approval_path" if packet.get("reviewed_approval_path") else "reviewed_approval_template_path")
     _validation_path, validation = artifact("validation_output_path")
     _dispatch_plan_path, dispatch_plan = artifact("dispatch_plan_output_path")
     _dispatch_execute_path, dispatch_execute = artifact("dispatch_execute_output_path")
@@ -568,7 +573,7 @@ def inspect_live_call_approval_packet(*, packet_path: Path) -> LiveCallApprovalP
         next_action = "run_validate_approval_command"
     elif proposal_ready:
         status = "template_pending_review"
-        next_action = "fill_reviewed_approval_template_and_get_explicit_review"
+        next_action = "fill_reviewed_approval_json_and_get_explicit_review"
     else:
         status = "packet_incomplete"
         next_action = "regenerate_packet"

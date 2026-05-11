@@ -14,6 +14,26 @@ from .model_training_workflow import ModelTrainingWorkflowPlan, WorkflowStage, b
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_WORKFLOW_STATE_PATH = Path("storage/runtime/model_training_workflow_state.json")
+DEFAULT_WORKFLOW_STATE_ROOT = Path("storage/runtime")
+
+
+def workflow_state_path_for_month(start_month: str, *, root: Path = DEFAULT_WORKFLOW_STATE_ROOT) -> Path:
+    """Return the scheduler-owned month-scoped workflow checkpoint path."""
+
+    return root / f"model_training_workflow_state_{start_month}.json"
+
+
+def resolve_workflow_state_path(
+    start_month: str,
+    state_path: Path | None = None,
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+) -> Path:
+    """Resolve explicit or automatic month-scoped workflow checkpoint path."""
+
+    return state_path if state_path is not None else workflow_state_path_for_month(start_month, root=storage_root / "runtime")
+
+
 StageProgressStatus = Literal["pending", "blocked", "ready", "succeeded", "failed", "not_applicable"]
 
 
@@ -53,6 +73,7 @@ class WorkflowState:
     stages: tuple[StageProgress, ...]
     updated_utc: str
     provider_calls: int = 0
+    provider_calls_observed: int = 0
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
 
@@ -65,6 +86,7 @@ class WorkflowState:
             "next_stage": next_ready_or_blocked_stage(self).summary_row() if next_ready_or_blocked_stage(self) else None,
             "updated_utc": self.updated_utc,
             "provider_calls": self.provider_calls,
+            "provider_calls_observed": self.provider_calls_observed,
             "model_activation_performed": self.model_activation_performed,
             "broker_execution_performed": self.broker_execution_performed,
         }
@@ -140,6 +162,7 @@ def load_workflow_state(path: Path, plan: ModelTrainingWorkflowPlan) -> Workflow
         stages=stages,
         updated_utc=str(payload.get("updated_utc") or now),
         provider_calls=int(payload.get("provider_calls") or 0),
+        provider_calls_observed=int(payload.get("provider_calls_observed") or 0),
         model_activation_performed=bool(payload.get("model_activation_performed", False)),
         broker_execution_performed=bool(payload.get("broker_execution_performed", False)),
     )
@@ -401,6 +424,25 @@ def _receipt_artifacts(receipt: Mapping[str, Any]) -> list[str]:
     return refs
 
 
+def _receipt_provider_calls(receipt: Mapping[str, Any]) -> int:
+    try:
+        return int(receipt.get("provider_calls") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _receipt_ref_known(state: WorkflowState, receipt_ref: str) -> bool:
+    return any(receipt_ref in stage.receipt_refs for stage in state.stages)
+
+
+def _add_observed_provider_calls_if_new(state: WorkflowState, *, receipt_ref: str, receipt: Mapping[str, Any]) -> WorkflowState:
+    if _receipt_ref_known(state, receipt_ref):
+        return state
+    provider_calls = _receipt_provider_calls(receipt)
+    if provider_calls <= 0:
+        return state
+    return replace(state, provider_calls_observed=state.provider_calls_observed + provider_calls)
+
 def ingest_completion_receipts(state: WorkflowState, receipt_paths: Iterable[Path]) -> WorkflowState:
     updated = state
     for path in receipt_paths:
@@ -410,6 +452,7 @@ def ingest_completion_receipts(state: WorkflowState, receipt_paths: Iterable[Pat
         stage_id = _receipt_stage_id(receipt)
         if not stage_id:
             raise ValueError(f"receipt missing manager_stage_id/stage_id: {path}")
+        updated = _add_observed_provider_calls_if_new(updated, receipt_ref=str(path), receipt=receipt)
         if not _terminal_receipt_success(receipt):
             updated = _attach_stage_evidence(
                 updated,
@@ -479,6 +522,7 @@ def ingest_stage_receipts(
             if not isinstance(receipt, Mapping):
                 raise ValueError(f"receipt must be a JSON object: {path}")
             observed_receipts.append(str(path))
+            updated = _add_observed_provider_calls_if_new(updated, receipt_ref=str(path), receipt=receipt)
             artifact_refs.extend(_receipt_artifacts(receipt))
             if _terminal_receipt_success(receipt):
                 successful_receipts.append(str(path))
@@ -551,7 +595,7 @@ def advance_workflow_state(
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     storage_root: Path = DEFAULT_STORAGE_ROOT,
-    state_path: Path = DEFAULT_WORKFLOW_STATE_PATH,
+    state_path: Path | None = None,
     receipt_paths: Iterable[Path] = (),
     stage_receipts: Sequence[tuple[str, Path]] = (),
     stage_coverage_reports: Iterable[Path] = (),
@@ -560,6 +604,7 @@ def advance_workflow_state(
     approved_stage_refs: Iterable[str] = (),
     write: bool = False,
 ) -> WorkflowState:
+    state_path = resolve_workflow_state_path(start_month, state_path, storage_root=storage_root)
     plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
     state = load_workflow_state(state_path, plan)
     state = ingest_completion_receipts(state, receipt_paths)
@@ -596,7 +641,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
-    parser.add_argument("--state-path", type=Path, default=DEFAULT_WORKFLOW_STATE_PATH)
+    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to storage/runtime/model_training_workflow_state_YYYY-MM.json.")
     parser.add_argument("--receipt", action="append", type=Path, default=[], help="Component receipt JSON with manager_stage_id/stage_id to ingest.")
     parser.add_argument("--stage-receipt", action="append", default=[], help="Bind a component receipt to a stage without requiring embedded stage id: STAGE_ID=PATH.")
     parser.add_argument("--expected-receipt-count", action="append", default=[], help="Override expected successful receipt count for a stage: STAGE_ID=COUNT.")
@@ -624,6 +669,8 @@ def main(argv: list[str] | None = None) -> int:
 
 __all__ = [
     "DEFAULT_WORKFLOW_STATE_PATH",
+    "workflow_state_path_for_month",
+    "resolve_workflow_state_path",
     "StageProgress",
     "WorkflowState",
     "advance_workflow_state",
