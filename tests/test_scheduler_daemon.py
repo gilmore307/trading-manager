@@ -16,6 +16,7 @@ from trading_manager_tasks.scheduler_daemon import (
     next_month,
     release_daemon_lock,
     run_daemon_loop,
+    select_next_historical_work,
     update_state_from_error,
     write_daemon_state,
 )
@@ -97,6 +98,90 @@ class SchedulerDaemonTests(unittest.TestCase):
     def test_next_month_rolls_year_boundary(self):
         self.assertEqual(next_month("2016-01"), "2016-02")
         self.assertEqual(next_month("2016-12"), "2017-01")
+
+    def test_select_next_historical_work_advances_after_latest_completed_month(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in ("2016-02", "2016-03"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=all_stage_ids,
+                    write=True,
+                )
+
+            selection = select_next_historical_work(storage_root=storage_root, default_start_month="2016-01", default_end_month="2016-01")
+
+        self.assertEqual(selection.start_month, "2016-04")
+        self.assertEqual(selection.end_month, "2016-04")
+        self.assertEqual(selection.reason_code, "advance_after_latest_completed_workflow_state")
+        self.assertEqual(selection.completed_months, ("2016-02", "2016-03"))
+        self.assertEqual(selection.open_months, ())
+
+    def test_select_next_historical_work_resumes_earliest_open_month(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            complete_plan = build_model_training_workflow_plan(start_month="2016-01", end_month="2016-01", storage_root=storage_root)
+            all_stage_ids = [stage.stage_id for layer in complete_plan.layers for stage in layer.stages]
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2016-01", root=storage_root / "runtime"),
+                completed_stage_ids=all_stage_ids,
+                write=True,
+            )
+            open_path = workflow_state_path_for_month("2016-02", root=storage_root / "runtime")
+            open_path.parent.mkdir(parents=True, exist_ok=True)
+            open_path.write_text(
+                json.dumps({"start_month": "2016-02", "end_month": "2016-02", "stages": [{"status": "pending"}]}) + "\n",
+                encoding="utf-8",
+            )
+
+            selection = select_next_historical_work(storage_root=storage_root, default_start_month="2016-01", default_end_month="2016-01")
+
+        self.assertEqual(selection.start_month, "2016-02")
+        self.assertEqual(selection.reason_code, "resume_earliest_open_workflow_state")
+        self.assertEqual(selection.completed_months, ("2016-01",))
+        self.assertEqual(selection.open_months, ("2016-02",))
+
+    def test_daemon_auto_selects_next_work_without_user_month_instruction(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "manager-storage"
+            plan = build_model_training_workflow_plan(start_month="2016-01", end_month="2016-01", storage_root=storage_root)
+            all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2016-01", root=storage_root / "runtime"),
+                completed_stage_ids=all_stage_ids,
+                write=True,
+            )
+            state = run_daemon_loop(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage_root,
+                component_src_root=self._fake_data_src(tmp),
+                state_path=tmp / "runtime" / "state.json",
+                lock_path=tmp / "runtime" / "scheduler.lock",
+                decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                interval_seconds=0,
+                max_iterations=1,
+                execute_safe_preparation=True,
+                auto_select_next_work=True,
+                config=SchedulerConfig(min_free_disk_gb=0),
+            )
+
+        self.assertEqual(state.start_month, "2016-02")
+        self.assertEqual(state.end_month, "2016-02")
+        self.assertEqual(state.last_work_selection_reason, "advance_after_latest_completed_workflow_state")
+        self.assertEqual(state.last_completed_months, ("2016-01",))
 
     def test_daemon_advances_month_cursor_after_completed_workflow(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

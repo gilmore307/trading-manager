@@ -18,6 +18,7 @@ ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_auto
   --interval-seconds ${TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS} \
   --execute-safe-preparation \
   --execute-safe-offline-stages \
+  --auto-select-next-work \
   --advance-month-on-complete
 Restart=always
 RestartSec=30

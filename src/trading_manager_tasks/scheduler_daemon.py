@@ -35,6 +35,7 @@ DEFAULT_LOCK_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler.lock"
 DEFAULT_DECISION_LOG_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_decisions.jsonl"
 DEFAULT_INTERVAL_SECONDS = 300.0
 DEFAULT_STALE_LOCK_SECONDS = 6 * 60 * 60
+WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
 
 
 def next_month(month: str) -> str:
@@ -48,6 +49,115 @@ def next_month(month: str) -> str:
     if month_number == 12:
         return f"{year + 1:04d}-01"
     return f"{year:04d}-{month_number + 1:02d}"
+
+
+def _month_from_workflow_state_path(path: Path) -> str | None:
+    stem = path.stem
+    prefix = "model_training_workflow_state_"
+    if not stem.startswith(prefix):
+        return None
+    month = stem.removeprefix(prefix)
+    parts = month.split("-")
+    if len(parts) != 2:
+        return None
+    year_text, month_text = parts
+    if len(year_text) != 4 or len(month_text) != 2 or not year_text.isdigit() or not month_text.isdigit():
+        return None
+    month_number = int(month_text)
+    if month_number < 1 or month_number > 12:
+        return None
+    return month
+
+
+def _workflow_payload_is_complete(payload: dict[str, Any]) -> bool:
+    stages = payload.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return False
+    statuses = [stage.get("status") for stage in stages if isinstance(stage, dict)]
+    return bool(statuses) and all(status in {"succeeded", "not_applicable"} for status in statuses)
+
+
+@dataclass(frozen=True)
+class HistoricalWorkSelection:
+    """Service bootstrap decision for the next historical workflow month."""
+
+    contract_type: str = "manager_historical_work_selection_v1"
+    start_month: str = "2016-01"
+    end_month: str = "2016-01"
+    reason_code: str = "no_prior_workflow_state"
+    completed_months: tuple[str, ...] = ()
+    open_months: tuple[str, ...] = ()
+
+    def summary_row(self) -> dict[str, Any]:
+        row = asdict(self)
+        row["completed_months"] = list(self.completed_months)
+        row["open_months"] = list(self.open_months)
+        return row
+
+
+def select_next_historical_work(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    default_start_month: str = "2016-01",
+    default_end_month: str = "2016-01",
+) -> HistoricalWorkSelection:
+    """Inspect completed/open workflow checkpoints and choose the next month.
+
+    The service should not need a human to say where to continue. It first
+    resumes the earliest open month-scoped workflow state; if every discovered
+    month is complete, it advances to the next chronological month after the
+    latest complete state; if no workflow state exists, it starts from the
+    configured default bootstrap month.
+    """
+
+    runtime_root = storage_root / "runtime"
+    completed: list[str] = []
+    open_months: list[str] = []
+    if runtime_root.exists():
+        for path in sorted(runtime_root.glob(WORKFLOW_STATE_GLOB)):
+            month = _month_from_workflow_state_path(path)
+            if month is None:
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                open_months.append(month)
+                continue
+            state_month = str(payload.get("start_month") or month)
+            if state_month != month:
+                month = state_month
+            if _workflow_payload_is_complete(payload):
+                completed.append(month)
+            else:
+                open_months.append(month)
+
+    completed_tuple = tuple(sorted(set(completed)))
+    open_tuple = tuple(sorted(set(open_months)))
+    if open_tuple:
+        selected = open_tuple[0]
+        return HistoricalWorkSelection(
+            start_month=selected,
+            end_month=selected,
+            reason_code="resume_earliest_open_workflow_state",
+            completed_months=completed_tuple,
+            open_months=open_tuple,
+        )
+    if completed_tuple:
+        selected = next_month(completed_tuple[-1])
+        return HistoricalWorkSelection(
+            start_month=selected,
+            end_month=selected,
+            reason_code="advance_after_latest_completed_workflow_state",
+            completed_months=completed_tuple,
+            open_months=open_tuple,
+        )
+    return HistoricalWorkSelection(
+        start_month=default_start_month,
+        end_month=default_end_month,
+        reason_code="no_prior_workflow_state",
+        completed_months=completed_tuple,
+        open_months=open_tuple,
+    )
 
 
 @dataclass(frozen=True)
@@ -73,9 +183,15 @@ class SchedulerDaemonState:
     updated_utc: str | None = None
     service_managed: bool = True
     service_manager: str = "systemd"
+    last_work_selection_reason: str | None = None
+    last_completed_months: tuple[str, ...] = ()
+    last_open_months: tuple[str, ...] = ()
 
     def summary_row(self) -> dict[str, Any]:
-        return asdict(self)
+        row = asdict(self)
+        row["last_completed_months"] = list(self.last_completed_months)
+        row["last_open_months"] = list(self.last_open_months)
+        return row
 
 
 def utc_now_iso() -> str:
@@ -100,6 +216,11 @@ def load_daemon_state(
         return SchedulerDaemonState(start_month=start_month, end_month=end_month, updated_utc=utc_now_iso())
     payload = json.loads(path.read_text(encoding="utf-8"))
     state = SchedulerDaemonState(**payload)
+    state = replace(
+        state,
+        last_completed_months=tuple(state.last_completed_months),
+        last_open_months=tuple(state.last_open_months),
+    )
     if resume_month_cursor:
         return state
     if state.start_month != start_month or state.end_month != end_month:
@@ -218,6 +339,7 @@ def run_daemon_loop(
     max_iterations: int | None = None,
     execute_safe_preparation: bool = False,
     execute_safe_offline_stages: bool = False,
+    auto_select_next_work: bool = False,
     advance_month_on_complete: bool = False,
     config: SchedulerConfig = SchedulerConfig(),
     output: TextIO | None = None,
@@ -236,6 +358,22 @@ def run_daemon_loop(
         end_month=end_month,
         resume_month_cursor=advance_month_on_complete,
     )
+    if auto_select_next_work:
+        selection = select_next_historical_work(
+            storage_root=storage_root,
+            default_start_month=start_month,
+            default_end_month=end_month,
+        )
+        state = replace(
+            state,
+            start_month=selection.start_month,
+            end_month=selection.end_month,
+            last_next_internal_stage="historical_work_selected",
+            last_work_selection_reason=selection.reason_code,
+            last_completed_months=selection.completed_months,
+            last_open_months=selection.open_months,
+            updated_utc=utc_now_iso(),
+        )
     active_start_month = state.start_month
     active_end_month = state.end_month
     iterations = 0
@@ -300,6 +438,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--once", action="store_true", help="Alias for --max-iterations 1.")
     parser.add_argument("--execute-safe-preparation", action="store_true", help="Allow safe Layer 1 task-key preparation. No provider calls are performed.")
     parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Allow one ready offline workflow stage per tick. No provider calls or activation are performed.")
+    parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
@@ -324,6 +463,7 @@ def main(argv: list[str] | None = None) -> int:
         max_iterations=max_iterations,
         execute_safe_preparation=args.execute_safe_preparation,
         execute_safe_offline_stages=args.execute_safe_offline_stages,
+        auto_select_next_work=args.auto_select_next_work,
         advance_month_on_complete=args.advance_month_on_complete,
         config=config,
         output=sys.stdout,
@@ -338,6 +478,7 @@ __all__ = [
     "DEFAULT_LOCK_PATH",
     "DEFAULT_RUNTIME_DIR",
     "DEFAULT_STATE_PATH",
+    "HistoricalWorkSelection",
     "SchedulerDaemonState",
     "acquire_daemon_lock",
     "append_decision_log",
@@ -345,6 +486,7 @@ __all__ = [
     "release_daemon_lock",
     "next_month",
     "run_daemon_loop",
+    "select_next_historical_work",
     "update_state_from_decision",
     "update_state_from_error",
     "write_daemon_state",

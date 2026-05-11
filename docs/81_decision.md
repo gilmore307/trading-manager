@@ -2877,3 +2877,24 @@ The service may continue safe/offline work automatically and may advance from on
 - Runtime state includes service-management markers and a durable month cursor.
 - A terminal month workflow emits `month_workflow_complete`; the daemon may then advance the cursor to the next chronological month.
 - Manual commands should be documented and treated as fallback/debug surfaces.
+
+## D128 - Service selects next historical work without owner continuation prompts
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+After accepting the system-service runtime posture, Chentong clarified that service startup should not wait for the owner to say where to continue. The service should review completed work, inspect planned/open workflow state, determine the next safe task, and begin it under existing gates.
+
+### Decision
+
+The historical scheduler daemon must automatically select its next historical work item at service start. It reviews month-scoped `manager_model_training_workflow_state_v1` checkpoints, resumes the earliest open month if one exists, otherwise advances to the next chronological month after the latest completed checkpoint, and falls back to the configured bootstrap month only when no checkpoint evidence exists.
+
+The selected month is then evaluated against the maintained Layer 1-8 workflow plan and normal scheduler gates. This does not authorize provider calls, model activation, storage lifecycle mutation, or broker/account mutation outside their accepted agent-decision boundaries.
+
+### Consequences
+
+- Operators enable the service; they do not tell it whether to continue at 2016-04 or another month.
+- Runtime state records automatic work-selection evidence: completed months, open months, and the selection reason.
+- Manual month arguments remain bootstrap/fallback defaults, not routine continuation instructions.

@@ -12,10 +12,11 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py \
   --end-month 2016-01 \
   --execute-safe-preparation \
   --execute-safe-offline-stages \
+  --auto-select-next-work \
   --advance-month-on-complete
 ```
 
-The daemon repeatedly calls the capacity-aware scheduler tick, writes a checkpoint after every iteration, appends one decision JSONL row per tick, uses a single-instance lock so two historical schedulers do not race each other, and advances the month cursor when a month reaches terminal workflow completion.
+The daemon first audits month-scoped workflow checkpoints to identify the earliest open month, or the next chronological month after the latest completed checkpoint, then repeatedly calls the capacity-aware scheduler tick. Each tick writes a checkpoint, appends one decision JSONL row, uses a single-instance lock so two historical schedulers do not race each other, and advances the month cursor when a month reaches terminal workflow completion.
 
 ## Durable Runtime Files
 
@@ -23,7 +24,7 @@ Default local runtime files live under ignored `storage/runtime/`:
 
 | File | Contract | Purpose |
 | --- | --- | --- |
-| `historical_scheduler_state.json` | `manager_scheduler_daemon_state_v1` | Resume checkpoint: tick counters, last decision, last internal stage, last error, service-management markers, and current month scope. |
+| `historical_scheduler_state.json` | `manager_scheduler_daemon_state_v1` | Resume checkpoint: tick counters, last decision, last internal stage, last error, service-management markers, automatic work-selection evidence, and current month scope. |
 | `historical_scheduler.lock` | lock file | Single-instance guard; stale locks may be replaced only when the recorded process is gone and the lock is old. |
 | `historical_scheduler_decisions.jsonl` | `manager_scheduler_decision_v1` rows | Append-only operational log for scheduler decisions and gate outcomes. |
 
@@ -37,7 +38,7 @@ Reviewed host templates live in `deploy/`:
 - `deploy/systemd/trading-manager-historical-scheduler.env`
 - `deploy/logrotate/trading-manager-historical-scheduler`
 
-The systemd service is the canonical runtime owner. It is designed for `Restart=always` and `WantedBy=multi-user.target`, giving process supervision and boot autostart after an operator installs/enables it. The unit runs with safe preparation, safe offline stage execution, and chronological month-cursor advancement enabled. Committing the template does not install or enable the service on this host.
+The systemd service is the canonical runtime owner. It is designed for `Restart=always` and `WantedBy=multi-user.target`, giving process supervision and boot autostart after an operator installs/enables it. The unit runs with automatic next-work selection, safe preparation, safe offline stage execution, and chronological month-cursor advancement enabled. Committing the template does not install or enable the service on this host.
 
 Example operator flow after review:
 
@@ -61,6 +62,7 @@ The historical scheduler runtime must provide:
 - **Observable decisions:** every tick appends one decision row for review of ready/backoff/executed/error outcomes.
 - **Resource protection:** market-hours and host resource gates still run on every tick.
 - **Gate preservation:** provider calls, model activation, and broker execution remain blocked unless their explicit gates are satisfied.
+- **Automatic work selection:** on service start the daemon reviews completed/open month-scoped workflow states, resumes the earliest open month if one exists, otherwise selects the next chronological month after the latest completed checkpoint; the owner does not have to say where to continue.
 - **Chronological cursor:** terminal month completion advances the daemon to the next YYYY-MM month under the chronological-forward policy.
 - **Recoverability:** runtime logs/state are local operational evidence; canonical provider/model receipts still belong in manager/storage contracts as those stages are implemented.
 
