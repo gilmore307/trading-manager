@@ -4,7 +4,7 @@ Status: accepted manager-control policy for historical model training; no provid
 
 ## Purpose
 
-`trading-manager` owns the decision about which historical-training dataset role needs expansion next. Operators should not have to manually choose whether the next batch expands train, calibration, validation, test, forward holdout, or shadow-monitoring evidence.
+`trading-manager` owns the decision about which historical-training dataset role needs expansion next. Operators should not have to manually choose whether the next historical batch expands train, calibration, validation, test, or forward holdout evidence. Realtime monitoring is not a historical dataset-expansion source by default; it produces lightweight online decision-effectiveness evidence separately.
 
 The manager decision is still bounded by hard gates:
 
@@ -24,30 +24,30 @@ Manager treats dataset roles as an ordered evidence ladder:
 | `validation` | Tune model choices and compare candidates. | Fill after calibration. |
 | `test` | Frozen promotion holdout for final review evidence. | Fill after validation; do not use for tuning. |
 | `forward_holdout` | Out-of-time evidence for drift, regime coverage, and split stability. | Fill when promotion gaps require more out-of-time evidence after minimum train/calibration/validation/test coverage exists. |
-| `shadow_monitoring` | Post-approval observation evidence without broker mutation. | Only selected after a layer is production-approved. |
+| `shadow_monitoring` | Lightweight online effectiveness evidence for promoted/shadow decisions without broker mutation. | Consumed as aggregated monitoring metrics, not selected as a historical dataset expansion role. |
 
-## Realtime forward-validation rule
+## Realtime decision-effectiveness rule
 
-Realtime data should cover the live inference feature set, but realtime observations do **not** let the manager skip the historical split ladder by default.
+Realtime data should cover the live inference feature set, but realtime observations do **not** become the historical model test set by default. Historical backfill will eventually advance to the same calendar period and can build the reviewed train/calibration/validation/test/forward-holdout splits through the normal historical pipeline.
 
 Accepted rule:
 
 ```text
-realtime forward validation supplements, then may eventually dominate production monitoring;
-it does not replace initial chronological train/calibration/validation/test evidence.
+realtime monitoring measures whether the model's live/shadow decisions were correct;
+it does not create historical test rows, historical holdout rows, or training rows by default.
 ```
 
-Realtime rows may be used as `forward_holdout` or `shadow_monitoring` evidence only when they are captured as an append-only, point-in-time dataset with frozen model/config refs, immutable prediction/output refs, mature outcome labels, and no training/refit use before the reviewed snapshot boundary. Until enough realtime rows and labels accumulate across regimes, historical validation/test splits remain mandatory for promotion review because they provide sample size, regime coverage, split stability, and baseline comparison evidence immediately.
+The realtime monitor should therefore keep its evidence lightweight: decision id, model/config refs, instrument, decision time, selected model decision/output ref, evaluation horizon, matured outcome label/ref, correctness status, and aggregate accuracy/hit-rate/error metrics. It should not run the full historical feature/dataset processing ladder merely to manufacture a test set.
 
-Manager evidence should therefore report three separate views when available:
+Manager evidence should report separate views when available:
 
-- historical broad-sample validation/test performance;
-- historical live-route simulation performance;
-- realtime shadow/forward performance after labels mature.
+- historical broad-sample validation/test performance from the historical pipeline;
+- historical live-route simulation performance from historical snapshots;
+- realtime model decision-effectiveness metrics after outcome labels mature.
 
-Promotion can move toward realtime-forward evidence as the primary production monitor, but a model that only passes a short realtime window and lacks historical split/baseline/leakage/calibration evidence must still be deferred.
+Realtime effectiveness can trigger promotion review, drift review, trust reduction, or retraining planning, but it should not by itself rewrite historical dataset snapshots or substitute for the historical split ladder.
 
-The execution-side realtime coverage surface is `execution_realtime_input_coverage_v1`, and the append-only validation handoff surface is `realtime_capture_contract_v1`. Manager planning should treat those as coverage/gap contracts, not as provider-stream authorization.
+The execution-side realtime coverage surface is `execution_realtime_input_coverage_v1`, the capture surface is `realtime_capture_contract_v1`, and the online metric surface is `realtime_model_decision_effectiveness_v1`. Manager planning should treat these as monitoring/evidence contracts, not as provider-stream authorization or historical dataset-expansion inputs.
 
 Default planning minimums are intentionally conservative placeholders until measured production evidence supersedes them:
 
@@ -57,7 +57,7 @@ calibration=12 months
 validation=12 months
 test=12 months
 forward_holdout=6 months
-shadow_monitoring=1 month
+shadow_monitoring=online effectiveness metrics only
 ```
 
 These defaults are manager planning thresholds, not promotion approval by themselves.
@@ -90,7 +90,7 @@ The manager walks layers in dependency order and expands the earliest layer with
 3. Layer 8 is option-expression expansion and begins only after the selected target's upstream Layer 1-7 context/target chain is complete.
 4. Fill train, then calibration, then validation, then test.
 5. Use `forward_holdout` only after the base split ladder exists and evidence gaps such as coverage, drift, split stability, stale holdout, regime coverage, or baseline instability remain.
-6. Use `shadow_monitoring` only for production-approved layers, and never as a substitute for offline promotion evidence.
+6. Use realtime/shadow monitoring only as online decision-effectiveness metrics, and never as a substitute for offline promotion evidence or historical test rows.
 7. Every expansion plan must preserve point-in-time/no-future/no-downstream-leakage discipline.
 8. Dataset snapshots and splits remain frozen evidence; if expansion changes the sample universe, it creates a new snapshot/split lineage rather than silently rewriting reviewed evidence.
 
@@ -155,4 +155,5 @@ This policy does not authorize:
 - changing test/holdout boundaries after seeing bad results;
 - model promotion or activation;
 - live broker/order/fill/account mutation;
-- treating shadow observations as current-version training rows without a new reviewed dataset snapshot.
+- treating shadow observations as current-version training or historical test rows without a new reviewed historical dataset snapshot;
+- forcing the realtime monitor to perform heavy historical-dataset processing when lightweight decision-effectiveness metrics are sufficient.

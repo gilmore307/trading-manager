@@ -2983,3 +2983,25 @@ Realtime monitoring runtime control belongs to `trading-execution`. This include
 - Manager may reserve capacity for realtime systems and back off historical work, but that is priority protection, not runtime ownership.
 - Realtime monitor operational health belongs in execution-owned status/heartbeat surfaces.
 - Shared contracts can still be registered through `trading-manager`; registration and receipt visibility do not imply manager runtime control.
+
+## D133 - Realtime monitoring measures decision correctness, not historical test rows
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+Realtime monitoring can generate a large volume of market observations. Chentong clarified that using those rows to build historical test/holdout datasets is unnecessary because historical backfill will eventually advance to the same calendar period, and heavy realtime-side dataset processing would increase monitoring burden.
+
+### Decision
+
+Realtime monitoring should measure model decision effectiveness with lightweight online metrics. The accepted monitoring evidence is the model decision/output made at a point in time, the relevant model/config refs, the evaluation horizon, the matured outcome label/ref, correctness status, and aggregate accuracy/hit-rate/error metrics.
+
+Realtime monitor output must not be treated as the default source for historical test rows, historical forward-holdout rows, or training rows. Historical train/calibration/validation/test/forward-holdout splits remain owned by the historical data/modeling pipeline as backfill catches up.
+
+### Consequences
+
+- Realtime monitoring stays operationally light and focused on live/shadow decision quality.
+- Historical modeling remains responsible for reviewed dataset snapshots/splits.
+- Manager may consume realtime accuracy/effectiveness summaries for promotion review, drift review, trust reduction, or retraining planning.
+- Realtime effectiveness metrics do not authorize model activation, order construction, broker submission, account mutation, or historical dataset rewrites.

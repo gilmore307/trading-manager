@@ -171,7 +171,7 @@ PYTHONPATH=src python3 scripts/tasks/record_realtime_shadow_handoff.py \
   --output bundle
 ```
 
-The output is `manager_realtime_shadow_handoff_control_plane_bundle_v1`: a standard component completion receipt plus normalized `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows. It makes the execution -> model realtime shadow handoff visible to manager/task-summary consumers without model activation, broker calls, order construction, or account mutation. This is evidence consumption, not realtime runtime control: manager must not use this path to start/stop streams, schedule subscriptions, throttle providers, or reconnect monitoring processes. Add `--persist-normalized-rows` only when a durable receipt URI/database context is reviewed and manager SQL persistence is explicitly desired.
+The output is `manager_realtime_shadow_handoff_control_plane_bundle_v1`: a standard component completion receipt plus normalized `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows. It makes the execution -> model realtime shadow handoff visible to manager/task-summary consumers without model activation, broker calls, order construction, or account mutation. This is evidence consumption, not realtime runtime control: manager must not use this path to start/stop streams, schedule subscriptions, throttle providers, or reconnect monitoring processes. Realtime evidence should be persisted as lightweight decision-effectiveness metrics once labels mature, not as historical test-set rows by default. Add `--persist-normalized-rows` only when a durable receipt URI/database context is reviewed and manager SQL persistence is explicitly desired.
 
 Rehearse the full cross-repository fixture chain when validating realtime wiring:
 
