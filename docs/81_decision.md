@@ -2961,3 +2961,25 @@ These paths do not imply model activation or broker authority. Production model 
 - Provider observation and manager visibility are no longer fixture-only when their explicit gates are supplied.
 - Manager persistence is opt-in and reviewable instead of hidden behind validation.
 - Model activation and broker/account mutation remain separate formal integration stages, not accidental consequences of realtime observation.
+
+## D132 - Realtime monitoring runtime is execution-owned, not manager-controlled
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+The realtime market monitor and the historical modeling scheduler have different safety and availability requirements. Chentong clarified that realtime monitoring should be isolated from the historical modeling system and should not be controlled by `trading-manager`.
+
+### Decision
+
+Realtime monitoring runtime control belongs to `trading-execution`. This includes live observe process lifecycle, provider stream/session lifecycle, subscriptions, throttling, reconnect/backoff, runtime health, and monitoring-specific capacity policy.
+
+`trading-manager` remains the owner of historical modeling orchestration and shared registry/contract naming. It may consume execution-produced append-only realtime receipts, coverage summaries, shadow handoff artifacts, and mature validation evidence, including explicit manager persistence of normalized receipt rows when reviewed. It must not start, stop, schedule, throttle, reconnect, or otherwise control realtime provider monitoring processes.
+
+### Consequences
+
+- Historical scheduler pauses/restarts/backlogs must not interrupt live monitoring.
+- Manager may reserve capacity for realtime systems and back off historical work, but that is priority protection, not runtime ownership.
+- Realtime monitor operational health belongs in execution-owned status/heartbeat surfaces.
+- Shared contracts can still be registered through `trading-manager`; registration and receipt visibility do not imply manager runtime control.

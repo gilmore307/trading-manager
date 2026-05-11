@@ -210,7 +210,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_iterations=1,
                 execute_safe_preparation=True,
                 auto_select_next_work=True,
-                config=SchedulerConfig(min_free_disk_gb=0),
+                config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
             )
 
         self.assertEqual(state.start_month, "2016-02")
@@ -243,7 +243,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 interval_seconds=0,
                 max_iterations=1,
                 advance_month_on_complete=True,
-                config=SchedulerConfig(min_free_disk_gb=0),
+                config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
             )
 
         self.assertEqual(state.start_month, "2016-02")
@@ -269,7 +269,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 interval_seconds=0,
                 max_iterations=1,
                 execute_safe_preparation=True,
-                config=SchedulerConfig(min_free_disk_gb=0),
+                config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
             )
 
             self.assertEqual(state.total_ticks, 1)

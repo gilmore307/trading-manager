@@ -40,6 +40,8 @@ The scheduler must preserve this priority order:
 
 Historical training is important, but it is background work relative to live monitoring and execution.
 
+Realtime monitoring itself is not manager-controlled. The historical scheduler may reserve capacity for realtime monitoring/execution and back off under protection policy, but live observe process lifecycle, provider stream lifecycle, subscriptions, throttling, reconnect/backoff, and runtime health belong to `trading-execution`. Manager consumes append-only receipts/evidence; it does not operate the monitor loop.
+
 ## Resource Budget
 
 Historical work may use concurrency, but it must be capacity-aware.
