@@ -2,10 +2,11 @@
 
 ## Active Tasks
 
+- Promote-first model phase: prioritize historical evidence production and promotion-gate repair toward the first usable production-promotable model version. The current first target is Layer 1 `MarketRegimeModel`, because downstream Layer 2/3 promotion depends on a stable approved Layer 1 foundation.
 - No open system-design task blocks starting or supervising the historical scheduler service. The resident runtime owns automatic next-work selection, checkpoint/resume, lock safety, decision logging, safe/offline stage execution, chronological month advancement, and read-only status inspection.
-- Continue chronological historical operation from the service-selected month under existing gates. The current status surface identifies the selected month/stage, last decision, blocked reason, provider gate posture, failure evidence, and host/operator next action.
-- Add new provider adapters only when a new concrete source route has ready-signal evidence and an accepted approval/reconcile contract. This is extension work, not a missing bypass around the current Layer 1/2 Alpaca adapter or the Layer 8 no-provider/no-option branch.
+- Continue chronological historical operation from the service-selected month under existing gates, but treat promotion evidence/gate repair as the priority lens. The current status surface identifies the selected month/stage, last decision, blocked reason, provider gate posture, failure evidence, and host/operator next action.
 - Run/refresh `manager_dataset_evidence_v1` as real snapshot/split/label/evaluation evidence becomes available so expansion planning remains evidence-driven.
+- Keep realtime handoff/monitoring receipts as parked evidence surfaces only. Do not expand realtime runtime, shadow/live integration, or execution control-plane work until a model has an approved/promotable version or the phase is explicitly reopened.
 
 The manager/control-plane MVP and historical scheduler runtime are closed for no-broker historical training: planning, request persistence, payload materialization, dry-run handoff validation, receipt normalization, task summary, review-decision artifacts, live-call approval validation, service-owned scheduling, automatic work selection, and observability/status inspection are accepted. Normal progress should come from the resident service; manual CLIs remain inspection, repair, smoke-test, or emergency tools.
 
@@ -19,8 +20,9 @@ The manager/control-plane MVP and historical scheduler runtime are closed for no
 
 ## Not Current Historical-Training Scope
 
-These items are intentionally outside the current no-broker historical-training run and must not be treated as active manager work items:
+These items are intentionally outside the current promote-first historical-training run and must not be treated as active manager work items:
 
+- realtime runtime expansion, realtime shadow/live integration expansion, or execution runtime control before a model has an approved/promotable version;
 - live provider dispatch workers that bypass owner-observed agent review, validated `live_call_approval_v1` artifacts, or terminal-coverage guards;
 - broker/order-construction implementation;
 - execution-owned order/fill/account lifecycle;
