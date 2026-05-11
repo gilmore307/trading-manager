@@ -177,6 +177,19 @@ PYTHONPATH=src python3 scripts/tasks/inspect_live_call_approval_packet.py \
 
 The status artifact is `manager_live_call_approval_packet_status_v1`. It reports the local lifecycle as `template_pending_review`, `approval_ready_pending_validation`, `approval_validated_pending_dispatch_plan`, `dispatch_plan_ready_pending_execute`, `executed_pending_reconcile`, `reconciled`, or `packet_inconsistent`. Status inspection is read-only and also reports the next safe action.
 
+For normal operation, use the stage-run dashboard as the single human-facing entry point:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/summarize_stage_run.py \
+  --stage-id layer_02_sector_context.data_acquisition \
+  --start-month 2016-01 \
+  --end-month 2016-01 \
+  --next-limit 5 \
+  --write
+```
+
+The dashboard artifact is `manager_stage_run_dashboard_v1`. It summarizes stage coverage, packet statuses, observed provider calls, evidence refs, the next pending-only packet preview, and the next safe action. Lower-level artifacts remain the audit trail, but operators should normally inspect this dashboard first instead of manually opening proposal/validation/dispatch/reconcile/coverage files.
+
 Before any human-reviewed approval is written, rehearse the packet mechanics without changing persistent packet state:
 
 ```bash

@@ -53,6 +53,11 @@
   - accepted-skip and corrected failures requiring agent review evidence;
   - durable skip disposition for reviewed normal historical absences.
 
+- `test_stage_run_dashboard.py` verifies:
+  - single `manager_stage_run_dashboard_v1` receipt construction from coverage, packet statuses, and pending-only next-packet preview;
+  - packet status discovery under the approval packet runtime root;
+  - failed stage coverage takes priority over next-packet suggestions.
+
 - `test_stage_coverage.py` verifies:
   - `manager_stage_coverage_v1` classification from `task_summary` rows;
   - partial coverage such as `3/22` remaining blocked from downstream unlock;
