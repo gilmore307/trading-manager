@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build historical_task_progress_summary_v1 dashboard payload."""
+"""Build historical_task_progress_summary dashboard payload."""
 
 from __future__ import annotations
 

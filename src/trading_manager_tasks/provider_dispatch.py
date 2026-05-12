@@ -91,8 +91,8 @@ def _autonomous_provider_task_key(task_key: Mapping[str, Any]) -> dict[str, Any]
     params["manager_dry_run"] = False
     runtime_key["params"] = params
     policy_refs = [str(item) for item in runtime_key.get("policy_refs") or []]
-    if "autonomous_historical_provider_acquisition_v1" not in policy_refs:
-        policy_refs.append("autonomous_historical_provider_acquisition_v1")
+    if "autonomous_historical_provider_acquisition" not in policy_refs:
+        policy_refs.append("autonomous_historical_provider_acquisition")
     runtime_key["policy_refs"] = policy_refs
     return runtime_key
 
@@ -198,8 +198,8 @@ def dispatch_layer_provider_acquisition(
             skipped_requests.append(dict(row))
             continue
         policy_refs = [str(item) for item in row.get("policy_refs") or []]
-        if "autonomous_historical_provider_acquisition_v1" not in policy_refs:
-            policy_refs.append("autonomous_historical_provider_acquisition_v1")
+        if "autonomous_historical_provider_acquisition" not in policy_refs:
+            policy_refs.append("autonomous_historical_provider_acquisition")
         live_requests.append(dict(row) | {"dry_run": False, "policy_refs": policy_refs})
     if execute_provider_calls and reject_terminal_coverage and live_requests:
         report = collect_stage_coverage(
@@ -275,7 +275,7 @@ def dispatch_layer_provider_acquisition(
             )
         )
     return ProviderDispatchSummary(
-        contract_type="manager_provider_dispatch_summary_v1",
+        contract_type="manager_provider_dispatch_summary",
         stage_id=f"{model_layer}.data_acquisition",
         request_count=len(selected_requests),
         validation_count=0,

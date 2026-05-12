@@ -353,7 +353,7 @@ def build_dataset_expansion_plan(
         )
 
     plan = DatasetExpansionPlan(
-        contract_type="manager_dataset_expansion_plan_v1",
+        contract_type="manager_dataset_expansion_plan",
         start_month=start_month,
         end_month=end_month,
         minimum_months=dict(DEFAULT_MINIMUM_MONTHS),

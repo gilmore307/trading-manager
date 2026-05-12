@@ -26,7 +26,7 @@ class ReviewDecisionArtifactTests(unittest.TestCase):
         )
 
         normalized = validate_review_decision(decision)
-        self.assertEqual(normalized["contract_type"], "review_decision_v1")
+        self.assertEqual(normalized["contract_type"], "review_decision")
         self.assertEqual(normalized["decision_status"], "defer")
         self.assertEqual(normalized["conditions"], ["supply_real_sample_eval"])
 
@@ -43,7 +43,7 @@ class ReviewDecisionArtifactTests(unittest.TestCase):
         )
 
         normalized = validate_agent_model_promotion_decision(decision)
-        self.assertEqual(normalized["contract_type"], "agent_model_promotion_decision_v1")
+        self.assertEqual(normalized["contract_type"], "agent_model_promotion_decision")
         self.assertTrue(normalized["owner_observed_automation"])
         self.assertEqual(normalized["advisory_review_refs"], ["review_decision://candidate_review"])
 
@@ -55,7 +55,7 @@ class ReviewDecisionArtifactTests(unittest.TestCase):
             decision_reason="missing production calibration evidence",
         )
 
-        with self.assertRaisesRegex(TaskSystemError, "approving agent_model_promotion_decision_v1"):
+        with self.assertRaisesRegex(TaskSystemError, "approving agent_model_promotion_decision"):
             build_activation_record(
                 agent_decision=decision,
                 activated_component="model_03_target_state_vector",
@@ -81,7 +81,7 @@ class ReviewDecisionArtifactTests(unittest.TestCase):
             activated_by="openclaw_agent_under_owner_observation",
         )
 
-        self.assertEqual(activation["contract_type"], "activation_record_v1")
+        self.assertEqual(activation["contract_type"], "activation_record")
         self.assertEqual(
             activation["approved_agent_model_promotion_decision_ref"],
             decision["agent_model_promotion_decision_id"],

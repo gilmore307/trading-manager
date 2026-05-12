@@ -185,7 +185,7 @@ def build_layer_eight_gate_review(
         reason = "Layer 7 produced no active underlying-action chain for Layer 8; all rows are no-trade/maintain/neutral, so no option-chain provider call is warranted for this month."
         recommended_next_action = "record_layer_08_data_acquisition_no_provider_skip"
     return LayerEightGateReview(
-        contract_type="manager_layer_08_option_expression_gate_review_v1",
+        contract_type="manager_layer_08_option_expression_gate_review",
         stage_id=STAGE_ID,
         start_month=start_month,
         end_month=end_month,
@@ -248,7 +248,7 @@ def write_gate_review_artifacts(review: LayerEightGateReview, *, output_root: Pa
     receipt_status = "succeeded" if review.status == "no_provider_skip_accepted" else "blocked"
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     receipt = {
-        "contract_type": "component_completion_receipt_v1",
+        "contract_type": "component_completion_receipt",
         "manager_stage_id": review.stage_id,
         "stage_type": "data_acquisition",
         "status": receipt_status,

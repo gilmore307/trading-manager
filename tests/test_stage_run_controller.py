@@ -11,7 +11,7 @@ from trading_manager_tasks.stage_run_dashboard import StageRunDashboard, StageRu
 
 def _coverage() -> dict:
     return {
-        "contract_type": "manager_stage_coverage_v1",
+        "contract_type": "manager_stage_coverage",
         "status": "partial_ready",
         "expected_count": 25,
         "observed_count": 8,
@@ -43,7 +43,7 @@ def _preview() -> StageRunProviderDispatchPreview:
 
 def _dashboard(next_action: str) -> StageRunDashboard:
     return StageRunDashboard(
-        contract_type="manager_stage_run_dashboard_v1",
+        contract_type="manager_stage_run_dashboard",
         stage_id="layer_02_sector_context.data_acquisition",
         model_layer="layer_02_sector_context",
         start_month="2016-01",
@@ -77,7 +77,7 @@ class StageRunControllerTests(unittest.TestCase):
             )
             dashboard_exists = dashboard_path.exists()
 
-        self.assertEqual(receipt.contract_type, "manager_stage_run_controller_receipt_v1")
+        self.assertEqual(receipt.contract_type, "manager_stage_run_controller_receipt")
         self.assertEqual(receipt.action_taken, "execute_autonomous_provider_dispatch")
         self.assertEqual(receipt.action_status, "completed")
         self.assertEqual(receipt.dispatch_request_ids, ("mgrreq_backfill_alpaca_bars_arkg_2016_01",))

@@ -22,7 +22,7 @@ class ControlledInformationPassTests(unittest.TestCase):
                 output_path=root / "runtime" / "information_pass" / "report.json",
             )
 
-            self.assertEqual(report.contract_type, "manager_controlled_information_pass_v1")
+            self.assertEqual(report.contract_type, "manager_controlled_information_pass")
             self.assertEqual(report.start_month, "2016-01")
             self.assertTrue(report.wrote_report)
             self.assertEqual(report.provider_calls, 0)
@@ -45,7 +45,7 @@ class ControlledInformationPassTests(unittest.TestCase):
             )
             self.assertTrue((root / "runtime" / "information_pass" / "report.json").exists())
             self.assertTrue((root / "runtime" / "information_pass" / "manager_dataset_expansion_plan.json").exists())
-            task_keys = list((root / "monthly_backfill_v1" / "alpaca_bars").glob("*/2016-01/task_key.json"))
+            task_keys = list((root / "monthly_backfill" / "alpaca_bars").glob("*/2016-01/task_key.json"))
             self.assertEqual(len(task_keys), 22)
 
     def test_information_pass_can_preview_provider_dispatch_without_dispatching(self):

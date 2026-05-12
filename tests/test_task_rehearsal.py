@@ -17,7 +17,7 @@ class TaskSystemRehearsalTests(unittest.TestCase):
     def test_mixed_rehearsal_exercises_ready_partial_failed_paths(self) -> None:
         rehearsal = rehearse_monthly_backfill_task_system(end_month="2016-01", limit=3, scenario="mixed")
 
-        self.assertEqual(rehearsal["contract_type"], "manager_task_system_rehearsal_v1")
+        self.assertEqual(rehearsal["contract_type"], "manager_task_system_rehearsal")
         self.assertTrue(rehearsal["rehearsal_only"])
         self.assertEqual(rehearsal["request_count"], 3)
         self.assertTrue(all(row["request_id"].startswith("mgrreq_rehearsal_") for row in rehearsal["requests"]))

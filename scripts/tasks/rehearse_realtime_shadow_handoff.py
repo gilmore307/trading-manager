@@ -76,7 +76,7 @@ def main() -> int:
         receipt_uri=args.receipt_uri,
     )
     bundle = {
-        "contract_type": "manager_realtime_shadow_handoff_rehearsal_v1",
+        "contract_type": "manager_realtime_shadow_handoff_rehearsal",
         "request_id": args.request_id,
         "execution_fixture": execution_fixture,
         "route_plan": route_plan,

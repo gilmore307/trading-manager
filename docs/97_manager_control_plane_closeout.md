@@ -24,12 +24,12 @@ This closeout covers the manager-owned control-plane surfaces needed before comp
 The accepted lifecycle is:
 
 ```text
-manager_request_v1
+manager_request
   -> component-owned run
   -> component completion receipt
-  -> run_manifest_v1
-  -> artifact_ref_v1
-  -> ready_signal_v1
+  -> run_manifest
+  -> artifact_ref
+  -> ready_signal
   -> task_summary read model
 ```
 
@@ -37,16 +37,16 @@ The accepted promotion route is:
 
 ```text
 model evidence package
-  -> model_promotion_review_v1 manager request
-  -> agent_model_promotion_decision_v1
-  -> activation_record_v1 only after agent approve
+  -> model_promotion_review manager request
+  -> agent_model_promotion_decision
+  -> activation_record only after agent approve
 ```
 
 The accepted live-provider gate is:
 
 ```text
 dry-run request/payload/handoff evidence
-  -> non-dry-run manager_request_v1 with provider-dispatch policy refs
+  -> non-dry-run manager_request with provider-dispatch policy refs
   -> autonomous historical provider dispatch
   -> provider receipt reconciliation / coverage validation
   -> component dispatch may be considered outside this closeout

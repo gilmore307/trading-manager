@@ -6,7 +6,7 @@ It starts with the first formal historical month, `2016-01`, and answers: what d
 
 ## Contract
 
-The report contract is `manager_controlled_information_pass_v1`.
+The report contract is `manager_controlled_information_pass`.
 
 It summarizes:
 
@@ -26,7 +26,7 @@ It must not:
 - run model activation;
 - route broker/paper/live execution;
 - delete, compress, archive, restore, or mutate storage lifecycle state;
-- weaken `agent_model_promotion_decision_v1`, storage lifecycle policy/protected-set checks, or broker/order/account mutation gates.
+- weaken `agent_model_promotion_decision`, storage lifecycle policy/protected-set checks, or broker/order/account mutation gates.
 
 Provider dispatch preview is plan-only inside the information-pass boundary. Actual autonomous historical provider acquisition runs outside the information-pass boundary through the scheduler/provider-stage adapter.
 

@@ -2,9 +2,9 @@
 
 The task system has one durable shape across component repositories:
 
-- `manager_request_v1` rows record what the manager asked a component to do.
-- component completion receipts are normalized into `run_manifest_v1`,
-  `artifact_ref_v1`, and `ready_signal_v1` rows.
+- `manager_request` rows record what the manager asked a component to do.
+- component completion receipts are normalized into `run_manifest`,
+  `artifact_ref`, and `ready_signal` rows.
 
 Component-owned payloads stay behind artifact/parameter refs. This module keeps
 row construction and validation importable; scripts own CLI behavior and optional
@@ -262,12 +262,12 @@ def _step_reference_artifact_rows(
             rows.append(
                 {
                     "artifact_id": f"art_step_{run_id}_{index:03d}",
-                    "contract_type": "artifact_ref_v1",
+                    "contract_type": "artifact_ref",
                     "artifact_kind": artifact_kind,
                     "producer_run_id": run_id,
                     "uri": uri,
                     "content_hash": None,
-                    "schema_ref": "component_step_reference_v1",
+                    "schema_ref": "component_step_reference",
                     "row_count": _matching_row_count(row_counts, uri),
                     "lifecycle_status": "active" if ready_status in {"ready", "partial"} else "failed",
                     "media_type": _media_type_from_uri(uri),
@@ -284,18 +284,18 @@ def _output_artifact_row(run_id: str, index: int, output: Any, ready_status: str
     if isinstance(output, Mapping):
         artifact_kind = _artifact_kind_for_output(output, uri)
         content_hash = output.get("content_hash") or output.get("hash")
-        schema_ref = str(output.get("schema_ref") or "component_output_ref_v1")
+        schema_ref = str(output.get("schema_ref") or "component_output_ref")
         row_count = _row_count_for_output(run, output, uri)
         media_type = output.get("media_type") or output.get("mime_type") or _media_type_from_uri(uri)
     else:
         artifact_kind = _artifact_kind_for_output(output, uri)
         content_hash = None
-        schema_ref = "component_output_ref_v1"
+        schema_ref = "component_output_ref"
         row_count = _row_count_for_output(run, output, uri)
         media_type = _media_type_from_uri(uri)
     return {
         "artifact_id": f"art_output_{run_id}_{index:03d}",
-        "contract_type": "artifact_ref_v1",
+        "contract_type": "artifact_ref",
         "artifact_kind": artifact_kind,
         "producer_run_id": run_id,
         "uri": uri,
@@ -323,13 +323,13 @@ def _receipt_runs(receipt: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 
 def validate_manager_request(row: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate and normalize one manager_request_v1 row dictionary."""
+    """Validate and normalize one manager_request row dictionary."""
 
     normalized = {column: row.get(column) for column in REQUEST_COLUMNS}
     normalized["request_id"] = str(_required(row, "request_id"))
-    normalized["contract_type"] = str(row.get("contract_type") or "manager_request_v1")
-    if normalized["contract_type"] != "manager_request_v1":
-        raise TaskSystemError("request.contract_type must be manager_request_v1")
+    normalized["contract_type"] = str(row.get("contract_type") or "manager_request")
+    if normalized["contract_type"] != "manager_request":
+        raise TaskSystemError("request.contract_type must be manager_request")
     normalized["request_kind"] = str(_required(row, "request_kind"))
     normalized["status"] = str(row.get("status") or "requested")
     normalized["requested_by"] = str(_required(row, "requested_by"))
@@ -375,7 +375,7 @@ def normalize_completion_receipt(
     receipt_hash: str | None = None,
     parameter_ref: str | None = None,
     ready_signal_kind: str = "component_task_ready",
-    receipt_schema_ref: str = "component_completion_receipt_v1",
+    receipt_schema_ref: str = "component_completion_receipt",
     consumer_hint: str | None = None,
 ) -> CompletionReceiptRows:
     """Normalize a component completion receipt into manager control-plane rows."""
@@ -410,7 +410,7 @@ def normalize_completion_receipt(
         manifests.append(
             {
                 "run_id": run_id,
-                "contract_type": "run_manifest_v1",
+                "contract_type": "run_manifest",
                 "request_id": request_id,
                 "component_id": component_id,
                 "component_kind": component_kind,
@@ -425,7 +425,7 @@ def normalize_completion_receipt(
         artifacts.append(
             {
                 "artifact_id": artifact_id,
-                "contract_type": "artifact_ref_v1",
+                "contract_type": "artifact_ref",
                 "artifact_kind": "component_completion_receipt",
                 "producer_run_id": run_id,
                 "uri": receipt_uri,
@@ -457,7 +457,7 @@ def normalize_completion_receipt(
         signals.append(
             {
                 "ready_signal_id": ready_signal_id,
-                "contract_type": "ready_signal_v1",
+                "contract_type": "ready_signal",
                 "signal_kind": ready_signal_kind,
                 "producer_component_id": component_id,
                 "producer_run_id": run_id,
@@ -661,7 +661,7 @@ def fetch_task_summary(
 
 
 def submit_requests_main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate or persist manager_request_v1 rows.")
+    parser = argparse.ArgumentParser(description="Validate or persist manager_request rows.")
     parser.add_argument("path", type=Path, help="JSON, JSON array, or JSONL request rows.")
     parser.add_argument("--write", action="store_true", help="Persist rows to trading_manager.manager_request.")
     parser.add_argument("--database-url")

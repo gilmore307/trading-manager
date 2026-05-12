@@ -246,7 +246,7 @@ def materialize_layer_four_event_overlay_inputs(
         references = [str(item) for item in payload.get("references") or []]
         source_receipt_path = next((item for item in references if item.endswith("completion_receipt.json")), None)
     summary = LayerFourEventOverlayMaterialization(
-        contract_type="manager_layer_four_event_overlay_input_materialization_v1",
+        contract_type="manager_layer_four_event_overlay_input_materialization",
         start_month=start_month,
         end_month=end_month,
         detector_run_count=len(detector_runs),

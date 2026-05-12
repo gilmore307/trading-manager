@@ -23,9 +23,9 @@
   - safe Layer 1 task-key preparation with zero provider calls, model activation, or broker execution.
 
 - `test_information_pass.py` verifies:
-  - `manager_controlled_information_pass_v1` report construction;
+  - `manager_controlled_information_pass` report construction;
   - safe 2016-01 information-pass writes with zero provider calls, model activation, broker execution, or storage lifecycle mutation;
-  - optional `autonomous_historical_provider_acquisition_v1` plan-only validation without dispatch;
+  - optional `autonomous_historical_provider_acquisition` plan-only validation without dispatch;
   - non-stressful host resource snapshot collection.
 
 - `test_model_training_workflow.py` verifies:
@@ -55,7 +55,7 @@
   - delegation to trading-data `feature_08_option_expression` with month-scoped source windows after active-path acquisition.
 
 - `test_model_training_state.py` verifies:
-  - durable `manager_model_training_workflow_state_v1` initialization;
+  - durable `manager_model_training_workflow_state` initialization;
   - approval-ref and receipt-driven stage advancement;
   - downstream readiness after upstream stage completion;
   - not-applicable feature/source stages for Layers 5-7;
@@ -64,28 +64,28 @@
 - `test_provider_dispatch.py` verifies:
   - Layer 1 provider-dispatch approval validation;
   - default plan-only behavior with zero provider calls;
-  - concrete trading-data command planning after `autonomous_historical_provider_acquisition_v1` validation;
-  - execution requiring exact `manager_provider_dispatch_proposal_validation_v1` evidence;
+  - concrete trading-data command planning after `autonomous_historical_provider_acquisition` validation;
+  - execution requiring exact `manager_provider_dispatch_proposal_validation` evidence;
   - optional per-request failure continuation for approved batches;
   - registered accepted-failure skips with zero repeated provider calls.
 
 - `test_failure_register.py` verifies:
-  - `manager_failure_register_v1` validation;
+  - `manager_failure_register` validation;
   - accepted-skip and corrected failures requiring agent review evidence;
   - durable skip disposition for reviewed normal historical absences.
 
 - `test_stage_run_controller.py` verifies:
-  - one-step conservative `manager_stage_run_controller_receipt_v1` behavior;
+  - one-step conservative `manager_stage_run_controller_receipt` behavior;
   - automatic bounded provider-dispatch execution when the dashboard requests it;
   - hard stops at provider-execution and dry-run/no-write gates.
 
 - `test_stage_run_dashboard.py` verifies:
-  - single `manager_stage_run_dashboard_v1` receipt construction from coverage and next provider-dispatch preview;
+  - single `manager_stage_run_dashboard` receipt construction from coverage and next provider-dispatch preview;
   - packet status discovery under the provider-dispatch plan runtime root;
   - failed stage coverage takes priority over next-packet suggestions.
 
 - `test_stage_coverage.py` verifies:
-  - `manager_stage_coverage_v1` classification from `task_summary` rows;
+  - `manager_stage_coverage` classification from `task_summary` rows;
   - partial coverage such as `3/22` remaining blocked from downstream unlock;
   - full expected coverage allowing workflow stage completion;
   - failed coverage preventing downstream unlock.
@@ -104,21 +104,21 @@
 - `test_model_promotion.py` verifies:
   - unified model promotion review request planning;
   - registered model target coverage across Layers 1-8;
-  - one shared `model_promotion_review_v1` request kind for all model layers.
+  - one shared `model_promotion_review` request kind for all model layers.
 
 - `test_provider_dispatch.py` verifies:
-  - `autonomous_historical_provider_acquisition_v1` validation for bounded non-dry-run provider acquisition requests;
+  - `autonomous_historical_provider_acquisition` validation for bounded non-dry-run provider acquisition requests;
   - rejection of dry-run requests, missing provider-dispatch guard policy, wrong provider scope, over-wide windows, over-count batches, and broker-execution approval.
 
 - `test_provider_dispatch.py` verifies:
-  - skip-aware `manager_provider_dispatch_proposal_v1` review-template planning;
+  - skip-aware `manager_provider_dispatch_proposal` review-template planning;
   - exclusion of registered accepted skips before approval;
-  - exact proposal-bound validation of reviewed `autonomous_historical_provider_acquisition_v1` request ids, skip exclusion, and max request bounds;
+  - exact proposal-bound validation of reviewed `autonomous_historical_provider_acquisition` request ids, skip exclusion, and max request bounds;
   - proposal/validation outputs stay non-dispatching with zero provider calls;
   - pending-only planning excludes already ready/reviewed-terminal requests and blocks unreviewed failed stage requests.
 
 - `test_stage_run_dashboard.py` verifies:
-  - complete `manager_provider_dispatch_packet_v1` bundle generation;
+  - complete `manager_provider_dispatch_packet` bundle generation;
   - packet files for proposal, reviewed-approval template, editable reviewed approval, validation output, dispatch templates, reconcile templates, and status templates;
   - registered skip exclusion before packet command construction;
   - read-only packet lifecycle/status transitions from review template through validation, plan, execute, reconcile, and inconsistency detection;
@@ -135,17 +135,17 @@
   - accepted `2016-01` common start behavior;
   - OKX crypto joining later at `2018-01`;
   - current-only feeds staying out of historical backfill requests;
-  - dry-run `manager_request_v1` JSONL shape.
+  - dry-run `manager_request` JSONL shape.
 
 - `test_request_payloads.py` verifies:
   - `storage://trading-manager/...` parameter refs resolve to local storage-root paths;
   - monthly backfill requests materialize component-readable `task_key.json` payloads;
-  - request-scoped `input_binding_v1` metadata captures parameter payload refs and hashes;
+  - request-scoped `input_binding` metadata captures parameter payload refs and hashes;
   - all default `2016-01` monthly backfill feeds receive required starter params.
 
 - `test_request_handoff.py` verifies:
   - materialized request payloads load through component `build_context` without dispatch/provider calls;
-  - hash-backed `input_binding_v1` metadata must match the local payload;
+  - hash-backed `input_binding` metadata must match the local payload;
   - provider-call-enabled payloads are rejected by the dry-run handoff validator.
 
 - `test_scheduler.py` verifies:
@@ -155,27 +155,27 @@
   - scheduler ready/backoff/executed decisions for safe offline Layer 1 preparation without provider dispatch.
 
 - `test_scheduler_daemon.py` verifies:
-  - `manager_scheduler_daemon_state_v1` checkpoint round-tripping and resume-scope updates;
+  - `manager_scheduler_daemon_state` checkpoint round-tripping and resume-scope updates;
   - single-instance lock behavior;
   - error checkpointing for restart-safe failure visibility;
   - persistent daemon loop state/log writing without provider dispatch.
 
 - `test_scheduler_status.py` verifies:
-  - read-only `manager_historical_scheduler_status_v1` collection;
+  - read-only `manager_historical_scheduler_status` collection;
   - automatic next-month selection visibility when daemon state is absent;
   - service template/env/wrapper readiness and required flag checks;
   - latest decision/provider-gate status reporting;
   - explicit deferred statuses for model activation, storage lifecycle mutation, and broker/account mutation.
 
 - `test_dashboard_read_models.py` verifies:
-  - manager-owned `historical_task_progress_summary_v1` dashboard payload construction from read-only scheduler/status evidence;
+  - manager-owned `historical_task_progress_summary` dashboard payload construction from read-only scheduler/status evidence;
   - optional stage-coverage counts in chart payloads;
   - CLI output shape without provider calls, model activation, broker execution, account mutation, or storage layout writes.
 
 - `test_review_decision.py` verifies:
-  - unified `review_decision_v1` artifact construction;
+  - unified `review_decision` artifact construction;
   - activation records require approving review decisions;
-  - `activation_record_v1` links to its approved decision.
+  - `activation_record` links to its approved decision.
 
 - `test_realtime_shadow_handoff.py` verifies:
   - paired realtime execution decision-input and model route-plan validation;
@@ -185,7 +185,7 @@
   - CLI bundle output and forbidden action blocking.
 
 - `test_task_control_plane.py` verifies:
-  - generic `manager_request_v1` validation;
+  - generic `manager_request` validation;
   - component completion receipt normalization into run/artifact/ready rows;
   - component output and step-reference artifact discovery with duplicate collapse;
   - priority validation and global task-summary sort policy;

@@ -405,7 +405,7 @@ def run_scheduler_once(
 
     if not market_gate.allowed:
         return SchedulerDecision(
-            contract_type="manager_scheduler_decision_v1",
+            contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="backoff",
@@ -419,7 +419,7 @@ def run_scheduler_once(
         )
     if not res_gate.allowed:
         return SchedulerDecision(
-            contract_type="manager_scheduler_decision_v1",
+            contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="backoff",
@@ -443,7 +443,7 @@ def run_scheduler_once(
     workflow_next_stage = next_ready_or_blocked_stage(workflow_state)
     if workflow_next_stage is None and all(stage.status in {"succeeded", "not_applicable"} for stage in workflow_state.stages):
         return SchedulerDecision(
-            contract_type="manager_scheduler_decision_v1",
+            contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="ready",
@@ -459,7 +459,7 @@ def run_scheduler_once(
     if workflow_next_stage and workflow_next_stage.status == "ready" and workflow_next_stage.stage_id in PROVIDER_STAGE_MODEL_LAYERS:
         if not execute_autonomous_provider_stages:
             return SchedulerDecision(
-                contract_type="manager_scheduler_decision_v1",
+                contract_type="manager_scheduler_decision",
                 now_utc=now.isoformat(),
                 now_et=now_et.isoformat(),
                 decision_status="ready",
@@ -481,7 +481,7 @@ def run_scheduler_once(
             next_limit=provider_stage_next_limit,
         )
         return SchedulerDecision(
-            contract_type="manager_scheduler_decision_v1",
+            contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="executed",
@@ -502,7 +502,7 @@ def run_scheduler_once(
     if workflow_next_stage and workflow_next_stage.status == "ready":
         if not execute_safe_offline_stages:
             return SchedulerDecision(
-                contract_type="manager_scheduler_decision_v1",
+                contract_type="manager_scheduler_decision",
                 now_utc=now.isoformat(),
                 now_et=now_et.isoformat(),
                 decision_status="ready",
@@ -525,7 +525,7 @@ def run_scheduler_once(
             write=True,
         )
         return SchedulerDecision(
-            contract_type="manager_scheduler_decision_v1",
+            contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="executed",
@@ -550,7 +550,7 @@ def run_scheduler_once(
     if preparation_model_layer is None:
         next_stage = workflow_next_stage or workflow_plan.next_stage
         return SchedulerDecision(
-            contract_type="manager_scheduler_decision_v1",
+            contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="backoff",
@@ -568,7 +568,7 @@ def run_scheduler_once(
     command = _safe_prep_command(start_month, end_month, model_layer=preparation_model_layer, execute=execute_safe_preparation)
     if not execute_safe_preparation:
         return SchedulerDecision(
-            contract_type="manager_scheduler_decision_v1",
+            contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="ready",
@@ -605,7 +605,7 @@ def run_scheduler_once(
         write=False,
     )
     return SchedulerDecision(
-        contract_type="manager_scheduler_decision_v1",
+        contract_type="manager_scheduler_decision",
         now_utc=now.isoformat(),
         now_et=now_et.isoformat(),
         decision_status="executed",

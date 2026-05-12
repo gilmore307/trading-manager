@@ -242,7 +242,7 @@ def _failure_summary(storage_root: Path) -> dict[str, Any]:
         except OSError:
             continue
     return {
-        "contract_type": "manager_failure_evidence_summary_v1",
+        "contract_type": "manager_failure_evidence_summary",
         "local_failure_evidence_file_count": len(paths),
         "local_failure_evidence_row_count": line_count,
         "sample_paths": [str(path) for path in paths[:10]],
@@ -293,7 +293,7 @@ def _provider_status(latest_decision: Mapping[str, Any] | None, daemon_state: Ma
     else:
         status = "no_provider_work_selected"
     return {
-        "contract_type": "manager_provider_runtime_status_v1",
+        "contract_type": "manager_provider_runtime_status",
         "status": status,
         "reason_code": reason_code or None,
         "next_internal_stage": next_stage or None,
@@ -306,18 +306,18 @@ def _gated_scope_status() -> dict[str, Any]:
     return {
         "provider_acquisition": {
             "status": "autonomous_historical_acquisition_after_payload_preparation",
-            "required_contracts": ["manager_request_v1", "component_completion_receipt_v1", "manager_stage_coverage_v1"],
+            "required_contracts": ["manager_request", "component_completion_receipt", "manager_stage_coverage"],
         },
         "model_activation": {
             "status": "agent_promotion_decision_required_not_owner_approval",
-            "required_contracts": ["agent_model_promotion_decision_v1", "activation_record_v1"],
+            "required_contracts": ["agent_model_promotion_decision", "activation_record"],
             "decision_actor": "agent",
             "owner_action_required_by_default": False,
             "mutation_performed_by_status_surface": False,
         },
         "storage_lifecycle_mutation": {
             "status": "rule_evaluated_lifecycle_policy_and_protected_checks_required",
-            "required_contracts": ["storage_lifecycle_request_v1", "storage_lifecycle_policy", "protected_set_clearance", "storage_lifecycle_receipt_v1"],
+            "required_contracts": ["storage_lifecycle_request", "storage_lifecycle_policy", "protected_set_clearance", "storage_lifecycle_receipt"],
             "agent_storage_lifecycle_decision_role": "policy_decision_evidence_not_owner_approval",
             "owner_action_required_by_default": False,
             "mutation_performed_by_status_surface": False,
@@ -430,7 +430,7 @@ def collect_historical_scheduler_status(
         latest_decision = dict(latest_decision)
         latest_decision["decision_log_row_count"] = decision_log_rows
     return HistoricalSchedulerStatus(
-        contract_type="manager_historical_scheduler_status_v1",
+        contract_type="manager_historical_scheduler_status",
         generated_utc=_now_utc(),
         service_runtime_ready=service_runtime_ready,
         recommended_next_action=recommended_next_action,

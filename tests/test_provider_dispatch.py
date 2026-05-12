@@ -28,7 +28,7 @@ class ProviderDispatchTests(unittest.TestCase):
                 storage_root=tmp,
                 execute_provider_calls=False,
             )
-        self.assertEqual(dispatch.contract_type, "manager_provider_dispatch_summary_v1")
+        self.assertEqual(dispatch.contract_type, "manager_provider_dispatch_summary")
         self.assertEqual(dispatch.stage_id, "layer_01_market_regime.data_acquisition")
         self.assertEqual(dispatch.request_count, 22)
         self.assertEqual(dispatch.validation_count, 0)
@@ -204,7 +204,7 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertTrue(payload["manager_controls"]["allow_live_provider_calls"])
         self.assertTrue(payload["manager_controls"]["autonomous_historical_provider_acquisition"])
         self.assertTrue(payload["manager_controls"]["allow_live_provider_calls"])
-        self.assertIn("autonomous_historical_provider_acquisition_v1", payload.get("policy_refs", []))
+        self.assertIn("autonomous_historical_provider_acquisition", payload.get("policy_refs", []))
 
     def test_layer_one_dispatch_skips_registered_accepted_failures(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

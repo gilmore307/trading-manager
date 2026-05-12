@@ -12,9 +12,9 @@ from typing import Any, Iterable, Literal, Mapping, TextIO
 
 from .control_plane import TaskSystemError
 
-REVIEW_DECISION_CONTRACT = "review_decision_v1"
-AGENT_MODEL_PROMOTION_DECISION_CONTRACT = "agent_model_promotion_decision_v1"
-ACTIVATION_RECORD_CONTRACT = "activation_record_v1"
+REVIEW_DECISION_CONTRACT = "review_decision"
+AGENT_MODEL_PROMOTION_DECISION_CONTRACT = "agent_model_promotion_decision"
+ACTIVATION_RECORD_CONTRACT = "activation_record"
 APPROVING_STATUS = "approve"
 ALLOWED_DECISION_STATUSES = {"approve", "defer", "reject", "revoke", "supersede"}
 
@@ -43,10 +43,10 @@ def build_review_decision(
     review_decision_id: str | None = None,
     created_at_utc: str | None = None,
 ) -> dict[str, Any]:
-    """Build an advisory review_decision_v1 artifact.
+    """Build an advisory review_decision artifact.
 
     This artifact may support promotion evidence, but it is not sufficient for
-    production activation. Activation requires `agent_model_promotion_decision_v1`.
+    production activation. Activation requires `agent_model_promotion_decision`.
     """
 
     if decision_status not in ALLOWED_DECISION_STATUSES:
@@ -76,7 +76,7 @@ def build_review_decision(
 
 
 def validate_review_decision(decision: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate a review_decision_v1 artifact and return a normalized copy."""
+    """Validate a review_decision artifact and return a normalized copy."""
 
     required = (
         "contract_type",
@@ -159,7 +159,7 @@ def build_agent_model_promotion_decision(
 
 
 def validate_agent_model_promotion_decision(decision: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate an agent_model_promotion_decision_v1 artifact."""
+    """Validate an agent_model_promotion_decision artifact."""
 
     required = (
         "contract_type",
@@ -201,11 +201,11 @@ def build_activation_record(
     activation_record_id: str | None = None,
     activated_at_utc: str | None = None,
 ) -> dict[str, Any]:
-    """Build an activation_record_v1 only from an approving agent decision."""
+    """Build an activation_record only from an approving agent decision."""
 
     decision = validate_agent_model_promotion_decision(agent_decision)
     if decision["decision_status"] != APPROVING_STATUS:
-        raise TaskSystemError("activation_record_v1 requires approving agent_model_promotion_decision_v1")
+        raise TaskSystemError("activation_record requires approving agent_model_promotion_decision")
     for field_name, value in {
         "activated_component": activated_component,
         "activated_config_ref": activated_config_ref,
@@ -238,7 +238,7 @@ def build_activation_record(
 
 
 def validate_activation_record(activation: Mapping[str, Any], *, agent_decision: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """Validate activation_record_v1 boundary rules."""
+    """Validate activation_record boundary rules."""
 
     normalized = dict(activation)
     required = (
@@ -259,7 +259,7 @@ def validate_activation_record(activation: Mapping[str, Any], *, agent_decision:
     if agent_decision is not None:
         decision = validate_agent_model_promotion_decision(agent_decision)
         if decision["decision_status"] != APPROVING_STATUS:
-            raise TaskSystemError("activation_record_v1 requires approving agent_model_promotion_decision_v1")
+            raise TaskSystemError("activation_record requires approving agent_model_promotion_decision")
         if normalized["approved_agent_model_promotion_decision_ref"] != decision["agent_model_promotion_decision_id"]:
             raise TaskSystemError("activation approved_agent_model_promotion_decision_ref does not match agent decision")
     return normalized
@@ -275,7 +275,7 @@ def write_artifact(payload: Mapping[str, Any], *, output: TextIO | None = None, 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build advisory review_decision_v1 artifacts without activation side effects.")
+    parser = argparse.ArgumentParser(description="Build advisory review_decision artifacts without activation side effects.")
     parser.add_argument("--review-target-ref", required=True)
     parser.add_argument("--reviewer-ref", default="openclaw")
     parser.add_argument("--decision-status", required=True, choices=tuple(sorted(ALLOWED_DECISION_STATUSES)))

@@ -15,7 +15,7 @@ from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_
 
 def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
     for member in load_market_regime_universe(model_layers=(model_layer,)):
-        path = root / "monthly_backfill_v1" / "alpaca_bars" / member.symbol / month / "task_key.json"
+        path = root / "monthly_backfill" / "alpaca_bars" / member.symbol / month / "task_key.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{}\n", encoding="utf-8")
 
@@ -25,7 +25,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
 
-        self.assertEqual(plan.contract_type, "manager_model_training_workflow_plan_v1")
+        self.assertEqual(plan.contract_type, "manager_model_training_workflow_plan")
         self.assertEqual(plan.layer_count, FULL_LAYER_COUNT)
         self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 9)))
         for layer in plan.layers:

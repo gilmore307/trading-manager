@@ -116,7 +116,7 @@ def initial_workflow_state(plan: ModelTrainingWorkflowPlan) -> WorkflowState:
     stages = tuple(_stage_from_plan(stage, now=now) for layer in plan.layers for stage in layer.stages)
     return refresh_workflow_state(
         WorkflowState(
-            contract_type="manager_model_training_workflow_state_v1",
+            contract_type="manager_model_training_workflow_state",
             start_month=plan.start_month,
             end_month=plan.end_month,
             stages=stages,
@@ -156,7 +156,7 @@ def load_workflow_state(path: Path, plan: ModelTrainingWorkflowPlan) -> Workflow
     now = utc_now_iso()
     stages = tuple(loaded.get(stage.stage_id) or _stage_from_plan(stage, now=now) for layer in plan.layers for stage in layer.stages)
     state = WorkflowState(
-        contract_type="manager_model_training_workflow_state_v1",
+        contract_type="manager_model_training_workflow_state",
         start_month=plan.start_month,
         end_month=plan.end_month,
         stages=stages,
@@ -295,7 +295,7 @@ def _task_key_count_for_stage(stage_id: str, *, storage_root: Path, start_month:
     if start_month != end_month:
         return None
     if stage_id == "layer_01_market_regime.data_acquisition":
-        return len(list((storage_root / "monthly_backfill_v1" / "alpaca_bars").glob(f"*/{start_month}/task_key.json")))
+        return len(list((storage_root / "monthly_backfill" / "alpaca_bars").glob(f"*/{start_month}/task_key.json")))
     return None
 
 
@@ -559,7 +559,7 @@ def ingest_stage_receipts(
 
 
 def ingest_stage_coverage_reports(state: WorkflowState, coverage_report_paths: Iterable[Path]) -> WorkflowState:
-    """Apply manager_stage_coverage_v1 reports without bypassing coverage.
+    """Apply manager_stage_coverage reports without bypassing coverage.
 
     A coverage report can attach SQL-derived control-plane evidence to a stage.
     It may mark the stage succeeded only when the report explicitly says the
@@ -571,7 +571,7 @@ def ingest_stage_coverage_reports(state: WorkflowState, coverage_report_paths: I
         report = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(report, Mapping):
             raise ValueError(f"stage coverage report must be a JSON object: {path}")
-        if report.get("contract_type") != "manager_stage_coverage_v1":
+        if report.get("contract_type") != "manager_stage_coverage":
             raise ValueError(f"stage coverage report has unsupported contract_type: {path}")
         stage_id = str(report.get("stage_id") or "")
         if not stage_id:
@@ -643,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--receipt", action="append", type=Path, default=[], help="Component receipt JSON with manager_stage_id/stage_id to ingest.")
     parser.add_argument("--stage-receipt", action="append", default=[], help="Bind a component receipt to a stage without requiring embedded stage id: STAGE_ID=PATH.")
     parser.add_argument("--expected-receipt-count", action="append", default=[], help="Override expected successful receipt count for a stage: STAGE_ID=COUNT.")
-    parser.add_argument("--stage-coverage-report", action="append", type=Path, default=[], help="Ingest manager_stage_coverage_v1 report; only ready/full coverage may complete a stage.")
+    parser.add_argument("--stage-coverage-report", action="append", type=Path, default=[], help="Ingest manager_stage_coverage report; only ready/full coverage may complete a stage.")
     parser.add_argument("--complete-stage", action="append", default=[], help="Mark a workflow stage succeeded from manager evidence.")
     parser.add_argument("--approve-stage", action="append", default=[], help="Mark stage approval as satisfied: stage_id=approval_ref.")
     parser.add_argument("--write", action="store_true", help="Persist the refreshed workflow state checkpoint.")

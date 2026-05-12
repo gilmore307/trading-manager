@@ -138,7 +138,7 @@ def run_stage_controller_step(
     )
     _write_dashboard(after, output_dashboard_path)
     receipt = StageRunControllerReceipt(
-        contract_type="manager_stage_run_controller_receipt_v1",
+        contract_type="manager_stage_run_controller_receipt",
         stage_id=stage_id,
         start_month=start_month,
         end_month=end_month,

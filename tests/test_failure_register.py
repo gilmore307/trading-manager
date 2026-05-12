@@ -50,7 +50,7 @@ class FailureRegisterTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(row["contract_type"], "manager_failure_register_v1")
+        self.assertEqual(row["contract_type"], "manager_failure_register")
         self.assertEqual(row["symbol"], "BITW")
         self.assertEqual(row["failure_status"], "accepted_skip")
         self.assertTrue(row["skip_future_matching"])

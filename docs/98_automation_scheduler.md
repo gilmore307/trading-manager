@@ -81,7 +81,7 @@ Outside the protected window, including non-trading days, the scheduler should r
 Automation does not weaken gates:
 
 - historical provider/data acquisition is autonomous once manager request payloads are prepared and resource gates pass;
-- model activation is decided by the agent through script-called `agent_model_promotion_decision_v1`; only an agent-approved decision can produce a valid activation artifact;
+- model activation is decided by the agent through script-called `agent_model_promotion_decision`; only an agent-approved decision can produce a valid activation artifact;
 - broker/order/fill/account mutation remains execution-owned and must not be inferred from model-training progress;
 - secrets remain alias/config references only.
 
@@ -100,7 +100,7 @@ If no safe work exists, the scheduler should report why: waiting for agent decis
 
 The current scheduler tick evaluates regular-trading-day market-hours protection and host resource pressure, then admits one safe unit of historical work: preparation, a ready safe/offline workflow stage, a bounded gate/backoff decision, or terminal month completion. Safe/offline execution writes deterministic local artifacts, logs, receipts, and workflow state only; provider dispatch runs autonomously under manager request/resource/coverage controls, while model activation, storage lifecycle mutation, and broker/account mutation stay behind their separate boundaries.
 
-The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_daemon.py`. It wraps the tick in a resident system-service loop with a `manager_scheduler_daemon_state_v1` checkpoint, single-instance lock, decision JSONL log, automatic completed/open-work audit, chronological month-cursor advancement, and service-manager-ready template under `deploy/systemd/`. The service chooses the next month from durable workflow state and the maintained workflow plan; the owner does not tell it where to continue. `scripts/tasks/plan_dataset_expansion.py` provides the explicit dataset-expansion decision surface used by the scheduler policy: plan-only by default, and `--write` prepares only safe artifacts/payloads while preserving provider, promotion, and execution gates. See [`99_historical_scheduler_runtime.md`](99_historical_scheduler_runtime.md) for boot, resume, and maintenance expectations.
+The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_daemon.py`. It wraps the tick in a resident system-service loop with a `manager_scheduler_daemon_state` checkpoint, single-instance lock, decision JSONL log, automatic completed/open-work audit, chronological month-cursor advancement, and service-manager-ready template under `deploy/systemd/`. The service chooses the next month from durable workflow state and the maintained workflow plan; the owner does not tell it where to continue. `scripts/tasks/plan_dataset_expansion.py` provides the explicit dataset-expansion decision surface used by the scheduler policy: plan-only by default, and `--write` prepares only safe artifacts/payloads while preserving provider, promotion, and execution gates. See [`99_historical_scheduler_runtime.md`](99_historical_scheduler_runtime.md) for boot, resume, and maintenance expectations.
 
 ## Non-Goals
 

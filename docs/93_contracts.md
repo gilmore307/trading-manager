@@ -98,13 +98,13 @@ These are the first contracts to design and implement because every later workfl
 
 | Contract | Owns | Does Not Own |
 |---|---|---|
-| `component_ref_v1` | Stable reference to a runnable or producing component. | Runtime implementation, source code, package installation. |
-| `manager_request_v1` | Manager-issued request for work. | Component-internal task queue semantics. |
-| `input_binding_v1` | Point-in-time binding between a run and its inputs. | Full input data payloads. |
-| `run_manifest_v1` | Evidence of what actually ran. | Large logs, full output datasets, or model internals. |
-| `run_step_v1` | Optional ordered run sub-steps. | Fine-grained component-local tracing. |
-| `artifact_ref_v1` | Durable reference to a produced artifact. | Artifact bytes or storage engine internals. |
-| `ready_signal_v1` | Explicit statement that a producer output is consumable. | Approval to promote or activate. |
+| `component_ref` | Stable reference to a runnable or producing component. | Runtime implementation, source code, package installation. |
+| `manager_request` | Manager-issued request for work. | Component-internal task queue semantics. |
+| `input_binding` | Point-in-time binding between a run and its inputs. | Full input data payloads. |
+| `run_manifest` | Evidence of what actually ran. | Large logs, full output datasets, or model internals. |
+| `run_step` | Optional ordered run sub-steps. | Fine-grained component-local tracing. |
+| `artifact_ref` | Durable reference to a produced artifact. | Artifact bytes or storage engine internals. |
+| `ready_signal` | Explicit statement that a producer output is consumable. | Approval to promote or activate. |
 
 ### Evaluation And Promotion Contracts
 
@@ -112,13 +112,13 @@ These layer on top of the MVP contracts once runs and artifacts can be reference
 
 | Contract | Owns | Does Not Own |
 |---|---|---|
-| `dataset_snapshot_v1` | Evaluation/training/replay dataset identity and point-in-time boundary. | Raw market data storage. |
-| `model_output_envelope_v1` | Generic wrapper around model outputs. | Model-specific vector field definitions. |
-| `evaluation_run_v1` | Evaluation setup and evidence links. | Model training implementation. |
-| `metric_result_v1` | Individual metric result with threshold/evidence context. | Metric implementation code. |
-| `promotion_candidate_v1` | Candidate package for review. | Production activation. |
-| `review_decision_v1` | Legacy/advisory review outcome. | Production activation. |
-| `activation_record_v1` | Approved activation/change record with rollback reference. | Broker or order execution. |
+| `dataset_snapshot` | Evaluation/training/replay dataset identity and point-in-time boundary. | Raw market data storage. |
+| `model_output_envelope` | Generic wrapper around model outputs. | Model-specific vector field definitions. |
+| `evaluation_run` | Evaluation setup and evidence links. | Model training implementation. |
+| `metric_result` | Individual metric result with threshold/evidence context. | Metric implementation code. |
+| `promotion_candidate` | Candidate package for review. | Production activation. |
+| `review_decision` | Legacy/advisory review outcome. | Production activation. |
+| `activation_record` | Approved activation/change record with rollback reference. | Broker or order execution. |
 
 ### Live-Call Approval Contracts
 
@@ -126,9 +126,9 @@ These contracts gate provider/API calls after dry-run planning and before compon
 
 | Contract | Owns | Does Not Own |
 |---|---|---|
-| `autonomous_historical_provider_acquisition_v1` | Bounded manager-owned historical provider/data acquisition after payload preparation. | Broker/order/account mutation, model activation, or model promotion approval. |
+| `autonomous_historical_provider_acquisition` | Bounded manager-owned historical provider/data acquisition after payload preparation. | Broker/order/account mutation, model activation, or model promotion approval. |
 
-Historical provider acquisition no longer requires per-batch `autonomous_historical_provider_acquisition_v1`. The active contract is bounded by manager request ids, resource gates, terminal-coverage guards, provider receipts, and reconciliation. Broker execution, order construction, account mutation, model activation, and promotion remain outside this contract.
+Historical provider acquisition no longer requires per-batch `autonomous_historical_provider_acquisition`. The active contract is bounded by manager request ids, resource gates, terminal-coverage guards, provider receipts, and reconciliation. Broker execution, order construction, account mutation, model activation, and promotion remain outside this contract.
 
 ### Downstream Handoff Contracts
 
@@ -136,14 +136,14 @@ These prevent manager/model outputs from pretending to be execution, storage, or
 
 | Contract | Owns | Does Not Own |
 |---|---|---|
-| `downstream_handoff_v1` | Boundary-crossing handoff to storage, execution, dashboard, or audit. | The downstream component's internal lifecycle. |
-| `execution_intent_ref_v1` | Optional reference to an execution-owned intent accepted for processing. | Broker orders, fills, positions, or account mutation. |
+| `downstream_handoff` | Boundary-crossing handoff to storage, execution, dashboard, or audit. | The downstream component's internal lifecycle. |
+| `execution_intent_ref` | Optional reference to an execution-owned intent accepted for processing. | Broker orders, fills, positions, or account mutation. |
 
-`execution_intent_ref_v1` is intentionally a reference contract, not an order contract. Broker order lifecycle belongs to `trading-execution`.
+`execution_intent_ref` is intentionally a reference contract, not an order contract. Broker order lifecycle belongs to `trading-execution`.
 
 ## Core Contract Skeletons
 
-### `component_ref_v1`
+### `component_ref`
 
 Use this whenever a contract needs to identify a producer, consumer, runnable script, model layer, source, feature generator, or review helper.
 
@@ -151,7 +151,7 @@ Required fields:
 
 | Field | Meaning |
 |---|---|
-| `contract_type` | Literal `component_ref_v1`. |
+| `contract_type` | Literal `component_ref`. |
 | `component_id` | Stable registry id or reviewed component id. |
 | `component_kind` | Generic role such as `data_feed`, `data_source`, `data_feature`, `model`, `review_helper`, `execution_service`, `dashboard_surface`. |
 | `repo_id` | Stable repository id. |
@@ -165,7 +165,7 @@ Optional fields:
 - `registry_ref`
 - `notes`
 
-### `manager_request_v1`
+### `manager_request`
 
 A manager request is the control-plane instruction to do work. It is not proof that work happened.
 
@@ -173,13 +173,13 @@ Required fields:
 
 | Field | Meaning |
 |---|---|
-| `contract_type` | Literal `manager_request_v1`. |
+| `contract_type` | Literal `manager_request`. |
 | `request_id` | Stable unique request id. |
 | `request_kind` | Generic request class: `produce_data`, `run_model`, `evaluate_model`, `review_promotion`, `handoff_downstream`, etc. |
 | `created_at_utc` | UTC ISO-8601 creation time. |
 | `requested_by` | Human, agent, scheduler, or parent request reference. |
-| `target_component` | `component_ref_v1`. |
-| `input_bindings` | One or more `input_binding_v1` records or refs. |
+| `target_component` | `component_ref`. |
+| `input_bindings` | One or more `input_binding` records or refs. |
 | `expected_outputs` | Output type names or artifact expectations. |
 | `policy_refs` | Guardrail, retry, provider-call, promotion, or safety policy refs. |
 
@@ -193,7 +193,7 @@ Optional fields:
 - `dry_run`
 - `manual_override_ref`
 
-### `input_binding_v1`
+### `input_binding`
 
 Input binding makes the run's inputs explicit and reproducible.
 
@@ -201,7 +201,7 @@ Required fields:
 
 | Field | Meaning |
 |---|---|
-| `contract_type` | Literal `input_binding_v1`. |
+| `contract_type` | Literal `input_binding`. |
 | `binding_id` | Stable unique binding id. |
 | `input_role` | Role such as `feature_table`, `source_artifact`, `model_output`, `dataset_snapshot`, `config`, `policy`, `secret_alias`. |
 | `input_ref` | Artifact, table, registry, dataset, or config reference. |
@@ -217,7 +217,7 @@ Optional fields:
 - `quality_ref`
 - `lineage_ref`
 
-### `run_manifest_v1`
+### `run_manifest`
 
 A run manifest records what actually happened.
 
@@ -225,16 +225,16 @@ Required fields:
 
 | Field | Meaning |
 |---|---|
-| `contract_type` | Literal `run_manifest_v1`. |
+| `contract_type` | Literal `run_manifest`. |
 | `run_id` | Stable unique run id. |
 | `request_id` | Source manager request. |
-| `component` | `component_ref_v1` for the component that ran. |
+| `component` | `component_ref` for the component that ran. |
 | `status` | Lifecycle status from the registry. |
 | `started_at_utc` | UTC ISO-8601 start time. |
 | `ended_at_utc` | UTC ISO-8601 end time or null while running. |
 | `input_bindings` | Bound inputs used by the run. |
-| `output_artifacts` | Produced `artifact_ref_v1` refs. |
-| `run_steps` | Optional `run_step_v1` refs. |
+| `output_artifacts` | Produced `artifact_ref` refs. |
+| `run_steps` | Optional `run_step` refs. |
 
 Optional fields:
 
@@ -246,7 +246,7 @@ Optional fields:
 - `retry_of_run_id`
 - `checkpoint_ref`
 
-### `run_step_v1`
+### `run_step`
 
 Run steps are optional. Use them when a run has meaningful phases that downstream review may need.
 
@@ -254,7 +254,7 @@ Required fields:
 
 | Field | Meaning |
 |---|---|
-| `contract_type` | Literal `run_step_v1`. |
+| `contract_type` | Literal `run_step`. |
 | `step_id` | Stable unique step id. |
 | `run_id` | Owning run. |
 | `step_name` | Human-readable phase name. |
@@ -270,7 +270,7 @@ Optional fields:
 - `metric_refs`
 - `error_summary`
 
-### `artifact_ref_v1`
+### `artifact_ref`
 
 An artifact ref describes a durable output without storing the artifact itself.
 
@@ -278,7 +278,7 @@ Required fields:
 
 | Field | Meaning |
 |---|---|
-| `contract_type` | Literal `artifact_ref_v1`. |
+| `contract_type` | Literal `artifact_ref`. |
 | `artifact_id` | Stable unique artifact id. |
 | `artifact_kind` | Registered artifact type. |
 | `producer_run_id` | Run that produced it. |
@@ -297,7 +297,7 @@ Optional fields:
 - `media_type`
 - `lineage_ref`
 
-### `ready_signal_v1`
+### `ready_signal`
 
 A ready signal is the producer's explicit statement that a downstream boundary may consume an output.
 
@@ -305,10 +305,10 @@ Required fields:
 
 | Field | Meaning |
 |---|---|
-| `contract_type` | Literal `ready_signal_v1`. |
+| `contract_type` | Literal `ready_signal`. |
 | `ready_signal_id` | Stable unique signal id. |
 | `signal_kind` | Registered ready-signal type. |
-| `producer_component` | `component_ref_v1`. |
+| `producer_component` | `component_ref`. |
 | `producer_run_id` | Producing run. |
 | `artifact_refs` | One or more consumable artifacts. |
 | `status` | Ready, blocked, partial, superseded, or failed status. |
@@ -324,7 +324,7 @@ Optional fields:
 
 ## Evaluation And Promotion Skeletons
 
-### `dataset_snapshot_v1`
+### `dataset_snapshot`
 
 Required fields:
 
@@ -341,7 +341,7 @@ Required fields:
 
 This contract owns dataset identity and leakage boundaries. It does not own storage internals or raw data payloads.
 
-### `model_output_envelope_v1`
+### `model_output_envelope`
 
 Required fields:
 
@@ -359,7 +359,7 @@ Required fields:
 
 The payload may contain `market_context_state`, `sector_context_state`, `target_context_state`, `event_context_vector`, `alpha_confidence_vector`, `position_projection_vector`, `underlying_action_vector`, or `expression_vector`, but the envelope does not define those vector fields.
 
-### `evaluation_run_v1`
+### `evaluation_run`
 
 Required fields:
 
@@ -373,7 +373,7 @@ Required fields:
 - `metric_result_refs`
 - `run_manifest_ref`
 
-### `metric_result_v1`
+### `metric_result`
 
 Required fields:
 
@@ -388,7 +388,7 @@ Required fields:
 - `horizon_ref`
 - `evidence_ref`
 
-### `promotion_candidate_v1`
+### `promotion_candidate`
 
 Required fields:
 
@@ -404,7 +404,7 @@ Required fields:
 
 A promotion candidate is reviewable evidence. It is not activation.
 
-### `agent_model_promotion_decision_v1`
+### `agent_model_promotion_decision`
 
 Required fields:
 
@@ -421,7 +421,7 @@ Required fields:
 
 Allowed statuses should remain registry vocabulary: approve, defer, reject, revoke, or supersede. This script-called agent decision is required before production model activation.
 
-### `review_decision_v1`
+### `review_decision`
 
 Required fields:
 
@@ -436,7 +436,7 @@ Required fields:
 
 Allowed statuses should remain registry vocabulary: approve, defer, reject, revoke, or supersede. This contract is advisory evidence only; it is not sufficient for production activation.
 
-### `activation_record_v1`
+### `activation_record`
 
 Required fields:
 
@@ -450,11 +450,11 @@ Required fields:
 - `activated_at_utc`
 - `activated_by`
 
-Activation records are only valid after an approving `agent_model_promotion_decision_v1`. They do not execute broker or exchange actions.
+Activation records are only valid after an approving `agent_model_promotion_decision`. They do not execute broker or exchange actions.
 
 ## Downstream Handoff Skeletons
 
-### `downstream_handoff_v1`
+### `downstream_handoff`
 
 Required fields:
 
@@ -471,7 +471,7 @@ Required fields:
 
 Use this contract when manager passes durable work to storage, execution, dashboard, or audit boundaries.
 
-### `execution_intent_ref_v1`
+### `execution_intent_ref`
 
 Required fields:
 
@@ -490,29 +490,29 @@ This is a reference to execution-owned intent handling. It must not include brok
 All component work uses the same task-system skeleton. Manager issues requests; components return completion receipts; manager records the durable receipt summary as run, artifact, and ready-signal facts.
 
 ```text
-manager_request_v1
+manager_request
   -> component completion receipt
-  -> input_binding_v1[]
-  -> run_manifest_v1
-       -> run_step_v1[]
-       -> artifact_ref_v1[]
-       -> ready_signal_v1
-            -> downstream_handoff_v1
+  -> input_binding[]
+  -> run_manifest
+       -> run_step[]
+       -> artifact_ref[]
+       -> ready_signal
+            -> downstream_handoff
 
 For model evaluation/promotion:
 
-model_promotion_review_v1 manager request
-  -> run_manifest_v1
-  -> dataset_snapshot_v1
-  -> model_output_envelope_v1[]
-  -> evaluation_run_v1
-       -> metric_result_v1[]
-       -> promotion_candidate_v1
-            -> agent_model_promotion_decision_v1
-                 -> activation_record_v1
+model_promotion_review manager request
+  -> run_manifest
+  -> dataset_snapshot
+  -> model_output_envelope[]
+  -> evaluation_run
+       -> metric_result[]
+       -> promotion_candidate
+            -> agent_model_promotion_decision
+                 -> activation_record
 ```
 
-`model_promotion_review_v1` is the single manager-side entrypoint for every model layer. Layer-specific differences belong in evidence adapters, labels, metrics, baseline ladders, and gate policy refs, not in separate promotion mechanisms.
+`model_promotion_review` is the single manager-side entrypoint for every model layer. Layer-specific differences belong in evidence adapters, labels, metrics, baseline ladders, and gate policy refs, not in separate promotion mechanisms.
 
 ## Cross-Repository Ownership
 
@@ -536,7 +536,7 @@ The following must not be introduced as manager contracts unless a separate arch
 - dashboard widget/view schemas;
 - filesystem directory implementation details;
 - secrets, tokens, private keys, or credential payloads;
-- component-local debug logs except as `artifact_ref_v1` references.
+- component-local debug logs except as `artifact_ref` references.
 
 ## MVP Implementation Status
 
@@ -544,16 +544,16 @@ The first implementation slice is intentionally small:
 
 | Contract | SQL table |
 |---|---|
-| `manager_request_v1` | `trading_manager.manager_request` |
-| `input_binding_v1` | `trading_manager.input_binding` |
-| `run_manifest_v1` | `trading_manager.run_manifest` |
-| `run_step_v1` | `trading_manager.run_step` |
-| `artifact_ref_v1` | `trading_manager.artifact_ref` |
-| `ready_signal_v1` | `trading_manager.ready_signal` |
+| `manager_request` | `trading_manager.manager_request` |
+| `input_binding` | `trading_manager.input_binding` |
+| `run_manifest` | `trading_manager.run_manifest` |
+| `run_step` | `trading_manager.run_step` |
+| `artifact_ref` | `trading_manager.artifact_ref` |
+| `ready_signal` | `trading_manager.ready_signal` |
 
-`component_ref_v1` is not a table yet. It is represented by registry-backed component/repo/version/entrypoint fields on the durable tables.
+`component_ref` is not a table yet. It is represented by registry-backed component/repo/version/entrypoint fields on the durable tables.
 
-The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows, `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary, `scripts/tasks/plan_model_promotion_review.py` plans the single manager-side promotion review request kind for all model layers, and `scripts/tasks/dispatch_provider_acquisition.py` plans or executes bounded autonomous provider dispatch.
+The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest`, `artifact_ref`, and `ready_signal` rows, `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary, `scripts/tasks/plan_model_promotion_review.py` plans the single manager-side promotion review request kind for all model layers, and `scripts/tasks/dispatch_provider_acquisition.py` plans or executes bounded autonomous provider dispatch.
 
 Current manager closeout stance:
 

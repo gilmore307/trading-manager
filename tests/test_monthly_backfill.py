@@ -44,7 +44,7 @@ class MonthlyBackfillPlannerTests(unittest.TestCase):
         }:
             self.assertIn(component_id, by_component)
             self.assertEqual(by_component[component_id]["month"], "2016-01")
-            self.assertEqual(by_component[component_id]["contract_type"], "manager_request_v1")
+            self.assertEqual(by_component[component_id]["contract_type"], "manager_request")
             self.assertEqual(by_component[component_id]["priority"], "normal")
             self.assertTrue(by_component[component_id]["dry_run"])
 
@@ -99,10 +99,10 @@ class MonthlyBackfillPlannerTests(unittest.TestCase):
         write_requests([request], output=buffer, output_format="jsonl")
 
         payload = json.loads(buffer.getvalue())
-        self.assertEqual(payload["contract_type"], "manager_request_v1")
+        self.assertEqual(payload["contract_type"], "manager_request")
         self.assertEqual(payload["status"], "requested")
-        self.assertIn("monthly_backfill_v1", payload["policy_refs"])
-        self.assertIn("chronological_forward_backfill_policy_v1", payload["policy_refs"])
+        self.assertIn("monthly_backfill", payload["policy_refs"])
+        self.assertIn("chronological_forward_backfill_policy", payload["policy_refs"])
         self.assertTrue(payload["parameter_ref"].endswith("/task_key.json"))
 
     def test_planner_clamps_to_common_start_and_orders_months_forward(self):

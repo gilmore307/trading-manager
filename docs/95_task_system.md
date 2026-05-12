@@ -12,12 +12,12 @@ It does not run provider calls, model training, broker mutations, dashboard rend
 ## Unified Lifecycle
 
 ```text
-manager_request_v1
+manager_request
   -> component executes inside its own repository boundary
   -> component completion receipt JSON
-  -> run_manifest_v1
-  -> artifact_ref_v1 for the receipt/payload refs
-  -> ready_signal_v1 when outputs are consumable
+  -> run_manifest
+  -> artifact_ref for the receipt/payload refs
+  -> ready_signal when outputs are consumable
 ```
 
 The manager uses the same lifecycle for data, model, storage, execution, and dashboard work. Component-local task queues may exist, but their private queue schemas do not become shared contracts.
@@ -28,7 +28,7 @@ For historical model training, manager is the scheduler/orchestrator. It should 
 
 ## Request Ownership
 
-Every cross-component request starts as `manager_request_v1` in `trading_manager.manager_request`.
+Every cross-component request starts as `manager_request` in `trading_manager.manager_request`.
 
 The request row stores concise control-plane facts only:
 
@@ -41,7 +41,7 @@ The request row stores concise control-plane facts only:
 - optional parameter ref;
 - dry-run/live intent.
 
-The parameter body belongs in storage behind `parameter_ref`; it is not embedded in manager SQL. When a parameter payload is materialized, manager records the request-scoped payload reference as an `input_binding_v1` row rather than changing task state or pretending component execution has happened.
+The parameter body belongs in storage behind `parameter_ref`; it is not embedded in manager SQL. When a parameter payload is materialized, manager records the request-scoped payload reference as an `input_binding` row rather than changing task state or pretending component execution has happened.
 
 Accepted priority values, in descending order, are:
 
@@ -61,20 +61,20 @@ A component completion receipt is the component's evidence that a requested run 
 
 The component receipt payload may remain component/storage-owned JSON. Manager records the durable control-plane summary as:
 
-- `run_manifest_v1` row per run;
-- `artifact_ref_v1` row referencing the receipt payload;
-- optional `artifact_ref_v1` rows for generic output refs listed by the receipt;
-- `ready_signal_v1` row when the output is ready, partial, blocked, or failed.
+- `run_manifest` row per run;
+- `artifact_ref` row referencing the receipt payload;
+- optional `artifact_ref` rows for generic output refs listed by the receipt;
+- `ready_signal` row when the output is ready, partial, blocked, or failed.
 
 Manager stores concise output references only. It does not copy large output lists, raw provider payloads, model vectors, logs, or broker payloads into SQL. When component receipts report local `storage/...` output paths, manager normalizes them to repo-scoped `storage://<repo>/...` URIs and infers simple output metadata such as CSV media type and row count from receipt `row_counts` when explicit artifact objects are absent.
 
 Artifact discovery is component-receipt-driven. Final `outputs` become downstream output artifacts; `steps.*.references` become supporting component artifacts such as `request_manifest`, `clean_equity_bar`, and `clean_schema`. Duplicate references are collapsed so the saved output is not counted twice when it appears in both `outputs` and a `save` step. These supporting artifacts may be attached to the ready signal for traceability, but they do not expand provider calls or imply stage-level coverage.
 
-A task-level `ready_signal_v1` is not enough to unlock a workflow stage. Stage advancement must pass a `manager_stage_coverage_v1` gate over `task_summary`: for example, Layer 1 January 2016 data acquisition remains `partial_ready` at `3/22` ready requests and may unlock feature generation only at full expected coverage with `can_unlock_downstream=true`. Coverage accounting must preserve observed terminal states: an actual failed request remains in `failed_count`, even when later review accepts it as a normal historical absence. A stage may pass with `ready_count + accepted_failed_count >= expected_count` only when every failed request is covered by explicit agent failure-review evidence plus any required review artifact; it must not rewrite failures into ready rows. Accepted failed requests without an agent review reference are invalid.
+A task-level `ready_signal` is not enough to unlock a workflow stage. Stage advancement must pass a `manager_stage_coverage` gate over `task_summary`: for example, Layer 1 January 2016 data acquisition remains `partial_ready` at `3/22` ready requests and may unlock feature generation only at full expected coverage with `can_unlock_downstream=true`. Coverage accounting must preserve observed terminal states: an actual failed request remains in `failed_count`, even when later review accepts it as a normal historical absence. A stage may pass with `ready_count + accepted_failed_count >= expected_count` only when every failed request is covered by explicit agent failure-review evidence plus any required review artifact; it must not rewrite failures into ready rows. Accepted failed requests without an agent review reference are invalid.
 
 Failed requests also belong in `trading_manager.failure_register`. The register records current state (`observed`, `agent_review_required`, `retry_required`, `corrected`, `accepted_skip`, or `unresolved`), the agent review artifact, correction evidence when applicable, and whether future matching requests should be skipped. A fixable failure should move to `corrected` only after the agent-reviewed fix evidence exists. A normal historical absence such as a not-yet-listed symbol may move to `accepted_skip`; future provider dispatch can then skip that exact registered request instead of repeating a known-useless call. When the not-yet-listed fact is clear before dispatch, a preflight agent review may register `accepted_skip` without making the known-useless provider call; stage coverage counts that row as a reviewed terminal skip, not as a ready output.
 
-`trading-storage` provides `scripts/artifacts/store_completion_receipt_payload.py` for storage-owned receipt payload materialization. The emitted `artifact_ref_v1` metadata is what manager consumes through `record_completion_receipt.py`.
+`trading-storage` provides `scripts/artifacts/store_completion_receipt_payload.py` for storage-owned receipt payload materialization. The emitted `artifact_ref` metadata is what manager consumes through `record_completion_receipt.py`.
 
 ## Scripts
 
@@ -91,14 +91,14 @@ List the global task summary in priority order:
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 ```
 
-Materialize request parameter payloads behind `parameter_ref` and optionally persist `input_binding_v1` metadata:
+Materialize request parameter payloads behind `parameter_ref` and optionally persist `input_binding` metadata:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py requests.jsonl --write-files
 
 PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py \
   --from-db \
-  --request-kind data_backfill_month_v1 \
+  --request-kind data_backfill_month \
   --status requested \
   --write-files \
   --write-bindings
@@ -149,7 +149,7 @@ PYTHONPATH=src python3 scripts/tasks/materialize_layer_three_target_state_inputs
   --write
 ```
 
-This emits `manager_layer_three_target_state_input_materialization_v1` evidence, merges completed Layer 2 Alpaca bar artifacts into a `source_03_target_state` task key, and delegates normalization to `trading-data`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation.
+This emits `manager_layer_three_target_state_input_materialization` evidence, merges completed Layer 2 Alpaca bar artifacts into a `source_03_target_state` task key, and delegates normalization to `trading-data`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation.
 
 Materialize Layer 4 event-overlay inputs from local source-detector outputs over already reviewed Layer 2 feed artifacts:
 
@@ -160,7 +160,7 @@ PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_overlay_inputs
   --write
 ```
 
-This emits `manager_layer_four_event_overlay_input_materialization_v1` evidence, runs only the local `source_04_event_overlay.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes the resulting event overview rows through `source_04_event_overlay`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. Layer 2 feed artifacts with zero saved bar rows are recorded as `skipped_zero_bar_rows` before detector execution; this preserves not-yet-listed/no-data evidence without failing the local detector. If all executed local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
+This emits `manager_layer_four_event_overlay_input_materialization` evidence, runs only the local `source_04_event_overlay.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes the resulting event overview rows through `source_04_event_overlay`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. Layer 2 feed artifacts with zero saved bar rows are recorded as `skipped_zero_bar_rows` before detector execution; this preserves not-yet-listed/no-data evidence without failing the local detector. If all executed local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
 
 Record a realtime shadow decision handoff receipt when execution/model scaffolds have produced a realtime decision input snapshot and model route plan:
 
@@ -171,7 +171,7 @@ PYTHONPATH=src python3 scripts/tasks/record_realtime_shadow_handoff.py \
   --output bundle
 ```
 
-The output is `manager_realtime_shadow_handoff_control_plane_bundle_v1`: a standard component completion receipt plus normalized `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows. It makes the execution -> model realtime shadow handoff visible to manager/task-summary consumers without model activation, broker calls, order construction, or account mutation. This is evidence consumption, not realtime runtime control: manager must not use this path to start/stop streams, schedule subscriptions, throttle providers, or reconnect monitoring processes. Realtime evidence should be persisted as lightweight decision-effectiveness metrics once labels mature, not as historical test-set rows by default. Add `--persist-normalized-rows` only when a durable receipt URI/database context is reviewed and manager SQL persistence is explicitly desired.
+The output is `manager_realtime_shadow_handoff_control_plane_bundle`: a standard component completion receipt plus normalized `run_manifest`, `artifact_ref`, and `ready_signal` rows. It makes the execution -> model realtime shadow handoff visible to manager/task-summary consumers without model activation, broker calls, order construction, or account mutation. This is evidence consumption, not realtime runtime control: manager must not use this path to start/stop streams, schedule subscriptions, throttle providers, or reconnect monitoring processes. Realtime evidence should be persisted as lightweight decision-effectiveness metrics once labels mature, not as historical test-set rows by default. Add `--persist-normalized-rows` only when a durable receipt URI/database context is reviewed and manager SQL persistence is explicitly desired.
 
 Rehearse the full cross-repository fixture chain when validating realtime wiring:
 
@@ -201,7 +201,7 @@ PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.p
   --write
 ```
 
-The artifact is `manager_layer_08_option_expression_gate_review_v1`. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active Layer 7 action chains, and records a reviewed no-provider skip when all Layer 7 rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action is bounded autonomous provider dispatch; if no active request previews exist, the review itself is sufficient evidence to complete Layer 8 data acquisition as a no-provider skip.
+The artifact is `manager_layer_08_option_expression_gate_review`. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active Layer 7 action chains, and records a reviewed no-provider skip when all Layer 7 rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action is bounded autonomous provider dispatch; if no active request previews exist, the review itself is sufficient evidence to complete Layer 8 data acquisition as a no-provider skip.
 
 Layer 8 feature generation now runs through the manager adapter `scripts/tasks/execute_layer_eight_option_feature_generation.py`. When the gate review is `no_provider_skip_accepted` with zero active requests, the adapter writes `layer_08_option_expression_feature_generation_no_provider_skip_receipt_YYYY-MM.json` and treats `feature_08_option_expression` as a reviewed no-op. When active option requests were approved and acquired, the same adapter delegates to trading-data `feature_08_option_expression` with month-scoped source windows.
 
@@ -213,7 +213,7 @@ PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py \
   --request-id mgrreq_backfill_alpaca_bars_2016_01
 ```
 
-This imports the target `trading-data` feed pipeline and calls only `build_context`. It verifies the request, payload, hash-backed `input_binding_v1`, dry-run manager controls, and component task-key shape. It does not call component `run`, does not call providers, does not write completion receipts, and does not change task status.
+This imports the target `trading-data` feed pipeline and calls only `build_context`. It verifies the request, payload, hash-backed `input_binding`, dry-run manager controls, and component task-key shape. It does not call component `run`, does not call providers, does not write completion receipts, and does not change task status.
 
 Dispatch historical provider acquisition autonomously when the stage dashboard shows pending request ids:
 
@@ -241,7 +241,7 @@ PYTHONPATH=src python3 scripts/tasks/summarize_stage_run.py \
   --write
 ```
 
-The dashboard artifact is `manager_stage_run_dashboard_v1`. It summarizes stage coverage, observed provider calls, evidence refs, the next autonomous provider-dispatch preview, and the next safe action.
+The dashboard artifact is `manager_stage_run_dashboard`. It summarizes stage coverage, observed provider calls, evidence refs, the next autonomous provider-dispatch preview, and the next safe action.
 
 Workflow checkpoints keep `provider_calls` as the safe/offline stage counter and record acquisition calls from ingested receipts in `provider_calls_observed`. This preserves the safety invariant that offline stages report zero provider calls while still making month-level acquisition volume visible to dashboards and audits.
 
@@ -256,7 +256,7 @@ PYTHONPATH=src python3 scripts/tasks/run_stage_controller.py \
   --write
 ```
 
-The controller emits `manager_stage_run_controller_receipt_v1`, refreshes the dashboard, and may execute the next bounded autonomous provider-dispatch slice. It still stops at broker/order/fill/account mutation, and model/storage mutations require their own agent decision artifacts.
+The controller emits `manager_stage_run_controller_receipt`, refreshes the dashboard, and may execute the next bounded autonomous provider-dispatch slice. It still stops at broker/order/fill/account mutation, and model/storage mutations require their own agent decision artifacts.
 
 Provider dispatch is batch-aware. Plan-only dispatch prints commands without provider calls; actual `--execute-provider-calls` runs autonomous historical acquisition for bounded request ids, strips retired approval-policy refs from runtime task keys, and preserves broker/model prohibitions. Use `--continue-on-error` only when individual provider/feed misses should become failed component receipts instead of aborting the batch.
 
@@ -330,7 +330,7 @@ PYTHONPATH=src python3 scripts/tasks/reconcile_provider_stage.py \
   --write-workflow-state
 ```
 
-`reconcile_provider_stage.py` discovers existing completion receipts, normalizes `run_manifest_v1` / `artifact_ref_v1` / `ready_signal_v1` rows, refreshes `manager_stage_coverage_v1`, and can ingest that written coverage report into workflow state. With `--write-failure-proposal`, failed receipts also produce JSONL `manager_failure_register_v1` proposal rows with `failure_status=agent_review_required`; with `--write-failure-register`, those observed failures may be persisted for review. This preserves failed facts but does not accept, skip, correct, or retry any failure until a later agent review changes the disposition. The reconcile script never dispatches components, calls providers, activates models, mutates broker state, or executes storage lifecycle actions.
+`reconcile_provider_stage.py` discovers existing completion receipts, normalizes `run_manifest` / `artifact_ref` / `ready_signal` rows, refreshes `manager_stage_coverage`, and can ingest that written coverage report into workflow state. With `--write-failure-proposal`, failed receipts also produce JSONL `manager_failure_register` proposal rows with `failure_status=agent_review_required`; with `--write-failure-register`, those observed failures may be persisted for review. This preserves failed facts but does not accept, skip, correct, or retry any failure until a later agent review changes the disposition. The reconcile script never dispatches components, calls providers, activates models, mutates broker state, or executes storage lifecycle actions.
 
 Check stage-level coverage before advancing downstream workflow stages:
 
@@ -352,7 +352,7 @@ The coverage report is evidence only when partial. It marks a workflow stage suc
 ## Component Rules
 
 - `trading-data` emits feed/source/feature receipts; manager records run/artifact/ready facts.
-- `trading-model` emits generation/evaluation/review evidence receipts; manager records run/artifact/ready facts and owns the unified `model_promotion_review_v1` request entrypoint.
+- `trading-model` emits generation/evaluation/review evidence receipts; manager records run/artifact/ready facts and owns the unified `model_promotion_review` request entrypoint.
 - `trading-storage` owns durable payload storage, retention, backup, and rehydrate mechanics.
 - `trading-execution` may receive manager requests, but broker order/fill/account payloads remain execution-owned.
 - `trading-dashboard` receives ready/reviewed outputs for display, but dashboard widget schemas remain dashboard-owned.
@@ -360,7 +360,7 @@ The coverage report is evidence only when partial. It marks a workflow stage suc
 ## Guardrails
 
 - A request is not proof that work happened.
-- A receipt is not downstream approval unless it produces a compatible `ready_signal_v1`.
+- A receipt is not downstream approval unless it produces a compatible `ready_signal`.
 - `partial` receipts require review before downstream consumers rely on them.
 - `task_summary` is derived state; update the underlying request/run/ready rows rather than editing summary output.
 - Failed receipts must remain queryable for audit, but they must not emit `ready` status.

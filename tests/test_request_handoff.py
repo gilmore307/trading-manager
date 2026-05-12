@@ -60,7 +60,7 @@ class RequestHandoffValidationTests(unittest.TestCase):
         self.assertFalse(result.dispatch_performed)
         self.assertEqual(
             result.context_run_dir,
-            f"storage/monthly_backfill_v1/alpaca_bars/{request['symbol']}/2016-01/runs/manager_handoff_validation",
+            f"storage/monthly_backfill/alpaca_bars/{request['symbol']}/2016-01/runs/manager_handoff_validation",
         )
 
     def test_rejects_input_binding_hash_mismatch(self):

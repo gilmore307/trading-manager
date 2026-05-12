@@ -61,7 +61,7 @@ class HistoricalTrainingPreparationTests(unittest.TestCase):
         self.assertIn("SPY", summary.symbols)
         self.assertTrue(all(row["target_component_id"] == "01_feed_alpaca_bars" for row in requests))
         self.assertTrue(all("/alpaca_bars/" in row["parameter_ref"] for row in requests))
-        self.assertTrue(all(row["schema_ref"] == "manager_request_parameter_payload_v1" for row in payloads))
+        self.assertTrue(all(row["schema_ref"] == "manager_request_parameter_payload" for row in payloads))
         self.assertTrue(all(row["provider_calls"] == 0 for row in validations))
         self.assertFalse(summary.dispatch_performed)
         self.assertFalse(summary.model_activation_performed)

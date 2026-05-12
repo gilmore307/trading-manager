@@ -45,7 +45,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(
                 status,
                 stage_coverage={
-                    "contract_type": "manager_stage_coverage_v1",
+                    "contract_type": "manager_stage_coverage",
                     "stage_id": "layer_01_market_regime.data_acquisition",
                     "status": "partial_ready",
                     "expected_count": 22,
@@ -58,10 +58,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 generated_at_utc="2026-05-12T12:00:00Z",
             )
 
-        self.assertEqual(payload["contract_type"], "historical_task_progress_summary_v1")
+        self.assertEqual(payload["contract_type"], "historical_task_progress_summary")
         self.assertEqual(payload["source_system"], "trading-manager")
         self.assertEqual(payload["generated_at_utc"], "2026-05-12T12:00:00Z")
-        self.assertEqual(payload["schema_ref"], "storage/dashboard/schemas/historical_task_progress_summary_v1.schema.json")
+        self.assertEqual(payload["schema_ref"], "storage/dashboard/schemas/historical_task_progress_summary.schema.json")
         self.assertEqual(payload["chart_payload"]["stage_coverage"]["expected_count"], 22)
         self.assertFalse(payload["chart_payload"]["stage_coverage"]["can_unlock_downstream"])
         self.assertIn("profile_refs", payload)
@@ -98,7 +98,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         payload = json.loads(output.getvalue())
-        self.assertEqual(payload["contract_type"], "historical_task_progress_summary_v1")
+        self.assertEqual(payload["contract_type"], "historical_task_progress_summary")
         self.assertIn("chart_payload", payload)
 
 

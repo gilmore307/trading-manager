@@ -25,19 +25,19 @@ from .control_plane import (
     write_jsonl,
 )
 
-REQUEST_KIND = "model_promotion_review_v1"
+REQUEST_KIND = "model_promotion_review"
 TARGET_COMPONENT_ID = "manager_model_promotion_review"
 TARGET_COMPONENT_KIND = "review_helper"
 TARGET_REPO_ID = "trading-manager"
 DEFAULT_REQUESTED_BY = "openclaw"
 DEFAULT_POLICY_REFS = (
-    "model_promotion_unified_review_v1",
-    "model_promotion_script_called_agent_decision_v1",
+    "model_promotion_unified_review",
+    "model_promotion_script_called_agent_decision",
     "model_promotion_no_activation_without_agent_decision",
 )
 DEFAULT_EXPECTED_OUTPUTS = (
-    "agent_model_promotion_decision_v1",
-    "activation_record_v1_if_agent_approved",
+    "agent_model_promotion_decision",
+    "activation_record_if_agent_approved",
     "promotion_review_ready_signal",
 )
 
@@ -108,7 +108,7 @@ def build_model_promotion_review_request(
     parameter_ref: str | None = None,
     dry_run: bool = True,
 ) -> dict[str, Any]:
-    """Build one manager_request_v1 row for the unified promotion review entrypoint."""
+    """Build one manager_request row for the unified promotion review entrypoint."""
 
     if not candidate_ref:
         raise TaskSystemError("candidate_ref is required")
@@ -124,7 +124,7 @@ def build_model_promotion_review_request(
 
     request = {
         "request_id": stable_id,
-        "contract_type": "manager_request_v1",
+        "contract_type": "manager_request",
         "request_kind": REQUEST_KIND,
         "status": "requested",
         "requested_by": requested_by,

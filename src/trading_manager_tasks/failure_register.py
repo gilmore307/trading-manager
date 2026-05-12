@@ -76,7 +76,7 @@ def validate_failure_register_row(row: Mapping[str, Any]) -> dict[str, Any]:
         raise TaskSystemError("evidence_refs must be a list")
     return {
         "failure_id": failure_id,
-        "contract_type": "manager_failure_register_v1",
+        "contract_type": "manager_failure_register",
         "request_id": request_id,
         "run_id": row.get("run_id"),
         "stage_id": stage_id,
@@ -175,7 +175,7 @@ def accepted_failure_request_ids_from_register(
 
 
 def register_failure_main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate or persist manager_failure_register_v1 rows.")
+    parser = argparse.ArgumentParser(description="Validate or persist manager_failure_register rows.")
     parser.add_argument("path", type=Path, help="JSON, JSON array, or JSONL failure-register rows.")
     parser.add_argument("--write", action="store_true", help="Persist rows to trading_manager.failure_register.")
     parser.add_argument("--database-url")

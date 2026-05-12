@@ -1,6 +1,6 @@
 # Historical Scheduler Runtime
 
-`trading-manager` treats historical-data model training as a maintained system-service runtime, not a manual script sequence. The canonical owner is the historical scheduler service; chat/manual CLI runs are debugging and recovery tools only. The runtime goal is continuous progress with hard safety gates where they still belong: provider calls run autonomously under manager request/resource/coverage controls, model activation is approved or deferred by the agent through `agent_model_promotion_decision_v1`, storage lifecycle mutation is rule-executed through lifecycle policy plus protected-set checks and receipts, and broker/order/fill/account mutation remains execution-owned.
+`trading-manager` treats historical-data model training as a maintained system-service runtime, not a manual script sequence. The canonical owner is the historical scheduler service; chat/manual CLI runs are debugging and recovery tools only. The runtime goal is continuous progress with hard safety gates where they still belong: provider calls run autonomously under manager request/resource/coverage controls, model activation is approved or deferred by the agent through `agent_model_promotion_decision`, storage lifecycle mutation is rule-executed through lifecycle policy plus protected-set checks and receipts, and broker/order/fill/account mutation remains execution-owned.
 
 ## Runtime Shape
 
@@ -25,10 +25,10 @@ Default local runtime files live under ignored `storage/runtime/`:
 
 | File | Contract | Purpose |
 | --- | --- | --- |
-| `historical_scheduler_state.json` | `manager_scheduler_daemon_state_v1` | Resume checkpoint: tick counters, last decision, last internal stage, last error, service-management markers, automatic work-selection evidence, and current month scope. |
+| `historical_scheduler_state.json` | `manager_scheduler_daemon_state` | Resume checkpoint: tick counters, last decision, last internal stage, last error, service-management markers, automatic work-selection evidence, and current month scope. |
 | `historical_scheduler.lock` | lock file | Single-instance guard; stale locks may be replaced only when the recorded process is gone and the lock is old. |
-| `historical_scheduler_decisions.jsonl` | `manager_scheduler_decision_v1` rows | Append-only operational log for scheduler decisions and gate outcomes. |
-| `model_training_workflow_state_YYYY-MM.json` | `manager_model_training_workflow_state_v1` | Month-scoped workflow checkpoint that the service uses for automatic next-work selection and resume. |
+| `historical_scheduler_decisions.jsonl` | `manager_scheduler_decision` rows | Append-only operational log for scheduler decisions and gate outcomes. |
+| `model_training_workflow_state_YYYY-MM.json` | `manager_model_training_workflow_state` | Month-scoped workflow checkpoint that the service uses for automatic next-work selection and resume. |
 
 These files are runtime state, not Git artifacts. If the daemon restarts after host reboot or process failure, it resumes from the checkpoint and re-enters the scheduler work loop instead of relying on chat/session memory.
 
@@ -40,7 +40,7 @@ The read-only status entrypoint is:
 PYTHONPATH=src python3 scripts/tasks/inspect_historical_scheduler_status.py
 ```
 
-It emits `manager_historical_scheduler_status_v1` and performs no provider calls, no model activation, no broker execution, and no storage lifecycle mutation. The status row summarizes:
+It emits `manager_historical_scheduler_status` and performs no provider calls, no model activation, no broker execution, and no storage lifecycle mutation. The status row summarizes:
 
 - service template/env/wrapper readiness and required service flags;
 - lock state (`absent`, `active`, or `stale`);
@@ -80,7 +80,7 @@ Do not enable the service until the active host path, Python path, scheduler fla
 The historical scheduler runtime must provide:
 
 - **Residency:** the daemon is a long-running process supervised by a host service manager when enabled; this is the normal production control path, not an optional convenience.
-- **Checkpoint/restart:** every tick updates `manager_scheduler_daemon_state_v1`; restart resumes from the latest checkpoint and current month cursor.
+- **Checkpoint/restart:** every tick updates `manager_scheduler_daemon_state`; restart resumes from the latest checkpoint and current month cursor.
 - **Single-instance safety:** the lock prevents duplicate daemon loops from racing on the same task payloads and state.
 - **Observable decisions:** every tick appends one decision row for review of ready/backoff/executed/error outcomes, and `inspect_historical_scheduler_status.py` summarizes the current service posture without mutating runtime state.
 - **Resource protection:** host resource gates still run on every tick. Market-hours protection is configurable; in the current pre-promotion full-training phase `TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=false` disables market-hours backoff because no production model/live trading capacity is active yet.
@@ -92,7 +92,7 @@ The historical scheduler runtime must provide:
 
 ## Current Full-Stack Workflow Graph
 
-The daemon now carries a manager-owned `manager_model_training_workflow_plan_v1` for all eight model layers plus a durable `manager_model_training_workflow_state_v1` checkpoint. Each layer has explicit stages for data acquisition, feature/input preparation, model generation, model evaluation, promotion-review preparation, and maintenance. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
+The daemon now carries a manager-owned `manager_model_training_workflow_plan` for all eight model layers plus a durable `manager_model_training_workflow_state` checkpoint. Each layer has explicit stages for data acquisition, feature/input preparation, model generation, model evaluation, promotion-review preparation, and maintenance. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
 
 The workflow is intentionally not a synchronized all-layers-per-month loop:
 
@@ -111,7 +111,7 @@ Current execution still preserves gates: when Layer 1 or Layer 2 task keys exist
 
 `dispatch_provider_acquisition.py` is the autonomous Alpaca-bars dispatch adapter for Layer 1 and Layer 2. It prepares bounded request sets selected by `--model-layer`, prints the exact trading-data commands in plan-only mode, and performs provider calls only when `--execute-provider-calls` is present. Use repeated `--symbol`, repeated `--request-id`, or `--limit` for controlled small-batch measurement before running a full request set. After receipts exist, `reconcile_provider_stage.py` performs the safe offline closeout: discovers existing completion receipts, normalizes manager control-plane rows, proposes/persists failed receipts as `agent_review_required` failure-register facts when requested, refreshes stage coverage, and can ingest the written coverage report into workflow state. It never dispatches providers or bypasses coverage gates.
 
-`execute_model_training_stage.py` handles the other side of the loop: it executes one ready safe offline stage, writes stdout/stderr logs and a `component_completion_receipt_v1`, updates workflow state when requested, and refuses Layer 1/2 provider-dispatch stages. The scheduler/daemon expose `--execute-safe-offline-stages` to admit at most one non-provider offline stage per tick after market/resource gates pass; provider stages are routed through `--execute-autonomous-provider-stages` instead.
+`execute_model_training_stage.py` handles the other side of the loop: it executes one ready safe offline stage, writes stdout/stderr logs and a `component_completion_receipt`, updates workflow state when requested, and refuses Layer 1/2 provider-dispatch stages. The scheduler/daemon expose `--execute-safe-offline-stages` to admit at most one non-provider offline stage per tick after market/resource gates pass; provider stages are routed through `--execute-autonomous-provider-stages` instead.
 
 For `layer_01_market_regime.feature_generation`, the safe offline command first materializes already-acquired `01_feed_alpaca_bars` `equity_bar.csv` artifacts into `trading_data.source_01_market_regime`, then generates `trading_data.feature_01_market_regime`. This stage is allowed to write deterministic SQL source/feature rows, but it must keep `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`. Known accepted no-data symbols stay represented by failure-register rows rather than fabricated bars.
 

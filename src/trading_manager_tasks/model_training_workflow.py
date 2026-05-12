@@ -337,7 +337,7 @@ def _symbols_for_model_layer(model_layer: str) -> tuple[str, ...]:
 
 
 def count_alpaca_bar_task_keys(storage_root: Path, *, start_month: str, model_layer: str) -> int:
-    root = storage_root / "monthly_backfill_v1" / "alpaca_bars"
+    root = storage_root / "monthly_backfill" / "alpaca_bars"
     if not root.exists():
         return 0
     symbols = set(_symbols_for_model_layer(model_layer))
@@ -569,7 +569,7 @@ def build_model_training_workflow_plan(
         if next_stage is not None:
             break
     return ModelTrainingWorkflowPlan(
-        contract_type="manager_model_training_workflow_plan_v1",
+        contract_type="manager_model_training_workflow_plan",
         start_month=start_month,
         end_month=end_month,
         layer_count=len(layers),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build unified review_decision_v1 artifacts."""
+"""Build unified review_decision artifacts."""
 
 from __future__ import annotations
 

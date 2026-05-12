@@ -11,7 +11,7 @@ from trading_manager_tasks.stage_reconcile import discover_stage_receipts, propo
 
 
 def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01", status: str = "succeeded") -> Path:
-    path = root / "monthly_backfill_v1" / "alpaca_bars" / symbol / month / "completion_receipt.json"
+    path = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
@@ -22,7 +22,7 @@ def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01", s
                         "status": status,
                         "started_at": "2026-05-10T00:00:00Z",
                         "completed_at": "2026-05-10T00:00:01Z",
-                        "outputs": [f"storage/monthly_backfill_v1/alpaca_bars/{symbol}/{month}/runs/run_1/saved/equity_bar.csv"],
+                        "outputs": [f"storage/monthly_backfill/alpaca_bars/{symbol}/{month}/runs/run_1/saved/equity_bar.csv"],
                         "row_counts": {"equity_bar": 10},
                         "error": {"type": "AlpacaBarsError", "message": "bars unavailable"} if status != "succeeded" else None,
                     }
@@ -37,7 +37,7 @@ def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01", s
 
 def _coverage() -> StageCoverageReport:
     return StageCoverageReport(
-        contract_type="manager_stage_coverage_v1",
+        contract_type="manager_stage_coverage",
         stage_id="layer_02_sector_context.data_acquisition",
         start_month="2016-01",
         end_month="2016-01",
@@ -80,7 +80,7 @@ class StageReconcileTests(unittest.TestCase):
         self.assertEqual(refs[0].symbol, "XLK")
         self.assertEqual(refs[0].request_id, "mgrreq_backfill_alpaca_bars_xlk_2016_01")
         self.assertEqual(refs[0].receipt_path, receipt)
-        self.assertEqual(refs[0].receipt_uri, "storage://trading-data/monthly_backfill_v1/alpaca_bars/XLK/2016-01/completion_receipt.json")
+        self.assertEqual(refs[0].receipt_uri, "storage://trading-data/monthly_backfill/alpaca_bars/XLK/2016-01/completion_receipt.json")
 
     def test_reconcile_normalizes_receipts_without_provider_calls_or_writes_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch(
@@ -98,7 +98,7 @@ class StageReconcileTests(unittest.TestCase):
                 component_storage_root=root,
             )
 
-        self.assertEqual(summary.contract_type, "manager_provider_stage_reconcile_v1")
+        self.assertEqual(summary.contract_type, "manager_provider_stage_reconcile")
         self.assertEqual(summary.discovered_receipt_count, 1)
         self.assertEqual(summary.normalized_run_manifest_count, 1)
         self.assertGreaterEqual(summary.normalized_artifact_ref_count, 2)
@@ -131,7 +131,7 @@ class StageReconcileTests(unittest.TestCase):
             )
 
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["contract_type"], "manager_failure_register_v1")
+        self.assertEqual(rows[0]["contract_type"], "manager_failure_register")
         self.assertEqual(rows[0]["request_id"], "mgrreq_backfill_alpaca_bars_xlk_2016_01")
         self.assertEqual(rows[0]["failure_status"], "agent_review_required")
         self.assertEqual(rows[0]["failure_kind"], "unclassified_provider_failure")

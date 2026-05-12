@@ -109,9 +109,9 @@ def validate_realtime_shadow_handoff_pair(
 
     missing_fields: list[str] = []
     mismatched_fields: list[str] = []
-    if decision_input.get("contract_type") != "execution_model_decision_input_snapshot_v1":
+    if decision_input.get("contract_type") != "execution_model_decision_input_snapshot":
         mismatched_fields.append("decision_input.contract_type")
-    if route_plan.get("contract_type") != "model_realtime_decision_route_plan_v1":
+    if route_plan.get("contract_type") != "model_realtime_decision_route_plan":
         mismatched_fields.append("route_plan.contract_type")
     for field in ("decision_input_snapshot_id", "decision_time", "instrument_ref"):
         if not decision_input.get(field):
@@ -135,7 +135,7 @@ def validate_realtime_shadow_handoff_pair(
     )
     valid = not missing_fields and not mismatched_fields and not missing_layers and not forbidden_actions_present and route_plan_ready
     result = RealtimeShadowHandoffValidation(
-        contract_type="manager_realtime_shadow_handoff_validation_v1",
+        contract_type="manager_realtime_shadow_handoff_validation",
         request_id=request_id,
         decision_input_snapshot_id=decision_input.get("decision_input_snapshot_id"),
         route_plan_id=route_plan.get("route_plan_id"),
@@ -194,8 +194,8 @@ def build_realtime_shadow_handoff_receipt(
     route_plan_ref = route_plan_ref or f"artifact://trading-model/{route_plan.get('route_plan_id', 'missing')}"
     validation_ref = validation_ref or f"artifact://trading-manager/{run_id}/validation"
     return {
-        "contract_type": "component_completion_receipt_v1",
-        "receipt_kind": "manager_realtime_shadow_handoff_receipt_v1",
+        "contract_type": "component_completion_receipt",
+        "receipt_kind": "manager_realtime_shadow_handoff_receipt",
         "request_id": request_id,
         "status": status,
         "provider_calls_performed": 0,
@@ -218,19 +218,19 @@ def build_realtime_shadow_handoff_receipt(
                     {
                         "artifact_kind": "execution_model_decision_input_snapshot",
                         "uri": decision_input_ref,
-                        "schema_ref": "execution_model_decision_input_snapshot_v1",
+                        "schema_ref": "execution_model_decision_input_snapshot",
                         "row_count": 1,
                     },
                     {
                         "artifact_kind": "model_realtime_decision_route_plan",
                         "uri": route_plan_ref,
-                        "schema_ref": "model_realtime_decision_route_plan_v1",
+                        "schema_ref": "model_realtime_decision_route_plan",
                         "row_count": 1,
                     },
                     {
                         "artifact_kind": "manager_realtime_shadow_handoff_validation",
                         "uri": validation_ref,
-                        "schema_ref": "manager_realtime_shadow_handoff_validation_v1",
+                        "schema_ref": "manager_realtime_shadow_handoff_validation",
                         "row_count": 1,
                     },
                 ],
@@ -288,13 +288,13 @@ def build_realtime_shadow_handoff_control_plane_bundle(
         receipt_uri=receipt_uri,
         receipt_hash=receipt_hash,
         ready_signal_kind="realtime_shadow_decision_handoff_ready",
-        receipt_schema_ref="manager_realtime_shadow_handoff_receipt_v1",
+        receipt_schema_ref="manager_realtime_shadow_handoff_receipt",
         consumer_hint="fixture_or_shadow_model_decision_route",
     )
     if persist_rows:
         persist_completion_rows(rows, database_url=database_url)
     return {
-        "contract_type": "manager_realtime_shadow_handoff_control_plane_bundle_v1",
+        "contract_type": "manager_realtime_shadow_handoff_control_plane_bundle",
         "receipt": receipt,
         "normalized_rows": rows.jsonl_rows(),
         "persistence_performed": bool(persist_rows),
@@ -317,8 +317,8 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def realtime_shadow_handoff_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build manager realtime shadow handoff receipt/control-plane rows without persistence.")
-    parser.add_argument("--decision-input", type=Path, required=True, help="execution_model_decision_input_snapshot_v1 JSON path.")
-    parser.add_argument("--route-plan", type=Path, required=True, help="model_realtime_decision_route_plan_v1 JSON path.")
+    parser.add_argument("--decision-input", type=Path, required=True, help="execution_model_decision_input_snapshot JSON path.")
+    parser.add_argument("--route-plan", type=Path, required=True, help="model_realtime_decision_route_plan JSON path.")
     parser.add_argument("--request-id")
     parser.add_argument("--receipt-uri")
     parser.add_argument("--receipt-hash")

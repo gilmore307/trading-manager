@@ -19,7 +19,7 @@ class LayerEightFeatureStageTests(unittest.TestCase):
             review_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_layer_08_option_expression_gate_review_v1",
+                        "contract_type": "manager_layer_08_option_expression_gate_review",
                         "stage_id": "layer_08_option_expression.data_acquisition",
                         "start_month": "2016-02",
                         "end_month": "2016-02",
@@ -54,7 +54,7 @@ class LayerEightFeatureStageTests(unittest.TestCase):
             (review_root / "layer_08_option_expression_gate_review_2016-02.json").write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_layer_08_option_expression_gate_review_v1",
+                        "contract_type": "manager_layer_08_option_expression_gate_review",
                         "status": "approval_required",
                         "active_request_count": 2,
                     }

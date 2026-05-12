@@ -73,7 +73,7 @@ class SchedulerStatusTests(unittest.TestCase):
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_text(
                 json.dumps({
-                    "contract_type": "manager_scheduler_daemon_state_v1",
+                    "contract_type": "manager_scheduler_daemon_state",
                     "daemon_id": "manager_historical_training_scheduler",
                     "resume_supported": True,
                     "start_month": "2016-04",
@@ -95,7 +95,7 @@ class SchedulerStatusTests(unittest.TestCase):
             )
             decision_log.write_text(
                 json.dumps({
-                    "contract_type": "manager_scheduler_decision_v1",
+                    "contract_type": "manager_scheduler_decision",
                     "decision_status": "ready",
                     "reason_code": "workflow_stage_ready",
                     "reason": "provider stage ready for autonomous dispatch",
@@ -144,7 +144,7 @@ class SchedulerStatusTests(unittest.TestCase):
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_text(
                 json.dumps({
-                    "contract_type": "manager_scheduler_daemon_state_v1",
+                    "contract_type": "manager_scheduler_daemon_state",
                     "start_month": "2019-01",
                     "end_month": "2019-01",
                     "last_next_internal_stage": "old_provider_gate",
@@ -153,7 +153,7 @@ class SchedulerStatusTests(unittest.TestCase):
             )
             decision_log.write_text(
                 json.dumps({
-                    "contract_type": "manager_scheduler_decision_v1",
+                    "contract_type": "manager_scheduler_decision",
                     "decision_status": "executed",
                     "start_month": "2019-01",
                     "selected_work": "old_stage",

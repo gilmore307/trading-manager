@@ -149,7 +149,7 @@ class RegistryHelperTests(unittest.TestCase):
         }:
             self.assertNotIn(obsolete_config, rows)
         self.assertEqual(rows["TARGET_STATE_VECTOR_SYNCHRONIZED_STATE_WINDOWS"]["payload"], "5min;15min;60min;390min")
-        self.assertEqual(rows["TARGET_CONTEXT_STATE_VERSION_DEFAULT"]["payload"], "target_context_state_v1")
+        self.assertEqual(rows["TARGET_CONTEXT_STATE_VERSION_DEFAULT"]["payload"], "target_context_state")
         self.assertEqual(
             rows["TARGET_STATE_VECTOR_WINDOW_SYNC_POLICY"]["payload"],
             "market_sector_target_blocks_must_share_identical_observation_windows",
@@ -245,11 +245,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("8_resolved_no_option_reason_codes", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
         self.assertIn("long_call", rows["OPTION_EXPRESSION_TYPES"]["payload"])
         self.assertIn("option_expression_not_broker_order", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
-        self.assertIn("maintain_or_no_trade_means_no_option_expression_v1", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
-        self.assertIn("preferred_delta_range_hard_filter_v1", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
-        self.assertIn("target_range_moneyness_guardrail_v1", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
+        self.assertIn("maintain_or_no_trade_means_no_option_expression", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
+        self.assertIn("preferred_delta_range_hard_filter", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
+        self.assertIn("target_range_moneyness_guardrail", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
         self.assertIn("8_candidate_hard_filter_fail_reason_codes", rows["OPTION_EXPRESSION_DIAGNOSTIC_FIELD_FAMILIES"]["payload"])
-        self.assertIn("bullish_call_strike_not_above_target_price_high", rows["OPTION_EXPRESSION_V1_MONEYNESS_GUARDRAIL"]["payload"])
+        self.assertIn("bullish_call_strike_not_above_target_price_high", rows["OPTION_EXPRESSION_MONEYNESS_GUARDRAIL"]["payload"])
         self.assertEqual(rows["OPTION_CHAIN_SNAPSHOT_REF"]["payload"], "option_chain_snapshot_ref")
         self.assertEqual(rows["UNDERLYING_QUOTE_SNAPSHOT_REF"]["payload"], "underlying_quote_snapshot_ref")
         self.assertEqual(rows["PENDING_OPTION_EXPOSURE_CONTEXT"]["payload"], "pending_option_exposure_context")
@@ -258,17 +258,17 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("dataset_snapshot_ref", rows["MODEL_PROMOTION_READINESS_CHECKLIST"]["payload"])
         self.assertIn("calibration_report_ref", rows["MODEL_PROMOTION_READINESS_CHECKLIST"]["payload"])
         self.assertIn("layer_2_deferred", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
-        self.assertEqual(rows["MODEL_PROMOTION_REVIEW_V1"]["payload"], "model_promotion_review_v1")
-        self.assertIn("every model layer", rows["MODEL_PROMOTION_REVIEW_V1"]["note"])
+        self.assertEqual(rows["MODEL_PROMOTION_REVIEW"]["payload"], "model_promotion_review")
+        self.assertIn("every model layer", rows["MODEL_PROMOTION_REVIEW"]["note"])
         self.assertIn("activation_requires_approved_review_decision", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertIn("model_08_option_expression", rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"])
         self.assertEqual(rows["MANAGER_MODEL_PROMOTION_REVIEW_PLAN"]["kind"], "script")
         self.assertEqual(rows["MANAGER_TASK_SYSTEM_REHEARSAL"]["kind"], "script")
         self.assertEqual(rows["MANAGER_TASK_SYSTEM_REHEARSAL"]["payload"], "PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py")
-        self.assertEqual(rows["MANAGER_TASK_SYSTEM_REHEARSAL_V1"]["kind"], "artifact_type")
-        self.assertIn("ready_signal_v1", rows["MANAGER_TASK_SYSTEM_REHEARSAL_V1"]["applies_to"])
-        self.assertNotIn("MODEL_01_PROMOTION_REVIEW_V1", rows)
-        self.assertNotIn("MODEL_08_PROMOTION_REVIEW_V1", rows)
+        self.assertEqual(rows["MANAGER_TASK_SYSTEM_REHEARSAL_ARTIFACT"]["kind"], "artifact_type")
+        self.assertIn("ready_signal", rows["MANAGER_TASK_SYSTEM_REHEARSAL_ARTIFACT"]["applies_to"])
+        self.assertNotIn("MODEL_01_PROMOTION_REVIEW", rows)
+        self.assertNotIn("MODEL_08_PROMOTION_REVIEW", rows)
         self.assertEqual(rows["TRADE_RISK_CAP"]["payload"], "trade_risk_cap")
         self.assertIn("max_loss_usd", rows["TRADE_RISK_CAP_REQUIRED_FIELDS"]["payload"])
         self.assertIn("long_option_premium_defined_risk", rows["TRADE_RISK_CAP_ENFORCEMENT_MODES"]["payload"])
@@ -318,20 +318,20 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layers_4_8_agent_reviewed_missing_production_eval_run_labels_metrics", rows["MODEL_PROMOTION_CLOSEOUT_BLOCKERS"]["payload"])
         self.assertIn("data_source_model_input_design_closed", rows["TRADING_DATA_STACK_CLOSEOUT_STATUS"]["payload"])
         self.assertIn("default_next_regular_us_session_open_after_as_of_date", rows["ETF_HOLDINGS_AVAILABLE_TIME_POLICY"]["payload"])
-        self.assertEqual(rows["EQUITY_ABNORMAL_ACTIVITY_MODEL_STANDARD"]["payload"], "equity_abnormal_activity_conservative_v1")
+        self.assertEqual(rows["EQUITY_ABNORMAL_ACTIVITY_MODEL_STANDARD"]["payload"], "equity_abnormal_activity_conservative")
         self.assertIn("historical_calibration_required", rows["EQUITY_ABNORMAL_ACTIVITY_CALIBRATION_STATUS"]["payload"])
-        self.assertIn("manager_request_v1", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
-        self.assertIn("run_manifest_v1", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
-        self.assertIn("artifact_ref_v1", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
-        self.assertIn("ready_signal_v1", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
+        self.assertIn("manager_request", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
+        self.assertIn("run_manifest", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
+        self.assertIn("artifact_ref", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
+        self.assertIn("ready_signal", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
         self.assertIn("promoted_model_bodies_keep_forever", rows["STORAGE_LIFECYCLE_POLICY"]["payload"])
         self.assertIn("quarantined_for_delete", rows["STORAGE_LIFECYCLE_STATE_VALUES"]["payload"])
         self.assertIn("direct_readable", rows["STORAGE_READ_MODE_VALUES"]["payload"])
         self.assertIn("provider_window_limited", rows["STORAGE_REPRODUCIBILITY_CLASS_VALUES"]["payload"])
-        self.assertEqual(rows["STORAGE_LIFECYCLE_REQUEST_V1"]["kind"], "request_type")
-        self.assertEqual(rows["COMPRESSION_RECEIPT_V1"]["kind"], "manifest_type")
-        self.assertEqual(rows["DELETION_RECEIPT_V1"]["payload"], "deletion_receipt_v1")
-        self.assertEqual(rows["ARTIFACT_TOMBSTONE_V1"]["kind"], "artifact_type")
+        self.assertEqual(rows["STORAGE_LIFECYCLE_REQUEST"]["kind"], "request_type")
+        self.assertEqual(rows["COMPRESSION_RECEIPT"]["kind"], "manifest_type")
+        self.assertEqual(rows["DELETION_RECEIPT"]["payload"], "deletion_receipt")
+        self.assertEqual(rows["ARTIFACT_TOMBSTONE"]["kind"], "artifact_type")
         self.assertIn("artifact_index", rows["STORAGE_ARTIFACT_INDEX"]["payload"])
         self.assertIn("manager_unified_request_task_summary_surface", rows["STORAGE_LIFECYCLE_MANAGER_CONTROL_POLICY"]["payload"])
         self.assertIn("trading_storage_protected_set_physical_execution", rows["STORAGE_LIFECYCLE_MANAGER_CONTROL_POLICY"]["payload"])
@@ -340,16 +340,16 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("near_to_far_listed_expirations", rows["LAYER_08_OPTION_BUCKET_EXPIRATION_POLICY"]["payload"])
         self.assertIn("three_listed_strike_levels_below", rows["LAYER_08_OPTION_BUCKET_STRIKE_POLICY"]["payload"])
         self.assertIn("no_acquisition_time_prefilter_for_model_construction", rows["LAYER_08_OPTION_BUCKET_PREFILTER_POLICY"]["payload"])
-        self.assertIn("single_leg_only", rows["LAYER_08_OPTION_EXPRESSION_V1_SINGLE_LEG_POLICY"]["payload"])
+        self.assertIn("single_leg_only", rows["LAYER_08_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
         self.assertNotIn("live_" + "calls_disabled_by_default", rows["DATA_PRODUCTION_HARDENING_POLICY"]["payload"])
-        self.assertEqual(rows["MANAGER_CONTROLLED_INFORMATION_PASS_V1"]["payload"], "manager_controlled_information_pass_v1")
+        self.assertEqual(rows["MANAGER_CONTROLLED_INFORMATION_PASS"]["payload"], "manager_controlled_information_pass")
         self.assertIn("plan_controlled_information_pass.py", rows["MANAGER_CONTROLLED_INFORMATION_PASS_PLAN"]["path"])
         self.assertIn("provider_calls_zero", rows["MANAGER_CONTROLLED_INFORMATION_PASS_POLICY"]["payload"])
         self.assertIn("checkpoint_resume_required_for_segmented_runs", rows["DATA_PRODUCTION_HARDENING_POLICY"]["payload"])
         self.assertIn("provider_allowlist_required", rows["PROVIDER_CALL_GUARDRAILS_POLICY"]["payload"])
         self.assertIn("segment_id_required", rows["CHECKPOINT_RESUME_POLICY"]["payload"])
-        self.assertEqual(rows["RUN_MANIFEST_V1"]["kind"], "manifest_type")
-        self.assertEqual(rows["RUN_MANIFEST_V1"]["payload"], "run_manifest_v1")
+        self.assertEqual(rows["RUN_MANIFEST"]["kind"], "manifest_type")
+        self.assertEqual(rows["RUN_MANIFEST"]["payload"], "run_manifest")
         self.assertEqual(rows["DATA_SOURCE_RUN_REQUEST"]["kind"], "request_type")
         self.assertEqual(rows["DATA_SOURCE_RUN_REQUEST"]["payload"], "data_source_run")
         self.assertEqual(rows["MODEL_EVAL_READY_SIGNAL"]["kind"], "ready_signal_type")
@@ -393,13 +393,13 @@ class RegistryHelperTests(unittest.TestCase):
 
         contract_payload = rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"]
         for contract_name in {
-            "component_ref_v1",
-            "manager_request_v1",
-            "input_binding_v1",
-            "run_manifest_v1",
-            "run_step_v1",
-            "artifact_ref_v1",
-            "ready_signal_v1",
+            "component_ref",
+            "manager_request",
+            "input_binding",
+            "run_manifest",
+            "run_step",
+            "artifact_ref",
+            "ready_signal",
         }:
             self.assertIn(contract_name, contract_payload)
 
@@ -410,12 +410,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MANAGER_GLOBAL_TASK_SUMMARY_VIEW"]["payload"], "trading_manager.task_summary")
         self.assertEqual(rows["MANAGER_TASK_PRIORITY_VALUES"]["payload"], "critical;high;normal;low;backlog")
         self.assertEqual(rows["COMPONENT_OUTPUT_ARTIFACT"]["payload"], "component_output")
-        self.assertEqual(rows["MANAGER_REQUEST_PARAMETER_PAYLOAD_V1"]["payload"], "manager_request_parameter_payload_v1")
-        self.assertNotEqual(rows["COMPONENT_OUTPUT_ARTIFACT"]["id"], rows["MANAGER_REQUEST_PARAMETER_PAYLOAD_V1"]["id"])
+        self.assertEqual(rows["MANAGER_REQUEST_PARAMETER_PAYLOAD"]["payload"], "manager_request_parameter_payload")
+        self.assertNotEqual(rows["COMPONENT_OUTPUT_ARTIFACT"]["id"], rows["MANAGER_REQUEST_PARAMETER_PAYLOAD"]["id"])
         self.assertIn("materialize_request_payloads.py", rows["MANAGER_REQUEST_PAYLOAD_MATERIALIZE"]["path"])
         self.assertIn("validate_request_handoff.py", rows["MANAGER_REQUEST_HANDOFF_VALIDATE"]["path"])
-        self.assertNotIn("LIVE_" + "CALL_APPROVAL_V1", rows)
-        self.assertNotIn("LIVE_" + "CALL_APPROVAL_GATE_V1", rows)
+        self.assertNotIn("LIVE_" + "CALL_APPROVAL", rows)
+        self.assertNotIn("LIVE_" + "CALL_APPROVAL_GATE", rows)
         self.assertNotIn("MANAGER_LIVE_" + "CALL_APPROVAL_VALIDATE", rows)
         self.assertIn("dispatch_and_reconcile_provider_stage.py", rows["MANAGER_PROVIDER_ACQUISITION_DISPATCH"]["path"])
         self.assertIn("current_manager_control_plane_phase_closed", rows["TRADING_MANAGER_CONTROL_PLANE_CLOSEOUT_STATUS"]["payload"])
@@ -436,29 +436,29 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("execute_model_training_stage.py", rows["MANAGER_SAFE_OFFLINE_STAGE_EXECUTION"]["path"])
         self.assertIn("plan_dataset_expansion.py", rows["MANAGER_DATASET_EXPANSION_PLANNER"]["path"])
         self.assertIn("manager_selects_next_dataset_role", rows["MANAGER_DATASET_EXPANSION_POLICY"]["payload"])
-        self.assertIn("provider_calls_use_autonomous_historical_acquisition_v1", rows["MANAGER_DATASET_EXPANSION_POLICY"]["payload"])
+        self.assertIn("provider_calls_use_autonomous_historical_acquisition", rows["MANAGER_DATASET_EXPANSION_POLICY"]["payload"])
         self.assertIn("historical_training_sampling_universe_may_be_broader", rows["HISTORICAL_SAMPLING_VS_LIVE_ROUTING_POLICY"]["payload"])
         self.assertIn("layer_03_targets_may_include_non_selected_sectors", rows["HISTORICAL_SAMPLING_VS_LIVE_ROUTING_POLICY"]["payload"])
         self.assertEqual(rows["HISTORICAL_TRAINING_SAMPLING_UNIVERSE"]["payload"], "historical_training_sampling_universe")
         self.assertEqual(rows["LIVE_INFERENCE_ROUTING_UNIVERSE"]["payload"], "live_inference_routing_universe")
-        self.assertEqual(rows["MANAGER_DATASET_EXPANSION_PLAN_V1"]["payload"], "manager_dataset_expansion_plan_v1")
-        self.assertEqual(rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_V1"]["payload"], "manager_model_training_workflow_plan_v1")
-        self.assertEqual(rows["MANAGER_MODEL_TRAINING_WORKFLOW_STATE_V1"]["payload"], "manager_model_training_workflow_state_v1")
-        self.assertEqual(rows["MANAGER_PROVIDER_DISPATCH_SUMMARY_V1"]["payload"], "manager_provider_dispatch_summary_v1")
-        self.assertEqual(rows["MANAGER_STAGE_EXECUTION_SUMMARY_V1"]["payload"], "manager_stage_execution_summary_v1")
-        self.assertIn("layer_08_option_expression", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_V1"]["applies_to"])
-        self.assertEqual(rows["MANAGER_SCHEDULER_DECISION_V1"]["payload"], "manager_scheduler_decision_v1")
-        self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE_V1"]["payload"], "manager_scheduler_daemon_state_v1")
+        self.assertEqual(rows["MANAGER_DATASET_EXPANSION_PLAN"]["payload"], "manager_dataset_expansion_plan")
+        self.assertEqual(rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["payload"], "manager_model_training_workflow_plan")
+        self.assertEqual(rows["MANAGER_MODEL_TRAINING_WORKFLOW_STATE"]["payload"], "manager_model_training_workflow_state")
+        self.assertEqual(rows["MANAGER_PROVIDER_DISPATCH_SUMMARY"]["payload"], "manager_provider_dispatch_summary")
+        self.assertEqual(rows["MANAGER_STAGE_EXECUTION_SUMMARY"]["payload"], "manager_stage_execution_summary")
+        self.assertIn("layer_08_option_expression", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
+        self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
         self.assertIn("trading-manager-historical-scheduler.service", rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["path"])
-        self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision_v1")
-        self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "activation_record_v1")
+        self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision")
+        self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "activation_record")
         self.assertIn("build_review_decision.py", rows["MANAGER_REVIEW_DECISION_BUILD"]["path"])
-        self.assertEqual(rows["COMPONENT_COMPLETION_RECEIPT_PAYLOAD_V1"]["payload"], "component_completion_receipt_payload_v1")
+        self.assertEqual(rows["COMPONENT_COMPLETION_RECEIPT_PAYLOAD"]["payload"], "component_completion_receipt_payload")
         self.assertIn("store_completion_receipt_payload.py", rows["STORAGE_COMPLETION_RECEIPT_PAYLOAD_STORE"]["path"])
         self.assertIn("validate_trade_risk_cap.py", rows["TRADE_RISK_CAP_VALIDATE"]["path"])
-        self.assertIn("contract_type;binding_id;input_role", rows["INPUT_BINDING_V1_REQUIRED_FIELDS"]["payload"])
-        self.assertIn("contract_type;step_id;run_id", rows["RUN_STEP_V1_REQUIRED_FIELDS"]["payload"])
+        self.assertIn("contract_type;binding_id;input_role", rows["INPUT_BINDING_REQUIRED_FIELDS"]["payload"])
+        self.assertIn("contract_type;step_id;run_id", rows["RUN_STEP_REQUIRED_FIELDS"]["payload"])
         self.assertIn("requested", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
         self.assertIn("deleted", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
 
@@ -478,7 +478,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("priority_rank", summary_migration)
 
         payload_migration = Path("scripts/registry/sql/schema_migrations/258_register_request_payload_materialization.sql").read_text()
-        self.assertIn("MANAGER_REQUEST_PARAMETER_PAYLOAD_V1", payload_migration)
+        self.assertIn("MANAGER_REQUEST_PARAMETER_PAYLOAD", payload_migration)
         self.assertIn("MANAGER_REQUEST_PAYLOAD_MATERIALIZE", payload_migration)
 
         handoff_migration = Path("scripts/registry/sql/schema_migrations/260_register_request_handoff_validation.sql").read_text()
@@ -891,11 +891,11 @@ class RegistryHelperTests(unittest.TestCase):
         expected_domains = {
             "artifact_sync_policy_type",
             "manager_contract_lifecycle_status",
-            "manager_request_v1",
-            "run_manifest_v1",
-            "run_step_v1",
-            "artifact_ref_v1",
-            "ready_signal_v1",
+            "manager_request",
+            "run_manifest",
+            "run_step",
+            "artifact_ref",
+            "ready_signal",
         }
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -1496,7 +1496,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("supplements_not_replaces_initial_historical_splits", rows["REALTIME_FORWARD_VALIDATION_POLICY"]["payload"])
         self.assertIn("append_only_point_in_time_capture_required", rows["REALTIME_FORWARD_VALIDATION_POLICY"]["payload"])
         self.assertIn("frozen_model_config_refs_required", rows["REALTIME_FORWARD_VALIDATION_POLICY"]["payload"])
-        self.assertEqual(rows["REALTIME_FORWARD_VALIDATION_DATASET"]["payload"], "realtime_forward_validation_dataset_v1")
+        self.assertEqual(rows["REALTIME_FORWARD_VALIDATION_DATASET"]["payload"], "realtime_forward_validation_dataset")
         self.assertIn("model_dataset_snapshot", rows["REALTIME_FORWARD_VALIDATION_DATASET"]["applies_to"])
         self.assertIn("report_historical_live_route_simulation", rows["MODEL_VALIDATION_EVIDENCE_VIEW_POLICY"]["payload"])
         self.assertIn("report_realtime_shadow_forward_after_label_maturity", rows["MODEL_VALIDATION_EVIDENCE_VIEW_POLICY"]["payload"])
@@ -1509,12 +1509,12 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             rows["EXECUTION_REALTIME_INPUT_COVERAGE_MATRIX"]["payload"],
-            "execution_realtime_input_coverage_v1",
+            "execution_realtime_input_coverage",
         )
         self.assertIn("model_08_option_expression", rows["EXECUTION_REALTIME_INPUT_COVERAGE_MATRIX"]["applies_to"])
-        self.assertEqual(rows["REALTIME_CAPTURE_CONTRACT"]["payload"], "realtime_capture_contract_v1")
+        self.assertEqual(rows["REALTIME_CAPTURE_CONTRACT"]["payload"], "realtime_capture_contract")
         self.assertIn("forward_holdout", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
-        self.assertIn("ready_signal_v1", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
+        self.assertIn("ready_signal", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
         self.assertIn("zero_provider_calls", rows["EXECUTION_REALTIME_COVERAGE_GAP_POLICY"]["payload"])
         self.assertIn("layer_06_broker_account_route_deferred", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
         self.assertIn("layer_08_thetadata_terminal_required", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
@@ -1526,14 +1526,14 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             rows["EXECUTION_REALTIME_SUBSCRIPTION_PLAN"]["payload"],
-            "execution_realtime_subscription_plan_v1",
+            "execution_realtime_subscription_plan",
         )
         self.assertIn("no_provider_calls", rows["EXECUTION_REALTIME_SUBSCRIPTION_PLAN"]["applies_to"])
         self.assertEqual(
             rows["EXECUTION_REALTIME_SUBSCRIPTION_PLAN_SET"]["payload"],
-            "execution_realtime_subscription_plan_set_v1",
+            "execution_realtime_subscription_plan_set",
         )
-        self.assertEqual(rows["REALTIME_CAPTURE_VALIDATION"]["payload"], "realtime_capture_validation_v1")
+        self.assertEqual(rows["REALTIME_CAPTURE_VALIDATION"]["payload"], "realtime_capture_validation")
         self.assertIn("no_model_activation", rows["REALTIME_CAPTURE_VALIDATION"]["applies_to"])
         self.assertIn("plan_realtime_capture.py", rows["EXECUTION_REALTIME_CAPTURE_PLAN"]["path"])
         self.assertIn("validate_realtime_capture.py", rows["EXECUTION_REALTIME_CAPTURE_VALIDATE"]["path"])
@@ -1543,16 +1543,16 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        self.assertEqual(rows["REALTIME_FEATURE_SNAPSHOT"]["payload"], "realtime_feature_snapshot_v1")
+        self.assertEqual(rows["REALTIME_FEATURE_SNAPSHOT"]["payload"], "realtime_feature_snapshot")
         self.assertIn("historical_feature_parity", rows["REALTIME_FEATURE_SNAPSHOT"]["applies_to"])
         self.assertEqual(
             rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["payload"],
-            "execution_model_decision_input_snapshot_v1",
+            "execution_model_decision_input_snapshot",
         )
         self.assertIn("historical_model_decision_handoff", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
         self.assertEqual(
             rows["EXECUTION_MODEL_DECISION_INPUT_VALIDATION"]["payload"],
-            "execution_model_decision_input_validation_v1",
+            "execution_model_decision_input_validation",
         )
         self.assertIn("build_realtime_feature_snapshot.py", rows["EXECUTION_REALTIME_FEATURE_SNAPSHOT_BUILD"]["path"])
         self.assertIn("build_realtime_model_input.py", rows["EXECUTION_REALTIME_MODEL_INPUT_BUILD"]["path"])
@@ -1565,17 +1565,17 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             rows["MODEL_REALTIME_DECISION_INPUT_VALIDATION"]["payload"],
-            "model_realtime_decision_input_validation_v1",
+            "model_realtime_decision_input_validation",
         )
-        self.assertIn("execution_model_decision_input_snapshot_v1", rows["MODEL_REALTIME_DECISION_INPUT_VALIDATION"]["applies_to"])
+        self.assertIn("execution_model_decision_input_snapshot", rows["MODEL_REALTIME_DECISION_INPUT_VALIDATION"]["applies_to"])
         self.assertEqual(
             rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["payload"],
-            "model_realtime_decision_route_plan_v1",
+            "model_realtime_decision_route_plan",
         )
         self.assertIn("historical_model_decision_route", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
         self.assertEqual(
             rows["MODEL_REALTIME_DECISION_ROUTE_PLAN_VALIDATION"]["payload"],
-            "model_realtime_decision_route_plan_validation_v1",
+            "model_realtime_decision_route_plan_validation",
         )
         self.assertIn("plan_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_PLAN"]["path"])
         self.assertIn("validate_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_VALIDATE"]["path"])
@@ -1587,17 +1587,17 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             rows["MANAGER_REALTIME_SHADOW_HANDOFF_VALIDATION"]["payload"],
-            "manager_realtime_shadow_handoff_validation_v1",
+            "manager_realtime_shadow_handoff_validation",
         )
-        self.assertIn("model_realtime_decision_route_plan_v1", rows["MANAGER_REALTIME_SHADOW_HANDOFF_VALIDATION"]["applies_to"])
+        self.assertIn("model_realtime_decision_route_plan", rows["MANAGER_REALTIME_SHADOW_HANDOFF_VALIDATION"]["applies_to"])
         self.assertEqual(
             rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECEIPT"]["payload"],
-            "manager_realtime_shadow_handoff_receipt_v1",
+            "manager_realtime_shadow_handoff_receipt",
         )
-        self.assertIn("ready_signal_v1", rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECEIPT"]["applies_to"])
+        self.assertIn("ready_signal", rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECEIPT"]["applies_to"])
         self.assertEqual(
             rows["MANAGER_REALTIME_SHADOW_HANDOFF_CONTROL_PLANE_BUNDLE"]["payload"],
-            "manager_realtime_shadow_handoff_control_plane_bundle_v1",
+            "manager_realtime_shadow_handoff_control_plane_bundle",
         )
         self.assertIn("record_realtime_shadow_handoff.py", rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECORD"]["path"])
         self.assertIn("no_model_activation", rows["MANAGER_REALTIME_SHADOW_HANDOFF_POLICY"]["payload"])
@@ -1606,10 +1606,10 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        self.assertEqual(rows["EXECUTION_ORDER_CONSTRUCTION_APPROVAL"]["payload"], "execution_order_construction_approval_v1")
-        self.assertEqual(rows["EXECUTION_ORDER_CONSTRUCTION_APPROVAL_VALIDATION"]["payload"], "execution_order_construction_approval_validation_v1")
-        self.assertEqual(rows["EXECUTION_BROKER_ORDER_INTENT"]["payload"], "execution_broker_order_intent_v1")
-        self.assertEqual(rows["EXECUTION_BROKER_ORDER_INTENT_RESULT"]["payload"], "execution_broker_order_intent_result_v1")
+        self.assertEqual(rows["EXECUTION_ORDER_CONSTRUCTION_APPROVAL"]["payload"], "execution_order_construction_approval")
+        self.assertEqual(rows["EXECUTION_ORDER_CONSTRUCTION_APPROVAL_VALIDATION"]["payload"], "execution_order_construction_approval_validation")
+        self.assertEqual(rows["EXECUTION_BROKER_ORDER_INTENT"]["payload"], "execution_broker_order_intent")
+        self.assertEqual(rows["EXECUTION_BROKER_ORDER_INTENT_RESULT"]["payload"], "execution_broker_order_intent_result")
         self.assertIn("build_broker_order_intent.py", rows["EXECUTION_BROKER_ORDER_INTENT_BUILD"]["path"])
         self.assertIn("broker_submission_requires_separate_execution_gate", rows["EXECUTION_ORDER_CONSTRUCTION_POLICY"]["payload"])
 
@@ -1617,10 +1617,10 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        self.assertEqual(rows["REALTIME_LIVE_OBSERVE_APPROVAL"]["payload"], "realtime_live_observe_approval_v1")
-        self.assertEqual(rows["REALTIME_LIVE_OBSERVE_APPROVAL_VALIDATION"]["payload"], "realtime_live_observe_approval_validation_v1")
-        self.assertEqual(rows["EXECUTION_REALTIME_LIVE_OBSERVE_RESULT"]["payload"], "execution_realtime_live_observe_result_v1")
-        self.assertEqual(rows["REALTIME_LIVE_OBSERVATION"]["payload"], "realtime_live_observation_v1")
+        self.assertEqual(rows["REALTIME_LIVE_OBSERVE_APPROVAL"]["payload"], "realtime_live_observe_approval")
+        self.assertEqual(rows["REALTIME_LIVE_OBSERVE_APPROVAL_VALIDATION"]["payload"], "realtime_live_observe_approval_validation")
+        self.assertEqual(rows["EXECUTION_REALTIME_LIVE_OBSERVE_RESULT"]["payload"], "execution_realtime_live_observe_result")
+        self.assertEqual(rows["REALTIME_LIVE_OBSERVATION"]["payload"], "realtime_live_observation")
         self.assertIn("execute_live_observe.py", rows["EXECUTION_REALTIME_LIVE_OBSERVE_EXECUTE"]["path"])
         self.assertIn("separate_execution_gate", rows["REALTIME_FORMAL_INTEGRATION_POLICY"]["payload"])
         self.assertIn("persist_completion_rows", rows["MANAGER_REALTIME_SHADOW_HANDOFF_PERSISTENCE"]["applies_to"])
@@ -1631,7 +1631,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             rows["EXECUTION_REALTIME_LIVE_OBSERVE_ADAPTER_PLAN"]["payload"],
-            "execution_realtime_live_observe_adapter_plan_v1",
+            "execution_realtime_live_observe_adapter_plan",
         )
         self.assertEqual(
             rows["EXECUTION_REALTIME_LIVE_OBSERVE_ADAPTER_PLAN_SCRIPT"]["payload"],
@@ -1639,15 +1639,15 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(
             rows["EXECUTION_REALTIME_CAPTURE_FIXTURE_SET"]["payload"],
-            "execution_realtime_capture_fixture_set_v1",
+            "execution_realtime_capture_fixture_set",
         )
         self.assertEqual(
             rows["EXECUTION_REALTIME_SHADOW_FIXTURE_BUNDLE"]["payload"],
-            "execution_realtime_shadow_fixture_bundle_v1",
+            "execution_realtime_shadow_fixture_bundle",
         )
         self.assertEqual(
             rows["MANAGER_REALTIME_SHADOW_HANDOFF_REHEARSAL"]["payload"],
-            "manager_realtime_shadow_handoff_rehearsal_v1",
+            "manager_realtime_shadow_handoff_rehearsal",
         )
         self.assertIn("rehearse_realtime_shadow_handoff.py", rows["MANAGER_REALTIME_SHADOW_HANDOFF_REHEARSE"]["path"])
         self.assertIn("live_observe_requires_reviewed_live_stream_approval_ref", rows["REALTIME_LIVE_OBSERVE_FIXTURE_POLICY"]["payload"])

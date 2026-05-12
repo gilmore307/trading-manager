@@ -30,7 +30,7 @@ class StageExecutorTests(unittest.TestCase):
                 receipt_root=tmp / "receipts",
                 log_root=tmp / "logs",
             )
-            self.assertEqual(summary.contract_type, "manager_stage_execution_summary_v1")
+            self.assertEqual(summary.contract_type, "manager_stage_execution_summary")
             self.assertEqual(summary.status, "succeeded")
             self.assertEqual(summary.provider_calls, 0)
             self.assertFalse(summary.model_activation_performed)
@@ -139,8 +139,8 @@ class StageExecutorTests(unittest.TestCase):
             stage_type="data_acquisition",
             status="ready",
             command=["python3", "-c", "print('no')"],
-            blockers=("manual_provider_gate_v1",),
-            approval_gate_required="manual_provider_gate_v1",
+            blockers=("manual_provider_gate",),
+            approval_gate_required="manual_provider_gate",
         )
         with self.assertRaises(TaskSystemError):
             execute_stage_process(stage)

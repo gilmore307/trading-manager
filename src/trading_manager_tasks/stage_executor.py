@@ -173,7 +173,7 @@ def _receipt_payload(
     completed_at: str,
 ) -> dict[str, Any]:
     return {
-        "contract_type": "component_completion_receipt_v1",
+        "contract_type": "component_completion_receipt",
         "manager_stage_id": stage.stage_id,
         "stage_type": stage.stage_type,
         "status": summary.status,
@@ -235,7 +235,7 @@ def execute_stage_process(
     receipt_path = stage_receipt_root / f"{stamp}.receipt.json"
     provider_calls = _provider_call_count_from_stdout(result.stdout) if result.returncode == 0 else 0
     summary = StageExecutionSummary(
-        contract_type="manager_stage_execution_summary_v1",
+        contract_type="manager_stage_execution_summary",
         stage_id=stage.stage_id,
         status=status,
         command=stage.command,

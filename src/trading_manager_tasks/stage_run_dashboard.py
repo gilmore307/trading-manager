@@ -228,7 +228,7 @@ def build_stage_run_dashboard(
     next_action, blocking_reason = _next_action(coverage=coverage, preview=preview)
     evidence_refs = [f"stage_coverage:{stage_id}:{start_month}:{coverage.status}"]
     return StageRunDashboard(
-        contract_type="manager_stage_run_dashboard_v1",
+        contract_type="manager_stage_run_dashboard",
         stage_id=stage_id,
         model_layer=model_layer,
         start_month=start_month,

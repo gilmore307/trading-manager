@@ -82,7 +82,7 @@ def _workflow_payload_is_complete(payload: dict[str, Any]) -> bool:
 class HistoricalWorkSelection:
     """Service bootstrap decision for the next historical workflow month."""
 
-    contract_type: str = "manager_historical_work_selection_v1"
+    contract_type: str = "manager_historical_work_selection"
     start_month: str = "2016-01"
     end_month: str = "2016-01"
     reason_code: str = "no_prior_workflow_state"
@@ -165,7 +165,7 @@ def select_next_historical_work(
 class SchedulerDaemonState:
     """Durable checkpoint for the historical-training scheduler daemon."""
 
-    contract_type: str = "manager_scheduler_daemon_state_v1"
+    contract_type: str = "manager_scheduler_daemon_state"
     daemon_id: str = "manager_historical_training_scheduler"
     resume_supported: bool = True
     start_month: str = "2016-01"

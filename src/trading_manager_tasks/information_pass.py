@@ -240,7 +240,7 @@ def build_controlled_information_pass(
             execute_provider_calls=False,
         )
     report = ControlledInformationPass(
-        contract_type="manager_controlled_information_pass_v1",
+        contract_type="manager_controlled_information_pass",
         start_month=start_month,
         end_month=end_month,
         purpose="Measure the remaining provider, concurrency, target-queue, dataset-threshold, artifact-discovery, and storage-lifecycle unknowns for the first formal historical month before accepting broad automation defaults.",
@@ -292,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build a safe 2016-01 controlled information pass report.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
-    parser.add_argument("--evidence", type=Path, help="Optional manager_dataset_evidence_v1 JSON file.")
+    parser.add_argument("--evidence", type=Path, help="Optional manager_dataset_evidence JSON file.")
     parser.add_argument("--collect-evidence-from-db", action="store_true", help="Collect current dataset evidence from SQL before planning.")
     parser.add_argument("--database-url")
     parser.add_argument("--model-schema", default="trading_model")

@@ -86,7 +86,7 @@ def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
 def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str) -> bool:
     if row.get("target_component_id") != "01_feed_alpaca_bars":
         return False
-    if row.get("request_kind") != "data_backfill_month_v1":
+    if row.get("request_kind") != "data_backfill_month":
         return False
     request_id = str(row.get("request_id") or "")
     if request_id not in _stage_request_ids(stage_id=stage_id, start_month=start_month):
@@ -167,7 +167,7 @@ def summarize_stage_coverage_from_rows(
         reason = f"stage coverage not ready 0/{expected_count}; downstream remains blocked"
 
     return StageCoverageReport(
-        contract_type="manager_stage_coverage_v1",
+        contract_type="manager_stage_coverage",
         stage_id=stage_id,
         start_month=start_month,
         end_month=end_month,

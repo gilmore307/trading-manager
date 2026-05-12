@@ -2,7 +2,7 @@
 
 Manager SQL stores concise request facts. Component-readable task parameters live
 as storage payloads referenced by `manager_request.parameter_ref` and recorded as
-`input_binding_v1` rows when SQL persistence is requested.
+`input_binding` rows when SQL persistence is requested.
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ from .control_plane import (
     validate_manager_request,
 )
 
-REQUEST_KIND = "data_backfill_month_v1"
-PARAMETER_SCHEMA_REF = "manager_request_parameter_payload_v1"
+REQUEST_KIND = "data_backfill_month"
+PARAMETER_SCHEMA_REF = "manager_request_parameter_payload"
 DEFAULT_STORAGE_ROOT = Path("storage")
 
 
@@ -119,7 +119,7 @@ class MaterializedRequestPayload:
 
 
 def _parameter_ref_parts(parameter_ref: str) -> list[str]:
-    marker = "storage://trading-manager/monthly_backfill_v1/"
+    marker = "storage://trading-manager/monthly_backfill/"
     if not parameter_ref.startswith(marker):
         return []
     return parameter_ref[len(marker) :].split("/")
@@ -235,9 +235,9 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
         enriched_row["symbol"] = str(symbol).upper()
         enriched_row.setdefault("timeframe", _market_regime_timeframe(str(symbol), model_layer=str(row.get("model_layer") or "") or None) or defaults.params.get("timeframe"))
     output_root = (
-        f"storage/monthly_backfill_v1/{defaults.source_id}/{str(symbol).upper()}/{month}"
+        f"storage/monthly_backfill/{defaults.source_id}/{str(symbol).upper()}/{month}"
         if symbol and feed_id == "01_feed_alpaca_bars"
-        else f"storage/monthly_backfill_v1/{defaults.source_id}/{month}"
+        else f"storage/monthly_backfill/{defaults.source_id}/{month}"
     )
     return {
         "contract_type": PARAMETER_SCHEMA_REF,
@@ -266,7 +266,7 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def build_input_binding(row: Mapping[str, Any], *, content_hash: str, byte_size: int) -> dict[str, Any]:
-    """Build the request-scoped `input_binding_v1` row for a parameter payload."""
+    """Build the request-scoped `input_binding` row for a parameter payload."""
 
     request = validate_manager_request(row)
     parameter_ref = str(request.get("parameter_ref") or "")
@@ -274,7 +274,7 @@ def build_input_binding(row: Mapping[str, Any], *, content_hash: str, byte_size:
     start_date, end_date_exclusive = _window_from_request(row, month)
     return {
         "binding_id": f"bind_param_{request['request_id']}",
-        "contract_type": "input_binding_v1",
+        "contract_type": "input_binding",
         "request_id": request["request_id"],
         "run_id": None,
         "input_role": "parameter_payload",
@@ -368,7 +368,7 @@ def _load_rows_from_args(args: argparse.Namespace) -> list[dict[str, Any]]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Materialize manager request parameter payloads behind parameter_ref.")
-    parser.add_argument("path", nargs="?", type=Path, help="JSON, JSON array, or JSONL manager_request_v1 rows.")
+    parser.add_argument("path", nargs="?", type=Path, help="JSON, JSON array, or JSONL manager_request rows.")
     parser.add_argument("--from-db", action="store_true", help="Fetch request rows from trading_manager.manager_request.")
     parser.add_argument("--database-url")
     parser.add_argument("--request-kind", default=REQUEST_KIND)
@@ -378,7 +378,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--write-files", action="store_true", help="Write task_key.json files under --storage-root.")
-    parser.add_argument("--write-bindings", action="store_true", help="Persist input_binding_v1 rows for materialized payloads.")
+    parser.add_argument("--write-bindings", action="store_true", help="Persist input_binding rows for materialized payloads.")
     parser.add_argument("--format", choices=("jsonl", "json"), default="jsonl")
     parser.add_argument("--include-payload", action="store_true", help="Include full payload bodies in stdout.")
     args = parser.parse_args(argv)

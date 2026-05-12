@@ -46,7 +46,7 @@ When a source/feature/model name crosses repository boundaries, the canonical sh
 
 - fetch provider data;
 - run feature generation, model training, or model inference as production behavior;
-- activate a model without an approving `agent_model_promotion_decision_v1`;
+- activate a model without an approving `agent_model_promotion_decision`;
 - dispatch broker/order/account mutations or model activation through the historical provider path;
 - construct/place broker orders, process fills, mutate positions, or mutate account state.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan dry-run manager_request_v1 rows for monthly historical data backfill."""
+"""Plan dry-run manager_request rows for monthly historical data backfill."""
 
 from __future__ import annotations
 

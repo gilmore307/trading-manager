@@ -1,6 +1,6 @@
 """Monthly manager-request planning for historical data backfill.
 
-This module plans `manager_request_v1` rows only. It does not call providers,
+This module plans `manager_request` rows only. It does not call providers,
 insert SQL rows, or create data task payload bodies. Bulky task parameters live
 behind later artifact refs; the request row keeps only durable control-plane
 facts and a deterministic parameter reference.
@@ -20,8 +20,8 @@ from typing import Iterable, Iterator, Literal, TextIO
 DEFAULT_REQUESTED_BY = "openclaw"
 DEFAULT_START_MONTH = "2016-01"
 OKX_START_MONTH = "2018-01"
-CHRONOLOGICAL_FORWARD_POLICY_REF = "chronological_forward_backfill_policy_v1"
-DEFAULT_POLICY_REFS = ("monthly_backfill_v1", CHRONOLOGICAL_FORWARD_POLICY_REF, "autonomous_historical_provider_acquisition_v1")
+CHRONOLOGICAL_FORWARD_POLICY_REF = "chronological_forward_backfill_policy"
+DEFAULT_POLICY_REFS = ("monthly_backfill", CHRONOLOGICAL_FORWARD_POLICY_REF, "autonomous_historical_provider_acquisition")
 DEFAULT_PROJECTS_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
     DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "market_regime_etf_universe.csv"
@@ -96,7 +96,7 @@ class SourceAvailability:
     target_component_id: str
     target_repo_id: str
     earliest_month: str | None
-    request_kind: str = "data_backfill_month_v1"
+    request_kind: str = "data_backfill_month"
     include_by_default: bool = True
     historical_backfill_supported: bool = True
     note: str = ""
@@ -221,14 +221,14 @@ def _request_id(source_id: str, month: str, *, symbol: str | None = None) -> str
 
 def _parameter_ref(source_id: str, month: str, *, symbol: str | None = None) -> str:
     if symbol:
-        return f"storage://trading-manager/monthly_backfill_v1/{source_id}/{symbol.upper()}/{month}/task_key.json"
-    return f"storage://trading-manager/monthly_backfill_v1/{source_id}/{month}/task_key.json"
+        return f"storage://trading-manager/monthly_backfill/{source_id}/{symbol.upper()}/{month}/task_key.json"
+    return f"storage://trading-manager/monthly_backfill/{source_id}/{month}/task_key.json"
 
 
 def _expected_outputs(source_id: str, month: str, *, symbol: str | None = None) -> list[str]:
     if symbol:
-        return [f"storage://trading-data/monthly_backfill_v1/{source_id}/{symbol.upper()}/{month}/"]
-    return [f"storage://trading-data/monthly_backfill_v1/{source_id}/{month}/"]
+        return [f"storage://trading-data/monthly_backfill/{source_id}/{symbol.upper()}/{month}/"]
+    return [f"storage://trading-data/monthly_backfill/{source_id}/{month}/"]
 
 
 def load_market_regime_universe(
@@ -276,7 +276,7 @@ def _plan_source_window(
     symbol = universe_member.symbol if universe_member else None
     request: dict[str, object] = {
         "request_id": _request_id(source.source_id, window.month, symbol=symbol),
-        "contract_type": "manager_request_v1",
+        "contract_type": "manager_request",
         "request_kind": source.request_kind,
         "status": "requested",
         "requested_by": requested_by,
@@ -318,7 +318,7 @@ def plan_monthly_backfill_requests(
     market_regime_universe_path: Path = DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH,
     model_layers: Iterable[str] = (LAYER_ONE_MODEL_LAYER,),
 ) -> list[dict[str, object]]:
-    """Plan deterministic `manager_request_v1` dictionaries.
+    """Plan deterministic `manager_request` dictionaries.
 
     The global start is 2016-01 by accepted policy. Each source can join later
     when its own honest historical availability starts later; OKX crypto is the
@@ -401,7 +401,7 @@ def source_inventory() -> list[dict[str, object]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Plan dry-run manager_request_v1 rows for monthly data backfill.")
+    parser = argparse.ArgumentParser(description="Plan dry-run manager_request rows for monthly data backfill.")
     parser.add_argument("--start-month", default=DEFAULT_START_MONTH, help="Inclusive YYYY-MM start month; values earlier than the accepted 2016-01 common start are clamped to 2016-01.")
     parser.add_argument("--end-month", required=True, help="Inclusive YYYY-MM end month.")
     parser.add_argument("--exclude-crypto", action="store_true", help="Skip OKX crypto; by default it joins at its later 2018-01 start.")

@@ -6,16 +6,16 @@ The model repositories produce evidence. The manager records and reviews that ev
 
 ```text
 model-specific evidence producer
-  -> model_promotion_review_v1 manager request
-  -> agent_model_promotion_decision_v1
-  -> activation_record_v1 only if agent-approved
+  -> model_promotion_review manager request
+  -> agent_model_promotion_decision
+  -> activation_record only if agent-approved
 ```
 
 Do not create one promotion system per model. Layer-specific semantics belong in evidence adapters, metric names, labels, baseline ladders, and gate policy refs. The request/evidence/agent-decision/activation skeleton is shared.
 
 ## Unified Request
 
-Use `model_promotion_review_v1` for all model layers.
+Use `model_promotion_review` for all model layers.
 
 The request targets the manager review helper:
 
@@ -59,7 +59,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py \
 
 Add `--write` only after the request payload is ready for agent-managed automation. `--write` persists the request rows to `trading_manager.manager_request`; it does not approve promotion and does not activate configs.
 
-Build a generic decision artifact only through the script-called agent promotion-decision path. Until that agent decision surface exists, legacy `review_decision_v1` builders are evidence/advisory scaffolding only and must not activate configs:
+Build a generic decision artifact only through the script-called agent promotion-decision path. Until that agent decision surface exists, legacy `review_decision` builders are evidence/advisory scaffolding only and must not activate configs:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/build_review_decision.py \
@@ -69,7 +69,7 @@ PYTHONPATH=src python3 scripts/tasks/build_review_decision.py \
   --condition supply_real_sample_eval
 ```
 
-The accepted production boundary is `agent_model_promotion_decision_v1`. Only an agent decision with approved activation scope may be used to build an `activation_record_v1`; deferred, rejected, failed, partial, revoked, superseded, or legacy advisory review decisions cannot activate configs.
+The accepted production boundary is `agent_model_promotion_decision`. Only an agent decision with approved activation scope may be used to build an `activation_record`; deferred, rejected, failed, partial, revoked, superseded, or legacy advisory review decisions cannot activate configs.
 
 ## Boundary
 
@@ -104,7 +104,7 @@ manager schedules lifecycle
 storage executes lifecycle
 ```
 
-Promotion outputs should mark promoted model bodies and required lineage as permanently retained, and may emit retention hints for regenerable intermediates. Any storage lifecycle work created by promotion must enter the manager task system as `storage_lifecycle_request_v1`, where it can be prioritized, scheduled, summarized, and evaluated against lifecycle policy. `agent_storage_lifecycle_decision_v1` records the policy/agent decision without mutating storage; when the request fits accepted rules and protected-set checks pass, it is not a human approval prompt. `trading-storage` remains the owner of protected-set checks, physical compression/archive/restore/delete actions, receipts, and tombstones.
+Promotion outputs should mark promoted model bodies and required lineage as permanently retained, and may emit retention hints for regenerable intermediates. Any storage lifecycle work created by promotion must enter the manager task system as `storage_lifecycle_request`, where it can be prioritized, scheduled, summarized, and evaluated against lifecycle policy. `agent_storage_lifecycle_decision` records the policy/agent decision without mutating storage; when the request fits accepted rules and protected-set checks pass, it is not a human approval prompt. `trading-storage` remains the owner of protected-set checks, physical compression/archive/restore/delete actions, receipts, and tombstones.
 
 ## Registered Models
 
@@ -125,6 +125,6 @@ This table is the manager-side promotion target map. It records review targets a
 
 - A promotion request is not a promotion decision.
 - Evidence generation does not imply activation.
-- Activation requires an approving `agent_model_promotion_decision_v1`.
+- Activation requires an approving `agent_model_promotion_decision`.
 - Deferred, rejected, failed, partial, legacy advisory, or missing agent decisions must not move production pointers.
 - Model-specific fields stay in model evidence; manager only stores refs and generic review facts.

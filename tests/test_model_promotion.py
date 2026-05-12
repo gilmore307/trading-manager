@@ -47,18 +47,18 @@ class ModelPromotionRequestTests(unittest.TestCase):
         )
 
         normalized = validate_manager_request(request)
-        self.assertEqual(normalized["request_kind"], "model_promotion_review_v1")
+        self.assertEqual(normalized["request_kind"], "model_promotion_review")
         self.assertEqual(normalized["priority"], "high")
         self.assertEqual(request["model_id"], "model_08_option_expression")
         self.assertEqual(request["model_layer"], "layer_08_option_expression")
         self.assertEqual(request["output_contract"], "option_expression_plan")
         self.assertEqual(request["candidate_ref"], "trading-model://promotion-candidates/mpcand_example")
         self.assertEqual(request["evaluation_run_refs"], ["trading-model://eval-runs/mdevrun_example"])
-        self.assertIn("model_promotion_unified_review_v1", request["policy_refs"])
-        self.assertIn("model_promotion_script_called_agent_decision_v1", request["policy_refs"])
+        self.assertIn("model_promotion_unified_review", request["policy_refs"])
+        self.assertIn("model_promotion_script_called_agent_decision", request["policy_refs"])
         self.assertIn("model_promotion_no_activation_without_agent_decision", request["policy_refs"])
-        self.assertIn("agent_model_promotion_decision_v1", request["expected_outputs"])
-        self.assertIn("activation_record_v1_if_agent_approved", request["expected_outputs"])
+        self.assertIn("agent_model_promotion_decision", request["expected_outputs"])
+        self.assertIn("activation_record_if_agent_approved", request["expected_outputs"])
 
     def test_rejects_unknown_model_target(self):
         with self.assertRaises(TaskSystemError):
@@ -77,7 +77,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
         write_requests([request], output=buffer, output_format="jsonl")
 
         payload = json.loads(buffer.getvalue())
-        self.assertEqual(payload["request_kind"], "model_promotion_review_v1")
+        self.assertEqual(payload["request_kind"], "model_promotion_review")
         self.assertEqual(payload["target_component_kind"], "review_helper")
         self.assertTrue(payload["parameter_ref"].startswith("storage://trading-manager/model_promotion/model_01_market_regime/"))
 

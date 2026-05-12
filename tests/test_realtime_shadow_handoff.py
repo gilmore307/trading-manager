@@ -27,7 +27,7 @@ def _decision_input_snapshot() -> dict[str, object]:
         ("layer_08_option_expression", "model_08_option_expression", "option_expression_plan"),
     ]
     return {
-        "contract_type": "execution_model_decision_input_snapshot_v1",
+        "contract_type": "execution_model_decision_input_snapshot",
         "decision_input_snapshot_id": "rtdecision_unit",
         "decision_time": "2026-05-11T13:30:00+00:00",
         "instrument_ref": "AAPL",
@@ -37,7 +37,7 @@ def _decision_input_snapshot() -> dict[str, object]:
         "realtime_feature_snapshot_ref": "realtime-feature-snapshot://rtfeat_unit",
         "layer_input_refs": [
             {
-                "contract_type": "execution_model_decision_layer_input_v1",
+                "contract_type": "execution_model_decision_layer_input",
                 "decision_input_snapshot_id": "rtdecision_unit",
                 "model_layer": layer,
                 "model_id": model_id,
@@ -60,7 +60,7 @@ def _route_plan() -> dict[str, object]:
     for row in decision["layer_input_refs"]:  # type: ignore[index]
         routes.append(
             {
-                "contract_type": "model_realtime_decision_layer_route_v1",
+                "contract_type": "model_realtime_decision_layer_route",
                 "route_plan_id": "rtdroute_unit",
                 "model_layer": row["model_layer"],
                 "model_id": row["model_id"],
@@ -75,7 +75,7 @@ def _route_plan() -> dict[str, object]:
             }
         )
     return {
-        "contract_type": "model_realtime_decision_route_plan_v1",
+        "contract_type": "model_realtime_decision_route_plan",
         "route_plan_id": "rtdroute_unit",
         "decision_input_snapshot_id": "rtdecision_unit",
         "decision_time": "2026-05-11T13:30:00+00:00",
@@ -110,8 +110,8 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
             request_id="mgrreq_unit",
         )
 
-        self.assertEqual(receipt["contract_type"], "component_completion_receipt_v1")
-        self.assertEqual(receipt["receipt_kind"], "manager_realtime_shadow_handoff_receipt_v1")
+        self.assertEqual(receipt["contract_type"], "component_completion_receipt")
+        self.assertEqual(receipt["receipt_kind"], "manager_realtime_shadow_handoff_receipt")
         self.assertEqual(receipt["status"], "succeeded")
         self.assertEqual(receipt["runs"][0]["row_counts"]["layer_routes"], 8)
         self.assertFalse(receipt["model_activation_performed"])
@@ -125,7 +125,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
             receipt_uri="artifact://trading-manager/mgrreq_unit/receipt.json",
         )
 
-        self.assertEqual(bundle["contract_type"], "manager_realtime_shadow_handoff_control_plane_bundle_v1")
+        self.assertEqual(bundle["contract_type"], "manager_realtime_shadow_handoff_control_plane_bundle")
         self.assertEqual(bundle["run_manifest_count"], 1)
         self.assertGreaterEqual(bundle["artifact_ref_count"], 4)
         self.assertEqual(bundle["ready_signal_count"], 1)
@@ -189,7 +189,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
             capture_output=True,
         )
         bundle = json.loads(result.stdout)
-        self.assertEqual(bundle["contract_type"], "manager_realtime_shadow_handoff_rehearsal_v1")
+        self.assertEqual(bundle["contract_type"], "manager_realtime_shadow_handoff_rehearsal")
         self.assertEqual(bundle["rehearsal_status"], "ready")
         self.assertEqual(bundle["provider_calls_performed"], 0)
         self.assertFalse(bundle["broker_order_construction_performed"])

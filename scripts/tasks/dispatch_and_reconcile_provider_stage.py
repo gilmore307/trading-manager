@@ -75,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         write_workflow_state=True,
     )
     summary = {
-        "contract_type": "manager_provider_dispatch_reconcile_summary_v1",
+        "contract_type": "manager_provider_dispatch_reconcile_summary",
         "stage_id": _stage_id(args.model_layer),
         "start_month": args.start_month,
         "end_month": args.end_month,

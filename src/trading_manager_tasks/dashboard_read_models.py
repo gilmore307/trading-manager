@@ -27,7 +27,7 @@ from .scheduler_status import (
     collect_historical_scheduler_status,
 )
 
-HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary_v1"
+HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
 HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/dashboard/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
 DEFAULT_STALE_AFTER_SECONDS = 900
 
@@ -117,7 +117,7 @@ def _issue_refs(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
 
 def _diagnostic_refs(status: HistoricalSchedulerStatus, stage_coverage: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     refs: list[dict[str, Any]] = [
-        {"ref_type": "manager_historical_scheduler_status_v1", "path": "scripts/tasks/inspect_historical_scheduler_status.py"}
+        {"ref_type": "manager_historical_scheduler_status", "path": "scripts/tasks/inspect_historical_scheduler_status.py"}
     ]
     workflow_path = status.workflow_checkpoint.path
     if status.workflow_checkpoint.exists and workflow_path:
@@ -125,7 +125,7 @@ def _diagnostic_refs(status: HistoricalSchedulerStatus, stage_coverage: Mapping[
     if stage_coverage is not None:
         refs.append(
             {
-                "ref_type": "manager_stage_coverage_v1",
+                "ref_type": "manager_stage_coverage",
                 "stage_id": stage_coverage.get("stage_id"),
                 "status": stage_coverage.get("status"),
             }
@@ -154,7 +154,7 @@ def build_historical_task_progress_summary(
     stage_coverage: Mapping[str, Any] | None = None,
     generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
-    """Build `historical_task_progress_summary_v1` for storage materialization."""
+    """Build `historical_task_progress_summary` for storage materialization."""
 
     generated_at_utc = generated_at_utc or now_utc()
     stage_counts = _stage_counts(status)
@@ -178,7 +178,7 @@ def build_historical_task_progress_summary(
         chart_payload["stage_coverage"] = coverage_chart
     return {
         "contract_type": HISTORICAL_TASK_PROGRESS_CONTRACT,
-        "contract_version": "1.0.0",
+        "schema_version": 1,
         "generated_at_utc": generated_at_utc,
         "source_system": "trading-manager",
         "status": dashboard_status,
@@ -186,14 +186,14 @@ def build_historical_task_progress_summary(
         "summary": summary,
         "chart_payload": chart_payload,
         "profile_refs": [
-            {"registry_ref": "HISTORICAL_TASK_PROGRESS_SUMMARY_V1", "field": "contract_type"},
+            {"registry_ref": "HISTORICAL_TASK_PROGRESS_SUMMARY", "field": "contract_type"},
             {"registry_ref": "DASHBOARD_READ_MODEL_COMMON_ENVELOPE", "field": "common_envelope"},
         ],
         "issue_refs": _issue_refs(status),
         "diagnostic_refs": _diagnostic_refs(status, stage_coverage),
         "lineage_refs": [
             {"contract_type": status.contract_type, "generated_utc": status.generated_utc},
-            {"contract_type": "manager_stage_coverage_v1", "included": stage_coverage is not None},
+            {"contract_type": "manager_stage_coverage", "included": stage_coverage is not None},
         ],
         "freshness": {
             "class": "runtime_status_snapshot",
@@ -218,7 +218,7 @@ def write_historical_task_progress_summary(payload: Mapping[str, Any], *, output
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Build historical_task_progress_summary_v1 dashboard payload from read-only manager scheduler status."
+        description="Build historical_task_progress_summary dashboard payload from read-only manager scheduler status."
     )
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--state-path", type=Path, default=DEFAULT_STATE_PATH)
@@ -227,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--service-template-path", type=Path, default=DEFAULT_SERVICE_TEMPLATE_PATH)
     parser.add_argument("--service-env-path", type=Path, default=DEFAULT_SERVICE_ENV_PATH)
     parser.add_argument("--daemon-wrapper-path", type=Path, default=DEFAULT_DAEMON_WRAPPER_PATH)
-    parser.add_argument("--stage-coverage-path", type=Path, help="Optional manager_stage_coverage_v1 JSON artifact to summarize.")
+    parser.add_argument("--stage-coverage-path", type=Path, help="Optional manager_stage_coverage JSON artifact to summarize.")
     args = parser.parse_args(argv)
 
     status = collect_historical_scheduler_status(

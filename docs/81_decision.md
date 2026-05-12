@@ -2296,7 +2296,7 @@ Status: Accepted
 
 Register the data closeout status, ETF holdings availability-time policy, and equity abnormal activity conservative model-standard/calibration status.
 
-Without explicit source/task `available_time`, ETF holdings candidate-preparation rows become visible at the next regular US session open after `as_of_date`. `equity_abnormal_activity_conservative_v1` is accepted as a conservative local standard, not as production-calibrated label evidence.
+Without explicit source/task `available_time`, ETF holdings candidate-preparation rows become visible at the next regular US session open after `as_of_date`. `equity_abnormal_activity_conservative` is accepted as a conservative local standard, not as production-calibrated label evidence.
 
 ### Consequences
 
@@ -2379,10 +2379,10 @@ Some remaining work does not depend on accumulated production trading data: requ
 
 Register the storage-owned V1 logical handoff contracts and hardening policies:
 
-- `manager_request_v1`
-- `run_manifest_v1`
-- `artifact_ref_v1`
-- `ready_signal_v1`
+- `manager_request`
+- `run_manifest`
+- `artifact_ref`
+- `ready_signal`
 - provider-call guardrails policy
 - checkpoint/resume policy
 - data-production hardening policy
@@ -2412,14 +2412,14 @@ Use SQL for durable control-plane facts and audit state. Use storage for bulky p
 
 The MVP SQL implementation should start with tables for:
 
-- `manager_request_v1`
-- `input_binding_v1`
-- `run_manifest_v1`
-- `run_step_v1`
-- `artifact_ref_v1`
-- `ready_signal_v1`
+- `manager_request`
+- `input_binding`
+- `run_manifest`
+- `run_step`
+- `artifact_ref`
+- `ready_signal`
 
-`component_ref_v1` should initially be registry-backed fields on those SQL rows, not a separate component catalog table. Add a component catalog only when real query or lifecycle needs require it.
+`component_ref` should initially be registry-backed fields on those SQL rows, not a separate component catalog table. Add a component catalog only when real query or lifecycle needs require it.
 
 If a storage payload participates in a formal request, run, evaluation, review, activation, or handoff, SQL must retain durable reference metadata such as artifact id, URI, hash/fingerprint, producer run, schema reference, retention policy, and lifecycle state. Payload cleanup must not erase the audit trail that the artifact existed and was used.
 
@@ -2518,7 +2518,7 @@ The accepted scheduler direction needs implementation without prematurely enabli
 
 Implement `scripts/tasks/run_automation_scheduler.py` backed by `trading_manager_tasks.scheduler` as the first scheduler work-loop increment.
 
-The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes task-key payload materialization and handoff validation through the existing preparation path, then reports autonomous historical provider acquisition as the next internal stage. With `--execute-autonomous-provider-stages`, it may execute one bounded provider-dispatch/reconcile slice per tick while preserving model activation, storage lifecycle, and broker/account gates.
+The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes task-key payload materialization and handoff validation through the existing preparation path, then reports autonomous historical provider acquisition as the next internal stage. With `--execute-autonomous-provider-stages`, it may execute one bounded provider-dispatch/reconcile slice per tick while preserving model activation, storage lifecycle, and broker/account gates.
 
 The tick must emit safety counters on every path. Safe preparation/offline paths must prove `provider_calls=0` and `dispatch_performed=false`; autonomous provider-stage paths may report bounded `provider_calls>0`, but must still prove `model_activation_performed=false`, `broker_execution_performed=false`, and storage lifecycle mutation remains false.
 
@@ -2560,7 +2560,7 @@ Historical-data model training is not a chat-session task or a one-shot maintena
 
 ### Decision
 
-Add a persistent historical-training scheduler runtime around the existing scheduler tick. The runtime must persist `manager_scheduler_daemon_state_v1` after every tick, append scheduler decisions to JSONL, enforce a single-instance lock, and expose a service-manager-compatible entrypoint for always-on operation.
+Add a persistent historical-training scheduler runtime around the existing scheduler tick. The runtime must persist `manager_scheduler_daemon_state` after every tick, append scheduler decisions to JSONL, enforce a single-instance lock, and expose a service-manager-compatible entrypoint for always-on operation.
 
 Host autostart is supported through reviewed templates under `deploy/`, but installing/enabling those templates is an operator action. The repository owns the runtime capability and documentation; the host owner controls activation.
 
@@ -2582,7 +2582,7 @@ The historical scheduler daemon must not remain a Layer 1-only loop. The current
 
 ### Decision
 
-Add `manager_model_training_workflow_plan_v1` as the manager-owned full-stack workflow graph. The graph covers Layers 1-8 and defines six stages per layer: data acquisition, feature/input generation, model generation, model evaluation, promotion-review preparation, and maintenance.
+Add `manager_model_training_workflow_plan` as the manager-owned full-stack workflow graph. The graph covers Layers 1-8 and defines six stages per layer: data acquisition, feature/input generation, model generation, model evaluation, promotion-review preparation, and maintenance.
 
 Layer-specific data surfaces remain honest: Layers 5-7 do not invent trading-data feature surfaces; they consume upstream model/control-plane/position-risk artifacts. Provider-backed stages run through autonomous manager dispatch; model activation remains blocked behind an approving decision artifact; broker execution remains outside manager.
 
@@ -2603,14 +2603,14 @@ A full Layer 1-8 graph is not enough by itself; the manager needs a durable chec
 
 ### Decision
 
-Add `manager_model_training_workflow_state_v1` as the durable state checkpoint for the Layer 1-8 historical-training workflow. The state records every stage status, command, blockers, review refs, receipt refs, and artifact refs. `advance_model_training_workflow.py` refreshes the checkpoint, ingests receipts containing `manager_stage_id` / `stage_id`, records review references, and selects the next ready or guarded stage.
+Add `manager_model_training_workflow_state` as the durable state checkpoint for the Layer 1-8 historical-training workflow. The state records every stage status, command, blockers, review refs, receipt refs, and artifact refs. `advance_model_training_workflow.py` refreshes the checkpoint, ingests receipts containing `manager_stage_id` / `stage_id`, records review references, and selects the next ready or guarded stage.
 
 ### Consequences
 
 - The resident scheduler can report both the static workflow graph and current resumable progress.
 - Component receipts are the accepted evidence for marking workflow stages complete.
 - Review/receipt satisfaction is recorded as an artifact reference on the guarded stage; it does not itself perform provider dispatch.
-- The remaining implementation boundary is an provider dispatch adapter that validates `autonomous_historical_provider_acquisition_v1`, performs the allowed provider work, and emits receipts for this state machine.
+- The remaining implementation boundary is an provider dispatch adapter that validates `autonomous_historical_provider_acquisition`, performs the allowed provider work, and emits receipts for this state machine.
 
 ## D116 - Provider acquisition dispatch requires explicit approved execution
 
@@ -2623,13 +2623,13 @@ The manager must be able to move from safe preparation into historical provider 
 
 ### Decision
 
-Add a narrow Layer 1 provider-dispatch adapter. `dispatch_provider_acquisition.py` validates `autonomous_historical_provider_acquisition_v1` against the prepared Alpaca bars request set and defaults to plan-only validation. It performs provider calls only when `--execute-provider-calls` is present, and it still performs no model activation or broker execution.
+Add a narrow Layer 1 provider-dispatch adapter. `dispatch_provider_acquisition.py` validates `autonomous_historical_provider_acquisition` against the prepared Alpaca bars request set and defaults to plan-only validation. It performs provider calls only when `--execute-provider-calls` is present, and it still performs no model activation or broker execution.
 
 ### Consequences
 
 - The scheduler can point the Layer 1 data-acquisition stage at a concrete manager script instead of a placeholder.
 - Plan-only preview, provider execution, receipt capture, and reconciliation remain separate, inspectable steps.
-- Downstream workflow progression remains receipt-driven through `manager_model_training_workflow_state_v1`.
+- Downstream workflow progression remains receipt-driven through `manager_model_training_workflow_state`.
 
 ## D117 - Ready offline stages may be executed one-at-a-time after scheduler gates
 
@@ -2642,7 +2642,7 @@ After provider-backed acquisition receipts unlock downstream work, feature gener
 
 ### Decision
 
-Add `execute_model_training_stage.py` and `manager_stage_execution_summary_v1`. The executor runs only `ready` stages of safe offline types, refuses guarded stages, writes stdout/stderr logs plus a `component_completion_receipt_v1`, and can persist successful stage progress to `manager_model_training_workflow_state_v1`. The scheduler and daemon accept `--execute-safe-offline-stages` to admit at most one non-provider safe offline stage per tick after market/resource gates pass; Layer 1/2 provider stages are admitted separately by `--execute-autonomous-provider-stages`.
+Add `execute_model_training_stage.py` and `manager_stage_execution_summary`. The executor runs only `ready` stages of safe offline types, refuses guarded stages, writes stdout/stderr logs plus a `component_completion_receipt`, and can persist successful stage progress to `manager_model_training_workflow_state`. The scheduler and daemon accept `--execute-safe-offline-stages` to admit at most one non-provider safe offline stage per tick after market/resource gates pass; Layer 1/2 provider stages are admitted separately by `--execute-autonomous-provider-stages`.
 
 ### Consequences
 
@@ -2661,7 +2661,7 @@ Historical model-training expansion should not require an operator to manually c
 
 ### Decision
 
-Add `manager_dataset_expansion_plan_v1` and `scripts/tasks/plan_dataset_expansion.py`. The planner walks model layers in dependency order, fills train -> calibration -> validation -> test minimums first, expands forward holdout when promotion evidence shows coverage/drift/split-stability/regime/baseline gaps, and selects shadow monitoring only after production approval. With `--write`, manager prepares the selected safe artifacts/payloads. For Layer 1 this means writing Alpaca ETF task-key payloads and handoff validation evidence only; provider dispatch requires explicit execution through the manager adapter.
+Add `manager_dataset_expansion_plan` and `scripts/tasks/plan_dataset_expansion.py`. The planner walks model layers in dependency order, fills train -> calibration -> validation -> test minimums first, expands forward holdout when promotion evidence shows coverage/drift/split-stability/regime/baseline gaps, and selects shadow monitoring only after production approval. With `--write`, manager prepares the selected safe artifacts/payloads. For Layer 1 this means writing Alpaca ETF task-key payloads and handoff validation evidence only; provider dispatch requires explicit execution through the manager adapter.
 
 ### Consequences
 
@@ -2681,7 +2681,7 @@ The dataset expansion planner can choose the next layer/role, but absent an evid
 
 ### Decision
 
-Add `manager_dataset_evidence_v1` and `scripts/tasks/collect_dataset_evidence.py`. The collector reads existing model-governance and manager-control-plane evidence, summarizes per-layer/per-role coverage, records promotion gaps, and feeds the existing dataset expansion planner.
+Add `manager_dataset_evidence` and `scripts/tasks/collect_dataset_evidence.py`. The collector reads existing model-governance and manager-control-plane evidence, summarizes per-layer/per-role coverage, records promotion gaps, and feeds the existing dataset expansion planner.
 
 This is an evidence collection layer, not a second decision-rule system. The planner remains responsible for selecting the next expansion target from the evidence. Collection is read-only and performs no provider calls, model activation, or broker execution.
 
@@ -2689,7 +2689,7 @@ This is an evidence collection layer, not a second decision-rule system. The pla
 
 - Manager can determine missing train/calibration/validation/test/forward-holdout evidence from durable records instead of relying on absent-evidence defaults.
 - `plan_dataset_expansion.py --collect-evidence-from-db` can collect evidence and plan in one run.
-- Provider calls remain gated by `autonomous_historical_provider_acquisition_v1`; model activation remains gated by approving `review_decision_v1`; broker/order/fill/account mutation remains execution-owned.
+- Provider calls remain gated by `autonomous_historical_provider_acquisition`; model activation remains gated by approving `review_decision`; broker/order/fill/account mutation remains execution-owned.
 
 ## D120 - Historical sampling universe can be broader than live routing
 
@@ -2748,14 +2748,14 @@ The remaining scheduler defaults need measured evidence rather than guesswork. P
 
 ### Decision
 
-Add `manager_controlled_information_pass_v1` and `scripts/tasks/plan_controlled_information_pass.py` as the safe first-month information-gathering report for formal historical operation from `2016-01`.
+Add `manager_controlled_information_pass` and `scripts/tasks/plan_controlled_information_pass.py` as the safe first-month information-gathering report for formal historical operation from `2016-01`.
 
 The pass may write a report and safe preparation artifacts, including Layer 1 task-key payloads and plan-only approval validation. It must not call providers, activate models, mutate broker/execution state, or execute storage cleanup/compression/archive/delete/restore. It names the evidence required to close six open areas: provider dispatch expansion, concurrency defaults, L3-L7 target queue rules, dataset thresholds, artifact discovery, and storage lifecycle implementation.
 
 ### Consequences
 
 - The next phase is evidence collection, not broad default hardening.
-- Provider calls remain outside the information-pass boundary and still require validated `autonomous_historical_provider_acquisition_v1` plus explicit provider-dispatch execution.
+- Provider calls remain outside the information-pass boundary and still require validated `autonomous_historical_provider_acquisition` plus explicit provider-dispatch execution.
 - Storage lifecycle remains dry-run/protected-set-first until artifact index and restore/protection evidence exists.
 
 ## D123 - 2016-01 Layer 1-8 safe workflow is closed without provider expansion
@@ -2823,8 +2823,8 @@ Routine historical backfill work was too manually gated: provider calls still wa
 Adopt autonomous historical provider acquisition for the current historical modeling control plane:
 
 - Provider data acquisition may be automatically agent-reviewed, dispatched, and reconciled when it is bounded to historical provider acquisition scope and keeps broker execution, model activation, and storage lifecycle mutation false.
-- Model activation / production promotion must be decided by a script-called agent decision artifact (`agent_model_promotion_decision_v1`) rather than a routine manual provider guardrail. The agent, not the owner, performs the approval/defer/reject decision from evidence.
-- Storage lifecycle mutation must follow accepted lifecycle rules, protected-set checks, quarantine/recheck rules where applicable, and storage receipts before storage executes archive/delete/compress/restore mutation. `agent_storage_lifecycle_decision_v1` is a policy/agent decision artifact, not a human approval prompt.
+- Model activation / production promotion must be decided by a script-called agent decision artifact (`agent_model_promotion_decision`) rather than a routine manual provider guardrail. The agent, not the owner, performs the approval/defer/reject decision from evidence.
+- Storage lifecycle mutation must follow accepted lifecycle rules, protected-set checks, quarantine/recheck rules where applicable, and storage receipts before storage executes archive/delete/compress/restore mutation. `agent_storage_lifecycle_decision` is a policy/agent decision artifact, not a human approval prompt.
 - Broker/order/fill/account mutation remains out of scope here and belongs to execution-library work.
 
 ### Consequences
@@ -2867,7 +2867,7 @@ The completed 2016-01 through 2016-03 historical workflow proved the Layer 1-8 m
 
 Make the historical scheduler daemon the canonical owner of the historical data/modeling runtime. The service owns the scheduler loop, checkpoint/resume state, single-instance lock, decision log, safe preparation, safe/offline stage execution, and chronological month-cursor advancement. Manual CLI/script invocation remains available only for inspection, repair, smoke testing, or emergency intervention.
 
-The service may continue safe/offline work automatically and may advance from one completed YYYY-MM month to the next under the chronological-forward policy. Provider acquisition now runs autonomously with terminal-coverage guards, dispatch receipts, and reconcile coverage. Model activation is decided by `agent_model_promotion_decision_v1`; storage lifecycle mutation follows lifecycle policy/protected-set checks with decision/receipt evidence; broker/order/fill/account mutation remains out of scope.
+The service may continue safe/offline work automatically and may advance from one completed YYYY-MM month to the next under the chronological-forward policy. Provider acquisition now runs autonomously with terminal-coverage guards, dispatch receipts, and reconcile coverage. Model activation is decided by `agent_model_promotion_decision`; storage lifecycle mutation follows lifecycle policy/protected-set checks with decision/receipt evidence; broker/order/fill/account mutation remains out of scope.
 
 ### Consequences
 
@@ -2887,7 +2887,7 @@ After accepting the system-service runtime posture, Chentong clarified that serv
 
 ### Decision
 
-The historical scheduler daemon must automatically select its next historical work item at service start. It reviews month-scoped `manager_model_training_workflow_state_v1` checkpoints, resumes the earliest open month if one exists, otherwise advances to the next chronological month after the latest completed checkpoint, and falls back to the configured bootstrap month only when no checkpoint evidence exists.
+The historical scheduler daemon must automatically select its next historical work item at service start. It reviews month-scoped `manager_model_training_workflow_state` checkpoints, resumes the earliest open month if one exists, otherwise advances to the next chronological month after the latest completed checkpoint, and falls back to the configured bootstrap month only when no checkpoint evidence exists.
 
 The selected month is then evaluated against the maintained Layer 1-8 workflow plan and normal scheduler gates. This does not authorize provider calls, model activation, storage lifecycle mutation, or broker/account mutation outside their accepted agent-decision boundaries.
 
@@ -2903,7 +2903,7 @@ The selected month is then evaluated against the maintained Layer 1-8 workflow p
 After accepting the service-owned runtime and automatic next-work selection, Chentong asked whether system-level todos were gone and then requested that the remaining system-level items be solved in one pass. The remaining risk was not another manual workflow step; it was lack of a single read-only surface that proves service readiness, selected work, current stage/blocker, latest decision, provider posture, failure evidence, and deferred mutation boundaries.
 
 ### Decision
-Add `manager_historical_scheduler_status_v1` as the canonical read-only status surface for the historical scheduler service. The status command inspects daemon state, decision logs, workflow checkpoints, lock state, deployment templates, local failure evidence, and explicit gated-scope states without mutating runtime state.
+Add `manager_historical_scheduler_status` as the canonical read-only status surface for the historical scheduler service. The status command inspects daemon state, decision logs, workflow checkpoints, lock state, deployment templates, local failure evidence, and explicit gated-scope states without mutating runtime state.
 
 `inspect_historical_scheduler_status.py` is the normal operator inspection command after host activation. It reports the next selected month when daemon state does not exist yet, confirms required systemd/runtime flags, surfaces stale locks, summarizes the latest scheduler decision and provider gate posture, and makes model activation, storage lifecycle mutation, and broker/order/account mutation visible as explicitly gated or out-of-scope states rather than hidden todos.
 
@@ -2911,7 +2911,7 @@ Add `manager_historical_scheduler_status_v1` as the canonical read-only status s
 - System-level service-control and observability work is closed for supervised historical operation.
 - Host-level install/enable remains an explicit operator action; committed code/templates/status checks do not install or start services.
 - Provider expansion beyond current adapters remains future source-specific extension work, not a missing generic scheduler mechanism.
-- Production model activation still requires an agent-authored `agent_model_promotion_decision_v1`; storage lifecycle mutation still requires accepted lifecycle rules, storage-owned protected checks, and receipts, with `agent_storage_lifecycle_decision_v1` serving as policy/agent decision evidence rather than owner approval; broker/order/fill/account mutation remains outside historical modeling.
+- Production model activation still requires an agent-authored `agent_model_promotion_decision`; storage lifecycle mutation still requires accepted lifecycle rules, storage-owned protected checks, and receipts, with `agent_storage_lifecycle_decision` serving as policy/agent decision evidence rather than owner approval; broker/order/fill/account mutation remains outside historical modeling.
 
 ## D130 - Realtime shadow handoff receipts are manager-visible but non-mutating
 
@@ -2924,7 +2924,7 @@ Status: Accepted
 
 ### Decision
 
-Add `manager_realtime_shadow_handoff_control_plane_bundle_v1` as the manager-visible receipt/normalization surface for realtime shadow decision handoffs. It validates the paired `execution_model_decision_input_snapshot_v1` and `model_realtime_decision_route_plan_v1`, emits a standard component completion receipt, and normalizes that receipt into run/artifact/ready rows for task-summary consumers.
+Add `manager_realtime_shadow_handoff_control_plane_bundle` as the manager-visible receipt/normalization surface for realtime shadow decision handoffs. It validates the paired `execution_model_decision_input_snapshot` and `model_realtime_decision_route_plan`, emits a standard component completion receipt, and normalizes that receipt into run/artifact/ready rows for task-summary consumers.
 
 Add a full rehearsal path that can build execution-side realtime adapter/capture/feature/model-input fixture artifacts, route them through the model-side realtime decision route planner, and normalize the manager receipt in one command.
 
@@ -2949,7 +2949,7 @@ Fixture-only realtime scaffolds are not enough for formal integration. At the sa
 
 Formal realtime integration begins with two explicit live paths:
 
-- `realtime_live_observe_approval_v1` permits bounded read-only provider market-data observation in `trading-execution`.
+- `realtime_live_observe_approval` permits bounded read-only provider market-data observation in `trading-execution`.
 - `record_realtime_shadow_handoff.py --persist-normalized-rows` permits explicit manager SQL persistence of normalized realtime shadow handoff run/artifact/ready rows when a reviewed durable receipt/database context exists.
 
 These paths do not imply model activation or broker authority. Production model activation still requires the accepted model-promotion decision path. Broker order construction, execution, fill/reconcile, and account mutation require separate execution-owned risk, idempotency, receipt, and reconcile gates.
@@ -3012,13 +3012,13 @@ Status: Accepted
 
 ### Context
 
-Chentong clarified that the remaining historical-system boundaries should not regress into owner approval prompts. `agent_model_promotion_decision_v1` exists so the agent can approve, defer, reject, revoke, or supersede model activation from evidence. Storage lifecycle already has accepted lifecycle policy, protected-set rules, quarantine/recheck expectations, and storage receipts, so routine lifecycle work should execute by those rules rather than wait for owner approval.
+Chentong clarified that the remaining historical-system boundaries should not regress into owner approval prompts. `agent_model_promotion_decision` exists so the agent can approve, defer, reject, revoke, or supersede model activation from evidence. Storage lifecycle already has accepted lifecycle policy, protected-set rules, quarantine/recheck expectations, and storage receipts, so routine lifecycle work should execute by those rules rather than wait for owner approval.
 
 ### Decision
 
-Production model activation remains blocked until the agent emits `agent_model_promotion_decision_v1` and only an agent-approved decision can produce `activation_record_v1`. The owner observes and can intervene, but the normal approval actor is the agent decision surface.
+Production model activation remains blocked until the agent emits `agent_model_promotion_decision` and only an agent-approved decision can produce `activation_record`. The owner observes and can intervene, but the normal approval actor is the agent decision surface.
 
-Storage lifecycle mutation is rule-executed: manager may schedule `storage_lifecycle_request_v1`; lifecycle policy, protected-set checks, quarantine/recheck rules where applicable, and storage receipts decide whether `trading-storage` may compress, archive, restore, detach/drop, or delete. `agent_storage_lifecycle_decision_v1` remains useful as policy/agent decision evidence when a lifecycle request is evaluated, but it is not a human approval prompt. Ambiguous, policy-missing, protected-set-failing, or high-risk destructive cases must defer/escalate instead of executing.
+Storage lifecycle mutation is rule-executed: manager may schedule `storage_lifecycle_request`; lifecycle policy, protected-set checks, quarantine/recheck rules where applicable, and storage receipts decide whether `trading-storage` may compress, archive, restore, detach/drop, or delete. `agent_storage_lifecycle_decision` remains useful as policy/agent decision evidence when a lifecycle request is evaluated, but it is not a human approval prompt. Ambiguous, policy-missing, protected-set-failing, or high-risk destructive cases must defer/escalate instead of executing.
 
 ### Consequences
 

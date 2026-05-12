@@ -88,7 +88,7 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
     receipt_path = output_root / f"layer_08_option_expression_feature_generation_no_provider_skip_receipt_{start_month}.json"
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     receipt = {
-        "contract_type": "component_completion_receipt_v1",
+        "contract_type": "component_completion_receipt",
         "manager_stage_id": FEATURE_STAGE_ID,
         "stage_type": "feature_generation",
         "status": "succeeded",
@@ -135,7 +135,7 @@ def execute_layer_eight_feature_stage(
 
     review_path = _gate_review_path(start_month, gate_review_root=gate_review_root)
     review = _read_json(review_path)
-    if review.get("contract_type") != "manager_layer_08_option_expression_gate_review_v1":
+    if review.get("contract_type") != "manager_layer_08_option_expression_gate_review":
         raise TaskSystemError(f"unsupported Layer 8 gate review contract_type: {review_path}")
     if review.get("status") == "no_provider_skip_accepted" and int(review.get("active_request_count") or 0) == 0:
         receipt_path = _write_skip_receipt(
@@ -146,7 +146,7 @@ def execute_layer_eight_feature_stage(
             output_root=output_root,
         )
         return LayerEightFeatureStageSummary(
-            contract_type="manager_layer_08_feature_generation_stage_v1",
+            contract_type="manager_layer_08_feature_generation_stage",
             stage_id=FEATURE_STAGE_ID,
             start_month=start_month,
             end_month=end_month,
@@ -181,7 +181,7 @@ def execute_layer_eight_feature_stage(
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
     return LayerEightFeatureStageSummary(
-        contract_type="manager_layer_08_feature_generation_stage_v1",
+        contract_type="manager_layer_08_feature_generation_stage",
         stage_id=FEATURE_STAGE_ID,
         start_month=start_month,
         end_month=end_month,

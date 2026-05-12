@@ -1,6 +1,6 @@
 # Monthly Backfill Planning
 
-`trading-manager` plans historical data acquisition as dry-run `manager_request_v1` rows before any provider call is made. The planner is monthly because source availability, retry, and storage readiness should be reviewed one bounded month at a time.
+`trading-manager` plans historical data acquisition as dry-run `manager_request` rows before any provider call is made. The planner is monthly because source availability, retry, and storage readiness should be reviewed one bounded month at a time.
 
 ## Accepted Start Policy
 
@@ -44,7 +44,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_monthly_backfill.py \
   --format jsonl
 ```
 
-The planner emits deterministic dry-run `manager_request_v1` dictionaries. It does not insert SQL rows, call providers, or persist task payload bodies.
+The planner emits deterministic dry-run `manager_request` dictionaries. It does not insert SQL rows, call providers, or persist task payload bodies.
 
 For Layer 1 `MarketRegimeModel` training, `01_feed_alpaca_bars` expands over every `model_layer = layer_01_market_regime` row in `trading-storage/main/shared/market_regime_etf_universe.csv`. Each ETF symbol gets its own monthly request and storage path so missing history, provider errors, and receipts stay isolated by symbol. The current reviewed Layer 1 universe has 22 market-state ETFs.
 
@@ -53,8 +53,8 @@ For Layer 2 `SectorContextModel` training, pass `--model-layer layer_02_sector_c
 Each planned request keeps only concise control-plane facts:
 
 - `request_id`
-- `contract_type = manager_request_v1`
-- `request_kind = data_backfill_month_v1`
+- `contract_type = manager_request`
+- `request_kind = data_backfill_month`
 - `status = requested`
 - target component/repo fields
 - selected ETF symbol/timeframe/universe metadata for `01_feed_alpaca_bars`
@@ -95,7 +95,7 @@ The batch preparation performs these manager-owned steps together:
 3. validate the payload handoff against the `trading-data` feed `build_context` boundary;
 4. report a batch summary showing zero provider calls, zero dispatch, zero model activation, and zero broker execution.
 
-Use `--write` only when the reviewed batch should be persisted to manager SQL as active control-plane requests and request-scoped input bindings. Even then, provider dispatch still requires a validated `autonomous_historical_provider_acquisition_v1`.
+Use `--write` only when the reviewed batch should be persisted to manager SQL as active control-plane requests and request-scoped input bindings. Even then, provider dispatch still requires a validated `autonomous_historical_provider_acquisition`.
 
 ## Payload Materialization
 
@@ -111,13 +111,13 @@ For SQL-backed request rows, fetch and materialize directly from `trading_manage
 ```bash
 PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py \
   --from-db \
-  --request-kind data_backfill_month_v1 \
+  --request-kind data_backfill_month \
   --status requested \
   --write-files \
   --write-bindings
 ```
 
-The materializer writes local development payloads under `storage/monthly_backfill_v1/.../task_key.json` by resolving `storage://trading-manager/...` URIs. Layer 1 and Layer 2 Alpaca bar payloads use `storage/monthly_backfill_v1/alpaca_bars/<SYMBOL>/<MONTH>/task_key.json` and set the component `params.symbol` / `params.timeframe` from the reviewed ETF universe row for the request model layer. It also emits or persists request-scoped `input_binding_v1` rows with the payload URI, schema ref, byte size summary, and canonical SHA-256 hash.
+The materializer writes local development payloads under `storage/monthly_backfill/.../task_key.json` by resolving `storage://trading-manager/...` URIs. Layer 1 and Layer 2 Alpaca bar payloads use `storage/monthly_backfill/alpaca_bars/<SYMBOL>/<MONTH>/task_key.json` and set the component `params.symbol` / `params.timeframe` from the reviewed ETF universe row for the request model layer. It also emits or persists request-scoped `input_binding` rows with the payload URI, schema ref, byte size summary, and canonical SHA-256 hash.
 
 This still does not dispatch components or call providers. It only makes the request package concrete enough for a later component-facing dry-run handoff.
 

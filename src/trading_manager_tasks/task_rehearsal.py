@@ -3,8 +3,8 @@
 The rehearsal exercises the control-plane lifecycle without calling providers or
 mutating SQL:
 
-manager_request_v1 -> component completion receipt -> run_manifest_v1 /
-artifact_ref_v1 / ready_signal_v1 -> task_summary-like rows.
+manager_request -> component completion receipt -> run_manifest /
+artifact_ref / ready_signal -> task_summary-like rows.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def build_rehearsal_receipt(
     output_base = str((normalized.get("expected_outputs") or [f"storage://trading-data/rehearsal/{request_id}/"])[0]).rstrip("/")
     row_count = 1000 if status == "succeeded" else 400 if status == "partial" else 0
     receipt: dict[str, Any] = {
-        "contract_type": "component_completion_receipt_v1",
+        "contract_type": "component_completion_receipt",
         "request_id": request_id,
         "rehearsal_only": True,
         "runs": [
@@ -68,7 +68,7 @@ def build_rehearsal_receipt(
                     {
                         "uri": f"{output_base}/rehearsal_output.parquet",
                         "artifact_kind": "monthly_backfill_rehearsal_output",
-                        "schema_ref": "monthly_backfill_output_v1",
+                        "schema_ref": "monthly_backfill_output",
                         "row_count": row_count,
                         "content_hash": f"sha256:rehearsal-{request_id}-{status}",
                         "media_type": "application/x-parquet",
@@ -202,7 +202,7 @@ def rehearse_monthly_backfill_task_system(
         ready_signal_rows.extend(rows.ready_signals)
     summary = build_rehearsal_task_summary(requests, run_rows=run_rows, artifact_rows=artifact_rows, ready_signal_rows=ready_signal_rows)
     return {
-        "contract_type": "manager_task_system_rehearsal_v1",
+        "contract_type": "manager_task_system_rehearsal",
         "rehearsal_only": True,
         "scenario": scenario,
         "request_count": len(requests),

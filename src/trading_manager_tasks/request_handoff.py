@@ -151,7 +151,7 @@ def _binding_by_request(bindings: Iterable[Mapping[str, Any]]) -> dict[str, Mapp
 
 def _validate_input_binding(request: Mapping[str, Any], binding: Mapping[str, Any] | None, *, content_hash: str) -> None:
     if binding is None:
-        raise TaskSystemError(f"missing parameter_payload input_binding_v1 for {request['request_id']}")
+        raise TaskSystemError(f"missing parameter_payload input_binding for {request['request_id']}")
     if binding.get("input_ref") != request.get("parameter_ref"):
         raise TaskSystemError("input_binding.input_ref does not match request parameter_ref")
     if binding.get("schema_ref") != PARAMETER_SCHEMA_REF:
@@ -263,10 +263,10 @@ def _load_rows_from_args(args: argparse.Namespace) -> list[dict[str, Any]]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate materialized request payload handoff without dispatch/provider calls.")
-    parser.add_argument("path", nargs="?", type=Path, help="JSON, JSON array, or JSONL manager_request_v1 rows.")
+    parser.add_argument("path", nargs="?", type=Path, help="JSON, JSON array, or JSONL manager_request rows.")
     parser.add_argument("--from-db", action="store_true", help="Fetch request rows from trading_manager.manager_request.")
     parser.add_argument("--database-url")
-    parser.add_argument("--request-kind", default="data_backfill_month_v1")
+    parser.add_argument("--request-kind", default="data_backfill_month")
     parser.add_argument("--status", default="requested")
     parser.add_argument("--request-id", action="append", help="Limit SQL fetch to one request id; repeatable.")
     parser.add_argument("--include-rehearsals", action="store_true", help="Include mgrreq_rehearsal_* rows when fetching from SQL.")

@@ -132,7 +132,7 @@ def discover_layer_two_feed_artifacts(
     allowed_symbols = {symbol.upper() for symbol in (symbols or _read_layer_two_symbols(universe_path))}
     refs: list[FeedArtifactRef] = []
     for symbol in sorted(allowed_symbols):
-        receipt_path = trading_storage_root / "monthly_backfill_v1" / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
+        receipt_path = trading_storage_root / "monthly_backfill" / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
         if not receipt_path.exists():
             continue
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -301,7 +301,7 @@ def materialize_layer_three_target_state_inputs(
         refs_out = [str(item) for item in payload.get("references") or []]
         trading_data_receipt_path = next((item for item in refs_out if item.endswith("completion_receipt.json")), str(trading_data_output_root / "completion_receipt.json"))
     summary = LayerThreeTargetStateMaterialization(
-        contract_type="manager_layer_three_target_state_input_materialization_v1",
+        contract_type="manager_layer_three_target_state_input_materialization",
         start_month=start_month,
         end_month=end_month,
         symbols=tuple(ref.symbol for ref in refs),

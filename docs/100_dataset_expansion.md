@@ -9,8 +9,8 @@ Status: accepted manager-control policy for historical model training; no provid
 The manager decision is still bounded by hard gates:
 
 - historical provider calls use autonomous bounded acquisition after manager payload preparation and resource/coverage guards;
-- model activation is approved/deferred by the agent through script-called `agent_model_promotion_decision_v1`;
-- storage lifecycle mutation follows the accepted lifecycle rules, protected-set checks, quarantine/recheck rules where applicable, and storage receipts; `agent_storage_lifecycle_decision_v1` is a policy decision artifact, not a human approval prompt;
+- model activation is approved/deferred by the agent through script-called `agent_model_promotion_decision`;
+- storage lifecycle mutation follows the accepted lifecycle rules, protected-set checks, quarantine/recheck rules where applicable, and storage receipts; `agent_storage_lifecycle_decision` is a policy decision artifact, not a human approval prompt;
 - broker/order/fill/account mutation remains execution-owned and forbidden here.
 
 ## Dataset roles
@@ -47,7 +47,7 @@ Manager evidence should report separate views when available:
 
 Realtime effectiveness can trigger promotion review, drift review, trust reduction, or retraining planning, but it should not by itself rewrite historical dataset snapshots or substitute for the historical split ladder.
 
-The execution-side realtime coverage surface is `execution_realtime_input_coverage_v1`, the capture surface is `realtime_capture_contract_v1`, and the online metric surface is `realtime_model_decision_effectiveness_v1`. Manager planning should treat these as monitoring/evidence contracts, not as provider-stream authorization or historical dataset-expansion inputs.
+The execution-side realtime coverage surface is `execution_realtime_input_coverage`, the capture surface is `realtime_capture_contract`, and the online metric surface is `realtime_model_decision_effectiveness`. Manager planning should treat these as monitoring/evidence contracts, not as provider-stream authorization or historical dataset-expansion inputs.
 
 Default planning minimums are intentionally conservative placeholders until measured production evidence supersedes them:
 
@@ -98,14 +98,14 @@ The manager walks layers in dependency order and expands the earliest layer with
 
 The expansion planner consumes manager-visible evidence; it must not invent missing-dataset status from a second decision-rule system.
 
-The evidence collector emits `manager_dataset_evidence_v1` by inventorying existing durable evidence where available:
+The evidence collector emits `manager_dataset_evidence` by inventorying existing durable evidence where available:
 
 - `trading_model.model_dataset_snapshot`;
 - `trading_model.model_dataset_split`;
 - `trading_model.model_eval_label`;
 - `trading_model.model_eval_run`;
 - `trading_model.model_promotion_metric`;
-- manager `artifact_ref_v1` / `ready_signal_v1` records.
+- manager `artifact_ref` / `ready_signal` records.
 
 The collector summarizes per-layer/per-role coverage with month counts, sample counts, snapshot/split refs, label/eval coverage, artifact/ready-signal counts, and promotion gaps. It performs no provider calls, no model activation, and no broker/order/fill/account mutation.
 
@@ -145,7 +145,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py \
 
 Add `--write` only to let manager prepare the selected safe expansion artifacts/payloads. For Layer 1, this writes the full Alpaca ETF task-key payload set and handoff validation evidence, but still performs zero provider calls. After preparation, provider dispatch proceeds through autonomous `dispatch_and_reconcile_provider_stage.py` under resource and terminal-coverage guards.
 
-The emitted contracts are `manager_dataset_evidence_v1` and `manager_dataset_expansion_plan_v1`.
+The emitted contracts are `manager_dataset_evidence` and `manager_dataset_expansion_plan`.
 
 ## Non-goals
 

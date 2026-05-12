@@ -14,7 +14,7 @@ from trading_manager_tasks.stage_run_dashboard import (
 
 def _coverage(*, status: str = "partial_ready") -> StageCoverageReport:
     return StageCoverageReport(
-        contract_type="manager_stage_coverage_v1",
+        contract_type="manager_stage_coverage",
         stage_id="layer_02_sector_context.data_acquisition",
         start_month="2016-01",
         end_month="2016-01",
@@ -71,7 +71,7 @@ class StageRunDashboardTests(unittest.TestCase):
                 next_limit=1,
             )
 
-        self.assertEqual(dashboard.contract_type, "manager_stage_run_dashboard_v1")
+        self.assertEqual(dashboard.contract_type, "manager_stage_run_dashboard")
         self.assertEqual(dashboard.coverage["ready_count"], 3)
         self.assertEqual(dashboard.coverage["pending_count"], 17)
         self.assertTrue(dashboard.next_provider_dispatch.available)

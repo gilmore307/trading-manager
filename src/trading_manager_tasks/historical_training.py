@@ -19,8 +19,8 @@ from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, plan
 from .request_handoff import DEFAULT_TRADING_DATA_SRC, validate_request_handoffs
 from .request_payloads import DEFAULT_STORAGE_ROOT, materialize_request_payloads
 
-LAYER_ONE_PHASE = "layer_01_market_regime_historical_training_v1"
-LAYER_TWO_PHASE = "layer_02_sector_context_historical_training_v1"
+LAYER_ONE_PHASE = "layer_01_market_regime_historical_training"
+LAYER_TWO_PHASE = "layer_02_sector_context_historical_training"
 LAYER_ALPACA_BARS_COMPONENT_ID = "01_feed_alpaca_bars"
 LAYER_PHASES = {
     LAYER_ONE_MODEL_LAYER: LAYER_ONE_PHASE,

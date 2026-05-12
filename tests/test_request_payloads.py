@@ -25,11 +25,11 @@ def _spy_layer_one_request() -> dict[str, object]:
 class RequestPayloadMaterializationTests(unittest.TestCase):
     def test_storage_uri_resolves_under_storage_root(self):
         path = storage_uri_to_local_path(
-            "storage://trading-manager/monthly_backfill_v1/alpaca_bars/SPY/2016-01/task_key.json",
+            "storage://trading-manager/monthly_backfill/alpaca_bars/SPY/2016-01/task_key.json",
             storage_root=Path("/tmp/manager-storage"),
         )
 
-        self.assertEqual(path, Path("/tmp/manager-storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/task_key.json"))
+        self.assertEqual(path, Path("/tmp/manager-storage/monthly_backfill/alpaca_bars/SPY/2016-01/task_key.json"))
 
     def test_monthly_backfill_payload_uses_component_task_key_shape(self):
         request = _spy_layer_one_request()
@@ -46,7 +46,7 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
         self.assertEqual(payload["params"]["timeframe"], request["timeframe"])
         self.assertEqual(payload["params"]["start"], "2016-01-01")
         self.assertEqual(payload["params"]["end"], "2016-02-01")
-        self.assertEqual(payload["output_root"], "storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01")
+        self.assertEqual(payload["output_root"], "storage/monthly_backfill/alpaca_bars/SPY/2016-01")
         self.assertFalse(payload["manager_controls"]["allow_live_provider_calls"])
         self.assertFalse(payload["manager_controls"]["autonomous_historical_provider_acquisition"])
 
@@ -60,7 +60,7 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
         self.assertEqual(materialized.parameter_ref, request["parameter_ref"])
         self.assertTrue(materialized.content_hash.startswith("sha256:"))
         self.assertGreater(materialized.byte_size, 0)
-        self.assertEqual(materialized.input_binding["contract_type"], "input_binding_v1")
+        self.assertEqual(materialized.input_binding["contract_type"], "input_binding")
         self.assertEqual(materialized.input_binding["input_role"], "parameter_payload")
         self.assertEqual(materialized.input_binding["input_ref"], request["parameter_ref"])
         self.assertEqual(materialized.input_binding["schema_ref"], PARAMETER_SCHEMA_REF)

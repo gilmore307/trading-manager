@@ -277,7 +277,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             self.assertEqual(state.last_next_internal_stage, "autonomous_historical_provider_acquisition")
             self.assertFalse(lock_path.exists())
             persisted = json.loads(state_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["contract_type"], "manager_scheduler_daemon_state_v1")
+            self.assertEqual(persisted["contract_type"], "manager_scheduler_daemon_state")
             log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(len(log_rows), 1)
             self.assertEqual(log_rows[0]["provider_calls"], 0)

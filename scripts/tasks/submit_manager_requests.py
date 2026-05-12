@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate or persist manager_request_v1 rows."""
+"""Validate or persist manager_request rows."""
 
 from __future__ import annotations
 

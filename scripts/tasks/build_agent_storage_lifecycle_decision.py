@@ -19,7 +19,7 @@ def _stable_id(*parts: object) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build agent_storage_lifecycle_decision_v1 artifacts without storage mutation side effects.")
+    parser = argparse.ArgumentParser(description="Build agent_storage_lifecycle_decision artifacts without storage mutation side effects.")
     parser.add_argument("--storage-lifecycle-request-ref", required=True)
     parser.add_argument("--agent-ref", default="openclaw_agent_under_owner_observation")
     parser.add_argument("--decision-status", required=True, choices=ALLOWED_DECISIONS)
@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     decision = {
-        "contract_type": "agent_storage_lifecycle_decision_v1",
+        "contract_type": "agent_storage_lifecycle_decision",
         "agent_storage_lifecycle_decision_id": _stable_id(
             args.storage_lifecycle_request_ref,
             args.agent_ref,

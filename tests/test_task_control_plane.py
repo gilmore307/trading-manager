@@ -20,20 +20,20 @@ class TaskControlPlaneTests(unittest.TestCase):
         row = validate_manager_request(
             {
                 "request_id": "mgrreq_sample",
-                "request_kind": "data_backfill_month_v1",
+                "request_kind": "data_backfill_month",
                 "requested_by": "openclaw",
                 "target_component_id": "01_feed_alpaca_bars",
                 "target_component_kind": "data_feed",
                 "target_repo_id": "trading-data",
                 "expected_outputs": "storage://example/output/",
-                "policy_refs": ["monthly_backfill_v1"],
+                "policy_refs": ["monthly_backfill"],
                 "priority": "high",
                 "deadline_at_utc": "2026-05-09T14:30:00Z",
                 "parameter_ref": "storage://example/task_key.json",
             }
         )
 
-        self.assertEqual(row["contract_type"], "manager_request_v1")
+        self.assertEqual(row["contract_type"], "manager_request")
         self.assertEqual(row["status"], "requested")
         self.assertEqual(row["expected_outputs"], ["storage://example/output/"])
         self.assertEqual(row["priority"], "high")
@@ -45,7 +45,7 @@ class TaskControlPlaneTests(unittest.TestCase):
             validate_manager_request(
                 {
                     "request_id": "mgrreq_bad_priority",
-                    "request_kind": "data_backfill_month_v1",
+                    "request_kind": "data_backfill_month",
                     "requested_by": "openclaw",
                     "target_component_id": "01_feed_alpaca_bars",
                     "target_repo_id": "trading-data",
@@ -106,7 +106,7 @@ class TaskControlPlaneTests(unittest.TestCase):
                     "status": "succeeded",
                     "started_at": "2026-05-09T01:00:00Z",
                     "completed_at": "2026-05-09T01:01:00Z",
-                    "outputs": ["storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/saved/equity_bar.csv"],
+                    "outputs": ["storage/monthly_backfill/alpaca_bars/SPY/2016-01/saved/equity_bar.csv"],
                     "row_counts": {"equity_bar": 1000},
                 }
             ]
@@ -118,11 +118,11 @@ class TaskControlPlaneTests(unittest.TestCase):
             component_id="01_feed_alpaca_bars",
             component_kind="data_feed",
             repo_id="trading-data",
-            receipt_uri="storage://trading-data/monthly_backfill_v1/alpaca_bars/SPY/2016-01/completion_receipt.json",
+            receipt_uri="storage://trading-data/monthly_backfill/alpaca_bars/SPY/2016-01/completion_receipt.json",
         )
 
         output = rows.artifact_refs[1]
-        self.assertEqual(output["uri"], "storage://trading-data/monthly_backfill_v1/alpaca_bars/SPY/2016-01/saved/equity_bar.csv")
+        self.assertEqual(output["uri"], "storage://trading-data/monthly_backfill/alpaca_bars/SPY/2016-01/saved/equity_bar.csv")
         self.assertEqual(output["artifact_kind"], "equity_bar")
         self.assertEqual(output["row_count"], 1000)
         self.assertEqual(output["media_type"], "text/csv")
@@ -135,22 +135,22 @@ class TaskControlPlaneTests(unittest.TestCase):
                     "status": "succeeded",
                     "started_at": "2026-05-09T01:00:00Z",
                     "completed_at": "2026-05-09T01:01:00Z",
-                    "outputs": ["storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/saved/equity_bar.csv"],
+                    "outputs": ["storage/monthly_backfill/alpaca_bars/SPY/2016-01/runs/run_spy/saved/equity_bar.csv"],
                     "row_counts": {"equity_bar": 1000},
                     "steps": {
                         "fetch": {
-                            "references": ["storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/request_manifest.json"],
+                            "references": ["storage/monthly_backfill/alpaca_bars/SPY/2016-01/runs/run_spy/request_manifest.json"],
                             "row_counts": {"raw_bars_transient": 1000},
                         },
                         "clean": {
                             "references": [
-                                "storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/cleaned/equity_bar.jsonl",
-                                "storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/cleaned/schema.json",
+                                "storage/monthly_backfill/alpaca_bars/SPY/2016-01/runs/run_spy/cleaned/equity_bar.jsonl",
+                                "storage/monthly_backfill/alpaca_bars/SPY/2016-01/runs/run_spy/cleaned/schema.json",
                             ],
                             "row_counts": {"equity_bar": 1000},
                         },
                         "save": {
-                            "references": ["storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01/runs/run_spy/saved/equity_bar.csv"],
+                            "references": ["storage/monthly_backfill/alpaca_bars/SPY/2016-01/runs/run_spy/saved/equity_bar.csv"],
                             "row_counts": {"equity_bar": 1000},
                         },
                     },
@@ -164,7 +164,7 @@ class TaskControlPlaneTests(unittest.TestCase):
             component_id="01_feed_alpaca_bars",
             component_kind="data_feed",
             repo_id="trading-data",
-            receipt_uri="storage://trading-data/monthly_backfill_v1/alpaca_bars/SPY/2016-01/completion_receipt.json",
+            receipt_uri="storage://trading-data/monthly_backfill/alpaca_bars/SPY/2016-01/completion_receipt.json",
         )
 
         by_kind = {row["artifact_kind"]: row for row in rows.artifact_refs}
@@ -218,7 +218,7 @@ class TaskControlPlaneTests(unittest.TestCase):
                 json.dumps(
                     {
                         "request_id": "mgrreq_one",
-                        "request_kind": "data_backfill_month_v1",
+                        "request_kind": "data_backfill_month",
                         "requested_by": "openclaw",
                         "target_component_id": "01_feed_alpaca_bars",
                         "target_repo_id": "trading-data",

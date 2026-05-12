@@ -1,7 +1,7 @@
 """Collect manager-visible dataset evidence for expansion decisions.
 
 This module turns durable model-governance and manager-control-plane facts into
-`manager_dataset_evidence_v1`, the evidence input consumed by the dataset
+`manager_dataset_evidence`, the evidence input consumed by the dataset
 expansion planner. It does not call providers, train models, activate models, or
 mutate broker/execution state.
 """
@@ -368,7 +368,7 @@ def collect_dataset_evidence_from_rows(
         )
 
     return DatasetEvidenceCollection(
-        contract_type="manager_dataset_evidence_v1",
+        contract_type="manager_dataset_evidence",
         layers=tuple(layers),
         source_summary={
             "model_dataset_snapshot": len(snapshot_rows),

@@ -13,7 +13,7 @@ from trading_manager_tasks.stage_coverage import summarize_stage_coverage_from_r
 
 def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
     for member in load_market_regime_universe(model_layers=(model_layer,)):
-        task_key = root / "monthly_backfill_v1" / "alpaca_bars" / member.symbol / month / "task_key.json"
+        task_key = root / "monthly_backfill" / "alpaca_bars" / member.symbol / month / "task_key.json"
         task_key.parent.mkdir(parents=True, exist_ok=True)
         task_key.write_text("{}\n", encoding="utf-8")
 
@@ -27,20 +27,20 @@ def _summary_row(symbol: str, *, ready: bool = False, failed: bool = False) -> d
     if failed:
         return {
             "request_id": request_id,
-            "request_kind": "data_backfill_month_v1",
+            "request_kind": "data_backfill_month",
             "target_component_id": "01_feed_alpaca_bars",
-            "parameter_ref": f"storage://trading-manager/monthly_backfill_v1/alpaca_bars/{symbol}/2016-01/task_key.json",
-            "expected_outputs": [f"storage://trading-data/monthly_backfill_v1/alpaca_bars/{symbol}/2016-01/"],
+            "parameter_ref": f"storage://trading-manager/monthly_backfill/alpaca_bars/{symbol}/2016-01/task_key.json",
+            "expected_outputs": [f"storage://trading-data/monthly_backfill/alpaca_bars/{symbol}/2016-01/"],
             "task_status": "failed",
             "latest_run_status": "failed",
             "latest_ready_signal_status": None,
         }
     return {
         "request_id": request_id,
-        "request_kind": "data_backfill_month_v1",
+        "request_kind": "data_backfill_month",
         "target_component_id": "01_feed_alpaca_bars",
-        "parameter_ref": f"storage://trading-manager/monthly_backfill_v1/alpaca_bars/{symbol}/2016-01/task_key.json",
-        "expected_outputs": [f"storage://trading-data/monthly_backfill_v1/alpaca_bars/{symbol}/2016-01/"],
+        "parameter_ref": f"storage://trading-manager/monthly_backfill/alpaca_bars/{symbol}/2016-01/task_key.json",
+        "expected_outputs": [f"storage://trading-data/monthly_backfill/alpaca_bars/{symbol}/2016-01/"],
         "task_status": "ready" if ready else "requested",
         "latest_run_status": "succeeded" if ready else None,
         "latest_ready_signal_status": "ready" if ready else None,
@@ -223,7 +223,7 @@ class StageCoverageTests(unittest.TestCase):
             report_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_stage_coverage_v1",
+                        "contract_type": "manager_stage_coverage",
                         "stage_id": "layer_01_market_regime.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
@@ -268,7 +268,7 @@ class StageCoverageTests(unittest.TestCase):
             report_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_stage_coverage_v1",
+                        "contract_type": "manager_stage_coverage",
                         "stage_id": "layer_01_market_regime.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
@@ -316,7 +316,7 @@ class StageCoverageTests(unittest.TestCase):
             report_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_stage_coverage_v1",
+                        "contract_type": "manager_stage_coverage",
                         "stage_id": "layer_01_market_regime.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
