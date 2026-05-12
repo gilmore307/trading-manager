@@ -80,16 +80,16 @@ class RequestHandoffValidationTests(unittest.TestCase):
                     require_input_binding=True,
                 )
 
-    def test_rejects_payload_that_allows_live_calls(self):
+    def test_rejects_payload_that_allows_live_provider_calls(self):
         request = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")[0]
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             materialized = materialize_request_payload(request, storage_root=tmp, write_file=True)
             payload = json.loads(materialized.local_path.read_text(encoding="utf-8"))
-            payload["live_call_policy"]["allow_live_calls"] = True
+            payload["manager_controls"]["allow_live_provider_calls"] = True
             materialized.local_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-            with self.assertRaisesRegex(ValueError, "allow_live_calls"):
+            with self.assertRaisesRegex(ValueError, "allow_live_provider_calls"):
                 validate_request_handoff(request, storage_root=tmp, component_src_root=self._fake_data_src(tmp))
 
 

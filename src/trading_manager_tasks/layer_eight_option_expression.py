@@ -1,10 +1,10 @@
 """Layer 8 option-expression gate review helpers.
 
 This module is deliberately no-provider. It reviews completed Layer 7 rows for
-option-expression-worthy underlying actions before any ThetaData approval packet
-is prepared. If the month has no active underlying action chain, the correct
-Layer 8 acquisition outcome is a reviewed no-provider skip, not a live-call
-approval request.
+option-expression-worthy underlying actions before ThetaData option-snapshot
+acquisition is prepared. If the month has no active underlying action chain,
+the correct Layer 8 acquisition outcome is a reviewed no-provider skip, not an
+empty provider request.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ class LayerEightRequestPreview:
 
 @dataclass(frozen=True)
 class LayerEightGateReview:
-    """No-provider review of whether Layer 8 needs an approval packet."""
+    """No-provider review of whether Layer 8 needs option-snapshot acquisition."""
 
     contract_type: str
     stage_id: str
@@ -175,15 +175,15 @@ def build_layer_eight_gate_review(
 ) -> LayerEightGateReview:
     previews = request_previews_from_layer_7_rows(layer_7_rows, start_month=start_month)
     if previews:
-        status = "approval_required"
-        reviewed_decision = "active_target_chain_requires_live_call_approval"
-        reason = f"{len(previews)} active Layer 7 target-chain rows require reviewed ThetaData option snapshot approval before Layer 8 acquisition."
-        recommended_next_action = "prepare_or_review_layer_08_live_call_approval_packet"
+        status = "provider_acquisition_ready"
+        reviewed_decision = "active_target_chain_ready_for_autonomous_option_acquisition"
+        reason = f"{len(previews)} active Layer 7 target-chain rows are ready for autonomous ThetaData option snapshot acquisition before Layer 8 feature generation."
+        recommended_next_action = "prepare_option_expression_acquisition"
     else:
         status = "no_provider_skip_accepted"
         reviewed_decision = "accepted_skip_no_active_target_chain"
         reason = "Layer 7 produced no active underlying-action chain for Layer 8; all rows are no-trade/maintain/neutral, so no option-chain provider call is warranted for this month."
-        recommended_next_action = "record_layer_08_data_acquisition_no_provider_skip_and_do_not_create_approval_packet"
+        recommended_next_action = "record_layer_08_data_acquisition_no_provider_skip"
     return LayerEightGateReview(
         contract_type="manager_layer_08_option_expression_gate_review_v1",
         stage_id=STAGE_ID,

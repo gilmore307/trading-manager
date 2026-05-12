@@ -25,26 +25,19 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/plan_model_training_workflow.py` — emits the manager-owned Layer 1-8 historical model-training workflow graph, including data acquisition, feature, generation, evaluation, review, and maintenance stages.
 - `tasks/collect_dataset_evidence.py` — collects current snapshot/split/label/eval/control-plane evidence into `manager_dataset_evidence_v1` for expansion planning without provider calls.
 - `tasks/plan_dataset_expansion.py` — lets manager choose the next dataset role/layer to expand, and with `--write` prepares the selected safe artifacts/payloads without provider calls.
-- `tasks/advance_model_training_workflow.py` — refreshes the durable Layer 1-8 workflow checkpoint, ingests component receipts, records agent-reviewed provider refs, and selects the next safe/gated stage.
-- `tasks/summarize_stage_run.py` — writes or prints the single `manager_stage_run_dashboard_v1` human-facing receipt for stage coverage, packets, next pending-only packet preview, and next safe action.
-- `tasks/run_stage_controller.py` — runs one conservative no-provider stage-control step, creating the next pending-only packet when safe and stopping at human/external gates.
-- `tasks/plan_live_call_approval.py` — creates a skip-aware live-call approval review proposal/template without approving, dispatching, or calling providers; `--pending-only` excludes ready/reviewed-terminal stage requests.
-- `tasks/create_live_call_approval_packet.py` — writes a complete local approval packet bundle with proposal, invalid template, editable `reviewed_approval.json`, validation/dispatch/reconcile command templates, status command, and zero provider calls; use `--pending-only` for normal runtime packets.
-- `tasks/inspect_live_call_approval_packet.py` — inspects packet lifecycle status (`template_pending_review` through `reconciled`) without approving, dispatching, or calling providers.
-- `tasks/rehearse_live_call_approval_packet.py` — rehearses proposal validation plus plan-only dispatch through ephemeral approval files, leaving persistent packet state unchanged and provider calls at zero.
-- `tasks/agent_review_live_call_approval_packet.py` — writes owner-observed agent-reviewed approval, proposal-validation, and plan-only dispatch artifacts for a packet while keeping provider calls at zero.
-- `tasks/validate_live_call_approval_proposal.py` — validates a reviewed `live_call_approval_v1` exactly against a manager proposal before any dispatch attempt.
-- `tasks/dispatch_approved_provider_acquisition.py` — validates `live_call_approval_v1` for Layer 1/2 Alpaca-bars provider acquisition selected by `--model-layer` and, only with both `--execute-approved-provider-calls` and exact `--approval-validation`, runs the owner-observed agent-reviewed trading-data commands.
+- `tasks/advance_model_training_workflow.py` — refreshes the durable Layer 1-8 workflow checkpoint, ingests component receipts, records receipt/review refs, and selects the next safe/gated stage.
+- `tasks/summarize_stage_run.py` — writes or prints the single `manager_stage_run_dashboard_v1` human-facing receipt for stage coverage, next autonomous provider-dispatch preview, and next safe action.
+- `tasks/run_stage_controller.py` — runs one conservative stage-control step, executing at most one bounded autonomous provider-dispatch slice and stopping at model/storage/broker gates.
+- `tasks/dispatch_provider_acquisition.py` — runs bounded autonomous Layer 1/2 Alpaca-bars provider acquisition selected by `--model-layer` when `--execute-provider-calls` is explicit.
 - `tasks/reconcile_provider_stage.py` — safely reconciles existing provider-stage completion receipts into manager control-plane rows, stage coverage, and workflow state without dispatching providers.
-- `tasks/review_layer_eight_option_expression_gate.py` — reviews completed Layer 7 rows for active option-expression target chains, emits Layer 8 approval-needed previews or a reviewed no-provider skip, and never calls providers.
-- `tasks/execute_layer_eight_option_feature_generation.py` — executes the Layer 8 feature stage by writing a reviewed no-provider/no-feature skip receipt or delegating to trading-data feature generation after approved acquisition.
-- `tasks/validate_live_call_approval.py` — validates reviewed `live_call_approval_v1` artifacts before any non-dry-run provider handoff is considered.
-- `tasks/execute_model_training_stage.py` — executes one ready safe offline workflow stage, writes stdout/stderr logs and a component receipt, and refuses provider-gated stages.
+- `tasks/review_layer_eight_option_expression_gate.py` — reviews completed Layer 7 rows for active option-expression target chains, emits Layer 8 provider-acquisition previews or a reviewed no-provider skip, and never calls providers.
+- `tasks/execute_layer_eight_option_feature_generation.py` — executes the Layer 8 feature stage by writing a reviewed no-provider/no-feature skip receipt or delegating to trading-data feature generation after provider acquisition.
+- `tasks/execute_model_training_stage.py` — executes one ready safe offline workflow stage, writes stdout/stderr logs and a component receipt, and refuses unsafe mutation stages.
 - `tasks/prepare_layer_one_historical_training.py` — manager-owned Layer 1 batch preparation: plans the full market-regime ETF universe, materializes payloads, and validates handoff boundaries without provider dispatch.
 - `tasks/prepare_layer_two_historical_training.py` — manager-owned Layer 2 batch preparation: plans the full sector/industry ETF universe, materializes payloads, and validates handoff boundaries without provider dispatch.
 - `tasks/run_automation_scheduler.py` — runs one capacity-aware scheduler tick: applies regular-trading-day market-hours protection, resource gates, and either reports or executes safe offline Layer 1 preparation without provider dispatch.
 - `tasks/run_automation_scheduler_daemon.py` — runs the persistent checkpointed historical-training scheduler daemon for resident system-service ownership, automatic next-work selection, safe/offline stage execution, and chronological month-cursor advancement.
-- `tasks/inspect_historical_scheduler_status.py` — emits read-only `manager_historical_scheduler_status_v1` service status: selected month/stage, readiness, lock state, latest decision, provider gate posture, failure evidence summary, gated-scope states, and recommended operator action.
+- `tasks/inspect_historical_scheduler_status.py` — emits read-only `manager_historical_scheduler_status_v1` service status: selected month/stage, readiness, lock state, latest decision, provider dispatch posture, failure evidence summary, gated-scope states, and recommended operator action.
 - `tasks/submit_manager_requests.py` — validates or persists manager request rows.
 - `tasks/materialize_request_payloads.py` — writes component-readable parameter payloads behind `parameter_ref` and can persist request-scoped `input_binding_v1` metadata.
 - `tasks/validate_request_handoff.py` — validates materialized request payloads against component `build_context` paths without dispatching work or calling providers.
@@ -70,8 +63,7 @@ PYTHONPATH=src python3 scripts/tasks/advance_model_training_workflow.py --start-
 PYTHONPATH=src python3 scripts/tasks/collect_dataset_evidence.py --write --output-path storage/runtime/dataset_expansion/evidence.json
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --collect-evidence-from-db --start-month 2016-01 --end-month 2016-01
-PYTHONPATH=src python3 scripts/tasks/dispatch_approved_provider_acquisition.py --start-month 2016-01 --end-month 2016-01 --approval storage/runtime/live_call_approval_layer_01.json
-PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval.py live_requests.jsonl --approval live_call_approval.json
+PYTHONPATH=src python3 scripts/tasks/dispatch_provider_acquisition.py --start-month 2016-01 --end-month 2016-01 --model-layer layer_01_market_regime --execute-provider-calls
 PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.py --start-month 2016-01 --end-month 2016-01 --write
 PYTHONPATH=src python3 scripts/tasks/execute_layer_eight_option_feature_generation.py --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/execute_model_training_stage.py --start-month 2016-01 --end-month 2016-01 --write

@@ -1,7 +1,7 @@
 """Layer 1-8 historical model-training workflow graph.
 
 The manager owns orchestration across all model layers. This module defines the
-current automation graph, command surfaces, owner-observed automation gates, and
+current automation graph, command surfaces, provider automation gates, and
 dependency status without weakening broker/order/account boundaries.
 """
 
@@ -125,7 +125,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "background_panel_continuous",
         "candidate_axis": "month",
         "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each chronological month, then continue to the next month without waiting for downstream layers",
-        "data_surface": "agent-reviewed owner-observed Alpaca ETF bars acquisition plus feature_01_market_regime",
+        "data_surface": "autonomous Alpaca ETF bars acquisition plus feature_01_market_regime",
         "feature_cli": "trading-data-feature-01-market-regime",
     },
     {
@@ -136,7 +136,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "month;sector_or_industry_symbol",
         "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each chronological month once Layer 1 context exists, then continue forward without waiting for Layers 3-8",
-        "data_surface": "agent-reviewed owner-observed Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
+        "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
     {
@@ -352,7 +352,7 @@ def count_layer_two_task_keys(storage_root: Path, *, start_month: str) -> int:
     return count_alpaca_bar_task_keys(storage_root, start_month=start_month, model_layer=LAYER_TWO_MODEL_LAYER)
 
 
-def _stage_status_for_approval_gated_acquisition(
+def _stage_status_for_provider_acquisition(
     *,
     task_key_count: int,
     required_count: int,
@@ -360,7 +360,7 @@ def _stage_status_for_approval_gated_acquisition(
 ) -> tuple[StageStatus, tuple[str, ...], str | None]:
     if task_key_count < required_count:
         return "blocked", (preparation_blocker,), None
-    return "blocked", ("live_call_approval_v1",), "live_call_approval_v1"
+    return "ready", (), None
 
 
 def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int, layer_two_task_key_count: int) -> LayerWorkflow:
@@ -374,13 +374,13 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
     maintenance = maintenance_command(layer, slug)
 
     if layer == 1:
-        acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_approval_gated_acquisition(
+        acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_provider_acquisition(
             task_key_count=layer_one_task_key_count,
             required_count=LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
             preparation_blocker="layer_01_task_key_preparation",
         )
     elif layer == 2:
-        acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_approval_gated_acquisition(
+        acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_provider_acquisition(
             task_key_count=layer_two_task_key_count,
             required_count=LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
             preparation_blocker="layer_02_task_key_preparation",
@@ -402,16 +402,15 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/dispatch_approved_provider_acquisition.py",
+            "scripts/tasks/dispatch_and_reconcile_provider_stage.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
             "${END_MONTH}",
-            "--approval",
-            "${LIVE_CALL_APPROVAL_JSON}",
             "--model-layer",
             key,
             "--skip-registered-failures",
+            "--reject-terminal-coverage",
         ]
     elif layer == 3:
         acquisition_command = [
@@ -461,7 +460,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
             blockers=acquisition_blockers,
             approval_gate_required=acquisition_gate,
             safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
-            provider_calls_allowed=False,
+            provider_calls_allowed=layer in {1, 2},
         )
     ]
     if meta.get("feature_cli") is None:
@@ -564,12 +563,7 @@ def build_model_training_workflow_plan(
     next_stage = None
     for layer in layers:
         for stage in layer.stages:
-            only_blocked_by_approval = (
-                stage.status == "blocked"
-                and stage.approval_gate_required is not None
-                and stage.blockers == (stage.approval_gate_required,)
-            )
-            if stage.status == "ready" or only_blocked_by_approval:
+            if stage.status == "ready":
                 next_stage = stage
                 break
         if next_stage is not None:

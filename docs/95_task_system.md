@@ -22,7 +22,7 @@ manager_request_v1
 
 The manager uses the same lifecycle for data, model, storage, execution, and dashboard work. Component-local task queues may exist, but their private queue schemas do not become shared contracts.
 
-For historical model training, manager is the scheduler/orchestrator. It should prepare and issue the layer-scoped component request set itself, not wait for an operator to manually prompt each feed, feature, or model step. Formal historical work must move chronological-forward from the accepted common start (`2016-01`) month by month; the scheduler should not jump to newer months before older eligible months are planned, dispatched, and received unless a reviewed operator exception is recorded. Owner-observed agent review is the default boundary control for historical provider acquisition, model promotion/activation decisions, and storage lifecycle decisions; the owner observes and intervenes on issues instead of approving every routine historical batch. Broker/order/fill/account mutation remains execution-library scope and is outside this historical modeling workflow. Realtime monitoring runtime control also remains execution-owned: manager may consume append-only realtime receipts/evidence, but must not start, stop, schedule, throttle, or reconnect realtime provider monitoring processes. The long-running scheduler policy is defined in [`98_automation_scheduler.md`](98_automation_scheduler.md): keep safe historical work moving, but reserve capacity and regular-trading-day market-hours priority for live monitoring/execution.
+For historical model training, manager is the scheduler/orchestrator. It should prepare and issue the layer-scoped component request set itself, not wait for an operator to manually prompt each feed, feature, or model step. Formal historical work must move chronological-forward from the accepted common start (`2016-01`) month by month; the scheduler should not jump to newer months before older eligible months are planned, dispatched, and received unless a reviewed operator exception is recorded. Historical provider acquisition advances autonomously under manager controls; owner-observed agent review remains the boundary for model promotion/activation decisions and storage lifecycle decisions. The owner observes and intervenes on issues instead of approving routine historical batches. Broker/order/fill/account mutation remains execution-library scope and is outside this historical modeling workflow. Realtime monitoring runtime control also remains execution-owned: manager may consume append-only realtime receipts/evidence, but must not start, stop, schedule, throttle, or reconnect realtime provider monitoring processes. The long-running scheduler policy is defined in [`98_automation_scheduler.md`](98_automation_scheduler.md): keep safe historical work moving, but reserve capacity and regular-trading-day market-hours priority for live monitoring/execution.
 
 `trading_manager.task_summary` is the global read model for all requests. It joins request, latest run, latest ready signal, and artifact counts so dashboards and operators can see every task in one priority-ordered surface.
 
@@ -70,7 +70,7 @@ Manager stores concise output references only. It does not copy large output lis
 
 Artifact discovery is component-receipt-driven. Final `outputs` become downstream output artifacts; `steps.*.references` become supporting component artifacts such as `request_manifest`, `clean_equity_bar`, and `clean_schema`. Duplicate references are collapsed so the saved output is not counted twice when it appears in both `outputs` and a `save` step. These supporting artifacts may be attached to the ready signal for traceability, but they do not expand provider calls or imply stage-level coverage.
 
-A task-level `ready_signal_v1` is not enough to unlock a workflow stage. Stage advancement must pass a `manager_stage_coverage_v1` gate over `task_summary`: for example, Layer 1 January 2016 data acquisition remains `partial_ready` at `3/22` ready requests and may unlock feature generation only at full expected coverage with `can_unlock_downstream=true`. Coverage accounting must preserve observed terminal states: an actual failed request remains in `failed_count`, even when later review accepts it as a normal historical absence. A stage may pass with `ready_count + accepted_failed_count >= expected_count` only when every failed request is covered by explicit agent failure-review evidence plus any required owner-observed decision artifact; it must not rewrite failures into ready rows. Accepted failed requests without an agent review reference are invalid.
+A task-level `ready_signal_v1` is not enough to unlock a workflow stage. Stage advancement must pass a `manager_stage_coverage_v1` gate over `task_summary`: for example, Layer 1 January 2016 data acquisition remains `partial_ready` at `3/22` ready requests and may unlock feature generation only at full expected coverage with `can_unlock_downstream=true`. Coverage accounting must preserve observed terminal states: an actual failed request remains in `failed_count`, even when later review accepts it as a normal historical absence. A stage may pass with `ready_count + accepted_failed_count >= expected_count` only when every failed request is covered by explicit agent failure-review evidence plus any required review artifact; it must not rewrite failures into ready rows. Accepted failed requests without an agent review reference are invalid.
 
 Failed requests also belong in `trading_manager.failure_register`. The register records current state (`observed`, `agent_review_required`, `retry_required`, `corrected`, `accepted_skip`, or `unresolved`), the agent review artifact, correction evidence when applicable, and whether future matching requests should be skipped. A fixable failure should move to `corrected` only after the agent-reviewed fix evidence exists. A normal historical absence such as a not-yet-listed symbol may move to `accepted_skip`; future provider dispatch can then skip that exact registered request instead of repeating a known-useless call. When the not-yet-listed fact is clear before dispatch, a preflight agent review may register `accepted_skip` without making the known-useless provider call; stage coverage counts that row as a reviewed terminal skip, not as a ready output.
 
@@ -114,7 +114,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py \
   --end-month 2016-01
 ```
 
-By default this is plan-only and reports the next safe internal work item or explicit backoff reason. Add `--execute-safe-preparation` to let the scheduler write Layer 1 task-key payload files and validate handoff shape. This still performs no provider calls, model activation, or broker/execution work. Layer 1 Alpaca bar acquisition is the next internal historical-training stage; `live_call_approval_v1` is the safety gate for that stage, not an external manual dependency.
+By default this is plan-only and reports the next internal work item or explicit backoff reason. Add `--execute-safe-preparation` to let the scheduler write Layer 1 task-key payload files and validate handoff shape. Preparation still performs no provider calls, model activation, or broker/execution work. After payloads exist, Layer 1 Alpaca bar acquisition advances through autonomous historical provider dispatch and reconciliation under resource/terminal-coverage guards.
 
 Prepare the first Layer 1 historical-training batch directly as one manager-owned operation:
 
@@ -201,7 +201,7 @@ PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.p
   --write
 ```
 
-The artifact is `manager_layer_08_option_expression_gate_review_v1`. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active Layer 7 action chains, and records a reviewed no-provider skip when all Layer 7 rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action is owner-observed agent review of the bounded provider packet before dispatch; if no active request previews exist, the review itself is sufficient evidence to complete Layer 8 data acquisition as a no-provider skip.
+The artifact is `manager_layer_08_option_expression_gate_review_v1`. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active Layer 7 action chains, and records a reviewed no-provider skip when all Layer 7 rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action is bounded autonomous provider dispatch; if no active request previews exist, the review itself is sufficient evidence to complete Layer 8 data acquisition as a no-provider skip.
 
 Layer 8 feature generation now runs through the manager adapter `scripts/tasks/execute_layer_eight_option_feature_generation.py`. When the gate review is `no_provider_skip_accepted` with zero active requests, the adapter writes `layer_08_option_expression_feature_generation_no_provider_skip_receipt_YYYY-MM.json` and treats `feature_08_option_expression` as a reviewed no-op. When active option requests were approved and acquired, the same adapter delegates to trading-data `feature_08_option_expression` with month-scoped source windows.
 
@@ -213,36 +213,24 @@ PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py \
   --request-id mgrreq_backfill_alpaca_bars_2016_01
 ```
 
-This imports the target `trading-data` feed pipeline and calls only `build_context`. It verifies the request, payload, hash-backed `input_binding_v1`, dry-run live-call policy, and component task-key shape. It does not call component `run`, does not call providers, does not write completion receipts, and does not change task status.
+This imports the target `trading-data` feed pipeline and calls only `build_context`. It verifies the request, payload, hash-backed `input_binding_v1`, dry-run manager controls, and component task-key shape. It does not call component `run`, does not call providers, does not write completion receipts, and does not change task status.
 
-Create a complete local approval packet when preparing a reviewed live-call batch:
+Dispatch historical provider acquisition autonomously when the stage dashboard shows pending request ids:
 
 ```bash
-PYTHONPATH=src python3 scripts/tasks/create_live_call_approval_packet.py \
+PYTHONPATH=src python3 scripts/tasks/dispatch_and_reconcile_provider_stage.py \
   --model-layer layer_02_sector_context \
   --start-month 2016-01 \
   --end-month 2016-01 \
-  --pending-only \
-  --limit 3 \
-  --write
+  --execute-provider-calls \
+  --continue-on-error \
+  --skip-registered-failures \
+  --reject-terminal-coverage
 ```
 
-Use `--pending-only` for normal runtime packets. It reads `manager_stage_coverage_v1`, excludes already ready requests and reviewed terminal accepted skips/failures, and blocks planning while unreviewed failed requests exist. Explicit `--symbol`/`--request-id` filters may still be used, but terminal requests are removed before proposal creation. The generated execute command includes `--reject-terminal-coverage` so provider execution refuses already terminal request ids if coverage changed after packet creation.
+The active historical provider path no longer has a per-batch manual gate. It dispatches bounded manager request ids under resource controls, terminal-coverage rejection, receipts, and failure registration. It still does not activate models, construct or execute broker orders, mutate accounts, or perform storage lifecycle mutation.
 
-The packet writes a proposal, a deliberately invalid `reviewed_approval_TEMPLATE.json`, a separate `reviewed_approval.json` working approval artifact, validation output target, dispatch plan/execute summary targets, reconcile summary/failure-proposal/coverage targets, and a status command under `storage/runtime/approvals/...`. It is a local runtime bundle only: packet creation does not approve, validate as reviewed, dispatch, or call providers. Routine historical operation should use owner-observed agent review to fill `reviewed_approval.json`; manual editing remains available for intervention/debugging. Generated approval ids are stable and do not include review-placeholder text; placeholder fields remain inside the invalid template/body until reviewed.
-
-Inspect packet status at any time:
-
-```bash
-PYTHONPATH=src python3 scripts/tasks/inspect_live_call_approval_packet.py \
-  --packet storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet.json \
-  --write \
-  --output-path storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet_status.json
-```
-
-The status artifact is `manager_live_call_approval_packet_status_v1`. It reports the local lifecycle as `template_pending_review`, `approval_ready_pending_validation`, `approval_validated_pending_dispatch_plan`, `dispatch_plan_ready_pending_execute`, `executed_pending_reconcile`, `reconciled`, or `packet_inconsistent`. Status inspection is read-only and also reports the next safe action.
-
-For normal operation, use the stage-run dashboard as the single human-facing entry point:
+For normal operation, use the stage-run dashboard as the single operator-facing entry point:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/summarize_stage_run.py \
@@ -253,11 +241,11 @@ PYTHONPATH=src python3 scripts/tasks/summarize_stage_run.py \
   --write
 ```
 
-The dashboard artifact is `manager_stage_run_dashboard_v1`. It summarizes stage coverage, packet statuses, observed provider calls, evidence refs, the next pending-only packet preview, and the next safe action. Lower-level artifacts remain the audit trail, but operators should normally inspect this dashboard first instead of manually opening proposal/validation/dispatch/reconcile/coverage files.
+The dashboard artifact is `manager_stage_run_dashboard_v1`. It summarizes stage coverage, observed provider calls, evidence refs, the next autonomous provider-dispatch preview, and the next safe action.
 
-Workflow checkpoints keep `provider_calls` as the safe/offline stage counter and record approved acquisition calls from ingested receipts in `provider_calls_observed`. This preserves the safety invariant that offline stages report zero provider calls while still making month-level acquisition volume visible to dashboards and audits.
+Workflow checkpoints keep `provider_calls` as the safe/offline stage counter and record acquisition calls from ingested receipts in `provider_calls_observed`. This preserves the safety invariant that offline stages report zero provider calls while still making month-level acquisition volume visible to dashboards and audits.
 
-For the simplest safe control loop, run one conservative controller step:
+For the simplest control loop, run one controller step:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/run_stage_controller.py \
@@ -268,65 +256,9 @@ PYTHONPATH=src python3 scripts/tasks/run_stage_controller.py \
   --write
 ```
 
-The controller emits `manager_stage_run_controller_receipt_v1`, refreshes the dashboard, and may create the next pending-only packet when no packet already needs review. Historical provider dispatch is now intended to be owner-observed agent-reviewed automation: the agent can review/validate/plan a bounded packet and execute the provider call batch while preserving proposal validation, terminal-coverage rejection, receipts, and reconciliation. It still stops at broker/order/fill/account mutation, and model/storage mutations require their own agent decision artifacts.
+The controller emits `manager_stage_run_controller_receipt_v1`, refreshes the dashboard, and may execute the next bounded autonomous provider-dispatch slice. It still stops at broker/order/fill/account mutation, and model/storage mutations require their own agent decision artifacts.
 
-Before any persistent owner-observed agent approval is written, rehearse the packet mechanics without changing persistent packet state:
-
-```bash
-PYTHONPATH=src python3 scripts/tasks/rehearse_live_call_approval_packet.py \
-  --packet storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet.json \
-  --write \
-  --output-path storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet_rehearsal.json
-```
-
-The rehearsal artifact is `manager_live_call_approval_packet_rehearsal_v1`. It uses temporary in-memory/on-disk approval files to validate the proposal and run plan-only dispatch, but it does not write a persistent approval, validation, dispatch-plan, or execute artifact into the packet and does not advance packet status. It must report `provider_calls=0` and `dispatch_performed=false`.
-
-Plan the exact request ids for a reviewed live-call approval before creating or editing an approval artifact:
-
-```bash
-PYTHONPATH=src python3 scripts/tasks/plan_live_call_approval.py \
-  --model-layer layer_02_sector_context \
-  --start-month 2016-01 \
-  --end-month 2016-01 \
-  --pending-only \
-  --limit 3 \
-  --write \
-  --output-path storage/runtime/approvals/layer_02_sector_context/live_call_approval_proposal_layer_02_smoke_xlb_xlk_xle_2016-01.json
-```
-
-The proposal excludes `accepted_skip` rows from `trading_manager.failure_register`, emits a deliberately invalid `live_call_approval_v1` template with review placeholders, and prints plan/execute command templates. It does not approve, dispatch, call providers, activate models, or mutate broker/storage lifecycle state.
-
-Owner-observed agent review can fill the real approval artifact, validate it exactly against the proposal, and write a plan-only dispatch artifact before any provider dispatch attempt:
-
-```bash
-PYTHONPATH=src python3 scripts/tasks/agent_review_live_call_approval_packet.py \
-  --packet storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/packet.json \
-  --write
-```
-
-Manual review can still fill an approval artifact for intervention/debugging; either path must validate exactly against the proposal before dispatch:
-
-```bash
-PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval_proposal.py \
-  --proposal storage/runtime/approvals/layer_02_sector_context/live_call_approval_proposal_layer_02_smoke_xlb_xlk_xle_2016-01.json \
-  --approval storage/runtime/approvals/layer_02_sector_context/live_call_approval_layer_02_smoke_xlb_xlk_xle_2016-01.json \
-  --write \
-  --output-path storage/runtime/approvals/layer_02_sector_context/layer_02_sector_context_2016_01_xlb_xle_xlk/proposal_validation.json
-```
-
-This proposal-bound validation requires `approval.request_ids` to exactly equal `proposal.request_ids`, rejects any request id listed as a registered skip in the proposal, requires `max_requests` to equal the proposal request count, and then runs the normal live-call gate validation on regenerated non-dry-run manager requests. It is still plan-only: no provider dispatch or mutation occurs.
-
-Validate a reviewed live-call approval artifact before converting a request into live provider handoff:
-
-```bash
-PYTHONPATH=src python3 scripts/tasks/validate_live_call_approval.py \
-  live_requests.jsonl \
-  --approval live_call_approval.json
-```
-
-`validate_live_call_approval.py` validates only the manager-side gate. It requires a non-dry-run `manager_request_v1` with `live_call_policy_required` and `live_call_approval_gate_v1` policy refs plus a `live_call_approval_v1` artifact with explicit approved request ids, provider allowlist, max request count, max window days, expiry, `approval_scope=provider_data_acquisition_only`, and `broker_execution_allowed=false`. It does not dispatch components, call providers, approve model promotion, or enable broker execution.
-
-Provider dispatch is batch-aware. Plan-only dispatch can validate the approval and print commands, but actual `--execute-approved-provider-calls` now also requires `--approval-validation` pointing to a `manager_live_call_approval_proposal_validation_v1` artifact for the exact executable live request ids. Use `--continue-on-error` only after both gates pass when individual provider/feed misses should become failed component receipts instead of aborting the entire approved batch. This keeps per-request failure evidence queryable in manager SQL while preserving the same approval scope and broker/model prohibitions.
+Provider dispatch is batch-aware. Plan-only dispatch prints commands without provider calls; actual `--execute-provider-calls` runs autonomous historical acquisition for bounded request ids, strips retired approval-policy refs from runtime task keys, and preserves broker/model prohibitions. Use `--continue-on-error` only when individual provider/feed misses should become failed component receipts instead of aborting the batch.
 
 Run a deterministic in-memory rehearsal of the request/receipt/summary lifecycle without provider calls or SQL writes:
 
@@ -384,7 +316,7 @@ PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_rec
 
 By default these scripts print normalized rows and do not mutate SQL. `--write` persists to the manager control-plane tables.
 
-After an approved provider batch has produced component receipts, reconcile the stage in one safe offline pass:
+After an provider batch has produced component receipts, reconcile the stage in one safe offline pass:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/reconcile_provider_stage.py \
@@ -435,6 +367,6 @@ The coverage report is evidence only when partial. It marks a workflow stage suc
 - Manager-owned historical-training orchestration prepares whole layer batches; it must not degrade into manual one-request-at-a-time prompting.
 - Formal historical work advances chronological-forward from `2016-01`; newer months must not leapfrog older eligible months without a reviewed operator exception.
 - Historical work is background work relative to live monitoring/execution; the scheduler must respect resource budgets and market-hours protection only on regular US equity trading days during the protected window.
-- Live provider acquisition requires an owner-observed agent-reviewed and proposal-validated `live_call_approval_v1`; dry-run planning, payload materialization, and handoff validation are not approval.
-- Live-call approval is data-acquisition-only; it must not permit broker orders, fills, account mutation, model activation, or execution-side lifecycle changes.
+- Historical provider acquisition is autonomous after manager payload preparation; dry-run planning, payload materialization, and handoff validation remain no-provider preparation. Broker/order/account mutation and model activation still require separate approval boundaries.
+- Autonomous provider dispatch is data-acquisition-only; it must not permit broker orders, fills, account mutation, model activation, or execution-side lifecycle changes.
 - Secrets must be aliases/config refs only.

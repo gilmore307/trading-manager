@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import json
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from trading_manager_tasks.live_call_packet import create_live_call_approval_packet
-from trading_manager_tasks.monthly_backfill import LAYER_TWO_MODEL_LAYER
 from trading_manager_tasks.stage_coverage import StageCoverageReport
-from trading_manager_tasks.stage_run_dashboard import build_stage_run_dashboard, collect_packet_summaries, default_dashboard_path
+from trading_manager_tasks.stage_run_dashboard import (
+    StageRunProviderDispatchPreview,
+    build_stage_run_dashboard,
+    default_dashboard_path,
+)
 
 
 def _coverage(*, status: str = "partial_ready") -> StageCoverageReport:
@@ -45,87 +45,51 @@ def _coverage(*, status: str = "partial_ready") -> StageCoverageReport:
     )
 
 
+def _preview(*, available: bool = True) -> StageRunProviderDispatchPreview:
+    return StageRunProviderDispatchPreview(
+        available=available,
+        reason="autonomous provider dispatch preview available" if available else "no pending request ids available",
+        request_count=1 if available else 0,
+        request_ids=("mgrreq_backfill_alpaca_bars_arkg_2016_01",) if available else (),
+        skipped_registered_request_ids=(),
+        command_preview=(("python3", "-m", "data_feed.01_feed_alpaca_bars", "task_key.json"),) if available else (),
+        execute_command_template=("PYTHONPATH=src", "python3", "scripts/tasks/dispatch_and_reconcile_provider_stage.py"),
+    )
+
+
 class StageRunDashboardTests(unittest.TestCase):
-    def test_collect_packet_summaries_reads_packet_statuses(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_tmp, patch(
-            "trading_manager_tasks.live_call_planning.accepted_failure_request_ids_from_register",
-            return_value=((), ()),
+    def test_dashboard_is_single_receipt_with_coverage_and_next_provider_dispatch(self) -> None:
+        with patch("trading_manager_tasks.stage_run_dashboard.collect_stage_coverage", return_value=_coverage()), patch(
+            "trading_manager_tasks.stage_run_dashboard.preview_next_provider_dispatch",
+            return_value=_preview(),
         ):
-            root = Path(raw_tmp)
-            packet = create_live_call_approval_packet(
-                model_layer=LAYER_TWO_MODEL_LAYER,
-                start_month="2016-01",
-                end_month="2016-01",
-                storage_root=root / "manager_storage",
-                packet_root=root / "packets",
-                symbols=("XLK",),
-                write=True,
-            )
-            rows = collect_packet_summaries(
-                model_layer=LAYER_TWO_MODEL_LAYER,
-                stage_id="layer_02_sector_context.data_acquisition",
-                start_month="2016-01",
-                end_month="2016-01",
-                packet_root=root / "packets",
-            )
-
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0].packet_id, packet.packet_id)
-        self.assertEqual(rows[0].status, "template_pending_review")
-        self.assertEqual(rows[0].provider_calls, 0)
-
-    def test_dashboard_is_single_receipt_with_coverage_packets_and_next_pending_packet(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_tmp, patch(
-            "trading_manager_tasks.live_call_planning.accepted_failure_request_ids_from_register",
-            return_value=((), ()),
-        ), patch(
-            "trading_manager_tasks.live_call_planning.collect_stage_coverage",
-            return_value=_coverage(),
-        ), patch(
-            "trading_manager_tasks.stage_run_dashboard.collect_stage_coverage",
-            return_value=_coverage(),
-        ):
-            root = Path(raw_tmp)
-            create_live_call_approval_packet(
-                model_layer=LAYER_TWO_MODEL_LAYER,
-                start_month="2016-01",
-                end_month="2016-01",
-                storage_root=root / "manager_storage",
-                packet_root=root / "packets",
-                symbols=("XLK",),
-                write=True,
-            )
             dashboard = build_stage_run_dashboard(
                 stage_id="layer_02_sector_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
-                packet_root=root / "packets",
-                packet_storage_root=root / "manager_storage",
+                packet_storage_root=Path("/tmp/does-not-exist"),
                 next_limit=1,
             )
 
         self.assertEqual(dashboard.contract_type, "manager_stage_run_dashboard_v1")
         self.assertEqual(dashboard.coverage["ready_count"], 3)
         self.assertEqual(dashboard.coverage["pending_count"], 17)
-        self.assertEqual(dashboard.packet_count, 1)
-        self.assertTrue(dashboard.next_recommended_packet.available)
-        self.assertEqual(dashboard.next_recommended_packet.request_count, 1)
-        self.assertEqual(dashboard.next_recommended_packet.request_ids, ("mgrreq_backfill_alpaca_bars_arkg_2016_01",))
-        self.assertEqual(dashboard.next_action, "review_existing_pending_packet")
+        self.assertTrue(dashboard.next_provider_dispatch.available)
+        self.assertEqual(dashboard.next_provider_dispatch.request_count, 1)
+        self.assertEqual(dashboard.next_provider_dispatch.request_ids, ("mgrreq_backfill_alpaca_bars_arkg_2016_01",))
+        self.assertEqual(dashboard.next_action, "autonomous_provider_dispatch_ready")
         self.assertFalse(dashboard.broker_execution_performed)
+        self.assertFalse(dashboard.model_activation_performed)
 
-    def test_dashboard_prioritizes_failed_coverage_over_next_packet(self) -> None:
+    def test_dashboard_prioritizes_failed_coverage_over_dispatch_preview(self) -> None:
         with patch("trading_manager_tasks.stage_run_dashboard.collect_stage_coverage", return_value=_coverage(status="failed")), patch(
-            "trading_manager_tasks.stage_run_dashboard.preview_next_pending_packet"
-        ) as preview_mock:
-            preview_mock.return_value.available = True
-            preview_mock.return_value.request_count = 1
-            preview_mock.return_value.reason = "pending"
+            "trading_manager_tasks.stage_run_dashboard.preview_next_provider_dispatch",
+            return_value=_preview(),
+        ):
             dashboard = build_stage_run_dashboard(
                 stage_id="layer_02_sector_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
-                packet_root=Path("/tmp/does-not-exist"),
                 packet_storage_root=Path("/tmp/does-not-exist"),
                 next_limit=1,
             )

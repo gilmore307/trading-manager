@@ -248,7 +248,7 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
         "source_id": defaults.source_id,
         "target_repo_id": request["target_repo_id"],
         "target_component_kind": request["target_component_kind"],
-        "production_mode": "dry_run" if request.get("dry_run", True) else "live",
+        "production_mode": "dry_run" if request.get("dry_run", True) else "historical_provider_acquisition",
         "dry_run": bool(request.get("dry_run", True)),
         "month": month,
         "window": {"start_date": start_date, "end_date_exclusive": end_date_exclusive},
@@ -259,13 +259,8 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
         "manager_controls": {
             "parameter_ref": parameter_ref,
             "allow_live_provider_calls": not bool(request.get("dry_run", True)),
-            "requires_live_call_policy": "live_call_policy_required" in set(request.get("policy_refs") or []),
+            "autonomous_historical_provider_acquisition": not bool(request.get("dry_run", True)),
             "secrets_policy": "secret_aliases_only",
-        },
-        "live_call_policy": {
-            "allow_live_calls": not bool(request.get("dry_run", True)),
-            "allowed_providers": [] if request.get("dry_run", True) else [defaults.source_id.split("_", 1)[0]],
-            "max_requests": 0 if request.get("dry_run", True) else None,
         },
     }
 

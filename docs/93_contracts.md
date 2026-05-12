@@ -126,9 +126,9 @@ These contracts gate provider/API calls after dry-run planning and before compon
 
 | Contract | Owns | Does Not Own |
 |---|---|---|
-| `live_call_approval_v1` | Reviewed permission for a bounded non-dry-run provider acquisition request. | Provider implementation, component dispatch, broker/order execution, or model promotion approval. |
+| `autonomous_historical_provider_acquisition_v1` | Bounded manager-owned historical provider/data acquisition after payload preparation. | Broker/order/account mutation, model activation, or model promotion approval. |
 
-A valid `live_call_approval_v1` must be explicit and narrow: it names approved `request_ids`, has `decision_status=approve`, uses `approval_scope=provider_data_acquisition_only`, sets `allowed_providers`, `max_requests`, `max_window_days`, `expires_at_utc`, and keeps `broker_execution_allowed=false`.
+Historical provider acquisition no longer requires per-batch `autonomous_historical_provider_acquisition_v1`. The active contract is bounded by manager request ids, resource gates, terminal-coverage guards, provider receipts, and reconciliation. Broker execution, order construction, account mutation, model activation, and promotion remain outside this contract.
 
 ### Downstream Handoff Contracts
 
@@ -181,7 +181,7 @@ Required fields:
 | `target_component` | `component_ref_v1`. |
 | `input_bindings` | One or more `input_binding_v1` records or refs. |
 | `expected_outputs` | Output type names or artifact expectations. |
-| `policy_refs` | Guardrail, retry, live-call, promotion, or safety policy refs. |
+| `policy_refs` | Guardrail, retry, provider-call, promotion, or safety policy refs. |
 
 Optional fields:
 
@@ -553,13 +553,13 @@ The first implementation slice is intentionally small:
 
 `component_ref_v1` is not a table yet. It is represented by registry-backed component/repo/version/entrypoint fields on the durable tables.
 
-The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows, `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary, `scripts/tasks/plan_model_promotion_review.py` plans the single manager-side promotion review request kind for all model layers, and `scripts/tasks/validate_live_call_approval.py` validates reviewed live-call approval artifacts before any provider dispatch.
+The first task-system helper slice is also implemented: `scripts/tasks/submit_manager_requests.py` validates/persists manager requests, `scripts/tasks/record_completion_receipt.py` normalizes component completion receipts into `run_manifest_v1`, `artifact_ref_v1`, and `ready_signal_v1` rows, `trading_manager.task_summary` / `scripts/tasks/list_task_summary.py` expose the global priority-ordered task summary, `scripts/tasks/plan_model_promotion_review.py` plans the single manager-side promotion review request kind for all model layers, and `scripts/tasks/dispatch_provider_acquisition.py` plans or executes bounded autonomous provider dispatch.
 
 Current manager closeout stance:
 
 1. Request/receipt/task-summary MVP is implemented and rehearsed.
 2. Model-promotion review routing and decision/activation artifact builders are implemented.
-3. Owner-observed live-call agent-review/validation is defined and registered; provider dispatch remains bounded to historical provider acquisition scope.
+3. Owner-observed provider-call agent-review/validation is defined and registered; provider dispatch remains bounded to historical provider acquisition scope.
 4. Broker/order/fill/account lifecycle remains outside `trading-manager` and must stay execution-owned.
 5. A component catalog or additional SQL tables should be added only when real query or lifecycle pressure proves they are needed.
 

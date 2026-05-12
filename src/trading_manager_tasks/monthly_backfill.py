@@ -21,7 +21,7 @@ DEFAULT_REQUESTED_BY = "openclaw"
 DEFAULT_START_MONTH = "2016-01"
 OKX_START_MONTH = "2018-01"
 CHRONOLOGICAL_FORWARD_POLICY_REF = "chronological_forward_backfill_policy_v1"
-DEFAULT_POLICY_REFS = ("monthly_backfill_v1", CHRONOLOGICAL_FORWARD_POLICY_REF, "live_call_policy_required")
+DEFAULT_POLICY_REFS = ("monthly_backfill_v1", CHRONOLOGICAL_FORWARD_POLICY_REF, "autonomous_historical_provider_acquisition_v1")
 DEFAULT_PROJECTS_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
     DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "market_regime_etf_universe.csv"

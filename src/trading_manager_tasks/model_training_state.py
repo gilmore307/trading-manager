@@ -190,8 +190,6 @@ def _layer_complete(layer_number: int, stages: Mapping[str, StageProgress]) -> b
 
 
 def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
-    if blocker == "live_call_approval_v1":
-        return False
     if blocker == "layer_01_task_key_preparation":
         return False
     if blocker == "upstream_layers_01_07_complete":
@@ -612,7 +610,7 @@ def advance_workflow_state(
         if "=" in raw:
             stage_id, approval_ref = raw.split("=", 1)
         else:
-            stage_id, approval_ref = raw, "live_call_approval_v1"
+            stage_id, approval_ref = raw, "stage_approval_ref"
         state = mark_stage_approved(state, stage_id=stage_id, approval_ref=approval_ref)
     state = ingest_stage_receipts(
         state,

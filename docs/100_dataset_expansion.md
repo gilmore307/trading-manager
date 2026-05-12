@@ -8,7 +8,7 @@ Status: accepted manager-control policy for historical model training; no provid
 
 The manager decision is still bounded by hard gates:
 
-- historical provider calls require owner-observed agent-reviewed `live_call_approval_v1` plus proposal validation;
+- historical provider calls use autonomous bounded acquisition after manager payload preparation and resource/coverage guards;
 - model activation requires an approving script-called `agent_model_promotion_decision_v1`;
 - storage lifecycle mutation requires a script-called `agent_storage_lifecycle_decision_v1`;
 - broker/order/fill/account mutation remains execution-owned and forbidden here.
@@ -143,7 +143,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py \
   --end-month 2016-01
 ```
 
-Add `--write` only to let manager prepare the selected safe expansion artifacts/payloads. For Layer 1, this writes the full Alpaca ETF task-key payload set and handoff validation evidence, but still performs zero provider calls. Actual provider dispatch remains blocked until `live_call_approval_v1` is validated and `dispatch_approved_provider_acquisition.py --execute-approved-provider-calls` is explicitly used.
+Add `--write` only to let manager prepare the selected safe expansion artifacts/payloads. For Layer 1, this writes the full Alpaca ETF task-key payload set and handoff validation evidence, but still performs zero provider calls. After preparation, provider dispatch proceeds through autonomous `dispatch_and_reconcile_provider_stage.py` under resource and terminal-coverage guards.
 
 The emitted contracts are `manager_dataset_evidence_v1` and `manager_dataset_expansion_plan_v1`.
 

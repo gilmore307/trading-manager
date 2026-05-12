@@ -1,4 +1,4 @@
-"""Safe execution adapter for ready offline model-training workflow stages."""
+"""Execution adapter for ready model-training workflow stages."""
 
 from __future__ import annotations
 
@@ -124,16 +124,42 @@ def _validate_safe_stage(stage: StageProgress) -> None:
     if stage.stage_type not in SAFE_OFFLINE_STAGE_TYPES:
         raise TaskSystemError(f"stage type is not safe offline executable: {stage.stage_type}")
     if stage.stage_type == "data_acquisition" and not any(
-        token.endswith("materialize_layer_three_target_state_inputs.py")
+        token.endswith("dispatch_and_reconcile_provider_stage.py")
+        or token.endswith("dispatch_provider_acquisition.py")
+        or token.endswith("materialize_layer_three_target_state_inputs.py")
         or token.endswith("materialize_layer_four_event_overlay_inputs.py")
         or token.endswith("review_layer_eight_option_expression_gate.py")
         for token in stage.command
     ):
-        raise TaskSystemError(f"data_acquisition stage is not an approved local materialization/review command: {stage.stage_id}")
+        raise TaskSystemError(f"data_acquisition stage is not an allowed acquisition/materialization/review command: {stage.stage_id}")
     if not stage.command:
         raise TaskSystemError(f"stage has no command: {stage.stage_id}")
     if any("${" in token for token in stage.command):
         raise TaskSystemError(f"stage command still contains unresolved placeholder: {stage.stage_id}")
+
+
+def _extract_json_from_stdout(stdout: str) -> Mapping[str, Any]:
+    text = stdout.strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
+
+
+def _provider_call_count_from_stdout(stdout: str) -> int:
+    parsed = _extract_json_from_stdout(stdout)
+    if not parsed:
+        return 0
+    value = parsed.get("provider_calls")
+    if value is None and isinstance(parsed.get("dispatch"), Mapping):
+        value = parsed["dispatch"].get("provider_calls")
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _receipt_payload(
@@ -161,9 +187,9 @@ def _receipt_payload(
                 "output_refs": [],
             }
         ],
-        "provider_calls": 0,
-        "model_activation_performed": False,
-        "broker_execution_performed": False,
+        "provider_calls": summary.provider_calls,
+        "model_activation_performed": summary.model_activation_performed,
+        "broker_execution_performed": summary.broker_execution_performed,
     }
 
 
@@ -204,6 +230,7 @@ def execute_stage_process(
     stderr_path.write_text(result.stderr, encoding="utf-8")
     status = "succeeded" if result.returncode == 0 else "failed"
     receipt_path = stage_receipt_root / f"{stamp}.receipt.json"
+    provider_calls = _provider_call_count_from_stdout(result.stdout) if result.returncode == 0 else 0
     summary = StageExecutionSummary(
         contract_type="manager_stage_execution_summary_v1",
         stage_id=stage.stage_id,
@@ -213,7 +240,8 @@ def execute_stage_process(
         receipt_path=str(receipt_path),
         stdout_path=str(stdout_path),
         stderr_path=str(stderr_path),
-        reason=None if result.returncode == 0 else "safe offline command returned non-zero status",
+        provider_calls=provider_calls,
+        reason=None if result.returncode == 0 else "stage command returned non-zero status",
     )
     receipt_path.write_text(
         json.dumps(_receipt_payload(stage=stage, summary=summary, started_at=started, completed_at=completed), indent=2, sort_keys=True)
@@ -264,7 +292,7 @@ def execute_next_ready_stage(
             state,
             stage_id=stage.stage_id,
             receipt_ref=summary.receipt_path,
-            reason="stage completed by safe offline executor",
+            reason="stage completed by manager stage executor",
         )
         plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
         updated = refresh_workflow_state(updated, plan=plan)
@@ -279,7 +307,7 @@ def write_stage_execution_summary(summary: StageExecutionSummary, *, output: Tex
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Execute the next ready safe offline model-training workflow stage.")
+    parser = argparse.ArgumentParser(description="Execute the next ready model-training workflow stage.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

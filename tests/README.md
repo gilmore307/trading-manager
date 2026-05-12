@@ -25,13 +25,13 @@
 - `test_information_pass.py` verifies:
   - `manager_controlled_information_pass_v1` report construction;
   - safe 2016-01 information-pass writes with zero provider calls, model activation, broker execution, or storage lifecycle mutation;
-  - optional `live_call_approval_v1` plan-only validation without dispatch;
+  - optional `autonomous_historical_provider_acquisition_v1` plan-only validation without dispatch;
   - non-stressful host resource snapshot collection.
 
 - `test_model_training_workflow.py` verifies:
   - full Layer 1-8 manager workflow graph coverage;
   - per-layer data acquisition, feature, model generation, evaluation, promotion-review, and maintenance stages;
-  - Layer 1 task-key preparation to live-call approval gate progression;
+  - Layer 1 task-key preparation to autonomous provider dispatch gate progression;
   - explicit no-dedicated-feature handling for Layers 5-7.
 
 - `test_layer_three_target_state.py` verifies:
@@ -64,8 +64,8 @@
 - `test_provider_dispatch.py` verifies:
   - Layer 1 provider-dispatch approval validation;
   - default plan-only behavior with zero provider calls;
-  - concrete trading-data command planning after `live_call_approval_v1` validation;
-  - execution requiring exact `manager_live_call_approval_proposal_validation_v1` evidence;
+  - concrete trading-data command planning after `autonomous_historical_provider_acquisition_v1` validation;
+  - execution requiring exact `manager_provider_dispatch_proposal_validation_v1` evidence;
   - optional per-request failure continuation for approved batches;
   - registered accepted-failure skips with zero repeated provider calls.
 
@@ -76,12 +76,12 @@
 
 - `test_stage_run_controller.py` verifies:
   - one-step conservative `manager_stage_run_controller_receipt_v1` behavior;
-  - automatic pending-only packet creation when the dashboard requests it;
+  - automatic bounded provider-dispatch execution when the dashboard requests it;
   - hard stops at provider-execution and dry-run/no-write gates.
 
 - `test_stage_run_dashboard.py` verifies:
-  - single `manager_stage_run_dashboard_v1` receipt construction from coverage, packet statuses, and pending-only next-packet preview;
-  - packet status discovery under the approval packet runtime root;
+  - single `manager_stage_run_dashboard_v1` receipt construction from coverage and next provider-dispatch preview;
+  - packet status discovery under the provider-dispatch plan runtime root;
   - failed stage coverage takes priority over next-packet suggestions.
 
 - `test_stage_coverage.py` verifies:
@@ -106,24 +106,24 @@
   - registered model target coverage across Layers 1-8;
   - one shared `model_promotion_review_v1` request kind for all model layers.
 
-- `test_live_call_gate.py` verifies:
-  - `live_call_approval_v1` validation for bounded non-dry-run provider acquisition requests;
-  - rejection of dry-run requests, missing live-call gate policy, wrong provider scope, over-wide windows, over-count batches, and broker-execution approval.
+- `test_provider_dispatch.py` verifies:
+  - `autonomous_historical_provider_acquisition_v1` validation for bounded non-dry-run provider acquisition requests;
+  - rejection of dry-run requests, missing provider-dispatch guard policy, wrong provider scope, over-wide windows, over-count batches, and broker-execution approval.
 
-- `test_live_call_planning.py` verifies:
-  - skip-aware `manager_live_call_approval_proposal_v1` review-template planning;
+- `test_provider_dispatch.py` verifies:
+  - skip-aware `manager_provider_dispatch_proposal_v1` review-template planning;
   - exclusion of registered accepted skips before approval;
-  - exact proposal-bound validation of reviewed `live_call_approval_v1` request ids, skip exclusion, and max request bounds;
+  - exact proposal-bound validation of reviewed `autonomous_historical_provider_acquisition_v1` request ids, skip exclusion, and max request bounds;
   - proposal/validation outputs stay non-dispatching with zero provider calls;
   - pending-only planning excludes already ready/reviewed-terminal requests and blocks unreviewed failed stage requests.
 
-- `test_live_call_packet.py` verifies:
-  - complete `manager_live_call_approval_packet_v1` bundle generation;
+- `test_stage_run_dashboard.py` verifies:
+  - complete `manager_provider_dispatch_packet_v1` bundle generation;
   - packet files for proposal, reviewed-approval template, editable reviewed approval, validation output, dispatch templates, reconcile templates, and status templates;
   - registered skip exclusion before packet command construction;
   - read-only packet lifecycle/status transitions from review template through validation, plan, execute, reconcile, and inconsistency detection;
   - packet rehearsal with ephemeral approval files, no persistent approval/validation/dispatch artifacts, and zero provider calls;
-  - pending-only packets exclude terminal stage requests before command construction.
+  - terminal stage requests are excluded before provider command construction.
 
 - `test_historical_training.py` verifies:
   - manager-owned Layer 1 historical-training batch preparation;
@@ -146,7 +146,7 @@
 - `test_request_handoff.py` verifies:
   - materialized request payloads load through component `build_context` without dispatch/provider calls;
   - hash-backed `input_binding_v1` metadata must match the local payload;
-  - live-call-enabled payloads are rejected by the dry-run handoff validator.
+  - provider-call-enabled payloads are rejected by the dry-run handoff validator.
 
 - `test_scheduler.py` verifies:
   - regular-trading-day-only market-hours protection;

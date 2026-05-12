@@ -990,7 +990,7 @@ The user approved designing templates around provider/API requirements for `trad
 
 ### Decision
 
-Create reusable draft data task templates under `trading-storage/main/templates/data_tasks/`. Cover task keys, per-bundle README documentation, fetch requirements, clean/normalization requirements, save/output requirements, completion receipts, and fixture/live-call policy.
+Create reusable draft data task templates under `trading-storage/main/templates/data_tasks/`. Cover task keys, per-bundle README documentation, fetch requirements, clean/normalization requirements, save/output requirements, completion receipts, and fixture/provider-dispatch policy.
 
 ### Rationale
 
@@ -2373,7 +2373,7 @@ Status: Accepted
 
 ### Context
 
-Some remaining work does not depend on accumulated production trading data: request shape, manifest evidence, artifact references, ready signals, live-call guardrails, and checkpoint/resume evidence can be defined now.
+Some remaining work does not depend on accumulated production trading data: request shape, manifest evidence, artifact references, ready signals, provider-call guardrails, and checkpoint/resume evidence can be defined now.
 
 ### Decision
 
@@ -2383,7 +2383,7 @@ Register the storage-owned V1 logical handoff contracts and hardening policies:
 - `run_manifest_v1`
 - `artifact_ref_v1`
 - `ready_signal_v1`
-- live-call guardrails policy
+- provider-call guardrails policy
 - checkpoint/resume policy
 - data-production hardening policy
 
@@ -2430,28 +2430,26 @@ If a storage payload participates in a formal request, run, evaluation, review, 
 - Storage cleanup can delete or archive payloads without breaking manager audit history.
 - Later evaluation/promotion SQL tables should follow the same rule: make first-class tables only for facts with lifecycle, query, relationship, retention, or audit obligations.
 
-## D107 - Live-call approval gate is required before provider dispatch
+## D107 - Retired provider approval gate is replaced by autonomous provider dispatch
 
 Date: 2026-05-09
-Status: Accepted
+Status: Superseded by autonomous historical provider acquisition
 
 ### Context
 
-The manager task system can plan monthly backfill requests, materialize component-readable payloads, and validate dry-run handoff shape. Those steps are intentionally not approval to call live providers.
+The manager task system can plan monthly backfill requests, materialize component-readable payloads, and validate dry-run handoff shape. The first implementation introduced a reviewed provider-decision artifact before non-dry-run historical provider calls. Chentong later clarified that this contradicted the automation goal for historical/data acquisition.
 
 ### Decision
 
-Define `live_call_approval_v1` as the reviewed artifact required before a non-dry-run provider acquisition request can move toward component dispatch.
+Retire the per-batch provider decision artifact for historical provider acquisition. Non-dry-run historical provider calls now move through bounded autonomous manager dispatch with explicit request ids, provider/resource controls, terminal-coverage rejection, receipts, reconcile coverage, and failure registration.
 
-A valid approval must name approved `request_ids`, have `decision_status=approve`, use `approval_scope=provider_data_acquisition_only`, list `allowed_providers`, set `max_requests`, set `max_window_days`, set `expires_at_utc`, and keep `broker_execution_allowed=false`.
-
-Register `LIVE_CALL_APPROVAL_GATE_V1`, `LIVE_CALL_APPROVAL_V1`, and `MANAGER_LIVE_CALL_APPROVAL_VALIDATE`. The validation helper checks the manager request and approval artifact only; it performs no provider calls, component dispatch, SQL mutation, model activation, broker order construction, or account mutation.
+This retirement does not weaken broker/order/fill/account mutation gates, production model activation gates, or storage lifecycle mutation gates.
 
 ### Consequences
 
 - Dry-run planning, payload materialization, and handoff validation remain safe preparation steps.
-- Live provider acquisition now has a manager-owned approval boundary without enabling unattended production orchestration.
-- Broker/order/fill/account lifecycle remains execution-owned and cannot be approved through this gate.
+- Historical provider acquisition can progress automatically under manager controls.
+- Broker/order/fill/account lifecycle remains execution-owned and cannot be enabled through provider dispatch.
 
 ## D108 - Current manager/control-plane phase is closed
 
@@ -2460,7 +2458,7 @@ Status: Accepted
 
 ### Context
 
-The manager repository now has the shared registry, MVP control-plane SQL contracts, request/receipt/task summary lifecycle, monthly backfill planning, request payload materialization, dry-run handoff validation, unified model-promotion review route, review decision/activation artifact builders, storage receipt payload reference flow, and live-call approval gate.
+The manager repository now has the shared registry, MVP control-plane SQL contracts, request/receipt/task summary lifecycle, monthly backfill planning, request payload materialization, dry-run handoff validation, unified model-promotion review route, review decision/activation artifact builders, storage receipt payload reference flow, and autonomous provider dispatch gate.
 
 ### Decision
 
@@ -2498,14 +2496,14 @@ Adopt the always-on automation scheduler policy in `docs/98_automation_scheduler
 
 Manager-owned scheduler automation should keep safe historical work moving whenever dependencies, approvals, resource budgets, and market-hours policy allow. Historical work may use concurrency, but only after reserving capacity for live monitoring and execution. During the `09:20-16:10 ET` protection window on actual regular US equity trading days, default behavior is to pause or heavily throttle historical provider acquisition and CPU-heavy modeling work. Non-trading days must not trigger this pause merely because the wall clock is inside that time range.
 
-Approval gates remain hard: live provider acquisition requires validated `live_call_approval_v1`, model activation requires an approving `review_decision_v1`, and broker/order/fill/account mutation remains execution-owned. The approval gate is an internal safety control for the historical-training acquisition stage, not an external manual dependency.
+Hard gates remain where they belong: historical provider acquisition runs autonomously through bounded manager dispatch, model activation requires an approving decision artifact, and broker/order/fill/account mutation remains execution-owned.
 
 ### Consequences
 
 - The next manager phase is scheduler implementation, not manual one-task-at-a-time prompting.
 - Historical training becomes background automation relative to live monitoring and execution.
-- Scheduler pauses/backoff reasons must be explicit: approval wait, regular-trading-day market-hours protection, resource pressure, dependency block, provider quota, or promotion review.
-- Automation does not authorize live provider calls, model activation, or broker execution by implication.
+- Scheduler pauses/backoff reasons must be explicit: provider wait, regular-trading-day market-hours protection, resource pressure, dependency block, provider quota, or promotion review.
+- Automation authorizes only bounded historical provider calls through manager dispatch; it does not authorize model activation or broker execution by implication.
 
 ## D111 - Implement scheduler tick before live dispatch
 
@@ -2520,15 +2518,15 @@ The accepted scheduler direction needs implementation without prematurely enabli
 
 Implement `scripts/tasks/run_automation_scheduler.py` backed by `trading_manager_tasks.scheduler` as the first scheduler work-loop increment.
 
-The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes only Layer 1 task-key payload materialization and handoff validation through the existing preparation path, then reports `owner_observed_agent_reviewed_provider_acquisition` as the next internal stage.
+The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes only Layer 1 task-key payload materialization and handoff validation through the existing preparation path, then reports autonomous historical provider acquisition as the next internal stage.
 
 The tick must emit safety counters proving `provider_calls=0`, `dispatch_performed=false`, `model_activation_performed=false`, and `broker_execution_performed=false` for this phase.
 
 ### Consequences
 
 - Scheduler automation is now implemented enough to decide and perform safe offline preparation.
-- Approval-gated provider acquisition, receipt-driven progression, feature/model/evaluation runners, and promotion-review automation remain the next scheduler increments.
-- Live provider dispatch still requires validated `live_call_approval_v1`; production activation still requires approving `review_decision_v1`; broker execution remains execution-owned.
+- Autonomous provider acquisition, receipt-driven progression, feature/model/evaluation runners, and promotion-review automation remain the next scheduler increments.
+- Historical provider dispatch runs through the manager adapter; production activation still requires an approving decision artifact; broker execution remains execution-owned.
 
 ## D112 - Treat provider acquisition as an internal historical-training stage
 
@@ -2541,13 +2539,13 @@ Layer 1 historical model training cannot honestly begin at feature/model code al
 
 ### Decision
 
-Historical provider acquisition is part of the historical-data model-training lifecycle. `trading-manager` must plan and advance it as an internal scheduler stage: prepare requests, prepare/validate the required `live_call_approval_v1` safety artifact, dispatch approved acquisition through `trading-data`, and then continue through receipts, feature generation, model training, evaluation, and promotion-review preparation.
+Historical provider acquisition is part of the historical-data model-training lifecycle. `trading-manager` must plan and advance it as an internal scheduler stage: prepare requests, prepare bounded requests, dispatch provider acquisition through `trading-data`, and then continue through receipts, feature generation, model training, evaluation, and promotion-review preparation.
 
-`live_call_approval_v1` remains mandatory for non-dry-run provider/API calls, but it is a safety gate inside the workflow, not a reason to classify data acquisition as an external requirement or manual operator task.
+The manager dispatch path is mandatory for non-dry-run historical provider/API calls, but it is an autonomous workflow control, not a reason to classify data acquisition as an external requirement or manual operator task.
 
 ### Consequences
 
-- Scheduler decisions should expose the next internal stage and required approval gate instead of stopping at preparation.
+- Scheduler decisions should expose the next internal stage and required provider guardrail instead of stopping at preparation.
 - Layer 1 Alpaca bar acquisition is tracked as historical-training work, while provider calls remain bounded and reviewable.
 - Offline preparation, feature generation, training, and evaluation continue automatically whenever their inputs and gates are satisfied.
 
@@ -2586,13 +2584,13 @@ The historical scheduler daemon must not remain a Layer 1-only loop. The current
 
 Add `manager_model_training_workflow_plan_v1` as the manager-owned full-stack workflow graph. The graph covers Layers 1-8 and defines six stages per layer: data acquisition, feature/input generation, model generation, model evaluation, promotion-review preparation, and maintenance.
 
-Layer-specific data surfaces remain honest: Layers 5-7 do not invent trading-data feature surfaces; they consume upstream model/control-plane/position-risk artifacts. Provider-backed stages remain blocked behind `live_call_approval_v1`; model activation remains blocked behind an approving `review_decision_v1`; broker execution remains outside manager.
+Layer-specific data surfaces remain honest: Layers 5-7 do not invent trading-data feature surfaces; they consume upstream model/control-plane/position-risk artifacts. Provider-backed stages run through autonomous manager dispatch; model activation remains blocked behind an approving decision artifact; broker execution remains outside manager.
 
 ### Consequences
 
 - Scheduler decisions now carry the full eight-layer workflow plan instead of only a Layer 1 preparation summary.
-- Once Layer 1 task keys exist, the scheduler advances to the internal stage `layer_01_market_regime.data_acquisition` and reports `live_call_approval_v1` as the blocking gate.
-- The next implementation boundary is durable stage completion from approved provider dispatch and component receipts, not more ad hoc layer-specific scripting.
+- Once Layer 1 task keys exist, the scheduler advances to the internal stage `layer_01_market_regime.data_acquisition` and reports autonomous historical provider acquisition as the next guarded stage.
+- The next implementation boundary is durable stage completion from provider dispatch and component receipts, not more ad hoc layer-specific scripting.
 
 ## D115 - Historical workflow progression is durable and receipt-driven
 
@@ -2605,14 +2603,14 @@ A full Layer 1-8 graph is not enough by itself; the manager needs a durable chec
 
 ### Decision
 
-Add `manager_model_training_workflow_state_v1` as the durable state checkpoint for the Layer 1-8 historical-training workflow. The state records every stage status, command, blockers, approval refs, receipt refs, and artifact refs. `advance_model_training_workflow.py` refreshes the checkpoint, ingests receipts containing `manager_stage_id` / `stage_id`, records reviewed approval references, and selects the next ready or approval-blocked stage.
+Add `manager_model_training_workflow_state_v1` as the durable state checkpoint for the Layer 1-8 historical-training workflow. The state records every stage status, command, blockers, review refs, receipt refs, and artifact refs. `advance_model_training_workflow.py` refreshes the checkpoint, ingests receipts containing `manager_stage_id` / `stage_id`, records review references, and selects the next ready or guarded stage.
 
 ### Consequences
 
 - The resident scheduler can report both the static workflow graph and current resumable progress.
 - Component receipts are the accepted evidence for marking workflow stages complete.
-- Approval satisfaction is recorded as an artifact reference on the gated stage; it does not itself perform provider dispatch.
-- The remaining implementation boundary is an approved dispatch adapter that validates `live_call_approval_v1`, performs the allowed provider work, and emits receipts for this state machine.
+- Review/receipt satisfaction is recorded as an artifact reference on the guarded stage; it does not itself perform provider dispatch.
+- The remaining implementation boundary is an provider dispatch adapter that validates `autonomous_historical_provider_acquisition_v1`, performs the allowed provider work, and emits receipts for this state machine.
 
 ## D116 - Provider acquisition dispatch requires explicit approved execution
 
@@ -2625,12 +2623,12 @@ The manager must be able to move from safe preparation into historical provider 
 
 ### Decision
 
-Add a narrow Layer 1 provider-dispatch adapter. `dispatch_approved_provider_acquisition.py` validates `live_call_approval_v1` against the prepared Alpaca bars request set and defaults to plan-only validation. It performs provider calls only when `--execute-approved-provider-calls` is present, and it still performs no model activation or broker execution.
+Add a narrow Layer 1 provider-dispatch adapter. `dispatch_provider_acquisition.py` validates `autonomous_historical_provider_acquisition_v1` against the prepared Alpaca bars request set and defaults to plan-only validation. It performs provider calls only when `--execute-provider-calls` is present, and it still performs no model activation or broker execution.
 
 ### Consequences
 
 - The scheduler can point the Layer 1 data-acquisition stage at a concrete manager script instead of a placeholder.
-- Approval validation and provider execution are separate, inspectable steps.
+- Plan-only preview, provider execution, receipt capture, and reconciliation remain separate, inspectable steps.
 - Downstream workflow progression remains receipt-driven through `manager_model_training_workflow_state_v1`.
 
 ## D117 - Ready offline stages may be executed one-at-a-time after scheduler gates
@@ -2644,12 +2642,12 @@ After provider-backed acquisition receipts unlock downstream work, feature gener
 
 ### Decision
 
-Add `execute_model_training_stage.py` and `manager_stage_execution_summary_v1`. The executor runs only `ready` stages of safe offline types, refuses approval-gated stages, writes stdout/stderr logs plus a `component_completion_receipt_v1`, and can persist successful stage progress to `manager_model_training_workflow_state_v1`. The scheduler and daemon accept `--execute-safe-offline-stages` to admit at most one safe offline stage per tick after market/resource gates pass.
+Add `execute_model_training_stage.py` and `manager_stage_execution_summary_v1`. The executor runs only `ready` stages of safe offline types, refuses guarded stages, writes stdout/stderr logs plus a `component_completion_receipt_v1`, and can persist successful stage progress to `manager_model_training_workflow_state_v1`. The scheduler and daemon accept `--execute-safe-offline-stages` to admit at most one safe offline stage per tick after market/resource gates pass.
 
 ### Consequences
 
 - Offline work can progress automatically once durable receipts make a stage ready.
-- Provider calls remain isolated in approval-gated dispatch adapters.
+- Provider calls remain isolated in guarded dispatch adapters.
 - Model activation and broker execution remain outside this executor.
 
 ## D118 - Manager decides and prepares dataset expansion
@@ -2663,7 +2661,7 @@ Historical model-training expansion should not require an operator to manually c
 
 ### Decision
 
-Add `manager_dataset_expansion_plan_v1` and `scripts/tasks/plan_dataset_expansion.py`. The planner walks model layers in dependency order, fills train -> calibration -> validation -> test minimums first, expands forward holdout when promotion evidence shows coverage/drift/split-stability/regime/baseline gaps, and selects shadow monitoring only after production approval. With `--write`, manager prepares the selected safe artifacts/payloads. For Layer 1 this means writing Alpaca ETF task-key payloads and handoff validation evidence only; provider dispatch still requires validated `live_call_approval_v1` and explicit execution.
+Add `manager_dataset_expansion_plan_v1` and `scripts/tasks/plan_dataset_expansion.py`. The planner walks model layers in dependency order, fills train -> calibration -> validation -> test minimums first, expands forward holdout when promotion evidence shows coverage/drift/split-stability/regime/baseline gaps, and selects shadow monitoring only after production approval. With `--write`, manager prepares the selected safe artifacts/payloads. For Layer 1 this means writing Alpaca ETF task-key payloads and handoff validation evidence only; provider dispatch requires explicit execution through the manager adapter.
 
 ### Consequences
 
@@ -2691,7 +2689,7 @@ This is an evidence collection layer, not a second decision-rule system. The pla
 
 - Manager can determine missing train/calibration/validation/test/forward-holdout evidence from durable records instead of relying on absent-evidence defaults.
 - `plan_dataset_expansion.py --collect-evidence-from-db` can collect evidence and plan in one run.
-- Provider calls remain gated by `live_call_approval_v1`; model activation remains gated by approving `review_decision_v1`; broker/order/fill/account mutation remains execution-owned.
+- Provider calls remain gated by `autonomous_historical_provider_acquisition_v1`; model activation remains gated by approving `review_decision_v1`; broker/order/fill/account mutation remains execution-owned.
 
 ## D120 - Historical sampling universe can be broader than live routing
 
@@ -2757,7 +2755,7 @@ The pass may write a report and safe preparation artifacts, including Layer 1 ta
 ### Consequences
 
 - The next phase is evidence collection, not broad default hardening.
-- Provider calls remain outside the information-pass boundary and still require validated `live_call_approval_v1` plus explicit provider-dispatch execution.
+- Provider calls remain outside the information-pass boundary and still require validated `autonomous_historical_provider_acquisition_v1` plus explicit provider-dispatch execution.
 - Storage lifecycle remains dry-run/protected-set-first until artifact index and restore/protection evidence exists.
 
 ## D123 - 2016-01 Layer 1-8 safe workflow is closed without provider expansion
@@ -2767,7 +2765,7 @@ Status: Accepted
 
 ### Context
 
-The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution requires explicit reviewed approval and an explicit execution instruction. Layers 1-7 reached safe/offline completion for the month. Layer 8 was blocked by the option-expression acquisition gate until the completed Layer 7 target chain could be reviewed.
+The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. Layers 1-7 reached safe/offline completion for the month. Layer 8 was blocked by the option-expression acquisition gate until the completed Layer 7 target chain could be reviewed.
 
 ### Decision
 
@@ -2775,12 +2773,12 @@ Close the current `2016-01` Layer 1-8 safe workflow section as complete for mech
 
 Layer 8 option-expression acquisition is closed by reviewed no-provider skip for this month because every Layer 7 row resolved to `no_trade` / `none`; there were no active target chains and therefore no warranted option-chain provider request. Layer 8 generated 279 deterministic `no_option_expression` rows from completed Layer 7 database rows. The run made zero provider calls, performed no dispatch, did not activate a model, did not perform broker/order/account mutation, and did not mutate storage lifecycle state.
 
-Promotion decisions for Layers 1-8 remain deferred. This closeout validates workflow mechanics and safe offline progression only; it is not production model activation and not approval to execute future provider calls.
+Promotion decisions for Layers 1-8 remain deferred. This closeout validates workflow mechanics and safe offline progression only; it is not production model activation and not authorization to bypass manager provider-dispatch controls.
 
 ### Consequences
 
-- The next chronological month can start from safe internal preparation and approval-packet review.
-- If a future month has active Layer 7 target chains, Layer 8 must stop at approval-packet review unless explicit provider execution approval is supplied.
+- The next chronological month can start from safe internal preparation and provider-dispatch review.
+- If a future month has active Layer 7 target chains, Layer 8 must stop at provider-dispatch review unless manager provider dispatch is executed.
 - Deferred promotion evidence remains a separate production-readiness track.
 - Runtime workflow checkpoints should be treated as month-scoped evidence when moving chronologically, so a later month should use an explicit month-specific state path unless/until the scheduler owns month checkpoint rotation.
 
@@ -2791,7 +2789,7 @@ Status: Accepted
 
 ### Context
 
-The `2016-02` historical workflow completed Layers 1-8 through safe/offline maintenance. Layer 1 and Layer 2 provider acquisition used reviewed approval and proposal-bound validation before execution; downstream Layers 3-8 advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and Layer 8 exposed a no-provider feature-stage skip gap.
+The `2016-02` historical workflow completed Layers 1-8 through safe/offline maintenance. Layer 1 and Layer 2 provider acquisition used bounded autonomous dispatch before execution; downstream Layers 3-8 advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and Layer 8 exposed a no-provider feature-stage skip gap.
 
 ### Decision
 
@@ -2799,40 +2797,40 @@ Close `2016-02` as complete for safe workflow mechanics. The final month-scoped 
 
 Accept the accompanying mechanism-hardening changes before starting `2016-03`:
 
-- Layer 8 feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_08_option_expression` after approved active-path acquisition.
+- Layer 8 feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_08_option_expression` after completed active-path acquisition.
 - Workflow CLIs default to scheduler-owned month-scoped checkpoints: `storage/runtime/model_training_workflow_state_YYYY-MM.json`.
-- Workflow state records `provider_calls_observed` separately from safe/offline `provider_calls`, so approved acquisition calls are visible without misclassifying offline stages as provider-calling stages.
-- Live-call approval packets now create a separate editable `reviewed_approval.json` beside `reviewed_approval_TEMPLATE.json`; generated approval ids no longer include review-placeholder text.
+- Workflow state records `provider_calls_observed` separately from safe/offline `provider_calls`, so provider acquisition calls are visible without misclassifying offline stages as provider-calling stages.
+- Autonomous provider dispatch no longer creates provider-dispatch reviews; bounded request ids, terminal-coverage rejection, receipts, and reconcile coverage are the control surface.
 
 ### Consequences
 
 - `2016-03` may begin from safe internal preparation after this hardening is committed and verified.
 - Production promotion remains deferred until reviewed evidence proves sufficient rows/labels, baseline improvement, split stability, no leakage, and approval.
-- Active Layer 8 provider acquisition remains approval-gated and must still stop at packet review unless explicit provider execution approval is supplied.
+- Active Layer 8 provider acquisition remains guarded by bounded provider-dispatch review, terminal coverage, receipts, and reconcile coverage.
 - Storage lifecycle mutation remains outside this closeout and requires a separate lifecycle plan/approval.
 
-## D125 - Owner-observed agent automation replaces routine manual approval gates
+## D125 - Owner-observed agent automation replaces routine manual provider guardrails
 
 Date: 2026-05-11
 Status: Accepted
 
 ### Context
 
-Routine historical backfill work was too manually gated: provider calls still waited for a human approval plus an explicit execution instruction, production promotion was phrased as requiring reviewed approval, and storage lifecycle mutation was phrased as requiring a separate approval. Chentong clarified the intended operating model: OpenClaw/agent automation should make bounded decisions and execute them while the owner observes and intervenes if needed. Broker/order/fill/account mutation is execution-library scope and is not part of the current historical modeling workflow.
+Routine historical backfill work was too manually gated: provider calls still waited for a human approval step plus an explicit execution instruction, production promotion was phrased as requiring reviewed approval, and storage lifecycle mutation was phrased as requiring a separate approval. Chentong clarified the intended operating model: OpenClaw/agent automation should make bounded decisions and execute them while the owner observes and intervenes if needed. Broker/order/fill/account mutation is execution-library scope and is not part of the current historical modeling workflow.
 
 ### Decision
 
-Adopt owner-observed agent automation for the current historical modeling control plane:
+Adopt autonomous historical provider acquisition for the current historical modeling control plane:
 
-- Provider data acquisition may be automatically agent-reviewed, proposal-validated, dispatched, and reconciled when it is bounded to historical provider acquisition scope and keeps broker execution, model activation, and storage lifecycle mutation false.
-- Model activation / production promotion must be decided by a script-called agent decision artifact (`agent_model_promotion_decision_v1`) rather than a routine manual approval gate.
+- Provider data acquisition may be automatically agent-reviewed, dispatched, and reconciled when it is bounded to historical provider acquisition scope and keeps broker execution, model activation, and storage lifecycle mutation false.
+- Model activation / production promotion must be decided by a script-called agent decision artifact (`agent_model_promotion_decision_v1`) rather than a routine manual provider guardrail.
 - Storage lifecycle mutation must be decided by a script-called agent lifecycle decision artifact before storage executes archive/delete/compress/restore mutation.
 - Broker/order/fill/account mutation remains out of scope here and belongs to execution-library work.
 
 ### Consequences
 
-- Historical provider packets still preserve proposal validation, expiry, exact request-id scope, terminal-coverage rejection, dispatch receipts, and reconcile coverage, but the agent can fill the approval/validation/plan artifacts and run dispatch under owner observation.
-- Existing “manual approval required” language should be replaced in active docs/code with owner-observed agent-review language.
+- Historical provider acquisition preserves exact request-id scope, terminal-coverage rejection, dispatch receipts, and reconcile coverage, and runs autonomously under owner observation.
+- Existing provider “manual approval required” language should be replaced in active docs/code with autonomous historical provider-acquisition language.
 - Promotion and storage lifecycle decision paths remain blocked only until their script-called agent decision surfaces exist; they are not blocked on routine manual approval.
 
 ## D126 - 2016-03 Layer 1-8 historical workflow closed
@@ -2842,7 +2840,7 @@ Status: Accepted
 
 ### Context
 
-The March 2016 chronological historical workflow continued after January and February closeouts. Layer 1 and Layer 2 provider acquisition used the owner-observed agent automation precedent: bounded provider-data acquisition only, exact proposal validation, terminal-coverage rejection, reconcile coverage, and no broker/order/account mutation, model activation, or storage lifecycle mutation.
+The March 2016 chronological historical workflow continued after January and February closeouts. Layer 1 and Layer 2 provider acquisition now use autonomous historical provider acquisition: bounded provider-data acquisition only, terminal-coverage rejection, reconcile coverage, and no broker/order/account mutation, model activation, or storage lifecycle mutation.
 
 ### Evidence
 
@@ -2869,7 +2867,7 @@ The completed 2016-01 through 2016-03 historical workflow proved the Layer 1-8 m
 
 Make the historical scheduler daemon the canonical owner of the historical data/modeling runtime. The service owns the scheduler loop, checkpoint/resume state, single-instance lock, decision log, safe preparation, safe/offline stage execution, and chronological month-cursor advancement. Manual CLI/script invocation remains available only for inspection, repair, smoke testing, or emergency intervention.
 
-The service may continue safe/offline work automatically and may advance from one completed YYYY-MM month to the next under the chronological-forward policy. Provider acquisition still requires owner-observed agent review, exact proposal validation, terminal-coverage guards, dispatch receipts, and reconcile coverage. Model activation requires `agent_model_promotion_decision_v1`; storage lifecycle mutation requires `agent_storage_lifecycle_decision_v1`; broker/order/fill/account mutation remains out of scope.
+The service may continue safe/offline work automatically and may advance from one completed YYYY-MM month to the next under the chronological-forward policy. Provider acquisition now runs autonomously with terminal-coverage guards, dispatch receipts, and reconcile coverage. Model activation requires `agent_model_promotion_decision_v1`; storage lifecycle mutation requires `agent_storage_lifecycle_decision_v1`; broker/order/fill/account mutation remains out of scope.
 
 ### Consequences
 

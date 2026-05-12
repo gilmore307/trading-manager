@@ -284,11 +284,11 @@ def decide_dataset_expansion(
 
 
 def _decision_for_role(layer_evidence: LayerDatasetEvidence, role: DatasetRole, *, reason: str) -> DatasetExpansionDecision:
-    requires_provider = layer_evidence.layer in {1, 8}
+    provider_backed = layer_evidence.layer in {1, 8}
     if layer_evidence.layer == 1:
         action = "prepare_layer_one_historical_training_batch"
     elif layer_evidence.layer == 8:
-        action = "prepare_approval_gated_option_expression_acquisition"
+        action = "prepare_option_expression_acquisition"
     else:
         action = "queue_offline_dataset_materialization"
     return DatasetExpansionDecision(
@@ -297,9 +297,10 @@ def _decision_for_role(layer_evidence: LayerDatasetEvidence, role: DatasetRole, 
         dataset_role=role,
         reason=reason,
         action=action,
-        requires_provider_approval=requires_provider,
-        approval_gate_required="live_call_approval_v1" if requires_provider else None,
-        safe_without_provider_calls=True,
+        requires_provider_approval=False,
+        approval_gate_required=None,
+        safe_without_provider_calls=not provider_backed,
+        provider_calls_allowed=provider_backed,
     )
 
 
@@ -330,17 +331,17 @@ def build_dataset_expansion_plan(
             plan_path=str(output_path),
             wrote_layer_one_payloads=True,
             layer_one_preparation=layer_one_preparation.summary_row(),
-            note="Prepared Layer 1 task-key payloads only; provider dispatch still requires live_call_approval_v1.",
+            note="Prepared Layer 1 task-key payloads only; provider dispatch proceeds through autonomous historical acquisition.",
         )
     elif write and decision:
         implementation = DatasetExpansionImplementation(
-            status="prepared" if not decision.requires_provider_approval else "blocked",
+            status="prepared",
             wrote_plan=True,
             plan_path=str(output_path),
             note=(
                 "Expansion request selected by manager; component-specific implementation is queued through the workflow state."
-                if not decision.requires_provider_approval
-                else "Provider-backed expansion selected; dispatch remains blocked until live_call_approval_v1."
+                if not decision.provider_calls_allowed
+                else "Provider-backed expansion selected; dispatch proceeds through autonomous historical acquisition controls."
             ),
         )
     elif decision is None:

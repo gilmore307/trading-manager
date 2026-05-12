@@ -1,8 +1,11 @@
-"""Single-entry dashboard for a manager provider-stage run.
+"""Single-entry dashboard for an autonomous manager provider-stage run.
 
-The dashboard is the human-facing receipt for a stage/month. It summarizes
-coverage, packet lifecycle state, evidence paths, and the next safe action while
-leaving the lower-level artifacts in place for audit and replay.
+The dashboard is the operator-facing receipt for a stage/month. It summarizes
+coverage, the next bounded provider-dispatch preview, evidence paths, and the
+next safe action. Historical provider dispatch is autonomous under manager
+resource/coverage controls; this surface still never approves model activation,
+broker execution, order construction, account mutation, or storage lifecycle
+mutation.
 """
 
 from __future__ import annotations
@@ -12,12 +15,11 @@ import json
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence, TextIO
+from typing import Any, Sequence, TextIO
 
 from .control_plane import TaskSystemError
-from .live_call_packet import DEFAULT_APPROVAL_PACKET_ROOT, PACKET_FILE_NAME, inspect_live_call_approval_packet
-from .live_call_planning import plan_live_call_approval_proposal
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
+from .provider_dispatch import dispatch_layer_provider_acquisition
 from .stage_coverage import StageCoverageReport, collect_stage_coverage
 
 DEFAULT_STAGE_RUN_DASHBOARD_ROOT = Path("storage/runtime/stage_run_dashboard")
@@ -28,52 +30,29 @@ SUPPORTED_DASHBOARD_STAGE_IDS = (
 
 
 @dataclass(frozen=True)
-class StageRunPacketSummary:
-    """Compact packet lifecycle row for dashboard display."""
-
-    packet_id: str | None
-    packet_path: str
-    packet_dir: str
-    status: str
-    next_action: str
-    request_count: int | None
-    provider_calls: int
-    dispatch_performed: bool
-    approval_id: str | None
-    missing_files: tuple[str, ...]
-    inconsistent_reasons: tuple[str, ...]
-
-    def summary_row(self) -> dict[str, Any]:
-        row = asdict(self)
-        row["missing_files"] = list(self.missing_files)
-        row["inconsistent_reasons"] = list(self.inconsistent_reasons)
-        return row
-
-
-@dataclass(frozen=True)
-class StageRunNextPacket:
-    """Preview of the next pending-only packet the operator should review."""
+class StageRunProviderDispatchPreview:
+    """Preview of the next autonomous provider dispatch slice."""
 
     available: bool
     reason: str
     request_count: int
     request_ids: tuple[str, ...]
     skipped_registered_request_ids: tuple[str, ...]
-    skipped_terminal_request_ids: tuple[str, ...]
-    create_packet_command: tuple[str, ...]
+    command_preview: tuple[tuple[str, ...], ...]
+    execute_command_template: tuple[str, ...]
 
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
         row["request_ids"] = list(self.request_ids)
         row["skipped_registered_request_ids"] = list(self.skipped_registered_request_ids)
-        row["skipped_terminal_request_ids"] = list(self.skipped_terminal_request_ids)
-        row["create_packet_command"] = list(self.create_packet_command)
+        row["command_preview"] = [list(command) for command in self.command_preview]
+        row["execute_command_template"] = list(self.execute_command_template)
         return row
 
 
 @dataclass(frozen=True)
 class StageRunDashboard:
-    """Human-facing stage-run dashboard/receipt."""
+    """Operator-facing stage-run dashboard/receipt."""
 
     contract_type: str
     stage_id: str
@@ -81,10 +60,7 @@ class StageRunDashboard:
     start_month: str
     end_month: str
     coverage: dict[str, Any]
-    packet_count: int
-    packets: tuple[StageRunPacketSummary, ...]
-    latest_packet_status: str | None
-    next_recommended_packet: StageRunNextPacket
+    next_provider_dispatch: StageRunProviderDispatchPreview
     blocking_reason: str
     next_action: str
     evidence_refs: tuple[str, ...]
@@ -96,8 +72,7 @@ class StageRunDashboard:
 
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
-        row["packets"] = [packet.summary_row() for packet in self.packets]
-        row["next_recommended_packet"] = self.next_recommended_packet.summary_row()
+        row["next_provider_dispatch"] = self.next_provider_dispatch.summary_row()
         row["evidence_refs"] = list(self.evidence_refs)
         return row
 
@@ -118,107 +93,81 @@ def default_dashboard_path(*, stage_id: str, start_month: str) -> Path:
     return DEFAULT_STAGE_RUN_DASHBOARD_ROOT / f"{_safe_stage(stage_id)}_{start_month}.json"
 
 
-def _packet_sort_key(path: Path) -> tuple[float, str]:
-    try:
-        return (path.stat().st_mtime, str(path))
-    except FileNotFoundError:
-        return (0.0, str(path))
-
-
-def collect_packet_summaries(
-    *,
-    model_layer: str,
-    stage_id: str,
-    start_month: str,
-    end_month: str,
-    packet_root: Path = DEFAULT_APPROVAL_PACKET_ROOT,
-) -> tuple[StageRunPacketSummary, ...]:
-    """Collect packet statuses matching the stage/month."""
-
-    root = packet_root / model_layer
-    if not root.exists():
-        return ()
-    summaries: list[StageRunPacketSummary] = []
-    for packet_path in sorted(root.glob(f"*/{PACKET_FILE_NAME}"), key=_packet_sort_key, reverse=True):
-        status = inspect_live_call_approval_packet(packet_path=packet_path)
-        if status.stage_id != stage_id or status.start_month != start_month or status.end_month != end_month:
-            continue
-        summaries.append(
-            StageRunPacketSummary(
-                packet_id=status.packet_id,
-                packet_path=str(packet_path),
-                packet_dir=status.packet_dir,
-                status=status.status,
-                next_action=status.next_action,
-                request_count=status.request_count,
-                provider_calls=status.provider_calls,
-                dispatch_performed=status.dispatch_performed,
-                approval_id=status.approval_id,
-                missing_files=status.missing_files,
-                inconsistent_reasons=status.inconsistent_reasons,
-            )
-        )
-    return tuple(summaries)
-
-
-def _next_packet_command(*, stage_id: str, start_month: str, end_month: str, limit: int) -> tuple[str, ...]:
-    return (
+def _execute_command(*, stage_id: str, start_month: str, end_month: str, request_ids: Sequence[str]) -> tuple[str, ...]:
+    command = [
         "PYTHONPATH=src",
         "python3",
-        "scripts/tasks/create_live_call_approval_packet.py",
+        "scripts/tasks/dispatch_and_reconcile_provider_stage.py",
         "--model-layer",
         _model_layer_for_stage(stage_id),
         "--start-month",
         start_month,
         "--end-month",
         end_month,
-        "--pending-only",
-        "--limit",
-        str(limit),
-        "--write",
-    )
+        "--execute-provider-calls",
+        "--continue-on-error",
+        "--skip-registered-failures",
+        "--reject-terminal-coverage",
+    ]
+    for request_id in request_ids:
+        command.extend(["--request-id", request_id])
+    return tuple(command)
 
 
-def preview_next_pending_packet(
+def preview_next_provider_dispatch(
     *,
     stage_id: str,
     start_month: str,
     end_month: str,
     limit: int,
-    packet_storage_root: Path,
+    storage_root: Path,
+    coverage: StageCoverageReport,
     database_url: str | None = None,
-) -> StageRunNextPacket:
-    """Preview the next pending-only packet without writing it."""
+) -> StageRunProviderDispatchPreview:
+    """Preview the next bounded autonomous provider dispatch without calling providers."""
 
+    pending_ids = tuple(str(item) for item in coverage.pending_request_ids[:limit])
+    if not pending_ids:
+        return StageRunProviderDispatchPreview(
+            available=False,
+            reason="no pending request ids available for provider dispatch",
+            request_count=0,
+            request_ids=(),
+            skipped_registered_request_ids=(),
+            command_preview=(),
+            execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=()),
+        )
     try:
-        proposal = plan_live_call_approval_proposal(
+        summary = dispatch_layer_provider_acquisition(
             model_layer=_model_layer_for_stage(stage_id),
             start_month=start_month,
             end_month=end_month,
-            storage_root=packet_storage_root,
-            limit=limit,
+            storage_root=storage_root,
+            request_ids=pending_ids,
+            execute_provider_calls=False,
             skip_registered_failures=True,
-            skip_terminal_coverage=True,
             database_url=database_url,
         )
     except TaskSystemError as exc:
-        return StageRunNextPacket(
+        return StageRunProviderDispatchPreview(
             available=False,
             reason=str(exc),
             request_count=0,
             request_ids=(),
             skipped_registered_request_ids=(),
-            skipped_terminal_request_ids=(),
-            create_packet_command=_next_packet_command(stage_id=stage_id, start_month=start_month, end_month=end_month, limit=limit),
+            command_preview=(),
+            execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=pending_ids),
         )
-    return StageRunNextPacket(
-        available=True,
-        reason="pending-only packet preview available",
-        request_count=proposal.request_count,
-        request_ids=proposal.request_ids,
-        skipped_registered_request_ids=proposal.skipped_registered_request_ids,
-        skipped_terminal_request_ids=proposal.skipped_terminal_request_ids,
-        create_packet_command=_next_packet_command(stage_id=stage_id, start_month=start_month, end_month=end_month, limit=limit),
+    runnable = tuple(item.request_id for item in summary.items if item.status != "skipped_registered_accepted_failure")
+    skipped = tuple(item.request_id for item in summary.items if item.status == "skipped_registered_accepted_failure")
+    return StageRunProviderDispatchPreview(
+        available=bool(runnable),
+        reason="autonomous provider dispatch preview available" if runnable else "all selected requests are registered accepted failures",
+        request_count=len(runnable),
+        request_ids=runnable,
+        skipped_registered_request_ids=skipped,
+        command_preview=tuple(tuple(item.command) for item in summary.items if item.command),
+        execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=runnable),
     )
 
 
@@ -242,26 +191,14 @@ def _coverage_payload(report: StageCoverageReport) -> dict[str, Any]:
     }
 
 
-def _next_action(*, coverage: StageCoverageReport, next_packet: StageRunNextPacket, packets: Sequence[StageRunPacketSummary]) -> tuple[str, str]:
-    inconsistent = [packet.packet_id or packet.packet_path for packet in packets if packet.status == "packet_inconsistent"]
-    if inconsistent:
-        return ("fix_packet_artifact_mismatch", "packet inconsistency detected: " + ",".join(inconsistent))
-    executable = [packet.packet_id or packet.packet_path for packet in packets if packet.status == "dispatch_plan_ready_pending_execute"]
-    if executable:
-        return ("review_execute_or_defer_ready_packet", "packet ready for explicit execution review: " + ",".join(executable))
-    reconcile = [packet.packet_id or packet.packet_path for packet in packets if packet.status == "executed_pending_reconcile"]
-    if reconcile:
-        return ("run_reconcile_for_executed_packet", "executed packet needs reconcile: " + ",".join(reconcile))
-    reviewable = [packet.packet_id or packet.packet_path for packet in packets if packet.status in {"template_pending_review", "approval_ready_pending_validation", "approval_validated_pending_dispatch_plan"}]
-    if reviewable:
-        return ("review_existing_pending_packet", "existing packet awaits review/validation/plan: " + ",".join(reviewable))
+def _next_action(*, coverage: StageCoverageReport, preview: StageRunProviderDispatchPreview) -> tuple[str, str]:
     if coverage.status == "failed":
         return ("review_stage_failures", coverage.reason)
     if coverage.can_unlock_downstream:
         return ("advance_downstream_workflow", coverage.reason)
-    if next_packet.available:
-        return ("create_or_review_next_pending_only_packet", f"{coverage.reason}; next pending packet has {next_packet.request_count} requests")
-    return ("no_action_until_blocker_resolved", f"{coverage.reason}; {next_packet.reason}")
+    if preview.available:
+        return ("autonomous_provider_dispatch_ready", f"{coverage.reason}; next dispatch has {preview.request_count} requests")
+    return ("no_action_until_blocker_resolved", f"{coverage.reason}; {preview.reason}")
 
 
 def build_stage_run_dashboard(
@@ -269,35 +206,27 @@ def build_stage_run_dashboard(
     stage_id: str,
     start_month: str = "2016-01",
     end_month: str = "2016-01",
-    packet_root: Path = DEFAULT_APPROVAL_PACKET_ROOT,
+    packet_root: Path | None = None,
     packet_storage_root: Path = Path("storage"),
     next_limit: int = 5,
     database_url: str | None = None,
 ) -> StageRunDashboard:
     """Build a single stage dashboard/receipt without mutating providers or storage."""
 
+    _ = packet_root  # legacy argument retained for CLI/API compatibility.
     model_layer = _model_layer_for_stage(stage_id)
     coverage = collect_stage_coverage(stage_id=stage_id, start_month=start_month, end_month=end_month, database_url=database_url)
-    packets = collect_packet_summaries(
-        model_layer=model_layer,
-        stage_id=stage_id,
-        start_month=start_month,
-        end_month=end_month,
-        packet_root=packet_root,
-    )
-    next_packet = preview_next_pending_packet(
+    preview = preview_next_provider_dispatch(
         stage_id=stage_id,
         start_month=start_month,
         end_month=end_month,
         limit=next_limit,
-        packet_storage_root=packet_storage_root,
+        storage_root=packet_storage_root,
+        coverage=coverage,
         database_url=database_url,
     )
-    next_action, blocking_reason = _next_action(coverage=coverage, next_packet=next_packet, packets=packets)
-    evidence_refs = [
-        f"stage_coverage:{stage_id}:{start_month}:{coverage.status}",
-        *[f"packet:{packet.packet_path}" for packet in packets],
-    ]
+    next_action, blocking_reason = _next_action(coverage=coverage, preview=preview)
+    evidence_refs = [f"stage_coverage:{stage_id}:{start_month}:{coverage.status}"]
     return StageRunDashboard(
         contract_type="manager_stage_run_dashboard_v1",
         stage_id=stage_id,
@@ -305,15 +234,12 @@ def build_stage_run_dashboard(
         start_month=start_month,
         end_month=end_month,
         coverage=_coverage_payload(coverage),
-        packet_count=len(packets),
-        packets=packets,
-        latest_packet_status=packets[0].status if packets else None,
-        next_recommended_packet=next_packet,
+        next_provider_dispatch=preview,
         blocking_reason=blocking_reason,
         next_action=next_action,
         evidence_refs=tuple(evidence_refs),
-        provider_calls_observed=sum(packet.provider_calls for packet in packets),
-        dispatch_performed_observed=any(packet.dispatch_performed for packet in packets),
+        provider_calls_observed=coverage.observed_count,
+        dispatch_performed_observed=coverage.observed_count > 0,
     )
 
 
@@ -323,11 +249,11 @@ def write_stage_run_dashboard(dashboard: StageRunDashboard, *, output: TextIO) -
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Summarize a provider-stage run as one dashboard/receipt without provider calls.")
+    parser = argparse.ArgumentParser(description="Summarize an autonomous provider-stage run as one dashboard/receipt without provider calls.")
     parser.add_argument("--stage-id", required=True, choices=SUPPORTED_DASHBOARD_STAGE_IDS)
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
-    parser.add_argument("--packet-root", type=Path, default=DEFAULT_APPROVAL_PACKET_ROOT)
+    parser.add_argument("--packet-root", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--packet-storage-root", type=Path, default=Path("storage"))
     parser.add_argument("--next-limit", type=int, default=5)
     parser.add_argument("--database-url")
@@ -354,12 +280,10 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "DEFAULT_STAGE_RUN_DASHBOARD_ROOT",
     "StageRunDashboard",
-    "StageRunNextPacket",
-    "StageRunPacketSummary",
+    "StageRunProviderDispatchPreview",
     "build_stage_run_dashboard",
-    "collect_packet_summaries",
     "default_dashboard_path",
-    "preview_next_pending_packet",
+    "preview_next_provider_dispatch",
     "write_stage_run_dashboard",
 ]
 

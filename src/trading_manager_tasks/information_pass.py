@@ -139,7 +139,7 @@ def _empty_evidence() -> tuple[LayerDatasetEvidence, ...]:
 
 
 def _information_needs(*, dispatch: ProviderDispatchSummary | None, plan: DatasetExpansionPlan) -> tuple[InformationNeed, ...]:
-    provider_status = "plan_validated_without_provider_calls" if dispatch else "needs_approval_or_plan_only_validation"
+    provider_status = "plan_previewed_without_provider_calls" if dispatch else "needs_plan_only_preview"
     selected = plan.selected_decision
     selected_action = selected.action if selected else "no_dataset_expansion_selected"
     return (
@@ -147,17 +147,16 @@ def _information_needs(*, dispatch: ProviderDispatchSummary | None, plan: Datase
             topic="provider_dispatch_expansion",
             status=provider_status,
             evidence_needed=(
-                "plan-only validation for each provider-backed acquisition adapter",
-                "bounded live-call approval artifacts before any non-dry-run provider call",
-                "actual 2016-01 request counts, latency, error classes, retry behavior, and provider quota pressure after approval",
+                "plan-only preview for each provider-backed acquisition adapter",
+                "actual 2016-01 request counts, latency, error classes, retry behavior, and provider quota pressure during autonomous acquisition",
             ),
-            safe_next_action="prepare task keys and validate live_call_approval_v1; do not execute provider calls inside the information pass",
+            safe_next_action="prepare task keys and preview provider dispatch; do not execute provider calls inside the information pass",
         ),
         InformationNeed(
             topic="concurrency_defaults",
             status="needs_controlled_runtime_measurement",
             evidence_needed=(
-                "CPU, memory, disk I/O, PostgreSQL pressure during a small approved 2016-01 batch",
+                "CPU, memory, disk I/O, PostgreSQL pressure during a small autonomous 2016-01 batch",
                 "worker saturation point outside regular-trading-day protection windows",
                 "throttle behavior under provider rate-limit or host pressure signals",
             ),
@@ -212,7 +211,7 @@ def build_controlled_information_pass(
     end_month: str = "2016-01",
     evidence: tuple[LayerDatasetEvidence, ...] | None = None,
     storage_root: Path = DEFAULT_STORAGE_ROOT,
-    approval_path: Path | None = None,
+    preview_provider_dispatch: bool = False,
     write: bool = False,
     output_path: Path = DEFAULT_INFORMATION_PASS_PATH,
 ) -> ControlledInformationPass:
@@ -233,13 +232,12 @@ def build_controlled_information_pass(
         output_path=output_path.parent / "manager_dataset_expansion_plan.json",
     )
     dispatch_summary = None
-    if approval_path is not None:
+    if preview_provider_dispatch:
         dispatch_summary = dispatch_layer_one_provider_acquisition(
             start_month=start_month,
             end_month=end_month,
             storage_root=storage_root,
-            approval_path=approval_path,
-            execute_approved_provider_calls=False,
+            execute_provider_calls=False,
         )
     report = ControlledInformationPass(
         contract_type="manager_controlled_information_pass_v1",
@@ -299,7 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--database-url")
     parser.add_argument("--model-schema", default="trading_model")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
-    parser.add_argument("--approval", type=Path, help="Optional live_call_approval_v1 artifact for plan-only dispatch validation.")
+    parser.add_argument("--preview-provider-dispatch", action="store_true", help="Include a plan-only provider dispatch preview without calling providers.")
     parser.add_argument("--output-path", type=Path, default=DEFAULT_INFORMATION_PASS_PATH)
     parser.add_argument("--write", action="store_true", help="Write safe report and preparation artifacts. Does not call providers.")
     args = parser.parse_args(argv)
@@ -309,7 +307,7 @@ def main(argv: list[str] | None = None) -> int:
         end_month=args.end_month,
         evidence=_load_evidence(args),
         storage_root=args.storage_root,
-        approval_path=args.approval,
+        preview_provider_dispatch=args.preview_provider_dispatch,
         write=args.write,
         output_path=args.output_path,
     )

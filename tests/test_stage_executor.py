@@ -126,8 +126,8 @@ class StageExecutorTests(unittest.TestCase):
             stage_type="data_acquisition",
             status="ready",
             command=["python3", "-c", "print('no')"],
-            blockers=("live_call_approval_v1",),
-            approval_gate_required="live_call_approval_v1",
+            blockers=("manual_provider_gate_v1",),
+            approval_gate_required="manual_provider_gate_v1",
         )
         with self.assertRaises(TaskSystemError):
             execute_stage_process(stage)

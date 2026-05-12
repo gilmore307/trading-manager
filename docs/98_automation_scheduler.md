@@ -10,7 +10,7 @@ The manager scheduler owns continuous orchestration across the full offline trai
 
 ```text
 data acquisition planning
-  -> owner-observed agent-reviewed provider acquisition dispatch
+  -> autonomous historical provider acquisition dispatch
   -> source normalization
   -> feature generation
   -> model training/generation
@@ -34,7 +34,7 @@ The scheduler must preserve this priority order:
 1. live trading monitoring, risk checks, and execution-owned order/fill/account lifecycle;
 2. provider-call safety gates, agent-review expiry checks, and dispatch guardrails;
 3. urgent production incident or data-integrity repair;
-4. historical data acquisition that has a valid owner-observed agent-reviewed `live_call_approval_v1`;
+4. historical data acquisition through autonomous bounded provider dispatch and reconciliation;
 5. offline feature generation, model training, evaluation, and promotion evidence;
 6. maintenance, cleanup, documentation, and registry hygiene.
 
@@ -74,13 +74,13 @@ The buffer covers pre-open checks and post-close reconciliation. The protection 
 - allow lightweight bookkeeping only when it does not contend with live systems;
 - allow urgent manual override only through reviewed policy, not as a hidden default.
 
-Outside the protected window, including non-trading days, the scheduler should resume safe queued historical work automatically subject to resource budgets and owner-observed agent decision gates. Before production model activation or live trading is enabled, set `TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=true` in the service environment to restore market-hours protection.
+Outside the protected window, including non-trading days, the scheduler should resume safe queued historical work automatically subject to resource budgets and agent decision gates. Before production model activation or live trading is enabled, set `TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=true` in the service environment to restore market-hours protection.
 
 ## Agent Decision Gates Stay Hard
 
 Automation does not weaken gates:
 
-- live historical provider calls require owner-observed agent-reviewed `live_call_approval_v1` and proposal validation;
+- historical provider/data acquisition is autonomous once manager request payloads are prepared and resource gates pass;
 - model activation requires an approving script-called `agent_model_promotion_decision_v1` before activation artifacts are valid;
 - broker/order/fill/account mutation remains execution-owned and must not be inferred from model-training progress;
 - secrets remain alias/config references only.
@@ -92,13 +92,13 @@ The scheduler implementation should behave like a durable work loop:
 1. inspect `task_summary`, receipts, ready signals, and artifact refs;
 2. find the next safe blocked/ready work item by priority and dependency state;
 3. check market-hours/resource/provider/promotion/execution gates;
-4. run owner-observed agent decisions where authorized, then dispatch only the allowed component request type;
+4. dispatch only the allowed component request type after its specific guardrails pass;
 5. record receipts and update manager summary surfaces;
 6. continue until no safe work exists, then sleep/backoff instead of spinning.
 
 If no safe work exists, the scheduler should report why: waiting for agent decision, regular-trading-day market-hours protection, resource pressure, missing upstream artifact, failed dependency, provider quota, or promotion review. The scheduler should distinguish failed dependencies from valid absent history: not-yet-listed symbols and reviewed provider no-data responses are terminal evidence for the acquisition request and should flow into coverage/missingness diagnostics instead of being retried indefinitely or treated as successful positive-row data. If a component receipt is technically failed, downstream progression may use an accepted-failure coverage exception only after an agent evaluates every failed request and records the analysis artifact; the original failed task state remains visible.
 
-The current scheduler tick evaluates regular-trading-day market-hours protection and host resource pressure, then admits one safe unit of historical work: preparation, a ready safe/offline workflow stage, a bounded gate/backoff decision, or terminal month completion. Safe/offline execution writes deterministic local artifacts, logs, receipts, and workflow state only; provider dispatch remains behind owner-observed agent review/proposal validation, while model activation, storage lifecycle mutation, and broker/account mutation stay behind their separate boundaries.
+The current scheduler tick evaluates regular-trading-day market-hours protection and host resource pressure, then admits one safe unit of historical work: preparation, a ready safe/offline workflow stage, a bounded gate/backoff decision, or terminal month completion. Safe/offline execution writes deterministic local artifacts, logs, receipts, and workflow state only; provider dispatch runs autonomously under manager request/resource/coverage controls, while model activation, storage lifecycle mutation, and broker/account mutation stay behind their separate boundaries.
 
 The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_daemon.py`. It wraps the tick in a resident system-service loop with a `manager_scheduler_daemon_state_v1` checkpoint, single-instance lock, decision JSONL log, automatic completed/open-work audit, chronological month-cursor advancement, and service-manager-ready template under `deploy/systemd/`. The service chooses the next month from durable workflow state and the maintained workflow plan; the owner does not tell it where to continue. `scripts/tasks/plan_dataset_expansion.py` provides the explicit dataset-expansion decision surface used by the scheduler policy: plan-only by default, and `--write` prepares only safe artifacts/payloads while preserving provider, promotion, and execution gates. See [`99_historical_scheduler_runtime.md`](99_historical_scheduler_runtime.md) for boot, resume, and maintenance expectations.
 
@@ -106,7 +106,7 @@ The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_dae
 
 This policy does not authorize:
 
-- provider dispatch without owner-observed agent review, proposal validation, and terminal-coverage guardrails;
+- provider dispatch without manager request bounds, resource controls, receipts, and terminal-coverage guardrails;
 - production model activation without a script-called agent decision artifact;
 - broker execution or account mutation;
 - hiding long-running jobs from receipts/artifacts/summary;

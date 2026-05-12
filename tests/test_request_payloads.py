@@ -47,8 +47,8 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
         self.assertEqual(payload["params"]["start"], "2016-01-01")
         self.assertEqual(payload["params"]["end"], "2016-02-01")
         self.assertEqual(payload["output_root"], "storage/monthly_backfill_v1/alpaca_bars/SPY/2016-01")
-        self.assertFalse(payload["live_call_policy"]["allow_live_calls"])
-        self.assertEqual(payload["live_call_policy"]["max_requests"], 0)
+        self.assertFalse(payload["manager_controls"]["allow_live_provider_calls"])
+        self.assertFalse(payload["manager_controls"]["autonomous_historical_provider_acquisition"])
 
     def test_materialization_writes_payload_and_request_input_binding(self):
         request = _spy_layer_one_request()

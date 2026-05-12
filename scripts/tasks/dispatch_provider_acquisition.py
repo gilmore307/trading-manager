@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and optionally dispatch approved provider acquisition work."""
+"""Plan or dispatch autonomous historical provider acquisition work."""
 
 from __future__ import annotations
 

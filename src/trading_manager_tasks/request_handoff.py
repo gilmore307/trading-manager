@@ -114,11 +114,6 @@ def _require_dry_run_safety(payload: Mapping[str, Any], *, allow_live: bool) -> 
     controls = payload.get("manager_controls") or {}
     if controls.get("allow_live_provider_calls") not in (False, None):
         raise TaskSystemError("manager_controls.allow_live_provider_calls must be false for dry-run handoff validation")
-    policy = payload.get("live_call_policy") or {}
-    if policy.get("allow_live_calls") not in (False, None):
-        raise TaskSystemError("live_call_policy.allow_live_calls must be false for dry-run handoff validation")
-    if policy.get("max_requests") not in (0, None):
-        raise TaskSystemError("live_call_policy.max_requests must be 0 for dry-run handoff validation")
 
 
 def _validate_payload_alignment(request: Mapping[str, Any], payload: Mapping[str, Any], *, allow_live: bool) -> None:

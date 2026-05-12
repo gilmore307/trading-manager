@@ -1,11 +1,9 @@
-"""Capacity-aware manager scheduler gates and first safe work loop.
+"""Capacity-aware manager scheduler gates and historical training work loop.
 
-The scheduler is intentionally conservative. Historical provider acquisition is
-an internal training stage, not an external dependency, but provider/API calls
-still pass through the internal ``live_call_approval_v1`` safety gate. This tick
-can plan or execute safe offline preparation work, but it does not call live
-providers, activate models, or touch broker/execution state. Model activation
-remains gated by an approving review decision.
+Historical provider acquisition is an internal training stage and advances
+automatically after request payload preparation. Provider/data acquisition may
+call historical data APIs through autonomous manager dispatch, but broker/order/account mutation and model
+activation remain blocked unless a separate approved decision exists.
 """
 
 from __future__ import annotations
@@ -357,8 +355,8 @@ def run_scheduler_once(
                 now_utc=now.isoformat(),
                 now_et=now_et.isoformat(),
                 decision_status="ready",
-                reason_code="safe_offline_stage_ready",
-                reason="safe offline workflow stage is ready; rerun with --execute-safe-offline-stages to execute it",
+                reason_code="workflow_stage_ready",
+                reason="workflow stage is ready; rerun with --execute-safe-offline-stages to execute it",
                 market_protection_active=False,
                 resource_pressure_active=False,
                 selected_work=workflow_next_stage.stage_id,
@@ -380,8 +378,8 @@ def run_scheduler_once(
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="executed",
-            reason_code="safe_offline_stage_executed",
-            reason="executed one ready safe offline workflow stage and recorded its receipt/state",
+            reason_code="workflow_stage_executed",
+            reason="executed one ready workflow stage and recorded its receipt/state",
             market_protection_active=False,
             resource_pressure_active=False,
             selected_work=workflow_next_stage.stage_id,
@@ -403,14 +401,13 @@ def run_scheduler_once(
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="backoff",
-            reason_code="waiting_owner_observed_agent_review",
-            reason="Layer 1 provider acquisition is the next internal historical-training stage and requires owner-observed agent-reviewed live_call_approval_v1 plus proposal validation",
+            reason_code="workflow_stage_ready",
+            reason="Layer 1 provider acquisition is ready for autonomous historical dispatch",
             market_protection_active=False,
             resource_pressure_active=False,
             selected_work=next_stage.stage_id if next_stage else "model_training_workflow",
             command=next_stage.command if next_stage else [],
-            next_internal_stage="owner_observed_agent_reviewed_provider_acquisition",
-            approval_gate_required="live_call_approval_v1",
+            next_internal_stage="autonomous_historical_provider_acquisition",
             execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
         )
 
@@ -428,8 +425,7 @@ def run_scheduler_once(
             resource_pressure_active=False,
             selected_work=selected_work,
             command=command,
-            next_internal_stage="owner_observed_agent_reviewed_provider_acquisition",
-            approval_gate_required="live_call_approval_v1",
+            next_internal_stage="autonomous_historical_provider_acquisition",
             execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
         )
 
@@ -456,13 +452,12 @@ def run_scheduler_once(
         now_et=now_et.isoformat(),
         decision_status="executed",
         reason_code="safe_offline_preparation_executed",
-        reason="completed Layer 1 internal acquisition preparation; next internal stage is owner-observed agent-reviewed provider acquisition",
+        reason="completed Layer 1 internal acquisition preparation; next internal stage is autonomous historical provider acquisition",
         market_protection_active=False,
         resource_pressure_active=False,
         selected_work=selected_work,
         command=command,
-        next_internal_stage="owner_observed_agent_reviewed_provider_acquisition",
-        approval_gate_required="live_call_approval_v1",
+        next_internal_stage="autonomous_historical_provider_acquisition",
         execution_summary=summary.summary_row()
         | {"workflow_plan": refreshed_workflow_plan.summary_row(), "workflow_state": refreshed_workflow_state.summary_row()},
     )

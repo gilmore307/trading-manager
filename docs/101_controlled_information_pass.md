@@ -12,7 +12,7 @@ It summarizes:
 
 - a lightweight resource snapshot;
 - the current dataset-expansion decision;
-- optional plan-only `live_call_approval_v1` validation for Layer 1 provider acquisition;
+- optional plan-only provider acquisition preview for Layer 1;
 - remaining information needs for provider dispatch, concurrency, L3-L7 target queues, dataset thresholds, artifact discovery, and storage lifecycle;
 - explicit safety counters proving no provider calls, model activation, broker execution, or storage lifecycle mutation occurred.
 
@@ -26,9 +26,9 @@ It must not:
 - run model activation;
 - route broker/paper/live execution;
 - delete, compress, archive, restore, or mutate storage lifecycle state;
-- weaken owner-observed `live_call_approval_v1`, `agent_model_promotion_decision_v1`, or `agent_storage_lifecycle_decision_v1` gates.
+- weaken `agent_model_promotion_decision_v1`, `agent_storage_lifecycle_decision_v1`, or broker/order/account mutation gates.
 
-Provider dispatch validation is plan-only unless the owner-observed agent automation path invokes the provider dispatch adapter with `--execute-approved-provider-calls`. That execution is outside the information-pass boundary.
+Provider dispatch preview is plan-only inside the information-pass boundary. Actual autonomous historical provider acquisition runs outside the information-pass boundary through the scheduler/provider-stage adapter.
 
 ## Command
 
@@ -49,13 +49,13 @@ PYTHONPATH=src python3 scripts/tasks/plan_controlled_information_pass.py \
   --write
 ```
 
-Optionally validate an agent-reviewed approval artifact without dispatching providers:
+Optionally include a plan-only provider dispatch preview without calling providers:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/plan_controlled_information_pass.py \
   --start-month 2016-01 \
   --end-month 2016-01 \
-  --approval storage/runtime/approvals/layer_01_market_regime/live_call_approval_layer_01_2016-01.json
+  --preview-provider-dispatch
 ```
 
 Default report path when `--write` is used:
@@ -68,8 +68,8 @@ storage/runtime/information_pass/controlled_information_pass_2016-01.json
 
 The report intentionally keeps six items open until evidence exists:
 
-1. **Provider dispatch expansion** — validate each provider adapter, then measure actual approved request counts, latency, error classes, retry behavior, and quota pressure.
-2. **Concurrency defaults** — measure CPU, memory, disk I/O, PostgreSQL pressure, and provider pressure during a small approved batch before setting worker defaults.
+1. **Provider dispatch expansion** — validate each provider adapter, then measure actual request counts, latency, error classes, retry behavior, and quota pressure.
+2. **Concurrency defaults** — measure CPU, memory, disk I/O, PostgreSQL pressure, and provider pressure during a small autonomous batch before setting worker defaults.
 3. **L3-L7 target queue rules** — inventory target candidates, ranking signals, sector coverage, data completeness, and one-target-at-a-time chain receipts.
 4. **Dataset thresholds** — collect real month/sample/label/eval coverage plus baseline, split-stability, regime, and no-leakage evidence before hardening thresholds.
 5. **Artifact discovery** — use real component receipt samples to define stable output refs, hashes, schema refs, retention hints, and ready-signal refs.

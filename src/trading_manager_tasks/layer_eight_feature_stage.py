@@ -5,7 +5,7 @@ The Layer 8 feature stage has two valid paths:
 * if the reviewed Layer 8 gate accepted a no-provider/no-active-target skip,
   feature generation is also a reviewed no-op because no source_05 option
   rows are required for deterministic no-option model rows;
-* otherwise, after approved provider acquisition has populated source_05, the
+* otherwise, after provider acquisition has populated source_05, the
   adapter delegates to trading-data's feature_08 SQL generator.
 """
 

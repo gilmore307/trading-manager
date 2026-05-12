@@ -37,7 +37,7 @@ When a source/feature/model name crosses repository boundaries, the canonical sh
 `trading-manager` may:
 
 - plan manager requests for data/model/storage/execution/dashboard review paths;
-- validate request payload shape and live-call approvals;
+- validate request payload shape and autonomous provider dispatchs;
 - maintain registry names, kind boundaries, and naming rules;
 - record promotion-review requests, script-called agent decision artifacts, and activation-record artifacts;
 - enforce that deferred/rejected/failed/partial/missing agent decisions cannot activate configs.
@@ -47,7 +47,7 @@ When a source/feature/model name crosses repository boundaries, the canonical sh
 - fetch provider data;
 - run feature generation, model training, or model inference as production behavior;
 - activate a model without an approving `agent_model_promotion_decision_v1`;
-- dispatch live provider calls without owner-observed agent-reviewed `live_call_approval_v1` plus proposal validation;
+- dispatch broker/order/account mutations or model activation through the historical provider path;
 - construct/place broker orders, process fills, mutate positions, or mutate account state.
 
 ## Registry and Promotion Relationship

@@ -14,7 +14,7 @@ This closeout covers the manager-owned control-plane surfaces needed before comp
 - storage-owned completion receipt payload reference flow;
 - unified model-promotion review request route;
 - generic review decision and activation-record artifact builders;
-- live-call approval gate for bounded provider acquisition;
+- autonomous bounded historical provider acquisition with reconciliation/coverage guards;
 - execution-side `trade_risk_cap` validation entrypoint registration.
 
 ## Accepted Manager-Owned Shape
@@ -46,9 +46,9 @@ The accepted live-provider gate is:
 
 ```text
 dry-run request/payload/handoff evidence
-  -> non-dry-run manager_request_v1 with live-call policy refs
-  -> owner-observed agent-reviewed live_call_approval_v1
-  -> validate_live_call_approval.py / proposal validation
+  -> non-dry-run manager_request_v1 with provider-dispatch policy refs
+  -> autonomous historical provider dispatch
+  -> provider receipt reconciliation / coverage validation
   -> component dispatch may be considered outside this closeout
 ```
 
@@ -70,7 +70,7 @@ Those are component production phases, not manager closeout blockers.
 
 The manager/control-plane closeout did not include an always-on production scheduler. Future scheduler work should begin from concrete lifecycle pressure and preserve these boundaries:
 
-- live provider dispatch worker implementation after a validated `live_call_approval_v1` exists;
+- historical provider dispatch worker operation under autonomous scheduler/resource controls;
 - durable object-store/SQL partitioning beyond current payload-reference helpers;
 - execution-owned broker/order/fill/account lifecycle;
 - dashboard surfaces over `task_summary`, promotion decisions, and ready signals;
@@ -87,7 +87,7 @@ The closeout is acceptable only while these gates pass:
 PYTHONPATH=src python3 -m unittest discover -s tests
 python3 scripts/registry/apply_registry_migrations.py --dry-run
 python3 -m compileall src scripts
-python3 scripts/tasks/validate_live_call_approval.py --help
+python3 scripts/tasks/dispatch_provider_acquisition.py --help
 ```
 
 No command in this closeout performs provider calls, component dispatch, broker execution, or production activation.

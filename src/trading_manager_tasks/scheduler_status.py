@@ -254,11 +254,11 @@ def _provider_status(latest_decision: Mapping[str, Any] | None, daemon_state: Ma
     provider_calls = int((latest_decision or {}).get("provider_calls") or 0)
     approval_gate = (latest_decision or {}).get("approval_gate_required")
     if approval_gate:
-        status = "waiting_agent_reviewed_provider_gate"
+        status = "legacy_approval_gate_present"
     elif provider_calls:
         status = "provider_calls_recorded"
-    elif "provider" in next_stage or "owner_observed_agent" in next_stage:
-        status = "provider_stage_gated"
+    elif "provider" in next_stage:
+        status = "provider_stage_autonomous_ready"
     else:
         status = "no_provider_work_selected"
     return {
@@ -275,8 +275,8 @@ def _provider_status(latest_decision: Mapping[str, Any] | None, daemon_state: Ma
 def _gated_scope_status() -> dict[str, Any]:
     return {
         "provider_acquisition": {
-            "status": "automated_after_agent_review_and_exact_validation",
-            "required_contracts": ["live_call_approval_v1", "manager_live_call_approval_proposal_validation_v1"],
+            "status": "autonomous_historical_acquisition_after_payload_preparation",
+            "required_contracts": ["manager_request_v1", "component_completion_receipt_v1", "manager_stage_coverage_v1"],
         },
         "model_activation": {
             "status": "deferred_until_agent_model_promotion_decision_approves",
@@ -352,7 +352,7 @@ def collect_historical_scheduler_status(
         if latest_decision.get("decision_status") == "backoff":
             blocked_reason = str(latest_decision.get("reason") or latest_decision.get("reason_code") or "") or None
         elif provider_status.get("approval_gate_required"):
-            blocked_reason = f"waiting for {provider_status['approval_gate_required']}"
+            blocked_reason = f"legacy approval gate still present: {provider_status['approval_gate_required']}"
     current_stage = workflow.next_stage_id or str((latest_decision or {}).get("selected_work") or "") or None
     if current_stage is None and current_month:
         current_stage = "prepare_layer_one_historical_training_batch" if not workflow.exists else "historical_work_selected"

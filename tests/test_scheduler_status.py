@@ -84,8 +84,8 @@ class SchedulerStatusTests(unittest.TestCase):
                     "failed_ticks": 0,
                     "consecutive_errors": 0,
                     "last_decision_status": "backoff",
-                    "last_reason_code": "waiting_owner_observed_agent_review",
-                    "last_next_internal_stage": "owner_observed_agent_reviewed_provider_acquisition",
+                    "last_reason_code": "workflow_stage_ready",
+                    "last_next_internal_stage": "autonomous_historical_provider_acquisition",
                     "service_managed": True,
                     "service_manager": "systemd",
                     "last_completed_months": ["2016-02", "2016-03"],
@@ -96,12 +96,11 @@ class SchedulerStatusTests(unittest.TestCase):
             decision_log.write_text(
                 json.dumps({
                     "contract_type": "manager_scheduler_decision_v1",
-                    "decision_status": "backoff",
-                    "reason_code": "waiting_owner_observed_agent_review",
-                    "reason": "waiting for reviewed provider gate",
+                    "decision_status": "ready",
+                    "reason_code": "workflow_stage_ready",
+                    "reason": "provider stage ready for autonomous dispatch",
                     "selected_work": "layer_01_market_regime.data_acquisition",
-                    "next_internal_stage": "owner_observed_agent_reviewed_provider_acquisition",
-                    "approval_gate_required": "live_call_approval_v1",
+                    "next_internal_stage": "autonomous_historical_provider_acquisition",
                     "provider_calls": 0,
                     "dispatch_performed": False,
                 }) + "\n",
@@ -121,8 +120,8 @@ class SchedulerStatusTests(unittest.TestCase):
         row = status.summary_row()
         self.assertEqual(row["current_month"], "2016-04")
         self.assertEqual(row["current_stage"], "layer_01_market_regime.data_acquisition")
-        self.assertEqual(row["provider_status"]["status"], "waiting_agent_reviewed_provider_gate")
-        self.assertEqual(row["blocked_reason"], "waiting for reviewed provider gate")
+        self.assertEqual(row["provider_status"]["status"], "provider_stage_autonomous_ready")
+        self.assertIsNone(row["blocked_reason"])
         self.assertEqual(row["latest_decision"]["decision_log_row_count"], 1)
 
     def test_status_flags_missing_service_flags(self):

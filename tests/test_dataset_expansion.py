@@ -40,9 +40,9 @@ class DatasetExpansionTests(unittest.TestCase):
         self.assertEqual(decision.layer, 1)
         self.assertEqual(decision.dataset_role, "train")
         self.assertEqual(decision.action, "prepare_layer_one_historical_training_batch")
-        self.assertEqual(decision.approval_gate_required, "live_call_approval_v1")
-        self.assertTrue(decision.safe_without_provider_calls)
-        self.assertFalse(decision.provider_calls_allowed)
+        self.assertIsNone(decision.approval_gate_required)
+        self.assertFalse(decision.safe_without_provider_calls)
+        self.assertTrue(decision.provider_calls_allowed)
         self.assertFalse(decision.model_activation_allowed)
         self.assertFalse(decision.broker_execution_allowed)
 

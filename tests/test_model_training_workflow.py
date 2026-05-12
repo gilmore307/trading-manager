@@ -46,7 +46,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertTrue(layer.candidate_axis)
             self.assertTrue(layer.candidate_progression_policy)
 
-    def test_layer_one_acquisition_waits_for_task_key_preparation_then_approval(self):
+    def test_layer_one_acquisition_waits_for_task_key_preparation_then_auto_dispatch(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
             plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
@@ -59,11 +59,15 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
             layer_one_acquisition = plan.layers[0].stages[0]
             self.assertEqual(plan.layer_one_task_key_count, LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS)
-            self.assertEqual(layer_one_acquisition.approval_gate_required, "live_call_approval_v1")
-            self.assertIn("live_call_approval_v1", layer_one_acquisition.blockers)
+            self.assertEqual(layer_one_acquisition.status, "ready")
+            self.assertIsNone(layer_one_acquisition.approval_gate_required)
+            self.assertEqual(layer_one_acquisition.blockers, ())
+            self.assertTrue(layer_one_acquisition.provider_calls_allowed)
+            self.assertIn("scripts/tasks/dispatch_and_reconcile_provider_stage.py", layer_one_acquisition.command)
+            self.assertIn("--reject-terminal-coverage", layer_one_acquisition.command)
             self.assertEqual(plan.next_stage, layer_one_acquisition)
 
-    def test_layer_two_acquisition_waits_for_own_task_key_preparation_then_approval(self):
+    def test_layer_two_acquisition_waits_for_own_task_key_preparation_then_auto_dispatch(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
             _write_task_keys(root, model_layer=LAYER_ONE_MODEL_LAYER)
@@ -77,12 +81,15 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
             layer_two_acquisition = plan.layers[1].stages[0]
             self.assertEqual(plan.layer_two_task_key_count, LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS)
-            self.assertEqual(layer_two_acquisition.approval_gate_required, "live_call_approval_v1")
-            self.assertIn("live_call_approval_v1", layer_two_acquisition.blockers)
+            self.assertEqual(layer_two_acquisition.status, "ready")
+            self.assertIsNone(layer_two_acquisition.approval_gate_required)
+            self.assertEqual(layer_two_acquisition.blockers, ())
+            self.assertTrue(layer_two_acquisition.provider_calls_allowed)
             self.assertIn("--model-layer", layer_two_acquisition.command)
             self.assertIn("layer_02_sector_context", layer_two_acquisition.command)
             self.assertIn("--skip-registered-failures", layer_two_acquisition.command)
-            self.assertNotIn("--execute-approved-provider-calls", layer_two_acquisition.command)
+            self.assertIn("--reject-terminal-coverage", layer_two_acquisition.command)
+            self.assertIn("scripts/tasks/dispatch_and_reconcile_provider_stage.py", layer_two_acquisition.command)
 
     def test_layer_three_data_acquisition_uses_local_materializer_without_provider_dispatch(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -146,7 +153,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("${START_MONTH}", command)
         self.assertIn("--end-month", command)
 
-    def test_layer_eight_data_acquisition_runs_gate_review_without_live_call_gate(self):
+    def test_layer_eight_data_acquisition_runs_gate_review_without_provider_approval(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
 

@@ -66,9 +66,9 @@ class LayerEightOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(previews[0].provider, "thetadata")
         self.assertEqual(previews[0].target_component_id, "source_05_option_expression")
         self.assertEqual(previews[0].snapshot_time, "2016-01-05T09:31:00-05:00")
-        self.assertEqual(review.status, "approval_required")
+        self.assertEqual(review.status, "provider_acquisition_ready")
         self.assertEqual(review.active_request_count, 1)
-        self.assertEqual(review.recommended_next_action, "prepare_or_review_layer_08_live_call_approval_packet")
+        self.assertEqual(review.recommended_next_action, "prepare_option_expression_acquisition")
 
     def test_written_no_provider_skip_receipt_is_safe_and_stage_scoped(self) -> None:
         review = build_layer_eight_gate_review(start_month="2016-01", end_month="2016-01", layer_7_rows=[])

@@ -48,7 +48,7 @@ The planner emits deterministic dry-run `manager_request_v1` dictionaries. It do
 
 For Layer 1 `MarketRegimeModel` training, `01_feed_alpaca_bars` expands over every `model_layer = layer_01_market_regime` row in `trading-storage/main/shared/market_regime_etf_universe.csv`. Each ETF symbol gets its own monthly request and storage path so missing history, provider errors, and receipts stay isolated by symbol. The current reviewed Layer 1 universe has 22 market-state ETFs.
 
-For Layer 2 `SectorContextModel` training, pass `--model-layer layer_02_sector_context` to the planner or use the dedicated Layer 2 preparation command below. Layer 2 expands over the reviewed sector/industry ETF rows from the same shared universe file. The current reviewed Layer 2 universe has 25 sector/industry ETFs and requires owner-observed agent review plus proposal validation before live provider dispatch.
+For Layer 2 `SectorContextModel` training, pass `--model-layer layer_02_sector_context` to the planner or use the dedicated Layer 2 preparation command below. Layer 2 expands over the reviewed sector/industry ETF rows from the same shared universe file. The current reviewed Layer 2 universe has 25 sector/industry ETFs and uses autonomous historical provider dispatch under manager request, resource, receipt, and terminal-coverage controls.
 
 Each planned request keeps only concise control-plane facts:
 
@@ -95,7 +95,7 @@ The batch preparation performs these manager-owned steps together:
 3. validate the payload handoff against the `trading-data` feed `build_context` boundary;
 4. report a batch summary showing zero provider calls, zero dispatch, zero model activation, and zero broker execution.
 
-Use `--write` only when the reviewed batch should be persisted to manager SQL as active control-plane requests and request-scoped input bindings. Even then, provider dispatch still requires a validated `live_call_approval_v1`.
+Use `--write` only when the reviewed batch should be persisted to manager SQL as active control-plane requests and request-scoped input bindings. Even then, provider dispatch still requires a validated `autonomous_historical_provider_acquisition_v1`.
 
 ## Payload Materialization
 
@@ -123,4 +123,4 @@ This still does not dispatch components or call providers. It only makes the req
 
 ## Guardrail
 
-A generated request or materialized task key is not approval to run live acquisition. Provider calls require a separately reviewed `live_call_approval_v1` artifact validated through `scripts/tasks/validate_live_call_approval.py`. The gate is data-acquisition-only and must not approve broker execution, model activation, or account mutation.
+A generated request or materialized task key is not by itself provider execution. Provider calls run only through bounded manager dispatch with request ids, resource controls, receipts, and terminal-coverage checks. The dispatch path is data-acquisition-only and must not enable broker execution, model activation, or account mutation.

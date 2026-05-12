@@ -67,7 +67,7 @@ class HistoricalTrainingBatchPreparation:
             "dispatch_performed": self.dispatch_performed,
             "model_activation_performed": self.model_activation_performed,
             "broker_execution_performed": self.broker_execution_performed,
-            "live_call_approval_required_before_provider_dispatch": True,
+            "autonomous_historical_provider_acquisition": True,
         }
 
 
