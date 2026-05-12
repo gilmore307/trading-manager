@@ -248,14 +248,44 @@ def _failure_summary(storage_root: Path) -> dict[str, Any]:
     }
 
 
+def _decision_month(decision: Mapping[str, Any] | None) -> str | None:
+    if not decision:
+        return None
+    for key in ("start_month", "month_start"):
+        value = str(decision.get(key) or "")
+        if value:
+            return value
+    execution_summary = decision.get("execution_summary")
+    if isinstance(execution_summary, Mapping):
+        value = str(execution_summary.get("month_start") or execution_summary.get("start_month") or "")
+        if value:
+            return value
+    workflow_state = decision.get("workflow_state")
+    if isinstance(workflow_state, Mapping):
+        value = str(workflow_state.get("start_month") or "")
+        if value:
+            return value
+    return None
+
+
+def _completed_months(selection: Mapping[str, Any]) -> set[str]:
+    values = selection.get("completed_months") or []
+    return {str(value) for value in values if str(value)}
+
+
+def _is_stale_completed_decision(decision: Mapping[str, Any] | None, selection: Mapping[str, Any]) -> bool:
+    month = _decision_month(decision)
+    if not month:
+        return False
+    selected_month = str(selection.get("start_month") or "")
+    return month in _completed_months(selection) and selected_month and selected_month != month
+
+
 def _provider_status(latest_decision: Mapping[str, Any] | None, daemon_state: Mapping[str, Any] | None) -> dict[str, Any]:
     reason_code = str((latest_decision or {}).get("reason_code") or (daemon_state or {}).get("last_reason_code") or "")
     next_stage = str((latest_decision or {}).get("next_internal_stage") or (daemon_state or {}).get("last_next_internal_stage") or "")
     provider_calls = int((latest_decision or {}).get("provider_calls") or 0)
-    approval_gate = (latest_decision or {}).get("approval_gate_required")
-    if approval_gate:
-        status = "legacy_approval_gate_present"
-    elif provider_calls:
+    if provider_calls:
         status = "provider_calls_recorded"
     elif "provider" in next_stage:
         status = "provider_stage_autonomous_ready"
@@ -266,7 +296,6 @@ def _provider_status(latest_decision: Mapping[str, Any] | None, daemon_state: Ma
         "status": status,
         "reason_code": reason_code or None,
         "next_internal_stage": next_stage or None,
-        "approval_gate_required": approval_gate,
         "provider_calls_latest_decision": provider_calls,
         "dispatch_performed_latest_decision": bool((latest_decision or {}).get("dispatch_performed", False)),
     }
@@ -334,10 +363,19 @@ def collect_historical_scheduler_status(
     daemon_state = _read_json_object(state_path)
     latest_decision, decision_log_rows = _latest_jsonl_object(decision_log_path)
     auto_work_selection = select_next_historical_work(storage_root=storage_root).summary_row()
+    stale_completed_decision = _is_stale_completed_decision(latest_decision, auto_work_selection)
+    current_decision = None if stale_completed_decision else latest_decision
+    state_month = str((daemon_state or {}).get("start_month") or "")
+    selected_month = str(auto_work_selection.get("start_month") or "")
+    stale_completed_state = bool(
+        state_month in _completed_months(auto_work_selection) and selected_month and selected_month != state_month
+    )
+    if stale_completed_state:
+        state_month = ""
     current_month = str(
-        (daemon_state or {}).get("start_month")
-        or (latest_decision or {}).get("start_month")
-        or auto_work_selection.get("start_month")
+        state_month
+        or (current_decision or {}).get("start_month")
+        or selected_month
         or ""
     ) or None
     workflow = _workflow_checkpoint_status(_workflow_state_path(storage_root, current_month))
@@ -346,14 +384,12 @@ def collect_historical_scheduler_status(
     service_env = _file_status(service_env_path)
     daemon_wrapper = _file_status(daemon_wrapper_path)
     flags_present, missing_flags = _service_flags(service_template_path)
-    provider_status = _provider_status(latest_decision, daemon_state)
+    current_daemon_state = None if stale_completed_state else daemon_state
+    provider_status = _provider_status(current_decision, current_daemon_state)
     blocked_reason = None
-    if latest_decision:
-        if latest_decision.get("decision_status") == "backoff":
-            blocked_reason = str(latest_decision.get("reason") or latest_decision.get("reason_code") or "") or None
-        elif provider_status.get("approval_gate_required"):
-            blocked_reason = f"legacy approval gate still present: {provider_status['approval_gate_required']}"
-    current_stage = workflow.next_stage_id or str((latest_decision or {}).get("selected_work") or "") or None
+    if current_decision and current_decision.get("decision_status") == "backoff":
+        blocked_reason = str(current_decision.get("reason") or current_decision.get("reason_code") or "") or None
+    current_stage = workflow.next_stage_id or str((current_decision or {}).get("selected_work") or "") or None
     if current_stage is None and current_month:
         current_stage = "prepare_layer_one_historical_training_batch" if not workflow.exists else "historical_work_selected"
     service_runtime_ready = bool(
@@ -378,7 +414,14 @@ def collect_historical_scheduler_status(
         recommended_next_action = "observe_service_status_and_decision_log"
     else:
         recommended_next_action = "operator_may_enable_or_restart_service_after_review"
-    if latest_decision is not None:
+    reported_daemon_state = daemon_state
+    if stale_completed_state and daemon_state is not None:
+        reported_daemon_state = dict(daemon_state)
+        reported_daemon_state.pop("last_next_internal_stage", None)
+        reported_daemon_state["superseded_by_auto_work_selection"] = True
+    if stale_completed_decision:
+        latest_decision = None
+    elif latest_decision is not None:
         latest_decision = dict(latest_decision)
         latest_decision["decision_log_row_count"] = decision_log_rows
     return HistoricalSchedulerStatus(
@@ -397,7 +440,7 @@ def collect_historical_scheduler_status(
         daemon_wrapper=daemon_wrapper,
         recommended_service_flags_present=flags_present,
         missing_service_flags=missing_flags,
-        daemon_state=daemon_state,
+        daemon_state=reported_daemon_state,
         latest_decision=latest_decision,
         auto_work_selection=auto_work_selection,
         workflow_checkpoint=workflow,
