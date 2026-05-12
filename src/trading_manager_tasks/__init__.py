@@ -18,6 +18,10 @@ from .dataset_evidence import (
     collect_dataset_evidence_from_database,
     collect_dataset_evidence_from_rows,
 )
+from .dashboard_read_models import (
+    HISTORICAL_TASK_PROGRESS_CONTRACT,
+    build_historical_task_progress_summary,
+)
 from .dataset_expansion import (
     DatasetExpansionDecision,
     DatasetExpansionPlan,
@@ -86,6 +90,7 @@ __all__ = [
     "DatasetExpansionPlan",
     "DatasetRoleEvidence",
     "LayerDatasetEvidence",
+    "HISTORICAL_TASK_PROGRESS_CONTRACT",
     "HistoricalSchedulerStatus",
     "TASK_PRIORITY_RANKS",
     "TASK_SUMMARY_ORDER_BY",
@@ -95,6 +100,7 @@ __all__ = [
     "ModelPromotionTarget",
     "SourceAvailability",
     "build_dataset_expansion_plan",
+    "build_historical_task_progress_summary",
     "build_model_promotion_review_request",
     "collect_historical_scheduler_status",
     "collect_dataset_evidence_from_database",

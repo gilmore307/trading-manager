@@ -38,6 +38,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/run_automation_scheduler.py` — runs one capacity-aware scheduler tick: applies regular-trading-day market-hours protection, resource gates, and either reports or executes safe offline Layer 1 preparation without provider dispatch.
 - `tasks/run_automation_scheduler_daemon.py` — runs the persistent checkpointed historical-training scheduler daemon for resident system-service ownership, automatic next-work selection, safe/offline stage execution, and chronological month-cursor advancement.
 - `tasks/inspect_historical_scheduler_status.py` — emits read-only `manager_historical_scheduler_status_v1` service status: selected month/stage, readiness, lock state, latest decision, provider dispatch posture, failure evidence summary, gated-scope states, and recommended operator action.
+- `tasks/build_historical_task_progress_summary.py` — builds owner-facing `historical_task_progress_summary_v1` dashboard payload from read-only scheduler/status evidence; storage materialization remains `trading-storage` responsibility.
 - `tasks/submit_manager_requests.py` — validates or persists manager request rows.
 - `tasks/materialize_request_payloads.py` — writes component-readable parameter payloads behind `parameter_ref` and can persist request-scoped `input_binding_v1` metadata.
 - `tasks/validate_request_handoff.py` — validates materialized request payloads against component `build_context` paths without dispatching work or calling providers.
@@ -73,6 +74,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py --start-month 2
 PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py --start-month 2016-01 --end-month 2016-01 --execute-safe-preparation
 PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py --start-month 2016-01 --end-month 2016-01 --execute-safe-preparation --execute-safe-offline-stages --execute-autonomous-provider-stages --auto-select-next-work --advance-month-on-complete --once
 PYTHONPATH=src python3 scripts/tasks/inspect_historical_scheduler_status.py
+PYTHONPATH=src python3 scripts/tasks/build_historical_task_progress_summary.py
 PYTHONPATH=src python3 scripts/tasks/submit_manager_requests.py requests.jsonl
 PYTHONPATH=src python3 scripts/tasks/materialize_request_payloads.py requests.jsonl --write-files
 PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py --from-db --request-id mgrreq_backfill_alpaca_bars_2016_01

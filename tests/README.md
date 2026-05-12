@@ -167,6 +167,11 @@
   - latest decision/provider-gate status reporting;
   - explicit deferred statuses for model activation, storage lifecycle mutation, and broker/account mutation.
 
+- `test_dashboard_read_models.py` verifies:
+  - manager-owned `historical_task_progress_summary_v1` dashboard payload construction from read-only scheduler/status evidence;
+  - optional stage-coverage counts in chart payloads;
+  - CLI output shape without provider calls, model activation, broker execution, account mutation, or storage layout writes.
+
 - `test_review_decision.py` verifies:
   - unified `review_decision_v1` artifact construction;
   - activation records require approving review decisions;
