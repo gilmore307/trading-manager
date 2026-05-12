@@ -26,6 +26,7 @@ DEFAULT_DAEMON_WRAPPER_PATH = Path("scripts/tasks/run_automation_scheduler_daemo
 RECOMMENDED_SERVICE_FLAGS = (
     "--execute-safe-preparation",
     "--execute-safe-offline-stages",
+    "--execute-autonomous-provider-stages",
     "--auto-select-next-work",
     "--advance-month-on-complete",
 )

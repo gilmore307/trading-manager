@@ -382,6 +382,8 @@ def run_daemon_loop(
     max_iterations: int | None = None,
     execute_safe_preparation: bool = False,
     execute_safe_offline_stages: bool = False,
+    execute_autonomous_provider_stages: bool = False,
+    provider_stage_next_limit: int = 5,
     auto_select_next_work: bool = False,
     advance_month_on_complete: bool = False,
     config: SchedulerConfig = SchedulerConfig(),
@@ -432,6 +434,8 @@ def run_daemon_loop(
                     component_src_root=component_src_root,
                     execute_safe_preparation=execute_safe_preparation,
                     execute_safe_offline_stages=execute_safe_offline_stages,
+                    execute_autonomous_provider_stages=execute_autonomous_provider_stages,
+                    provider_stage_next_limit=provider_stage_next_limit,
                 )
                 append_decision_log(decision_log_path, decision)
                 completed = utc_now_iso()
@@ -479,8 +483,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--interval-seconds", type=float, default=DEFAULT_INTERVAL_SECONDS)
     parser.add_argument("--max-iterations", type=int, help="Run a bounded number of daemon iterations for smoke tests.")
     parser.add_argument("--once", action="store_true", help="Alias for --max-iterations 1.")
-    parser.add_argument("--execute-safe-preparation", action="store_true", help="Allow safe Layer 1 task-key preparation. No provider calls are performed.")
-    parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Allow one ready offline workflow stage per tick. No provider calls or activation are performed.")
+    parser.add_argument("--execute-safe-preparation", action="store_true", help="Allow safe task-key preparation. No provider calls are performed.")
+    parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Allow one ready offline workflow stage per tick. Provider stages use --execute-autonomous-provider-stages instead.")
+    parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Allow one bounded autonomous provider-dispatch/reconcile slice per tick when provider acquisition is ready.")
+    parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one daemon tick.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
@@ -508,6 +514,8 @@ def main(argv: list[str] | None = None) -> int:
         max_iterations=max_iterations,
         execute_safe_preparation=args.execute_safe_preparation,
         execute_safe_offline_stages=args.execute_safe_offline_stages,
+        execute_autonomous_provider_stages=args.execute_autonomous_provider_stages,
+        provider_stage_next_limit=args.provider_stage_next_limit,
         auto_select_next_work=args.auto_select_next_work,
         advance_month_on_complete=args.advance_month_on_complete,
         config=config,

@@ -19,11 +19,14 @@ from pathlib import Path
 from typing import Any, Literal, TextIO
 from zoneinfo import ZoneInfo
 
-from .historical_training import prepare_layer_one_historical_training_batch
+from .historical_training import prepare_layer_historical_training_batch, prepare_layer_one_historical_training_batch
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .model_training_state import advance_workflow_state, next_ready_or_blocked_stage, workflow_state_path_for_month
-from .model_training_workflow import LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS, build_model_training_workflow_plan
+from .model_training_workflow import LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS, LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS, build_model_training_workflow_plan
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .stage_executor import execute_next_ready_stage
+from .stage_reconcile import DEFAULT_COMPONENT_STORAGE_ROOT, reconcile_provider_stage
+from .stage_run_controller import run_stage_controller_step
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 NEW_YORK = ZoneInfo("America/New_York")
@@ -95,6 +98,7 @@ class SchedulerDecision:
     dispatch_performed: bool = False
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
+    storage_lifecycle_mutation_performed: bool = False
     execution_summary: dict[str, Any] | None = None
 
     def summary_row(self) -> dict[str, Any]:
@@ -253,11 +257,18 @@ def resource_gate(snapshot: ResourceSnapshot, config: SchedulerConfig = Schedule
     return GateResult(True, "resource_budget_available", "resource budget is available after reserving live-system headroom")
 
 
-def _safe_prep_command(start_month: str, end_month: str, *, execute: bool) -> list[str]:
+PROVIDER_STAGE_MODEL_LAYERS = {
+    "layer_01_market_regime.data_acquisition": LAYER_ONE_MODEL_LAYER,
+    "layer_02_sector_context.data_acquisition": LAYER_TWO_MODEL_LAYER,
+}
+
+
+def _safe_prep_command(start_month: str, end_month: str, *, model_layer: str, execute: bool) -> list[str]:
+    script = "prepare_layer_one_historical_training.py" if model_layer == LAYER_ONE_MODEL_LAYER else "prepare_layer_two_historical_training.py"
     command = [
         "PYTHONPATH=src",
         "python3",
-        "scripts/tasks/prepare_layer_one_historical_training.py",
+        f"scripts/tasks/{script}",
         "--start-month",
         start_month,
         "--end-month",
@@ -268,6 +279,99 @@ def _safe_prep_command(start_month: str, end_month: str, *, execute: bool) -> li
     if execute:
         command.append("--write-files-only")
     return command
+
+
+def _stage_status(workflow_state: Any, stage_id: str) -> str | None:
+    for stage in workflow_state.stages:
+        if stage.stage_id == stage_id:
+            return stage.status
+    return None
+
+
+def _next_preparation_model_layer(*, workflow_plan: Any, workflow_state: Any) -> str | None:
+    if (
+        _stage_status(workflow_state, "layer_01_market_regime.data_acquisition") != "succeeded"
+        and workflow_plan.layer_one_task_key_count < LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS
+    ):
+        return LAYER_ONE_MODEL_LAYER
+    if (
+        _stage_status(workflow_state, "layer_01_market_regime.data_acquisition") == "succeeded"
+        and _stage_status(workflow_state, "layer_02_sector_context.data_acquisition") != "succeeded"
+        and workflow_plan.layer_two_task_key_count < LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS
+    ):
+        return LAYER_TWO_MODEL_LAYER
+    return None
+
+
+def _preparation_selected_work(model_layer: str) -> str:
+    if model_layer == LAYER_ONE_MODEL_LAYER:
+        return "prepare_layer_one_historical_training_batch"
+    if model_layer == LAYER_TWO_MODEL_LAYER:
+        return "prepare_layer_two_historical_training_batch"
+    raise ValueError(f"unsupported preparation model layer: {model_layer}")
+
+
+def _execute_autonomous_provider_stage(
+    *,
+    stage_id: str,
+    start_month: str,
+    end_month: str,
+    storage_root: Path,
+    component_src_root: Path,
+    next_limit: int,
+) -> dict[str, Any]:
+    model_layer = PROVIDER_STAGE_MODEL_LAYERS[stage_id]
+    preparation, _requests, _payloads, _validations = prepare_layer_historical_training_batch(
+        model_layer=model_layer,
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        component_src_root=component_src_root,
+        write=True,
+        persist_sql=True,
+        validate_handoff=True,
+    )
+    controller_receipt, dashboard = run_stage_controller_step(
+        stage_id=stage_id,
+        start_month=start_month,
+        end_month=end_month,
+        packet_storage_root=storage_root,
+        next_limit=next_limit,
+        auto_execute_provider_calls=True,
+    )
+    reconcile = reconcile_provider_stage(
+        stage_id=stage_id,
+        start_month=start_month,
+        end_month=end_month,
+        component_storage_root=DEFAULT_COMPONENT_STORAGE_ROOT,
+        manager_storage_root=storage_root,
+        persist_control_plane=True,
+        write_failure_proposal=True,
+        persist_failure_register=True,
+        collect_coverage=True,
+        write_coverage_report=True,
+        advance_workflow=True,
+        write_workflow_state=True,
+    )
+    refreshed_state = advance_workflow_state(
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
+        write=False,
+    )
+    return {
+        "preparation": preparation.summary_row(),
+        "stage_run_controller": controller_receipt.summary_row(),
+        "stage_run_dashboard": dashboard.summary_row(),
+        "stage_reconcile": reconcile.summary_row(),
+        "workflow_state": refreshed_state.summary_row(),
+        "provider_calls": controller_receipt.provider_calls,
+        "dispatch_performed": controller_receipt.dispatch_performed,
+        "model_activation_performed": controller_receipt.model_activation_performed,
+        "broker_execution_performed": controller_receipt.broker_execution_performed,
+        "storage_lifecycle_mutation_performed": controller_receipt.storage_lifecycle_mutation_performed,
+    }
 
 
 def run_scheduler_once(
@@ -281,12 +385,16 @@ def run_scheduler_once(
     component_src_root: Path = DEFAULT_TRADING_DATA_SRC,
     execute_safe_preparation: bool = False,
     execute_safe_offline_stages: bool = False,
+    execute_autonomous_provider_stages: bool = False,
+    provider_stage_next_limit: int = 5,
 ) -> SchedulerDecision:
     """Run one scheduler tick.
 
-    The first executable work item is Layer 1 historical-training preparation. It
-    writes task-key payloads only when ``execute_safe_preparation`` is true and
-    never dispatches providers, activates models, or touches broker execution.
+    The first executable work item is historical-training preparation. Provider
+    stages execute only when ``execute_autonomous_provider_stages`` is true and
+    remain bounded to one dispatch/reconcile slice per tick. Model activation,
+    broker execution, account mutation, and storage lifecycle mutation stay hard
+    blocked.
     """
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
@@ -348,6 +456,49 @@ def run_scheduler_once(
             next_internal_stage="chronological_month_advance",
             execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
         )
+    if workflow_next_stage and workflow_next_stage.status == "ready" and workflow_next_stage.stage_id in PROVIDER_STAGE_MODEL_LAYERS:
+        if not execute_autonomous_provider_stages:
+            return SchedulerDecision(
+                contract_type="manager_scheduler_decision_v1",
+                now_utc=now.isoformat(),
+                now_et=now_et.isoformat(),
+                decision_status="ready",
+                reason_code="autonomous_provider_stage_ready",
+                reason="provider acquisition stage is ready; rerun with autonomous provider-stage execution enabled to dispatch one bounded slice",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work=workflow_next_stage.stage_id,
+                command=workflow_next_stage.command,
+                next_internal_stage="autonomous_historical_provider_acquisition",
+                execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+            )
+        execution_summary = _execute_autonomous_provider_stage(
+            stage_id=workflow_next_stage.stage_id,
+            start_month=start_month,
+            end_month=end_month,
+            storage_root=storage_root,
+            component_src_root=component_src_root,
+            next_limit=provider_stage_next_limit,
+        )
+        return SchedulerDecision(
+            contract_type="manager_scheduler_decision_v1",
+            now_utc=now.isoformat(),
+            now_et=now_et.isoformat(),
+            decision_status="executed",
+            reason_code="autonomous_provider_stage_executed",
+            reason="executed one bounded autonomous historical provider-dispatch/reconcile slice",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work=workflow_next_stage.stage_id,
+            command=workflow_next_stage.command,
+            next_internal_stage="autonomous_historical_provider_acquisition",
+            provider_calls=int(execution_summary.get("provider_calls") or 0),
+            dispatch_performed=bool(execution_summary.get("dispatch_performed")),
+            model_activation_performed=bool(execution_summary.get("model_activation_performed")),
+            broker_execution_performed=bool(execution_summary.get("broker_execution_performed")),
+            storage_lifecycle_mutation_performed=bool(execution_summary.get("storage_lifecycle_mutation_performed")),
+            execution_summary=execution_summary,
+        )
     if workflow_next_stage and workflow_next_stage.status == "ready":
         if not execute_safe_offline_stages:
             return SchedulerDecision(
@@ -394,25 +545,27 @@ def run_scheduler_once(
                 "workflow_state": updated_workflow_state.summary_row(),
             },
         )
-    if workflow_plan.layer_one_task_key_count >= LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS:
+
+    preparation_model_layer = _next_preparation_model_layer(workflow_plan=workflow_plan, workflow_state=workflow_state)
+    if preparation_model_layer is None:
         next_stage = workflow_next_stage or workflow_plan.next_stage
         return SchedulerDecision(
             contract_type="manager_scheduler_decision_v1",
             now_utc=now.isoformat(),
             now_et=now_et.isoformat(),
             decision_status="backoff",
-            reason_code="workflow_stage_ready",
-            reason="Layer 1 provider acquisition is ready for autonomous historical dispatch",
+            reason_code="workflow_stage_blocked",
+            reason="no executable scheduler-owned workflow stage is currently available",
             market_protection_active=False,
             resource_pressure_active=False,
             selected_work=next_stage.stage_id if next_stage else "model_training_workflow",
             command=next_stage.command if next_stage else [],
-            next_internal_stage="autonomous_historical_provider_acquisition",
+            next_internal_stage=next_stage.stage_type if next_stage else "historical_training_work_loop",
             execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
         )
 
-    selected_work = "prepare_layer_one_historical_training_batch"
-    command = _safe_prep_command(start_month, end_month, execute=execute_safe_preparation)
+    selected_work = _preparation_selected_work(preparation_model_layer)
+    command = _safe_prep_command(start_month, end_month, model_layer=preparation_model_layer, execute=execute_safe_preparation)
     if not execute_safe_preparation:
         return SchedulerDecision(
             contract_type="manager_scheduler_decision_v1",
@@ -420,7 +573,7 @@ def run_scheduler_once(
             now_et=now_et.isoformat(),
             decision_status="ready",
             reason_code="safe_offline_work_ready",
-            reason="safe Layer 1 historical-training preparation is ready; rerun with --execute-safe-preparation to write payload files",
+            reason="safe historical-training preparation is ready; rerun with --execute-safe-preparation to write payload files",
             market_protection_active=False,
             resource_pressure_active=False,
             selected_work=selected_work,
@@ -429,7 +582,12 @@ def run_scheduler_once(
             execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
         )
 
-    summary, _requests, _payloads, _validations = prepare_layer_one_historical_training_batch(
+    if preparation_model_layer == LAYER_ONE_MODEL_LAYER:
+        prepare = prepare_layer_one_historical_training_batch
+    else:
+        def prepare(**kwargs: Any):
+            return prepare_layer_historical_training_batch(model_layer=preparation_model_layer, **kwargs)
+    summary, _requests, _payloads, _validations = prepare(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
@@ -452,7 +610,7 @@ def run_scheduler_once(
         now_et=now_et.isoformat(),
         decision_status="executed",
         reason_code="safe_offline_preparation_executed",
-        reason="completed Layer 1 internal acquisition preparation; next internal stage is autonomous historical provider acquisition",
+        reason="completed internal acquisition preparation; next internal stage is autonomous historical provider acquisition",
         market_protection_active=False,
         resource_pressure_active=False,
         selected_work=selected_work,
@@ -475,8 +633,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--component-src-root", type=Path, default=DEFAULT_TRADING_DATA_SRC)
-    parser.add_argument("--execute-safe-preparation", action="store_true", help="Write Layer 1 task-key payload files and validate handoff shape. No provider calls are performed.")
-    parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Execute one ready offline workflow stage and record its receipt/state. No provider calls or activation are performed.")
+    parser.add_argument("--execute-safe-preparation", action="store_true", help="Write task-key payload files and validate handoff shape. No provider calls are performed.")
+    parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Execute one ready offline workflow stage and record its receipt/state. Provider stages use --execute-autonomous-provider-stages instead.")
+    parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Execute one bounded autonomous provider-dispatch/reconcile slice when a provider acquisition stage is ready.")
+    parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one scheduler tick.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
@@ -504,6 +664,8 @@ def main(argv: list[str] | None = None) -> int:
         component_src_root=args.component_src_root,
         execute_safe_preparation=args.execute_safe_preparation,
         execute_safe_offline_stages=args.execute_safe_offline_stages,
+        execute_autonomous_provider_stages=args.execute_autonomous_provider_stages,
+        provider_stage_next_limit=args.provider_stage_next_limit,
     )
     write_scheduler_decision(decision, output=sys.stdout)
     return 0

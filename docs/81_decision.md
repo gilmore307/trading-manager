@@ -2518,9 +2518,9 @@ The accepted scheduler direction needs implementation without prematurely enabli
 
 Implement `scripts/tasks/run_automation_scheduler.py` backed by `trading_manager_tasks.scheduler` as the first scheduler work-loop increment.
 
-The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes only Layer 1 task-key payload materialization and handoff validation through the existing preparation path, then reports autonomous historical provider acquisition as the next internal stage.
+The tick evaluates regular-US-equity-trading-day market-hours protection, resource pressure, and the next safe work item. In plan-only mode, it emits `manager_scheduler_decision_v1` with explicit ready/backoff reason codes. With `--execute-safe-preparation`, it executes task-key payload materialization and handoff validation through the existing preparation path, then reports autonomous historical provider acquisition as the next internal stage. With `--execute-autonomous-provider-stages`, it may execute one bounded provider-dispatch/reconcile slice per tick while preserving model activation, storage lifecycle, and broker/account gates.
 
-The tick must emit safety counters proving `provider_calls=0`, `dispatch_performed=false`, `model_activation_performed=false`, and `broker_execution_performed=false` for this phase.
+The tick must emit safety counters on every path. Safe preparation/offline paths must prove `provider_calls=0` and `dispatch_performed=false`; autonomous provider-stage paths may report bounded `provider_calls>0`, but must still prove `model_activation_performed=false`, `broker_execution_performed=false`, and storage lifecycle mutation remains false.
 
 ### Consequences
 
@@ -2642,7 +2642,7 @@ After provider-backed acquisition receipts unlock downstream work, feature gener
 
 ### Decision
 
-Add `execute_model_training_stage.py` and `manager_stage_execution_summary_v1`. The executor runs only `ready` stages of safe offline types, refuses guarded stages, writes stdout/stderr logs plus a `component_completion_receipt_v1`, and can persist successful stage progress to `manager_model_training_workflow_state_v1`. The scheduler and daemon accept `--execute-safe-offline-stages` to admit at most one safe offline stage per tick after market/resource gates pass.
+Add `execute_model_training_stage.py` and `manager_stage_execution_summary_v1`. The executor runs only `ready` stages of safe offline types, refuses guarded stages, writes stdout/stderr logs plus a `component_completion_receipt_v1`, and can persist successful stage progress to `manager_model_training_workflow_state_v1`. The scheduler and daemon accept `--execute-safe-offline-stages` to admit at most one non-provider safe offline stage per tick after market/resource gates pass; Layer 1/2 provider stages are admitted separately by `--execute-autonomous-provider-stages`.
 
 ### Consequences
 

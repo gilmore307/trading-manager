@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import patch
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -167,10 +168,54 @@ class SchedulerTests(unittest.TestCase):
                 execute_safe_preparation=False,
             )
         self.assertEqual(decision.decision_status, "ready")
-        self.assertEqual(decision.reason_code, "workflow_stage_ready")
+        self.assertEqual(decision.reason_code, "autonomous_provider_stage_ready")
         self.assertEqual(decision.selected_work, "layer_01_market_regime.data_acquisition")
         self.assertIsNone(decision.approval_gate_required)
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], 8)
+
+    def test_safe_offline_stage_flag_does_not_execute_provider_acquisition(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            self._write_task_keys(tmp / "manager-storage", model_layer=LAYER_ONE_MODEL_LAYER)
+            decision = run_scheduler_once(
+                now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
+                resource_snapshot=self._healthy_resource_snapshot(),
+                storage_root=tmp / "manager-storage",
+                execute_safe_offline_stages=True,
+            )
+        self.assertEqual(decision.decision_status, "ready")
+        self.assertEqual(decision.reason_code, "autonomous_provider_stage_ready")
+        self.assertFalse(decision.dispatch_performed)
+        self.assertEqual(decision.provider_calls, 0)
+
+    def test_scheduler_executes_bounded_autonomous_provider_stage_when_enabled(self):
+        fake_summary = {
+            "provider_calls": 5,
+            "dispatch_performed": True,
+            "model_activation_performed": False,
+            "broker_execution_performed": False,
+            "storage_lifecycle_mutation_performed": False,
+        }
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.scheduler._execute_autonomous_provider_stage", return_value=fake_summary
+        ) as execute_provider_stage:
+            tmp = Path(raw_tmp)
+            self._write_task_keys(tmp / "manager-storage", model_layer=LAYER_ONE_MODEL_LAYER)
+            decision = run_scheduler_once(
+                now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
+                resource_snapshot=self._healthy_resource_snapshot(),
+                storage_root=tmp / "manager-storage",
+                execute_autonomous_provider_stages=True,
+                provider_stage_next_limit=5,
+            )
+        self.assertEqual(decision.decision_status, "executed")
+        self.assertEqual(decision.reason_code, "autonomous_provider_stage_executed")
+        self.assertEqual(decision.provider_calls, 5)
+        self.assertTrue(decision.dispatch_performed)
+        self.assertFalse(decision.model_activation_performed)
+        self.assertFalse(decision.broker_execution_performed)
+        self.assertFalse(decision.storage_lifecycle_mutation_performed)
+        execute_provider_stage.assert_called_once()
 
 
 if __name__ == "__main__":

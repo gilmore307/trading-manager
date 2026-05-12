@@ -20,7 +20,7 @@ class SchedulerStatusTests(unittest.TestCase):
         service.write_text(
             "ExecStart=python3 scripts/tasks/run_automation_scheduler_daemon.py "
             "--execute-safe-preparation --execute-safe-offline-stages "
-            "--auto-select-next-work --advance-month-on-complete\n",
+            "--execute-autonomous-provider-stages --auto-select-next-work --advance-month-on-complete\n",
             encoding="utf-8",
         )
         env.write_text("TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\n", encoding="utf-8")

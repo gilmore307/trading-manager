@@ -114,7 +114,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py \
   --end-month 2016-01
 ```
 
-By default this is plan-only and reports the next internal work item or explicit backoff reason. Add `--execute-safe-preparation` to let the scheduler write Layer 1 task-key payload files and validate handoff shape. Preparation still performs no provider calls, model activation, or broker/execution work. After payloads exist, Layer 1 Alpaca bar acquisition advances through autonomous historical provider dispatch and reconciliation under resource/terminal-coverage guards.
+By default this is plan-only and reports the next internal work item or explicit backoff reason. Add `--execute-safe-preparation` to let the scheduler write task-key payload files and validate handoff shape. Preparation still performs no provider calls, model activation, or broker/execution work. After payloads exist, Layer 1/2 Alpaca bar acquisition advances through `--execute-autonomous-provider-stages`, which executes at most one bounded autonomous provider dispatch/reconcile slice per tick under resource/terminal-coverage guards.
 
 Prepare the first Layer 1 historical-training batch directly as one manager-owned operation:
 

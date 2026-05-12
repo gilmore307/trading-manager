@@ -12,6 +12,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py \
   --end-month 2016-01 \
   --execute-safe-preparation \
   --execute-safe-offline-stages \
+  --execute-autonomous-provider-stages \
   --auto-select-next-work \
   --advance-month-on-complete
 ```
@@ -60,7 +61,7 @@ Reviewed host templates live in `deploy/`:
 - `deploy/systemd/trading-manager-historical-scheduler.env`
 - `deploy/logrotate/trading-manager-historical-scheduler`
 
-The systemd service is the canonical runtime owner. It is designed for `Restart=always` and `WantedBy=multi-user.target`, giving process supervision and boot autostart after an operator installs/enables it. The unit runs with automatic next-work selection, safe preparation, safe offline stage execution, and chronological month-cursor advancement enabled. Committing the template does not install or enable the service on this host.
+The systemd service is the canonical runtime owner. It is designed for `Restart=always` and `WantedBy=multi-user.target`, giving process supervision and boot autostart after an operator installs/enables it. The unit runs with automatic next-work selection, safe preparation, bounded autonomous provider-stage dispatch/reconcile, safe offline stage execution, and chronological month-cursor advancement enabled. Committing the template does not install or enable the service on this host.
 
 Example operator flow after review:
 
@@ -106,11 +107,11 @@ This preserves the finite-panel nature of Layers 1-2 while preventing the open L
 
 `advance_model_training_workflow.py` refreshes this state, ingests component receipts with `manager_stage_id` / `stage_id`, records receipt/review references for provider stages, and selects the next ready or gated stage. For component-local receipts that do not embed a manager stage id, use `--stage-receipt STAGE_ID=PATH`; manager attaches receipt/artifact evidence but does not mark the stage complete until expected successful receipt coverage is met. Scheduler decisions include both the static graph and durable state so resident operation can resume after restarts.
 
-Current execution still preserves gates: when Layer 1 or Layer 2 task keys exist, the corresponding data-acquisition stage uses autonomous historical provider acquisition under manager request, resource, receipt, and terminal-coverage controls. The daemon may execute provider calls automatically, but it still does not perform broker/order/account mutation, model activation, or storage lifecycle mutation without their own agent decision artifacts.
+Current execution still preserves gates: when Layer 1 or Layer 2 task keys exist, the corresponding data-acquisition stage uses autonomous historical provider acquisition under manager request, resource, receipt, and terminal-coverage controls. With `--execute-autonomous-provider-stages`, the daemon executes at most one bounded provider-dispatch/reconcile slice per tick, then writes control-plane coverage/workflow evidence before moving on. It still does not perform broker/order/account mutation, model activation, or storage lifecycle mutation without their own agent decision artifacts.
 
 `dispatch_provider_acquisition.py` is the autonomous Alpaca-bars dispatch adapter for Layer 1 and Layer 2. It prepares bounded request sets selected by `--model-layer`, prints the exact trading-data commands in plan-only mode, and performs provider calls only when `--execute-provider-calls` is present. Use repeated `--symbol`, repeated `--request-id`, or `--limit` for controlled small-batch measurement before running a full request set. After receipts exist, `reconcile_provider_stage.py` performs the safe offline closeout: discovers existing completion receipts, normalizes manager control-plane rows, proposes/persists failed receipts as `agent_review_required` failure-register facts when requested, refreshes stage coverage, and can ingest the written coverage report into workflow state. It never dispatches providers or bypasses coverage gates.
 
-`execute_model_training_stage.py` handles the other side of the loop: it executes one ready safe offline stage, writes stdout/stderr logs and a `component_completion_receipt_v1`, updates workflow state when requested, and refuses Layer 1/2 provider-dispatch stages. The scheduler/daemon expose `--execute-safe-offline-stages` to admit at most one such stage per tick after market/resource gates pass.
+`execute_model_training_stage.py` handles the other side of the loop: it executes one ready safe offline stage, writes stdout/stderr logs and a `component_completion_receipt_v1`, updates workflow state when requested, and refuses Layer 1/2 provider-dispatch stages. The scheduler/daemon expose `--execute-safe-offline-stages` to admit at most one non-provider offline stage per tick after market/resource gates pass; provider stages are routed through `--execute-autonomous-provider-stages` instead.
 
 For `layer_01_market_regime.feature_generation`, the safe offline command first materializes already-acquired `01_feed_alpaca_bars` `equity_bar.csv` artifacts into `trading_data.source_01_market_regime`, then generates `trading_data.feature_01_market_regime`. This stage is allowed to write deterministic SQL source/feature rows, but it must keep `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`. Known accepted no-data symbols stay represented by failure-register rows rather than fabricated bars.
 
