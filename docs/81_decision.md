@@ -2343,7 +2343,7 @@ Register `REVIEW_LAYERS_03_08_PROMOTION_CLOSEOUT` as the stable callable script 
 
 - Layers 3-8 closeout is now explicitly agent-reviewed instead of only mechanically deferred.
 - The registry points to the callable script path and current reviewed decision receipts.
-- Missing production eval substrate still blocks approval; the new entrypoint changes the review path, not the outcome.
+- Missing production eval substrate still blocks agent promotion approval; the new entrypoint changes the review path, not the outcome.
 
 ## D104 - Register Layer 3 real production-evaluation substrate without approval
 
@@ -2362,7 +2362,7 @@ This registration does not approve Layer 3 production use. The decision remains 
 
 ### Consequences
 
-- Layer 3 is no longer blocked for missing evaluation substrate; it is blocked for upstream approvals and calibration.
+- Layer 3 is no longer blocked for missing evaluation substrate; it is blocked for upstream agent decisions and calibration.
 - Layers 4-8 remain blocked for missing production eval runs, labels, and metrics.
 - No deferred decision may create a production activation row or active config pointer.
 
@@ -2496,7 +2496,7 @@ Adopt the always-on automation scheduler policy in `docs/98_automation_scheduler
 
 Manager-owned scheduler automation should keep safe historical work moving whenever dependencies, approvals, resource budgets, and market-hours policy allow. Historical work may use concurrency, but only after reserving capacity for live monitoring and execution. During the `09:20-16:10 ET` protection window on actual regular US equity trading days, default behavior is to pause or heavily throttle historical provider acquisition and CPU-heavy modeling work. Non-trading days must not trigger this pause merely because the wall clock is inside that time range.
 
-Hard gates remain where they belong: historical provider acquisition runs autonomously through bounded manager dispatch, model activation requires an approving decision artifact, and broker/order/fill/account mutation remains execution-owned.
+Hard gates remain where they belong: historical provider acquisition runs autonomously through bounded manager dispatch, model activation is approved/deferred by an agent decision artifact, storage lifecycle mutation follows accepted lifecycle policy/protected-set checks, and broker/order/fill/account mutation remains execution-owned.
 
 ### Consequences
 
@@ -2805,9 +2805,9 @@ Accept the accompanying mechanism-hardening changes before starting `2016-03`:
 ### Consequences
 
 - `2016-03` may begin from safe internal preparation after this hardening is committed and verified.
-- Production promotion remains deferred until reviewed evidence proves sufficient rows/labels, baseline improvement, split stability, no leakage, and approval.
+- Production promotion remains deferred until reviewed evidence proves sufficient rows/labels, baseline improvement, split stability, no leakage, and an agent-approved promotion decision.
 - Active Layer 8 provider acquisition remains guarded by bounded provider-dispatch review, terminal coverage, receipts, and reconcile coverage.
-- Storage lifecycle mutation remains outside this closeout and requires a separate lifecycle plan/approval.
+- Storage lifecycle mutation remains outside this closeout and requires lifecycle policy/protected-set execution surfaces.
 
 ## D125 - Owner-observed agent automation replaces routine manual provider guardrails
 
@@ -2816,22 +2816,22 @@ Status: Accepted
 
 ### Context
 
-Routine historical backfill work was too manually gated: provider calls still waited for a human approval step plus an explicit execution instruction, production promotion was phrased as requiring reviewed approval, and storage lifecycle mutation was phrased as requiring a separate approval. Chentong clarified the intended operating model: OpenClaw/agent automation should make bounded decisions and execute them while the owner observes and intervenes if needed. Broker/order/fill/account mutation is execution-library scope and is not part of the current historical modeling workflow.
+Routine historical backfill work was too manually gated: provider calls still waited for a human approval step plus an explicit execution instruction, production promotion was phrased ambiguously as user approval rather than an agent evidence decision, and storage lifecycle mutation was phrased as requiring a separate approval rather than rule/policy execution. Chentong clarified the intended operating model: OpenClaw/agent automation should make bounded decisions and execute them while the owner observes and intervenes if needed. Broker/order/fill/account mutation is execution-library scope and is not part of the current historical modeling workflow.
 
 ### Decision
 
 Adopt autonomous historical provider acquisition for the current historical modeling control plane:
 
 - Provider data acquisition may be automatically agent-reviewed, dispatched, and reconciled when it is bounded to historical provider acquisition scope and keeps broker execution, model activation, and storage lifecycle mutation false.
-- Model activation / production promotion must be decided by a script-called agent decision artifact (`agent_model_promotion_decision_v1`) rather than a routine manual provider guardrail.
-- Storage lifecycle mutation must be decided by a script-called agent lifecycle decision artifact before storage executes archive/delete/compress/restore mutation.
+- Model activation / production promotion must be decided by a script-called agent decision artifact (`agent_model_promotion_decision_v1`) rather than a routine manual provider guardrail. The agent, not the owner, performs the approval/defer/reject decision from evidence.
+- Storage lifecycle mutation must follow accepted lifecycle rules, protected-set checks, quarantine/recheck rules where applicable, and storage receipts before storage executes archive/delete/compress/restore mutation. `agent_storage_lifecycle_decision_v1` is a policy/agent decision artifact, not a human approval prompt.
 - Broker/order/fill/account mutation remains out of scope here and belongs to execution-library work.
 
 ### Consequences
 
-- Historical provider acquisition preserves exact request-id scope, terminal-coverage rejection, dispatch receipts, and reconcile coverage, and runs autonomously under owner observation.
+- Historical provider acquisition preserves exact request-id scope, terminal-coverage rejection, dispatch receipts, and reconcile coverage, and runs autonomously while the owner can observe/intervene.
 - Existing provider “manual approval required” language should be replaced in active docs/code with autonomous historical provider-acquisition language.
-- Promotion and storage lifecycle decision paths remain blocked only until their script-called agent decision surfaces exist; they are not blocked on routine manual approval.
+- Promotion decision paths remain blocked only until their script-called agent decision surfaces exist; storage lifecycle paths remain blocked only until lifecycle policy/protected-set execution surfaces exist. Neither is blocked on routine manual approval.
 
 ## D126 - 2016-03 Layer 1-8 historical workflow closed
 
@@ -2867,7 +2867,7 @@ The completed 2016-01 through 2016-03 historical workflow proved the Layer 1-8 m
 
 Make the historical scheduler daemon the canonical owner of the historical data/modeling runtime. The service owns the scheduler loop, checkpoint/resume state, single-instance lock, decision log, safe preparation, safe/offline stage execution, and chronological month-cursor advancement. Manual CLI/script invocation remains available only for inspection, repair, smoke testing, or emergency intervention.
 
-The service may continue safe/offline work automatically and may advance from one completed YYYY-MM month to the next under the chronological-forward policy. Provider acquisition now runs autonomously with terminal-coverage guards, dispatch receipts, and reconcile coverage. Model activation requires `agent_model_promotion_decision_v1`; storage lifecycle mutation requires `agent_storage_lifecycle_decision_v1`; broker/order/fill/account mutation remains out of scope.
+The service may continue safe/offline work automatically and may advance from one completed YYYY-MM month to the next under the chronological-forward policy. Provider acquisition now runs autonomously with terminal-coverage guards, dispatch receipts, and reconcile coverage. Model activation is decided by `agent_model_promotion_decision_v1`; storage lifecycle mutation follows lifecycle policy/protected-set checks with decision/receipt evidence; broker/order/fill/account mutation remains out of scope.
 
 ### Consequences
 
@@ -2911,7 +2911,7 @@ Add `manager_historical_scheduler_status_v1` as the canonical read-only status s
 - System-level service-control and observability work is closed for supervised historical operation.
 - Host-level install/enable remains an explicit operator action; committed code/templates/status checks do not install or start services.
 - Provider expansion beyond current adapters remains future source-specific extension work, not a missing generic scheduler mechanism.
-- Production model activation still requires `agent_model_promotion_decision_v1`; storage lifecycle mutation still requires `agent_storage_lifecycle_decision_v1` plus storage-owned protected checks and receipts; broker/order/fill/account mutation remains outside historical modeling.
+- Production model activation still requires an agent-authored `agent_model_promotion_decision_v1`; storage lifecycle mutation still requires accepted lifecycle rules, storage-owned protected checks, and receipts, with `agent_storage_lifecycle_decision_v1` serving as policy/agent decision evidence rather than owner approval; broker/order/fill/account mutation remains outside historical modeling.
 
 ## D130 - Realtime shadow handoff receipts are manager-visible but non-mutating
 
@@ -3003,3 +3003,26 @@ Realtime monitor output must not be treated as the default source for historical
 - Historical modeling remains responsible for reviewed dataset snapshots/splits.
 - Manager may consume realtime accuracy/effectiveness summaries for promotion review, drift review, trust reduction, or retraining planning.
 - Realtime effectiveness metrics do not authorize model activation, order construction, broker submission, account mutation, or historical dataset rewrites.
+
+
+## D134 - Model promotion is agent-approved; storage lifecycle is rule-executed
+
+Date: 2026-05-11
+Status: Accepted
+
+### Context
+
+Chentong clarified that the remaining historical-system boundaries should not regress into owner approval prompts. `agent_model_promotion_decision_v1` exists so the agent can approve, defer, reject, revoke, or supersede model activation from evidence. Storage lifecycle already has accepted lifecycle policy, protected-set rules, quarantine/recheck expectations, and storage receipts, so routine lifecycle work should execute by those rules rather than wait for owner approval.
+
+### Decision
+
+Production model activation remains blocked until the agent emits `agent_model_promotion_decision_v1` and only an agent-approved decision can produce `activation_record_v1`. The owner observes and can intervene, but the normal approval actor is the agent decision surface.
+
+Storage lifecycle mutation is rule-executed: manager may schedule `storage_lifecycle_request_v1`; lifecycle policy, protected-set checks, quarantine/recheck rules where applicable, and storage receipts decide whether `trading-storage` may compress, archive, restore, detach/drop, or delete. `agent_storage_lifecycle_decision_v1` remains useful as policy/agent decision evidence when a lifecycle request is evaluated, but it is not a human approval prompt. Ambiguous, policy-missing, protected-set-failing, or high-risk destructive cases must defer/escalate instead of executing.
+
+### Consequences
+
+- Historical automation can keep moving without asking Chentong to approve routine promotion-review or lifecycle plumbing.
+- Model activation still cannot happen from a generic review, metric, ready signal, or scheduler tick; it needs the agent promotion decision plus activation record.
+- Storage lifecycle execution remains protected by deterministic rules, protected-set clearance, receipts, tombstones/manifests, and restore evidence rather than chat approval.
+- Broker/order/fill/account mutation remains execution-owned and outside historical modeling automation.

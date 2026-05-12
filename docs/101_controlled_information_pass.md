@@ -26,7 +26,7 @@ It must not:
 - run model activation;
 - route broker/paper/live execution;
 - delete, compress, archive, restore, or mutate storage lifecycle state;
-- weaken `agent_model_promotion_decision_v1`, `agent_storage_lifecycle_decision_v1`, or broker/order/account mutation gates.
+- weaken `agent_model_promotion_decision_v1`, storage lifecycle policy/protected-set checks, or broker/order/account mutation gates.
 
 Provider dispatch preview is plan-only inside the information-pass boundary. Actual autonomous historical provider acquisition runs outside the information-pass boundary through the scheduler/provider-stage adapter.
 

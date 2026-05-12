@@ -61,7 +61,7 @@ class SchedulerStatusTests(unittest.TestCase):
         self.assertEqual(row["current_stage"], "prepare_layer_one_historical_training_batch")
         self.assertEqual(row["missing_service_flags"], [])
         self.assertIn("start_service_or_run_one_shot_smoke_to_create_daemon_state", row["open_operational_items"])
-        self.assertEqual(row["gated_scope_status"]["model_activation"]["status"], "deferred_until_agent_model_promotion_decision_approves")
+        self.assertEqual(row["gated_scope_status"]["model_activation"]["status"], "agent_promotion_decision_required_not_owner_approval")
 
     def test_status_reports_latest_decision_and_provider_gate(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

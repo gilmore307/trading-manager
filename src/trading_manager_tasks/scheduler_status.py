@@ -309,13 +309,17 @@ def _gated_scope_status() -> dict[str, Any]:
             "required_contracts": ["manager_request_v1", "component_completion_receipt_v1", "manager_stage_coverage_v1"],
         },
         "model_activation": {
-            "status": "deferred_until_agent_model_promotion_decision_approves",
+            "status": "agent_promotion_decision_required_not_owner_approval",
             "required_contracts": ["agent_model_promotion_decision_v1", "activation_record_v1"],
+            "decision_actor": "agent",
+            "owner_action_required_by_default": False,
             "mutation_performed_by_status_surface": False,
         },
         "storage_lifecycle_mutation": {
-            "status": "deferred_until_agent_storage_lifecycle_decision_and_storage_protected_checks",
-            "required_contracts": ["agent_storage_lifecycle_decision_v1", "storage_lifecycle_receipt_v1"],
+            "status": "rule_evaluated_lifecycle_policy_and_protected_checks_required",
+            "required_contracts": ["storage_lifecycle_request_v1", "storage_lifecycle_policy", "protected_set_clearance", "storage_lifecycle_receipt_v1"],
+            "agent_storage_lifecycle_decision_role": "policy_decision_evidence_not_owner_approval",
+            "owner_action_required_by_default": False,
             "mutation_performed_by_status_surface": False,
         },
         "broker_order_fill_account_mutation": {

@@ -9,8 +9,8 @@ Status: accepted manager-control policy for historical model training; no provid
 The manager decision is still bounded by hard gates:
 
 - historical provider calls use autonomous bounded acquisition after manager payload preparation and resource/coverage guards;
-- model activation requires an approving script-called `agent_model_promotion_decision_v1`;
-- storage lifecycle mutation requires a script-called `agent_storage_lifecycle_decision_v1`;
+- model activation is approved/deferred by the agent through script-called `agent_model_promotion_decision_v1`;
+- storage lifecycle mutation follows the accepted lifecycle rules, protected-set checks, quarantine/recheck rules where applicable, and storage receipts; `agent_storage_lifecycle_decision_v1` is a policy decision artifact, not a human approval prompt;
 - broker/order/fill/account mutation remains execution-owned and forbidden here.
 
 ## Dataset roles

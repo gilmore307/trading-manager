@@ -48,8 +48,8 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/rehearse_task_system.py` — runs a deterministic request/receipt/summary rehearsal without provider calls; add `--write` only to persist rehearsal-only rows to manager SQL.
 - `tasks/plan_model_promotion_review.py` — plans one unified manager-side promotion-review request shape for any model layer.
 - `tasks/build_review_decision.py` — builds legacy/advisory `review_decision_v1` artifacts without activation side effects.
-- `tasks/build_agent_model_promotion_decision.py` — builds required `agent_model_promotion_decision_v1` artifacts for owner-observed production-promotion decisions; activation must reference this contract, not legacy advisory reviews.
-- `tasks/build_agent_storage_lifecycle_decision.py` — builds required `agent_storage_lifecycle_decision_v1` artifacts for owner-observed storage lifecycle decisions; it has no storage mutation side effects.
+- `tasks/build_agent_model_promotion_decision.py` — builds required `agent_model_promotion_decision_v1` artifacts for agent-reviewed production-promotion decisions; activation must reference this contract, not legacy advisory reviews.
+- `tasks/build_agent_storage_lifecycle_decision.py` — builds `agent_storage_lifecycle_decision_v1` policy-decision artifacts for storage lifecycle requests; it has no storage mutation side effects.
 
 ## Run
 

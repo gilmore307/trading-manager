@@ -19,7 +19,7 @@ data acquisition planning
   -> agent decision artifact for production promotion/activation
 ```
 
-The scheduler should not sit idle when safe work exists. If provider calls are waiting on bounded review/validation, or if a regular-trading-day market-hours throttle is active, it should shift to work that does not violate gates: dataset expansion planning, approval-artifact preparation, payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle review.
+The scheduler should not sit idle when safe work exists. If provider calls are waiting on bounded controls/validation, or if a regular-trading-day market-hours throttle is active, it should shift to work that does not violate gates: dataset expansion planning, decision-artifact preparation, payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle rule evaluation.
 
 Dataset expansion is manager-owned. The manager decides whether the next expansion should target train, calibration, validation, test, forward holdout, or shadow-monitoring evidence for the earliest blocked layer. Operators may provide evidence inputs, but should not have to manually choose the dataset role. See [`100_dataset_expansion.md`](100_dataset_expansion.md). Before widening unresolved defaults, run the 2016-01 controlled information pass in [`101_controlled_information_pass.md`](101_controlled_information_pass.md).
 
@@ -74,14 +74,14 @@ The buffer covers pre-open checks and post-close reconciliation. The protection 
 - allow lightweight bookkeeping only when it does not contend with live systems;
 - allow urgent manual override only through reviewed policy, not as a hidden default.
 
-Outside the protected window, including non-trading days, the scheduler should resume safe queued historical work automatically subject to resource budgets and agent decision gates. Before production model activation or live trading is enabled, set `TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=true` in the service environment to restore market-hours protection.
+Outside the protected window, including non-trading days, the scheduler should resume safe queued historical work automatically subject to resource budgets, agent model-promotion decisions, and storage lifecycle policy gates. Before production model activation or live trading is enabled, set `TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=true` in the service environment to restore market-hours protection.
 
 ## Agent Decision Gates Stay Hard
 
 Automation does not weaken gates:
 
 - historical provider/data acquisition is autonomous once manager request payloads are prepared and resource gates pass;
-- model activation requires an approving script-called `agent_model_promotion_decision_v1` before activation artifacts are valid;
+- model activation is decided by the agent through script-called `agent_model_promotion_decision_v1`; only an agent-approved decision can produce a valid activation artifact;
 - broker/order/fill/account mutation remains execution-owned and must not be inferred from model-training progress;
 - secrets remain alias/config references only.
 
@@ -91,7 +91,7 @@ The scheduler implementation should behave like a durable work loop:
 
 1. inspect `task_summary`, receipts, ready signals, and artifact refs;
 2. find the next safe blocked/ready work item by priority and dependency state;
-3. check market-hours/resource/provider/promotion/execution gates;
+3. check market-hours/resource/provider/promotion/storage/execution gates;
 4. dispatch only the allowed component request type after its specific guardrails pass;
 5. record receipts and update manager summary surfaces;
 6. continue until no safe work exists, then sleep/backoff instead of spinning.

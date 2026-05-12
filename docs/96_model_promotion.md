@@ -2,7 +2,7 @@
 
 `trading-manager` owns one promotion review entrypoint for every model layer.
 
-The model repositories produce evidence. The manager records and reviews that evidence through one control-plane path, then calls an agent decision step under owner observation.
+The model repositories produce evidence. The manager records and reviews that evidence through one control-plane path, then calls an agent decision step. The agent approves, defers, or rejects from evidence; this is not a routine owner approval prompt.
 
 ```text
 model-specific evidence producer
@@ -57,7 +57,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py \
   --candidate-ref trading-model://promotion-candidates/mpcand_example
 ```
 
-Add `--write` only after the request payload is ready for owner-observed automation. `--write` persists the request rows to `trading_manager.manager_request`; it does not approve promotion and does not activate configs.
+Add `--write` only after the request payload is ready for agent-managed automation. `--write` persists the request rows to `trading_manager.manager_request`; it does not approve promotion and does not activate configs.
 
 Build a generic decision artifact only through the script-called agent promotion-decision path. Until that agent decision surface exists, legacy `review_decision_v1` builders are evidence/advisory scaffolding only and must not activate configs:
 
@@ -104,7 +104,7 @@ manager schedules lifecycle
 storage executes lifecycle
 ```
 
-Promotion outputs should mark promoted model bodies and required lineage as permanently retained, and may emit retention hints for regenerable intermediates. Any storage lifecycle work created by promotion must enter the manager task system as `storage_lifecycle_request_v1`, where it can be prioritized, scheduled, summarized, and decided by a script-called agent lifecycle-decision artifact under owner observation. `scripts/tasks/build_agent_storage_lifecycle_decision.py` records that decision without mutating storage. `trading-storage` remains the owner of protected-set checks, physical compression/archive/restore/delete actions, receipts, and tombstones.
+Promotion outputs should mark promoted model bodies and required lineage as permanently retained, and may emit retention hints for regenerable intermediates. Any storage lifecycle work created by promotion must enter the manager task system as `storage_lifecycle_request_v1`, where it can be prioritized, scheduled, summarized, and evaluated against lifecycle policy. `agent_storage_lifecycle_decision_v1` records the policy/agent decision without mutating storage; when the request fits accepted rules and protected-set checks pass, it is not a human approval prompt. `trading-storage` remains the owner of protected-set checks, physical compression/archive/restore/delete actions, receipts, and tombstones.
 
 ## Registered Models
 

@@ -4,8 +4,8 @@ This module owns the common control-plane entrypoint for promotion review reques
 Model repositories still produce model-specific evidence, labels, metrics, and
 candidate artifacts; the manager owns the request shape and review/activation
 boundary. Production promotion/activation decisions are made by a
-script-called agent decision artifact under owner observation; they are not a
-routine manual approval gate.
+script-called agent decision artifact; they are not a routine owner
+approval gate.
 """
 
 from __future__ import annotations
