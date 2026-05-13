@@ -16,6 +16,7 @@
   - centralized safety boundaries for diagnosis and repair;
   - queued diagnosis artifact behavior when no reviewed runner is configured;
   - explicit configured-runner invocation behavior for safe local test runners.
+  - Discord alert command construction through OpenClaw message CLI using the reviewed channel target.
 
 - `test_dataset_evidence.py` verifies:
   - manager-visible dataset evidence collection from model governance rows;

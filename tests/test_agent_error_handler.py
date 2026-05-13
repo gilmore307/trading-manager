@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from trading_manager_tasks.agent_error_handler import (
     build_server_error_agent_request,
     handle_server_error,
+    notify_discord_for_error,
     validate_agent_error_diagnosis,
     validate_server_error_agent_request,
 )
@@ -88,6 +90,36 @@ class AgentErrorHandlerTests(unittest.TestCase):
             diagnosis = json.loads(Path(result["diagnosis_path"]).read_text(encoding="utf-8"))
             self.assertEqual(diagnosis["status"], "completed")
             self.assertIn("diagnosis_status", diagnosis["stdout"])
+
+    def test_discord_notification_uses_openclaw_message_cli_target(self) -> None:
+        request = build_server_error_agent_request(
+            source_component="server.test",
+            source_repo="trading-manager",
+            summary="failure",
+            exit_code=1,
+        )
+        diagnosis = {
+            "contract_type": "agent_error_diagnosis",
+            "schema_version": "1",
+            "diagnosis_id": "errdiag_test",
+            "request_ref": request["request_id"],
+            "agent_ref": request["agent_ref"],
+            "status": "queued",
+            "completed_at_utc": "2026-05-13T12:00:00Z",
+        }
+
+        with patch("trading_manager_tasks.agent_error_handler.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "sent"
+            run.return_value.stderr = ""
+            result = notify_discord_for_error(request, diagnosis)
+
+        self.assertEqual(result["status"], "sent")
+        cmd = run.call_args.args[0]
+        self.assertEqual(cmd[:4], ["openclaw", "message", "send", "--channel"])
+        self.assertIn("discord", cmd)
+        self.assertIn("channel:1504100135200620665", cmd)
+        self.assertIn("--message", cmd)
 
 
 if __name__ == "__main__":

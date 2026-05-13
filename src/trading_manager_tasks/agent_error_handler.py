@@ -26,6 +26,8 @@ AGENT_ERROR_DIAGNOSIS_CONTRACT = "agent_error_diagnosis"
 AGENT_ERROR_HANDLING_RESULT_CONTRACT = "agent_error_handling_result"
 DEFAULT_AGENT_REF = "openclaw_agent_under_owner_observation"
 DEFAULT_OUTPUT_ROOT = Path("storage/runtime/agent_error_handling")
+DEFAULT_DISCORD_TARGET = "channel:1504100135200620665"
+DEFAULT_DISCORD_SERVER_ID = "1480186849241731084"
 ALLOWED_SEVERITIES = {"info", "warning", "error", "critical"}
 SAFE_ALLOWED_ACTIONS = (
     "inspect referenced logs, receipts, status artifacts, source files, docs, and tests",
@@ -304,6 +306,82 @@ def validate_agent_error_diagnosis(diagnosis: Mapping[str, Any]) -> dict[str, An
     return normalized
 
 
+
+def _discord_message(request: Mapping[str, Any], diagnosis: Mapping[str, Any], *, server_id: str | None = None) -> str:
+    severity = str(request.get("severity") or "error").upper()
+    component = request.get("source_component") or "unknown component"
+    summary = request.get("summary") or "server error"
+    error_kind = request.get("error_kind") or "unclassified_error"
+    scope = request.get("error_scope") or "server"
+    exit_code = request.get("exit_code")
+    request_id = request.get("request_id")
+    diagnosis_status = diagnosis.get("status")
+    stderr_path = request.get("stderr_path")
+    stdout_path = request.get("stdout_path")
+    lines = [
+        f"🚨 Trading server error [{severity}]",
+        f"Component: {component}",
+        f"Scope: {scope}",
+        f"Kind: {error_kind}",
+        f"Summary: {summary}",
+        f"Agent diagnosis: {diagnosis_status}",
+        f"Request: {request_id}",
+    ]
+    if server_id:
+        lines.insert(1, f"Discord server: {server_id}")
+    if exit_code is not None:
+        lines.append(f"Exit code: {exit_code}")
+    if stderr_path:
+        lines.append(f"stderr: {stderr_path}")
+    elif stdout_path:
+        lines.append(f"stdout: {stdout_path}")
+    lines.append("Boundaries: no provider calls, broker/account mutation, or destructive repair without separate approval.")
+    return "\n".join(lines)
+
+
+def notify_discord_for_error(
+    request: Mapping[str, Any],
+    diagnosis: Mapping[str, Any],
+    *,
+    target: str | None = None,
+    server_id: str | None = None,
+    account_id: str | None = None,
+    timeout_seconds: int = 30,
+) -> dict[str, Any]:
+    """Send a best-effort Discord notification through OpenClaw's message CLI."""
+
+    resolved_target = target or os.environ.get("MANAGER_AGENT_ERROR_DISCORD_TARGET", "").strip() or DEFAULT_DISCORD_TARGET
+    resolved_server_id = server_id or os.environ.get("MANAGER_AGENT_ERROR_DISCORD_SERVER_ID", "").strip() or DEFAULT_DISCORD_SERVER_ID
+    resolved_account_id = account_id or os.environ.get("MANAGER_AGENT_ERROR_DISCORD_ACCOUNT_ID", "").strip() or None
+    if not resolved_target:
+        return {"status": "skipped", "reason": "discord target not configured"}
+    message = _discord_message(request, diagnosis, server_id=resolved_server_id)
+    cmd = [
+        "openclaw",
+        "message",
+        "send",
+        "--channel",
+        "discord",
+        "--target",
+        resolved_target,
+        "--message",
+        message,
+    ]
+    if resolved_account_id:
+        cmd.extend(["--account", resolved_account_id])
+    try:
+        result = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout_seconds, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"status": "failed", "reason": str(exc), "target": resolved_target}
+    return {
+        "status": "sent" if result.returncode == 0 else "failed",
+        "target": resolved_target,
+        "return_code": result.returncode,
+        "stdout": result.stdout[-1000:],
+        "stderr": result.stderr[-1000:],
+    }
+
+
 def handle_server_error(
     *,
     source_component: str,
@@ -311,6 +389,10 @@ def handle_server_error(
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     call_agent: bool = False,
     runner_command: str | None = None,
+    notify_discord: bool | None = None,
+    discord_target: str | None = None,
+    discord_server_id: str | None = None,
+    discord_account_id: str | None = None,
     **request_kwargs: Any,
 ) -> dict[str, Any]:
     """Create the standard request and optionally call the configured agent runner."""
@@ -325,6 +407,22 @@ def handle_server_error(
         diagnosis = build_queued_diagnosis(request, reason="agent runner not configured" if call_agent else "agent call not requested")
     diagnosis_path = default_diagnosis_path(request, output_root)
     write_json_artifact(diagnosis, path=diagnosis_path)
+    should_notify_discord = (
+        bool(notify_discord)
+        if notify_discord is not None
+        else bool(os.environ.get("MANAGER_AGENT_ERROR_NOTIFY_DISCORD") or discord_target or os.environ.get("MANAGER_AGENT_ERROR_DISCORD_TARGET"))
+    )
+    discord_notification = (
+        notify_discord_for_error(
+            request,
+            diagnosis,
+            target=discord_target,
+            server_id=discord_server_id,
+            account_id=discord_account_id,
+        )
+        if should_notify_discord
+        else {"status": "skipped", "reason": "discord notification not requested"}
+    )
     result = {
         "contract_type": AGENT_ERROR_HANDLING_RESULT_CONTRACT,
         "schema_version": "1",
@@ -333,6 +431,7 @@ def handle_server_error(
         "diagnosis_id": diagnosis["diagnosis_id"],
         "diagnosis_path": str(diagnosis_path),
         "status": diagnosis["status"],
+        "discord_notification": discord_notification,
     }
     return result
 
@@ -356,6 +455,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--call-agent", action="store_true", help="Invoke the configured agent runner; otherwise only queue/write the request artifacts.")
     parser.add_argument("--agent-runner-command", help="Reviewed local command that accepts request JSON on stdin and returns diagnosis text/JSON on stdout.")
+    parser.add_argument("--notify-discord", action="store_true", help="Send a Discord alert through OpenClaw's message CLI after writing diagnosis artifacts.")
+    parser.add_argument("--discord-target", default=None, help="Discord target such as channel:1504100135200620665; defaults to MANAGER_AGENT_ERROR_DISCORD_TARGET.")
+    parser.add_argument("--discord-server-id", default=None, help="Optional Discord server/guild id for alert context.")
+    parser.add_argument("--discord-account-id", default=None, help="Optional OpenClaw Discord account id; defaults to plugin account resolution.")
     args = parser.parse_args(argv)
     result = handle_server_error(
         source_component=args.source_component,
@@ -375,6 +478,10 @@ def main(argv: list[str] | None = None) -> int:
         output_root=args.output_root,
         call_agent=args.call_agent,
         runner_command=args.agent_runner_command,
+        notify_discord=args.notify_discord,
+        discord_target=args.discord_target,
+        discord_server_id=args.discord_server_id,
+        discord_account_id=args.discord_account_id,
     )
     write_json_artifact(result, output=sys.stdout)
     return 0
@@ -389,6 +496,7 @@ __all__ = [
     "build_server_error_agent_request",
     "call_agent_runner",
     "handle_server_error",
+    "notify_discord_for_error",
     "validate_agent_error_diagnosis",
     "validate_server_error_agent_request",
     "write_json_artifact",

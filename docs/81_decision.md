@@ -3046,3 +3046,21 @@ A single error-agent boundary prevents each component from building inconsistent
 - Model training, provider acquisition, storage refresh, dashboard refresh, realtime evidence ingestion, service scripts, and future server jobs should use this entrypoint when they want agent diagnosis/repair.
 - Agent-assisted repair remains bounded to internal reversible work unless a separate provider, storage lifecycle, service-control, package-change, or broker/account approval path exists.
 - Failure registration and dashboard surfaces may link to these artifacts as diagnosis evidence instead of embedding ad hoc logs.
+
+## D131 - Notify the reviewed Discord channel for server error handoffs
+
+Date: 2026-05-13
+
+### Decision
+
+The unified server-wide error handoff should notify the owner-facing Discord channel when an error request is created. The reviewed destination for this host is Discord server `1480186849241731084`, channel `1504100135200620665`, addressed through OpenClaw message delivery as `channel:1504100135200620665`.
+
+### Rationale
+
+Error artifacts alone are too passive for unattended server operation. Discord alerting gives the owner immediate visibility while preserving durable diagnosis evidence in storage.
+
+### Consequences
+
+- `call_agent_for_error.py` supports `--notify-discord` and Discord target overrides.
+- Resident services can enable notifications with `MANAGER_AGENT_ERROR_NOTIFY_DISCORD=true` and `MANAGER_AGENT_ERROR_DISCORD_TARGET=channel:1504100135200620665`.
+- Discord notification is best-effort and must not block artifact creation, diagnosis queuing, or safe failure handling.

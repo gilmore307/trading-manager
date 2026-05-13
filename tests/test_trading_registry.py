@@ -450,6 +450,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["AGENT_ERROR_DIAGNOSIS"]["payload"], "agent_error_diagnosis")
         self.assertIn("call_agent_for_error.py", rows["MANAGER_AGENT_ERROR_HANDOFF_CALL"]["path"])
         self.assertIn("no_provider_calls", rows["MANAGER_AGENT_ERROR_SAFETY_BOUNDARY"]["payload"])
+        self.assertIn("1504100135200620665", rows["MANAGER_AGENT_ERROR_DISCORD_NOTIFICATION_TARGET"]["payload"])
+        self.assertIn("best_effort", rows["MANAGER_AGENT_ERROR_DISCORD_NOTIFICATION_POLICY"]["payload"])
         self.assertIn("layer_08_option_expression", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
         self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")
