@@ -3063,4 +3063,5 @@ Error artifacts alone are too passive for unattended server operation. Discord a
 
 - `call_agent_for_error.py` supports `--notify-discord` and Discord target overrides.
 - Resident services can enable notifications with `MANAGER_AGENT_ERROR_NOTIFY_DISCORD=true` and `MANAGER_AGENT_ERROR_DISCORD_TARGET=channel:1504100135200620665`.
+- The historical scheduler daemon wrapper routes fatal service-level exceptions through the same handoff before exiting non-zero.
 - Discord notification is best-effort and must not block artifact creation, diagnosis queuing, or safe failure handling.
