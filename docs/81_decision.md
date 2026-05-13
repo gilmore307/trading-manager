@@ -3158,3 +3158,22 @@ Chentong clarified that 2016-01 and 2016-02 should be understood as separate mon
 - The dashboard can group task rows by month while preserving row-level completion state.
 - Expandable details remain sanitized and manager-owned; the dashboard does not query raw workflow checkpoint internals.
 - The current task can show concrete progress details when stage coverage is attached to the read model.
+
+## D137 - Dashboard task timeline includes completed historical months
+
+Date: 2026-05-13
+Status: Accepted
+
+### Context
+
+The first month-grouped task timeline emitted only the active scheduler month. That made the dashboard show only the current month even though the daemon records completed historical months and the runtime keeps month-specific workflow-state files.
+
+### Decision
+
+The manager dashboard read model must include completed month workflow states from the daemon `last_completed_months` list before adding the active/current month. The current month remains the only month that can expose the `current` task state, latest execution attachment, or current stage-coverage progress.
+
+### Consequences
+
+- Dashboard consumers can show past/current/future child tasks across historical months without reading raw runtime files directly.
+- Missing completed-month state files are skipped rather than fabricating completed rows.
+- The active month remains visually distinct and operationally current.

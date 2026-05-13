@@ -270,13 +270,14 @@ def _storage_root_from_checkpoint_path(path: object) -> Path:
     return DEFAULT_STORAGE_ROOT
 
 
-def _planned_stage_rows(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
-    if not status.current_month:
+def _planned_stage_rows(status: HistoricalSchedulerStatus, *, month: str | None = None) -> list[dict[str, Any]]:
+    selected_month = month or status.current_month
+    if not selected_month:
         return []
     try:
         plan = build_model_training_workflow_plan(
-            start_month=status.current_month,
-            end_month=status.current_month,
+            start_month=selected_month,
+            end_month=selected_month,
             storage_root=_storage_root_from_checkpoint_path(status.workflow_checkpoint.path),
         )
     except Exception:
@@ -285,6 +286,47 @@ def _planned_stage_rows(status: HistoricalSchedulerStatus) -> list[dict[str, Any
     for layer in plan.layers:
         rows.extend(stage.summary_row() for stage in layer.stages)
     return rows
+
+
+def _completed_months(status: HistoricalSchedulerStatus) -> list[str]:
+    daemon_state = status.daemon_state or {}
+    raw_months = daemon_state.get("last_completed_months") if isinstance(daemon_state, Mapping) else None
+    if not isinstance(raw_months, list):
+        return []
+    months: list[str] = []
+    seen: set[str] = set()
+    for raw_month in raw_months:
+        month = str(raw_month or "").strip()
+        if month and month not in seen and month != status.current_month:
+            months.append(month)
+            seen.add(month)
+    return months
+
+
+def _workflow_state_payload(storage_root: Path, month: str) -> dict[str, Any] | None:
+    path = storage_root / "runtime" / f"model_training_workflow_state_{month}.json"
+    try:
+        return _load_json_object(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def _active_month_stages(status: HistoricalSchedulerStatus, storage_root: Path) -> tuple[str | None, list[Any]]:
+    checkpoint_path = _resolve_local_path(status.workflow_checkpoint.path)
+    timeline_month = status.current_month
+    payload: dict[str, Any] = {}
+    if checkpoint_path is not None and checkpoint_path.exists():
+        try:
+            payload = _load_json_object(checkpoint_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            payload = {}
+        else:
+            timeline_month = str(payload.get("start_month") or status.current_month or "") or None
+    elif status.current_month:
+        payload = _workflow_state_payload(storage_root, status.current_month) or {}
+        timeline_month = str(payload.get("start_month") or status.current_month or "") or None
+    raw_stages = payload.get("stages") or _planned_stage_rows(status, month=timeline_month)
+    return timeline_month, raw_stages if isinstance(raw_stages, list) else []
 
 
 def _task_timeline(
@@ -297,87 +339,91 @@ def _task_timeline(
 
     The dashboard should show task progress at the operational stage level
     (data acquisition, feature generation, model generation, etc.) without
-    requiring the UI to read workflow checkpoint internals directly.
+    requiring the UI to read workflow checkpoint internals directly. Completed
+    months remain visible as historical groups; the current month remains the
+    only month allowed to expose a `current` row.
     """
 
-    checkpoint_path = _resolve_local_path(status.workflow_checkpoint.path)
-    timeline_month = status.current_month
-    if checkpoint_path is None or not checkpoint_path.exists():
-        raw_stages = _planned_stage_rows(status)
-    else:
-        try:
-            payload = _load_json_object(checkpoint_path)
-        except (OSError, ValueError, json.JSONDecodeError):
-            payload = {}
-        else:
-            timeline_month = str(payload.get("start_month") or status.current_month or "") or None
-        raw_stages = payload.get("stages") or _planned_stage_rows(status)
-    if not isinstance(raw_stages, list):
+    storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    month_stage_sets: list[tuple[str | None, list[Any], bool]] = []
+    for month in _completed_months(status):
+        payload = _workflow_state_payload(storage_root, month)
+        if payload is None:
+            continue
+        raw_stages = payload.get("stages")
+        if isinstance(raw_stages, list):
+            month_stage_sets.append((str(payload.get("start_month") or month), raw_stages, False))
+    active_month, active_stages = _active_month_stages(status, storage_root)
+    if active_stages:
+        month_stage_sets.append((active_month, active_stages, True))
+    if not month_stage_sets:
         return []
+
     coverage_stage_id = str(stage_coverage.get("stage_id") or "") if stage_coverage else ""
     latest_execution = _latest_stage_execution(status) or {}
     latest_failed_stage = latest_execution.get("stage_id") if latest_execution.get("status") == "failed" else None
     tasks: list[dict[str, Any]] = []
     first_open_seen = False
-    for index, raw_stage in enumerate(raw_stages, start=1):
-        if not isinstance(raw_stage, Mapping):
-            continue
-        stage_id = str(raw_stage.get("stage_id") or "")
-        stage_status = str(raw_stage.get("status") or "unknown")
-        is_terminal = stage_status in {"succeeded", "not_applicable"}
-        is_current = bool(stage_id and stage_id == status.current_stage and not is_terminal)
-        if not first_open_seen and not is_terminal:
-            is_current = True
-            first_open_seen = True
-        if latest_failed_stage and stage_id == latest_failed_stage:
-            task_state = "failed"
-        elif is_terminal:
-            task_state = "completed" if stage_status == "succeeded" else "skipped"
-        elif is_current:
-            task_state = "current"
-        else:
-            task_state = "future"
-        reason = str(raw_stage.get("last_reason") or "")
-        if len(reason) > max_reason_chars:
-            reason = reason[: max_reason_chars - 1] + "…"
-        blockers = raw_stage.get("blockers") or []
-        if not isinstance(blockers, list):
-            blockers = []
-        receipt_refs = raw_stage.get("receipt_refs") or []
-        if not isinstance(receipt_refs, list):
-            receipt_refs = []
-        task: dict[str, Any] = {
-            "sequence": index,
-            "month": raw_stage.get("month") or raw_stage.get("start_month") or timeline_month,
-            "task_id": stage_id,
-            "task_label": _public_stage_name(stage_id, raw_stage.get("stage_type")),
-            "task_state": task_state,
-            "status": stage_status,
-            "stage_type": raw_stage.get("stage_type"),
-            "layer": raw_stage.get("layer"),
-            "layer_key": raw_stage.get("layer_key"),
-            "updated_at_utc": raw_stage.get("updated_utc"),
-            "reason": reason or None,
-            "receipt_count": len(receipt_refs),
-            "blocker_count": len(blockers),
-            "detail": {
-                "blockers": [str(blocker) for blocker in blockers],
-                "receipt_refs": [str(ref) for ref in receipt_refs],
-                "safe_without_provider_calls": raw_stage.get("safe_without_provider_calls"),
-                "provider_calls_allowed": raw_stage.get("provider_calls_allowed"),
-                "model_activation_allowed": raw_stage.get("model_activation_allowed"),
-                "broker_execution_allowed": raw_stage.get("broker_execution_allowed"),
-            },
-        }
-        if coverage_stage_id and stage_id == coverage_stage_id and stage_coverage is not None:
-            task["detail"]["progress"] = _stage_coverage_chart(stage_coverage)
-        if latest_execution.get("stage_id") == stage_id:
-            task["detail"]["last_execution"] = {
-                "status": latest_execution.get("status"),
-                "return_code": latest_execution.get("return_code"),
-                "reason": latest_execution.get("failure_detail") or latest_execution.get("reason"),
+    for timeline_month, raw_stages, is_active_month in month_stage_sets:
+        for raw_stage in raw_stages:
+            if not isinstance(raw_stage, Mapping):
+                continue
+            stage_id = str(raw_stage.get("stage_id") or "")
+            stage_status = str(raw_stage.get("status") or "unknown")
+            is_terminal = stage_status in {"succeeded", "not_applicable"}
+            is_current = bool(is_active_month and stage_id and stage_id == status.current_stage and not is_terminal)
+            if is_active_month and not first_open_seen and not is_terminal:
+                is_current = True
+                first_open_seen = True
+            if latest_failed_stage and is_active_month and stage_id == latest_failed_stage:
+                task_state = "failed"
+            elif is_terminal:
+                task_state = "completed" if stage_status == "succeeded" else "skipped"
+            elif is_current:
+                task_state = "current"
+            else:
+                task_state = "future"
+            reason = str(raw_stage.get("last_reason") or "")
+            if len(reason) > max_reason_chars:
+                reason = reason[: max_reason_chars - 1] + "…"
+            blockers = raw_stage.get("blockers") or []
+            if not isinstance(blockers, list):
+                blockers = []
+            receipt_refs = raw_stage.get("receipt_refs") or []
+            if not isinstance(receipt_refs, list):
+                receipt_refs = []
+            task: dict[str, Any] = {
+                "sequence": len(tasks) + 1,
+                "month": raw_stage.get("month") or raw_stage.get("start_month") or timeline_month,
+                "task_id": stage_id,
+                "task_label": _public_stage_name(stage_id, raw_stage.get("stage_type")),
+                "task_state": task_state,
+                "status": stage_status,
+                "stage_type": raw_stage.get("stage_type"),
+                "layer": raw_stage.get("layer"),
+                "layer_key": raw_stage.get("layer_key"),
+                "updated_at_utc": raw_stage.get("updated_utc"),
+                "reason": reason or None,
+                "receipt_count": len(receipt_refs),
+                "blocker_count": len(blockers),
+                "detail": {
+                    "blockers": [str(blocker) for blocker in blockers],
+                    "receipt_refs": [str(ref) for ref in receipt_refs],
+                    "safe_without_provider_calls": raw_stage.get("safe_without_provider_calls"),
+                    "provider_calls_allowed": raw_stage.get("provider_calls_allowed"),
+                    "model_activation_allowed": raw_stage.get("model_activation_allowed"),
+                    "broker_execution_allowed": raw_stage.get("broker_execution_allowed"),
+                },
             }
-        tasks.append(task)
+            if is_active_month and coverage_stage_id and stage_id == coverage_stage_id and stage_coverage is not None:
+                task["detail"]["progress"] = _stage_coverage_chart(stage_coverage)
+            if is_active_month and latest_execution.get("stage_id") == stage_id:
+                task["detail"]["last_execution"] = {
+                    "status": latest_execution.get("status"),
+                    "return_code": latest_execution.get("return_code"),
+                    "reason": latest_execution.get("failure_detail") or latest_execution.get("reason"),
+                }
+            tasks.append(task)
     return tasks
 
 
