@@ -32,11 +32,40 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            decision_log.parent.mkdir(parents=True, exist_ok=True)
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "executed",
+                        "selected_work": "layer_03_target_state_vector.data_acquisition",
+                        "start_month": "2019-05",
+                        "execution_summary": {
+                            "stage_execution": {
+                                "contract_type": "manager_stage_execution_summary",
+                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "status": "failed",
+                                "reason": "no successful Layer 2 feed artifacts are available for Layer 3 target-state materialization",
+                                "return_code": 1,
+                                "stdout_path": "storage/runtime/model_training_stage_logs/example.stdout.log",
+                                "stderr_path": "storage/runtime/model_training_stage_logs/example.stderr.log",
+                                "receipt_path": "storage/runtime/model_training_stage_receipts/example.receipt.json",
+                                "provider_calls": 0,
+                                "model_activation_performed": False,
+                                "broker_execution_performed": False,
+                            }
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
-                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                decision_log_path=decision_log,
                 service_template_path=service,
                 service_env_path=env,
                 daemon_wrapper_path=wrapper,
@@ -62,8 +91,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["source_system"], "trading-manager")
         self.assertEqual(payload["generated_at_utc"], "2026-05-12T12:00:00Z")
         self.assertEqual(payload["schema_ref"], "storage/dashboard/schemas/historical_task_progress_summary.schema.json")
+        self.assertEqual(payload["status"], "action_required")
+        self.assertIn("last execution failed", payload["summary"])
         self.assertEqual(payload["chart_payload"]["stage_coverage"]["expected_count"], 22)
         self.assertFalse(payload["chart_payload"]["stage_coverage"]["can_unlock_downstream"])
+        self.assertEqual(payload["chart_payload"]["last_stage_execution"]["status"], "failed")
+        self.assertEqual(payload["chart_payload"]["last_stage_execution"]["return_code"], 1)
+        self.assertIn("Layer 2 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
+        self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
+        self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))
         self.assertIn("profile_refs", payload)
         self.assertIn("lineage_refs", payload)
         self.assertIn(payload["severity"], {"critical", "high", "medium", "low", "info"})

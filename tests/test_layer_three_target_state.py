@@ -20,7 +20,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
             universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\nSPY,layer_01_market_regime\n", encoding="utf-8")
-            run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-01" / "runs" / "run_001"
+            run_dir = storage_root / "monthly_backfill_v1" / "alpaca_bars" / "XLF" / "2016-01" / "runs" / "run_001"
             (run_dir / "cleaned").mkdir(parents=True)
             (run_dir / "cleaned" / "equity_bar.jsonl").write_text('{"symbol":"XLF","timestamp":"2016-01-04T09:30:00-05:00"}\n', encoding="utf-8")
             receipt = {
@@ -29,11 +29,11 @@ class LayerThreeTargetStateTests(unittest.TestCase):
                         "run_id": "run_001",
                         "status": "succeeded",
                         "row_counts": {"equity_bar": 1},
-                        "steps": {"clean": {"references": ["storage/monthly_backfill/alpaca_bars/XLF/2016-01/runs/run_001/cleaned/equity_bar.jsonl"]}},
+                        "steps": {"clean": {"references": ["storage/monthly_backfill_v1/alpaca_bars/XLF/2016-01/runs/run_001/cleaned/equity_bar.jsonl"]}},
                     }
                 ]
             }
-            receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-01" / "completion_receipt.json"
+            receipt_path = storage_root / "monthly_backfill_v1" / "alpaca_bars" / "XLF" / "2016-01" / "completion_receipt.json"
             receipt_path.parent.mkdir(parents=True, exist_ok=True)
             receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
 
@@ -80,10 +80,10 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
             universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
-            run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-01" / "runs" / "run_001"
+            run_dir = storage_root / "monthly_backfill_v1" / "alpaca_bars" / "XLF" / "2016-01" / "runs" / "run_001"
             (run_dir / "cleaned").mkdir(parents=True)
             (run_dir / "cleaned" / "equity_bar.jsonl").write_text('{"symbol":"XLF","timestamp":"2016-01-04T09:30:00-05:00"}\n', encoding="utf-8")
-            receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-01" / "completion_receipt.json"
+            receipt_path = storage_root / "monthly_backfill_v1" / "alpaca_bars" / "XLF" / "2016-01" / "completion_receipt.json"
             receipt_path.parent.mkdir(parents=True, exist_ok=True)
             receipt_path.write_text(
                 json.dumps(
@@ -93,7 +93,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
                                 "run_id": "run_001",
                                 "status": "succeeded",
                                 "row_counts": {"equity_bar": 1},
-                                "steps": {"clean": {"references": ["storage/monthly_backfill/alpaca_bars/XLF/2016-01/runs/run_001/cleaned/equity_bar.jsonl"]}},
+                                "steps": {"clean": {"references": ["storage/monthly_backfill_v1/alpaca_bars/XLF/2016-01/runs/run_001/cleaned/equity_bar.jsonl"]}},
                             }
                         ]
                     }

@@ -50,10 +50,70 @@ def _progress_percent(stage_counts: Mapping[str, int]) -> float:
     return round((terminal / total) * 100.0, 2)
 
 
+def _resolve_local_path(path: object) -> Path | None:
+    if not isinstance(path, str) or not path.strip():
+        return None
+    candidate = Path(path)
+    return candidate if candidate.is_absolute() else Path.cwd() / candidate
+
+
+def _failure_excerpt(path: object, *, max_chars: int = 800) -> str | None:
+    """Return a bounded, human-useful failure excerpt from a local stderr/stdout ref."""
+
+    candidate = _resolve_local_path(path)
+    if candidate is None or not candidate.exists() or not candidate.is_file():
+        return None
+    text = candidate.read_text(encoding="utf-8", errors="replace")
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return None
+    error_lines = [line for line in lines if "Error:" in line or line.endswith("Error") or "Traceback" in line]
+    excerpt = error_lines[-1] if error_lines else lines[-1]
+    return excerpt[-max_chars:]
+
+
+def _latest_stage_execution(status: HistoricalSchedulerStatus) -> dict[str, Any] | None:
+    """Return a sanitized latest stage-execution summary for dashboard display."""
+
+    latest_decision = status.latest_decision or {}
+    execution_summary = latest_decision.get("execution_summary")
+    if not isinstance(execution_summary, Mapping):
+        return None
+    stage_execution = execution_summary.get("stage_execution")
+    if not isinstance(stage_execution, Mapping):
+        return None
+    stderr_excerpt = _failure_excerpt(stage_execution.get("stderr_path"))
+    stdout_excerpt = _failure_excerpt(stage_execution.get("stdout_path")) if stderr_excerpt is None else None
+    failure_detail = stderr_excerpt or stdout_excerpt or stage_execution.get("reason")
+    return {
+        "stage_id": stage_execution.get("stage_id"),
+        "status": stage_execution.get("status"),
+        "reason": stage_execution.get("reason"),
+        "failure_detail": failure_detail,
+        "return_code": stage_execution.get("return_code"),
+        "stdout_path": stage_execution.get("stdout_path"),
+        "stderr_path": stage_execution.get("stderr_path"),
+        "receipt_path": stage_execution.get("receipt_path"),
+        "provider_calls": int(stage_execution.get("provider_calls") or 0),
+        "model_activation_performed": bool(stage_execution.get("model_activation_performed")),
+        "broker_execution_performed": bool(stage_execution.get("broker_execution_performed")),
+    }
+
+
 def _owner_status(status: HistoricalSchedulerStatus) -> tuple[str, str, str]:
     """Return dashboard status, severity, and short summary."""
 
     workflow = status.workflow_checkpoint
+    latest_stage_execution = _latest_stage_execution(status)
+    if latest_stage_execution and latest_stage_execution.get("status") == "failed":
+        stage_id = latest_stage_execution.get("stage_id") or status.current_stage or "unknown stage"
+        reason = latest_stage_execution.get("failure_detail") or latest_stage_execution.get("reason") or "latest stage execution failed"
+        dashboard_status = "running_with_failure" if status.lock.status == "active" else "action_required"
+        return (
+            dashboard_status,
+            "medium",
+            f"Historical scheduler last execution failed at {stage_id}: {reason}.",
+        )
     if not status.service_runtime_ready:
         return (
             "blocked",
@@ -93,6 +153,17 @@ def _owner_status(status: HistoricalSchedulerStatus) -> tuple[str, str, str]:
 
 def _issue_refs(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
     refs: list[dict[str, Any]] = []
+    latest_stage_execution = _latest_stage_execution(status)
+    if latest_stage_execution and latest_stage_execution.get("status") == "failed":
+        refs.append(
+            {
+                "issue_type": "historical_stage_execution_failed",
+                "issue_id": latest_stage_execution.get("stage_id") or "unknown_stage",
+                "severity": "medium",
+                "owner_action_required": False,
+                "summary": latest_stage_execution.get("reason") or "latest stage execution failed",
+            }
+        )
     for item in status.open_operational_items:
         refs.append(
             {
@@ -119,6 +190,18 @@ def _diagnostic_refs(status: HistoricalSchedulerStatus, stage_coverage: Mapping[
     refs: list[dict[str, Any]] = [
         {"ref_type": "manager_historical_scheduler_status", "path": "scripts/tasks/inspect_historical_scheduler_status.py"}
     ]
+    latest_stage_execution = _latest_stage_execution(status)
+    if latest_stage_execution is not None:
+        refs.append(
+            {
+                "ref_type": "manager_stage_execution_summary",
+                "stage_id": latest_stage_execution.get("stage_id"),
+                "status": latest_stage_execution.get("status"),
+                "receipt_path": latest_stage_execution.get("receipt_path"),
+                "stdout_path": latest_stage_execution.get("stdout_path"),
+                "stderr_path": latest_stage_execution.get("stderr_path"),
+            }
+        )
     workflow_path = status.workflow_checkpoint.path
     if status.workflow_checkpoint.exists and workflow_path:
         refs.append({"ref_type": "workflow_checkpoint", "path": workflow_path})
@@ -173,6 +256,9 @@ def build_historical_task_progress_summary(
         "next_expected_system_action": status.recommended_next_action,
         "blocker_category": active_blocker,
     }
+    latest_stage_execution = _latest_stage_execution(status)
+    if latest_stage_execution is not None:
+        chart_payload["last_stage_execution"] = latest_stage_execution
     coverage_chart = _stage_coverage_chart(stage_coverage)
     if coverage_chart is not None:
         chart_payload["stage_coverage"] = coverage_chart
