@@ -6,7 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_PATHS = ("src", "tests", "docs", "README.md")
-FORBIDDEN_ACTIVE_TOKENS = ("monthly_backfill_v1",)
+FORBIDDEN_ACTIVE_TOKENS = ("_".join(("monthly", "backfill", "v1")),)
 
 
 def _iter_active_text_files() -> list[Path]:
