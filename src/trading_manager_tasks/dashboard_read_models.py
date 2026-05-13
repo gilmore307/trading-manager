@@ -99,6 +99,8 @@ def _latest_stage_execution(status: HistoricalSchedulerStatus) -> dict[str, Any]
         "broker_execution_performed": bool(stage_execution.get("broker_execution_performed")),
         "agent_error_request_path": stage_execution.get("agent_error_request_path"),
         "agent_error_diagnosis_path": stage_execution.get("agent_error_diagnosis_path"),
+        "agent_error_number": stage_execution.get("agent_error_number"),
+        "agent_error_ref": stage_execution.get("agent_error_ref"),
     }
 
 
@@ -204,6 +206,8 @@ def _diagnostic_refs(status: HistoricalSchedulerStatus, stage_coverage: Mapping[
                 "stderr_path": latest_stage_execution.get("stderr_path"),
                 "agent_error_request_path": latest_stage_execution.get("agent_error_request_path"),
                 "agent_error_diagnosis_path": latest_stage_execution.get("agent_error_diagnosis_path"),
+                "agent_error_number": latest_stage_execution.get("agent_error_number"),
+                "agent_error_ref": latest_stage_execution.get("agent_error_ref"),
             }
         )
         if latest_stage_execution.get("agent_error_request_path"):
@@ -213,6 +217,8 @@ def _diagnostic_refs(status: HistoricalSchedulerStatus, stage_coverage: Mapping[
                     "stage_id": latest_stage_execution.get("stage_id"),
                     "path": latest_stage_execution.get("agent_error_request_path"),
                     "diagnosis_path": latest_stage_execution.get("agent_error_diagnosis_path"),
+                    "error_number": latest_stage_execution.get("agent_error_number"),
+                    "error_ref": latest_stage_execution.get("agent_error_ref"),
                 }
             )
     workflow_path = status.workflow_checkpoint.path

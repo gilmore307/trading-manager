@@ -58,6 +58,8 @@ class StageExecutionSummary:
     reason: str | None = None
     agent_error_request_path: str | None = None
     agent_error_diagnosis_path: str | None = None
+    agent_error_number: int | None = None
+    agent_error_ref: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -268,6 +270,8 @@ def execute_stage_process(
         reason=None if result.returncode == 0 else "stage command returned non-zero status",
         agent_error_request_path=str(agent_error_result.get("request_path")) if agent_error_result else None,
         agent_error_diagnosis_path=str(agent_error_result.get("diagnosis_path")) if agent_error_result else None,
+        agent_error_number=int(agent_error_result["error_number"]) if agent_error_result and agent_error_result.get("error_number") else None,
+        agent_error_ref=str(agent_error_result.get("error_ref")) if agent_error_result and agent_error_result.get("error_ref") else None,
     )
     receipt_path.write_text(
         json.dumps(_receipt_payload(stage=stage, summary=summary, started_at=started, completed_at=completed), indent=2, sort_keys=True)

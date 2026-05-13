@@ -10,7 +10,9 @@ from trading_manager_tasks.agent_error_handler import (
     build_server_error_agent_request,
     handle_server_error,
     notify_discord_for_error,
+    register_error_in_catalog,
     validate_agent_error_diagnosis,
+    validate_server_error_catalog_entry,
     validate_server_error_agent_request,
 )
 from trading_manager_tasks.control_plane import TaskSystemError
@@ -67,6 +69,14 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertTrue(diagnosis_path.exists())
             diagnosis = json.loads(diagnosis_path.read_text(encoding="utf-8"))
             self.assertEqual(validate_agent_error_diagnosis(diagnosis)["status"], "queued")
+            self.assertEqual(result["error_ref"], "ERR-000001")
+            catalog_path = tmp / "server_error_catalog.jsonl"
+            rows = [json.loads(line) for line in catalog_path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(validate_server_error_catalog_entry(rows[0])["error_ref"], "ERR-000001")
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            self.assertEqual(request["error_ref"], "ERR-000001")
+            self.assertIn("Error number: ERR-000001", request["agent_prompt"])
 
     def test_handle_server_error_calls_configured_runner_when_requested(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -91,6 +101,34 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertEqual(diagnosis["status"], "completed")
             self.assertIn("diagnosis_status", diagnosis["stdout"])
 
+    def test_catalog_assigns_monotonic_error_numbers(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            first = handle_server_error(source_component="server.one", summary="first", output_root=tmp)
+            second = handle_server_error(source_component="server.two", summary="second", output_root=tmp)
+
+            self.assertEqual(first["error_ref"], "ERR-000001")
+            self.assertEqual(second["error_ref"], "ERR-000002")
+            rows = [json.loads(line) for line in (tmp / "server_error_catalog.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([row["error_ref"] for row in rows], ["ERR-000001", "ERR-000002"])
+
+    def test_catalog_reuses_existing_number_for_same_request_id(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            request = build_server_error_agent_request(
+                source_component="server.test",
+                summary="same failure",
+                request_id="erragent_fixed",
+            )
+            first_request, first_row = register_error_in_catalog(request, output_root=tmp)
+            second_request, second_row = register_error_in_catalog(request, output_root=tmp)
+
+            self.assertEqual(first_request["error_ref"], "ERR-000001")
+            self.assertEqual(second_request["error_ref"], "ERR-000001")
+            self.assertEqual(first_row["error_ref"], second_row["error_ref"])
+            self.assertEqual(len((tmp / "server_error_catalog.jsonl").read_text(encoding="utf-8").splitlines()), 1)
+
+
     def test_discord_notification_uses_openclaw_message_cli_target(self) -> None:
         request = build_server_error_agent_request(
             source_component="server.test",
@@ -108,6 +146,9 @@ class AgentErrorHandlerTests(unittest.TestCase):
             "completed_at_utc": "2026-05-13T12:00:00Z",
         }
 
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            request, _ = register_error_in_catalog(request, output_root=Path(raw_tmp))
+
         with patch("trading_manager_tasks.agent_error_handler.subprocess.run") as run:
             run.return_value.returncode = 0
             run.return_value.stdout = "sent"
@@ -120,6 +161,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
         self.assertIn("discord", cmd)
         self.assertIn("channel:1504100135200620665", cmd)
         self.assertIn("--message", cmd)
+        self.assertIn("Error No: ERR-000001", cmd[cmd.index("--message") + 1])
 
 
 if __name__ == "__main__":

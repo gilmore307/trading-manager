@@ -9,6 +9,7 @@ behind an explicit runner command supplied by reviewed runtime configuration.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -24,8 +25,11 @@ from .control_plane import TaskSystemError
 SERVER_ERROR_AGENT_REQUEST_CONTRACT = "server_error_agent_request"
 AGENT_ERROR_DIAGNOSIS_CONTRACT = "agent_error_diagnosis"
 AGENT_ERROR_HANDLING_RESULT_CONTRACT = "agent_error_handling_result"
+SERVER_ERROR_CATALOG_ENTRY_CONTRACT = "server_error_catalog_entry"
 DEFAULT_AGENT_REF = "openclaw_agent_under_owner_observation"
 DEFAULT_OUTPUT_ROOT = Path("storage/runtime/agent_error_handling")
+DEFAULT_ERROR_CATALOG_NAME = "server_error_catalog.jsonl"
+DEFAULT_ERROR_CATALOG_LOCK_NAME = ".server_error_catalog.lock"
 DEFAULT_DISCORD_TARGET = "channel:1504100135200620665"
 DEFAULT_DISCORD_SERVER_ID = "1480186849241731084"
 ALLOWED_SEVERITIES = {"info", "warning", "error", "critical"}
@@ -88,6 +92,7 @@ def build_agent_prompt(request: Mapping[str, Any]) -> str:
             "Forbidden actions:",
             *[f"- {item}" for item in request.get("forbidden_actions", [])],
             "",
+            f"Error number: {request.get('error_ref') or 'unassigned'}",
             "Error request:",
             json.dumps({key: value for key, value in request.items() if key != "agent_prompt"}, indent=2, sort_keys=True),
         ]
@@ -168,6 +173,126 @@ def build_server_error_agent_request(
     request["agent_prompt"] = build_agent_prompt(request)
     validate_server_error_agent_request(request)
     return request
+
+
+def _catalog_path(output_root: Path = DEFAULT_OUTPUT_ROOT) -> Path:
+    return output_root / DEFAULT_ERROR_CATALOG_NAME
+
+
+def _catalog_lock_path(output_root: Path = DEFAULT_OUTPUT_ROOT) -> Path:
+    return output_root / DEFAULT_ERROR_CATALOG_LOCK_NAME
+
+
+def _read_catalog_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def register_error_in_catalog(request: Mapping[str, Any], *, output_root: Path = DEFAULT_OUTPUT_ROOT) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Assign a durable human-facing error number and append the catalog row.
+
+    The request id remains the stable machine id. The catalog assigns a concise
+    owner-facing reference such as ERR-000123 so Discord/chat follow-up can refer
+    to a specific error without pasting long hashes.
+    """
+
+    root = Path(output_root)
+    root.mkdir(parents=True, exist_ok=True)
+    catalog_path = _catalog_path(root)
+    lock_path = _catalog_lock_path(root)
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            rows = _read_catalog_rows(catalog_path)
+            request_id = str(request["request_id"])
+            existing = next((row for row in rows if str(row.get("request_id")) == request_id), None)
+            if existing is not None:
+                numbered_request = dict(request)
+                numbered_request["error_number"] = existing["error_number"]
+                numbered_request["error_ref"] = existing["error_ref"]
+                numbered_request["error_catalog_path"] = str(catalog_path)
+                numbered_request["agent_prompt"] = build_agent_prompt(numbered_request)
+                validate_server_error_agent_request(numbered_request)
+                return numbered_request, existing
+            next_number = max([int(row.get("error_number") or 0) for row in rows] or [0]) + 1
+            error_ref = f"ERR-{next_number:06d}"
+            numbered_request = dict(request)
+            numbered_request["error_number"] = next_number
+            numbered_request["error_ref"] = error_ref
+            numbered_request["error_catalog_path"] = str(catalog_path)
+            numbered_request["agent_prompt"] = build_agent_prompt(numbered_request)
+            row = {
+                "contract_type": SERVER_ERROR_CATALOG_ENTRY_CONTRACT,
+                "schema_version": "1",
+                "error_number": next_number,
+                "error_ref": error_ref,
+                "request_id": request_id,
+                "request_path": str(default_request_path(numbered_request, root)),
+                "diagnosis_path": str(default_diagnosis_path(numbered_request, root)),
+                "source_component": numbered_request.get("source_component"),
+                "source_repo": numbered_request.get("source_repo"),
+                "error_scope": numbered_request.get("error_scope"),
+                "error_kind": numbered_request.get("error_kind"),
+                "severity": numbered_request.get("severity"),
+                "summary": numbered_request.get("summary"),
+                "exit_code": numbered_request.get("exit_code"),
+                "occurred_at_utc": numbered_request.get("occurred_at_utc"),
+                "created_at_utc": _now_utc(),
+            }
+            validate_server_error_catalog_entry(row)
+            validate_server_error_agent_request(numbered_request)
+            with catalog_path.open("a", encoding="utf-8") as catalog_file:
+                catalog_file.write(json.dumps(row, sort_keys=True) + "\n")
+            return numbered_request, row
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def validate_server_error_catalog_entry(row: Mapping[str, Any]) -> dict[str, Any]:
+    normalized = dict(row)
+    required = (
+        "contract_type",
+        "schema_version",
+        "error_number",
+        "error_ref",
+        "request_id",
+        "request_path",
+        "diagnosis_path",
+        "source_component",
+        "error_scope",
+        "error_kind",
+        "severity",
+        "summary",
+        "occurred_at_utc",
+        "created_at_utc",
+    )
+    for field in required:
+        if normalized.get(field) in (None, ""):
+            raise TaskSystemError(f"missing required server error catalog field: {field}")
+    if normalized["contract_type"] != SERVER_ERROR_CATALOG_ENTRY_CONTRACT:
+        raise TaskSystemError(f"contract_type must be {SERVER_ERROR_CATALOG_ENTRY_CONTRACT}")
+    if str(normalized["schema_version"]) != "1":
+        raise TaskSystemError("schema_version must be 1")
+    if not isinstance(normalized["error_number"], int) or normalized["error_number"] < 1:
+        raise TaskSystemError("error_number must be a positive integer")
+    expected_ref = f"ERR-{normalized['error_number']:06d}"
+    if normalized["error_ref"] != expected_ref:
+        raise TaskSystemError(f"error_ref must be {expected_ref}")
+    if normalized["severity"] not in ALLOWED_SEVERITIES:
+        raise TaskSystemError(f"unsupported severity: {normalized['severity']}")
+    return normalized
 
 
 def validate_server_error_agent_request(request: Mapping[str, Any]) -> dict[str, Any]:
@@ -315,6 +440,7 @@ def _discord_message(request: Mapping[str, Any], diagnosis: Mapping[str, Any], *
     scope = request.get("error_scope") or "server"
     exit_code = request.get("exit_code")
     request_id = request.get("request_id")
+    error_ref = request.get("error_ref") or request.get("request_id")
     diagnosis_status = diagnosis.get("status")
     stderr_path = request.get("stderr_path")
     stdout_path = request.get("stdout_path")
@@ -325,6 +451,7 @@ def _discord_message(request: Mapping[str, Any], diagnosis: Mapping[str, Any], *
         f"Kind: {error_kind}",
         f"Summary: {summary}",
         f"Agent diagnosis: {diagnosis_status}",
+        f"Error No: {error_ref}",
         f"Request: {request_id}",
     ]
     if server_id:
@@ -398,6 +525,7 @@ def handle_server_error(
     """Create the standard request and optionally call the configured agent runner."""
 
     request = build_server_error_agent_request(source_component=source_component, summary=summary, **request_kwargs)
+    request, catalog_entry = register_error_in_catalog(request, output_root=output_root)
     request_path = default_request_path(request, output_root)
     write_json_artifact(request, path=request_path)
     configured_runner = runner_command or os.environ.get("MANAGER_AGENT_ERROR_RUNNER_COMMAND", "").strip()
@@ -426,6 +554,9 @@ def handle_server_error(
     result = {
         "contract_type": AGENT_ERROR_HANDLING_RESULT_CONTRACT,
         "schema_version": "1",
+        "error_number": request["error_number"],
+        "error_ref": request["error_ref"],
+        "error_catalog_entry": catalog_entry,
         "request_id": request["request_id"],
         "request_path": str(request_path),
         "diagnosis_id": diagnosis["diagnosis_id"],
@@ -490,14 +621,18 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "AGENT_ERROR_DIAGNOSIS_CONTRACT",
     "AGENT_ERROR_HANDLING_RESULT_CONTRACT",
+    "DEFAULT_ERROR_CATALOG_NAME",
     "SERVER_ERROR_AGENT_REQUEST_CONTRACT",
+    "SERVER_ERROR_CATALOG_ENTRY_CONTRACT",
     "build_agent_prompt",
     "build_queued_diagnosis",
     "build_server_error_agent_request",
     "call_agent_runner",
     "handle_server_error",
     "notify_discord_for_error",
+    "register_error_in_catalog",
     "validate_agent_error_diagnosis",
+    "validate_server_error_catalog_entry",
     "validate_server_error_agent_request",
     "write_json_artifact",
 ]

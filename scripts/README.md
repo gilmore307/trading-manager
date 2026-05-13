@@ -93,3 +93,11 @@ PYTHONPATH=src python3 scripts/tasks/call_agent_for_error.py --source-component 
 The SQL `trading_registry.kind` constraint and `scripts/registry/kinds/*.md` files must stay aligned. Tests compare those sources directly.
 
 Registry `id` is the stable automation reference. Registry `key` is a human-readable output/display label and may be renamed by reviewed migration. Helper APIs must not take key as input.
+
+- `list_agent_errors.py` lists the append-only server error catalog so owner-facing refs such as `ERR-000001` can be resolved to request/diagnosis/log paths.
+
+Example:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/list_agent_errors.py --error-ref ERR-000001
+```

@@ -3065,3 +3065,22 @@ Error artifacts alone are too passive for unattended server operation. Discord a
 - Resident services can enable notifications with `MANAGER_AGENT_ERROR_NOTIFY_DISCORD=true` and `MANAGER_AGENT_ERROR_DISCORD_TARGET=channel:1504100135200620665`.
 - The historical scheduler daemon wrapper routes fatal service-level exceptions through the same handoff before exiting non-zero.
 - Discord notification is best-effort and must not block artifact creation, diagnosis queuing, or safe failure handling.
+
+## D132 - Assign human-facing numbers to server errors
+
+Date: 2026-05-13
+
+### Decision
+
+Every error routed through the unified server-wide handoff receives a monotonic human-facing reference such as `ERR-000001`. The durable source is `storage/runtime/agent_error_handling/server_error_catalog.jsonl`; `request_id` remains the machine-stable artifact id.
+
+### Rationale
+
+Long hashed request ids are unsuitable for Discord/chat follow-up. A compact error number lets the owner say "ERR-000123" and have the manager, dashboard, and assistant resolve the exact request, diagnosis, logs, and evidence refs.
+
+### Consequences
+
+- `server_error_catalog.jsonl` is append-only and protected by a local lock during assignment.
+- Discord alerts include `Error No: ERR-......`.
+- Stage execution summaries carry `agent_error_number` and `agent_error_ref` when a failed stage creates an error handoff.
+- `scripts/tasks/list_agent_errors.py` lists recent catalog rows or filters by `--error-ref`.

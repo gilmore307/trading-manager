@@ -3,9 +3,11 @@
 from .agent_error_handler import (
     SERVER_ERROR_AGENT_REQUEST_CONTRACT,
     AGENT_ERROR_DIAGNOSIS_CONTRACT,
+    SERVER_ERROR_CATALOG_ENTRY_CONTRACT,
     build_server_error_agent_request,
     handle_server_error,
     validate_agent_error_diagnosis,
+    validate_server_error_catalog_entry,
     validate_server_error_agent_request,
 )
 from .control_plane import (
@@ -91,6 +93,7 @@ from .task_rehearsal import (
 __all__ = [
     "AGENT_ERROR_DIAGNOSIS_CONTRACT",
     "SERVER_ERROR_AGENT_REQUEST_CONTRACT",
+    "SERVER_ERROR_CATALOG_ENTRY_CONTRACT",
     "CompletionReceiptRows",
     "DEFAULT_SOURCES",
     "DatasetEvidenceCollection",
@@ -122,6 +125,7 @@ __all__ = [
     "build_review_decision",
     "validate_server_error_agent_request",
     "validate_agent_error_diagnosis",
+    "validate_server_error_catalog_entry",
     "handle_server_error",
     "build_server_error_agent_request",
     "build_rehearsal_task_summary",
