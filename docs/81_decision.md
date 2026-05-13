@@ -3084,3 +3084,21 @@ Long hashed request ids are unsuitable for Discord/chat follow-up. A compact err
 - Discord alerts include `Error No: ERR-......`.
 - Stage execution summaries carry `agent_error_number` and `agent_error_ref` when a failed stage creates an error handoff.
 - `scripts/tasks/list_agent_errors.py` lists recent catalog rows or filters by `--error-ref`.
+
+## D133 - Recover dead-PID scheduler locks immediately
+
+Date: 2026-05-13
+
+### Decision
+
+The historical scheduler daemon may immediately replace a lock file when the lock records a PID and that process no longer exists. The stale-age threshold remains only for malformed locks that do not identify a dead owner.
+
+### Rationale
+
+Dashboard status already classifies a lock with a non-running PID as stale. Keeping that lock until the generic age threshold expires prevents systemd recovery and creates repeated error notifications without protecting an active daemon.
+
+### Consequences
+
+- Duplicate daemon protection remains strict when the recorded PID is still running.
+- Recent malformed locks still require the stale-age threshold before replacement.
+- Dead-PID locks no longer block normal service restart/recovery.

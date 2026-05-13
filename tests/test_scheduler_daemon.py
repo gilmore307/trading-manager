@@ -84,6 +84,27 @@ class SchedulerDaemonTests(unittest.TestCase):
                 release_daemon_lock(lock_path)
             self.assertFalse(lock_path.exists())
 
+    def test_lock_replaces_dead_pid_without_waiting_for_age_threshold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            lock_path = Path(raw_tmp) / "scheduler.lock"
+            lock_path.write_text('{"pid": 999999999, "created_utc": "2026-05-13T00:00:00+00:00"}\n', encoding="utf-8")
+
+            acquire_daemon_lock(lock_path)
+            try:
+                payload = json.loads(lock_path.read_text(encoding="utf-8"))
+                self.assertNotEqual(payload["pid"], 999999999)
+            finally:
+                release_daemon_lock(lock_path)
+
+    def test_lock_keeps_recent_malformed_lock_until_stale_threshold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            lock_path = Path(raw_tmp) / "scheduler.lock"
+            lock_path.write_text('{"created_utc": "2026-05-13T00:00:00+00:00"}\n', encoding="utf-8")
+
+            with self.assertRaises(RuntimeError):
+                acquire_daemon_lock(lock_path, stale_after_seconds=3600)
+
+
     def test_error_update_records_resume_safe_failure(self):
         state = update_state_from_error(
             SchedulerDaemonState(),

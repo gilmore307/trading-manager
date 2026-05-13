@@ -297,7 +297,13 @@ def _process_exists(pid: int) -> bool:
 
 
 def acquire_daemon_lock(path: Path, *, stale_after_seconds: int = DEFAULT_STALE_LOCK_SECONDS) -> None:
-    """Create a single-instance lock, replacing stale locks only."""
+    """Create a single-instance lock, immediately replacing dead-PID locks.
+
+    Age gating is only for malformed locks that do not identify a dead owner. If
+    the lock records a PID and that process no longer exists, keeping the lock
+    blocks systemd recovery and creates an alert loop without protecting an
+    active daemon instance.
+    """
 
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"pid": os.getpid(), "created_utc": utc_now_iso()}
@@ -311,7 +317,10 @@ def acquire_daemon_lock(path: Path, *, stale_after_seconds: int = DEFAULT_STALE_
             existing = {}
         existing_pid = int(existing.get("pid") or 0)
         age = time.time() - path.stat().st_mtime if path.exists() else 0
-        if _process_exists(existing_pid) or age < stale_after_seconds:
+        if existing_pid > 0:
+            if _process_exists(existing_pid):
+                raise RuntimeError(f"scheduler daemon lock is active: {path}") from exc
+        elif age < stale_after_seconds:
             raise RuntimeError(f"scheduler daemon lock is active: {path}") from exc
         path.unlink(missing_ok=True)
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
