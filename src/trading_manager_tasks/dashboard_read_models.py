@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping, TextIO
 
+from .model_training_workflow import build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_status import (
     DEFAULT_DAEMON_WRAPPER_PATH,
@@ -250,6 +251,105 @@ def _stage_coverage_chart(stage_coverage: Mapping[str, Any] | None) -> dict[str,
     }
 
 
+def _public_stage_name(stage_id: object, stage_type: object) -> str:
+    phase = str(stage_type or "").replace("_", " ").strip()
+    if phase:
+        return phase.title()
+    return str(stage_id or "unknown task").replace("_", " ").replace(".", " / ").title()
+
+
+def _storage_root_from_checkpoint_path(path: object) -> Path:
+    candidate = _resolve_local_path(path)
+    if candidate is None:
+        return DEFAULT_STORAGE_ROOT
+    parts = candidate.parts
+    if "runtime" in parts:
+        runtime_index = parts.index("runtime")
+        if runtime_index > 0:
+            return Path(*parts[:runtime_index])
+    return DEFAULT_STORAGE_ROOT
+
+
+def _planned_stage_rows(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
+    if not status.current_month:
+        return []
+    try:
+        plan = build_model_training_workflow_plan(
+            start_month=status.current_month,
+            end_month=status.current_month,
+            storage_root=_storage_root_from_checkpoint_path(status.workflow_checkpoint.path),
+        )
+    except Exception:
+        return []
+    rows: list[dict[str, Any]] = []
+    for layer in plan.layers:
+        rows.extend(stage.summary_row() for stage in layer.stages)
+    return rows
+
+
+def _task_timeline(status: HistoricalSchedulerStatus, *, max_reason_chars: int = 220) -> list[dict[str, Any]]:
+    """Return a sanitized all-stage task timeline for dashboard display.
+
+    The dashboard should show task progress at the operational stage level
+    (data acquisition, feature generation, model generation, etc.) without
+    requiring the UI to read workflow checkpoint internals directly.
+    """
+
+    checkpoint_path = _resolve_local_path(status.workflow_checkpoint.path)
+    if checkpoint_path is None or not checkpoint_path.exists():
+        raw_stages = _planned_stage_rows(status)
+    else:
+        try:
+            payload = _load_json_object(checkpoint_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            payload = {}
+        raw_stages = payload.get("stages") or _planned_stage_rows(status)
+    if not isinstance(raw_stages, list):
+        return []
+    latest_execution = _latest_stage_execution(status) or {}
+    latest_failed_stage = latest_execution.get("stage_id") if latest_execution.get("status") == "failed" else None
+    tasks: list[dict[str, Any]] = []
+    first_open_seen = False
+    for index, raw_stage in enumerate(raw_stages, start=1):
+        if not isinstance(raw_stage, Mapping):
+            continue
+        stage_id = str(raw_stage.get("stage_id") or "")
+        stage_status = str(raw_stage.get("status") or "unknown")
+        is_terminal = stage_status in {"succeeded", "not_applicable"}
+        is_current = bool(stage_id and stage_id == status.current_stage and not is_terminal)
+        if not first_open_seen and not is_terminal:
+            is_current = True
+            first_open_seen = True
+        if latest_failed_stage and stage_id == latest_failed_stage:
+            task_state = "failed"
+        elif is_terminal:
+            task_state = "completed" if stage_status == "succeeded" else "skipped"
+        elif is_current:
+            task_state = "current"
+        else:
+            task_state = "future"
+        reason = str(raw_stage.get("last_reason") or "")
+        if len(reason) > max_reason_chars:
+            reason = reason[: max_reason_chars - 1] + "…"
+        tasks.append(
+            {
+                "sequence": index,
+                "task_id": stage_id,
+                "task_label": _public_stage_name(stage_id, raw_stage.get("stage_type")),
+                "task_state": task_state,
+                "status": stage_status,
+                "stage_type": raw_stage.get("stage_type"),
+                "layer": raw_stage.get("layer"),
+                "layer_key": raw_stage.get("layer_key"),
+                "updated_at_utc": raw_stage.get("updated_utc"),
+                "reason": reason or None,
+                "receipt_count": len(raw_stage.get("receipt_refs") or []) if isinstance(raw_stage.get("receipt_refs") or [], list) else 0,
+                "blocker_count": len(raw_stage.get("blockers") or []) if isinstance(raw_stage.get("blockers") or [], list) else 0,
+            }
+        )
+    return tasks
+
+
 def build_historical_task_progress_summary(
     status: HistoricalSchedulerStatus,
     *,
@@ -260,6 +360,12 @@ def build_historical_task_progress_summary(
 
     generated_at_utc = generated_at_utc or now_utc()
     stage_counts = _stage_counts(status)
+    task_timeline = _task_timeline(status)
+    if not stage_counts and task_timeline:
+        for task in task_timeline:
+            task_status = str(task.get("status") or "unknown")
+            stage_counts[task_status] = stage_counts.get(task_status, 0) + 1
+        stage_counts = dict(sorted(stage_counts.items()))
     progress_percent = _progress_percent(stage_counts)
     dashboard_status, severity, summary = _owner_status(status)
     active_blocker = status.blocked_reason or (status.open_operational_items[0] if status.open_operational_items else None)
@@ -274,6 +380,7 @@ def build_historical_task_progress_summary(
         "provider_status": status.provider_status.get("status"),
         "next_expected_system_action": status.recommended_next_action,
         "blocker_category": active_blocker,
+        "task_timeline": task_timeline,
     }
     latest_stage_execution = _latest_stage_execution(status)
     if latest_stage_execution is not None:

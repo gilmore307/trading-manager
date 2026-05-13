@@ -459,6 +459,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("dedup_window_seconds=3600", rows["MANAGER_AGENT_ERROR_DEDUP_POLICY"]["payload"])
         self.assertIn("occurred", rows["MANAGER_AGENT_ERROR_ALERT_TIME_POLICY"]["payload"])
         self.assertIn("run_safe_error_repair.py", rows["MANAGER_SAFE_ERROR_REPAIR_RUNNER"]["path"])
+        self.assertEqual(rows["DASHBOARD_HISTORICAL_TASK_TIMELINE"]["payload"], "historical_task_progress_summary.chart_payload.task_timeline")
+        self.assertIn("task_timeline", rows["DASHBOARD_HISTORICAL_TASK_PROGRESS_PAGE"]["applies_to"])
         self.assertIn("layer_08_option_expression", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
         self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")

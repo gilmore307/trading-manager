@@ -34,6 +34,52 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
             decision_log.parent.mkdir(parents=True, exist_ok=True)
+            workflow_state = tmp / "storage" / "runtime" / "model_training_workflow_state_2019-05.json"
+            workflow_state.parent.mkdir(parents=True, exist_ok=True)
+            workflow_state.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2019-05",
+                        "end_month": "2019-05",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "succeeded",
+                                "updated_utc": "2026-05-12T10:00:00Z",
+                                "last_reason": "stage coverage complete",
+                                "receipt_refs": ["coverage.json"],
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "blocked",
+                                "updated_utc": "2026-05-12T11:00:00Z",
+                                "last_reason": "waiting for source rows",
+                                "blockers": ["layer_02_sector_context.model_evaluation_complete"],
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "blocked",
+                                "updated_utc": "2026-05-12T11:05:00Z",
+                                "last_reason": "waiting for data acquisition",
+                                "blockers": ["layer_03_target_state_vector.data_acquisition_complete"],
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
             decision_log.write_text(
                 json.dumps(
                     {
@@ -97,6 +143,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertFalse(payload["chart_payload"]["stage_coverage"]["can_unlock_downstream"])
         self.assertEqual(payload["chart_payload"]["last_stage_execution"]["status"], "failed")
         self.assertEqual(payload["chart_payload"]["last_stage_execution"]["return_code"], 1)
+        task_timeline = payload["chart_payload"]["task_timeline"]
+        self.assertEqual([task["task_state"] for task in task_timeline], ["completed", "failed", "future"])
+        self.assertEqual(task_timeline[1]["task_label"], "Data Acquisition")
+        self.assertEqual(task_timeline[2]["stage_type"], "feature_generation")
         self.assertIn("Layer 2 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
         self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))

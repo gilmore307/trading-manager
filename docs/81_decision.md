@@ -3122,3 +3122,21 @@ Notification without repair is not enough for unattended operation. At the same 
 - `MANAGER_AGENT_ERROR_DEDUP_SECONDS=3600` is the default dedup window.
 - Duplicate catalog rows use `server_error_catalog_occurrence` and preserve the original owner-facing error ref.
 - Unknown errors still create numbered artifacts and notifications but do not perform automated mutation.
+
+## D135 - Publish sanitized historical task timeline for dashboard Tasks
+
+Date: 2026-05-13
+
+### Decision
+
+`historical_task_progress_summary.chart_payload` includes a sanitized `task_timeline` derived by the manager semantic producer from the active workflow checkpoint. The dashboard Tasks page consumes that list to show past, current, and future operational stages.
+
+### Rationale
+
+The dashboard must remain read-only and storage-hosted; it should not parse raw workflow checkpoint files directly. A manager-owned summary can expose owner-facing stage facts while preserving internal evidence boundaries.
+
+### Consequences
+
+- Tasks can show data-acquisition/feature-generation/model-generation/evaluation-level progress.
+- Model-specific aggregate progress and coverage cards can move to Models.
+- Raw command arrays, full receipt refs, and internal workflow state remain hidden unless surfaced through diagnostics.
