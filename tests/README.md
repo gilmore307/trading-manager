@@ -84,6 +84,9 @@
   - packet status discovery under the provider-dispatch plan runtime root;
   - failed stage coverage takes priority over next-packet suggestions.
 
+- `test_stable_semantic_ids.py` verifies:
+  - active code, tests, and docs use the stable `monthly_backfill` semantic id instead of reintroducing legacy version-suffixed storage names.
+
 - `test_stage_coverage.py` verifies:
   - `manager_stage_coverage` classification from `task_summary` rows;
   - partial coverage such as `3/22` remaining blocked from downstream unlock;
