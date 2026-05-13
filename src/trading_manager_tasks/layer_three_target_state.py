@@ -29,7 +29,7 @@ DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/sha
 DEFAULT_OUTPUT_ROOT = Path("runtime/layer_03_target_state_vector/input_materialization")
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SOURCE = "source_03_target_state"
-MONTHLY_BACKFILL_STORAGE_DIRS = ("monthly_backfill_v1", "monthly_backfill")
+MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
 
 
 @dataclass(frozen=True)
@@ -133,15 +133,8 @@ def discover_layer_two_feed_artifacts(
     allowed_symbols = {symbol.upper() for symbol in (symbols or _read_layer_two_symbols(universe_path))}
     refs: list[FeedArtifactRef] = []
     for symbol in sorted(allowed_symbols):
-        receipt_path = next(
-            (
-                trading_storage_root / storage_dir / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
-                for storage_dir in MONTHLY_BACKFILL_STORAGE_DIRS
-                if (trading_storage_root / storage_dir / "alpaca_bars" / symbol / start_month / "completion_receipt.json").exists()
-            ),
-            None,
-        )
-        if receipt_path is None:
+        receipt_path = trading_storage_root / MONTHLY_BACKFILL_STORAGE_DIR / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
+        if not receipt_path.exists():
             continue
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
         run = _latest_successful_run(receipt)
