@@ -3140,3 +3140,21 @@ The dashboard must remain read-only and storage-hosted; it should not parse raw 
 - Tasks can show data-acquisition/feature-generation/model-generation/evaluation-level progress.
 - Model-specific aggregate progress and coverage cards can move to Models.
 - Raw command arrays, full receipt refs, and internal workflow state remain hidden unless surfaced through diagnostics.
+
+## D136 - Timeline rows include month grouping and compact details
+
+Date: 2026-05-13
+
+### Decision
+
+Each `historical_task_progress_summary.chart_payload.task_timeline` row represents the finest dashboard task unit: historical month plus layer plus operational stage/work type. Rows include a `month` field for grouping and a compact `detail` object for expandable dashboard display. The detail object may include blockers, receipt references/counts, safe-execution posture, matching stage-coverage progress, and the latest execution result when it belongs to that row.
+
+### Rationale
+
+Chentong clarified that 2016-01 and 2016-02 should be understood as separate month groupings/batches under the same broader historical workflow, while the visible task rows should be the finest child tasks that can be completed, blocked, current, failed, skipped, or future. The dashboard also needs a read-only way to expand the current task and inspect progress without turning into a raw workflow/checkpoint browser.
+
+### Consequences
+
+- The dashboard can group task rows by month while preserving row-level completion state.
+- Expandable details remain sanitized and manager-owned; the dashboard does not query raw workflow checkpoint internals.
+- The current task can show concrete progress details when stage coverage is attached to the read model.

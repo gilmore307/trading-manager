@@ -146,7 +146,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task_timeline = payload["chart_payload"]["task_timeline"]
         self.assertEqual([task["task_state"] for task in task_timeline], ["completed", "failed", "future"])
         self.assertEqual(task_timeline[1]["task_label"], "Data Acquisition")
+        self.assertEqual(task_timeline[1]["month"], "2019-05")
+        self.assertEqual(task_timeline[1]["detail"]["last_execution"]["return_code"], 1)
         self.assertEqual(task_timeline[2]["stage_type"], "feature_generation")
+        self.assertEqual(task_timeline[0]["detail"]["progress"]["ready_count"], 3)
         self.assertIn("Layer 2 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
         self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))
