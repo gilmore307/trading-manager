@@ -51,6 +51,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/build_review_decision.py` — builds legacy/advisory `review_decision` artifacts without activation side effects.
 - `tasks/build_agent_model_promotion_decision.py` — builds required `agent_model_promotion_decision` artifacts for agent-reviewed production-promotion decisions; activation must reference this contract, not legacy advisory reviews.
 - `tasks/build_agent_storage_lifecycle_decision.py` — builds `agent_storage_lifecycle_decision` policy-decision artifacts for storage lifecycle requests; it has no storage mutation side effects.
+- `tasks/call_agent_for_error.py` — creates the server-wide `server_error_agent_request` / `agent_error_diagnosis` artifact pair for any component error; actual runner invocation is explicit and reviewed.
 
 ## Run
 
@@ -86,6 +87,7 @@ PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl
 PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_08_option_expression --candidate-ref trading-model://promotion-candidates/mpcand_example
 PYTHONPATH=src python3 scripts/tasks/build_review_decision.py --review-target-ref storage://trading-model/promotion-candidates/mpcand_example.json --decision-status defer --decision-reason "missing production calibration evidence"
+PYTHONPATH=src python3 scripts/tasks/call_agent_for_error.py --source-component trading-manager.stage_executor --source-repo trading-manager --summary "stage command returned non-zero status" --stderr-path storage/runtime/model_training_stage_logs/example.stderr.log
 ```
 
 The SQL `trading_registry.kind` constraint and `scripts/registry/kinds/*.md` files must stay aligned. Tests compare those sources directly.

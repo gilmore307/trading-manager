@@ -3026,3 +3026,23 @@ Storage lifecycle mutation is rule-executed: manager may schedule `storage_lifec
 - Model activation still cannot happen from a generic review, metric, ready signal, or scheduler tick; it needs the agent promotion decision plus activation record.
 - Storage lifecycle execution remains protected by deterministic rules, protected-set clearance, receipts, tombstones/manifests, and restore evidence rather than chat approval.
 - Broker/order/fill/account mutation remains execution-owned and outside historical modeling automation.
+
+## D130 - Route server-wide errors through a unified agent error handoff
+
+Date: 2026-05-13
+
+### Decision
+
+All server-side workflows that need automated diagnosis or repair should call the manager-owned `call_agent_for_error.py` entrypoint rather than inventing local error-agent paths. The contract is server-wide, not model-training-specific: callers provide component/repo/scope, command, exit code, bounded stdout/stderr refs or excerpts, and evidence refs.
+
+The entrypoint produces `server_error_agent_request` and `agent_error_diagnosis` artifacts. It may call an agent runner only when a reviewed runner command is explicitly configured; otherwise it queues durable request/diagnosis artifacts for the operator/agent runtime to consume.
+
+### Rationale
+
+A single error-agent boundary prevents each component from building inconsistent diagnosis/repair behavior, preserves evidence shape, and keeps safety restrictions centralized.
+
+### Consequences
+
+- Model training, provider acquisition, storage refresh, dashboard refresh, realtime evidence ingestion, service scripts, and future server jobs should use this entrypoint when they want agent diagnosis/repair.
+- Agent-assisted repair remains bounded to internal reversible work unless a separate provider, storage lifecycle, service-control, package-change, or broker/account approval path exists.
+- Failure registration and dashboard surfaces may link to these artifacts as diagnosis evidence instead of embedding ad hoc logs.

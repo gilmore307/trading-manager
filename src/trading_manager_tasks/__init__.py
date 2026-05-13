@@ -1,5 +1,13 @@
 """Manager-owned task planning helpers."""
 
+from .agent_error_handler import (
+    SERVER_ERROR_AGENT_REQUEST_CONTRACT,
+    AGENT_ERROR_DIAGNOSIS_CONTRACT,
+    build_server_error_agent_request,
+    handle_server_error,
+    validate_agent_error_diagnosis,
+    validate_server_error_agent_request,
+)
 from .control_plane import (
     CompletionReceiptRows,
     TASK_PRIORITY_RANKS,
@@ -81,6 +89,8 @@ from .task_rehearsal import (
 )
 
 __all__ = [
+    "AGENT_ERROR_DIAGNOSIS_CONTRACT",
+    "SERVER_ERROR_AGENT_REQUEST_CONTRACT",
     "CompletionReceiptRows",
     "DEFAULT_SOURCES",
     "DatasetEvidenceCollection",
@@ -110,6 +120,10 @@ __all__ = [
     "build_model_promotion_review_requests",
     "build_rehearsal_receipt",
     "build_review_decision",
+    "validate_server_error_agent_request",
+    "validate_agent_error_diagnosis",
+    "handle_server_error",
+    "build_server_error_agent_request",
     "build_rehearsal_task_summary",
     "PARAMETER_SCHEMA_REF",
     "build_request_task_payload",

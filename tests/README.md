@@ -11,6 +11,12 @@
 
 ## Inventory
 
+- `test_agent_error_handler.py` verifies:
+  - server-wide `server_error_agent_request` construction from command/log/evidence refs;
+  - centralized safety boundaries for diagnosis and repair;
+  - queued diagnosis artifact behavior when no reviewed runner is configured;
+  - explicit configured-runner invocation behavior for safe local test runners.
+
 - `test_dataset_evidence.py` verifies:
   - manager-visible dataset evidence collection from model governance rows;
   - split-role normalization and chronological month coverage;

@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping, TextIO
 
+from .agent_error_handler import handle_server_error
 from .control_plane import TaskSystemError
 from .model_training_state import (
     DEFAULT_WORKFLOW_STATE_PATH,
@@ -55,6 +56,8 @@ class StageExecutionSummary:
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
     reason: str | None = None
+    agent_error_request_path: str | None = None
+    agent_error_diagnosis_path: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -234,6 +237,24 @@ def execute_stage_process(
     status = "succeeded" if result.returncode == 0 else "failed"
     receipt_path = stage_receipt_root / f"{stamp}.receipt.json"
     provider_calls = _provider_call_count_from_stdout(result.stdout) if result.returncode == 0 else 0
+    agent_error_result: Mapping[str, Any] | None = None
+    if result.returncode != 0:
+        agent_error_result = handle_server_error(
+            source_component="trading-manager.stage_executor",
+            source_repo="trading-manager",
+            error_scope="server.model_training_stage",
+            error_kind="stage_command_failed",
+            severity="error",
+            summary=f"model training stage {stage.stage_id} command returned non-zero status",
+            command=stage.command,
+            exit_code=result.returncode,
+            stdout_path=str(stdout_path),
+            stderr_path=str(stderr_path),
+            working_directory=str(cwd),
+            evidence_refs=[f"manager_stage:{stage.stage_id}"],
+            output_root=log_root.parent / "agent_error_handling",
+            call_agent=bool(os.environ.get("MANAGER_AGENT_ERROR_AUTOCALL")),
+        )
     summary = StageExecutionSummary(
         contract_type="manager_stage_execution_summary",
         stage_id=stage.stage_id,
@@ -245,6 +266,8 @@ def execute_stage_process(
         stderr_path=str(stderr_path),
         provider_calls=provider_calls,
         reason=None if result.returncode == 0 else "stage command returned non-zero status",
+        agent_error_request_path=str(agent_error_result.get("request_path")) if agent_error_result else None,
+        agent_error_diagnosis_path=str(agent_error_result.get("diagnosis_path")) if agent_error_result else None,
     )
     receipt_path.write_text(
         json.dumps(_receipt_payload(stage=stage, summary=summary, started_at=started, completed_at=completed), indent=2, sort_keys=True)

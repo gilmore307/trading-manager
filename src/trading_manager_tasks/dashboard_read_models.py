@@ -97,6 +97,8 @@ def _latest_stage_execution(status: HistoricalSchedulerStatus) -> dict[str, Any]
         "provider_calls": int(stage_execution.get("provider_calls") or 0),
         "model_activation_performed": bool(stage_execution.get("model_activation_performed")),
         "broker_execution_performed": bool(stage_execution.get("broker_execution_performed")),
+        "agent_error_request_path": stage_execution.get("agent_error_request_path"),
+        "agent_error_diagnosis_path": stage_execution.get("agent_error_diagnosis_path"),
     }
 
 
@@ -200,8 +202,19 @@ def _diagnostic_refs(status: HistoricalSchedulerStatus, stage_coverage: Mapping[
                 "receipt_path": latest_stage_execution.get("receipt_path"),
                 "stdout_path": latest_stage_execution.get("stdout_path"),
                 "stderr_path": latest_stage_execution.get("stderr_path"),
+                "agent_error_request_path": latest_stage_execution.get("agent_error_request_path"),
+                "agent_error_diagnosis_path": latest_stage_execution.get("agent_error_diagnosis_path"),
             }
         )
+        if latest_stage_execution.get("agent_error_request_path"):
+            refs.append(
+                {
+                    "ref_type": "server_error_agent_request",
+                    "stage_id": latest_stage_execution.get("stage_id"),
+                    "path": latest_stage_execution.get("agent_error_request_path"),
+                    "diagnosis_path": latest_stage_execution.get("agent_error_diagnosis_path"),
+                }
+            )
     workflow_path = status.workflow_checkpoint.path
     if status.workflow_checkpoint.exists and workflow_path:
         refs.append({"ref_type": "workflow_checkpoint", "path": workflow_path})

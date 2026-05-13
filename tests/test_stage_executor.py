@@ -81,6 +81,8 @@ class StageExecutorTests(unittest.TestCase):
             )
             self.assertEqual(summary.status, "failed")
             self.assertEqual(summary.provider_calls, 0)
+            self.assertTrue(Path(summary.agent_error_request_path or "").exists())
+            self.assertTrue(Path(summary.agent_error_diagnosis_path or "").exists())
 
     def test_executes_approved_layer_four_local_data_acquisition_command(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
