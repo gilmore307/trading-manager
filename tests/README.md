@@ -17,7 +17,8 @@
   - queued diagnosis artifact behavior when no reviewed runner is configured;
   - explicit configured-runner invocation behavior for safe local test runners.
   - Discord alert command construction through OpenClaw message CLI using the reviewed channel target.
-  - monotonic owner-facing error numbering and append-only catalog behavior.
+  - monotonic owner-facing error numbering, duplicate suppression, and append-only catalog behavior.
+  - safe auto-repair runner behavior for scheduler dead-PID lock files.
 
 - `test_dataset_evidence.py` verifies:
   - manager-visible dataset evidence collection from model governance rows;
@@ -158,6 +159,10 @@
   - materialized request payloads load through component `build_context` without dispatch/provider calls;
   - hash-backed `input_binding` metadata must match the local payload;
   - provider-call-enabled payloads are rejected by the dry-run handoff validator.
+
+- `test_safe_error_repair.py` verifies:
+  - reviewed deterministic safe auto-repair behavior for scheduler dead-PID lock files;
+  - unknown errors remain diagnosis-only without mutation.
 
 - `test_scheduler.py` verifies:
   - regular-trading-day-only market-hours protection;

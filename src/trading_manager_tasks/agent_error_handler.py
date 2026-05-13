@@ -16,7 +16,8 @@ import os
 import shlex
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any, Iterable, Mapping, TextIO
 
@@ -26,10 +27,12 @@ SERVER_ERROR_AGENT_REQUEST_CONTRACT = "server_error_agent_request"
 AGENT_ERROR_DIAGNOSIS_CONTRACT = "agent_error_diagnosis"
 AGENT_ERROR_HANDLING_RESULT_CONTRACT = "agent_error_handling_result"
 SERVER_ERROR_CATALOG_ENTRY_CONTRACT = "server_error_catalog_entry"
+SERVER_ERROR_CATALOG_OCCURRENCE_CONTRACT = "server_error_catalog_occurrence"
 DEFAULT_AGENT_REF = "openclaw_agent_under_owner_observation"
 DEFAULT_OUTPUT_ROOT = Path("storage/runtime/agent_error_handling")
 DEFAULT_ERROR_CATALOG_NAME = "server_error_catalog.jsonl"
 DEFAULT_ERROR_CATALOG_LOCK_NAME = ".server_error_catalog.lock"
+DEFAULT_DEDUP_WINDOW_SECONDS = 60 * 60
 DEFAULT_DISCORD_TARGET = "channel:1504100135200620665"
 DEFAULT_DISCORD_SERVER_ID = "1480186849241731084"
 ALLOWED_SEVERITIES = {"info", "warning", "error", "critical"}
@@ -51,6 +54,26 @@ FORBIDDEN_ACTIONS = (
 
 def _now_utc() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _env_truthy(name: str) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise TaskSystemError(f"{name} must be an integer") from exc
+    if parsed < 0:
+        raise TaskSystemError(f"{name} must be non-negative")
+    return parsed
 
 
 def _stable_id(prefix: str, *parts: object) -> str:
@@ -133,8 +156,8 @@ def build_server_error_agent_request(
     if stderr_path:
         normalized_evidence.append(f"stderr:{stderr_path}")
     occurred = occurred_at_utc or _now_utc()
-    stable_request_id = request_id or _stable_id(
-        "erragent",
+    error_fingerprint = _stable_id(
+        "errfp",
         source_component,
         source_repo,
         error_scope,
@@ -142,6 +165,10 @@ def build_server_error_agent_request(
         summary,
         normalized_command,
         exit_code,
+    )
+    stable_request_id = request_id or _stable_id(
+        "erragent",
+        error_fingerprint,
         stdout_path,
         stderr_path,
         occurred,
@@ -150,6 +177,7 @@ def build_server_error_agent_request(
         "contract_type": SERVER_ERROR_AGENT_REQUEST_CONTRACT,
         "schema_version": "1",
         "request_id": stable_request_id,
+        "error_fingerprint": error_fingerprint,
         "source_component": source_component,
         "source_repo": source_repo,
         "error_scope": error_scope,
@@ -200,44 +228,130 @@ def _read_catalog_rows(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def register_error_in_catalog(request: Mapping[str, Any], *, output_root: Path = DEFAULT_OUTPUT_ROOT) -> tuple[dict[str, Any], dict[str, Any]]:
+def _parse_utc(value: object) -> datetime | None:
+    if not value:
+        return None
+    try:
+        text = str(value).replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    except ValueError:
+        return None
+
+
+def _within_dedup_window(row: Mapping[str, Any], occurred_at_utc: str, *, dedup_window_seconds: int) -> bool:
+    current = _parse_utc(occurred_at_utc) or datetime.now(UTC)
+    seen = _parse_utc(row.get("last_seen_at_utc") or row.get("occurred_at_utc") or row.get("created_at_utc"))
+    if seen is None:
+        return False
+    return abs(current - seen) <= timedelta(seconds=dedup_window_seconds)
+
+
+def _format_alert_time(value: object) -> str:
+    parsed = _parse_utc(value)
+    if parsed is None:
+        return str(value or "unknown")
+    eastern = parsed.astimezone(ZoneInfo("America/New_York"))
+    return f"{parsed.strftime('%Y-%m-%d %H:%M:%S UTC')} / {eastern.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+
+
+def register_error_in_catalog(
+    request: Mapping[str, Any],
+    *,
+    output_root: Path = DEFAULT_OUTPUT_ROOT,
+    dedup_window_seconds: int | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Assign a durable human-facing error number and append the catalog row.
 
-    The request id remains the stable machine id. The catalog assigns a concise
-    owner-facing reference such as ERR-000123 so Discord/chat follow-up can refer
-    to a specific error without pasting long hashes.
+    New error fingerprints receive refs such as ERR-000123. Repeated errors
+    within the dedup window reuse the original ref and append an occurrence row
+    instead of allocating a new owner-facing number or sending another alert.
     """
 
     root = Path(output_root)
     root.mkdir(parents=True, exist_ok=True)
     catalog_path = _catalog_path(root)
     lock_path = _catalog_lock_path(root)
+    window = _env_int("MANAGER_AGENT_ERROR_DEDUP_SECONDS", dedup_window_seconds or DEFAULT_DEDUP_WINDOW_SECONDS)
     with lock_path.open("a+", encoding="utf-8") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         try:
             rows = _read_catalog_rows(catalog_path)
             request_id = str(request["request_id"])
+            fingerprint = str(request.get("error_fingerprint") or request_id)
             existing = next((row for row in rows if str(row.get("request_id")) == request_id), None)
             if existing is not None:
                 numbered_request = dict(request)
                 numbered_request["error_number"] = existing["error_number"]
                 numbered_request["error_ref"] = existing["error_ref"]
                 numbered_request["error_catalog_path"] = str(catalog_path)
+                numbered_request["error_deduplicated"] = bool(existing.get("deduplicated"))
                 numbered_request["agent_prompt"] = build_agent_prompt(numbered_request)
                 validate_server_error_agent_request(numbered_request)
                 return numbered_request, existing
+
+            duplicate_base = next(
+                (
+                    row
+                    for row in reversed(rows)
+                    if row.get("contract_type") in {SERVER_ERROR_CATALOG_ENTRY_CONTRACT, SERVER_ERROR_CATALOG_OCCURRENCE_CONTRACT}
+                    and str(row.get("error_fingerprint")) == fingerprint
+                    and _within_dedup_window(row, str(request.get("occurred_at_utc")), dedup_window_seconds=window)
+                ),
+                None,
+            )
+            if duplicate_base is not None:
+                numbered_request = dict(request)
+                numbered_request["error_number"] = int(duplicate_base["error_number"])
+                numbered_request["error_ref"] = duplicate_base["error_ref"]
+                numbered_request["error_catalog_path"] = str(catalog_path)
+                numbered_request["error_deduplicated"] = True
+                numbered_request["duplicate_of_request_id"] = duplicate_base.get("request_id") or duplicate_base.get("duplicate_of_request_id")
+                numbered_request["agent_prompt"] = build_agent_prompt(numbered_request)
+                row = {
+                    "contract_type": SERVER_ERROR_CATALOG_OCCURRENCE_CONTRACT,
+                    "schema_version": "1",
+                    "error_number": numbered_request["error_number"],
+                    "error_ref": numbered_request["error_ref"],
+                    "error_fingerprint": fingerprint,
+                    "request_id": request_id,
+                    "duplicate_of_request_id": numbered_request.get("duplicate_of_request_id"),
+                    "request_path": str(default_request_path(numbered_request, root)),
+                    "diagnosis_path": str(default_diagnosis_path(numbered_request, root)),
+                    "source_component": numbered_request.get("source_component"),
+                    "source_repo": numbered_request.get("source_repo"),
+                    "error_scope": numbered_request.get("error_scope"),
+                    "error_kind": numbered_request.get("error_kind"),
+                    "severity": numbered_request.get("severity"),
+                    "summary": numbered_request.get("summary"),
+                    "exit_code": numbered_request.get("exit_code"),
+                    "occurred_at_utc": numbered_request.get("occurred_at_utc"),
+                    "created_at_utc": _now_utc(),
+                    "deduplicated": True,
+                    "dedup_window_seconds": window,
+                }
+                validate_server_error_catalog_entry(row)
+                validate_server_error_agent_request(numbered_request)
+                with catalog_path.open("a", encoding="utf-8") as catalog_file:
+                    catalog_file.write(json.dumps(row, sort_keys=True) + "\n")
+                return numbered_request, row
+
             next_number = max([int(row.get("error_number") or 0) for row in rows] or [0]) + 1
             error_ref = f"ERR-{next_number:06d}"
             numbered_request = dict(request)
             numbered_request["error_number"] = next_number
             numbered_request["error_ref"] = error_ref
             numbered_request["error_catalog_path"] = str(catalog_path)
+            numbered_request["error_deduplicated"] = False
             numbered_request["agent_prompt"] = build_agent_prompt(numbered_request)
             row = {
                 "contract_type": SERVER_ERROR_CATALOG_ENTRY_CONTRACT,
                 "schema_version": "1",
                 "error_number": next_number,
                 "error_ref": error_ref,
+                "error_fingerprint": fingerprint,
                 "request_id": request_id,
                 "request_path": str(default_request_path(numbered_request, root)),
                 "diagnosis_path": str(default_diagnosis_path(numbered_request, root)),
@@ -249,7 +363,11 @@ def register_error_in_catalog(request: Mapping[str, Any], *, output_root: Path =
                 "summary": numbered_request.get("summary"),
                 "exit_code": numbered_request.get("exit_code"),
                 "occurred_at_utc": numbered_request.get("occurred_at_utc"),
+                "first_seen_at_utc": numbered_request.get("occurred_at_utc"),
+                "last_seen_at_utc": numbered_request.get("occurred_at_utc"),
                 "created_at_utc": _now_utc(),
+                "deduplicated": False,
+                "dedup_window_seconds": window,
             }
             validate_server_error_catalog_entry(row)
             validate_server_error_agent_request(numbered_request)
@@ -268,6 +386,7 @@ def validate_server_error_catalog_entry(row: Mapping[str, Any]) -> dict[str, Any
         "error_number",
         "error_ref",
         "request_id",
+        "error_fingerprint",
         "request_path",
         "diagnosis_path",
         "source_component",
@@ -281,8 +400,8 @@ def validate_server_error_catalog_entry(row: Mapping[str, Any]) -> dict[str, Any
     for field in required:
         if normalized.get(field) in (None, ""):
             raise TaskSystemError(f"missing required server error catalog field: {field}")
-    if normalized["contract_type"] != SERVER_ERROR_CATALOG_ENTRY_CONTRACT:
-        raise TaskSystemError(f"contract_type must be {SERVER_ERROR_CATALOG_ENTRY_CONTRACT}")
+    if normalized["contract_type"] not in {SERVER_ERROR_CATALOG_ENTRY_CONTRACT, SERVER_ERROR_CATALOG_OCCURRENCE_CONTRACT}:
+        raise TaskSystemError(f"contract_type must be {SERVER_ERROR_CATALOG_ENTRY_CONTRACT} or {SERVER_ERROR_CATALOG_OCCURRENCE_CONTRACT}")
     if str(normalized["schema_version"]) != "1":
         raise TaskSystemError("schema_version must be 1")
     if not isinstance(normalized["error_number"], int) or normalized["error_number"] < 1:
@@ -301,6 +420,7 @@ def validate_server_error_agent_request(request: Mapping[str, Any]) -> dict[str,
         "contract_type",
         "schema_version",
         "request_id",
+        "error_fingerprint",
         "source_component",
         "error_scope",
         "error_kind",
@@ -371,6 +491,13 @@ def call_agent_runner(
         return_code = result.returncode
         stdout = result.stdout
         stderr = result.stderr
+        if result.returncode == 0:
+            try:
+                parsed_stdout = json.loads(stdout)
+            except json.JSONDecodeError:
+                parsed_stdout = None
+            if isinstance(parsed_stdout, dict) and parsed_stdout.get("contract_type") == AGENT_ERROR_DIAGNOSIS_CONTRACT:
+                return validate_agent_error_diagnosis(parsed_stdout)
         status = "completed" if result.returncode == 0 else "agent_call_failed"
     except subprocess.TimeoutExpired as exc:
         return_code = None
@@ -442,6 +569,9 @@ def _discord_message(request: Mapping[str, Any], diagnosis: Mapping[str, Any], *
     request_id = request.get("request_id")
     error_ref = request.get("error_ref") or request.get("request_id")
     diagnosis_status = diagnosis.get("status")
+    occurred_at = _format_alert_time(request.get("occurred_at_utc"))
+    created_at = _format_alert_time(request.get("created_at_utc"))
+    dedup_note = "yes" if request.get("error_deduplicated") else "no"
     stderr_path = request.get("stderr_path")
     stdout_path = request.get("stdout_path")
     lines = [
@@ -450,8 +580,11 @@ def _discord_message(request: Mapping[str, Any], diagnosis: Mapping[str, Any], *
         f"Scope: {scope}",
         f"Kind: {error_kind}",
         f"Summary: {summary}",
+        f"Occurred: {occurred_at}",
+        f"Recorded: {created_at}",
         f"Agent diagnosis: {diagnosis_status}",
         f"Error No: {error_ref}",
+        f"Deduplicated: {dedup_note}",
         f"Request: {request_id}",
     ]
     if server_id:
@@ -529,33 +662,44 @@ def handle_server_error(
     request_path = default_request_path(request, output_root)
     write_json_artifact(request, path=request_path)
     configured_runner = runner_command or os.environ.get("MANAGER_AGENT_ERROR_RUNNER_COMMAND", "").strip()
-    if call_agent and configured_runner:
+    effective_call_agent = call_agent or _env_truthy("MANAGER_AGENT_ERROR_AUTOCALL")
+    if effective_call_agent and configured_runner:
         diagnosis = call_agent_runner(request, runner_command=configured_runner)
     else:
-        diagnosis = build_queued_diagnosis(request, reason="agent runner not configured" if call_agent else "agent call not requested")
+        diagnosis = build_queued_diagnosis(request, reason="agent runner not configured" if effective_call_agent else "agent call not requested")
     diagnosis_path = default_diagnosis_path(request, output_root)
     write_json_artifact(diagnosis, path=diagnosis_path)
     should_notify_discord = (
         bool(notify_discord)
         if notify_discord is not None
-        else bool(os.environ.get("MANAGER_AGENT_ERROR_NOTIFY_DISCORD") or discord_target or os.environ.get("MANAGER_AGENT_ERROR_DISCORD_TARGET"))
+        else (_env_truthy("MANAGER_AGENT_ERROR_NOTIFY_DISCORD") or bool(discord_target) or bool(os.environ.get("MANAGER_AGENT_ERROR_DISCORD_TARGET")))
     )
-    discord_notification = (
-        notify_discord_for_error(
-            request,
-            diagnosis,
-            target=discord_target,
-            server_id=discord_server_id,
-            account_id=discord_account_id,
+    notify_duplicates = _env_truthy("MANAGER_AGENT_ERROR_NOTIFY_DUPLICATES")
+    if should_notify_discord and request.get("error_deduplicated") and not notify_duplicates:
+        discord_notification = {
+            "status": "deduplicated",
+            "reason": "duplicate error within dedup window; notification suppressed",
+            "error_ref": request.get("error_ref"),
+        }
+    else:
+        discord_notification = (
+            notify_discord_for_error(
+                request,
+                diagnosis,
+                target=discord_target,
+                server_id=discord_server_id,
+                account_id=discord_account_id,
+            )
+            if should_notify_discord
+            else {"status": "skipped", "reason": "discord notification not requested"}
         )
-        if should_notify_discord
-        else {"status": "skipped", "reason": "discord notification not requested"}
-    )
     result = {
         "contract_type": AGENT_ERROR_HANDLING_RESULT_CONTRACT,
         "schema_version": "1",
         "error_number": request["error_number"],
         "error_ref": request["error_ref"],
+        "error_fingerprint": request["error_fingerprint"],
+        "error_deduplicated": bool(request.get("error_deduplicated")),
         "error_catalog_entry": catalog_entry,
         "request_id": request["request_id"],
         "request_path": str(request_path),
@@ -624,6 +768,7 @@ __all__ = [
     "DEFAULT_ERROR_CATALOG_NAME",
     "SERVER_ERROR_AGENT_REQUEST_CONTRACT",
     "SERVER_ERROR_CATALOG_ENTRY_CONTRACT",
+    "SERVER_ERROR_CATALOG_OCCURRENCE_CONTRACT",
     "build_agent_prompt",
     "build_queued_diagnosis",
     "build_server_error_agent_request",

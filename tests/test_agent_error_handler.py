@@ -101,6 +101,22 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertEqual(diagnosis["status"], "completed")
             self.assertIn("diagnosis_status", diagnosis["stdout"])
 
+    def test_false_autocall_env_does_not_call_runner(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_AUTOCALL": "false", "MANAGER_AGENT_ERROR_RUNNER_COMMAND": "python3 should_not_run.py"}, clear=False):
+                result = handle_server_error(
+                    source_component="server.env",
+                    summary="failure",
+                    output_root=tmp,
+                    call_agent=False,
+                )
+
+            diagnosis = json.loads(Path(result["diagnosis_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(diagnosis["status"], "queued")
+            self.assertEqual(diagnosis["stderr"], "agent call not requested")
+
+
     def test_catalog_assigns_monotonic_error_numbers(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -111,6 +127,36 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertEqual(second["error_ref"], "ERR-000002")
             rows = [json.loads(line) for line in (tmp / "server_error_catalog.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["error_ref"] for row in rows], ["ERR-000001", "ERR-000002"])
+
+    def test_duplicate_errors_reuse_number_and_suppress_notification(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            first = handle_server_error(
+                source_component="server.same",
+                summary="repeat failure",
+                command=["cmd"],
+                exit_code=1,
+                output_root=tmp,
+                notify_discord=False,
+                occurred_at_utc="2026-05-13T13:00:00Z",
+            )
+            second = handle_server_error(
+                source_component="server.same",
+                summary="repeat failure",
+                command=["cmd"],
+                exit_code=1,
+                output_root=tmp,
+                notify_discord=True,
+                occurred_at_utc="2026-05-13T13:00:30Z",
+            )
+
+            self.assertEqual(first["error_ref"], "ERR-000001")
+            self.assertEqual(second["error_ref"], "ERR-000001")
+            self.assertTrue(second["error_deduplicated"])
+            self.assertEqual(second["discord_notification"]["status"], "deduplicated")
+            rows = [json.loads(line) for line in (tmp / "server_error_catalog.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([row["contract_type"] for row in rows], ["server_error_catalog_entry", "server_error_catalog_occurrence"])
+
 
     def test_catalog_reuses_existing_number_for_same_request_id(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -162,6 +208,9 @@ class AgentErrorHandlerTests(unittest.TestCase):
         self.assertIn("channel:1504100135200620665", cmd)
         self.assertIn("--message", cmd)
         self.assertIn("Error No: ERR-000001", cmd[cmd.index("--message") + 1])
+        self.assertIn("Occurred:", cmd[cmd.index("--message") + 1])
+        self.assertIn("Recorded:", cmd[cmd.index("--message") + 1])
+        self.assertIn("Deduplicated: no", cmd[cmd.index("--message") + 1])
 
 
 if __name__ == "__main__":

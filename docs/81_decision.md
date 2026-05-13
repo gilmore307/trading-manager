@@ -3102,3 +3102,23 @@ Dashboard status already classifies a lock with a non-running PID as stale. Keep
 - Duplicate daemon protection remains strict when the recorded PID is still running.
 - Recent malformed locks still require the stale-age threshold before replacement.
 - Dead-PID locks no longer block normal service restart/recovery.
+
+## D134 - Enable bounded auto-repair, timestamps, and deduplication for server errors
+
+Date: 2026-05-13
+
+### Decision
+
+The server-wide error handoff should run a reviewed deterministic safe-repair runner when configured. The initial allowed repair class is scheduler dead-PID lock removal only. Alerts must include occurrence/record timestamps, and duplicate errors with the same fingerprint inside the dedup window reuse the same `ERR-......` number and suppress repeated Discord notifications by default.
+
+### Rationale
+
+Notification without repair is not enough for unattended operation. At the same time, automatic repair must stay bounded: no provider calls, broker/account mutation, secret exposure, package changes, or arbitrary shell execution. Deduplication prevents restart loops from producing alert spam and excessive error numbers.
+
+### Consequences
+
+- `MANAGER_AGENT_ERROR_AUTOCALL=true` enables the reviewed runner for service errors.
+- `MANAGER_AGENT_ERROR_RUNNER_COMMAND=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_safe_error_repair.py` is the configured runner.
+- `MANAGER_AGENT_ERROR_DEDUP_SECONDS=3600` is the default dedup window.
+- Duplicate catalog rows use `server_error_catalog_occurrence` and preserve the original owner-facing error ref.
+- Unknown errors still create numbered artifacts and notifications but do not perform automated mutation.

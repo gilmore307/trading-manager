@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import traceback
 from datetime import UTC, datetime
@@ -37,6 +38,7 @@ def main() -> int:
                 exit_code=1,
                 stderr_path=str(stderr_path),
                 working_directory=str(Path.cwd()),
+                call_agent=_env_truthy("MANAGER_AGENT_ERROR_AUTOCALL"),
             )
             print(json.dumps(result, sort_keys=True), file=sys.stderr)
         except Exception:  # pragma: no cover - preserves original fatal visibility if handoff fails.

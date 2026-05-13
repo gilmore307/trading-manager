@@ -101,3 +101,5 @@ Example:
 ```bash
 PYTHONPATH=src python3 scripts/tasks/list_agent_errors.py --error-ref ERR-000001
 ```
+
+- `run_safe_error_repair.py` is the reviewed deterministic auto-repair runner used by server error handoff when `MANAGER_AGENT_ERROR_AUTOCALL=true`; it currently repairs only scheduler dead-PID lock files and leaves unknown errors diagnosis-only.
