@@ -3611,3 +3611,22 @@ The historical scheduler runtime now uses `TRADING_MANAGER_MONTH_INGEST_WORKERS=
 - Two month-ingest rounds fill one six-month fold substrate.
 - Provider request workers remain subordinate per-stage dispatch capacity, not the primary runtime owner shown in Current Status.
 - Dashboard Current Status emphasizes runtime throughput, active topology, fold cadence, completion rate, and idle/blocked decisions.
+
+## D157 - Auto work selection cannot advance beyond the completed-month cutoff
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The scheduler auto-selection path could advance from the latest completed workflow checkpoint to the next calendar month without applying `completed_historical_month_cutoff()`. That meant the daemon could select or publish `2026-05` work while May 2026 was still incomplete, even though provider-download and dashboard selectors already treated `2026-04` as the latest eligible historical month.
+
+### Decision
+
+`select_next_historical_work()` now caps selectable months at the latest completed historical month by default. Open workflow checkpoints after the cutoff are ignored for active selection, completed-month advancement waits instead of moving into the incomplete month, and explicit `--advance-month-on-complete` daemon advancement stops at the same cutoff.
+
+### Consequences
+
+- Before May ends, the resident scheduler must not select, publish, or auto-advance into `2026-05` / `2605` work.
+- The dashboard cutoff remains a defensive display guard, but scheduler selection itself now enforces the same boundary.
+- Tests cover both advancement after a completed month and stale/open workflow states beyond the cutoff.

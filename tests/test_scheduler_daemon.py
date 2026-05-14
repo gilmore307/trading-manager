@@ -186,6 +186,62 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.completed_months, ("2016-02", "2016-03"))
         self.assertEqual(selection.open_months, ())
 
+    def test_select_next_historical_work_does_not_publish_incomplete_calendar_month(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            plan = build_model_training_workflow_plan(start_month="2026-04", end_month="2026-04", storage_root=storage_root)
+            all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+            advance_workflow_state(
+                start_month="2026-04",
+                end_month="2026-04",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2026-04", root=storage_root / "runtime"),
+                completed_stage_ids=all_stage_ids,
+                write=True,
+            )
+
+            selection = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2026-04",
+                default_end_month="2026-04",
+                max_month="2026-04",
+            )
+
+        self.assertEqual(selection.start_month, "2026-04")
+        self.assertEqual(selection.end_month, "2026-04")
+        self.assertEqual(selection.reason_code, "waiting_for_next_calendar_month_to_complete")
+
+    def test_select_next_historical_work_ignores_open_month_after_cutoff(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            plan = build_model_training_workflow_plan(start_month="2026-04", end_month="2026-04", storage_root=storage_root)
+            all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+            advance_workflow_state(
+                start_month="2026-04",
+                end_month="2026-04",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2026-04", root=storage_root / "runtime"),
+                completed_stage_ids=all_stage_ids,
+                write=True,
+            )
+            open_path = workflow_state_path_for_month("2026-05", root=storage_root / "runtime")
+            open_path.parent.mkdir(parents=True, exist_ok=True)
+            open_path.write_text(
+                json.dumps({"start_month": "2026-05", "end_month": "2026-05", "stages": [{"status": "pending"}]}) + "\n",
+                encoding="utf-8",
+            )
+
+            selection = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2026-04",
+                default_end_month="2026-04",
+                max_month="2026-04",
+            )
+
+        self.assertEqual(selection.start_month, "2026-04")
+        self.assertEqual(selection.reason_code, "waiting_for_next_calendar_month_to_complete")
+        self.assertEqual(selection.open_months, ("2026-05",))
+
     def test_select_next_historical_work_advances_after_foundation_substrate_month(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"

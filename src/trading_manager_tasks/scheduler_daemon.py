@@ -164,6 +164,7 @@ def select_next_historical_work(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     default_start_month: str = "2016-01",
     default_end_month: str = "2016-01",
+    max_month: str | None = None,
 ) -> HistoricalWorkSelection:
     """Inspect completed/open workflow checkpoints and choose the next month.
 
@@ -174,6 +175,7 @@ def select_next_historical_work(
     configured default bootstrap month.
     """
 
+    max_month = max_month or completed_historical_month_cutoff()
     runtime_root = storage_root / "runtime"
     completed: list[str] = []
     open_months: list[str] = []
@@ -197,8 +199,9 @@ def select_next_historical_work(
 
     completed_tuple = tuple(sorted(set(completed)))
     open_tuple = tuple(sorted(set(open_months)))
-    if open_tuple:
-        selected = open_tuple[0]
+    eligible_open_tuple = tuple(month for month in open_tuple if month <= max_month)
+    if eligible_open_tuple:
+        selected = eligible_open_tuple[0]
         return HistoricalWorkSelection(
             start_month=selected,
             end_month=selected,
@@ -208,6 +211,15 @@ def select_next_historical_work(
         )
     if completed_tuple:
         selected = next_month(completed_tuple[-1])
+        if selected > max_month:
+            capped_month = min(completed_tuple[-1], max_month)
+            return HistoricalWorkSelection(
+                start_month=capped_month,
+                end_month=capped_month,
+                reason_code="waiting_for_next_calendar_month_to_complete",
+                completed_months=completed_tuple,
+                open_months=open_tuple,
+            )
         return HistoricalWorkSelection(
             start_month=selected,
             end_month=selected,
@@ -215,9 +227,17 @@ def select_next_historical_work(
             completed_months=completed_tuple,
             open_months=open_tuple,
         )
+    if default_start_month > max_month:
+        return HistoricalWorkSelection(
+            start_month=max_month,
+            end_month=max_month,
+            reason_code="waiting_for_next_calendar_month_to_complete",
+            completed_months=completed_tuple,
+            open_months=open_tuple,
+        )
     return HistoricalWorkSelection(
         start_month=default_start_month,
-        end_month=default_end_month,
+        end_month=min(default_end_month, max_month),
         reason_code="no_prior_workflow_state",
         completed_months=completed_tuple,
         open_months=open_tuple,
@@ -987,17 +1007,25 @@ def run_daemon_loop(
                         state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=decision)
                         advanced_month = False
                         if advance_month_on_complete and decision.reason_code == "month_workflow_complete" and active_start_month == active_end_month:
-                            advanced_month = True
                             advanced_month_value = next_month(active_end_month)
-                            active_start_month = advanced_month_value
-                            active_end_month = advanced_month_value
-                            state = replace(
-                                state,
-                                start_month=advanced_month_value,
-                                end_month=advanced_month_value,
-                                last_next_internal_stage="chronological_month_advanced",
-                                updated_utc=completed,
-                            )
+                            if advanced_month_value <= completed_historical_month_cutoff():
+                                advanced_month = True
+                                active_start_month = advanced_month_value
+                                active_end_month = advanced_month_value
+                                state = replace(
+                                    state,
+                                    start_month=advanced_month_value,
+                                    end_month=advanced_month_value,
+                                    last_next_internal_stage="chronological_month_advanced",
+                                    updated_utc=completed,
+                                )
+                            else:
+                                state = replace(
+                                    state,
+                                    last_next_internal_stage="calendar_month_cutoff_wait",
+                                    last_work_selection_reason="waiting_for_next_calendar_month_to_complete",
+                                    updated_utc=completed,
+                                )
                         if decision.decision_status == "executed" or advanced_month:
                             refresh_dashboard_read_models(
                                 enabled=refresh_dashboard_on_decision,
