@@ -14,6 +14,7 @@ Environment=TRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL
 Environment=TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=5
 Environment=TRADING_MANAGER_PROVIDER_STAGE_NEXT_LIMIT=12
 Environment=TRADING_MANAGER_PROVIDER_STAGE_MAX_WORKERS=4
+Environment=TRADING_MANAGER_MONTH_INGEST_WORKERS=4
 Environment=TRADING_MANAGER_DRAIN_MAX_STEPS=50
 Environment=TRADING_MANAGER_DRAIN_MAX_SECONDS=300
 Environment=TRADING_MANAGER_DASHBOARD_REFRESH_SERVICE_UNIT=trading-storage-dashboard-read-model-refresh.service
@@ -29,6 +30,7 @@ ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_auto
   --execute-autonomous-provider-stages \
   --provider-stage-next-limit ${TRADING_MANAGER_PROVIDER_STAGE_NEXT_LIMIT} \
   --provider-stage-max-workers ${TRADING_MANAGER_PROVIDER_STAGE_MAX_WORKERS} \
+  --month-ingest-workers ${TRADING_MANAGER_MONTH_INGEST_WORKERS} \
   --auto-select-next-work \
   --advance-month-on-complete \
   --drain-ready-stages \

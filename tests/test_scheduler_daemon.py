@@ -18,6 +18,7 @@ from trading_manager_tasks.scheduler_daemon import (
     next_month,
     release_daemon_lock,
     run_daemon_loop,
+    select_month_ingest_worker_months,
     select_next_historical_work,
     update_state_from_error,
     write_daemon_state,
@@ -199,6 +200,40 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.reason_code, "resume_earliest_open_workflow_state")
         self.assertEqual(selection.completed_months, ("2016-01",))
         self.assertEqual(selection.open_months, ("2016-02",))
+
+    def test_month_ingest_worker_selection_fills_four_lanes_after_completed_months(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in ("2016-01", "2016-02"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                foundation_stage_ids = [
+                    stage.stage_id
+                    for layer in plan.layers
+                    if layer.layer in {1, 2}
+                    for stage in layer.stages
+                    if stage.stage_type in {"data_acquisition", "feature_generation"}
+                ]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=foundation_stage_ids,
+                    write=True,
+                )
+            advance_workflow_state(
+                start_month="2016-03",
+                end_month="2016-03",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2016-03", root=storage_root / "runtime"),
+                write=True,
+            )
+
+            selected = select_month_ingest_worker_months(storage_root=storage_root, default_start_month="2016-01", worker_count=4)
+            capped = select_month_ingest_worker_months(storage_root=storage_root, default_start_month="2016-01", worker_count=4, max_month="2016-04")
+
+        self.assertEqual(selected, ("2016-03", "2016-04", "2016-05", "2016-06"))
+        self.assertEqual(capped, ("2016-03", "2016-04"))
 
     def test_auto_work_selection_jumps_past_externally_completed_months(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

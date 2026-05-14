@@ -17,6 +17,7 @@ from typing import Any, Mapping, TextIO
 
 from .model_training_workflow import build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, select_month_ingest_worker_months
 from .scheduler_status import (
     DEFAULT_DAEMON_WRAPPER_PATH,
     DEFAULT_DECISION_LOG_PATH,
@@ -501,15 +502,34 @@ def _task_timeline(
 
     storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
     month_stage_sets: list[tuple[str | None, list[Any], bool]] = []
+    included_months: set[str] = set()
     for month in _completed_months(status):
         payload = _workflow_state_payload(storage_root, month)
         if payload is None:
             continue
         raw_stages = payload.get("stages")
         if isinstance(raw_stages, list):
-            month_stage_sets.append((str(payload.get("start_month") or month), raw_stages, False))
+            month_key = str(payload.get("start_month") or month)
+            month_stage_sets.append((month_key, raw_stages, False))
+            included_months.add(month_key)
+    lane_months = select_month_ingest_worker_months(
+        storage_root=storage_root,
+        default_start_month=status.current_month or status.workflow_checkpoint.start_month or "2016-01",
+        worker_count=DEFAULT_MONTH_INGEST_WORKERS,
+    )
+    for month in lane_months:
+        if month in included_months:
+            continue
+        payload = _workflow_state_payload(storage_root, month)
+        if payload is None:
+            continue
+        raw_stages = payload.get("stages")
+        if isinstance(raw_stages, list):
+            month_key = str(payload.get("start_month") or month)
+            month_stage_sets.append((month_key, raw_stages, True))
+            included_months.add(month_key)
     active_month, active_stages = _active_month_stages(status, storage_root)
-    if active_stages:
+    if active_stages and active_month not in included_months:
         month_stage_sets.append((active_month, active_stages, True))
     if not month_stage_sets:
         return []
@@ -517,6 +537,31 @@ def _task_timeline(
     coverage_stage_id = str(stage_coverage.get("stage_id") or "") if stage_coverage else ""
     latest_execution = _latest_stage_execution(status) or {}
     latest_failed_stage = latest_execution.get("stage_id") if latest_execution.get("status") == "failed" else None
+    current_lane_heads: set[tuple[str | None, str]] = set()
+    seen_ingest_workers: set[str] = set()
+    for timeline_month, raw_stages, _is_active_month in month_stage_sets:
+        for raw_stage in raw_stages:
+            if not isinstance(raw_stage, Mapping):
+                continue
+            stage_id = str(raw_stage.get("stage_id") or "")
+            if not stage_id or str(raw_stage.get("status") or "") in {"succeeded", "not_applicable"}:
+                continue
+            stage_type = str(raw_stage.get("stage_type") or "")
+            if stage_type not in {"data_acquisition", "feature_generation"}:
+                continue
+            try:
+                layer = int(raw_stage.get("layer"))
+            except (TypeError, ValueError):
+                continue
+            if layer not in {1, 2}:
+                continue
+            task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
+            worker_info = _worker_info_for_stage(raw_stage, month=task_month)
+            worker_id = worker_info.get("worker_id") or ""
+            if worker_info.get("worker_kind") != "month_ingest_worker" or worker_id in seen_ingest_workers:
+                continue
+            current_lane_heads.add((task_month, stage_id))
+            seen_ingest_workers.add(worker_id)
     tasks: list[dict[str, Any]] = []
     first_open_seen = False
     for timeline_month, raw_stages, is_active_month in month_stage_sets:
@@ -526,8 +571,11 @@ def _task_timeline(
             stage_id = str(raw_stage.get("stage_id") or "")
             stage_status = str(raw_stage.get("status") or "unknown")
             is_terminal = stage_status in {"succeeded", "not_applicable"}
-            is_current = bool(is_active_month and stage_id and stage_id == status.current_stage and not is_terminal)
-            if is_active_month and not first_open_seen and not is_terminal:
+            task_month_for_state = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
+            is_current = bool((task_month_for_state, stage_id) in current_lane_heads and not is_terminal)
+            if not is_current and not current_lane_heads:
+                is_current = bool(is_active_month and stage_id and stage_id == status.current_stage and not is_terminal)
+            if not current_lane_heads and is_active_month and not first_open_seen and not is_terminal:
                 is_current = True
                 first_open_seen = True
             if latest_failed_stage and is_active_month and stage_id == latest_failed_stage:

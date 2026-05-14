@@ -3446,3 +3446,22 @@ Dashboard task rows for month-scoped `data_acquisition` and `feature_generation`
 - Collapsed task previews and worker filters align with the 4 month-ingest + 1 model-worker runtime contract.
 - Stage-type labels no longer masquerade as worker identities.
 - Provider thread slots remain a subordinate detail, not the task owner shown in the main task timeline.
+
+## D149 - Scheduler service fills four month-ingest worker lanes
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The dashboard showed only one `Now` task because the service still used the older single-month auto-selection cursor. That contradicted the accepted runtime shape of four month-ingest workers plus one model worker.
+
+### Decision
+
+The daemon exposes `--month-ingest-workers` and the systemd deployment sets `TRADING_MANAGER_MONTH_INGEST_WORKERS=4`. In multi-lane mode, the daemon keeps up to four month-scoped Layer 1/2 ingest lanes filled. The selector ignores months whose Layer 1/2 foundation substrate is already complete, even when their later Layer 3+ stages are blocked behind foundation catch-up, and appends new chronological months after the latest known month only up to the current historical month. Each lane executes one safe scheduler decision per drain cycle; provider request worker counts are divided across active lanes so the configured provider worker budget remains bounded.
+
+### Consequences
+
+- Dashboard `Now` rows can represent the current task for each active month-ingest worker lane, not only a single historical cursor.
+- The service runtime now matches the accepted five-worker mental model: four month-ingest lanes plus one serial model/promotion worker.
+- Layer 3+ blocked rows no longer consume month-ingest worker identity once the Layer 1/2 substrate for that month is complete.

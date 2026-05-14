@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,6 +43,7 @@ DEFAULT_DRAIN_MAX_STEPS = 50
 DEFAULT_DRAIN_MAX_SECONDS = 300.0
 DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-refresh.service"
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
+DEFAULT_MONTH_INGEST_WORKERS = 4
 
 
 def next_month(month: str) -> str:
@@ -189,6 +191,65 @@ def select_next_historical_work(
         completed_months=completed_tuple,
         open_months=open_tuple,
     )
+
+
+def select_month_ingest_worker_months(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    default_start_month: str = "2016-01",
+    worker_count: int = DEFAULT_MONTH_INGEST_WORKERS,
+    max_month: str | None = None,
+) -> tuple[str, ...]:
+    """Return up to `worker_count` month-scoped ingest lanes to work now.
+
+    This selector is intentionally narrower than ``select_next_historical_work``:
+    it only considers the Layer 1/2 foundation substrate as ingest work. Months
+    whose Layer 1/2 data acquisition and feature generation are complete are not
+    assigned to month-ingest workers even if their later Layer 3+ stages are
+    blocked behind foundation catch-up. New months are appended after the latest
+    known month so all four ingest lanes can stay filled.
+    """
+
+    worker_count = max(1, int(worker_count))
+    max_month = max_month or datetime.now(UTC).strftime("%Y-%m")
+    runtime_root = storage_root / "runtime"
+    known_months: list[str] = []
+    open_ingest_months: list[str] = []
+    if runtime_root.exists():
+        for path in sorted(runtime_root.glob(WORKFLOW_STATE_GLOB)):
+            month = _month_from_workflow_state_path(path)
+            if month is None:
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                known_months.append(month)
+                open_ingest_months.append(month)
+                continue
+            state_month = str(payload.get("start_month") or month)
+            month = state_month if state_month else month
+            known_months.append(month)
+            if not _workflow_payload_foundation_catch_up_complete(payload):
+                open_ingest_months.append(month)
+
+    selected: list[str] = []
+    for month in sorted(set(open_ingest_months)):
+        if month > max_month:
+            continue
+        if month not in selected:
+            selected.append(month)
+        if len(selected) >= worker_count:
+            return tuple(selected)
+
+    if known_months:
+        next_candidate = next_month(max(known_months))
+    else:
+        next_candidate = default_start_month
+    while len(selected) < worker_count and next_candidate <= max_month:
+        if next_candidate not in selected:
+            selected.append(next_candidate)
+        next_candidate = next_month(next_candidate)
+    return tuple(selected)
 
 
 @dataclass(frozen=True)
@@ -459,6 +520,51 @@ def update_state_from_error(
     )
 
 
+def _run_month_ingest_worker_decisions(
+    *,
+    months: tuple[str, ...],
+    config: SchedulerConfig,
+    storage_root: Path,
+    component_src_root: Path,
+    execute_safe_preparation: bool,
+    execute_safe_offline_stages: bool,
+    execute_autonomous_provider_stages: bool,
+    provider_stage_next_limit: int,
+    provider_stage_max_workers: int,
+    selected_target_symbol: str | None,
+) -> list[tuple[str, SchedulerDecision]]:
+    if not months:
+        return []
+    per_lane_next_limit = max(1, (provider_stage_next_limit + len(months) - 1) // len(months))
+    per_lane_provider_workers = max(1, provider_stage_max_workers // len(months))
+
+    def run_month(month: str) -> tuple[str, SchedulerDecision]:
+        return (
+            month,
+            run_scheduler_once(
+                config=config,
+                start_month=month,
+                end_month=month,
+                storage_root=storage_root,
+                component_src_root=component_src_root,
+                execute_safe_preparation=execute_safe_preparation,
+                execute_safe_offline_stages=execute_safe_offline_stages,
+                execute_autonomous_provider_stages=execute_autonomous_provider_stages,
+                provider_stage_next_limit=per_lane_next_limit,
+                provider_stage_max_workers=per_lane_provider_workers,
+                selected_target_symbol=selected_target_symbol,
+            ),
+        )
+
+    by_month: dict[str, SchedulerDecision] = {}
+    with ThreadPoolExecutor(max_workers=len(months)) as executor:
+        futures = {executor.submit(run_month, month): month for month in months}
+        for future in as_completed(futures):
+            month, decision = future.result()
+            by_month[month] = decision
+    return [(month, by_month[month]) for month in months]
+
+
 def run_daemon_loop(
     *,
     start_month: str = "2016-01",
@@ -475,6 +581,7 @@ def run_daemon_loop(
     execute_autonomous_provider_stages: bool = False,
     provider_stage_next_limit: int = 5,
     provider_stage_max_workers: int = 4,
+    month_ingest_workers: int = 1,
     selected_target_symbol: str | None = None,
     auto_select_next_work: bool = False,
     advance_month_on_complete: bool = False,
@@ -516,65 +623,130 @@ def run_daemon_loop(
             drain_started_monotonic = time.monotonic()
             drain_steps = 0
             while max_iterations is None or iterations < max_iterations:
-                if auto_select_next_work:
-                    state = apply_auto_work_selection(
-                        state,
-                        storage_root=storage_root,
-                        default_start_month=active_start_month,
-                        default_end_month=active_end_month,
-                    )
-                    active_start_month = state.start_month
-                    active_end_month = state.end_month
                 started = utc_now_iso()
                 should_continue_drain = False
+                decisions_this_cycle = 0
                 try:
-                    decision = run_scheduler_once(
-                        config=config,
-                        start_month=active_start_month,
-                        end_month=active_end_month,
-                        storage_root=storage_root,
-                        component_src_root=component_src_root,
-                        execute_safe_preparation=execute_safe_preparation,
-                        execute_safe_offline_stages=execute_safe_offline_stages,
-                        execute_autonomous_provider_stages=execute_autonomous_provider_stages,
-                        provider_stage_next_limit=provider_stage_next_limit,
-                        provider_stage_max_workers=provider_stage_max_workers,
-                        selected_target_symbol=selected_target_symbol,
-                    )
-                    append_decision_log(decision_log_path, decision)
-                    completed = utc_now_iso()
-                    state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=decision)
-                    advanced_month = False
-                    if advance_month_on_complete and decision.reason_code == "month_workflow_complete" and active_start_month == active_end_month:
-                        advanced_month = True
-                        advanced_month_value = next_month(active_end_month)
-                        active_start_month = advanced_month_value
-                        active_end_month = advanced_month_value
-                        state = replace(
-                            state,
-                            start_month=advanced_month_value,
-                            end_month=advanced_month_value,
-                            last_next_internal_stage="chronological_month_advanced",
-                            updated_utc=completed,
+                    use_month_ingest_lanes = auto_select_next_work and month_ingest_workers > 1
+                    if use_month_ingest_lanes:
+                        remaining_iterations = None if max_iterations is None else max_iterations - iterations
+                        lane_limit = month_ingest_workers if remaining_iterations is None else min(month_ingest_workers, max(1, remaining_iterations))
+                        months = select_month_ingest_worker_months(
+                            storage_root=storage_root,
+                            default_start_month=active_start_month,
+                            worker_count=lane_limit,
                         )
-                    if decision.decision_status == "executed" or advanced_month:
-                        refresh_dashboard_read_models(
-                            enabled=refresh_dashboard_on_decision,
-                            service_unit=dashboard_refresh_service_unit,
-                            command=dashboard_refresh_command,
+                        decisions = _run_month_ingest_worker_decisions(
+                            months=months,
+                            config=config,
+                            storage_root=storage_root,
+                            component_src_root=component_src_root,
+                            execute_safe_preparation=execute_safe_preparation,
+                            execute_safe_offline_stages=execute_safe_offline_stages,
+                            execute_autonomous_provider_stages=execute_autonomous_provider_stages,
+                            provider_stage_next_limit=provider_stage_next_limit,
+                            provider_stage_max_workers=provider_stage_max_workers,
+                            selected_target_symbol=selected_target_symbol,
                         )
-                    should_continue_drain = _decision_should_continue_drain(decision, advanced_month=advanced_month)
-                    if output is not None:
-                        output.write(json.dumps(decision.summary_row(), sort_keys=True) + "\n")
-                        output.flush()
+                        completed = utc_now_iso()
+                        if months:
+                            active_start_month = months[0]
+                            active_end_month = months[-1]
+                            state = replace(
+                                state,
+                                start_month=active_start_month,
+                                end_month=active_end_month,
+                                last_next_internal_stage="month_ingest_worker_lanes",
+                                last_work_selection_reason="month_ingest_worker_lanes_selected",
+                                last_open_months=months,
+                                updated_utc=completed,
+                            )
+                        refresh_needed = False
+                        for month, decision in decisions:
+                            append_decision_log(decision_log_path, decision)
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=decision)
+                            state = replace(
+                                state,
+                                start_month=active_start_month,
+                                end_month=active_end_month,
+                                last_next_internal_stage="month_ingest_worker_lanes",
+                                last_work_selection_reason="month_ingest_worker_lanes_selected",
+                                last_open_months=months,
+                                updated_utc=completed,
+                            )
+                            refresh_needed = refresh_needed or decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = decision.summary_row()
+                                row["worker_month"] = month
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
+                        if refresh_needed:
+                            refresh_dashboard_read_models(
+                                enabled=refresh_dashboard_on_decision,
+                                service_unit=dashboard_refresh_service_unit,
+                                command=dashboard_refresh_command,
+                            )
+                    else:
+                        if auto_select_next_work:
+                            state = apply_auto_work_selection(
+                                state,
+                                storage_root=storage_root,
+                                default_start_month=active_start_month,
+                                default_end_month=active_end_month,
+                            )
+                            active_start_month = state.start_month
+                            active_end_month = state.end_month
+                        decision = run_scheduler_once(
+                            config=config,
+                            start_month=active_start_month,
+                            end_month=active_end_month,
+                            storage_root=storage_root,
+                            component_src_root=component_src_root,
+                            execute_safe_preparation=execute_safe_preparation,
+                            execute_safe_offline_stages=execute_safe_offline_stages,
+                            execute_autonomous_provider_stages=execute_autonomous_provider_stages,
+                            provider_stage_next_limit=provider_stage_next_limit,
+                            provider_stage_max_workers=provider_stage_max_workers,
+                            selected_target_symbol=selected_target_symbol,
+                        )
+                        append_decision_log(decision_log_path, decision)
+                        completed = utc_now_iso()
+                        state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=decision)
+                        advanced_month = False
+                        if advance_month_on_complete and decision.reason_code == "month_workflow_complete" and active_start_month == active_end_month:
+                            advanced_month = True
+                            advanced_month_value = next_month(active_end_month)
+                            active_start_month = advanced_month_value
+                            active_end_month = advanced_month_value
+                            state = replace(
+                                state,
+                                start_month=advanced_month_value,
+                                end_month=advanced_month_value,
+                                last_next_internal_stage="chronological_month_advanced",
+                                updated_utc=completed,
+                            )
+                        if decision.decision_status == "executed" or advanced_month:
+                            refresh_dashboard_read_models(
+                                enabled=refresh_dashboard_on_decision,
+                                service_unit=dashboard_refresh_service_unit,
+                                command=dashboard_refresh_command,
+                            )
+                        should_continue_drain = _decision_should_continue_drain(decision, advanced_month=advanced_month)
+                        decisions_this_cycle = 1
+                        if output is not None:
+                            output.write(json.dumps(decision.summary_row(), sort_keys=True) + "\n")
+                            output.flush()
                 except Exception as exc:  # pragma: no cover - exercised via direct state helper tests.
                     completed = utc_now_iso()
                     state = update_state_from_error(state, started_utc=started, completed_utc=completed, error=exc)
+                    decisions_this_cycle = 1
                     if output is not None:
                         output.write(json.dumps(state.summary_row(), sort_keys=True) + "\n")
                         output.flush()
                 write_daemon_state(state_path, state)
-                iterations += 1
+                iterations += max(1, decisions_this_cycle)
                 drain_steps += 1
                 if max_iterations is not None and iterations >= max_iterations:
                     break
@@ -612,6 +784,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Allow one bounded autonomous provider-dispatch/reconcile slice per tick when provider acquisition is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one daemon tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one daemon tick.")
+    parser.add_argument("--month-ingest-workers", type=int, default=1, help="Number of month-ingest worker lanes to keep filled for Layer 1/2 acquisition and feature generation.")
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")
@@ -648,6 +821,7 @@ def main(argv: list[str] | None = None) -> int:
         execute_autonomous_provider_stages=args.execute_autonomous_provider_stages,
         provider_stage_next_limit=args.provider_stage_next_limit,
         provider_stage_max_workers=args.provider_stage_max_workers,
+        month_ingest_workers=args.month_ingest_workers,
         selected_target_symbol=args.target_symbol,
         auto_select_next_work=args.auto_select_next_work,
         advance_month_on_complete=args.advance_month_on_complete,
