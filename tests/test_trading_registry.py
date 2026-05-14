@@ -874,7 +874,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(rows), 7)
         self.assertEqual(
             list(rows[0].keys()),
             [
@@ -892,13 +892,28 @@ class RegistryHelperTests(unittest.TestCase):
                 "interpretation",
             ],
         )
-        by_target = {row["target_symbol"]: row for row in rows}
-        self.assertEqual(set(by_target), {"BTC", "ETH", "SOL"})
-        self.assertEqual(by_target["BTC"]["layer2_context_symbol"], "BKCH")
-        self.assertEqual(by_target["BTC"]["listed_proxy_symbol"], "IBIT")
-        self.assertEqual(by_target["BTC"]["optionable_proxy_status"], "accepted_optionable_proxy")
-        self.assertEqual(by_target["ETH"]["optionable_proxy_status"], "verify_before_option_use")
-        self.assertEqual(by_target["SOL"]["optionable_proxy_status"], "verify_before_option_use")
+        by_target: dict[str, list[dict[str, str]]] = {}
+        for row in rows:
+            by_target.setdefault(row["target_symbol"], []).append(row)
+        self.assertEqual(set(by_target), {"BTC", "ETH", "SOL", "AAOI"})
+        self.assertEqual(by_target["BTC"][0]["layer2_context_symbol"], "BKCH")
+        self.assertEqual(by_target["BTC"][0]["listed_proxy_symbol"], "IBIT")
+        self.assertEqual(by_target["BTC"][0]["optionable_proxy_status"], "accepted_optionable_proxy")
+        self.assertEqual(by_target["ETH"][0]["optionable_proxy_status"], "verify_before_option_use")
+        self.assertEqual(by_target["SOL"][0]["optionable_proxy_status"], "verify_before_option_use")
+        self.assertEqual(
+            {row["layer2_context_symbol"] for row in by_target["AAOI"]},
+            {"AIQ", "XLK", "SMH", "XLC"},
+        )
+        self.assertEqual(
+            {row["layer2_mapping_method_type"] for row in by_target["AAOI"]},
+            {
+                "primary_business_context",
+                "secondary_sector_context",
+                "industry_chain_context",
+                "weak_demand_side_context",
+            },
+        )
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -911,6 +926,9 @@ class RegistryHelperTests(unittest.TestCase):
             "/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv",
         )
         self.assertEqual(registry["TARGET_LAYER2_CONTEXT_MAPPING_V1"]["payload"], "target_layer2_context_mapping_v1")
+        self.assertIn("target_context_business_mapping", registry["TARGET_LAYER2_CONTEXT_MAPPING_V1"]["applies_to"])
+        self.assertEqual(registry["TARGET_CONTEXT_BUSINESS_MAPPING"]["payload"], "target_context_business_mapping")
+        self.assertEqual(registry["TARGET_CONTEXT_MULTI_ROW_BY_TARGET"]["payload"], "target_context_multi_row_by_target")
         self.assertEqual(registry["TARGET_SYMBOL"]["payload"], "target_symbol")
         self.assertIn("target_layer2_context_mapping", registry["TARGET_SYMBOL"]["applies_to"])
         self.assertEqual(registry["INTERPRETATION"]["payload"], "interpretation")

@@ -54,7 +54,7 @@ REQUIRED_CHECKS = (
     "verify every target has a reviewed Layer 2 context symbol",
     "verify proxy symbols remain target-specific auxiliary evidence references",
     "verify optionable_proxy_status gates option-specific provider tasks",
-    "verify non-equity target mappings are business/theme mappings, not Layer 1/2 universe additions",
+    "verify targets outside direct Layer 2 holdings have reviewed business/theme mappings rather than implicit Layer 1/2 universe additions",
 )
 
 
@@ -149,7 +149,7 @@ def build_target_context_agent_review_request(
     request_id: str | None = None,
 ) -> dict[str, Any]:
     rows = _read_mapping_rows(mapping_csv, target_symbols=target_symbols)
-    selected_targets = [row["target_symbol"] for row in rows]
+    selected_targets = list(dict.fromkeys(row["target_symbol"] for row in rows))
     digest = _rows_digest(rows)
     stable_id = request_id or _stable_id("tl2ctxreview", str(mapping_csv), review_scope, selected_targets, digest)
     request = {
@@ -170,7 +170,8 @@ def build_target_context_agent_review_request(
         "expected_outputs": [TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT],
         "policy_refs": [
             "target_layer2_context_mapping_v1",
-            "crypto_target_proxy_not_layer_context",
+            "target_context_business_mapping",
+            "proxy_not_layer_context",
             "script_called_agent_review",
         ],
         "created_at_utc": _now_utc(),

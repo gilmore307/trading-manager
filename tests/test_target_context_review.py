@@ -28,6 +28,19 @@ class TargetContextReviewTests(unittest.TestCase):
         self.assertIn("do not dispatch provider calls", normalized["forbidden_actions"])
         self.assertIn("target_layer2_context_agent_review_decision", normalized["agent_prompt"])
 
+    def test_builds_review_request_for_multi_context_equity_mapping(self) -> None:
+        request = build_target_context_agent_review_request(target_symbols=["AAOI"])
+
+        normalized = validate_target_context_agent_review_request(request)
+        self.assertEqual(normalized["target_symbols"], ["AAOI"])
+        self.assertEqual(len(normalized["mapping_rows"]), 4)
+        self.assertEqual(
+            {row["layer2_context_symbol"] for row in normalized["mapping_rows"]},
+            {"AIQ", "XLK", "SMH", "XLC"},
+        )
+        self.assertTrue(all(row["optionable_proxy_status"] == "not_applicable" for row in normalized["mapping_rows"]))
+        self.assertIn("target_context_business_mapping", normalized["policy_refs"])
+
     def test_rejects_missing_target_symbol(self) -> None:
         with self.assertRaisesRegex(TaskSystemError, "not found"):
             build_target_context_agent_review_request(target_symbols=["NOTAREALTARGET"])

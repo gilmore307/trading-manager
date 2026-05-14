@@ -454,7 +454,7 @@ Required fields:
 - `agent_prompt`
 - `created_at_utc`
 
-This script-called request asks an agent to review target-to-Layer-2 context and auxiliary proxy mappings. It is evidence-only and must not call providers, activate models, mutate broker/accounts, execute storage lifecycle operations, or edit Layer 1/2 universe files.
+This script-called request asks an agent to review target-to-Layer-2 context, auxiliary proxy mappings, and multi-row equity business-context mappings such as `AAOI -> AIQ/XLK/SMH/XLC`. It is evidence-only and must not call providers, activate models, mutate broker/accounts, execute storage lifecycle operations, or edit Layer 1/2 universe files.
 
 ### `target_layer2_context_agent_review_decision`
 
@@ -469,7 +469,7 @@ Required fields:
 - `decision_reason`
 - `completed_at_utc`
 
-Allowed statuses are `approved`, `deferred`, `rejected`, `queued`, and `agent_call_failed`. An approved review confirms the selected mapping rows are acceptable as target-study metadata; it does not itself change repository files or registry rows.
+Allowed statuses are `approved`, `deferred`, `rejected`, `queued`, and `agent_call_failed`. An approved review confirms the selected mapping rows are acceptable as target-study metadata. It does not itself change repository files or registry rows, and consumers must preserve all rows for a selected target rather than collapsing multi-context targets into one row.
 
 ### `activation_record`
 

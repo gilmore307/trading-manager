@@ -3335,3 +3335,24 @@ The mixed Layer 1/2 files keep `model_layer` as the authoritative per-row discri
 - Active code, docs, tests, and registry current rows should use layer-prefixed shared CSV paths.
 - Historical migration files may keep old paths as immutable history.
 - This is a path clarity change only; it does not alter row semantics, provider dispatch, model activation, broker/account authority, or storage lifecycle authority.
+
+## D144 - Target context review supports multi-row equity business mappings
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The target-to-Layer-2 context mapping started with crypto targets and target-specific ETF proxies. Chentong also identified AAOI as a non-crypto equity target that needs reviewed Layer 2 business context rather than implicit or ad hoc classification.
+
+### Decision
+
+Treat `layer_02_target_context_mapping.csv` as a row-per-target-context contract, not a unique-target table. A target may have multiple reviewed Layer 2 context rows when the relationships have different roles. The accepted AAOI example maps to `AIQ` as primary AI/technology thematic context, `XLK` as secondary broad technology context, `SMH` as semiconductor/optical supply-chain context, and `XLC` as weak downstream demand-side context.
+
+The manager review helper must preserve all selected rows for a target while presenting `target_symbols` as a unique ordered list. Direct equity target mappings may use `optionable_proxy_status = not_applicable` and no auxiliary proxy symbol.
+
+### Consequences
+
+- Manager automation must not collapse multi-row target context mappings into a single symbol.
+- The script-called review path can review AAOI-style business mappings and BTC-style proxy mappings through the same evidence-only boundary.
+- Review output still does not authorize provider dispatch, model activation, broker/account mutation, storage lifecycle mutation, or direct Layer 1/2 universe edits.
