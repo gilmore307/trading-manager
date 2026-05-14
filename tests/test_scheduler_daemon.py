@@ -5,7 +5,9 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from trading_manager_tasks.scheduler import ResourceSnapshot, SchedulerConfig
 from trading_manager_tasks.model_training_state import advance_workflow_state, workflow_state_path_for_month
@@ -14,6 +16,7 @@ from trading_manager_tasks.scheduler_daemon import (
     SchedulerDaemonState,
     acquire_daemon_lock,
     apply_auto_work_selection,
+    completed_historical_month_cutoff,
     load_daemon_state,
     next_month,
     release_daemon_lock,
@@ -122,6 +125,16 @@ class SchedulerDaemonTests(unittest.TestCase):
     def test_next_month_rolls_year_boundary(self):
         self.assertEqual(next_month("2016-01"), "2016-02")
         self.assertEqual(next_month("2016-12"), "2017-01")
+
+    def test_completed_historical_month_cutoff_excludes_current_incomplete_month(self):
+        self.assertEqual(
+            completed_historical_month_cutoff(datetime(2026, 5, 14, 10, 9, tzinfo=ZoneInfo("America/New_York"))),
+            "2026-04",
+        )
+        self.assertEqual(
+            completed_historical_month_cutoff(datetime(2026, 6, 1, 0, 1, tzinfo=ZoneInfo("America/New_York"))),
+            "2026-05",
+        )
 
     def test_select_next_historical_work_advances_after_latest_completed_month(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

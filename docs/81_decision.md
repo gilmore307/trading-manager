@@ -3465,3 +3465,24 @@ The daemon exposes `--month-ingest-workers` and the systemd deployment sets `TRA
 - Dashboard `Now` rows can represent the current task for each active month-ingest worker lane, not only a single historical cursor.
 - The service runtime now matches the accepted five-worker mental model: four month-ingest lanes plus one serial model/promotion worker.
 - Layer 3+ blocked rows no longer consume month-ingest worker identity once the Layer 1/2 substrate for that month is complete.
+
+## D150 - Do not download the current incomplete calendar month
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+Chentong explicitly clarified that on 2026-05-14 the historical scheduler must not download May 2026 data before May has fully completed. Partial current-month provider data would create unstable historical substrate and could leak incomplete-month semantics into catch-up, fold construction, and later model evidence.
+
+### Decision
+
+Historical provider download selection is capped at the latest completed calendar month in `America/New_York`. On any date in May 2026, month-ingest workers may select at most `2026-04`; `2026-05` becomes eligible only after June begins in the project/operator timezone.
+
+The runtime owner is `completed_historical_month_cutoff()` in `scheduler_daemon.py`; month-ingest lane selection uses this cutoff by default unless a reviewed test/operator path supplies an explicit `max_month`.
+
+### Consequences
+
+- The scheduler cannot download the in-progress current calendar month during normal service operation.
+- Four-lane catch-up remains allowed for prior complete months.
+- Current-month data requires waiting for month close or a separate reviewed exception path; it must not happen as part of ordinary historical catch-up.

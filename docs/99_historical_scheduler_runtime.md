@@ -126,3 +126,7 @@ Layer 2 data-acquisition preparation now reuses the same request/payload/handoff
 For `layer_02_sector_context.feature_generation`, the safe offline command first materializes already-acquired `01_feed_alpaca_bars` `equity_bar.csv` artifacts into the shared `trading_data.source_01_market_regime` bar table, then generates `trading_data.feature_02_sector_context`. Like Layer 1 feature generation, this deterministic stage must keep `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`.
 
 The resident scheduler/service-control boundary is closed enough for supervised operation. Broader component execution coverage beyond the Alpaca-bars adapter is future provider-extension work and must start from concrete source-ready evidence plus the same dispatch/reconcile contracts. Artifact discovery for component receipts now captures final outputs and supporting step references; richer component-specific indexing belongs with each new component adapter rather than as an open scheduler bypass.
+
+## Current-month provider download guard
+
+The historical scheduler caps normal provider-download month selection at the latest completed calendar month in `America/New_York`. During May 2026, for example, the month-ingest lanes may catch up through `2026-04` but must not download `2026-05` until June begins. This protects historical substrate, fold construction, and promotion evidence from incomplete current-month data.

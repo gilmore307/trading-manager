@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TextIO
+from zoneinfo import ZoneInfo
 
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .model_training_workflow import FOUNDATION_CATCH_UP_LAYERS, FOUNDATION_CATCH_UP_STAGE_TYPES
@@ -44,6 +45,35 @@ DEFAULT_DRAIN_MAX_SECONDS = 300.0
 DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-refresh.service"
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
 DEFAULT_MONTH_INGEST_WORKERS = 4
+COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
+
+
+def previous_month(month: str) -> str:
+    """Return the previous YYYY-MM month."""
+
+    year_text, month_text = month.split("-", 1)
+    year = int(year_text)
+    month_number = int(month_text)
+    if month_number < 1 or month_number > 12:
+        raise ValueError(f"invalid month: {month}")
+    if month_number == 1:
+        return f"{year - 1:04d}-12"
+    return f"{year:04d}-{month_number - 1:02d}"
+
+
+def completed_historical_month_cutoff(now: datetime | None = None) -> str:
+    """Return latest completed calendar month allowed for provider downloads.
+
+    Historical provider downloads must not target the current in-progress month.
+    Runtime uses the operator/project timezone so a new month does not open early
+    at UTC midnight while the US/Eastern trading day is still in the prior month.
+    """
+
+    current = now or datetime.now(ZoneInfo(COMPLETED_MONTH_CUTOFF_TZ))
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=ZoneInfo(COMPLETED_MONTH_CUTOFF_TZ))
+    current_local = current.astimezone(ZoneInfo(COMPLETED_MONTH_CUTOFF_TZ))
+    return previous_month(current_local.strftime("%Y-%m"))
 
 
 def next_month(month: str) -> str:
@@ -211,7 +241,7 @@ def select_month_ingest_worker_months(
     """
 
     worker_count = max(1, int(worker_count))
-    max_month = max_month or datetime.now(UTC).strftime("%Y-%m")
+    max_month = max_month or completed_historical_month_cutoff()
     runtime_root = storage_root / "runtime"
     known_months: list[str] = []
     open_ingest_months: list[str] = []
