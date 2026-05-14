@@ -152,6 +152,22 @@ class StageCoverageTests(unittest.TestCase):
                 accepted_failure_request_ids=["mgrreq_backfill_alpaca_bars_bitw_2016_01"],
             )
 
+    def test_stale_reviewed_failures_outside_current_stage_requests_are_ignored(self):
+        rows = [_summary_row("SPY", ready=True), _summary_row("BITW", ready=True)]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="layer_01_market_regime.data_acquisition",
+            start_month="2016-01",
+            end_month="2016-01",
+            expected_count=2,
+            accepted_failure_request_ids=["mgrreq_backfill_alpaca_bars_ibit_2016_01"],
+        )
+
+        self.assertEqual(report.status, "ready")
+        self.assertEqual(report.accepted_failed_count, 0)
+        self.assertEqual(report.accepted_failed_request_ids, ())
+
     def test_reviewed_failed_requests_preserve_failed_count_but_allow_unlock(self):
         rows = [_summary_row("SPY", ready=True), _summary_row("BITW", failed=True)]
 
