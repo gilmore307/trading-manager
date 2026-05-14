@@ -27,6 +27,11 @@ FOUNDATION_CATCH_UP_LAYERS = (1, 2)
 FOUNDATION_CATCH_UP_STAGE_TYPES = ("data_acquisition", "feature_generation")
 FOUNDATION_CATCH_UP_BLOCKER = "layer_01_02_historical_catch_up_to_current_required"
 POST_MODEL_GENERATION_REBUILD_BLOCKER = "post_model_generation_rebuild_required_after_layer_01_02_catch_up"
+ROLLING_FOLD_TRAIN_MONTHS = 4
+ROLLING_FOLD_VALIDATION_MONTHS = 1
+ROLLING_FOLD_TEST_MONTHS = 1
+ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_MONTHS + ROLLING_FOLD_TEST_MONTHS
+PROMOTION_STAGE_TYPE = "promotion_review"
 
 
 @dataclass(frozen=True)
@@ -588,30 +593,49 @@ def _build_layer_workflow(
                 ),
             )
         )
+    if foundation_catch_up_only and layer in FOUNDATION_CATCH_UP_LAYERS:
+        return LayerWorkflow(
+            layer=layer,
+            layer_key=key,
+            model_name=str(meta["model_name"]),
+            depends_on_layers=tuple(meta["depends_on_layers"]),
+            progression_mode=str(meta["progression_mode"]),
+            candidate_axis=str(meta["candidate_axis"]),
+            candidate_progression_policy=str(meta["candidate_progression_policy"]),
+            dataset_unit=dataset_unit,
+            data_surface=str(meta["data_surface"]),
+            feature_command=feature,
+            model_generate_command=generate,
+            model_evaluate_command=evaluate,
+            promotion_review_command=review,
+            maintenance_command=maintenance,
+            stages=tuple(stages),
+        )
+
     for stage_type, command, description, blockers in (
         (
             "model_generation",
             generate,
-            "Generate offline model/state-vector rows from materialized inputs.",
+            "Generate offline model/state-vector rows from a complete frozen rolling-fold train manifest, never from one month alone.",
             tuple(f"upstream_layer_{dep:02d}_complete" for dep in meta["depends_on_layers"]) + (f"{key}.feature_or_input_ready",),
         ),
         (
             "model_evaluation",
             evaluate,
-            "Evaluate generated model rows against labels/baselines without activation.",
+            "Evaluate generated model rows against rolling-fold validation/test labels and baselines without activation.",
             (f"{key}.model_generation_complete",),
         ),
         (
-            "promotion_review_preparation",
+            PROMOTION_STAGE_TYPE,
             review,
-            "Prepare promotion-review evidence; activation remains review-gated.",
+            "Run the complete Promotion Review task: evidence packet, gates, baseline comparison, split stability, leakage/calibration/test report, agent decision, and durable decision write.",
             (f"{key}.model_evaluation_complete",),
         ),
         (
             "maintenance",
             maintenance,
             "Refresh manager review/maintenance surfaces and receipts for this layer.",
-            (f"{key}.promotion_review_preparation_complete",),
+            (f"{key}.{PROMOTION_STAGE_TYPE}_complete",),
         ),
     ):
         stage_blockers = blockers

@@ -322,7 +322,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                         f"{prefix}.feature_generation",
                         f"{prefix}.model_generation",
                         f"{prefix}.model_evaluation",
-                        f"{prefix}.promotion_review_preparation",
+                        f"{prefix}.promotion_review",
                         f"{prefix}.maintenance",
                     ]
                 )
@@ -358,7 +358,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                         f"{prefix}.feature_generation",
                         f"{prefix}.model_generation",
                         f"{prefix}.model_evaluation",
-                        f"{prefix}.promotion_review_preparation",
+                        f"{prefix}.promotion_review",
                         f"{prefix}.maintenance",
                     ]
                 )

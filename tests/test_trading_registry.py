@@ -440,6 +440,12 @@ class RegistryHelperTests(unittest.TestCase):
             rows["POST_MODEL_ARTIFACT_REBUILD_POLICY"]["payload"],
             "model_generation_evaluation_promotion_artifacts_superseded_until_rebuilt",
         )
+        self.assertEqual(rows["PROMOTION_STAGE_TYPE"]["payload"], "promotion_review")
+        self.assertIn("train_months=4", rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["payload"])
+        self.assertEqual(
+            rows["MONTH_SCOPED_INGEST_ONLY_DURING_FOUNDATION_CATCH_UP"]["payload"],
+            "month_scoped_layer_01_02_workflow_exposes_data_acquisition_and_feature_generation_only",
+        )
         self.assertIn("live_trading_capacity_reserved", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("historical_worker_count_capacity_adaptive", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("pre_promotion_full_training_mode", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])

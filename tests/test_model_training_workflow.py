@@ -31,17 +31,18 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layer_count, FULL_LAYER_COUNT)
         self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 9)))
         for layer in plan.layers:
-            self.assertEqual(
-                [stage.stage_type for stage in layer.stages],
-                [
-                    "data_acquisition",
-                    "feature_generation",
+            expected_stage_types = [
+                "data_acquisition",
+                "feature_generation",
+            ]
+            if layer.layer >= 3:
+                expected_stage_types.extend([
                     "model_generation",
                     "model_evaluation",
-                    "promotion_review_preparation",
+                    "promotion_review",
                     "maintenance",
-                ],
-            )
+                ])
+            self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertIn(f"model_{layer.layer:02d}_", " ".join(layer.model_generate_command))
             self.assertIn(f"model_{layer.layer:02d}_", " ".join(layer.model_evaluate_command))
             self.assertTrue(layer.progression_mode)
@@ -103,7 +104,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIsNone(plan.layers[2].stages[0].approval_gate_required)
         self.assertFalse(plan.layers[2].stages[0].provider_calls_allowed)
 
-    def test_foundation_catch_up_blocks_post_model_generation_until_substrate_is_current(self):
+    def test_foundation_catch_up_omits_monthly_post_feature_model_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -116,8 +117,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.foundation_catch_up_layers, (1, 2))
         self.assertEqual(plan.reusable_substrate_stage_types, ("data_acquisition", "feature_generation"))
         for layer_index in (0, 1):
-            model_generation = plan.layers[layer_index].stages[2]
-            self.assertIn(POST_MODEL_GENERATION_REBUILD_BLOCKER, model_generation.blockers)
+            self.assertEqual(
+                [stage.stage_type for stage in plan.layers[layer_index].stages],
+                ["data_acquisition", "feature_generation"],
+            )
         layer_three_acquisition = plan.layers[2].stages[0]
         self.assertIn(FOUNDATION_CATCH_UP_BLOCKER, layer_three_acquisition.blockers)
 

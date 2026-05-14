@@ -97,7 +97,7 @@ The historical scheduler runtime must provide:
 
 ## Current Full-Stack Workflow Graph
 
-The daemon now carries a manager-owned `manager_model_training_workflow_plan` for all eight model layers plus a durable `manager_model_training_workflow_state` checkpoint. Each layer has explicit stages for data acquisition, feature/input preparation, model generation, model evaluation, promotion-review preparation, and maintenance. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
+The daemon now carries a manager-owned `manager_model_training_workflow_plan` for all eight model layers plus durable workflow checkpoints. During foundation catch-up, Layer 1/2 month-scoped checkpoints expose only data acquisition and feature/input preparation. Model generation, model evaluation, and promotion are fold/cohort-scoped model-worker tasks that consume frozen 4+1+1 manifests, not per-month scheduler stages. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
 
 The workflow is intentionally not a synchronized all-layers-per-month loop. During the current catch-up phase, Layer 1/2 substrate work has higher priority than Layer 3+ target work:
 
@@ -105,7 +105,7 @@ The workflow is intentionally not a synchronized all-layers-per-month loop. Duri
 | --- | --- |
 | Layer 1 | Fixed market/cross-asset panel; dataset unit is one six-month chronological panel; no single target symbol applies; catch up data acquisition and feature generation month-by-month to current. |
 | Layer 2 | Fixed sector/industry panel; dataset unit is one six-month chronological panel once Layer 1 context exists; catch up data acquisition and feature generation month-by-month to current without waiting for downstream layers. |
-| Layers 1-2 post-feature model stages | Model generation, evaluation, promotion review, and maintenance are blocked during foundation catch-up with `post_model_generation_rebuild_required_after_layer_01_02_catch_up`; previously produced artifacts are substrate evidence only, not final promotion evidence. |
+| Layers 1-2 fold model/promotion work | Not represented as month-local stages during foundation catch-up. A complete fold such as `2016-01..2016-06` uses 2016-01 through 2016-04 for train, 2016-05 for validation, and 2016-06 for test; model generation/evaluation/Promotion Review occur once at the frozen fold level. Previously produced month-local model/promotion artifacts are substrate evidence only, not final promotion evidence. |
 | Layers 3-7 | Target-major serial chain; dataset unit is one named single-stock `target_symbol` over one six-month window; blocked during foundation catch-up with `layer_01_02_historical_catch_up_to_current_required`, then complete Layers 3 -> 4 -> 5 -> 6 -> 7 before admitting the next target unless a reviewed coverage exception is recorded. |
 | Layer 8 | Option-expression expansion begins only after the upstream Layer 1-7 context/target chain is complete for the selected single-stock `target_symbol` and six-month unit. |
 

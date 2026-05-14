@@ -2488,7 +2488,7 @@ Status: Accepted
 
 ### Context
 
-The manager should not remain a passive collection of scripts that waits for manual prompting after each step. The intended platform needs historical data acquisition, feature generation, model training, evaluation, promotion-review preparation, and maintenance to progress continuously, while future live trading monitoring and realtime order systems retain priority.
+The manager should not remain a passive collection of scripts that waits for manual prompting after each step. The intended platform needs historical data acquisition, feature generation, model training, evaluation, promotion, and maintenance to progress continuously, while future live trading monitoring and realtime order systems retain priority.
 
 ### Decision
 
@@ -2539,7 +2539,7 @@ Layer 1 historical model training cannot honestly begin at feature/model code al
 
 ### Decision
 
-Historical provider acquisition is part of the historical-data model-training lifecycle. `trading-manager` must plan and advance it as an internal scheduler stage: prepare requests, prepare bounded requests, dispatch provider acquisition through `trading-data`, and then continue through receipts, feature generation, model training, evaluation, and promotion-review preparation.
+Historical provider acquisition is part of the historical-data model-training lifecycle. `trading-manager` must plan and advance it as an internal scheduler stage: prepare requests, prepare bounded requests, dispatch provider acquisition through `trading-data`, and then continue through receipts, feature generation, model training, evaluation, and promotion.
 
 The manager dispatch path is mandatory for non-dry-run historical provider/API calls, but it is an autonomous workflow control, not a reason to classify data acquisition as an external requirement or manual operator task.
 
@@ -2582,7 +2582,7 @@ The historical scheduler daemon must not remain a Layer 1-only loop. The current
 
 ### Decision
 
-Add `manager_model_training_workflow_plan` as the manager-owned full-stack workflow graph. The graph covers Layers 1-8 and defines six stages per layer: data acquisition, feature/input generation, model generation, model evaluation, promotion-review preparation, and maintenance.
+Add `manager_model_training_workflow_plan` as the manager-owned full-stack workflow graph. The graph covers Layers 1-8 and defines six stages per layer: data acquisition, feature/input generation, model generation, model evaluation, promotion, and maintenance.
 
 Layer-specific data surfaces remain honest: Layers 5-7 do not invent trading-data feature surfaces; they consume upstream model/control-plane/position-risk artifacts. Provider-backed stages run through autonomous manager dispatch; model activation remains blocked behind an approving decision artifact; broker execution remains outside manager.
 
@@ -2638,7 +2638,7 @@ Status: Accepted
 
 ### Context
 
-After provider-backed acquisition receipts unlock downstream work, feature generation, model generation, model evaluation, promotion-review preparation, and maintenance are local/offline stages. They still need controlled admission, receipts, and checkpointing; they must not share the provider-dispatch path.
+After provider-backed acquisition receipts unlock downstream work, feature generation, model generation, model evaluation, promotion, and maintenance are local/offline stages. They still need controlled admission, receipts, and checkpointing; they must not share the provider-dispatch path.
 
 ### Decision
 
@@ -3286,8 +3286,8 @@ Accepted lock families for the next implementation are:
 
 - The current scheduler service can remain stopped while docs, registry, and implementation move to the rolling-fold charter.
 - Old monthly/local evaluation summaries remain evidence, not promotion-grade acceptance gates.
-- The next scheduler implementation should replace monthly `promotion_review_preparation` semantics with fold-scoped `rolling_fold_promotion` / `promotion` task semantics.
-- Dashboard and task summaries should eventually show fold preparation, model worker, and promotion task state without reading raw internals.
+- The next scheduler implementation should replace monthly `promotion_review` semantics with fold-scoped `rolling_fold_promotion` / `promotion_review` task semantics.
+- Dashboard and task summaries should eventually show fold preparation, model worker, and Promotion Review task state without reading raw internals.
 - Live activation, broker/account mutation, and execution lifecycle remain outside historical scheduler authority.
 
 ## D142 - Target context/proxy mappings may use script-called agent review
@@ -3374,7 +3374,7 @@ The historical scheduler treats Layer 1/2 data acquisition and feature generatio
 
 - Layer 1 and Layer 2 data/feature stages may advance month-by-month toward the current month.
 - A month is eligible for chronological advancement once Layer 1/2 `data_acquisition` and `feature_generation` are complete for that month.
-- Layer 1/2 `model_generation`, `model_evaluation`, `promotion_review_preparation`, and `maintenance` remain blocked with `post_model_generation_rebuild_required_after_layer_01_02_catch_up`.
+- Layer 1/2 month-scoped workflow states expose only `data_acquisition` and `feature_generation` during foundation catch-up. They must not show month-local `model_generation`, `model_evaluation`, `promotion_review`, or `maintenance` stages because model/promotion work is fold-scoped, not month-scoped.
 - Layer 3+ target-symbol work remains blocked with `layer_01_02_historical_catch_up_to_current_required` in addition to its target/upstream blockers.
 - Existing downloaded provider data, cleaned rows, and deterministic feature substrate may be reused when contract-valid.
 - Existing model candidates, evaluation summaries, promotion-review evidence, activation evidence, and later review artifacts are superseded as current promotion basis and must be rebuilt/revalidated after the foundation substrate is caught up.
@@ -3383,5 +3383,28 @@ The historical scheduler treats Layer 1/2 data acquisition and feature generatio
 
 - The default scheduler posture is no longer “finish every layer for a month before moving on.” It is “catch up Layer 1/2 historical substrate first.”
 - The first selected Layer 3+ target (`AAPL`) remains a parked runtime default until foundation catch-up is accepted as current.
-- Dashboard/task-state surfaces should show the catch-up/rebuild blockers rather than implying Layer 3+ is ready just because a target symbol exists.
+- Dashboard/task-state surfaces should show month-ingest catch-up for Layer 1/2 and the parked Layer 3+ blocker, not fake month-local model/Promotion Review stages.
 - Provider dispatch, model activation, broker/account mutation, and storage lifecycle authority remain unchanged.
+
+## D146 - Promotion is one fold-scoped task, not preparation
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The rolling-fold runtime charter uses a 4+1+1 split: four train months, one validation month, and one test month. A model/promotion worker consumes a complete frozen six-month fold manifest. Month-ingest workers may prepare provider data, cleaned data, point-in-time features, feature-ready manifests, and coverage evidence, but they must not run model generation, evaluation, or promotion work for a single month.
+
+The old workflow label `promotion_review_preparation` made promotion look like a loose pre-review chore after model evaluation. Chentong clarified that the whole promotion procedure belongs inside the `promotion_review` task.
+
+### Decision
+
+Rename scheduler stage semantics from `promotion_review_preparation` to `promotion_review`. The `promotion_review` task owns the complete fold-scoped promotion bundle: evidence packet build, gate checks, baseline comparison, split-stability check, leakage check, calibration/validation/test report, agent review, and durable decision write.
+
+For a fold such as `2016-01..2016-06`, months `2016-01` through `2016-04` provide the train substrate; they must not each have their own month-local model generation/evaluation/Promotion Review stages. Validation and test are fold roles, not independent monthly Promotion Review tasks.
+
+### Consequences
+
+- Month-scoped workflow state remains ingest/feature-only during Layer 1/2 foundation catch-up.
+- Model generation and promotion must be represented by fold/cohort-level work such as `cohort_2016-01_2016-06`, not by `model_training_workflow_state_2016-01.json` through `2016-04.json`.
+- Promotion approval still does not activate live trading, switch production pointers, submit orders, mutate accounts, or authorize broker activity.

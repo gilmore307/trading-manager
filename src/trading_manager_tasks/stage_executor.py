@@ -37,7 +37,7 @@ SAFE_OFFLINE_STAGE_TYPES = {
     "feature_generation",
     "model_generation",
     "model_evaluation",
-    "promotion_review_preparation",
+    "promotion_review",
     "maintenance",
 }
 
@@ -118,7 +118,7 @@ def _cwd_for_stage(stage: StageProgress, *, manager_root: Path, trading_data_roo
         return manager_root
     if "trading-data" in command_text or stage.stage_type == "feature_generation":
         return trading_data_root
-    if "trading-model" in command_text or stage.stage_type in {"model_generation", "model_evaluation", "promotion_review_preparation"}:
+    if "trading-model" in command_text or stage.stage_type in {"model_generation", "model_evaluation", "promotion_review"}:
         return trading_model_root
     return manager_root
 
