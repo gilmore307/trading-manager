@@ -98,7 +98,7 @@
 
 - `test_stage_coverage.py` verifies:
   - `manager_stage_coverage` classification from `task_summary` rows;
-  - partial coverage such as `3/22` remaining blocked from downstream unlock;
+  - partial coverage such as `3/19` remaining blocked from downstream unlock;
   - full expected coverage allowing workflow stage completion;
   - failed coverage preventing downstream unlock.
 

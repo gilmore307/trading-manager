@@ -128,7 +128,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             acquisition = stage_by_id["layer_01_market_regime.data_acquisition"]
             self.assertEqual(acquisition.status, "ready")
             self.assertEqual(len(acquisition.receipt_refs), 3)
-            self.assertIn("partial component receipt coverage 3/22", acquisition.last_reason)
+            self.assertIn("partial component receipt coverage 3/19", acquisition.last_reason)
             self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "blocked")
             self.assertIn("layer_01_market_regime.data_acquisition_complete", stage_by_id["layer_01_market_regime.feature_generation"].last_reason)
 

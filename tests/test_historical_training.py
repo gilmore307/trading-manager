@@ -55,9 +55,9 @@ class HistoricalTrainingPreparationTests(unittest.TestCase):
 
         self.assertEqual(summary.phase, LAYER_ONE_PHASE)
         self.assertEqual(summary.model_layer, "layer_01_market_regime")
-        self.assertEqual(summary.request_count, 22)
-        self.assertEqual(summary.payload_count, 22)
-        self.assertEqual(summary.handoff_validation_count, 22)
+        self.assertEqual(summary.request_count, 19)
+        self.assertEqual(summary.payload_count, 19)
+        self.assertEqual(summary.handoff_validation_count, 19)
         self.assertIn("SPY", summary.symbols)
         self.assertTrue(all(row["target_component_id"] == "01_feed_alpaca_bars" for row in requests))
         self.assertTrue(all("/alpaca_bars/" in row["parameter_ref"] for row in requests))
@@ -97,13 +97,13 @@ class HistoricalTrainingPreparationTests(unittest.TestCase):
             write=False,
         )
 
-        self.assertEqual(summary.request_count, 22)
-        self.assertEqual(summary.payload_count, 22)
+        self.assertEqual(summary.request_count, 19)
+        self.assertEqual(summary.payload_count, 19)
         self.assertEqual(summary.handoff_validation_count, 0)
         self.assertFalse(summary.wrote_manager_sql)
         self.assertFalse(summary.wrote_payload_files)
         self.assertFalse(summary.persisted_input_bindings)
-        self.assertEqual(len(payloads), 22)
+        self.assertEqual(len(payloads), 19)
         self.assertEqual(validations, [])
 
 

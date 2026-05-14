@@ -48,7 +48,7 @@ def _summary_row(symbol: str, *, ready: bool = False, failed: bool = False) -> d
 
 
 class StageCoverageTests(unittest.TestCase):
-    def test_three_ready_of_twenty_two_is_partial_and_cannot_unlock(self):
+    def test_three_ready_of_nineteen_is_partial_and_cannot_unlock(self):
         layer_one_symbols = _symbols(LAYER_ONE_MODEL_LAYER)
         rows = [
             *[_summary_row(symbol, ready=True) for symbol in ("QQQ", "SPY", "TLT")],
@@ -60,12 +60,12 @@ class StageCoverageTests(unittest.TestCase):
             stage_id="layer_01_market_regime.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
-            expected_count=22,
+            expected_count=19,
         )
 
         self.assertEqual(report.status, "partial_ready")
         self.assertEqual(report.ready_count, 3)
-        self.assertEqual(report.pending_count, 19)
+        self.assertEqual(report.pending_count, 16)
         self.assertFalse(report.can_unlock_downstream)
         self.assertIn("3 ready", report.reason)
 
@@ -77,11 +77,11 @@ class StageCoverageTests(unittest.TestCase):
             stage_id="layer_01_market_regime.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
-            expected_count=22,
+            expected_count=19,
         )
 
         self.assertEqual(report.status, "ready")
-        self.assertEqual(report.ready_count, 22)
+        self.assertEqual(report.ready_count, 19)
         self.assertTrue(report.can_unlock_downstream)
 
     def test_layer_one_stage_coverage_ignores_layer_two_rows_for_same_month(self):
@@ -95,11 +95,11 @@ class StageCoverageTests(unittest.TestCase):
             stage_id="layer_01_market_regime.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
-            expected_count=22,
+            expected_count=19,
         )
 
-        self.assertEqual(report.observed_count, 22)
-        self.assertEqual(report.ready_count, 22)
+        self.assertEqual(report.observed_count, 19)
+        self.assertEqual(report.ready_count, 19)
         self.assertEqual(report.pending_count, 0)
 
     def test_layer_two_stage_coverage_uses_sector_context_universe(self):
@@ -227,17 +227,17 @@ class StageCoverageTests(unittest.TestCase):
                         "stage_id": "layer_01_market_regime.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
-                        "expected_count": 22,
-                        "observed_count": 22,
+                        "expected_count": 19,
+                        "observed_count": 19,
                         "ready_count": 3,
                         "failed_count": 0,
-                        "pending_count": 19,
+                        "pending_count": 16,
                         "status": "partial_ready",
                         "can_unlock_downstream": False,
                         "ready_request_ids": ["mgrreq_backfill_alpaca_bars_spy_2016_01"],
                         "failed_request_ids": [],
                         "pending_request_ids": [],
-                        "reason": "stage coverage partial 3/22; downstream remains blocked",
+                        "reason": "stage coverage partial 3/19; downstream remains blocked",
                     }
                 )
                 + "\n",
@@ -256,7 +256,7 @@ class StageCoverageTests(unittest.TestCase):
 
             stages = {stage.stage_id: stage for stage in state.stages}
             self.assertEqual(stages["layer_01_market_regime.data_acquisition"].status, "ready")
-            self.assertIn("3/22", stages["layer_01_market_regime.data_acquisition"].last_reason or "")
+            self.assertIn("3/19", stages["layer_01_market_regime.data_acquisition"].last_reason or "")
             self.assertEqual(stages["layer_01_market_regime.feature_generation"].status, "blocked")
 
     def test_accepted_failure_coverage_report_completes_stage_and_unlocks_feature_generation(self):
@@ -272,9 +272,9 @@ class StageCoverageTests(unittest.TestCase):
                         "stage_id": "layer_01_market_regime.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
-                        "expected_count": 22,
-                        "observed_count": 22,
-                        "ready_count": 18,
+                        "expected_count": 19,
+                        "observed_count": 19,
+                        "ready_count": 15,
                         "failed_count": 4,
                         "accepted_failed_count": 4,
                         "pending_count": 0,
@@ -285,7 +285,7 @@ class StageCoverageTests(unittest.TestCase):
                         "accepted_failed_request_ids": ["mgrreq_backfill_alpaca_bars_bitw_2016_01"],
                         "pending_request_ids": [],
                         "accepted_failure_refs": ["review://not-yet-listed"],
-                        "reason": "stage coverage accepted 18 ready + 4 reviewed failed / 22; downstream may unlock",
+                        "reason": "stage coverage accepted 15 ready + 4 reviewed failed / 19; downstream may unlock",
                     }
                 )
                 + "\n",
@@ -320,9 +320,9 @@ class StageCoverageTests(unittest.TestCase):
                         "stage_id": "layer_01_market_regime.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
-                        "expected_count": 22,
-                        "observed_count": 22,
-                        "ready_count": 22,
+                        "expected_count": 19,
+                        "observed_count": 19,
+                        "ready_count": 19,
                         "failed_count": 0,
                         "pending_count": 0,
                         "status": "ready",
@@ -330,7 +330,7 @@ class StageCoverageTests(unittest.TestCase):
                         "ready_request_ids": [],
                         "failed_request_ids": [],
                         "pending_request_ids": [],
-                        "reason": "stage coverage complete 22/22; downstream may unlock",
+                        "reason": "stage coverage complete 19/19; downstream may unlock",
                     }
                 )
                 + "\n",

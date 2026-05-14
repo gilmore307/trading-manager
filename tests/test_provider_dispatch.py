@@ -30,7 +30,7 @@ class ProviderDispatchTests(unittest.TestCase):
             )
         self.assertEqual(dispatch.contract_type, "manager_provider_dispatch_summary")
         self.assertEqual(dispatch.stage_id, "layer_01_market_regime.data_acquisition")
-        self.assertEqual(dispatch.request_count, 22)
+        self.assertEqual(dispatch.request_count, 19)
         self.assertEqual(dispatch.validation_count, 0)
         self.assertEqual(dispatch.dispatch_count, 0)
         self.assertEqual(dispatch.provider_calls, 0)

@@ -46,7 +46,7 @@ class ControlledInformationPassTests(unittest.TestCase):
             self.assertTrue((root / "runtime" / "information_pass" / "report.json").exists())
             self.assertTrue((root / "runtime" / "information_pass" / "manager_dataset_expansion_plan.json").exists())
             task_keys = list((root / "monthly_backfill" / "alpaca_bars").glob("*/2016-01/task_key.json"))
-            self.assertEqual(len(task_keys), 22)
+            self.assertEqual(len(task_keys), 19)
 
     def test_information_pass_can_preview_provider_dispatch_without_dispatching(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -67,7 +67,7 @@ class ControlledInformationPassTests(unittest.TestCase):
             )
 
             self.assertIsNotNone(report.provider_dispatch_validation)
-            self.assertEqual(report.provider_dispatch_validation.request_count, 22)
+            self.assertEqual(report.provider_dispatch_validation.request_count, 19)
             self.assertEqual(report.provider_dispatch_validation.validation_count, 0)
             self.assertEqual(report.provider_dispatch_validation.dispatch_count, 0)
             self.assertEqual(report.provider_dispatch_validation.provider_calls, 0)

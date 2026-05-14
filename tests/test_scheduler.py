@@ -152,8 +152,8 @@ class SchedulerTests(unittest.TestCase):
         self.assertFalse(decision.model_activation_performed)
         self.assertFalse(decision.broker_execution_performed)
         self.assertIsNotNone(decision.execution_summary)
-        self.assertEqual(decision.execution_summary["request_count"], 22)
-        self.assertEqual(decision.execution_summary["handoff_validation_count"], 22)
+        self.assertEqual(decision.execution_summary["request_count"], 19)
+        self.assertEqual(decision.execution_summary["handoff_validation_count"], 19)
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], 8)
         self.assertEqual(decision.execution_summary["workflow_plan"]["next_stage"]["stage_id"], "layer_01_market_regime.data_acquisition")
 

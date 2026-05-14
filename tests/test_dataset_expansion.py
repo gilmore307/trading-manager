@@ -124,7 +124,7 @@ class DatasetExpansionTests(unittest.TestCase):
             self.assertFalse(plan.implementation.broker_execution_performed)
             self.assertTrue((root / "runtime" / "dataset_expansion" / "plan.json").exists())
             task_keys = list((root / "monthly_backfill" / "alpaca_bars").glob("*/2016-01/task_key.json"))
-            self.assertEqual(len(task_keys), 22)
+            self.assertEqual(len(task_keys), 19)
 
     def test_load_dataset_evidence_from_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:

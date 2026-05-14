@@ -137,9 +137,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "contract_type": "manager_stage_coverage",
                     "stage_id": "layer_01_market_regime.data_acquisition",
                     "status": "partial_ready",
-                    "expected_count": 22,
+                    "expected_count": 19,
                     "ready_count": 3,
-                    "pending_count": 19,
+                    "pending_count": 16,
                     "failed_count": 0,
                     "accepted_failed_count": 0,
                     "can_unlock_downstream": False,
@@ -153,7 +153,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["schema_ref"], "storage/dashboard/schemas/historical_task_progress_summary.schema.json")
         self.assertEqual(payload["status"], "action_required")
         self.assertIn("last execution failed", payload["summary"])
-        self.assertEqual(payload["chart_payload"]["stage_coverage"]["expected_count"], 22)
+        self.assertEqual(payload["chart_payload"]["stage_coverage"]["expected_count"], 19)
         self.assertFalse(payload["chart_payload"]["stage_coverage"]["can_unlock_downstream"])
         self.assertEqual(payload["chart_payload"]["last_stage_execution"]["status"], "failed")
         self.assertEqual(payload["chart_payload"]["last_stage_execution"]["return_code"], 1)
