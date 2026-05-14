@@ -409,7 +409,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertTrue(layer_three_task["target_required"])
         self.assertEqual(layer_three_task["detail"]["dataset_unit"]["target_symbol"], "AAPL")
 
-    def test_task_timeline_marks_four_month_ingest_lane_heads_current(self):
+    def test_task_timeline_marks_three_month_ingest_lane_heads_current(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -483,10 +483,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertEqual([task["month"] for task in current_tasks], ["2017-01", "2017-02", "2017-03", "2017-04"])
+        self.assertEqual([task["month"] for task in current_tasks], ["2017-01", "2017-02", "2017-03"])
         self.assertEqual(
             [task["worker_id"] for task in current_tasks],
-            ["month_ingest_worker_1", "month_ingest_worker_2", "month_ingest_worker_3", "month_ingest_worker_4"],
+            ["month_ingest_worker_1", "month_ingest_worker_2", "month_ingest_worker_3"],
         )
         self.assertTrue(all(task["task_id"] == "layer_02_sector_context.data_acquisition" for task in current_tasks))
 
@@ -571,11 +571,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-14T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertEqual([task["month"] for task in current_tasks], ["2020-09", "2020-10", "2020-11", "2020-12"])
+        self.assertEqual([task["month"] for task in current_tasks], ["2020-09", "2020-10", "2020-11"])
         self.assertTrue(all(task["task_id"] == "layer_03_target_state_vector.data_acquisition" for task in current_tasks))
         self.assertEqual(
             [task["worker_id"] for task in current_tasks],
-            ["month_ingest_worker_1", "month_ingest_worker_2", "month_ingest_worker_3", "month_ingest_worker_4"],
+            ["month_ingest_worker_1", "month_ingest_worker_2", "month_ingest_worker_3"],
         )
 
     def test_cli_builds_payload(self):

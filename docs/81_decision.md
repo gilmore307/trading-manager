@@ -3248,7 +3248,7 @@ After every executed progress decision or chronological month advancement, the d
 ## D141 - Pause monthly scheduler progression and adopt rolling-fold promotion runtime
 
 Date: 2026-05-14
-Status: Superseded by D153 for fold cadence; retained for the 4+1+1 split and worker-boundary charter.
+Status: Superseded by D153 for fold cadence and D156 for worker count; retained for the 4+1+1 split and worker-boundary charter.
 
 ### Context
 
@@ -3260,7 +3260,7 @@ Chentong directed that task progression may stop now because enough information 
 
 Pause the current historical task progression before changing the model/evaluation/promotion charter. The next accepted runtime shape is `rolling_fold_promotion`:
 
-- four bounded month-ingest workers prepare reusable month-scoped substrate: provider/raw data, cleaned monthly data, point-in-time features, feature-ready manifests, and coverage evidence;
+- three bounded month-ingest workers prepare reusable month-scoped substrate: provider/raw data, cleaned monthly data, point-in-time features, feature-ready manifests, and coverage evidence;
 - one serial model/promotion worker consumes only complete frozen fold manifests and owns model generation, validation/calibration, test evaluation, promotion evidence preparation, and the agent promotion decision;
 - folds use `fold_size_months = 6`, `train_months = 4`, `validation_months = 1`, `test_months = 1`; D153 later corrected active runtime cadence to non-overlapping `fold_step_months = 6`;
 - validation/test are post-model candidate evaluations, not pre-model work; pre-model ingest workers may prepare labels, split candidates, and manifests but must not evaluate a candidate that does not yet exist;
@@ -3435,35 +3435,35 @@ Status: Accepted
 
 ### Context
 
-The first task-worker dashboard pass labeled rows by stage type, such as input materialization worker or feature generation worker. That was misleading because the accepted historical runtime shape is four month-ingest workers plus one model worker.
+The first task-worker dashboard pass labeled rows by stage type, such as input materialization worker or feature generation worker. That was misleading because the accepted historical runtime shape is three month-ingest workers plus one model worker.
 
 ### Decision
 
-Dashboard task rows for month-scoped `data_acquisition` and `feature_generation` expose worker identity as `month_ingest_worker_1` through `month_ingest_worker_4`, assigned by the month's stable 4-lane cohort position. Model generation, evaluation, Promotion Review, and maintenance rows expose the serial `model_worker_1` identity. Lower-level provider request slots may still appear in provider-dispatch detail previews, but the primary task timeline worker is the owning month/model worker lane.
+Dashboard task rows for month-scoped `data_acquisition` and `feature_generation` expose worker identity as `month_ingest_worker_1` through `month_ingest_worker_3`, assigned by the month's stable 3-lane cohort position. Model generation, evaluation, Promotion Review, and maintenance rows expose the serial `model_worker_1` identity. Lower-level provider request slots may still appear in provider-dispatch detail previews, but the primary task timeline worker is the owning month/model worker lane.
 
 ### Consequences
 
-- Collapsed task previews and worker filters align with the 4 month-ingest + 1 model-worker runtime contract.
+- Collapsed task previews and worker filters align with the 3 month-ingest + 1 model-worker runtime contract.
 - Stage-type labels no longer masquerade as worker identities.
 - Provider thread slots remain a subordinate detail, not the task owner shown in the main task timeline.
 
-## D149 - Scheduler service fills four month-ingest worker lanes
+## D149 - Scheduler service fills month-ingest worker lanes
 
 Date: 2026-05-14
 Status: Accepted
 
 ### Context
 
-The dashboard showed only one `Now` task because the service still used the older single-month auto-selection cursor. That contradicted the accepted runtime shape of four month-ingest workers plus one model worker.
+The dashboard showed only one `Now` task because the service still used the older single-month auto-selection cursor. That contradicted the accepted runtime shape of three month-ingest workers plus one model worker.
 
 ### Decision
 
-The daemon exposes `--month-ingest-workers` and the systemd deployment sets `TRADING_MANAGER_MONTH_INGEST_WORKERS=4`. In multi-lane mode, the daemon keeps up to four month-scoped Layer 1/2 ingest lanes filled. The selector ignores months whose Layer 1/2 foundation substrate is already complete, even when their later Layer 3+ stages are blocked behind foundation catch-up, and appends new chronological months after the latest known month only up to the current historical month. Each lane executes one safe scheduler decision per drain cycle; provider request worker counts are divided across active lanes so the configured provider worker budget remains bounded.
+The daemon exposes `--month-ingest-workers` and the systemd deployment sets `TRADING_MANAGER_MONTH_INGEST_WORKERS=3`. In multi-lane mode, the daemon keeps up to three month-scoped Layer 1/2 ingest lanes filled. The selector ignores months whose Layer 1/2 foundation substrate is already complete, even when their later Layer 3+ stages are blocked behind foundation catch-up, and appends new chronological months after the latest known month only up to the current historical month. Each lane executes one safe scheduler decision per drain cycle; provider request worker counts are divided across active lanes so the configured provider worker budget remains bounded.
 
 ### Consequences
 
 - Dashboard `Now` rows can represent the current task for each active month-ingest worker lane, not only a single historical cursor.
-- The service runtime now matches the accepted five-worker mental model: four month-ingest lanes plus one serial model/promotion worker.
+- The service runtime now matches the accepted five-worker mental model: three month-ingest lanes plus one serial model/promotion worker.
 - Layer 3+ blocked rows no longer consume month-ingest worker identity once the Layer 1/2 substrate for that month is complete.
 
 ## D150 - Do not download the current incomplete calendar month
@@ -3506,7 +3506,7 @@ Month-ingest workers continue catch-up independently. Model Worker fold selectio
 
 - Once `2016-01` through `2016-06` foundation substrate is complete, `Model Worker 1` can start `layer_01_market_regime.model_generation` for the fold instead of waiting for full historical catch-up.
 - Fold model/progression state is durable and separate from month-ingest state.
-- Dashboard task timelines can show fold-scoped Model Worker tasks alongside the four month-ingest lane heads.
+- Dashboard task timelines can show fold-scoped Model Worker tasks alongside the active month-ingest lane heads.
 
 ## D152 - Layer 3+ model-worker stages are six-month target folds
 
@@ -3592,3 +3592,22 @@ Task detail presentation also omits the dedicated safety-boundary card. Current 
 - The current incomplete calendar month cannot appear as a Ready dashboard task before the month ends.
 - Dashboard visibility is defensive against stale runtime state, not merely dependent on normal scheduler selection.
 - Safety posture can remain in sanitized read-model payloads for diagnostics/contracts, but it is no longer a primary expanded-detail card.
+
+## D156 - Historical runtime uses three month-ingest workers plus one model worker
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+After the fold cadence was corrected to non-overlapping six-month groups, four month-ingest workers no longer matched the natural batch geometry. Three month-ingest lanes complete one six-month fold substrate in two clean rounds, while the single Model Worker remains serial over model generation, evaluation, Promotion Review, and maintenance.
+
+### Decision
+
+The historical scheduler runtime now uses `TRADING_MANAGER_MONTH_INGEST_WORKERS=3` plus `model_worker_1`. Month-scoped Data Acquisition / Feature Generation / input-preparation stages are assigned to the three month-ingest lanes; fold-scoped model-generation-and-later stages remain on the serial Model Worker. The Current Status runtime card reports this topology and summarizes observed scheduler throughput from the decision log instead of presenting obsolete provider-thread settings as the primary multitask model.
+
+### Consequences
+
+- Two month-ingest rounds fill one six-month fold substrate.
+- Provider request workers remain subordinate per-stage dispatch capacity, not the primary runtime owner shown in Current Status.
+- Dashboard Current Status emphasizes runtime throughput, active topology, fold cadence, completion rate, and idle/blocked decisions.

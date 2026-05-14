@@ -135,7 +135,7 @@ The historical scheduler caps normal provider-download month selection at the la
 
 The service has two independent historical work selectors:
 
-- Month-ingest lanes keep up to four Layer 1/2 month-scoped substrate tasks moving.
+- Month-ingest lanes keep up to three month-scoped substrate tasks moving.
 - `Model Worker 1` selects the earliest complete non-overlapping six-month fold whose Layer 1/2 substrate is ready for all six months. Fold cadence is half-year batches: `2016-01..2016-06`, then `2016-07..2016-12`; overlapping monthly windows such as `2016-02..2016-07` are invalid.
 
 A model fold writes a separate checkpoint under `storage/runtime/model_training_fold_state_<start>_<end>.json`. This preserves the month-scoped `model_training_workflow_state_YYYY-MM.json` checkpoints while allowing fold-scoped model generation, model evaluation, Promotion Review, and maintenance to run as soon as a 4+1+1 fold is ready.

@@ -45,7 +45,7 @@ DEFAULT_DRAIN_MAX_STEPS = 50
 DEFAULT_DRAIN_MAX_SECONDS = 300.0
 DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-refresh.service"
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
-DEFAULT_MONTH_INGEST_WORKERS = 4
+DEFAULT_MONTH_INGEST_WORKERS = 3
 COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
 
 
@@ -238,7 +238,7 @@ def select_month_ingest_worker_months(
     whose Layer 1/2 data acquisition and feature generation are complete are not
     assigned to month-ingest workers even if their later Layer 3+ stages are
     blocked behind foundation catch-up. New months are appended after the latest
-    known month so all four ingest lanes can stay filled.
+    known month so all three ingest lanes can stay filled by default.
     """
 
     worker_count = max(1, int(worker_count))
@@ -1055,7 +1055,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Allow one bounded autonomous provider-dispatch/reconcile slice per tick when provider acquisition is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one daemon tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one daemon tick.")
-    parser.add_argument("--month-ingest-workers", type=int, default=1, help="Number of month-ingest worker lanes to keep filled for Layer 1/2 acquisition and feature generation.")
+    parser.add_argument("--month-ingest-workers", type=int, default=DEFAULT_MONTH_INGEST_WORKERS, help="Number of month-ingest worker lanes to keep filled for month-scoped acquisition and feature generation.")
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")

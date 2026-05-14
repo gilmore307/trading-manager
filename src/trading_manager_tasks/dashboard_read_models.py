@@ -461,14 +461,15 @@ def _active_month_stages(status: HistoricalSchedulerStatus, storage_root: Path) 
 
 
 
-def _month_ingest_worker_info(month: str | None) -> dict[str, str]:
+def _month_ingest_worker_info(month: str | None, *, worker_count: int = DEFAULT_MONTH_INGEST_WORKERS) -> dict[str, str]:
+    worker_count = max(1, int(worker_count))
     if isinstance(month, str) and len(month) >= 7:
         try:
             year = int(month[:4])
             month_number = int(month[5:7])
             absolute_month = year * 12 + month_number
             base_month = 2016 * 12 + 1
-            lane = ((absolute_month - base_month) % 4) + 1
+            lane = ((absolute_month - base_month) % worker_count) + 1
         except ValueError:
             lane = 0
     else:
@@ -486,16 +487,35 @@ def _month_ingest_worker_info(month: str | None) -> dict[str, str]:
     }
 
 
+def _month_ingest_worker_info_for_lane(lane: int) -> dict[str, str]:
+    if lane <= 0:
+        return {
+            "worker_id": "month_ingest_worker_unassigned",
+            "worker_label": "Month Ingest Worker",
+            "worker_kind": "month_ingest_worker",
+        }
+    return {
+        "worker_id": f"month_ingest_worker_{lane}",
+        "worker_label": f"Month Ingest Worker {lane}",
+        "worker_kind": "month_ingest_worker",
+    }
+
+
 def _model_worker_info() -> dict[str, str]:
     return {"worker_id": "model_worker_1", "worker_label": "Model Worker 1", "worker_kind": "model_worker"}
 
 
-def _worker_info_for_stage(raw_stage: Mapping[str, Any], *, month: str | None = None) -> dict[str, str]:
+def _worker_info_for_stage(
+    raw_stage: Mapping[str, Any],
+    *,
+    month: str | None = None,
+    month_ingest_worker_count: int = DEFAULT_MONTH_INGEST_WORKERS,
+) -> dict[str, str]:
     """Return the public worker assignment shown in task previews.
 
     This is an operator-facing pipeline lane, not a raw process/thread id.
     Month-scoped data acquisition and feature generation belong to one of the
-    four accepted month-ingest workers. Fold/model/promotion stages belong to
+    accepted month-ingest workers. Fold/model/promotion stages belong to
     the single model worker. Lower-level provider request thread slots remain
     visible separately in provider-dispatch detail previews.
     """
@@ -511,7 +531,7 @@ def _worker_info_for_stage(raw_stage: Mapping[str, Any], *, month: str | None = 
 
     stage_type = str(raw_stage.get("stage_type") or "unknown")
     if stage_type in {"data_acquisition", "feature_generation"}:
-        return _month_ingest_worker_info(month)
+        return _month_ingest_worker_info(month, worker_count=month_ingest_worker_count)
     if stage_type in {"model_generation", "model_evaluation", "promotion_review", "maintenance"}:
         return _model_worker_info()
     return {"worker_id": "scheduler_control_worker", "worker_label": "Scheduler Control Worker", "worker_kind": "scheduler_control"}
@@ -532,6 +552,7 @@ def _task_timeline(
     """
 
     storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    month_ingest_worker_count = DEFAULT_MONTH_INGEST_WORKERS
     max_dashboard_month = completed_historical_month_cutoff()
     month_stage_sets: list[tuple[str | None, list[Any], bool]] = []
     included_months: set[str] = set()
@@ -547,9 +568,10 @@ def _task_timeline(
     lane_months = select_month_ingest_worker_months(
         storage_root=storage_root,
         default_start_month=status.current_month or status.workflow_checkpoint.start_month or "2016-01",
-        worker_count=DEFAULT_MONTH_INGEST_WORKERS,
+        worker_count=month_ingest_worker_count,
         max_month=max_dashboard_month,
     )
+    lane_worker_by_month = {month: _month_ingest_worker_info_for_lane(index + 1) for index, month in enumerate(lane_months)}
     for month in lane_months:
         if month in included_months:
             continue
@@ -613,7 +635,9 @@ def _task_timeline(
             if layer not in MONTHLY_SUBSTRATE_LAYERS:
                 continue
             task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
-            worker_info = _worker_info_for_stage(raw_stage, month=task_month)
+            worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
+                raw_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
+            )
             worker_id = worker_info.get("worker_id") or ""
             if worker_info.get("worker_kind") != "month_ingest_worker" or worker_id in seen_ingest_workers:
                 continue
@@ -669,7 +693,9 @@ def _task_timeline(
                 receipt_refs = []
             dataset_unit = raw_stage.get("dataset_unit") if isinstance(raw_stage.get("dataset_unit"), Mapping) else None
             task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
-            worker_info = _worker_info_for_stage(raw_stage, month=task_month)
+            worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
+                raw_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
+            )
             task: dict[str, Any] = {
                 "sequence": len(tasks) + 1,
                 "month": task_month,

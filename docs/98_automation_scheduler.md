@@ -35,7 +35,7 @@ Layer 8 option buckets expand from near expirations to farther expirations: curr
 
 The next historical runtime uses two classes of work lanes:
 
-- `month_ingest_workers = 4`: bounded workers that prepare month-scoped provider/raw data, cleaned data, point-in-time features, feature-ready manifests, and coverage evidence. These workers may run in parallel only when output scopes are partitioned by month/layer/stage and protected by ingest/publish locks.
+- `month_ingest_workers = 3`: bounded workers that prepare month-scoped provider/raw data, cleaned data, point-in-time features, feature-ready manifests, and coverage evidence. These workers may run in parallel only when output scopes are partitioned by month/layer/stage and protected by ingest/publish locks.
 - `model_promotion_workers = 1`: a single serial worker that consumes complete frozen non-overlapping half-year fold manifests and owns model generation, validation/calibration, test evaluation, promotion evidence preparation, and agent promotion decision tasks.
 
 Rolling-fold policy:
@@ -44,7 +44,7 @@ Rolling-fold policy:
 - `train_months = 4`;
 - `validation_months = 1`;
 - `test_months = 1`;
-- default `fold_step_months = 1`.
+- default `fold_step_months = 6`.
 
 Validation and test are post-candidate evaluations. Ingest workers may prepare point-in-time labels, split candidates, and manifests, but model validation/test cannot run until the model worker has generated a candidate against a frozen input manifest.
 
