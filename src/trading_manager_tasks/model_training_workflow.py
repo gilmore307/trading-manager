@@ -273,6 +273,13 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
         "python3",
         f"/root/projects/trading-model/scripts/models/model_{layer:02d}_{slug}/{script_name}",
     ]
+    if layer in {1, 2} and verb == "generate":
+        command.extend([
+            "--source-start",
+            "${START_MONTH_START_ET}",
+            "--source-end",
+            "${END_MONTH_EXCLUSIVE_START_ET}",
+        ])
     if layer in {3, 4, 5, 6, 7, 8} and verb == "generate":
         command.extend([
             "--from-database",

@@ -528,6 +528,23 @@ def _task_timeline(
             month_key = str(payload.get("start_month") or month)
             month_stage_sets.append((month_key, raw_stages, True))
             included_months.add(month_key)
+    runtime_root = storage_root / "runtime"
+    if runtime_root.exists():
+        for fold_path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
+            try:
+                fold_payload = _load_json_object(fold_path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            raw_stages = fold_payload.get("stages")
+            if not isinstance(raw_stages, list):
+                continue
+            fold_start = str(fold_payload.get("start_month") or "")
+            fold_end = str(fold_payload.get("end_month") or "")
+            fold_key = f"{fold_start}..{fold_end}" if fold_start and fold_end else fold_path.stem
+            if fold_key in included_months:
+                continue
+            month_stage_sets.append((fold_key, raw_stages, True))
+            included_months.add(fold_key)
     active_month, active_stages = _active_month_stages(status, storage_root)
     if active_stages and active_month not in included_months:
         month_stage_sets.append((active_month, active_stages, True))
@@ -538,6 +555,7 @@ def _task_timeline(
     latest_execution = _latest_stage_execution(status) or {}
     latest_failed_stage = latest_execution.get("stage_id") if latest_execution.get("status") == "failed" else None
     current_lane_heads: set[tuple[str | None, str]] = set()
+    current_model_heads: set[tuple[str | None, str]] = set()
     seen_ingest_workers: set[str] = set()
     for timeline_month, raw_stages, _is_active_month in month_stage_sets:
         for raw_stage in raw_stages:
@@ -562,6 +580,19 @@ def _task_timeline(
                 continue
             current_lane_heads.add((task_month, stage_id))
             seen_ingest_workers.add(worker_id)
+    for timeline_month, raw_stages, _is_active_month in month_stage_sets:
+        for raw_stage in raw_stages:
+            if not isinstance(raw_stage, Mapping):
+                continue
+            stage_id = str(raw_stage.get("stage_id") or "")
+            if not stage_id or str(raw_stage.get("status") or "") in {"succeeded", "not_applicable"}:
+                continue
+            stage_type = str(raw_stage.get("stage_type") or "")
+            if stage_type not in {"model_generation", "model_evaluation", "promotion_review", "maintenance"}:
+                continue
+            task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
+            current_model_heads.add((task_month, stage_id))
+            break
     tasks: list[dict[str, Any]] = []
     first_open_seen = False
     for timeline_month, raw_stages, is_active_month in month_stage_sets:
@@ -573,7 +604,9 @@ def _task_timeline(
             is_terminal = stage_status in {"succeeded", "not_applicable"}
             task_month_for_state = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
             is_current = bool((task_month_for_state, stage_id) in current_lane_heads and not is_terminal)
-            if not is_current and not current_lane_heads:
+            if not is_current:
+                is_current = bool((task_month_for_state, stage_id) in current_model_heads and not is_terminal)
+            if not is_current and not current_lane_heads and not current_model_heads:
                 is_current = bool(is_active_month and stage_id and stage_id == status.current_stage and not is_terminal)
             if not current_lane_heads and is_active_month and not first_open_seen and not is_terminal:
                 is_current = True

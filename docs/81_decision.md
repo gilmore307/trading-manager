@@ -3486,3 +3486,24 @@ The runtime owner is `completed_historical_month_cutoff()` in `scheduler_daemon.
 - The scheduler cannot download the in-progress current calendar month during normal service operation.
 - Four-lane catch-up remains allowed for prior complete months.
 - Current-month data requires waiting for month close or a separate reviewed exception path; it must not happen as part of ordinary historical catch-up.
+
+## D151 - Model Worker starts from complete six-month foundation folds
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+Layer 1/2 month-ingest catch-up completed the substrate for the first six months, including the 4 train months (`2016-01` through `2016-04`), the validation month (`2016-05`), and the test month (`2016-06`). The runtime still showed only month-ingest workers because `foundation_catch_up_only` intentionally hid month-local model/promotion stages, but no separate fold-scoped Model Worker queue had been added yet.
+
+### Decision
+
+`Model Worker 1` selects the earliest complete six-month Layer 1/2 foundation fold. It creates a separate `model_training_fold_state_<start>_<end>.json` checkpoint so fold-scoped model generation, model evaluation, Promotion Review, and maintenance do not overwrite month-scoped ingest checkpoints. The first eligible fold is `fold_2016-01_2016-06`: train months `2016-01`-`2016-04`, validation month `2016-05`, and test month `2016-06`.
+
+Month-ingest workers continue catch-up independently. Model Worker fold selection requires all six months' Layer 1/2 `data_acquisition` and `feature_generation` states to be complete; four train months alone are not enough to start validation/test/promotion.
+
+### Consequences
+
+- Once `2016-01` through `2016-06` foundation substrate is complete, `Model Worker 1` can start `layer_01_market_regime.model_generation` for the fold instead of waiting for full historical catch-up.
+- Fold model/progression state is durable and separate from month-ingest state.
+- Dashboard task timelines can show fold-scoped Model Worker tasks alongside the four month-ingest lane heads.

@@ -406,6 +406,8 @@ def run_scheduler_once(
     provider_stage_next_limit: int = 5,
     provider_stage_max_workers: int = 4,
     selected_target_symbol: str | None = None,
+    state_path: Path | None = None,
+    foundation_catch_up_only: bool = True,
 ) -> SchedulerDecision:
     """Run one scheduler tick.
 
@@ -456,13 +458,16 @@ def run_scheduler_once(
         end_month=end_month,
         storage_root=storage_root,
         selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=foundation_catch_up_only,
     )
+    resolved_state_path = state_path or workflow_state_path_for_month(start_month, root=storage_root / "runtime")
     workflow_state = advance_workflow_state(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
-        state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
+        state_path=resolved_state_path,
         selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=foundation_catch_up_only,
         write=False,
     )
     workflow_next_stage = next_ready_or_blocked_stage(workflow_state)
@@ -546,10 +551,11 @@ def run_scheduler_once(
             start_month=start_month,
             end_month=end_month,
             storage_root=storage_root,
-            state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
+            state_path=resolved_state_path,
             receipt_root=storage_root / "runtime" / "model_training_stage_receipts",
             log_root=storage_root / "runtime" / "model_training_stage_logs",
             selected_target_symbol=selected_target_symbol,
+            foundation_catch_up_only=foundation_catch_up_only,
             write=True,
         )
         return SchedulerDecision(
@@ -629,13 +635,15 @@ def run_scheduler_once(
         end_month=end_month,
         storage_root=storage_root,
         selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=foundation_catch_up_only,
     )
     refreshed_workflow_state = advance_workflow_state(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
-        state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
+        state_path=resolved_state_path,
         selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=foundation_catch_up_only,
         write=False,
     )
     return SchedulerDecision(

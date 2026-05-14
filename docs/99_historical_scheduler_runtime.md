@@ -130,3 +130,14 @@ The resident scheduler/service-control boundary is closed enough for supervised 
 ## Current-month provider download guard
 
 The historical scheduler caps normal provider-download month selection at the latest completed calendar month in `America/New_York`. During May 2026, for example, the month-ingest lanes may catch up through `2026-04` but must not download `2026-05` until June begins. This protects historical substrate, fold construction, and promotion evidence from incomplete current-month data.
+
+## Fold-scoped Model Worker queue
+
+The service has two independent historical work selectors:
+
+- Month-ingest lanes keep up to four Layer 1/2 month-scoped substrate tasks moving.
+- `Model Worker 1` selects the earliest complete six-month rolling fold whose Layer 1/2 substrate is ready for all six months.
+
+A model fold writes a separate checkpoint under `storage/runtime/model_training_fold_state_<start>_<end>.json`. This preserves the month-scoped `model_training_workflow_state_YYYY-MM.json` checkpoints while allowing fold-scoped model generation, model evaluation, Promotion Review, and maintenance to run as soon as a 4+1+1 fold is ready.
+
+For the bootstrap fold, `2016-01` through `2016-04` are train months, `2016-05` is validation, and `2016-06` is test. The fold is not eligible after only the four train months; it becomes eligible once all six months have complete Layer 1/2 `data_acquisition` and `feature_generation` substrate.

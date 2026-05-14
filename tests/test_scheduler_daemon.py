@@ -18,9 +18,13 @@ from trading_manager_tasks.scheduler_daemon import (
     apply_auto_work_selection,
     completed_historical_month_cutoff,
     load_daemon_state,
+    model_worker_fold_state_path,
     next_month,
     release_daemon_lock,
+    rolling_fold_months,
     run_daemon_loop,
+    seed_model_worker_fold_state,
+    select_model_worker_fold,
     select_month_ingest_worker_months,
     select_next_historical_work,
     update_state_from_error,
@@ -247,6 +251,67 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertEqual(selected, ("2016-03", "2016-04", "2016-05", "2016-06"))
         self.assertEqual(capped, ("2016-03", "2016-04"))
+
+
+    def test_model_worker_selects_first_complete_six_month_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                foundation_stage_ids = [
+                    stage.stage_id
+                    for layer in plan.layers
+                    if layer.layer in {1, 2}
+                    for stage in layer.stages
+                    if stage.stage_type in {"data_acquisition", "feature_generation"}
+                ]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=foundation_stage_ids,
+                    write=True,
+                )
+
+            selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-06")
+            self.assertIsNotNone(selection)
+            assert selection is not None
+            self.assertEqual(selection.fold_id, "fold_2016-01_2016-06")
+            self.assertEqual(selection.reason_code, "complete_foundation_fold_ready")
+            self.assertEqual(selection.fold_months, ("2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"))
+
+            state_path = seed_model_worker_fold_state(storage_root=storage_root, selection=selection, selected_target_symbol="AAPL")
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+            ready = [stage["stage_id"] for stage in payload["stages"] if stage["status"] == "ready"]
+
+        self.assertEqual(state_path.name, "model_training_fold_state_2016-01_2016-06.json")
+        self.assertIn("layer_01_market_regime.model_generation", ready)
+
+    def test_model_worker_does_not_select_until_validation_and_test_months_ready(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in ("2016-01", "2016-02", "2016-03", "2016-04"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                foundation_stage_ids = [
+                    stage.stage_id
+                    for layer in plan.layers
+                    if layer.layer in {1, 2}
+                    for stage in layer.stages
+                    if stage.stage_type in {"data_acquisition", "feature_generation"}
+                ]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=foundation_stage_ids,
+                    write=True,
+                )
+
+            selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-06")
+
+        self.assertIsNone(selection)
 
     def test_auto_work_selection_jumps_past_externally_completed_months(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

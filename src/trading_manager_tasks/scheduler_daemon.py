@@ -22,7 +22,8 @@ from typing import Any, TextIO
 from zoneinfo import ZoneInfo
 
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
-from .model_training_workflow import FOUNDATION_CATCH_UP_LAYERS, FOUNDATION_CATCH_UP_STAGE_TYPES
+from .model_training_state import advance_workflow_state
+from .model_training_workflow import FOUNDATION_CATCH_UP_LAYERS, FOUNDATION_CATCH_UP_STAGE_TYPES, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import (
     DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
@@ -280,6 +281,175 @@ def select_month_ingest_worker_months(
             selected.append(next_candidate)
         next_candidate = next_month(next_candidate)
     return tuple(selected)
+
+
+@dataclass(frozen=True)
+class ModelWorkerFoldSelection:
+    """Model-worker selection for the next complete six-month rolling fold."""
+
+    contract_type: str = "manager_model_worker_fold_selection"
+    fold_id: str = "fold_2016-01_2016-06"
+    start_month: str = "2016-01"
+    end_month: str = "2016-06"
+    fold_months: tuple[str, ...] = ()
+    reason_code: str = "no_complete_fold_available"
+    state_path: str | None = None
+
+    def summary_row(self) -> dict[str, Any]:
+        row = asdict(self)
+        row["fold_months"] = list(self.fold_months)
+        return row
+
+
+def rolling_fold_months(start_month: str, *, month_count: int = 6) -> tuple[str, ...]:
+    """Return the inclusive month sequence for one frozen rolling fold."""
+
+    months = [start_month]
+    while len(months) < month_count:
+        months.append(next_month(months[-1]))
+    return tuple(months)
+
+
+def model_worker_fold_state_path(start_month: str, end_month: str, *, root: Path = DEFAULT_RUNTIME_DIR) -> Path:
+    """Return the fold-scoped Model Worker checkpoint path."""
+
+    return root / f"model_training_fold_state_{start_month}_{end_month}.json"
+
+
+def _model_worker_fold_id(start_month: str, end_month: str) -> str:
+    return f"fold_{start_month}_{end_month}"
+
+
+def _workflow_payload_all_stages_complete(payload: dict[str, Any]) -> bool:
+    stages = payload.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return False
+    statuses = [stage.get("status") for stage in stages if isinstance(stage, dict)]
+    return bool(statuses) and all(status in {"succeeded", "not_applicable"} for status in statuses)
+
+
+def _fold_payload_has_open_model_worker_stage(payload: dict[str, Any]) -> bool:
+    stages = payload.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return True
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        if str(stage.get("stage_type") or "") in {"model_generation", "model_evaluation", "promotion_review", "maintenance"} and str(
+            stage.get("status") or ""
+        ) not in {"succeeded", "not_applicable"}:
+            return True
+    return False
+
+
+def _month_foundation_ready(storage_root: Path, month: str) -> bool:
+    path = storage_root / "runtime" / f"model_training_workflow_state_{month}.json"
+    if not path.exists():
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return _workflow_payload_foundation_catch_up_complete(payload)
+
+
+def _model_worker_fold_is_ready(storage_root: Path, start_month: str) -> tuple[bool, tuple[str, ...]]:
+    months = rolling_fold_months(start_month)
+    return all(_month_foundation_ready(storage_root, month) for month in months), months
+
+
+def select_model_worker_fold(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    default_start_month: str = "2016-01",
+    max_month: str | None = None,
+) -> ModelWorkerFoldSelection | None:
+    """Select the earliest complete six-month fold with open Model Worker work."""
+
+    max_month = max_month or completed_historical_month_cutoff()
+    runtime_root = storage_root / "runtime"
+    known_months: set[str] = set()
+    if runtime_root.exists():
+        for path in sorted(runtime_root.glob(WORKFLOW_STATE_GLOB)):
+            month = _month_from_workflow_state_path(path)
+            if month is not None:
+                known_months.add(month)
+    if not known_months:
+        known_months.add(default_start_month)
+
+    start = min(known_months | {default_start_month})
+    last_start = previous_month(previous_month(previous_month(previous_month(previous_month(max_month)))))
+    if start > last_start:
+        return None
+    candidate = start
+    while candidate <= last_start:
+        ready, months = _model_worker_fold_is_ready(storage_root, candidate)
+        end_month = months[-1]
+        state_path = model_worker_fold_state_path(candidate, end_month, root=runtime_root)
+        if ready:
+            if state_path.exists():
+                try:
+                    payload = json.loads(state_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    payload = {}
+                if not _workflow_payload_all_stages_complete(payload) and _fold_payload_has_open_model_worker_stage(payload):
+                    return ModelWorkerFoldSelection(
+                        fold_id=_model_worker_fold_id(candidate, end_month),
+                        start_month=candidate,
+                        end_month=end_month,
+                        fold_months=months,
+                        reason_code="resume_open_model_worker_fold",
+                        state_path=str(state_path),
+                    )
+            else:
+                return ModelWorkerFoldSelection(
+                    fold_id=_model_worker_fold_id(candidate, end_month),
+                    start_month=candidate,
+                    end_month=end_month,
+                    fold_months=months,
+                    reason_code="complete_foundation_fold_ready",
+                    state_path=str(state_path),
+                )
+        candidate = next_month(candidate)
+    return None
+
+
+def seed_model_worker_fold_state(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    selection: ModelWorkerFoldSelection,
+    selected_target_symbol: str | None = None,
+) -> Path:
+    """Create/refresh a fold-scoped state seeded from completed Layer 1/2 substrate months."""
+
+    state_path = Path(selection.state_path) if selection.state_path else model_worker_fold_state_path(
+        selection.start_month, selection.end_month, root=storage_root / "runtime"
+    )
+    plan = build_model_training_workflow_plan(
+        start_month=selection.start_month,
+        end_month=selection.end_month,
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=False,
+    )
+    foundation_stage_ids = [
+        stage.stage_id
+        for layer in plan.layers
+        if layer.layer in FOUNDATION_CATCH_UP_LAYERS
+        for stage in layer.stages
+        if stage.stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES
+    ]
+    advance_workflow_state(
+        start_month=selection.start_month,
+        end_month=selection.end_month,
+        storage_root=storage_root,
+        state_path=state_path,
+        completed_stage_ids=foundation_stage_ids if not state_path.exists() else (),
+        selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=False,
+        write=True,
+    )
+    return state_path
 
 
 @dataclass(frozen=True)
@@ -550,6 +720,38 @@ def update_state_from_error(
     )
 
 
+
+def _run_model_worker_decision(
+    *,
+    storage_root: Path,
+    component_src_root: Path,
+    config: SchedulerConfig,
+    execute_safe_offline_stages: bool,
+    selected_target_symbol: str | None,
+) -> tuple[ModelWorkerFoldSelection, SchedulerDecision] | None:
+    selection = select_model_worker_fold(storage_root=storage_root)
+    if selection is None:
+        return None
+    state_path = seed_model_worker_fold_state(
+        storage_root=storage_root,
+        selection=selection,
+        selected_target_symbol=selected_target_symbol,
+    )
+    decision = run_scheduler_once(
+        config=config,
+        start_month=selection.start_month,
+        end_month=selection.end_month,
+        storage_root=storage_root,
+        component_src_root=component_src_root,
+        execute_safe_preparation=False,
+        execute_safe_offline_stages=execute_safe_offline_stages,
+        execute_autonomous_provider_stages=False,
+        selected_target_symbol=selected_target_symbol,
+        state_path=state_path,
+        foundation_catch_up_only=False,
+    )
+    return selection, decision
+
 def _run_month_ingest_worker_decisions(
     *,
     months: tuple[str, ...],
@@ -710,6 +912,36 @@ def run_daemon_loop(
                             if output is not None:
                                 row = decision.summary_row()
                                 row["worker_month"] = month
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
+                        model_worker_result = _run_model_worker_decision(
+                            storage_root=storage_root,
+                            component_src_root=component_src_root,
+                            config=config,
+                            execute_safe_offline_stages=execute_safe_offline_stages,
+                            selected_target_symbol=selected_target_symbol,
+                        )
+                        if model_worker_result is not None:
+                            model_selection, model_decision = model_worker_result
+                            append_decision_log(decision_log_path, model_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=model_decision)
+                            state = replace(
+                                state,
+                                start_month=active_start_month,
+                                end_month=active_end_month,
+                                last_next_internal_stage="model_worker_1",
+                                last_work_selection_reason=model_selection.reason_code,
+                                updated_utc=completed,
+                            )
+                            refresh_needed = refresh_needed or model_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(model_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = model_decision.summary_row()
+                                row["worker_id"] = "model_worker_1"
+                                row["fold_id"] = model_selection.fold_id
+                                row["fold_months"] = list(model_selection.fold_months)
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
                         if refresh_needed:

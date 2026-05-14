@@ -295,6 +295,7 @@ def execute_next_ready_stage(
     receipt_root: Path = DEFAULT_RECEIPT_ROOT,
     log_root: Path = DEFAULT_LOG_ROOT,
     selected_target_symbol: str | None = None,
+    foundation_catch_up_only: bool = True,
     write: bool = False,
 ) -> tuple[StageExecutionSummary, WorkflowState]:
     state_path = resolve_workflow_state_path(start_month, state_path, storage_root=storage_root)
@@ -304,6 +305,7 @@ def execute_next_ready_stage(
         storage_root=storage_root,
         state_path=state_path,
         selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=foundation_catch_up_only,
         write=False,
     )
     stage = next_ready_or_blocked_stage(state)
@@ -338,6 +340,7 @@ def execute_next_ready_stage(
             end_month=end_month,
             storage_root=storage_root,
             selected_target_symbol=selected_target_symbol,
+            foundation_catch_up_only=foundation_catch_up_only,
         )
         updated = refresh_workflow_state(updated, plan=plan)
     elif summary.status == "failed":
@@ -369,6 +372,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--receipt-root", type=Path, default=DEFAULT_RECEIPT_ROOT)
     parser.add_argument("--log-root", type=Path, default=DEFAULT_LOG_ROOT)
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument(
+        "--allow-post-foundation-model-stages",
+        action="store_true",
+        help="Allow fold-scoped model generation/evaluation/promotion stages after Layer 1/2 substrate readiness.",
+    )
     parser.add_argument("--write", action="store_true", help="Persist successful stage progress to the workflow state checkpoint.")
     args = parser.parse_args(argv)
     summary, _state = execute_next_ready_stage(
@@ -382,6 +390,7 @@ def main(argv: list[str] | None = None) -> int:
         receipt_root=args.receipt_root,
         log_root=args.log_root,
         selected_target_symbol=args.target_symbol,
+        foundation_catch_up_only=not args.allow_post_foundation_model_stages,
         write=args.write,
     )
     write_stage_execution_summary(summary, output=sys.stdout)
