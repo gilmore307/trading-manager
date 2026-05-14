@@ -90,6 +90,14 @@ from .task_rehearsal import (
     persist_rehearsal,
     rehearse_monthly_backfill_task_system,
 )
+from .target_context_review import (
+    TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT,
+    TARGET_CONTEXT_AGENT_REVIEW_REQUEST_CONTRACT,
+    build_target_context_agent_review_request,
+    handle_target_context_agent_review,
+    validate_target_context_agent_review_decision,
+    validate_target_context_agent_review_request,
+)
 
 __all__ = [
     "AGENT_ERROR_DIAGNOSIS_CONTRACT",
@@ -109,6 +117,8 @@ __all__ = [
     "HistoricalSchedulerStatus",
     "TASK_PRIORITY_RANKS",
     "TASK_SUMMARY_ORDER_BY",
+    "TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT",
+    "TARGET_CONTEXT_AGENT_REVIEW_REQUEST_CONTRACT",
     "MODEL_PROMOTION_REVIEW_REQUEST_KIND",
     "MODEL_PROMOTION_TARGETS",
     "MonthlyWindow",
@@ -117,6 +127,7 @@ __all__ = [
     "build_dataset_expansion_plan",
     "build_historical_task_progress_summary",
     "build_model_promotion_review_request",
+    "build_target_context_agent_review_request",
     "collect_historical_scheduler_status",
     "collect_dataset_evidence_from_database",
     "collect_dataset_evidence_from_rows",
@@ -126,9 +137,12 @@ __all__ = [
     "build_rehearsal_receipt",
     "build_review_decision",
     "validate_server_error_agent_request",
+    "validate_target_context_agent_review_decision",
+    "validate_target_context_agent_review_request",
     "validate_agent_error_diagnosis",
     "validate_server_error_catalog_entry",
     "handle_server_error",
+    "handle_target_context_agent_review",
     "build_server_error_agent_request",
     "build_rehearsal_task_summary",
     "PARAMETER_SCHEMA_REF",

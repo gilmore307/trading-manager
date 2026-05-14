@@ -215,6 +215,12 @@
   - ready, partial/review-required, and failed task-summary paths;
   - rehearsal CLI JSONL output shape.
 
+- `test_target_context_review.py` verifies:
+  - target-to-Layer-2 context mapping review request construction;
+  - queued review artifact writing when no reviewed agent runner is configured;
+  - configured local runner decision ingestion;
+  - safety boundaries for proxy mappings without provider calls, model activation, broker/account mutation, storage lifecycle mutation, or Layer 1/2 universe edits.
+
 - `test_trading_bigquery.py` verifies:
   - BigQuery query-result metadata parsing for dry-run byte estimates;
   - query request payload handling for `maximumBytesBilled` and dry-run flags.

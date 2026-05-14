@@ -436,6 +436,41 @@ Required fields:
 
 Allowed statuses should remain registry vocabulary: approve, defer, reject, revoke, or supersede. This contract is advisory evidence only; it is not sufficient for production activation.
 
+### `target_layer2_context_agent_review_request`
+
+Required fields:
+
+- `contract_type`
+- `schema_version`
+- `request_id`
+- `agent_ref`
+- `review_scope`
+- `mapping_ref`
+- `mapping_path`
+- `target_symbols`
+- `mapping_rows`
+- `required_checks`
+- `forbidden_actions`
+- `agent_prompt`
+- `created_at_utc`
+
+This script-called request asks an agent to review target-to-Layer-2 context and auxiliary proxy mappings. It is evidence-only and must not call providers, activate models, mutate broker/accounts, execute storage lifecycle operations, or edit Layer 1/2 universe files.
+
+### `target_layer2_context_agent_review_decision`
+
+Required fields:
+
+- `contract_type`
+- `schema_version`
+- `decision_id`
+- `request_ref`
+- `agent_ref`
+- `decision_status`
+- `decision_reason`
+- `completed_at_utc`
+
+Allowed statuses are `approved`, `deferred`, `rejected`, `queued`, and `agent_call_failed`. An approved review confirms the selected mapping rows are acceptable as target-study metadata; it does not itself change repository files or registry rows.
+
 ### `activation_record`
 
 Required fields:

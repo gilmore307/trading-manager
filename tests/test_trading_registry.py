@@ -933,6 +933,27 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["path"], "trading-storage/main/shared/target_layer2_context_mapping.csv")
             self.assertIn("target_layer2_context_mapping", registry[key]["applies_to"])
 
+    def test_target_context_agent_review_script_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            registry = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW"]["payload"], "target_layer2_context_agent_review")
+        self.assertEqual(
+            registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW_REQUEST"]["payload"],
+            "target_layer2_context_agent_review_request",
+        )
+        self.assertEqual(
+            registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW_DECISION"]["payload"],
+            "target_layer2_context_agent_review_decision",
+        )
+        self.assertEqual(registry["REVIEW_TARGET_LAYER2_CONTEXT_MAPPING"]["kind"], "script")
+        self.assertEqual(
+            registry["REVIEW_TARGET_LAYER2_CONTEXT_MAPPING"]["path"],
+            "/root/projects/trading-manager/scripts/tasks/review_target_layer2_context_mapping.py",
+        )
+        self.assertIn("target_layer2_context_agent_review", registry["REVIEW_TARGET_LAYER2_CONTEXT_MAPPING"]["applies_to"])
+        self.assertIn("no_provider_calls", registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW_SAFETY_BOUNDARY"]["payload"])
+
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
         for migration in sorted(Path("scripts/registry/sql/schema_migrations").glob("*.sql")):

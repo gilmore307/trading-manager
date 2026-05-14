@@ -3289,3 +3289,24 @@ Accepted lock families for the next implementation are:
 - The next scheduler implementation should replace monthly `promotion_review_preparation` semantics with fold-scoped `rolling_fold_promotion` / `promotion` task semantics.
 - Dashboard and task summaries should eventually show fold preparation, model worker, and promotion task state without reading raw internals.
 - Live activation, broker/account mutation, and execution lifecycle remain outside historical scheduler authority.
+
+## D142 - Target context/proxy mappings may use script-called agent review
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+Target-to-Layer-2 context mapping is now a reviewed shared contract. Some rows, such as crypto spot targets mapped to Layer 2 context with listed ETF proxies, require qualitative checks that are better handled by a script-called reviewer agent than by hard-coded CSV validation alone.
+
+### Decision
+
+Register a manager-owned script-called agent review path for `target_layer2_context_mapping.csv`. The script builds `target_layer2_context_agent_review_request` artifacts, may call a reviewed local agent runner when explicitly configured, and records `target_layer2_context_agent_review_decision` artifacts.
+
+This review path is evidence-only. It may approve, defer, reject, queue, or record agent-call failure for mapping rows, but it must not dispatch providers, activate models, mutate broker/accounts, execute storage lifecycle operations, or edit Layer 1/2 universe files. Proxy rows remain target-specific auxiliary evidence references unless a separate reviewed artifact explicitly changes the Layer 1/2 universe.
+
+### Consequences
+
+- Scripts can request agent review for mappings such as `BTC -> BKCH` with `IBIT` as proxy, or future business mappings such as `AAOI -> AIQ/XLK/SMH`.
+- The normal automation path can depend on durable request/decision artifacts instead of informal chat approval.
+- Review decisions do not replace registry migrations or storage contract updates; accepted structural changes still need normal project commits and registry sync.
