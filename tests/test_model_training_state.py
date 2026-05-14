@@ -330,7 +330,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 storage_root=tmp,
                 state_path=state_path,
                 completed_stage_ids=completions,
-                selected_target_symbol="SPY",
+                selected_target_symbol="AAPL",
                 write=False,
             )
             layer_eight_acquisition = {stage.stage_id: stage for stage in state.stages}["layer_08_option_expression.data_acquisition"]
@@ -365,7 +365,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 storage_root=tmp,
                 state_path=state_path,
                 completed_stage_ids=completions,
-                selected_target_symbol="SPY",
+                selected_target_symbol="AAPL",
                 write=False,
             )
             stage_by_id = {stage.stage_id: stage for stage in state.stages}

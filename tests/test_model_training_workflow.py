@@ -251,10 +251,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=Path(raw_tmp),
                 start_month="2016-01",
                 end_month="2016-06",
-                selected_target_symbol="spy",
+                selected_target_symbol="aapl",
             )
 
-        self.assertEqual(plan.selected_target_symbol, "SPY")
+        self.assertEqual(plan.selected_target_symbol, "AAPL")
         self.assertEqual(plan.layers[0].dataset_unit.unit_kind, "six_month_panel")
         self.assertEqual(plan.layers[0].dataset_unit.unit_months, 6)
         self.assertIsNone(plan.layers[0].dataset_unit.target_symbol)
@@ -263,9 +263,9 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         for layer in plan.layers[2:]:
             self.assertEqual(layer.dataset_unit.unit_kind, "target_symbol_six_month")
             self.assertEqual(layer.dataset_unit.unit_months, 6)
-            self.assertEqual(layer.dataset_unit.target_symbol, "SPY")
+            self.assertEqual(layer.dataset_unit.target_symbol, "AAPL")
             self.assertTrue(layer.dataset_unit.target_required)
-            self.assertEqual(layer.stages[0].dataset_unit.target_symbol, "SPY")
+            self.assertEqual(layer.stages[0].dataset_unit.target_symbol, "AAPL")
 
     def test_later_layers_block_when_task_intro_omits_target_symbol(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

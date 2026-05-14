@@ -311,7 +311,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             env.write_text(
                 "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\n"
-                "TRADING_MANAGER_SELECTED_TARGET_SYMBOL=SPY\n",
+                "TRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
                 encoding="utf-8",
             )
             state_path = tmp / "runtime" / "historical_scheduler_state.json"
@@ -341,9 +341,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         layer_three_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["layer"] == 3)
         self.assertEqual(layer_three_task["dataset_unit_kind"], "target_symbol_six_month")
-        self.assertEqual(layer_three_task["target_symbol"], "SPY")
+        self.assertEqual(layer_three_task["target_symbol"], "AAPL")
         self.assertTrue(layer_three_task["target_required"])
-        self.assertEqual(layer_three_task["detail"]["dataset_unit"]["target_symbol"], "SPY")
+        self.assertEqual(layer_three_task["detail"]["dataset_unit"]["target_symbol"], "AAPL")
 
     def test_cli_builds_payload(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

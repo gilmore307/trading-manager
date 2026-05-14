@@ -75,15 +75,15 @@ class DatasetExpansionTests(unittest.TestCase):
         evidence = [self.complete_layer(layer) for layer in range(1, 9)]
         evidence[2] = self.complete_layer(3, gaps=("split_stability",))
 
-        decision = decide_dataset_expansion(tuple(evidence), selected_target_symbol="SPY")
+        decision = decide_dataset_expansion(tuple(evidence), selected_target_symbol="AAPL")
 
         self.assertIsNotNone(decision)
         self.assertEqual(decision.layer, 3)
         self.assertEqual(decision.dataset_role, "forward_holdout")
         self.assertEqual(decision.dataset_unit_kind, "target_symbol_six_month")
         self.assertEqual(decision.dataset_unit_months, 6)
-        self.assertEqual(decision.target_symbol, "SPY")
-        self.assertIn("target SPY over 6 months", decision.task_scope_description)
+        self.assertEqual(decision.target_symbol, "AAPL")
+        self.assertIn("target AAPL over 6 months", decision.task_scope_description)
         self.assertIn("split_stability", decision.reason)
 
     def test_later_layer_expansion_blocks_until_target_symbol_is_named(self):
