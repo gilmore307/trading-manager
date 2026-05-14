@@ -248,6 +248,7 @@ def reconcile_provider_stage(
     advance_workflow: bool = False,
     workflow_state_path: Path | None = None,
     write_workflow_state: bool = False,
+    selected_target_symbol: str | None = None,
 ) -> StageReconcileSummary:
     """Run safe offline receipt/control-plane/coverage reconciliation."""
 
@@ -294,6 +295,7 @@ def reconcile_provider_stage(
             storage_root=manager_storage_root,
             state_path=resolved_workflow_state_path,
             stage_coverage_reports=(output_path,),
+            selected_target_symbol=selected_target_symbol,
             write=write_workflow_state,
         )
 
@@ -366,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
         advance_workflow=args.advance_workflow,
         workflow_state_path=args.workflow_state_path,
         write_workflow_state=args.write_workflow_state,
+        selected_target_symbol=args.target_symbol,
     )
     if args.write_summary:
         if args.summary_output_path is None:

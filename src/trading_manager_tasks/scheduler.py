@@ -320,6 +320,7 @@ def _execute_autonomous_provider_stage(
     component_src_root: Path,
     next_limit: int,
     max_workers: int,
+    selected_target_symbol: str | None,
 ) -> dict[str, Any]:
     model_layer = PROVIDER_STAGE_MODEL_LAYERS[stage_id]
     preparation, _requests, _payloads, _validations = prepare_layer_historical_training_batch(
@@ -338,6 +339,7 @@ def _execute_autonomous_provider_stage(
         end_month=end_month,
         storage_root=storage_root,
         state_path=state_path,
+        selected_target_symbol=selected_target_symbol,
         write=False,
     )
     started_state = mark_stage_started(started_state, stage_id=stage_id, reason="provider acquisition stage started by scheduler")
@@ -365,12 +367,14 @@ def _execute_autonomous_provider_stage(
         write_coverage_report=True,
         advance_workflow=True,
         write_workflow_state=True,
+        selected_target_symbol=selected_target_symbol,
     )
     refreshed_state = advance_workflow_state(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
         state_path=state_path,
+        selected_target_symbol=selected_target_symbol,
         write=False,
     )
     return {
@@ -501,6 +505,7 @@ def run_scheduler_once(
             component_src_root=component_src_root,
             next_limit=provider_stage_next_limit,
             max_workers=provider_stage_max_workers,
+            selected_target_symbol=selected_target_symbol,
         )
         return SchedulerDecision(
             contract_type="manager_scheduler_decision",

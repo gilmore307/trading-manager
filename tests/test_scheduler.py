@@ -207,6 +207,7 @@ class SchedulerTests(unittest.TestCase):
                 storage_root=tmp / "manager-storage",
                 execute_autonomous_provider_stages=True,
                 provider_stage_next_limit=5,
+                selected_target_symbol="AAPL",
             )
         self.assertEqual(decision.decision_status, "executed")
         self.assertEqual(decision.reason_code, "autonomous_provider_stage_executed")
@@ -216,6 +217,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertFalse(decision.broker_execution_performed)
         self.assertFalse(decision.storage_lifecycle_mutation_performed)
         execute_provider_stage.assert_called_once()
+        self.assertEqual(execute_provider_stage.call_args.kwargs["selected_target_symbol"], "AAPL")
 
 
 if __name__ == "__main__":
