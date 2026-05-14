@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Literal, Mapping, TextIO
 
 from .historical_training import HistoricalTrainingBatchPreparation, prepare_layer_one_historical_training_batch
+from .model_training_workflow import DATASET_UNIT_MONTHS
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DatasetRole = Literal["train", "calibration", "validation", "test", "forward_holdout", "shadow_monitoring"]
@@ -115,6 +116,11 @@ class DatasetExpansionDecision:
     requires_provider_approval: bool
     approval_gate_required: str | None
     safe_without_provider_calls: bool
+    dataset_unit_kind: str
+    dataset_unit_months: int
+    target_symbol: str | None
+    target_required: bool
+    task_scope_description: str
     provider_calls_allowed: bool = False
     model_activation_allowed: bool = False
     broker_execution_allowed: bool = False
@@ -152,6 +158,7 @@ class DatasetExpansionPlan:
     evidence: tuple[LayerDatasetEvidence, ...]
     selected_decision: DatasetExpansionDecision | None
     implementation: DatasetExpansionImplementation
+    selected_target_symbol: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         return {
@@ -159,6 +166,7 @@ class DatasetExpansionPlan:
             "start_month": self.start_month,
             "end_month": self.end_month,
             "minimum_months": dict(self.minimum_months),
+            "selected_target_symbol": self.selected_target_symbol,
             "evidence": [item.summary_row() for item in self.evidence],
             "selected_decision": self.selected_decision.summary_row() if self.selected_decision else None,
             "implementation": self.implementation.summary_row(),
@@ -235,6 +243,7 @@ def decide_dataset_expansion(
     evidence: tuple[LayerDatasetEvidence, ...],
     *,
     minimum_months: Mapping[DatasetRole, int] = DEFAULT_MINIMUM_MONTHS,
+    selected_target_symbol: str | None = None,
 ) -> DatasetExpansionDecision | None:
     """Select the next dataset role manager should expand.
 
@@ -257,6 +266,7 @@ def decide_dataset_expansion(
                     layer_evidence,
                     role,
                     reason=f"{role} coverage {observed}/{required} months; {upstream_reason or 'upstream coverage ready'}",
+                    selected_target_symbol=selected_target_symbol,
                 )
         normalized_gaps = {gap.strip().lower() for gap in layer_evidence.promotion_gaps}
         if normalized_gaps & PROMOTION_GAPS_REQUIRING_FORWARD_HOLDOUT:
@@ -270,6 +280,7 @@ def decide_dataset_expansion(
                         f"promotion gaps require forward holdout {observed}/{required} months: "
                         + ",".join(sorted(normalized_gaps & PROMOTION_GAPS_REQUIRING_FORWARD_HOLDOUT))
                     ),
+                    selected_target_symbol=selected_target_symbol,
                 )
         if layer_evidence.production_approved:
             observed = layer_evidence.role("shadow_monitoring").month_count
@@ -279,18 +290,37 @@ def decide_dataset_expansion(
                     layer_evidence,
                     "shadow_monitoring",
                     reason=f"production-approved layer needs shadow monitoring coverage {observed}/{required} months",
+                    selected_target_symbol=selected_target_symbol,
                 )
     return None
 
 
-def _decision_for_role(layer_evidence: LayerDatasetEvidence, role: DatasetRole, *, reason: str) -> DatasetExpansionDecision:
+def _decision_for_role(
+    layer_evidence: LayerDatasetEvidence,
+    role: DatasetRole,
+    *,
+    reason: str,
+    selected_target_symbol: str | None,
+) -> DatasetExpansionDecision:
     provider_backed = layer_evidence.layer in {1, 8}
+    normalized_target = selected_target_symbol.strip().upper() if selected_target_symbol else None
+    target_required = layer_evidence.layer >= 3
+    target_missing = target_required and normalized_target is None
     if layer_evidence.layer == 1:
         action = "prepare_layer_one_historical_training_batch"
+    elif target_missing:
+        action = "select_target_symbol_for_six_month_unit"
     elif layer_evidence.layer == 8:
         action = "prepare_option_expression_acquisition"
     else:
         action = "queue_offline_dataset_materialization"
+    dataset_unit_kind = "six_month_panel" if layer_evidence.layer in {1, 2} else "target_symbol_six_month"
+    target_text = normalized_target if normalized_target else ("UNSELECTED_TARGET" if target_required else "not_applicable")
+    task_scope_description = (
+        f"{layer_evidence.layer_key}: {role} dataset unit is the fixed Layer {layer_evidence.layer} panel over 6 months."
+        if layer_evidence.layer in {1, 2}
+        else f"{layer_evidence.layer_key}: {role} dataset unit is target {target_text} over 6 months."
+    )
     return DatasetExpansionDecision(
         layer=layer_evidence.layer,
         layer_key=layer_evidence.layer_key,
@@ -299,8 +329,13 @@ def _decision_for_role(layer_evidence: LayerDatasetEvidence, role: DatasetRole, 
         action=action,
         requires_provider_approval=False,
         approval_gate_required=None,
-        safe_without_provider_calls=not provider_backed,
-        provider_calls_allowed=provider_backed,
+        safe_without_provider_calls=(not provider_backed) or target_missing,
+        dataset_unit_kind=dataset_unit_kind,
+        dataset_unit_months=DATASET_UNIT_MONTHS,
+        target_symbol=normalized_target,
+        target_required=target_required,
+        task_scope_description=task_scope_description,
+        provider_calls_allowed=provider_backed and not target_missing,
     )
 
 
@@ -312,8 +347,9 @@ def build_dataset_expansion_plan(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     write: bool = False,
     output_path: Path = DEFAULT_DATASET_EXPANSION_PATH,
+    selected_target_symbol: str | None = None,
 ) -> DatasetExpansionPlan:
-    decision = decide_dataset_expansion(evidence)
+    decision = decide_dataset_expansion(evidence, selected_target_symbol=selected_target_symbol)
     implementation = DatasetExpansionImplementation(status="planned", wrote_plan=False, plan_path=None)
     layer_one_preparation: HistoricalTrainingBatchPreparation | None = None
     if write and decision and decision.action == "prepare_layer_one_historical_training_batch":
@@ -334,12 +370,15 @@ def build_dataset_expansion_plan(
             note="Prepared Layer 1 task-key payloads only; provider dispatch proceeds through autonomous historical acquisition.",
         )
     elif write and decision:
+        target_missing = decision.target_required and not decision.target_symbol
         implementation = DatasetExpansionImplementation(
-            status="prepared",
+            status="blocked" if target_missing else "prepared",
             wrote_plan=True,
             plan_path=str(output_path),
             note=(
-                "Expansion request selected by manager; component-specific implementation is queued through the workflow state."
+                "Layer 3+ expansion is blocked until the task names the selected target symbol for the six-month unit."
+                if target_missing
+                else "Expansion request selected by manager; component-specific implementation is queued through the workflow state."
                 if not decision.provider_calls_allowed
                 else "Provider-backed expansion selected; dispatch proceeds through autonomous historical acquisition controls."
             ),
@@ -360,6 +399,7 @@ def build_dataset_expansion_plan(
         evidence=evidence,
         selected_decision=decision,
         implementation=implementation,
+        selected_target_symbol=selected_target_symbol.strip().upper() if selected_target_symbol else None,
     )
     if write:
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -382,6 +422,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model-schema", default="trading_model")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_DATASET_EXPANSION_PATH)
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--write", action="store_true", help="Prepare the selected safe expansion artifact/payloads without provider calls.")
     args = parser.parse_args(argv)
 
@@ -407,6 +448,7 @@ def main(argv: list[str] | None = None) -> int:
         storage_root=args.storage_root,
         write=args.write,
         output_path=args.output_path,
+        selected_target_symbol=args.target_symbol,
     )
     write_plan(plan, output=sys.stdout)
     return 0

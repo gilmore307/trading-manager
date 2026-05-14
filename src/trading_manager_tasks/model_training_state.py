@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterable, Literal, Mapping, Sequence, TextIO
 
-from .model_training_workflow import ModelTrainingWorkflowPlan, WorkflowStage, build_model_training_workflow_plan
+from .model_training_workflow import DatasetUnit, ModelTrainingWorkflowPlan, WorkflowStage, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_WORKFLOW_STATE_PATH = Path("storage/runtime/model_training_workflow_state.json")
@@ -49,6 +49,7 @@ class StageProgress:
     status: StageProgressStatus
     command: list[str]
     blockers: tuple[str, ...]
+    dataset_unit: DatasetUnit | None = None
     approval_gate_required: str | None = None
     approval_status: str | None = None
     artifact_refs: tuple[str, ...] = ()
@@ -63,6 +64,7 @@ class StageProgress:
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
         row["blockers"] = list(self.blockers)
+        row["dataset_unit"] = self.dataset_unit.summary_row() if self.dataset_unit else None
         row["artifact_refs"] = list(self.artifact_refs)
         row["receipt_refs"] = list(self.receipt_refs)
         return row
@@ -111,6 +113,7 @@ def _stage_from_plan(stage: WorkflowStage, *, now: str) -> StageProgress:
         status=status,
         command=stage.command,
         blockers=stage.blockers,
+        dataset_unit=stage.dataset_unit,
         approval_gate_required=stage.approval_gate_required,
         updated_utc=now,
         created_at_utc=now,
@@ -166,6 +169,7 @@ def load_workflow_state(path: Path, plan: ModelTrainingWorkflowPlan) -> Workflow
             status=status,  # type: ignore[arg-type]
             command=stage.command,
             blockers=stage.blockers,
+            dataset_unit=stage.dataset_unit,
             approval_gate_required=stage.approval_gate_required,
             approval_status=row.get("approval_status"),
             artifact_refs=tuple(str(item) for item in row.get("artifact_refs") or []),
@@ -688,10 +692,16 @@ def advance_workflow_state(
     expected_receipt_counts: Mapping[str, int] | None = None,
     completed_stage_ids: Iterable[str] = (),
     approved_stage_refs: Iterable[str] = (),
+    selected_target_symbol: str | None = None,
     write: bool = False,
 ) -> WorkflowState:
     state_path = resolve_workflow_state_path(start_month, state_path, storage_root=storage_root)
-    plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
+    plan = build_model_training_workflow_plan(
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
     state = load_workflow_state(state_path, plan)
     state = ingest_completion_receipts(state, receipt_paths)
     for raw in approved_stage_refs:
@@ -734,6 +744,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stage-coverage-report", action="append", type=Path, default=[], help="Ingest manager_stage_coverage report; only ready/full coverage may complete a stage.")
     parser.add_argument("--complete-stage", action="append", default=[], help="Mark a workflow stage succeeded from manager evidence.")
     parser.add_argument("--approve-stage", action="append", default=[], help="Mark stage approval as satisfied: stage_id=approval_ref.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--write", action="store_true", help="Persist the refreshed workflow state checkpoint.")
     args = parser.parse_args(argv)
     state = advance_workflow_state(
@@ -747,6 +758,7 @@ def main(argv: list[str] | None = None) -> int:
         expected_receipt_counts=dict(parse_expected_count_arg(item) for item in args.expected_receipt_count),
         completed_stage_ids=args.complete_stage,
         approved_stage_refs=args.approve_stage,
+        selected_target_symbol=args.target_symbol,
         write=args.write,
     )
     write_state_output(state, output=sys.stdout)

@@ -245,6 +245,38 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertEqual(layer.stages[1].status, "not_applicable")
             self.assertIn("no-dedicated-trading-data-feature-stage", " ".join(layer.feature_command))
 
+    def test_dataset_units_are_layer_aware_and_target_visible(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-06",
+                selected_target_symbol="spy",
+            )
+
+        self.assertEqual(plan.selected_target_symbol, "SPY")
+        self.assertEqual(plan.layers[0].dataset_unit.unit_kind, "six_month_panel")
+        self.assertEqual(plan.layers[0].dataset_unit.unit_months, 6)
+        self.assertIsNone(plan.layers[0].dataset_unit.target_symbol)
+        self.assertFalse(plan.layers[0].dataset_unit.target_required)
+        self.assertEqual(plan.layers[1].dataset_unit.unit_kind, "six_month_panel")
+        for layer in plan.layers[2:]:
+            self.assertEqual(layer.dataset_unit.unit_kind, "target_symbol_six_month")
+            self.assertEqual(layer.dataset_unit.unit_months, 6)
+            self.assertEqual(layer.dataset_unit.target_symbol, "SPY")
+            self.assertTrue(layer.dataset_unit.target_required)
+            self.assertEqual(layer.stages[0].dataset_unit.target_symbol, "SPY")
+
+    def test_later_layers_block_when_task_intro_omits_target_symbol(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-06")
+
+        self.assertIsNone(plan.selected_target_symbol)
+        layer_three_acquisition = plan.layers[2].stages[0]
+        self.assertIn("selected_target_symbol_required", layer_three_acquisition.blockers)
+        self.assertTrue(layer_three_acquisition.dataset_unit.target_required)
+        self.assertIsNone(layer_three_acquisition.dataset_unit.target_symbol)
+
 
 if __name__ == "__main__":
     unittest.main()

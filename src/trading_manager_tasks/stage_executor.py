@@ -294,6 +294,7 @@ def execute_next_ready_stage(
     trading_model_root: Path = Path("/root/projects/trading-model"),
     receipt_root: Path = DEFAULT_RECEIPT_ROOT,
     log_root: Path = DEFAULT_LOG_ROOT,
+    selected_target_symbol: str | None = None,
     write: bool = False,
 ) -> tuple[StageExecutionSummary, WorkflowState]:
     state_path = resolve_workflow_state_path(start_month, state_path, storage_root=storage_root)
@@ -302,6 +303,7 @@ def execute_next_ready_stage(
         end_month=end_month,
         storage_root=storage_root,
         state_path=state_path,
+        selected_target_symbol=selected_target_symbol,
         write=False,
     )
     stage = next_ready_or_blocked_stage(state)
@@ -331,7 +333,12 @@ def execute_next_ready_stage(
             receipt_ref=summary.receipt_path,
             reason="stage completed by manager stage executor",
         )
-        plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
+        plan = build_model_training_workflow_plan(
+            start_month=start_month,
+            end_month=end_month,
+            storage_root=storage_root,
+            selected_target_symbol=selected_target_symbol,
+        )
         updated = refresh_workflow_state(updated, plan=plan)
     elif summary.status == "failed":
         updated = mark_stage_failed(
@@ -361,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trading-model-root", type=Path, default=Path("/root/projects/trading-model"))
     parser.add_argument("--receipt-root", type=Path, default=DEFAULT_RECEIPT_ROOT)
     parser.add_argument("--log-root", type=Path, default=DEFAULT_LOG_ROOT)
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--write", action="store_true", help="Persist successful stage progress to the workflow state checkpoint.")
     args = parser.parse_args(argv)
     summary, _state = execute_next_ready_stage(
@@ -373,6 +381,7 @@ def main(argv: list[str] | None = None) -> int:
         trading_model_root=args.trading_model_root,
         receipt_root=args.receipt_root,
         log_root=args.log_root,
+        selected_target_symbol=args.target_symbol,
         write=args.write,
     )
     write_stage_execution_summary(summary, output=sys.stdout)

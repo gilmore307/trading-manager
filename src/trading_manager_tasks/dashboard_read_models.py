@@ -270,6 +270,26 @@ def _storage_root_from_checkpoint_path(path: object) -> Path:
     return DEFAULT_STORAGE_ROOT
 
 
+def _selected_target_symbol_from_service_env(status: HistoricalSchedulerStatus) -> str | None:
+    env_path = _resolve_local_path(status.service_env.path)
+    if env_path is None or not env_path.exists():
+        return None
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key.strip() != "TRADING_MANAGER_SELECTED_TARGET_SYMBOL":
+            continue
+        symbol = value.strip().strip('"').strip("'").upper()
+        return symbol or None
+    return None
+
+
 def _planned_stage_rows(status: HistoricalSchedulerStatus, *, month: str | None = None) -> list[dict[str, Any]]:
     selected_month = month or status.current_month
     if not selected_month:
@@ -279,6 +299,7 @@ def _planned_stage_rows(status: HistoricalSchedulerStatus, *, month: str | None 
             start_month=selected_month,
             end_month=selected_month,
             storage_root=_storage_root_from_checkpoint_path(status.workflow_checkpoint.path),
+            selected_target_symbol=_selected_target_symbol_from_service_env(status),
         )
     except Exception:
         return []
@@ -470,6 +491,7 @@ def _task_timeline(
             receipt_refs = raw_stage.get("receipt_refs") or []
             if not isinstance(receipt_refs, list):
                 receipt_refs = []
+            dataset_unit = raw_stage.get("dataset_unit") if isinstance(raw_stage.get("dataset_unit"), Mapping) else None
             task: dict[str, Any] = {
                 "sequence": len(tasks) + 1,
                 "month": raw_stage.get("month") or raw_stage.get("start_month") or timeline_month,
@@ -480,6 +502,10 @@ def _task_timeline(
                 "stage_type": raw_stage.get("stage_type"),
                 "layer": raw_stage.get("layer"),
                 "layer_key": raw_stage.get("layer_key"),
+                "dataset_unit_kind": dataset_unit.get("unit_kind") if dataset_unit else None,
+                "dataset_unit_months": dataset_unit.get("unit_months") if dataset_unit else None,
+                "target_symbol": dataset_unit.get("target_symbol") if dataset_unit else None,
+                "target_required": dataset_unit.get("target_required") if dataset_unit else None,
                 "updated_at_utc": raw_stage.get("updated_utc"),
                 **_task_timestamp_fields(raw_stage, storage_root=storage_root),
                 "reason": reason or None,
@@ -492,6 +518,7 @@ def _task_timeline(
                     "provider_calls_allowed": raw_stage.get("provider_calls_allowed"),
                     "model_activation_allowed": raw_stage.get("model_activation_allowed"),
                     "broker_execution_allowed": raw_stage.get("broker_execution_allowed"),
+                    "dataset_unit": dataset_unit,
                 },
             }
             if is_active_month and coverage_stage_id and stage_id == coverage_stage_id and stage_coverage is not None:

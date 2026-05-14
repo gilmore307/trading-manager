@@ -75,12 +75,34 @@ class DatasetExpansionTests(unittest.TestCase):
         evidence = [self.complete_layer(layer) for layer in range(1, 9)]
         evidence[2] = self.complete_layer(3, gaps=("split_stability",))
 
-        decision = decide_dataset_expansion(tuple(evidence))
+        decision = decide_dataset_expansion(tuple(evidence), selected_target_symbol="SPY")
 
         self.assertIsNotNone(decision)
         self.assertEqual(decision.layer, 3)
         self.assertEqual(decision.dataset_role, "forward_holdout")
+        self.assertEqual(decision.dataset_unit_kind, "target_symbol_six_month")
+        self.assertEqual(decision.dataset_unit_months, 6)
+        self.assertEqual(decision.target_symbol, "SPY")
+        self.assertIn("target SPY over 6 months", decision.task_scope_description)
         self.assertIn("split_stability", decision.reason)
+
+    def test_later_layer_expansion_blocks_until_target_symbol_is_named(self):
+        evidence = [self.complete_layer(layer) for layer in range(1, 9)]
+        evidence[2] = self.complete_layer(3, gaps=("coverage",))
+
+        plan = build_dataset_expansion_plan(
+            start_month="2016-01",
+            end_month="2016-06",
+            evidence=tuple(evidence),
+            write=True,
+        )
+
+        self.assertEqual(plan.selected_decision.layer, 3)
+        self.assertEqual(plan.selected_decision.action, "select_target_symbol_for_six_month_unit")
+        self.assertTrue(plan.selected_decision.target_required)
+        self.assertIsNone(plan.selected_decision.target_symbol)
+        self.assertEqual(plan.implementation.status, "blocked")
+        self.assertIn("target symbol", plan.implementation.note)
 
     def test_write_prepares_layer_one_payloads_without_provider_calls(self):
         with tempfile.TemporaryDirectory() as tmpdir:

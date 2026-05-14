@@ -449,6 +449,7 @@ def run_daemon_loop(
     execute_autonomous_provider_stages: bool = False,
     provider_stage_next_limit: int = 5,
     provider_stage_max_workers: int = 4,
+    selected_target_symbol: str | None = None,
     auto_select_next_work: bool = False,
     advance_month_on_complete: bool = False,
     drain_ready_stages: bool = False,
@@ -512,6 +513,7 @@ def run_daemon_loop(
                         execute_autonomous_provider_stages=execute_autonomous_provider_stages,
                         provider_stage_next_limit=provider_stage_next_limit,
                         provider_stage_max_workers=provider_stage_max_workers,
+                        selected_target_symbol=selected_target_symbol,
                     )
                     append_decision_log(decision_log_path, decision)
                     completed = utc_now_iso()
@@ -584,6 +586,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Allow one bounded autonomous provider-dispatch/reconcile slice per tick when provider acquisition is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one daemon tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one daemon tick.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")
     parser.add_argument("--drain-ready-stages", action="store_true", help="After a scheduler-owned task completes, immediately continue to the next runnable safe task until no task is ready or drain limits are reached.")
@@ -619,6 +622,7 @@ def main(argv: list[str] | None = None) -> int:
         execute_autonomous_provider_stages=args.execute_autonomous_provider_stages,
         provider_stage_next_limit=args.provider_stage_next_limit,
         provider_stage_max_workers=args.provider_stage_max_workers,
+        selected_target_symbol=args.target_symbol,
         auto_select_next_work=args.auto_select_next_work,
         advance_month_on_complete=args.advance_month_on_complete,
         drain_ready_stages=args.drain_ready_stages,

@@ -401,6 +401,7 @@ def run_scheduler_once(
     execute_autonomous_provider_stages: bool = False,
     provider_stage_next_limit: int = 5,
     provider_stage_max_workers: int = 4,
+    selected_target_symbol: str | None = None,
 ) -> SchedulerDecision:
     """Run one scheduler tick.
 
@@ -446,12 +447,18 @@ def run_scheduler_once(
             next_internal_stage="historical_training_work_loop",
         )
 
-    workflow_plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
+    workflow_plan = build_model_training_workflow_plan(
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
     workflow_state = advance_workflow_state(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
         state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
+        selected_target_symbol=selected_target_symbol,
         write=False,
     )
     workflow_next_stage = next_ready_or_blocked_stage(workflow_state)
@@ -537,6 +544,7 @@ def run_scheduler_once(
             state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
             receipt_root=storage_root / "runtime" / "model_training_stage_receipts",
             log_root=storage_root / "runtime" / "model_training_stage_logs",
+            selected_target_symbol=selected_target_symbol,
             write=True,
         )
         return SchedulerDecision(
@@ -611,12 +619,18 @@ def run_scheduler_once(
         persist_sql=False,
         validate_handoff=True,
     )
-    refreshed_workflow_plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
+    refreshed_workflow_plan = build_model_training_workflow_plan(
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
     refreshed_workflow_state = advance_workflow_state(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
         state_path=workflow_state_path_for_month(start_month, root=storage_root / "runtime"),
+        selected_target_symbol=selected_target_symbol,
         write=False,
     )
     return SchedulerDecision(
@@ -653,6 +667,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Execute one bounded autonomous provider-dispatch/reconcile slice when a provider acquisition stage is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one scheduler tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one scheduler tick.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
@@ -683,6 +698,7 @@ def main(argv: list[str] | None = None) -> int:
         execute_autonomous_provider_stages=args.execute_autonomous_provider_stages,
         provider_stage_next_limit=args.provider_stage_next_limit,
         provider_stage_max_workers=args.provider_stage_max_workers,
+        selected_target_symbol=args.target_symbol,
     )
     write_scheduler_decision(decision, output=sys.stdout)
     return 0

@@ -22,6 +22,23 @@ StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 FULL_LAYER_COUNT = 8
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 22
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
+DATASET_UNIT_MONTHS = 6
+
+
+@dataclass(frozen=True)
+class DatasetUnit:
+    """Operator-visible historical-training dataset work unit."""
+
+    unit_kind: str
+    unit_months: int
+    start_month: str
+    end_month: str
+    target_symbol: str | None
+    target_required: bool
+    description: str
+
+    def summary_row(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -35,6 +52,7 @@ class WorkflowStage:
     description: str
     status: StageStatus
     command: list[str]
+    dataset_unit: DatasetUnit
     blockers: tuple[str, ...] = ()
     approval_gate_required: str | None = None
     safe_without_provider_calls: bool = True
@@ -43,7 +61,10 @@ class WorkflowStage:
     broker_execution_allowed: bool = False
 
     def summary_row(self) -> dict[str, Any]:
-        return asdict(self) | {"blockers": list(self.blockers)}
+        row = asdict(self)
+        row["dataset_unit"] = self.dataset_unit.summary_row()
+        row["blockers"] = list(self.blockers)
+        return row
 
 
 @dataclass(frozen=True)
@@ -57,6 +78,7 @@ class LayerWorkflow:
     progression_mode: str
     candidate_axis: str
     candidate_progression_policy: str
+    dataset_unit: DatasetUnit
     data_surface: str
     feature_command: list[str]
     model_generate_command: list[str]
@@ -74,6 +96,7 @@ class LayerWorkflow:
             "progression_mode": self.progression_mode,
             "candidate_axis": self.candidate_axis,
             "candidate_progression_policy": self.candidate_progression_policy,
+            "dataset_unit": self.dataset_unit.summary_row(),
             "data_surface": self.data_surface,
             "feature_command": self.feature_command,
             "model_generate_command": self.model_generate_command,
@@ -91,6 +114,7 @@ class ModelTrainingWorkflowPlan:
     contract_type: str
     start_month: str
     end_month: str
+    selected_target_symbol: str | None
     layer_count: int
     layer_one_task_key_count: int
     layer_two_task_key_count: int
@@ -105,6 +129,7 @@ class ModelTrainingWorkflowPlan:
             "contract_type": self.contract_type,
             "start_month": self.start_month,
             "end_month": self.end_month,
+            "selected_target_symbol": self.selected_target_symbol,
             "layer_count": self.layer_count,
             "layer_one_task_key_count": self.layer_one_task_key_count,
             "layer_two_task_key_count": self.layer_two_task_key_count,
@@ -123,8 +148,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "MarketRegimeModel",
         "depends_on_layers": (),
         "progression_mode": "background_panel_continuous",
-        "candidate_axis": "month",
-        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each chronological month, then continue to the next month without waiting for downstream layers",
+        "candidate_axis": "six_month_window",
+        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each six-month chronological unit, then continue to the next six-month unit without waiting for downstream layers",
         "data_surface": "autonomous Alpaca ETF bars acquisition plus feature_01_market_regime",
         "feature_cli": "trading-data-feature-01-market-regime",
     },
@@ -134,8 +159,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "SectorContextModel",
         "depends_on_layers": (1,),
         "progression_mode": "sector_panel_continuous",
-        "candidate_axis": "month;sector_or_industry_symbol",
-        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each chronological month once Layer 1 context exists, then continue forward without waiting for Layers 3-8",
+        "candidate_axis": "six_month_window;sector_or_industry_symbol",
+        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists, then continue forward without waiting for Layers 3-8",
         "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
@@ -145,8 +170,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "TargetStateVectorModel",
         "depends_on_layers": (1, 2),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "month;target_candidate_id",
-        "candidate_progression_policy": "for each selected target candidate, complete Layers 3-7 in order before admitting the next target candidate unless a reviewed coverage exception is recorded",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id",
+        "candidate_progression_policy": "for one selected target symbol and one six-month unit, complete Layers 3-7 in order before admitting the next target unless a reviewed coverage exception is recorded",
         "data_surface": "target candidate/source_03 inputs plus feature_03_target_state_vector",
         "feature_cli": "trading-data-feature-03-target-state-vector",
     },
@@ -156,7 +181,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "EventOverlayModel",
         "depends_on_layers": (3,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "month;target_candidate_id;event_context_id",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_context_id",
         "candidate_progression_policy": "continue the active target candidate chain after Layer 3 target state is ready; do not fan out to unrelated targets mid-chain",
         "data_surface": "source_04_event_overlay plus feature_04_event_overlay",
         "feature_cli": "trading-data-feature-04-event-overlay",
@@ -167,7 +192,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "AlphaConfidenceModel",
         "depends_on_layers": (4,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "month;target_candidate_id;event_context_id",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_context_id",
         "candidate_progression_policy": "continue the active target candidate chain after Layer 4 event context is ready",
         "data_surface": "upstream state/event vectors plus labels; no dedicated trading-data source",
         "feature_cli": None,
@@ -178,7 +203,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "PositionProjectionModel",
         "depends_on_layers": (5,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "month;target_candidate_id;position_context_id",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;position_context_id",
         "candidate_progression_policy": "continue the active target candidate chain after Layer 5 alpha confidence is ready",
         "data_surface": "alpha confidence plus position/risk/cost context; no dedicated trading-data source",
         "feature_cli": None,
@@ -189,7 +214,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "UnderlyingActionModel",
         "depends_on_layers": (6,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "month;target_candidate_id;underlying_action_context_id",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;underlying_action_context_id",
         "candidate_progression_policy": "finish the active target candidate chain through Layer 7 before admitting the next target candidate",
         "data_surface": "model/control-plane action context; no dedicated trading-data source",
         "feature_cli": None,
@@ -200,7 +225,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "OptionExpressionModel",
         "depends_on_layers": (1, 2, 3, 4, 5, 6, 7),
         "progression_mode": "option_expression_after_target_chain_complete",
-        "candidate_axis": "month;target_candidate_id;option_contract_bucket",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
         "candidate_progression_policy": "admit option-expression contract/bucket expansion only after the upstream Layer 1-7 context/target chain is complete for the selected target; expand expirations near-to-far by listed expiry week and include current-to-target strike corridor plus three listed strike levels on each side without prefiltering illiquid/extreme contracts for model-construction coverage; V1 expression candidates are single-leg only",
         "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active Layer 7 target chains exist plus feature_08_option_expression",
         "feature_cli": "trading-data-feature-08-option-expression",
@@ -363,7 +388,51 @@ def _stage_status_for_provider_acquisition(
     return "ready", (), None
 
 
-def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int, layer_two_task_key_count: int) -> LayerWorkflow:
+def _dataset_unit_for_layer(
+    *,
+    layer: int,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> DatasetUnit:
+    if layer in {1, 2}:
+        return DatasetUnit(
+            unit_kind="six_month_panel",
+            unit_months=DATASET_UNIT_MONTHS,
+            start_month=start_month,
+            end_month=end_month,
+            target_symbol=None,
+            target_required=False,
+            description=f"Layer {layer} dataset unit: fixed panel over one six-month window; no single target symbol applies.",
+        )
+    target = selected_target_symbol.strip().upper() if selected_target_symbol else None
+    target_text = target if target else "UNSELECTED_TARGET"
+    return DatasetUnit(
+        unit_kind="target_symbol_six_month",
+        unit_months=DATASET_UNIT_MONTHS,
+        start_month=start_month,
+        end_month=end_month,
+        target_symbol=target,
+        target_required=True,
+        description=f"Layer {layer} dataset unit: target {target_text} over one six-month window.",
+    )
+
+
+def _with_target_blocker(blockers: tuple[str, ...], *, layer: int, selected_target_symbol: str | None) -> tuple[str, ...]:
+    if layer >= 3 and not (selected_target_symbol and selected_target_symbol.strip()):
+        return ("selected_target_symbol_required",) + blockers
+    return blockers
+
+
+def _build_layer_workflow(
+    meta: dict[str, Any],
+    *,
+    layer_one_task_key_count: int,
+    layer_two_task_key_count: int,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> LayerWorkflow:
     layer = int(meta["layer"])
     slug = str(meta["slug"])
     key = layer_key(layer, slug)
@@ -372,6 +441,12 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
     review = model_script(layer, slug, "review")
     feature = feature_command(meta.get("feature_cli"))
     maintenance = maintenance_command(layer, slug)
+    dataset_unit = _dataset_unit_for_layer(
+        layer=layer,
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
 
     if layer == 1:
         acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_provider_acquisition(
@@ -448,6 +523,8 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
 
+    acquisition_blockers = _with_target_blocker(acquisition_blockers, layer=layer, selected_target_symbol=selected_target_symbol)
+
     stages = [
         WorkflowStage(
             stage_id=f"{key}.data_acquisition",
@@ -457,6 +534,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
             description=str(meta["data_surface"]),
             status=acquisition_status,
             command=acquisition_command,
+            dataset_unit=dataset_unit,
             blockers=acquisition_blockers,
             approval_gate_required=acquisition_gate,
             safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
@@ -473,6 +551,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
                 description="No dedicated trading-data feature surface; consume upstream model/control-plane artifacts.",
                 status="not_applicable",
                 command=feature,
+                dataset_unit=dataset_unit,
             )
         )
     else:
@@ -485,7 +564,8 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
                 description="Generate deterministic feature rows from materialized local inputs.",
                 status="blocked",
                 command=feature,
-                blockers=(f"{key}.data_acquisition_complete",),
+                dataset_unit=dataset_unit,
+                blockers=_with_target_blocker((f"{key}.data_acquisition_complete",), layer=layer, selected_target_symbol=selected_target_symbol),
             )
         )
     for stage_type, command, description, blockers in (
@@ -523,7 +603,8 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
                 description=description,
                 status="blocked",
                 command=command,
-                blockers=blockers,
+                dataset_unit=dataset_unit,
+                blockers=_with_target_blocker(blockers, layer=layer, selected_target_symbol=selected_target_symbol),
             )
         )
     return LayerWorkflow(
@@ -534,6 +615,7 @@ def _build_layer_workflow(meta: dict[str, Any], *, layer_one_task_key_count: int
         progression_mode=str(meta["progression_mode"]),
         candidate_axis=str(meta["candidate_axis"]),
         candidate_progression_policy=str(meta["candidate_progression_policy"]),
+        dataset_unit=dataset_unit,
         data_surface=str(meta["data_surface"]),
         feature_command=feature,
         model_generate_command=generate,
@@ -549,6 +631,7 @@ def build_model_training_workflow_plan(
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     storage_root: Path = DEFAULT_STORAGE_ROOT,
+    selected_target_symbol: str | None = None,
 ) -> ModelTrainingWorkflowPlan:
     task_key_count = count_layer_one_task_keys(storage_root, start_month=start_month)
     layer_two_task_key_count = count_layer_two_task_keys(storage_root, start_month=start_month)
@@ -557,6 +640,9 @@ def build_model_training_workflow_plan(
             meta,
             layer_one_task_key_count=task_key_count,
             layer_two_task_key_count=layer_two_task_key_count,
+            start_month=start_month,
+            end_month=end_month,
+            selected_target_symbol=selected_target_symbol,
         )
         for meta in LAYER_METADATA
     )
@@ -572,6 +658,7 @@ def build_model_training_workflow_plan(
         contract_type="manager_model_training_workflow_plan",
         start_month=start_month,
         end_month=end_month,
+        selected_target_symbol=selected_target_symbol.strip().upper() if selected_target_symbol else None,
         layer_count=len(layers),
         layer_one_task_key_count=task_key_count,
         layer_two_task_key_count=layer_two_task_key_count,
@@ -590,12 +677,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     args = parser.parse_args(argv)
     write_workflow_plan(
         build_model_training_workflow_plan(
             start_month=args.start_month,
             end_month=args.end_month,
             storage_root=args.storage_root,
+            selected_target_symbol=args.target_symbol,
         ),
         output=sys.stdout,
     )
@@ -603,6 +692,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 __all__ = [
+    "DATASET_UNIT_MONTHS",
+    "DatasetUnit",
     "FULL_LAYER_COUNT",
     "LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS",
     "LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS",

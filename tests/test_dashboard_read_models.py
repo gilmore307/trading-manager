@@ -305,6 +305,46 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual([task["month"] for task in task_timeline], ["2019-04", "2019-06"])
         self.assertEqual([task["task_state"] for task in task_timeline], ["completed", "current"])
 
+    def test_planned_task_timeline_uses_service_target_symbol(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\n"
+                "TRADING_MANAGER_SELECTED_TARGET_SYMBOL=SPY\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "start_month": "2019-05",
+                        "end_month": "2019-05",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage",
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
+
+        layer_three_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["layer"] == 3)
+        self.assertEqual(layer_three_task["dataset_unit_kind"], "target_symbol_six_month")
+        self.assertEqual(layer_three_task["target_symbol"], "SPY")
+        self.assertTrue(layer_three_task["target_required"])
+        self.assertEqual(layer_three_task["detail"]["dataset_unit"]["target_symbol"], "SPY")
+
     def test_cli_builds_payload(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

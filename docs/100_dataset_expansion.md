@@ -85,14 +85,21 @@ When the historical sampling universe is broader than live routing, manager evid
 
 The manager walks layers in dependency order and expands the earliest layer with a blocking evidence gap, but the unit of expansion differs by layer segment.
 
-1. Layers 1-2 are finite panel flows: continue chronological months after each layer's own month-level receipts are ready; do not wait for downstream Layers 3-8.
-2. Layers 3-7 are target-major serial flows: select one target candidate, complete Layers 3 -> 4 -> 5 -> 6 -> 7 for that target, then admit the next target candidate unless a reviewed coverage exception is recorded.
+| Layer segment | Dataset unit | Target binding rule |
+|---|---|---|
+| Layers 1-2 | One six-month chronological panel. | No single target symbol applies; the unit is the reviewed market/sector panel over the six-month window. |
+| Layers 3-7 | One target symbol over one six-month window. | The task introduction/plan must name `target_symbol`; if omitted, the task remains blocked with `selected_target_symbol_required`. |
+| Layer 8 | One target symbol over one six-month window, then option-expression buckets for that completed target chain. | The task inherits the selected `target_symbol` from the Layer 3-7 chain before contract/bucket expansion begins. |
+
+1. Layers 1-2 are finite six-month panel flows: continue chronological six-month units after each layer's own receipts are ready; do not wait for downstream Layers 3-8.
+2. Layers 3-7 are target-major serial flows: select one target symbol, complete Layers 3 -> 4 -> 5 -> 6 -> 7 for that target over the six-month unit, then admit the next target symbol unless a reviewed coverage exception is recorded.
 3. Layer 8 is option-expression expansion and begins only after the selected target's upstream Layer 1-7 context/target chain is complete.
-4. Fill train, then calibration, then validation, then test.
-5. Use `forward_holdout` only after the base split ladder exists and evidence gaps such as coverage, drift, split stability, stale holdout, regime coverage, or baseline instability remain.
-6. Use realtime/shadow monitoring only as online decision-effectiveness metrics, and never as a substitute for offline promotion evidence or historical test rows.
-7. Every expansion plan must preserve point-in-time/no-future/no-downstream-leakage discipline.
-8. Dataset snapshots and splits remain frozen evidence; if expansion changes the sample universe, it creates a new snapshot/split lineage rather than silently rewriting reviewed evidence.
+4. Every Layer 3+ expansion/task plan must expose `selected_target_symbol`, `dataset_unit_kind=target_symbol_six_month`, and `dataset_unit_months=6` in the emitted plan/state/dashboard rows.
+5. Fill train, then calibration, then validation, then test.
+6. Use `forward_holdout` only after the base split ladder exists and evidence gaps such as coverage, drift, split stability, stale holdout, regime coverage, or baseline instability remain.
+7. Use realtime/shadow monitoring only as online decision-effectiveness metrics, and never as a substitute for offline promotion evidence or historical test rows.
+8. Every expansion plan must preserve point-in-time/no-future/no-downstream-leakage discipline.
+9. Dataset snapshots and splits remain frozen evidence; if expansion changes the sample universe, it creates a new snapshot/split lineage rather than silently rewriting reviewed evidence.
 
 ## Evidence collection
 
@@ -124,8 +131,11 @@ The manager planner entrypoint is:
 ```bash
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py \
   --start-month 2016-01 \
-  --end-month 2016-01
+  --end-month 2016-06 \
+  --target-symbol SPY
 ```
+
+For Layers 1-2, `--target-symbol` is ignored because the dataset unit is the six-month panel. For Layers 3-8, omitting `--target-symbol` is intentionally blocking: the emitted task plan tells the operator that the selected target is missing instead of allowing vague downstream work.
 
 Optional evidence can be supplied as JSON:
 
