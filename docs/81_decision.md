@@ -3244,3 +3244,48 @@ After every executed progress decision or chronological month advancement, the d
 - The dashboard can show near-real-time progress through the existing websocket path because read-model materialization is triggered by workflow progress events.
 - The periodic dashboard refresh timer and scheduler interval remain useful as backstops rather than primary progress mechanisms.
 - Drain limits and existing gates prevent tight-looping, provider hammering, or accidental expansion into activation/broker/account boundaries.
+
+## D141 - Pause monthly scheduler progression and adopt rolling-fold promotion runtime
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The resident historical scheduler proved that manager-owned automation can advance provider acquisition, feature generation, evaluation, dashboard refresh, and task lifecycle reporting without broker/account mutation. Runtime measurements also showed that the old month-by-month/local split posture is not the right production-promotion evidence shape. Existing monthly evaluation artifacts are useful diagnostics, but they do not provide enough stability evidence for production-grade model promotion.
+
+Chentong directed that task progression may stop now because enough information has been collected to optimize the process before continuing.
+
+### Decision
+
+Pause the current historical task progression before changing the model/evaluation/promotion charter. The next accepted runtime shape is `rolling_fold_promotion`:
+
+- four bounded month-ingest workers prepare reusable month-scoped substrate: provider/raw data, cleaned monthly data, point-in-time features, feature-ready manifests, and coverage evidence;
+- one serial model/promotion worker consumes only complete frozen fold manifests and owns model generation, validation/calibration, test evaluation, promotion evidence preparation, and the agent promotion decision;
+- rolling folds use `fold_size_months = 6`, `train_months = 4`, `validation_months = 1`, `test_months = 1`, and default `fold_step_months = 1`;
+- validation/test are post-model candidate evaluations, not pre-model work; pre-model ingest workers may prepare labels, split candidates, and manifests but must not evaluate a candidate that does not yet exist;
+- promotion is one scheduler task that packages evidence packet build, gate checks, baseline comparison, split-stability check, leakage check, calibration/test report, agent review, and durable decision write;
+- promotion decision results are `approved`, `deferred`, or `rejected` for this scheduler task boundary;
+- promotion approval does not activate a live model, switch production pointers, submit broker orders, mutate accounts, or authorize live trading. Activation remains a separate reviewed policy boundary.
+
+Model/evaluation/promotion artifacts produced under the old local/monthly split policy may be superseded and rebuilt. Downloaded provider data, cleaned monthly data, point-in-time features, feature-ready manifests, and coverage evidence are reusable substrate when their point-in-time and coverage contracts remain valid.
+
+SQL/storage coordination must prevent the serial model/promotion worker from reading half-finished or mixed-version data. Month-ingest workers write partitioned staging/output scopes, validate coverage, publish manifest/artifact refs, and emit `ready_signal`s. Fold preparation freezes explicit input manifests; model/promotion reads those frozen manifests only, never unqualified `latest`, uncommitted staging, or partial month rows.
+
+Accepted lock families for the next implementation are:
+
+- `ingest_lock:{month}:{layer}:{stage_type}`;
+- `feature_publish_lock:{month}:{layer}`;
+- `cohort_barrier_lock:{cohort_start}:{cohort_end}:{layer}`;
+- `model_cohort_lock:{cohort_start}:{cohort_end}:{layer}`;
+- `promotion_lock:{model_id}`;
+- `cursor_lock`;
+- `dashboard_publish_lock:{read_model}`.
+
+### Consequences
+
+- The current scheduler service can remain stopped while docs, registry, and implementation move to the rolling-fold charter.
+- Old monthly/local evaluation summaries remain evidence, not promotion-grade acceptance gates.
+- The next scheduler implementation should replace monthly `promotion_review_preparation` semantics with fold-scoped `rolling_fold_promotion` / `promotion` task semantics.
+- Dashboard and task summaries should eventually show fold preparation, model worker, and promotion task state without reading raw internals.
+- Live activation, broker/account mutation, and execution lifecycle remain outside historical scheduler authority.

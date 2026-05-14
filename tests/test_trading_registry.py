@@ -904,9 +904,12 @@ class RegistryHelperTests(unittest.TestCase):
             "docs_status",
         }
         expected_domains = {
+            "agent_model_promotion_decision",
             "artifact_sync_policy_type",
             "manager_contract_lifecycle_status",
             "manager_request",
+            "promotion_result",
+            "rolling_fold_promotion_task",
             "run_manifest",
             "run_step",
             "artifact_ref",

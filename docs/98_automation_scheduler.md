@@ -2,6 +2,8 @@
 
 `trading-manager` should become the always-on automation control plane for historical model training and maintenance while preserving capacity for live trading operations.
 
+As of D141, historical task progression is intentionally paused while the runtime charter moves from month-local evaluation to rolling-fold promotion. The prior resident scheduler implementation remains accepted as infrastructure, but autonomous progress should not resume until the rolling-fold worker/fold/promotion contract is implemented and reviewed.
+
 This policy is accepted as the target scheduler shape. The first implementation is `scripts/tasks/run_automation_scheduler.py`, which runs one gated scheduler tick and can execute safe offline Layer 1 preparation only. It does not enable live provider calls, model activation, broker orders, fills, position mutation, or unattended production trading.
 
 ## Responsibility
@@ -9,14 +11,16 @@ This policy is accepted as the target scheduler shape. The first implementation 
 The manager scheduler owns continuous orchestration across the full offline training lifecycle. Historical provider acquisition is part of that lifecycle, not an external manual requirement:
 
 ```text
-data acquisition planning
-  -> autonomous historical provider acquisition dispatch
+month-scoped ingest planning
+  -> autonomous bounded historical provider acquisition dispatch
   -> source normalization
-  -> feature generation
-  -> model training/generation
-  -> evaluation and label evidence
-  -> promotion-review request
-  -> agent decision artifact for production promotion/activation
+  -> point-in-time feature generation
+  -> monthly feature-ready manifests and coverage evidence
+  -> frozen rolling-fold input manifest
+  -> serial model generation
+  -> validation/calibration and test evaluation
+  -> promotion evidence packet
+  -> agent promotion decision artifact
 ```
 
 The scheduler should not sit idle when safe work exists. If provider calls are waiting on bounded controls/validation, or if a regular-trading-day market-hours throttle is active, it should shift to work that does not violate gates: dataset expansion planning, decision-artifact preparation, payload preparation, handoff validation, local feature/model/evaluation jobs over materialized data, receipt normalization, artifact/reference checks, stale-failure retry planning, docs/registry consistency checks, and storage lifecycle rule evaluation.
@@ -26,6 +30,39 @@ Dataset expansion is manager-owned. The manager decides whether the next expansi
 Layer progression is segmented rather than synchronized across all models. Layers 1-2 are finite background panels and may keep moving forward by month after their own receipts are ready. Layers 3-7 are a target-major chain: complete one selected target candidate through Layer 7 before opening the next target candidate by default. Layer 8 waits for the upstream target chain before expanding option-expression contract buckets. This is the default scheduler posture unless a reviewed coverage/exception artifact says otherwise.
 
 Layer 8 option buckets expand from near expirations to farther expirations: current listed week first, then next listed week, then the following listed week, continuing outward only when coverage policy requires it. For each selected target, the strike bucket is the listed-strike corridor from current underlying reference price to Layer 7 target price plus three listed strike levels below the corridor and three listed strike levels above it. Example: current `95`, target `100`, one-dollar listed strikes -> `92` through `103`. Historical model-construction buckets intentionally do not prefilter out illiquid, wide-spread, low-OI, high-IV, deep ITM/OTM, or otherwise extreme contracts; those observations are needed for robustness and should become features/labels/reason codes rather than acquisition-time exclusions. V1 expression coverage is single-leg only: long call, long put, or no-option expression.
+
+## Rolling-Fold Runtime Charter
+
+The next historical runtime uses two classes of work lanes:
+
+- `month_ingest_workers = 4`: bounded workers that prepare month-scoped provider/raw data, cleaned data, point-in-time features, feature-ready manifests, and coverage evidence. These workers may run in parallel only when output scopes are partitioned by month/layer/stage and protected by ingest/publish locks.
+- `model_promotion_workers = 1`: a single serial worker that consumes complete frozen rolling-fold manifests and owns model generation, validation/calibration, test evaluation, promotion evidence preparation, and agent promotion decision tasks.
+
+Rolling-fold policy:
+
+- `fold_size_months = 6`;
+- `train_months = 4`;
+- `validation_months = 1`;
+- `test_months = 1`;
+- default `fold_step_months = 1`.
+
+Validation and test are post-candidate evaluations. Ingest workers may prepare point-in-time labels, split candidates, and manifests, but model validation/test cannot run until the model worker has generated a candidate against a frozen input manifest.
+
+Promotion is a single scheduler task, not a loose sequence of independent chores. The task packages evidence packet build, gate checks, baseline comparison, split-stability check, leakage check, calibration/test report, agent review, and durable decision write. Accepted scheduler-level promotion results are `approved`, `deferred`, and `rejected`. An `approved` promotion decision does not activate live trading, switch production pointers, submit orders, mutate accounts, or authorize broker activity; activation remains a separate reviewed policy boundary.
+
+Reusable substrate after this charter change: downloaded provider data, monthly cleaned data, point-in-time features, feature-ready manifests, and coverage evidence. Supersedable artifacts: model rows, evaluation summaries, split artifacts, promotion metrics, promotion review/decision packets, and dashboard model/eval/promotion status produced under the old local/monthly split policy.
+
+SQL/storage coordination must prevent the serial model/promotion worker from reading half-finished or mixed-version data. It may read only frozen rolling-fold manifests with explicit artifact refs, ready signals, coverage evidence, and versioned input scope. It must not read unqualified `latest`, uncommitted staging, or partial month rows.
+
+Accepted lock families for implementation:
+
+- `ingest_lock:{month}:{layer}:{stage_type}`;
+- `feature_publish_lock:{month}:{layer}`;
+- `cohort_barrier_lock:{cohort_start}:{cohort_end}:{layer}`;
+- `model_cohort_lock:{cohort_start}:{cohort_end}:{layer}`;
+- `promotion_lock:{model_id}`;
+- `cursor_lock`;
+- `dashboard_publish_lock:{read_model}`.
 
 ## Priority Order
 
@@ -82,7 +119,7 @@ Outside the protected window, including non-trading days, the scheduler should r
 Automation does not weaken gates:
 
 - historical provider/data acquisition is autonomous once manager request payloads are prepared and resource gates pass;
-- model activation is decided by the agent through script-called `agent_model_promotion_decision`; only an agent-approved decision can produce a valid activation artifact;
+- model promotion is decided by the agent through script-called `agent_model_promotion_decision`, but promotion approval does not by itself activate a live model, switch production pointers, or authorize broker/account mutation; activation remains a separate reviewed boundary;
 - broker/order/fill/account mutation remains execution-owned and must not be inferred from model-training progress;
 - secrets remain alias/config references only.
 
@@ -99,9 +136,9 @@ The scheduler implementation should behave like a durable work loop:
 
 If no safe work exists, the scheduler should report why: waiting for agent decision, regular-trading-day market-hours protection, resource pressure, missing upstream artifact, failed dependency, provider quota, or promotion review. The scheduler should distinguish failed dependencies from valid absent history: not-yet-listed symbols and reviewed provider no-data responses are terminal evidence for the acquisition request and should flow into coverage/missingness diagnostics instead of being retried indefinitely or treated as successful positive-row data. If a component receipt is technically failed, downstream progression may use an accepted-failure coverage exception only after an agent evaluates every failed request and records the analysis artifact; the original failed task state remains visible.
 
-The current scheduler gate evaluates regular-trading-day market-hours protection and host resource pressure, then admits safe historical work: preparation, a ready safe/offline workflow stage, a bounded provider-dispatch/reconcile slice, a gate/backoff decision, or terminal month completion. Safe/offline execution writes deterministic local artifacts, logs, receipts, and workflow state only; provider dispatch runs autonomously under manager request/resource/coverage controls. Within a provider dispatch slice, selected request commands may run concurrently using dynamic worker threads bounded by request count, configured max workers, load target, and memory reserve. Model activation, storage lifecycle mutation, and broker/account mutation stay behind their separate boundaries.
+The current scheduler gate implementation evaluates regular-trading-day market-hours protection and host resource pressure, then admits safe historical work: preparation, a ready safe/offline workflow stage, a bounded provider-dispatch/reconcile slice, a gate/backoff decision, or terminal month completion. It is intentionally paused while the rolling-fold runtime replaces month-local model/evaluation/promotion progression. Safe/offline execution writes deterministic local artifacts, logs, receipts, and workflow state only; provider dispatch runs autonomously under manager request/resource/coverage controls. Within a provider dispatch slice, selected request commands may run concurrently using dynamic worker threads bounded by request count, configured max workers, load target, and memory reserve. Model activation, storage lifecycle mutation, and broker/account mutation stay behind their separate boundaries.
 
-The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_daemon.py`. It wraps the scheduler gate in a resident system-service loop with a `manager_scheduler_daemon_state` checkpoint, single-instance lock, decision JSONL log, automatic completed/open-work audit, chronological month-cursor advancement, and service-manager-ready template under `deploy/systemd/`. The service chooses the next month from durable workflow state and the maintained workflow plan; the owner does not tell it where to continue. In drain mode, a completed scheduler-owned task immediately leads to the next runnable safe task until no task is ready or bounded drain limits are reached; the 5-second interval remains only as an idle/backstop poll for external changes, not as the normal delay between tasks. After executed progress decisions, the daemon starts the storage-owned dashboard read-model refresh service so `trading-dashboard` can push websocket snapshots from updated storage-hosted `latest.json` files. `scripts/tasks/plan_dataset_expansion.py` provides the explicit dataset-expansion decision surface used by the scheduler policy: plan-only by default, and `--write` prepares only safe artifacts/payloads while preserving provider, promotion, and execution gates. See [`99_historical_scheduler_runtime.md`](99_historical_scheduler_runtime.md) for boot, resume, and maintenance expectations.
+The persistent runtime entrypoint is `scripts/tasks/run_automation_scheduler_daemon.py`. It wraps the scheduler gate in a resident system-service loop with a `manager_scheduler_daemon_state` checkpoint, single-instance lock, decision JSONL log, automatic completed/open-work audit, chronological month-cursor advancement, and service-manager-ready template under `deploy/systemd/`. The current service should remain stopped until the rolling-fold runtime contract is implemented; after that, the service chooses the next safe fold/month work from durable workflow state and the maintained workflow plan, not from owner prompting. In drain mode, a completed scheduler-owned task immediately leads to the next runnable safe task until no task is ready or bounded drain limits are reached; the 5-second interval remains only as an idle/backstop poll for external changes, not as the normal delay between tasks. After executed progress decisions, the daemon starts the storage-owned dashboard read-model refresh service so `trading-dashboard` can push websocket snapshots from updated storage-hosted `latest.json` files. `scripts/tasks/plan_dataset_expansion.py` provides the explicit dataset-expansion decision surface used by the scheduler policy: plan-only by default, and `--write` prepares only safe artifacts/payloads while preserving provider, promotion, and execution gates. See [`99_historical_scheduler_runtime.md`](99_historical_scheduler_runtime.md) for boot, resume, and maintenance expectations.
 
 ## Non-Goals
 
