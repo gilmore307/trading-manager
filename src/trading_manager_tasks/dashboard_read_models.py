@@ -428,6 +428,47 @@ def _active_month_stages(status: HistoricalSchedulerStatus, storage_root: Path) 
     return timeline_month, raw_stages if isinstance(raw_stages, list) else []
 
 
+
+def _worker_info_for_stage(raw_stage: Mapping[str, Any]) -> dict[str, str]:
+    """Return the public worker assignment shown in task previews.
+
+    This is an operator-facing ownership label, not a process/thread id.
+    Provider acquisition stages run through the bounded provider worker pool;
+    ordinary safe stages run through the scheduler-owned stage worker for their
+    work type.
+    """
+
+    explicit_id = raw_stage.get("worker_id") or raw_stage.get("worker_ref")
+    explicit_label = raw_stage.get("worker_label")
+    explicit_kind = raw_stage.get("worker_kind")
+    if explicit_id or explicit_label or explicit_kind:
+        worker_id = str(explicit_id or explicit_label or explicit_kind)
+        worker_label = str(explicit_label or explicit_id or explicit_kind)
+        worker_kind = str(explicit_kind or "explicit")
+        return {"worker_id": worker_id, "worker_label": worker_label, "worker_kind": worker_kind}
+
+    stage_type = str(raw_stage.get("stage_type") or "unknown")
+    provider_calls_allowed = raw_stage.get("provider_calls_allowed") is True
+    if stage_type == "data_acquisition" and provider_calls_allowed:
+        return {
+            "worker_id": "provider_stage_worker_pool",
+            "worker_label": "Provider Worker Pool",
+            "worker_kind": "provider_pool",
+        }
+    if stage_type == "data_acquisition":
+        return {"worker_id": "input_materialization_worker", "worker_label": "Input Materialization Worker", "worker_kind": "scheduler_stage"}
+    if stage_type == "feature_generation":
+        return {"worker_id": "feature_generation_worker", "worker_label": "Feature Generation Worker", "worker_kind": "scheduler_stage"}
+    if stage_type == "model_generation":
+        return {"worker_id": "fold_model_generation_worker", "worker_label": "Fold Model Generation Worker", "worker_kind": "fold_worker"}
+    if stage_type == "model_evaluation":
+        return {"worker_id": "fold_model_evaluation_worker", "worker_label": "Fold Model Evaluation Worker", "worker_kind": "fold_worker"}
+    if stage_type == "promotion_review":
+        return {"worker_id": "fold_promotion_review_worker", "worker_label": "Fold Promotion Review Worker", "worker_kind": "fold_worker"}
+    if stage_type == "maintenance":
+        return {"worker_id": "maintenance_worker", "worker_label": "Maintenance Worker", "worker_kind": "scheduler_stage"}
+    return {"worker_id": "scheduler_stage_worker", "worker_label": "Scheduler Stage Worker", "worker_kind": "scheduler_stage"}
+
 def _task_timeline(
     status: HistoricalSchedulerStatus,
     *,
@@ -492,6 +533,7 @@ def _task_timeline(
             if not isinstance(receipt_refs, list):
                 receipt_refs = []
             dataset_unit = raw_stage.get("dataset_unit") if isinstance(raw_stage.get("dataset_unit"), Mapping) else None
+            worker_info = _worker_info_for_stage(raw_stage)
             task: dict[str, Any] = {
                 "sequence": len(tasks) + 1,
                 "month": raw_stage.get("month") or raw_stage.get("start_month") or timeline_month,
@@ -506,6 +548,7 @@ def _task_timeline(
                 "dataset_unit_months": dataset_unit.get("unit_months") if dataset_unit else None,
                 "target_symbol": dataset_unit.get("target_symbol") if dataset_unit else None,
                 "target_required": dataset_unit.get("target_required") if dataset_unit else None,
+                **worker_info,
                 "updated_at_utc": raw_stage.get("updated_utc"),
                 **_task_timestamp_fields(raw_stage, storage_root=storage_root),
                 "reason": reason or None,
@@ -519,6 +562,7 @@ def _task_timeline(
                     "model_activation_allowed": raw_stage.get("model_activation_allowed"),
                     "broker_execution_allowed": raw_stage.get("broker_execution_allowed"),
                     "dataset_unit": dataset_unit,
+                    "worker": worker_info,
                 },
             }
             if is_active_month and coverage_stage_id and stage_id == coverage_stage_id and stage_coverage is not None:

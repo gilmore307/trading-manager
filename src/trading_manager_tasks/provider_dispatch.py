@@ -60,6 +60,8 @@ class ProviderDispatchItem:
     command: list[str]
     receipt_path: str
     status: str
+    worker_id: str
+    worker_slot: int
     return_code: int | None = None
     error_summary: str | None = None
 
@@ -337,6 +339,8 @@ def dispatch_layer_provider_acquisition(
             command=[],
             receipt_path="",
             status="skipped_registered_accepted_failure",
+            worker_id="provider-worker-skipped",
+            worker_slot=0,
             return_code=None,
             error_summary=";".join(registered_skip_refs) if registered_skip_refs else "registered accepted failure",
         )
@@ -349,7 +353,7 @@ def dispatch_layer_provider_acquisition(
         max_workers=max_workers,
     )
 
-    def dispatch_one(request: Mapping[str, Any]) -> ProviderDispatchItem:
+    def dispatch_one(request: Mapping[str, Any], *, worker_slot: int) -> ProviderDispatchItem:
         source_path = _task_key_path(storage_root, request).resolve()
         if not source_path.exists():
             raise TaskSystemError(f"task key does not exist: {source_path}")
@@ -389,6 +393,8 @@ def dispatch_layer_provider_acquisition(
             command=command,
             receipt_path=receipt_path,
             status=status,
+            worker_id=f"provider-worker-{worker_slot}",
+            worker_slot=worker_slot,
             return_code=return_code,
             error_summary=error_tail,
         )
@@ -396,12 +402,15 @@ def dispatch_layer_provider_acquisition(
     if worker_selection.selected_worker_count > 1:
         by_id: dict[str, ProviderDispatchItem] = {}
         with ThreadPoolExecutor(max_workers=worker_selection.selected_worker_count) as executor:
-            futures = {executor.submit(dispatch_one, request): str(request["request_id"]) for request in live_requests}
+            futures = {
+                executor.submit(dispatch_one, request, worker_slot=(index % worker_selection.selected_worker_count) + 1): str(request["request_id"])
+                for index, request in enumerate(live_requests)
+            }
             for future in as_completed(futures):
                 by_id[futures[future]] = future.result()
         items.extend(by_id[str(request["request_id"])] for request in live_requests)
     else:
-        items.extend(dispatch_one(request) for request in live_requests)
+        items.extend(dispatch_one(request, worker_slot=1) for request in live_requests)
     dispatch_count = sum(1 for item in items if item.status in {"dispatched_succeeded", "dispatched_failed"})
     return ProviderDispatchSummary(
         contract_type="manager_provider_dispatch_summary",

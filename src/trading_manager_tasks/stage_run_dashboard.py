@@ -40,12 +40,14 @@ class StageRunProviderDispatchPreview:
     skipped_registered_request_ids: tuple[str, ...]
     command_preview: tuple[tuple[str, ...], ...]
     execute_command_template: tuple[str, ...]
+    worker_preview: tuple[dict[str, Any], ...] = ()
 
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
         row["request_ids"] = list(self.request_ids)
         row["skipped_registered_request_ids"] = list(self.skipped_registered_request_ids)
         row["command_preview"] = [list(command) for command in self.command_preview]
+        row["worker_preview"] = [dict(worker) for worker in self.worker_preview]
         row["execute_command_template"] = list(self.execute_command_template)
         return row
 
@@ -135,6 +137,7 @@ def preview_next_provider_dispatch(
             request_ids=(),
             skipped_registered_request_ids=(),
             command_preview=(),
+            worker_preview=(),
             execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=()),
         )
     try:
@@ -156,6 +159,7 @@ def preview_next_provider_dispatch(
             request_ids=(),
             skipped_registered_request_ids=(),
             command_preview=(),
+            worker_preview=(),
             execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=pending_ids),
         )
     runnable = tuple(item.request_id for item in summary.items if item.status != "skipped_registered_accepted_failure")
@@ -167,6 +171,16 @@ def preview_next_provider_dispatch(
         request_ids=runnable,
         skipped_registered_request_ids=skipped,
         command_preview=tuple(tuple(item.command) for item in summary.items if item.command),
+        worker_preview=tuple(
+            {
+                "request_id": item.request_id,
+                "worker_id": item.worker_id,
+                "worker_slot": item.worker_slot,
+                "status": item.status,
+            }
+            for item in summary.items
+            if item.status != "skipped_registered_accepted_failure"
+        ),
         execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=runnable),
     )
 

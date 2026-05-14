@@ -53,6 +53,14 @@ def _preview(*, available: bool = True) -> StageRunProviderDispatchPreview:
         request_ids=("mgrreq_backfill_alpaca_bars_arkg_2016_01",) if available else (),
         skipped_registered_request_ids=(),
         command_preview=(("python3", "-m", "data_feed.01_feed_alpaca_bars", "task_key.json"),) if available else (),
+        worker_preview=(
+            {
+                "request_id": "mgrreq_backfill_alpaca_bars_arkg_2016_01",
+                "worker_id": "provider-worker-1",
+                "worker_slot": 1,
+                "status": "validated_not_dispatched",
+            },
+        ) if available else (),
         execute_command_template=("PYTHONPATH=src", "python3", "scripts/tasks/dispatch_and_reconcile_provider_stage.py"),
     )
 
@@ -77,6 +85,7 @@ class StageRunDashboardTests(unittest.TestCase):
         self.assertTrue(dashboard.next_provider_dispatch.available)
         self.assertEqual(dashboard.next_provider_dispatch.request_count, 1)
         self.assertEqual(dashboard.next_provider_dispatch.request_ids, ("mgrreq_backfill_alpaca_bars_arkg_2016_01",))
+        self.assertEqual(dashboard.next_provider_dispatch.worker_preview[0]["worker_id"], "provider-worker-1")
         self.assertEqual(dashboard.next_action, "autonomous_provider_dispatch_ready")
         self.assertFalse(dashboard.broker_execution_performed)
         self.assertFalse(dashboard.model_activation_performed)

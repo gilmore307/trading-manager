@@ -3408,3 +3408,22 @@ For a fold such as `2016-01..2016-06`, months `2016-01` through `2016-04` provid
 - Month-scoped workflow state remains ingest/feature-only during Layer 1/2 foundation catch-up.
 - Model generation and promotion must be represented by fold/cohort-level work such as `cohort_2016-01_2016-06`, not by `model_training_workflow_state_2016-01.json` through `2016-04.json`.
 - Promotion approval still does not activate live trading, switch production pointers, submit orders, mutate accounts, or authorize broker activity.
+
+## D147 - Dashboard task previews show worker ownership
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+Chentong asked that each task preview show which worker owns or executes it. The dashboard task list previously showed month, layer, task type, status, timing, blockers, and receipt counts, but not the worker assignment.
+
+### Decision
+
+`historical_task_progress_summary.chart_payload.task_timeline` rows expose sanitized `worker_id`, `worker_label`, and `worker_kind` fields. The same worker object is repeated under `detail.worker` for expandable details. Worker labels are owner-facing operational ownership labels, not raw process ids. Provider-dispatch previews also expose `worker_preview` rows with request id, worker id, worker slot, and status.
+
+### Consequences
+
+- Dashboard task rows can show the owning worker directly in the compact preview and detail panel.
+- Provider dispatch previews can explain which provider worker slot would run each selected request.
+- Raw thread internals remain hidden; the read model exposes stable sanitized worker identity only.
