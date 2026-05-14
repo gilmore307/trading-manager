@@ -122,6 +122,8 @@ def _stage_with_update(stage: StageProgress, *, now: str, **changes: Any) -> Sta
     next_status = changes.get("status", stage.status)
     if next_status != stage.status and "status_updated_at_utc" not in changes:
         changes["status_updated_at_utc"] = now
+    if next_status == "ready" and not stage.started_at_utc and "started_at_utc" not in changes:
+        changes["started_at_utc"] = now
     if "updated_utc" not in changes:
         changes["updated_utc"] = now
     return replace(stage, **changes)

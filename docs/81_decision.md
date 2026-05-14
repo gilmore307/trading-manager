@@ -3194,7 +3194,7 @@ Chentong asked to see each task's generated time, start time, end time, and stat
 ### Consequences
 
 - Dashboard task detail panels can show generated, started, ended, and status-updated timestamps per child task.
-- Missing timestamps are rendered as not recorded rather than inferred. Past terminal rows without recorded lifecycle metadata are not backfilled from status-update timestamps; future rows must record lifecycle metadata as scheduler/workflow state changes happen.
+- Missing timestamps are rendered as not recorded rather than inferred. Past terminal rows without recorded lifecycle metadata are not backfilled from status-update timestamps; future rows must record lifecycle metadata as scheduler/workflow state changes happen. A task's `started_at_utc` is recorded when the stage enters the active/current `ready` lifecycle so the current task has a visible start time; `ended_at_utc` is recorded only on terminal success/failure/skip.
 - Dashboard remains read-only and storage-hosted; timestamp enrichment stays in the manager semantic producer.
 
 ## D139 - Use bounded dynamic provider worker threads for historical acquisition

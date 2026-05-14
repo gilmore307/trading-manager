@@ -192,13 +192,14 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             stage = {stage.stage_id: stage for stage in state.stages}[stage_id]
             self.assertIsNotNone(stage.created_at_utc)
             self.assertIsNotNone(stage.status_updated_at_utc)
-            self.assertIsNone(stage.started_at_utc)
+            self.assertIsNotNone(stage.started_at_utc)
             self.assertIsNone(stage.ended_at_utc)
+            started_when_current = stage.started_at_utc
 
             state = mark_stage_started(state, stage_id=stage_id, started_at="2026-05-13T10:00:00+00:00")
             state = mark_stage_succeeded(state, stage_id=stage_id, ended_at="2026-05-13T10:05:00+00:00")
             stage = {stage.stage_id: stage for stage in state.stages}[stage_id]
-            self.assertEqual(stage.started_at_utc, "2026-05-13T10:00:00+00:00")
+            self.assertEqual(stage.started_at_utc, started_when_current)
             self.assertEqual(stage.ended_at_utc, "2026-05-13T10:05:00+00:00")
             self.assertEqual(stage.status_updated_at_utc, "2026-05-13T10:05:00+00:00")
 
