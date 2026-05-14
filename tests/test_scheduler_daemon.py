@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -302,6 +303,53 @@ class SchedulerDaemonTests(unittest.TestCase):
             log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(len(log_rows), 1)
             self.assertEqual(log_rows[0]["provider_calls"], 0)
+
+    def test_daemon_drain_continues_until_next_non_executed_decision(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state_path = tmp / "runtime" / "state.json"
+            lock_path = tmp / "runtime" / "scheduler.lock"
+            decision_log = tmp / "runtime" / "decisions.jsonl"
+            state = run_daemon_loop(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp / "manager-storage",
+                component_src_root=self._fake_data_src(tmp),
+                state_path=state_path,
+                lock_path=lock_path,
+                decision_log_path=decision_log,
+                interval_seconds=0,
+                max_iterations=2,
+                execute_safe_preparation=True,
+                drain_ready_stages=True,
+                config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+            )
+
+            self.assertEqual(state.total_ticks, 2)
+            log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([row["reason_code"] for row in log_rows], ["safe_offline_preparation_executed", "autonomous_provider_stage_ready"])
+
+    def test_daemon_can_trigger_event_dashboard_refresh_after_executed_decision(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            marker = tmp / "dashboard_refresh_marker.txt"
+            run_daemon_loop(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp / "manager-storage",
+                component_src_root=self._fake_data_src(tmp),
+                state_path=tmp / "runtime" / "state.json",
+                lock_path=tmp / "runtime" / "scheduler.lock",
+                decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                interval_seconds=0,
+                max_iterations=1,
+                execute_safe_preparation=True,
+                refresh_dashboard_on_decision=True,
+                dashboard_refresh_command=(sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).write_text('refreshed')"),
+                config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+            )
+
+            self.assertEqual(marker.read_text(encoding="utf-8"), "refreshed")
 
 
 if __name__ == "__main__":

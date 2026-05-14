@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass, replace
@@ -36,6 +37,9 @@ DEFAULT_LOCK_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler.lock"
 DEFAULT_DECISION_LOG_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_decisions.jsonl"
 DEFAULT_INTERVAL_SECONDS = 300.0
 DEFAULT_STALE_LOCK_SECONDS = 6 * 60 * 60
+DEFAULT_DRAIN_MAX_STEPS = 50
+DEFAULT_DRAIN_MAX_SECONDS = 300.0
+DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-refresh.service"
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
 
 
@@ -356,6 +360,57 @@ def update_state_from_decision(
     )
 
 
+def refresh_dashboard_read_models(
+    *,
+    enabled: bool,
+    service_unit: str = DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT,
+    command: tuple[str, ...] | None = None,
+    timeout_seconds: float = 30.0,
+) -> dict[str, Any]:
+    """Trigger storage-owned dashboard read-model refresh after progress events.
+
+    The manager daemon does not materialize dashboard payloads directly. It only
+    nudges the storage-owned oneshot refresh service so the dashboard websocket
+    can push the newly materialized ``latest.json`` snapshots immediately after
+    each scheduler decision that changes workflow progress.
+    """
+
+    if not enabled:
+        return {"status": "disabled", "service_unit": service_unit}
+    refresh_command = command or ("systemctl", "start", service_unit)
+    try:
+        completed = subprocess.run(
+            refresh_command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except Exception as exc:  # pragma: no cover - defensive operational path.
+        return {
+            "status": "failed",
+            "service_unit": service_unit,
+            "command": list(refresh_command),
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    return {
+        "status": "succeeded" if completed.returncode == 0 else "failed",
+        "service_unit": service_unit,
+        "command": list(refresh_command),
+        "return_code": completed.returncode,
+        "stdout": completed.stdout[-1000:],
+        "stderr": completed.stderr[-1000:],
+    }
+
+
+def _decision_should_continue_drain(decision: SchedulerDecision, *, advanced_month: bool) -> bool:
+    if decision.decision_status == "executed":
+        return True
+    if advanced_month:
+        return True
+    return False
+
+
 def update_state_from_error(
     state: SchedulerDaemonState,
     *,
@@ -396,6 +451,12 @@ def run_daemon_loop(
     provider_stage_max_workers: int = 4,
     auto_select_next_work: bool = False,
     advance_month_on_complete: bool = False,
+    drain_ready_stages: bool = False,
+    drain_max_steps: int = DEFAULT_DRAIN_MAX_STEPS,
+    drain_max_seconds: float = DEFAULT_DRAIN_MAX_SECONDS,
+    refresh_dashboard_on_decision: bool = False,
+    dashboard_refresh_service_unit: str = DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT,
+    dashboard_refresh_command: tuple[str, ...] | None = None,
     config: SchedulerConfig = SchedulerConfig(),
     output: TextIO | None = None,
 ) -> SchedulerDaemonState:
@@ -425,54 +486,78 @@ def run_daemon_loop(
     iterations = 0
     try:
         while max_iterations is None or iterations < max_iterations:
-            if auto_select_next_work:
-                state = apply_auto_work_selection(
-                    state,
-                    storage_root=storage_root,
-                    default_start_month=active_start_month,
-                    default_end_month=active_end_month,
-                )
-                active_start_month = state.start_month
-                active_end_month = state.end_month
-            started = utc_now_iso()
-            try:
-                decision = run_scheduler_once(
-                    config=config,
-                    start_month=active_start_month,
-                    end_month=active_end_month,
-                    storage_root=storage_root,
-                    component_src_root=component_src_root,
-                    execute_safe_preparation=execute_safe_preparation,
-                    execute_safe_offline_stages=execute_safe_offline_stages,
-                    execute_autonomous_provider_stages=execute_autonomous_provider_stages,
-                    provider_stage_next_limit=provider_stage_next_limit,
-                    provider_stage_max_workers=provider_stage_max_workers,
-                )
-                append_decision_log(decision_log_path, decision)
-                completed = utc_now_iso()
-                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=decision)
-                if advance_month_on_complete and decision.reason_code == "month_workflow_complete" and active_start_month == active_end_month:
-                    advanced_month = next_month(active_end_month)
-                    active_start_month = advanced_month
-                    active_end_month = advanced_month
-                    state = replace(
+            drain_started_monotonic = time.monotonic()
+            drain_steps = 0
+            while max_iterations is None or iterations < max_iterations:
+                if auto_select_next_work:
+                    state = apply_auto_work_selection(
                         state,
-                        start_month=advanced_month,
-                        end_month=advanced_month,
-                        last_next_internal_stage="chronological_month_advanced",
-                        updated_utc=completed,
+                        storage_root=storage_root,
+                        default_start_month=active_start_month,
+                        default_end_month=active_end_month,
                     )
-                if output is not None:
-                    output.write(json.dumps(decision.summary_row(), sort_keys=True) + "\n")
-                    output.flush()
-            except Exception as exc:  # pragma: no cover - exercised via direct state helper tests.
-                completed = utc_now_iso()
-                state = update_state_from_error(state, started_utc=started, completed_utc=completed, error=exc)
-                if output is not None:
-                    output.write(json.dumps(state.summary_row(), sort_keys=True) + "\n")
-                    output.flush()
-            write_daemon_state(state_path, state)
-            iterations += 1
+                    active_start_month = state.start_month
+                    active_end_month = state.end_month
+                started = utc_now_iso()
+                should_continue_drain = False
+                try:
+                    decision = run_scheduler_once(
+                        config=config,
+                        start_month=active_start_month,
+                        end_month=active_end_month,
+                        storage_root=storage_root,
+                        component_src_root=component_src_root,
+                        execute_safe_preparation=execute_safe_preparation,
+                        execute_safe_offline_stages=execute_safe_offline_stages,
+                        execute_autonomous_provider_stages=execute_autonomous_provider_stages,
+                        provider_stage_next_limit=provider_stage_next_limit,
+                        provider_stage_max_workers=provider_stage_max_workers,
+                    )
+                    append_decision_log(decision_log_path, decision)
+                    completed = utc_now_iso()
+                    state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=decision)
+                    advanced_month = False
+                    if advance_month_on_complete and decision.reason_code == "month_workflow_complete" and active_start_month == active_end_month:
+                        advanced_month = True
+                        advanced_month_value = next_month(active_end_month)
+                        active_start_month = advanced_month_value
+                        active_end_month = advanced_month_value
+                        state = replace(
+                            state,
+                            start_month=advanced_month_value,
+                            end_month=advanced_month_value,
+                            last_next_internal_stage="chronological_month_advanced",
+                            updated_utc=completed,
+                        )
+                    if decision.decision_status == "executed" or advanced_month:
+                        refresh_dashboard_read_models(
+                            enabled=refresh_dashboard_on_decision,
+                            service_unit=dashboard_refresh_service_unit,
+                            command=dashboard_refresh_command,
+                        )
+                    should_continue_drain = _decision_should_continue_drain(decision, advanced_month=advanced_month)
+                    if output is not None:
+                        output.write(json.dumps(decision.summary_row(), sort_keys=True) + "\n")
+                        output.flush()
+                except Exception as exc:  # pragma: no cover - exercised via direct state helper tests.
+                    completed = utc_now_iso()
+                    state = update_state_from_error(state, started_utc=started, completed_utc=completed, error=exc)
+                    if output is not None:
+                        output.write(json.dumps(state.summary_row(), sort_keys=True) + "\n")
+                        output.flush()
+                write_daemon_state(state_path, state)
+                iterations += 1
+                drain_steps += 1
+                if max_iterations is not None and iterations >= max_iterations:
+                    break
+                if not drain_ready_stages:
+                    break
+                if drain_steps >= max(1, drain_max_steps):
+                    break
+                if time.monotonic() - drain_started_monotonic >= max(0.0, drain_max_seconds):
+                    break
+                if not should_continue_drain:
+                    break
             if max_iterations is not None and iterations >= max_iterations:
                 break
             if interval_seconds > 0:
@@ -501,6 +586,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one daemon tick.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")
+    parser.add_argument("--drain-ready-stages", action="store_true", help="After a scheduler-owned task completes, immediately continue to the next runnable safe task until no task is ready or drain limits are reached.")
+    parser.add_argument("--drain-max-steps", type=int, default=DEFAULT_DRAIN_MAX_STEPS, help="Maximum scheduler decisions to run back-to-back inside one drain cycle.")
+    parser.add_argument("--drain-max-seconds", type=float, default=DEFAULT_DRAIN_MAX_SECONDS, help="Maximum wall-clock seconds for one back-to-back drain cycle.")
+    parser.add_argument("--refresh-dashboard-on-decision", action="store_true", help="Trigger the storage-owned dashboard read-model refresh service after each executed scheduler decision.")
+    parser.add_argument("--dashboard-refresh-service-unit", default=DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT, help="systemd service unit to start for event-driven dashboard read-model refresh.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
@@ -531,6 +621,11 @@ def main(argv: list[str] | None = None) -> int:
         provider_stage_max_workers=args.provider_stage_max_workers,
         auto_select_next_work=args.auto_select_next_work,
         advance_month_on_complete=args.advance_month_on_complete,
+        drain_ready_stages=args.drain_ready_stages,
+        drain_max_steps=args.drain_max_steps,
+        drain_max_seconds=args.drain_max_seconds,
+        refresh_dashboard_on_decision=args.refresh_dashboard_on_decision,
+        dashboard_refresh_service_unit=args.dashboard_refresh_service_unit,
         config=config,
         output=sys.stdout,
     )
@@ -539,7 +634,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 __all__ = [
+    "DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT",
     "DEFAULT_DECISION_LOG_PATH",
+    "DEFAULT_DRAIN_MAX_SECONDS",
+    "DEFAULT_DRAIN_MAX_STEPS",
     "DEFAULT_INTERVAL_SECONDS",
     "DEFAULT_LOCK_PATH",
     "DEFAULT_RUNTIME_DIR",
@@ -552,6 +650,7 @@ __all__ = [
     "load_daemon_state",
     "release_daemon_lock",
     "next_month",
+    "refresh_dashboard_read_models",
     "run_daemon_loop",
     "select_next_historical_work",
     "update_state_from_decision",

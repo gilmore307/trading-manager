@@ -3208,10 +3208,39 @@ Server load and memory usage stayed very low while historical acquisition work r
 
 ### Decision
 
-Historical provider data-acquisition slices may execute multiple provider request commands concurrently through bounded worker threads. The scheduler still selects one workflow stage per tick, but provider-stage execution can process a configured request batch with a dynamic worker count selected from request count, configured max workers, current 1-minute load, CPU count, available memory, per-worker memory budget, and reserved memory. The measured service defaults are a 5-second tick, next-request limit 12, and maximum 4 provider worker threads. The shorter tick is preferred over broader task-type parallelism while individual feature/model/evaluation stages remain short and serial safety is still valuable.
+Historical provider data-acquisition slices may execute multiple provider request commands concurrently through bounded worker threads. Provider-stage execution can process a configured request batch with a dynamic worker count selected from request count, configured max workers, current 1-minute load, CPU count, available memory, per-worker memory budget, and reserved memory. The measured service defaults keep a 5-second idle/backstop tick, next-request limit 12, maximum 4 provider worker threads, and drain mode for back-to-back safe scheduler-owned stages. Broader task-type parallelism remains deferred while individual feature/model/evaluation stages are short and serial safety is still valuable.
 
 ### Consequences
 
 - Provider acquisition can better use the host when load and memory headroom are available.
 - Existing hard boundaries remain: no broker/account mutation, no model activation, no unbounded provider dispatch, no duplicate terminal request execution, and failures still flow through receipts, coverage, and failure registration.
 - Current Status exposes a scheduler parallelism/thread card so the owner can see selected workers, max workers, request batch size, tick interval, load target, and memory budget.
+
+## D140 - Drain safe historical tasks and refresh dashboard read models on progress
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+After shortening the scheduler interval from 60 seconds to 5 seconds, measured task durations still showed that many historical workflow stages finish quickly enough that even a 5-second inter-task wait can dominate visible progress. Chentong also noted that the website should reflect task progress in real time rather than waiting for the periodic dashboard refresh timer.
+
+### Decision
+
+The historical scheduler daemon uses a hybrid event-driven shape. The 5-second interval remains as an idle/backstop poll for external changes, lock recovery, approvals, failures, and service liveness, but it is no longer the normal cadence between completed safe tasks. When drain mode is enabled, every executed scheduler-owned task immediately triggers another scheduler gate evaluation and admits the next runnable safe task until one of these stop conditions occurs:
+
+- no scheduler-owned task is runnable;
+- market-hours/resource gates require backoff;
+- an approval, lock, failed dependency, provider cooldown/rate-limit, or other external wait is needed;
+- bounded drain limits are reached.
+
+The accepted service defaults enable `--drain-ready-stages` with `TRADING_MANAGER_DRAIN_MAX_STEPS=50` and `TRADING_MANAGER_DRAIN_MAX_SECONDS=300`. Provider stages remain bounded by the existing request batch and worker limits. Model activation, broker/account mutation, storage lifecycle mutation, and promotion decisions remain outside this drain loop unless a later reviewed decision explicitly admits them.
+
+After every executed progress decision or chronological month advancement, the daemon starts the storage-owned `trading-storage-dashboard-read-model-refresh.service`. The manager does not materialize dashboard payloads directly; storage keeps ownership of read-model validation/materialization. The dashboard websocket then pushes snapshots when the storage-hosted `latest.json` files change.
+
+### Consequences
+
+- Short, safe stages can progress back-to-back without waiting for the next poll interval.
+- The dashboard can show near-real-time progress through the existing websocket path because read-model materialization is triggered by workflow progress events.
+- The periodic dashboard refresh timer and scheduler interval remain useful as backstops rather than primary progress mechanisms.
+- Drain limits and existing gates prevent tight-looping, provider hammering, or accidental expansion into activation/broker/account boundaries.
