@@ -97,7 +97,7 @@ The historical scheduler runtime must provide:
 
 ## Current Full-Stack Workflow Graph
 
-The daemon now carries a manager-owned `manager_model_training_workflow_plan` for all eight model layers plus durable workflow checkpoints. During foundation catch-up, month-scoped checkpoints expose only reusable substrate stages: data acquisition and feature/input preparation. Model generation, model evaluation, and Promotion Review are fold/cohort-scoped model-worker tasks that consume frozen 4+1+1 manifests, not per-month scheduler stages. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
+The daemon now carries a manager-owned `manager_model_training_workflow_plan` for all eight model layers plus durable workflow checkpoints. Month-scoped checkpoints expose only reusable substrate stages: data acquisition and feature/input preparation. Model generation, model evaluation, Promotion Review, and maintenance are fold-scoped `Model Worker 1` tasks that consume frozen 4+1+1 manifests, not per-month scheduler stages. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
 
 The workflow is intentionally not a synchronized all-layers-per-month loop. During the current catch-up phase, Layer 1/2 substrate work has higher priority than Layer 3+ target work:
 
@@ -144,6 +144,6 @@ For the bootstrap fold, `2016-01` through `2016-04` are train months, `2016-05` 
 
 ### Layer 3+ fold scope
 
-`Model Worker 1` runs Layer 3+ work as one selected target/instrument over the complete non-overlapping six-month fold. Month-scoped artifacts from Layer 1/2 remain reusable substrate, but manager-owned Layer 3+ task keys, feature windows, model generation, model evaluation, and Promotion Review use the fold `start_month` and `end_month` together.
+`Model Worker 1` runs model-generation-and-later work as one selected target/instrument over the complete non-overlapping six-month fold. Month-scoped data acquisition and feature/input-preparation artifacts remain reusable substrate for every layer that has such substrate. Manager-owned model generation, model evaluation, Promotion Review, and maintenance use the fold `start_month` and `end_month` together.
 
 For the first fold, Layer 3+ execution scope is `2016-01` through `2016-06`, not six independent month-local runs.

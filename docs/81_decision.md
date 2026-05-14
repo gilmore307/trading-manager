@@ -3548,3 +3548,25 @@ Model Worker folds are non-overlapping half-year groups. The active fold size re
 - `Model Worker 1` advances fold starts by six months, not one month.
 - Month-ingest workers may continue preparing every chronological month as substrate.
 - Any runtime checkpoint or model output produced for an overlapping fold must be archived as invalid runtime evidence and must not be used for model/promotion status.
+
+
+## D154 - Substrate stages are monthly; model stages are fold-scoped
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+After the half-year fold correction, Chentong clarified the stage boundary: data acquisition and similar input-preparation work should remain month-scoped. Only model generation and later stages should run at fold scope. The prior fold-state implementation still allowed Layer 3/4/8 data acquisition or feature/input-preparation commands to execute with fold `start_month`/`end_month`, which blurred the accepted boundary.
+
+### Decision
+
+Month Ingest Workers own single-month substrate stages: `data_acquisition` and `feature_generation` / input preparation. `Model Worker 1` owns fold-scoped `model_generation`, `model_evaluation`, `promotion_review`, and `maintenance` after every month in the selected fold has completed its substrate stages.
+
+Fold checkpoints may carry substrate-stage status as seeded evidence from completed monthly checkpoints, but they must not execute data acquisition or feature/input-preparation commands over a fold range.
+
+### Consequences
+
+- Month completion and fold readiness require the month-scoped substrate stages needed by the workflow.
+- Model-generation-and-later commands continue to use fold `start_month` and `end_month`.
+- Any fold-run data acquisition / feature-generation artifacts produced before this correction are invalid boundary evidence and should be archived before resuming the service.

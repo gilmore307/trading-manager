@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .model_training_state import advance_workflow_state
-from .model_training_workflow import FOUNDATION_CATCH_UP_LAYERS, FOUNDATION_CATCH_UP_STAGE_TYPES, build_model_training_workflow_plan
+from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import (
     DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
@@ -114,7 +114,7 @@ def _workflow_payload_foundation_catch_up_complete(payload: dict[str, Any]) -> b
         return False
     required = {
         (layer, stage_type)
-        for layer in FOUNDATION_CATCH_UP_LAYERS
+        for layer in MONTHLY_SUBSTRATE_LAYERS
         for stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES
     }
     satisfied: set[tuple[int, str]] = set()
@@ -444,7 +444,7 @@ def seed_model_worker_fold_state(
     foundation_stage_ids = [
         stage.stage_id
         for layer in plan.layers
-        if layer.layer in FOUNDATION_CATCH_UP_LAYERS
+        if layer.layer in MONTHLY_SUBSTRATE_LAYERS
         for stage in layer.stages
         if stage.stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES
     ]

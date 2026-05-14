@@ -34,6 +34,29 @@ from trading_manager_tasks.scheduler_daemon import (
 
 
 class SchedulerDaemonTests(unittest.TestCase):
+
+    def _complete_monthly_substrate(self, *, storage_root: Path, month: str) -> None:
+        plan = build_model_training_workflow_plan(
+            start_month=month,
+            end_month=month,
+            storage_root=storage_root,
+            selected_target_symbol="AAPL",
+        )
+        substrate_stage_ids = [
+            stage.stage_id
+            for layer in plan.layers
+            for stage in layer.stages
+            if stage.stage_type in {"data_acquisition", "feature_generation"}
+        ]
+        advance_workflow_state(
+            start_month=month,
+            end_month=month,
+            storage_root=storage_root,
+            state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+            completed_stage_ids=substrate_stage_ids,
+            selected_target_symbol="AAPL",
+            write=True,
+        )
     def _fake_data_src(self, tmp: Path) -> Path:
         src = tmp / "trading-data-src"
         package = src / "data_feed" / "01_feed_alpaca_bars"
@@ -167,22 +190,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             month = "2016-01"
-            plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
-            foundation_stage_ids = [
-                stage.stage_id
-                for layer in plan.layers
-                if layer.layer in {1, 2}
-                for stage in layer.stages
-                if stage.stage_type in {"data_acquisition", "feature_generation"}
-            ]
-            advance_workflow_state(
-                start_month=month,
-                end_month=month,
-                storage_root=storage_root,
-                state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
-                completed_stage_ids=foundation_stage_ids,
-                write=True,
-            )
+            self._complete_monthly_substrate(storage_root=storage_root, month=month)
 
             selection = select_next_historical_work(storage_root=storage_root, default_start_month=month, default_end_month=month)
 
@@ -222,22 +230,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             for month in ("2016-01", "2016-02"):
-                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
-                foundation_stage_ids = [
-                    stage.stage_id
-                    for layer in plan.layers
-                    if layer.layer in {1, 2}
-                    for stage in layer.stages
-                    if stage.stage_type in {"data_acquisition", "feature_generation"}
-                ]
-                advance_workflow_state(
-                    start_month=month,
-                    end_month=month,
-                    storage_root=storage_root,
-                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
-                    completed_stage_ids=foundation_stage_ids,
-                    write=True,
-                )
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
             advance_workflow_state(
                 start_month="2016-03",
                 end_month="2016-03",
@@ -257,22 +250,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             for month in rolling_fold_months("2016-01"):
-                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
-                foundation_stage_ids = [
-                    stage.stage_id
-                    for layer in plan.layers
-                    if layer.layer in {1, 2}
-                    for stage in layer.stages
-                    if stage.stage_type in {"data_acquisition", "feature_generation"}
-                ]
-                advance_workflow_state(
-                    start_month=month,
-                    end_month=month,
-                    storage_root=storage_root,
-                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
-                    completed_stage_ids=foundation_stage_ids,
-                    write=True,
-                )
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
 
             selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-06")
             self.assertIsNotNone(selection)
@@ -292,22 +270,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             for month in ("2016-01", "2016-02", "2016-03", "2016-04"):
-                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
-                foundation_stage_ids = [
-                    stage.stage_id
-                    for layer in plan.layers
-                    if layer.layer in {1, 2}
-                    for stage in layer.stages
-                    if stage.stage_type in {"data_acquisition", "feature_generation"}
-                ]
-                advance_workflow_state(
-                    start_month=month,
-                    end_month=month,
-                    storage_root=storage_root,
-                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
-                    completed_stage_ids=foundation_stage_ids,
-                    write=True,
-                )
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
 
             selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-06")
 
@@ -317,22 +280,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             for month in rolling_fold_months("2016-01"):
-                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
-                foundation_stage_ids = [
-                    stage.stage_id
-                    for layer in plan.layers
-                    if layer.layer in {1, 2}
-                    for stage in layer.stages
-                    if stage.stage_type in {"data_acquisition", "feature_generation"}
-                ]
-                advance_workflow_state(
-                    start_month=month,
-                    end_month=month,
-                    storage_root=storage_root,
-                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
-                    completed_stage_ids=foundation_stage_ids,
-                    write=True,
-                )
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
 
             first_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-12")
             self.assertIsNotNone(first_selection)
@@ -360,22 +308,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             overlapping_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-07")
 
             for month in rolling_fold_months("2016-07"):
-                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
-                foundation_stage_ids = [
-                    stage.stage_id
-                    for layer in plan.layers
-                    if layer.layer in {1, 2}
-                    for stage in layer.stages
-                    if stage.stage_type in {"data_acquisition", "feature_generation"}
-                ]
-                advance_workflow_state(
-                    start_month=month,
-                    end_month=month,
-                    storage_root=storage_root,
-                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
-                    completed_stage_ids=foundation_stage_ids,
-                    write=True,
-                )
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
 
             next_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-12")
 

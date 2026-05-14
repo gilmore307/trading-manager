@@ -24,6 +24,7 @@ LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
 DATASET_UNIT_MONTHS = 6
 FOUNDATION_CATCH_UP_LAYERS = (1, 2)
+MONTHLY_SUBSTRATE_LAYERS = tuple(range(1, 9))
 FOUNDATION_CATCH_UP_STAGE_TYPES = ("data_acquisition", "feature_generation")
 FOUNDATION_CATCH_UP_BLOCKER = "layer_01_02_historical_catch_up_to_current_required"
 POST_MODEL_GENERATION_REBUILD_BLOCKER = "post_model_generation_rebuild_required_after_layer_01_02_catch_up"
@@ -133,7 +134,7 @@ class ModelTrainingWorkflowPlan:
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
     foundation_catch_up_only: bool = True
-    foundation_catch_up_layers: tuple[int, ...] = FOUNDATION_CATCH_UP_LAYERS
+    foundation_catch_up_layers: tuple[int, ...] = MONTHLY_SUBSTRATE_LAYERS
     reusable_substrate_stage_types: tuple[str, ...] = FOUNDATION_CATCH_UP_STAGE_TYPES
     post_model_generation_artifacts_policy: str = "supersede_and_rebuild_after_layer_01_02_historical_catch_up"
 
@@ -548,8 +549,6 @@ def _build_layer_workflow(
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
 
-    if foundation_catch_up_only and layer >= 3 and acquisition_status != "not_applicable":
-        acquisition_blockers = (FOUNDATION_CATCH_UP_BLOCKER,) + acquisition_blockers
     acquisition_blockers = _with_target_blocker(acquisition_blockers, layer=layer, selected_target_symbol=selected_target_symbol)
 
     stages = [
@@ -593,8 +592,7 @@ def _build_layer_workflow(
                 command=feature,
                 dataset_unit=dataset_unit,
                 blockers=_with_target_blocker(
-                    ((FOUNDATION_CATCH_UP_BLOCKER,) if foundation_catch_up_only and layer >= 3 else ())
-                    + (f"{key}.data_acquisition_complete",),
+                    (f"{key}.data_acquisition_complete",),
                     layer=layer,
                     selected_target_symbol=selected_target_symbol,
                 ),
@@ -763,6 +761,7 @@ __all__ = [
     "FULL_LAYER_COUNT",
     "FOUNDATION_CATCH_UP_BLOCKER",
     "FOUNDATION_CATCH_UP_LAYERS",
+    "MONTHLY_SUBSTRATE_LAYERS",
     "FOUNDATION_CATCH_UP_STAGE_TYPES",
     "LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS",
     "LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS",
