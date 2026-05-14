@@ -311,6 +311,86 @@ def _workflow_state_payload(storage_root: Path, month: str) -> dict[str, Any] | 
         return None
 
 
+def _resolve_stage_ref_path(ref: object, *, storage_root: Path) -> Path | None:
+    if not isinstance(ref, str) or not ref.strip():
+        return None
+    candidate = Path(ref)
+    if candidate.is_absolute():
+        return candidate
+    # Workflow state usually stores manager-local refs like
+    # storage/runtime/model_training_stage_receipts/.... Resolve those against
+    # the repo root inferred from the storage root so dashboard summaries can
+    # inspect manager-owned receipt timing metadata without exposing raw files.
+    if candidate.parts and candidate.parts[0] == "storage":
+        return storage_root.parent / candidate
+    return Path.cwd() / candidate
+
+
+def _min_timestamp(values: list[str]) -> str | None:
+    return min(values) if values else None
+
+
+def _max_timestamp(values: list[str]) -> str | None:
+    return max(values) if values else None
+
+
+def _receipt_timestamp_candidates(path: Path) -> dict[str, list[str]]:
+    try:
+        payload = _load_json_object(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {"started": [], "ended": []}
+    started: list[str] = []
+    ended: list[str] = []
+    for key in ("started_at_utc", "started_at"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            started.append(value)
+    for key in ("ended_at_utc", "completed_at_utc", "completed_at", "ended_at"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            ended.append(value)
+    runs = payload.get("runs")
+    if isinstance(runs, list):
+        for run in runs:
+            if not isinstance(run, Mapping):
+                continue
+            for key in ("started_at_utc", "started_at"):
+                value = run.get(key)
+                if isinstance(value, str) and value:
+                    started.append(value)
+            for key in ("ended_at_utc", "completed_at_utc", "completed_at", "ended_at"):
+                value = run.get(key)
+                if isinstance(value, str) and value:
+                    ended.append(value)
+    return {"started": started, "ended": ended}
+
+
+def _task_timestamp_fields(raw_stage: Mapping[str, Any], *, storage_root: Path) -> dict[str, str | None]:
+    receipt_started: list[str] = []
+    receipt_ended: list[str] = []
+    receipt_refs = raw_stage.get("receipt_refs") or []
+    if isinstance(receipt_refs, list):
+        for ref in receipt_refs:
+            path = _resolve_stage_ref_path(ref, storage_root=storage_root)
+            if path is None or not path.exists() or path.suffix.lower() != ".json":
+                continue
+            candidates = _receipt_timestamp_candidates(path)
+            receipt_started.extend(candidates["started"])
+            receipt_ended.extend(candidates["ended"])
+    status_updated = raw_stage.get("status_updated_at_utc") or raw_stage.get("status_updated_utc") or raw_stage.get("updated_utc")
+    started = raw_stage.get("started_at_utc") or raw_stage.get("started_at") or _min_timestamp(receipt_started)
+    ended = raw_stage.get("ended_at_utc") or raw_stage.get("completed_at_utc") or raw_stage.get("completed_at") or _max_timestamp(receipt_ended)
+    if ended is None and str(raw_stage.get("status") or "") in {"succeeded", "failed", "not_applicable"}:
+        ended = status_updated
+    created = raw_stage.get("created_at_utc") or raw_stage.get("created_utc") or raw_stage.get("created_at") or started or status_updated
+    return {
+        "created_at_utc": str(created) if created else None,
+        "started_at_utc": str(started) if started else None,
+        "ended_at_utc": str(ended) if ended else None,
+        "status_updated_at_utc": str(status_updated) if status_updated else None,
+    }
+
+
 def _active_month_stages(status: HistoricalSchedulerStatus, storage_root: Path) -> tuple[str | None, list[Any]]:
     checkpoint_path = _resolve_local_path(status.workflow_checkpoint.path)
     timeline_month = status.current_month
@@ -403,6 +483,7 @@ def _task_timeline(
                 "layer": raw_stage.get("layer"),
                 "layer_key": raw_stage.get("layer_key"),
                 "updated_at_utc": raw_stage.get("updated_utc"),
+                **_task_timestamp_fields(raw_stage, storage_root=storage_root),
                 "reason": reason or None,
                 "receipt_count": len(receipt_refs),
                 "blocker_count": len(blockers),

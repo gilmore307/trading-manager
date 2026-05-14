@@ -36,6 +36,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             decision_log.parent.mkdir(parents=True, exist_ok=True)
             workflow_state = tmp / "storage" / "runtime" / "model_training_workflow_state_2019-05.json"
             workflow_state.parent.mkdir(parents=True, exist_ok=True)
+            receipt_path = tmp / "storage" / "runtime" / "example_stage_receipt.json"
+            receipt_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "component_completion_receipt",
+                        "manager_stage_id": "layer_01_market_regime.data_acquisition",
+                        "started_at": "2026-05-12T09:00:00Z",
+                        "completed_at": "2026-05-12T09:30:00Z",
+                        "status": "succeeded",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             workflow_state.write_text(
                 json.dumps(
                     {
@@ -51,7 +65,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "updated_utc": "2026-05-12T10:00:00Z",
                                 "last_reason": "stage coverage complete",
-                                "receipt_refs": ["coverage.json"],
+                                "receipt_refs": ["storage/runtime/example_stage_receipt.json"],
                             },
                             {
                                 "stage_id": "layer_03_target_state_vector.data_acquisition",
@@ -149,6 +163,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task_timeline[1]["month"], "2019-05")
         self.assertEqual(task_timeline[1]["detail"]["last_execution"]["return_code"], 1)
         self.assertEqual(task_timeline[2]["stage_type"], "feature_generation")
+        self.assertEqual(task_timeline[0]["created_at_utc"], "2026-05-12T09:00:00Z")
+        self.assertEqual(task_timeline[0]["started_at_utc"], "2026-05-12T09:00:00Z")
+        self.assertEqual(task_timeline[0]["ended_at_utc"], "2026-05-12T09:30:00Z")
+        self.assertEqual(task_timeline[0]["status_updated_at_utc"], "2026-05-12T10:00:00Z")
         self.assertEqual(task_timeline[0]["detail"]["progress"]["ready_count"], 3)
         self.assertIn("Layer 2 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))

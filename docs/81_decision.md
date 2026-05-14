@@ -3177,3 +3177,22 @@ The manager dashboard read model must include completed month workflow states fr
 - Dashboard consumers can show past/current/future child tasks across historical months without reading raw runtime files directly.
 - Missing completed-month state files are skipped rather than fabricating completed rows.
 - The active month remains visually distinct and operationally current.
+
+## D138 - Dashboard task rows expose lifecycle timestamps
+
+Date: 2026-05-13
+Status: Accepted
+
+### Context
+
+Chentong asked to see each task's generated time, start time, end time, and status update time so the dashboard can show whether a task is actively moving or has been sitting unchanged.
+
+### Decision
+
+`historical_task_progress_summary.chart_payload.task_timeline` rows expose sanitized lifecycle timestamps when available: `created_at_utc`, `started_at_utc`, `ended_at_utc`, and `status_updated_at_utc`. The manager read-model producer derives these from workflow stage metadata and attached manager-owned receipt timing metadata without making the dashboard read raw workflow or receipt files directly. Existing `updated_at_utc` remains for compatibility.
+
+### Consequences
+
+- Dashboard task detail panels can show generated, started, ended, and status-updated timestamps per child task.
+- Missing timestamps are rendered as not recorded rather than fabricated, except terminal rows may use the workflow status update time as the stage end time when no finer receipt end time exists.
+- Dashboard remains read-only and storage-hosted; timestamp enrichment stays in the manager semantic producer.
