@@ -176,6 +176,59 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn(payload["severity"], {"critical", "high", "medium", "low", "info"})
 
 
+    def test_terminal_task_without_receipt_timing_uses_status_update_for_start_and_end(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2019-04.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2019-04",
+                        "end_month": "2019-04",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "succeeded",
+                                "updated_utc": "2026-05-12T10:00:00Z",
+                                "receipt_refs": ["storage/runtime/stage_coverage/example.json"],
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"current_month": "2019-05", "last_completed_months": ["2019-04"]}) + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage",
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
+
+        task = payload["chart_payload"]["task_timeline"][0]
+        self.assertEqual(task["task_state"], "completed")
+        self.assertEqual(task["created_at_utc"], "2026-05-12T10:00:00Z")
+        self.assertEqual(task["started_at_utc"], "2026-05-12T10:00:00Z")
+        self.assertEqual(task["ended_at_utc"], "2026-05-12T10:00:00Z")
+        self.assertEqual(task["status_updated_at_utc"], "2026-05-12T10:00:00Z")
+
     def test_task_timeline_includes_completed_month_groups_before_current_month(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
