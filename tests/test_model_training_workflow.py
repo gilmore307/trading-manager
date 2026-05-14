@@ -6,6 +6,8 @@ from pathlib import Path
 
 from trading_manager_tasks.model_training_workflow import (
     FULL_LAYER_COUNT,
+    FOUNDATION_CATCH_UP_BLOCKER,
+    POST_MODEL_GENERATION_REBUILD_BLOCKER,
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
     LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
     build_model_training_workflow_plan,
@@ -100,6 +102,38 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--write", command)
         self.assertIsNone(plan.layers[2].stages[0].approval_gate_required)
         self.assertFalse(plan.layers[2].stages[0].provider_calls_allowed)
+
+    def test_foundation_catch_up_blocks_post_model_generation_until_substrate_is_current(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertTrue(plan.foundation_catch_up_only)
+        self.assertEqual(plan.foundation_catch_up_layers, (1, 2))
+        self.assertEqual(plan.reusable_substrate_stage_types, ("data_acquisition", "feature_generation"))
+        for layer_index in (0, 1):
+            model_generation = plan.layers[layer_index].stages[2]
+            self.assertIn(POST_MODEL_GENERATION_REBUILD_BLOCKER, model_generation.blockers)
+        layer_three_acquisition = plan.layers[2].stages[0]
+        self.assertIn(FOUNDATION_CATCH_UP_BLOCKER, layer_three_acquisition.blockers)
+
+    def test_post_foundation_model_stages_can_be_reenabled_after_catch_up_acceptance(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        self.assertFalse(plan.foundation_catch_up_only)
+        self.assertNotIn(POST_MODEL_GENERATION_REBUILD_BLOCKER, plan.layers[0].stages[2].blockers)
+        self.assertNotIn(FOUNDATION_CATCH_UP_BLOCKER, plan.layers[2].stages[0].blockers)
 
     def test_layer_one_and_two_model_evaluation_read_database_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -10,7 +10,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterable, Literal, Mapping, Sequence, TextIO
 
-from .model_training_workflow import DatasetUnit, ModelTrainingWorkflowPlan, WorkflowStage, build_model_training_workflow_plan
+from .model_training_workflow import (
+    FOUNDATION_CATCH_UP_BLOCKER,
+    POST_MODEL_GENERATION_REBUILD_BLOCKER,
+    DatasetUnit,
+    ModelTrainingWorkflowPlan,
+    WorkflowStage,
+    build_model_training_workflow_plan,
+)
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_WORKFLOW_STATE_PATH = Path("storage/runtime/model_training_workflow_state.json")
@@ -217,7 +224,7 @@ def _layer_complete(layer_number: int, stages: Mapping[str, StageProgress]) -> b
 
 
 def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
-    if blocker == "layer_01_task_key_preparation":
+    if blocker in {"layer_01_task_key_preparation", FOUNDATION_CATCH_UP_BLOCKER, POST_MODEL_GENERATION_REBUILD_BLOCKER}:
         return False
     if blocker == "upstream_layers_01_07_complete":
         return all(_layer_complete(layer_number, stages) for layer_number in range(1, 8))
@@ -693,6 +700,7 @@ def advance_workflow_state(
     completed_stage_ids: Iterable[str] = (),
     approved_stage_refs: Iterable[str] = (),
     selected_target_symbol: str | None = None,
+    foundation_catch_up_only: bool = True,
     write: bool = False,
 ) -> WorkflowState:
     state_path = resolve_workflow_state_path(start_month, state_path, storage_root=storage_root)
@@ -701,6 +709,7 @@ def advance_workflow_state(
         end_month=end_month,
         storage_root=storage_root,
         selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=foundation_catch_up_only,
     )
     state = load_workflow_state(state_path, plan)
     state = ingest_completion_receipts(state, receipt_paths)
@@ -745,6 +754,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--complete-stage", action="append", default=[], help="Mark a workflow stage succeeded from manager evidence.")
     parser.add_argument("--approve-stage", action="append", default=[], help="Mark stage approval as satisfied: stage_id=approval_ref.")
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument(
+        "--allow-post-foundation-model-stages",
+        action="store_true",
+        help="Allow model generation/evaluation/promotion stages after the Layer 1/2 historical substrate catch-up has been explicitly accepted.",
+    )
     parser.add_argument("--write", action="store_true", help="Persist the refreshed workflow state checkpoint.")
     args = parser.parse_args(argv)
     state = advance_workflow_state(
@@ -759,6 +773,7 @@ def main(argv: list[str] | None = None) -> int:
         completed_stage_ids=args.complete_stage,
         approved_stage_refs=args.approve_stage,
         selected_target_symbol=args.target_symbol,
+        foundation_catch_up_only=not args.allow_post_foundation_model_stages,
         write=args.write,
     )
     write_state_output(state, output=sys.stdout)

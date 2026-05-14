@@ -18,7 +18,9 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py \
   --advance-month-on-complete
 ```
 
-`--target-symbol` is required once scheduler work reaches Layer 3+ because the downstream dataset unit is one single-stock target over one six-month window. The reviewed service template currently sets `TRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL` for the first single-stock target unit. SPY remains market-state/panel evidence by default and should only become a downstream target when explicitly reviewed as such. If the target is omitted, Layer 3+ stages remain blocked with `selected_target_symbol_required` rather than allowing ambiguous target work. Layers 1-2 still use targetless six-month panel units.
+The current runtime priority is Layer 1/2 foundation catch-up first. The scheduler should advance the targetless Layer 1 market/cross-asset panel and Layer 2 sector/industry panel from `2016-01` to the current month before admitting ordinary Layer 3+ target work. A month can advance during this catch-up once Layer 1/2 data acquisition and feature generation are complete; model generation, evaluation, and promotion-review artifacts produced after that substrate boundary are treated as superseded/rebuild-required until the Layer 1/2 historical substrate is current.
+
+`--target-symbol` is required once scheduler work reaches Layer 3+ because the downstream dataset unit is one single-stock target over one six-month window. The reviewed service template currently sets `TRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL` for the first single-stock target unit, but this target is intentionally parked while Layer 1/2 catch-up is active. SPY remains market-state/panel evidence by default and should only become a downstream target when explicitly reviewed as such. If the target is omitted, Layer 3+ stages remain blocked with `selected_target_symbol_required` rather than allowing ambiguous target work. Layers 1-2 still use targetless six-month panel units.
 
 The daemon audits month-scoped workflow checkpoints to identify the earliest open month, or the next chronological month after the latest completed checkpoint, then repeatedly calls the capacity-aware scheduler tick. It re-applies that automatic work selection before each tick, so provider dispatches, repair runs, or smoke runs that complete months while the daemon sleeps are folded back into the resident cursor instead of making the service walk one already-complete month per interval. Each tick writes a checkpoint, appends one decision JSONL row, uses a single-instance lock so two historical schedulers do not race each other, and advances the month cursor when a month reaches terminal workflow completion.
 
@@ -97,13 +99,14 @@ The historical scheduler runtime must provide:
 
 The daemon now carries a manager-owned `manager_model_training_workflow_plan` for all eight model layers plus a durable `manager_model_training_workflow_state` checkpoint. Each layer has explicit stages for data acquisition, feature/input preparation, model generation, model evaluation, promotion-review preparation, and maintenance. Layers 5-7 intentionally mark trading-data feature generation as `not_applicable` because their inputs are upstream model/control-plane/position-risk artifacts rather than new provider data surfaces.
 
-The workflow is intentionally not a synchronized all-layers-per-month loop:
+The workflow is intentionally not a synchronized all-layers-per-month loop. During the current catch-up phase, Layer 1/2 substrate work has higher priority than Layer 3+ target work:
 
 | Segment | Progression policy |
 | --- | --- |
-| Layer 1 | Fixed market/cross-asset panel; dataset unit is one six-month chronological panel; no single target symbol applies. |
-| Layer 2 | Fixed sector/industry panel; dataset unit is one six-month chronological panel once Layer 1 context exists, without waiting for downstream layers. |
-| Layers 3-7 | Target-major serial chain; dataset unit is one named single-stock `target_symbol` over one six-month window; complete Layers 3 -> 4 -> 5 -> 6 -> 7 before admitting the next target unless a reviewed coverage exception is recorded. |
+| Layer 1 | Fixed market/cross-asset panel; dataset unit is one six-month chronological panel; no single target symbol applies; catch up data acquisition and feature generation month-by-month to current. |
+| Layer 2 | Fixed sector/industry panel; dataset unit is one six-month chronological panel once Layer 1 context exists; catch up data acquisition and feature generation month-by-month to current without waiting for downstream layers. |
+| Layers 1-2 post-feature model stages | Model generation, evaluation, promotion review, and maintenance are blocked during foundation catch-up with `post_model_generation_rebuild_required_after_layer_01_02_catch_up`; previously produced artifacts are substrate evidence only, not final promotion evidence. |
+| Layers 3-7 | Target-major serial chain; dataset unit is one named single-stock `target_symbol` over one six-month window; blocked during foundation catch-up with `layer_01_02_historical_catch_up_to_current_required`, then complete Layers 3 -> 4 -> 5 -> 6 -> 7 before admitting the next target unless a reviewed coverage exception is recorded. |
 | Layer 8 | Option-expression expansion begins only after the upstream Layer 1-7 context/target chain is complete for the selected single-stock `target_symbol` and six-month unit. |
 
 This preserves the finite-panel nature of Layers 1-2 while preventing the open Layer 3+ candidate space from exploding into unbounded parallel target/contract expansion. The emitted workflow plan/state/dashboard rows expose `dataset_unit`, `dataset_unit_months`, `selected_target_symbol`, and per-stage `target_symbol` so the task introduction says exactly which target is being worked.

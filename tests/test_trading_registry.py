@@ -422,6 +422,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("no_broker_execution_enabled", rows["TRADING_MANAGER_CONTROL_PLANE_CLOSEOUT_STATUS"]["payload"])
         self.assertIn("continuous_safe_work", rows["MANAGER_AUTONOMOUS_SCHEDULER_POLICY"]["payload"])
         self.assertIn("execution_priority_reserved", rows["MANAGER_AUTONOMOUS_SCHEDULER_POLICY"]["payload"])
+        self.assertIn("layer_01_02_foundation_catch_up_priority", rows["MANAGER_AUTONOMOUS_SCHEDULER_POLICY"]["payload"])
+        self.assertEqual(rows["MANAGER_FOUNDATION_CATCH_UP_PRIORITY"]["payload"], "layer_01_02_foundation_catch_up_priority")
+        self.assertEqual(
+            rows["LAYER_01_02_HISTORICAL_CATCH_UP_TO_CURRENT_REQUIRED"]["payload"],
+            "layer_01_02_historical_catch_up_to_current_required",
+        )
+        self.assertEqual(
+            rows["POST_MODEL_GENERATION_REBUILD_REQUIRED_AFTER_LAYER_01_02_CATCH_UP"]["payload"],
+            "post_model_generation_rebuild_required_after_layer_01_02_catch_up",
+        )
+        self.assertEqual(
+            rows["HISTORICAL_SUBSTRATE_REUSE_POLICY"]["payload"],
+            "downloaded_cleaned_feature_substrate_reusable_when_contract_valid",
+        )
+        self.assertEqual(
+            rows["POST_MODEL_ARTIFACT_REBUILD_POLICY"]["payload"],
+            "model_generation_evaluation_promotion_artifacts_superseded_until_rebuilt",
+        )
         self.assertIn("live_trading_capacity_reserved", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("historical_worker_count_capacity_adaptive", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("pre_promotion_full_training_mode", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])

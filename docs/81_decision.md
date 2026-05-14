@@ -3356,3 +3356,32 @@ The manager review helper must preserve all selected rows for a target while pre
 - Manager automation must not collapse multi-row target context mappings into a single symbol.
 - The script-called review path can review AAOI-style business mappings and BTC-style proxy mappings through the same evidence-only boundary.
 - Review output still does not authorize provider dispatch, model activation, broker/account mutation, storage lifecycle mutation, or direct Layer 1/2 universe edits.
+
+## D145 - Layer 1/2 historical substrate catch-up outranks Layer 3+ target work
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The workflow now distinguishes targetless six-month panel units for Layers 1-2 from target-symbol six-month units for Layers 3+. Chentong clarified that the global Layer 1 market/cross-asset context and Layer 2 sector/industry context should catch up from `2016-01` to current before selecting or expanding ordinary Layer 3+ target work.
+
+Downloaded provider data is expected to remain reusable when source contracts, point-in-time semantics, and schema remain valid. Artifacts created after model generation are more sensitive to the available historical substrate, rolling-fold policy, and promotion baseline; those artifacts should not be treated as current promotion evidence after this scheduling change.
+
+### Decision
+
+The historical scheduler treats Layer 1/2 data acquisition and feature generation as the foundation catch-up substrate. During this catch-up phase:
+
+- Layer 1 and Layer 2 data/feature stages may advance month-by-month toward the current month.
+- A month is eligible for chronological advancement once Layer 1/2 `data_acquisition` and `feature_generation` are complete for that month.
+- Layer 1/2 `model_generation`, `model_evaluation`, `promotion_review_preparation`, and `maintenance` remain blocked with `post_model_generation_rebuild_required_after_layer_01_02_catch_up`.
+- Layer 3+ target-symbol work remains blocked with `layer_01_02_historical_catch_up_to_current_required` in addition to its target/upstream blockers.
+- Existing downloaded provider data, cleaned rows, and deterministic feature substrate may be reused when contract-valid.
+- Existing model candidates, evaluation summaries, promotion-review evidence, activation evidence, and later review artifacts are superseded as current promotion basis and must be rebuilt/revalidated after the foundation substrate is caught up.
+
+### Consequences
+
+- The default scheduler posture is no longer “finish every layer for a month before moving on.” It is “catch up Layer 1/2 historical substrate first.”
+- The first selected Layer 3+ target (`AAPL`) remains a parked runtime default until foundation catch-up is accepted as current.
+- Dashboard/task-state surfaces should show the catch-up/rebuild blockers rather than implying Layer 3+ is ready just because a target symbol exists.
+- Provider dispatch, model activation, broker/account mutation, and storage lifecycle authority remain unchanged.

@@ -145,6 +145,34 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.completed_months, ("2016-02", "2016-03"))
         self.assertEqual(selection.open_months, ())
 
+    def test_select_next_historical_work_advances_after_foundation_substrate_month(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            month = "2016-01"
+            plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+            foundation_stage_ids = [
+                stage.stage_id
+                for layer in plan.layers
+                if layer.layer in {1, 2}
+                for stage in layer.stages
+                if stage.stage_type in {"data_acquisition", "feature_generation"}
+            ]
+            advance_workflow_state(
+                start_month=month,
+                end_month=month,
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                completed_stage_ids=foundation_stage_ids,
+                write=True,
+            )
+
+            selection = select_next_historical_work(storage_root=storage_root, default_start_month=month, default_end_month=month)
+
+        self.assertEqual(selection.start_month, "2016-02")
+        self.assertEqual(selection.reason_code, "advance_after_latest_completed_workflow_state")
+        self.assertEqual(selection.completed_months, ("2016-01",))
+        self.assertEqual(selection.open_months, ())
+
     def test_select_next_historical_work_resumes_earliest_open_month(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"

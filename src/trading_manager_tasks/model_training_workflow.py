@@ -23,6 +23,10 @@ FULL_LAYER_COUNT = 8
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
 DATASET_UNIT_MONTHS = 6
+FOUNDATION_CATCH_UP_LAYERS = (1, 2)
+FOUNDATION_CATCH_UP_STAGE_TYPES = ("data_acquisition", "feature_generation")
+FOUNDATION_CATCH_UP_BLOCKER = "layer_01_02_historical_catch_up_to_current_required"
+POST_MODEL_GENERATION_REBUILD_BLOCKER = "post_model_generation_rebuild_required_after_layer_01_02_catch_up"
 
 
 @dataclass(frozen=True)
@@ -123,6 +127,10 @@ class ModelTrainingWorkflowPlan:
     provider_calls: int = 0
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
+    foundation_catch_up_only: bool = True
+    foundation_catch_up_layers: tuple[int, ...] = FOUNDATION_CATCH_UP_LAYERS
+    reusable_substrate_stage_types: tuple[str, ...] = FOUNDATION_CATCH_UP_STAGE_TYPES
+    post_model_generation_artifacts_policy: str = "supersede_and_rebuild_after_layer_01_02_historical_catch_up"
 
     def summary_row(self) -> dict[str, Any]:
         return {
@@ -138,6 +146,10 @@ class ModelTrainingWorkflowPlan:
             "provider_calls": self.provider_calls,
             "model_activation_performed": self.model_activation_performed,
             "broker_execution_performed": self.broker_execution_performed,
+            "foundation_catch_up_only": self.foundation_catch_up_only,
+            "foundation_catch_up_layers": list(self.foundation_catch_up_layers),
+            "reusable_substrate_stage_types": list(self.reusable_substrate_stage_types),
+            "post_model_generation_artifacts_policy": self.post_model_generation_artifacts_policy,
         }
 
 
@@ -432,6 +444,7 @@ def _build_layer_workflow(
     start_month: str,
     end_month: str,
     selected_target_symbol: str | None,
+    foundation_catch_up_only: bool,
 ) -> LayerWorkflow:
     layer = int(meta["layer"])
     slug = str(meta["slug"])
@@ -523,6 +536,8 @@ def _build_layer_workflow(
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
 
+    if foundation_catch_up_only and layer >= 3 and acquisition_status != "not_applicable":
+        acquisition_blockers = (FOUNDATION_CATCH_UP_BLOCKER,) + acquisition_blockers
     acquisition_blockers = _with_target_blocker(acquisition_blockers, layer=layer, selected_target_symbol=selected_target_symbol)
 
     stages = [
@@ -565,7 +580,12 @@ def _build_layer_workflow(
                 status="blocked",
                 command=feature,
                 dataset_unit=dataset_unit,
-                blockers=_with_target_blocker((f"{key}.data_acquisition_complete",), layer=layer, selected_target_symbol=selected_target_symbol),
+                blockers=_with_target_blocker(
+                    ((FOUNDATION_CATCH_UP_BLOCKER,) if foundation_catch_up_only and layer >= 3 else ())
+                    + (f"{key}.data_acquisition_complete",),
+                    layer=layer,
+                    selected_target_symbol=selected_target_symbol,
+                ),
             )
         )
     for stage_type, command, description, blockers in (
@@ -594,6 +614,12 @@ def _build_layer_workflow(
             (f"{key}.promotion_review_preparation_complete",),
         ),
     ):
+        stage_blockers = blockers
+        if foundation_catch_up_only:
+            if layer in FOUNDATION_CATCH_UP_LAYERS:
+                stage_blockers = (POST_MODEL_GENERATION_REBUILD_BLOCKER,) + stage_blockers
+            elif layer >= 3:
+                stage_blockers = (FOUNDATION_CATCH_UP_BLOCKER,) + stage_blockers
         stages.append(
             WorkflowStage(
                 stage_id=f"{key}.{stage_type}",
@@ -604,7 +630,7 @@ def _build_layer_workflow(
                 status="blocked",
                 command=command,
                 dataset_unit=dataset_unit,
-                blockers=_with_target_blocker(blockers, layer=layer, selected_target_symbol=selected_target_symbol),
+                blockers=_with_target_blocker(stage_blockers, layer=layer, selected_target_symbol=selected_target_symbol),
             )
         )
     return LayerWorkflow(
@@ -632,6 +658,7 @@ def build_model_training_workflow_plan(
     end_month: str = "2016-01",
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     selected_target_symbol: str | None = None,
+    foundation_catch_up_only: bool = True,
 ) -> ModelTrainingWorkflowPlan:
     task_key_count = count_layer_one_task_keys(storage_root, start_month=start_month)
     layer_two_task_key_count = count_layer_two_task_keys(storage_root, start_month=start_month)
@@ -643,6 +670,7 @@ def build_model_training_workflow_plan(
             start_month=start_month,
             end_month=end_month,
             selected_target_symbol=selected_target_symbol,
+            foundation_catch_up_only=foundation_catch_up_only,
         )
         for meta in LAYER_METADATA
     )
@@ -664,6 +692,7 @@ def build_model_training_workflow_plan(
         layer_two_task_key_count=layer_two_task_key_count,
         layers=layers,
         next_stage=next_stage,
+        foundation_catch_up_only=foundation_catch_up_only,
     )
 
 
@@ -678,6 +707,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument(
+        "--allow-post-foundation-model-stages",
+        action="store_true",
+        help="Allow model generation/evaluation/promotion stages after the Layer 1/2 historical substrate catch-up has been explicitly accepted.",
+    )
     args = parser.parse_args(argv)
     write_workflow_plan(
         build_model_training_workflow_plan(
@@ -685,6 +719,7 @@ def main(argv: list[str] | None = None) -> int:
             end_month=args.end_month,
             storage_root=args.storage_root,
             selected_target_symbol=args.target_symbol,
+            foundation_catch_up_only=not args.allow_post_foundation_model_stages,
         ),
         output=sys.stdout,
     )
@@ -695,8 +730,12 @@ __all__ = [
     "DATASET_UNIT_MONTHS",
     "DatasetUnit",
     "FULL_LAYER_COUNT",
+    "FOUNDATION_CATCH_UP_BLOCKER",
+    "FOUNDATION_CATCH_UP_LAYERS",
+    "FOUNDATION_CATCH_UP_STAGE_TYPES",
     "LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS",
     "LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS",
+    "POST_MODEL_GENERATION_REBUILD_BLOCKER",
     "LayerWorkflow",
     "ModelTrainingWorkflowPlan",
     "WorkflowStage",

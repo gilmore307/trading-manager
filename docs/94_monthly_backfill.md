@@ -6,7 +6,7 @@
 
 The common historical start month is `2016-01`.
 
-Formal historical operation is chronological-forward: start at the accepted earliest common month (`2016-01`) and advance month by month from old to new. Do not run nearer months ahead of older eligible months unless a reviewed operator exception is recorded. Request planning clamps any earlier requested month to `2016-01`, even when a provider has older raw availability, so formal evidence begins from the reviewed common start.
+Formal historical operation is chronological-forward: start at the accepted earliest common month (`2016-01`) and advance month by month from old to new. The current scheduler priority is Layer 1/2 foundation catch-up: complete targetless Layer 1 and Layer 2 data acquisition plus feature generation through current month before ordinary Layer 3+ target-symbol work. Do not run nearer months ahead of older eligible months unless a reviewed operator exception is recorded. Request planning clamps any earlier requested month to `2016-01`, even when a provider has older raw availability, so formal evidence begins from the reviewed common start.
 
 Crypto is allowed to join later. The current OKX BTC/USDT evidence supports starting OKX monthly backfill at `2018-01`; this does not block the equity/news/SEC/options route from beginning at `2016-01`.
 
@@ -87,6 +87,8 @@ PYTHONPATH=src python3 scripts/tasks/prepare_layer_two_historical_training.py \
   --write-files-only \
   --format json
 ```
+
+During foundation catch-up, these preparation/provider/feature outputs are the reusable substrate. Downloaded provider data and deterministic features may be reused when point-in-time semantics and schema contracts still match; model candidates, evaluations, promotion-review packages, and later activation/review artifacts from earlier local/monthly assumptions are superseded until rebuilt after catch-up.
 
 The batch preparation performs these manager-owned steps together:
 

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
+from .model_training_workflow import FOUNDATION_CATCH_UP_LAYERS, FOUNDATION_CATCH_UP_STAGE_TYPES
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import (
     DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
@@ -74,12 +75,37 @@ def _month_from_workflow_state_path(path: Path) -> str | None:
     return month
 
 
+def _workflow_payload_foundation_catch_up_complete(payload: dict[str, Any]) -> bool:
+    stages = payload.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return False
+    required = {
+        (layer, stage_type)
+        for layer in FOUNDATION_CATCH_UP_LAYERS
+        for stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES
+    }
+    satisfied: set[tuple[int, str]] = set()
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        try:
+            layer = int(stage.get("layer"))
+        except (TypeError, ValueError):
+            continue
+        stage_type = str(stage.get("stage_type") or "")
+        if (layer, stage_type) in required and stage.get("status") in {"succeeded", "not_applicable"}:
+            satisfied.add((layer, stage_type))
+    return required <= satisfied
+
+
 def _workflow_payload_is_complete(payload: dict[str, Any]) -> bool:
     stages = payload.get("stages")
     if not isinstance(stages, list) or not stages:
         return False
     statuses = [stage.get("status") for stage in stages if isinstance(stage, dict)]
-    return bool(statuses) and all(status in {"succeeded", "not_applicable"} for status in statuses)
+    if bool(statuses) and all(status in {"succeeded", "not_applicable"} for status in statuses):
+        return True
+    return _workflow_payload_foundation_catch_up_complete(payload)
 
 
 @dataclass(frozen=True)
