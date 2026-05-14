@@ -17,7 +17,7 @@ from typing import Any, Mapping, TextIO
 
 from .model_training_workflow import build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, select_month_ingest_worker_months
+from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, completed_historical_month_cutoff, select_month_ingest_worker_months
 from .scheduler_status import (
     DEFAULT_DAEMON_WRAPPER_PATH,
     DEFAULT_DECISION_LOG_PATH,
@@ -310,7 +310,33 @@ def _planned_stage_rows(status: HistoricalSchedulerStatus, *, month: str | None 
     return rows
 
 
-def _completed_months(status: HistoricalSchedulerStatus) -> list[str]:
+def _is_month_key(value: object) -> bool:
+    text = str(value or "")
+    if len(text) != 7 or text[4] != "-":
+        return False
+    year_text, month_text = text.split("-", 1)
+    if len(year_text) != 4 or len(month_text) != 2 or not year_text.isdigit() or not month_text.isdigit():
+        return False
+    month_number = int(month_text)
+    return 1 <= month_number <= 12
+
+
+def _month_visible_by_completed_cutoff(month: object, *, max_month: str) -> bool:
+    """Return whether a month-scoped dashboard task is safe to expose.
+
+    Provider-backed historical task previews must not create or advertise work
+    for the current in-progress calendar month.  The scheduler already applies
+    this cutoff for normal worker selection; the dashboard read model repeats
+    the guard so stale daemon state or pre-created workflow files cannot leak a
+    premature Ready task such as 2026-05 before June begins.
+    """
+
+    if not _is_month_key(month):
+        return True
+    return str(month) <= max_month
+
+
+def _completed_months(status: HistoricalSchedulerStatus, *, max_month: str) -> list[str]:
     daemon_state = status.daemon_state or {}
     raw_months = daemon_state.get("last_completed_months") if isinstance(daemon_state, Mapping) else None
     if not isinstance(raw_months, list):
@@ -319,7 +345,12 @@ def _completed_months(status: HistoricalSchedulerStatus) -> list[str]:
     seen: set[str] = set()
     for raw_month in raw_months:
         month = str(raw_month or "").strip()
-        if month and month not in seen and month != status.current_month:
+        if (
+            month
+            and month not in seen
+            and month != status.current_month
+            and _month_visible_by_completed_cutoff(month, max_month=max_month)
+        ):
             months.append(month)
             seen.add(month)
     return months
@@ -501,9 +532,10 @@ def _task_timeline(
     """
 
     storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    max_dashboard_month = completed_historical_month_cutoff()
     month_stage_sets: list[tuple[str | None, list[Any], bool]] = []
     included_months: set[str] = set()
-    for month in _completed_months(status):
+    for month in _completed_months(status, max_month=max_dashboard_month):
         payload = _workflow_state_payload(storage_root, month)
         if payload is None:
             continue
@@ -516,6 +548,7 @@ def _task_timeline(
         storage_root=storage_root,
         default_start_month=status.current_month or status.workflow_checkpoint.start_month or "2016-01",
         worker_count=DEFAULT_MONTH_INGEST_WORKERS,
+        max_month=max_dashboard_month,
     )
     for month in lane_months:
         if month in included_months:
@@ -541,12 +574,18 @@ def _task_timeline(
             fold_start = str(fold_payload.get("start_month") or "")
             fold_end = str(fold_payload.get("end_month") or "")
             fold_key = f"{fold_start}..{fold_end}" if fold_start and fold_end else fold_path.stem
+            if fold_end and not _month_visible_by_completed_cutoff(fold_end, max_month=max_dashboard_month):
+                continue
             if fold_key in included_months:
                 continue
             month_stage_sets.append((fold_key, raw_stages, True))
             included_months.add(fold_key)
     active_month, active_stages = _active_month_stages(status, storage_root)
-    if active_stages and active_month not in included_months:
+    if (
+        active_stages
+        and active_month not in included_months
+        and _month_visible_by_completed_cutoff(active_month, max_month=max_dashboard_month)
+    ):
         month_stage_sets.append((active_month, active_stages, True))
     if not month_stage_sets:
         return []

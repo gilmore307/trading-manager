@@ -3570,3 +3570,25 @@ Fold checkpoints may carry substrate-stage status as seeded evidence from comple
 - Month completion and fold readiness require the month-scoped substrate stages needed by the workflow.
 - Model-generation-and-later commands continue to use fold `start_month` and `end_month`.
 - Any fold-run data acquisition / feature-generation artifacts produced before this correction are invalid boundary evidence and should be archived before resuming the service.
+
+
+## D155 - Dashboard task timelines obey the completed-month cutoff
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The dashboard showed `2026-05 · Layer 1 · Data Acquisition` as a Ready task while May 2026 was still in progress. The scheduler's provider-download selector already capped month-ingest work at the latest completed calendar month in `America/New_York`, but the dashboard read-model producer could still expose a stale or pre-created workflow-state file beyond that cutoff.
+
+### Decision
+
+Dashboard historical task timelines must apply the same completed-month cutoff as month-ingest worker selection. Month-scoped task rows whose month is after `completed_historical_month_cutoff()` are not included in `historical_task_progress_summary.chart_payload.task_timeline`, even if daemon state or a workflow checkpoint names the month. Fold rows are hidden when their fold end month is after the cutoff.
+
+Task detail presentation also omits the dedicated safety-boundary card. Current progress is rendered as a progress bar, using stage-coverage counts when attached and a status-based fallback for active rows without a coverage artifact.
+
+### Consequences
+
+- The current incomplete calendar month cannot appear as a Ready dashboard task before the month ends.
+- Dashboard visibility is defensive against stale runtime state, not merely dependent on normal scheduler selection.
+- Safety posture can remain in sanitized read-model payloads for diagnostics/contracts, but it is no longer a primary expanded-detail card.

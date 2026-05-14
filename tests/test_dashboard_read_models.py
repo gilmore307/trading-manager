@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from trading_manager_tasks.dashboard_read_models import build_historical_task_progress_summary
 from trading_manager_tasks.scheduler_status import collect_historical_scheduler_status
@@ -307,6 +308,66 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task_timeline = payload["chart_payload"]["task_timeline"]
         self.assertEqual([task["month"] for task in task_timeline], ["2019-04", "2019-06"])
         self.assertEqual([task["task_state"] for task in task_timeline], ["completed", "current"])
+
+    def test_current_incomplete_calendar_month_is_not_exposed_as_ready_task(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2026-05.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2026-05",
+                        "end_month": "2026-05",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "start_month": "2026-05",
+                        "end_month": "2026-05",
+                        "current_month": "2026-05",
+                        "last_completed_months": ["2026-05"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage",
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            with patch(
+                "trading_manager_tasks.dashboard_read_models.completed_historical_month_cutoff",
+                return_value="2026-04",
+            ):
+                payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-14T12:00:00Z")
+
+        task_timeline = payload["chart_payload"]["task_timeline"]
+        self.assertFalse(any(task["month"] == "2026-05" for task in task_timeline))
 
     def test_planned_task_timeline_uses_service_target_symbol(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

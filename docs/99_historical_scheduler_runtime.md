@@ -129,7 +129,7 @@ The resident scheduler/service-control boundary is closed enough for supervised 
 
 ## Current-month provider download guard
 
-The historical scheduler caps normal provider-download month selection at the latest completed calendar month in `America/New_York`. During May 2026, for example, the month-ingest lanes may catch up through `2026-04` but must not download `2026-05` until June begins. This protects historical substrate, fold construction, and promotion evidence from incomplete current-month data.
+The historical scheduler caps normal provider-download month selection at the latest completed calendar month in `America/New_York`. During May 2026, for example, the month-ingest lanes may catch up through `2026-04` but must not download `2026-05` until June begins. Dashboard task timelines apply the same cutoff, so stale daemon state or pre-created workflow files must not expose `2026-05` as a Ready task before June begins. This protects historical substrate, fold construction, promotion evidence, and operator-facing task status from incomplete current-month data.
 
 ## Fold-scoped Model Worker queue
 
