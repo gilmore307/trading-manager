@@ -117,6 +117,57 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertFalse(summary.model_activation_performed)
             self.assertTrue(Path(summary.task_key_path).exists())
 
+    def test_fold_materialization_uses_one_candidate_per_symbol_across_months(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            trading_data_root = tmp / "trading-data"
+            storage_root = trading_data_root / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            for month in ("2016-01", "2016-02"):
+                run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / month / "runs" / "run_001"
+                (run_dir / "cleaned").mkdir(parents=True)
+                (run_dir / "cleaned" / "equity_bar.jsonl").write_text(f'{{"symbol":"XLF","timestamp":"{month}-04T09:30:00-05:00"}}\n', encoding="utf-8")
+                receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / month / "completion_receipt.json"
+                receipt_path.parent.mkdir(parents=True, exist_ok=True)
+                receipt_path.write_text(
+                    json.dumps(
+                        {
+                            "runs": [
+                                {
+                                    "run_id": "run_001",
+                                    "status": "succeeded",
+                                    "row_counts": {"equity_bar": 1},
+                                    "steps": {"clean": {"references": [f"storage/monthly_backfill/alpaca_bars/XLF/{month}/runs/run_001/cleaned/equity_bar.jsonl"]}},
+                                }
+                            ]
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            summary = materialize_layer_three_target_state_inputs(
+                start_month="2016-01",
+                end_month="2016-02",
+                manager_storage_root=tmp / "manager-storage",
+                trading_data_root=trading_data_root,
+                trading_storage_root=storage_root,
+                universe_path=universe_path,
+                write=False,
+            )
+            task_key = json.loads(Path(summary.task_key_path).read_text(encoding="utf-8"))
+            candidates = [json.loads(line) for line in Path(summary.candidate_rows_path).read_text(encoding="utf-8").splitlines()]
+            bars = [json.loads(line) for line in Path(summary.merged_bar_rows_path).read_text(encoding="utf-8").splitlines()]
+
+            self.assertEqual(summary.feed_artifact_count, 2)
+            self.assertEqual(summary.target_candidate_count, 1)
+            self.assertEqual(task_key["params"]["start"], "2016-01-01T00:00:00-05:00")
+            self.assertEqual(task_key["params"]["end"], "2016-03-01T00:00:00-05:00")
+            self.assertEqual(candidates[0]["fold_id"], "fold_2016-01_2016-02")
+            self.assertEqual(candidates[0]["fold_months"], "2016-01;2016-02")
+            self.assertEqual(len(bars), 2)
+            self.assertEqual({row["fold_month"] for row in bars}, {"2016-01", "2016-02"})
+
 
 if __name__ == "__main__":
     unittest.main()

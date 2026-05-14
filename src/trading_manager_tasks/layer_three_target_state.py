@@ -37,6 +37,7 @@ class FeedArtifactRef:
     """Completed Layer 2 feed artifact selected as target-local source evidence."""
 
     symbol: str
+    month: str
     receipt_path: str
     cleaned_bar_path: str
     run_id: str
@@ -86,18 +87,49 @@ class LayerThreeTargetStateMaterialization:
         }
 
 
-def _month_bounds(month: str) -> tuple[str, str]:
+def _validate_month(month: str) -> tuple[int, int]:
     if len(month) != 7 or month[4] != "-":
         raise TaskSystemError(f"month must use YYYY-MM format: {month}")
     year = int(month[:4])
     month_number = int(month[5:])
     if month_number < 1 or month_number > 12:
         raise TaskSystemError(f"month must use YYYY-MM format: {month}")
+    return year, month_number
+
+
+def _next_month(month: str) -> str:
+    year, month_number = _validate_month(month)
     if month_number == 12:
-        next_year, next_month = year + 1, 1
-    else:
-        next_year, next_month = year, month_number + 1
-    return f"{year:04d}-{month_number:02d}-01T00:00:00-05:00", f"{next_year:04d}-{next_month:02d}-01T00:00:00-05:00"
+        return f"{year + 1:04d}-01"
+    return f"{year:04d}-{month_number + 1:02d}"
+
+
+def _iter_months(start_month: str, end_month: str) -> Iterable[str]:
+    _validate_month(start_month)
+    _validate_month(end_month)
+    if start_month > end_month:
+        raise TaskSystemError(f"start_month must be <= end_month: {start_month} > {end_month}")
+    month = start_month
+    while month <= end_month:
+        yield month
+        month = _next_month(month)
+
+
+def _month_bounds(month: str) -> tuple[str, str]:
+    year, month_number = _validate_month(month)
+    next_month = _next_month(month)
+    next_year, next_month_number = int(next_month[:4]), int(next_month[5:])
+    return f"{year:04d}-{month_number:02d}-01T00:00:00-05:00", f"{next_year:04d}-{next_month_number:02d}-01T00:00:00-05:00"
+
+
+def _range_bounds(start_month: str, end_month: str) -> tuple[str, str]:
+    start, _ = _month_bounds(start_month)
+    _, end = _month_bounds(end_month)
+    return start, end
+
+
+def _fold_key(start_month: str, end_month: str) -> str:
+    return f"{start_month.replace('-', '_')}_{end_month.replace('-', '_')}"
 
 
 def _read_layer_two_symbols(universe_path: Path) -> tuple[str, ...]:
@@ -159,6 +191,7 @@ def discover_layer_two_feed_artifacts(
         refs.append(
             FeedArtifactRef(
                 symbol=symbol,
+                month=start_month,
                 receipt_path=str(receipt_path),
                 cleaned_bar_path=str(cleaned_path),
                 run_id=str(run.get("run_id") or ""),
@@ -168,25 +201,40 @@ def discover_layer_two_feed_artifacts(
     return tuple(refs)
 
 
-def _target_candidate_id(*, month: str, symbol: str) -> str:
-    digest = hashlib.sha256(f"layer_03_target_state_vector:{month}:{symbol}".encode("utf-8")).hexdigest()[:16]
-    return f"tcand_l03_{month.replace('-', '_')}_{digest}"
+def _target_candidate_id(*, fold_key: str, symbol: str) -> str:
+    digest = hashlib.sha256(f"layer_03_target_state_vector:{fold_key}:{symbol}".encode("utf-8")).hexdigest()[:16]
+    return f"tcand_l03_{fold_key}_{digest}"
 
 
-def _candidate_rows(refs: Sequence[FeedArtifactRef], *, start_month: str) -> list[dict[str, Any]]:
-    return [
-        {
-            "target_candidate_id": _target_candidate_id(month=start_month, symbol=ref.symbol),
-            "routing_symbol_ref": ref.symbol,
-            "audit_symbol_ref": ref.symbol,
-            "candidate_generation_reason_codes": "3_LAYER2_TRANSMISSION_TARGET_CANDIDATE;3_TARGET_LOCAL_EVIDENCE_JOINED",
-            "candidate_eligibility_state": "eligible",
-            "candidate_anonymity_check_state": "pass",
-            "candidate_data_quality_score": 1.0 if ref.row_count > 0 else 0.0,
-            "source_artifact_ref": ref.cleaned_bar_path,
-        }
-        for ref in refs
-    ]
+def _ref_month(ref: FeedArtifactRef) -> str:
+    return str(getattr(ref, "month", "") or "unknown_month")
+
+
+def _candidate_rows(refs: Sequence[FeedArtifactRef], *, start_month: str, end_month: str) -> list[dict[str, Any]]:
+    fold_key = _fold_key(start_month, end_month)
+    by_symbol: dict[str, list[FeedArtifactRef]] = {}
+    for ref in refs:
+        by_symbol.setdefault(ref.symbol, []).append(ref)
+    rows: list[dict[str, Any]] = []
+    for symbol, symbol_refs in sorted(by_symbol.items()):
+        months = sorted({_ref_month(ref) for ref in symbol_refs if _ref_month(ref) != "unknown_month"})
+        rows.append(
+            {
+                "target_candidate_id": _target_candidate_id(fold_key=fold_key, symbol=symbol),
+                "fold_id": f"fold_{start_month}_{end_month}",
+                "fold_start_month": start_month,
+                "fold_end_month": end_month,
+                "fold_months": ";".join(months),
+                "routing_symbol_ref": symbol,
+                "audit_symbol_ref": symbol,
+                "candidate_generation_reason_codes": "3_LAYER2_TRANSMISSION_TARGET_CANDIDATE;3_TARGET_LOCAL_EVIDENCE_JOINED",
+                "candidate_eligibility_state": "eligible",
+                "candidate_anonymity_check_state": "pass",
+                "candidate_data_quality_score": 1.0 if any(ref.row_count > 0 for ref in symbol_refs) else 0.0,
+                "source_artifact_ref": ";".join(ref.cleaned_bar_path for ref in symbol_refs),
+            }
+        )
+    return rows
 
 
 def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> int:
@@ -207,6 +255,8 @@ def _iter_merged_bar_rows(refs: Sequence[FeedArtifactRef]) -> Iterable[dict[str,
                     continue
                 row = json.loads(line)
                 row.setdefault("symbol", ref.symbol)
+                if _ref_month(ref) != "unknown_month":
+                    row.setdefault("fold_month", _ref_month(ref))
                 yield row
 
 
@@ -218,19 +268,18 @@ def build_source_task_key(
     trading_data_output_root: Path,
     refs: Sequence[FeedArtifactRef],
 ) -> tuple[dict[str, Any], Path, Path, Path, int]:
-    if start_month != end_month:
-        raise TaskSystemError("Layer 3 target-state materialization currently expects one chronological month per run")
     if not refs:
         raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 3 target-state materialization")
-    source_start, source_end = _month_bounds(start_month)
+    source_start, source_end = _range_bounds(start_month, end_month)
+    fold_key = _fold_key(start_month, end_month)
     candidate_path = output_dir / "target_candidates.jsonl"
     merged_bar_path = output_dir / "bars.jsonl"
     task_key_path = output_dir / "task_key.json"
-    candidates = _candidate_rows(refs, start_month=start_month)
+    candidates = _candidate_rows(refs, start_month=start_month, end_month=end_month)
     _write_jsonl(candidate_path, candidates)
     bar_count = _write_jsonl(merged_bar_path, _iter_merged_bar_rows(refs))
     task_key = {
-        "task_id": f"layer_03_target_state_vector_{start_month.replace('-', '_')}",
+        "task_id": f"layer_03_target_state_vector_{fold_key}",
         "source": SOURCE,
         "params": {
             "start": source_start,
@@ -261,17 +310,22 @@ def materialize_layer_three_target_state_inputs(
 ) -> LayerThreeTargetStateMaterialization:
     """Materialize source_03 target-state rows from existing Layer 2 feed artifacts."""
 
-    refs = discover_layer_two_feed_artifacts(
-        start_month=start_month,
-        trading_data_root=trading_data_root,
-        trading_storage_root=trading_storage_root,
-        universe_path=universe_path,
+    refs = tuple(
+        ref
+        for month in _iter_months(start_month, end_month)
+        for ref in discover_layer_two_feed_artifacts(
+            start_month=month,
+            trading_data_root=trading_data_root,
+            trading_storage_root=trading_storage_root,
+            universe_path=universe_path,
+        )
     )
     if not manager_storage_root.is_absolute():
         manager_storage_root = Path.cwd() / manager_storage_root
-    output_dir = manager_storage_root / output_root / start_month
-    trading_data_output_root = trading_data_root / "storage" / "runtime" / SOURCE / f"layer_03_target_state_vector_{start_month.replace('-', '_')}"
-    run_id = run_id or f"layer_03_target_state_vector_{start_month.replace('-', '_')}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    fold_key = _fold_key(start_month, end_month)
+    output_dir = manager_storage_root / output_root / fold_key
+    trading_data_output_root = trading_data_root / "storage" / "runtime" / SOURCE / f"layer_03_target_state_vector_{fold_key}"
+    run_id = run_id or f"layer_03_target_state_vector_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     _task_key, task_key_path, candidate_path, merged_bar_path, _bar_count = build_source_task_key(
         start_month=start_month,
         end_month=end_month,
@@ -308,7 +362,7 @@ def materialize_layer_three_target_state_inputs(
         symbols=tuple(ref.symbol for ref in refs),
         feed_artifact_count=len(refs),
         source_row_count=source_row_count,
-        target_candidate_count=len(refs),
+        target_candidate_count=len({ref.symbol for ref in refs}),
         task_key_path=str(task_key_path),
         candidate_rows_path=str(candidate_path),
         merged_bar_rows_path=str(merged_bar_path),

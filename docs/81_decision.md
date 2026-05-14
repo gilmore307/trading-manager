@@ -3507,3 +3507,24 @@ Month-ingest workers continue catch-up independently. Model Worker fold selectio
 - Once `2016-01` through `2016-06` foundation substrate is complete, `Model Worker 1` can start `layer_01_market_regime.model_generation` for the fold instead of waiting for full historical catch-up.
 - Fold model/progression state is durable and separate from month-ingest state.
 - Dashboard task timelines can show fold-scoped Model Worker tasks alongside the four month-ingest lane heads.
+
+## D152 - Layer 3+ model-worker stages are six-month target folds
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+After `Model Worker 1` started the first complete fold (`2016-01` through `2016-06`), Layer 1/2 model generation, evaluation, and Promotion Review succeeded. The next stage exposed a stale implementation assumption: Layer 3 target-state input materialization still rejected `start_month != end_month`, even though the accepted dataset unit for Layer 3+ is one selected target/instrument over one six-month rolling fold.
+
+### Decision
+
+All Layer 3+ model-worker stages use the same six-month fold unit as their execution scope. Local input materializers must accept `start_month`/`end_month` fold ranges and may not assume one chronological month per run. Month-scoped provider/feed artifacts remain reusable substrate, but the manager-owned task key and downstream source/model stage are fold-scoped.
+
+Layer 3 target-state materialization creates one target candidate per symbol for the fold and merges all reviewed Layer 2 bar artifacts from the six-month range. Layer 4 event-overlay materialization prepares detector task keys per symbol-month and then writes one fold-scoped source task key covering the full six-month event window.
+
+### Consequences
+
+- `Model Worker 1` can continue past Layer 1/2 into Layer 3+ without violating the accepted dataset-unit contract.
+- The six-month fold stays explicit through task ids, output paths, source windows, and summary receipts.
+- Single-month runtime assumptions in future Layer 3+ stage code are considered bugs unless explicitly documented as month-scoped substrate preparation, not model-worker execution.

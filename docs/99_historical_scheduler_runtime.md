@@ -141,3 +141,9 @@ The service has two independent historical work selectors:
 A model fold writes a separate checkpoint under `storage/runtime/model_training_fold_state_<start>_<end>.json`. This preserves the month-scoped `model_training_workflow_state_YYYY-MM.json` checkpoints while allowing fold-scoped model generation, model evaluation, Promotion Review, and maintenance to run as soon as a 4+1+1 fold is ready.
 
 For the bootstrap fold, `2016-01` through `2016-04` are train months, `2016-05` is validation, and `2016-06` is test. The fold is not eligible after only the four train months; it becomes eligible once all six months have complete Layer 1/2 `data_acquisition` and `feature_generation` substrate.
+
+### Layer 3+ fold scope
+
+`Model Worker 1` runs Layer 3+ work as one selected target/instrument over the complete six-month fold. Month-scoped artifacts from Layer 1/2 remain reusable substrate, but manager-owned Layer 3+ task keys, feature windows, model generation, model evaluation, and Promotion Review use the fold `start_month` and `end_month` together.
+
+For the first fold, Layer 3+ execution scope is `2016-01` through `2016-06`, not six independent month-local runs.

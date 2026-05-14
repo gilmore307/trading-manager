@@ -34,6 +34,7 @@ SOURCE = "source_04_event_overlay"
 @dataclass(frozen=True)
 class DetectorRunRef:
     symbol: str
+    month: str
     task_key_path: str
     receipt_path: str
     saved_event_path: str | None
@@ -76,12 +77,53 @@ class LayerFourEventOverlayMaterialization:
         }
 
 
-def _month_bounds(month: str) -> tuple[str, str]:
+def _validate_month(month: str) -> tuple[int, int]:
+    if len(month) != 7 or month[4] != "-":
+        raise TaskSystemError(f"month must use YYYY-MM format: {month}")
     year = int(month[:4])
     month_number = int(month[5:])
+    if month_number < 1 or month_number > 12:
+        raise TaskSystemError(f"month must use YYYY-MM format: {month}")
+    return year, month_number
+
+
+def _next_month(month: str) -> str:
+    year, month_number = _validate_month(month)
     if month_number == 12:
-        return f"{year:04d}-12-01T00:00:00-05:00", f"{year + 1:04d}-01-01T00:00:00-05:00"
-    return f"{year:04d}-{month_number:02d}-01T00:00:00-05:00", f"{year:04d}-{month_number + 1:02d}-01T00:00:00-05:00"
+        return f"{year + 1:04d}-01"
+    return f"{year:04d}-{month_number + 1:02d}"
+
+
+def _iter_months(start_month: str, end_month: str) -> Iterable[str]:
+    _validate_month(start_month)
+    _validate_month(end_month)
+    if start_month > end_month:
+        raise TaskSystemError(f"start_month must be <= end_month: {start_month} > {end_month}")
+    month = start_month
+    while month <= end_month:
+        yield month
+        month = _next_month(month)
+
+
+def _month_bounds(month: str) -> tuple[str, str]:
+    year, month_number = _validate_month(month)
+    next_month = _next_month(month)
+    next_year, next_month_number = int(next_month[:4]), int(next_month[5:])
+    return f"{year:04d}-{month_number:02d}-01T00:00:00-05:00", f"{next_year:04d}-{next_month_number:02d}-01T00:00:00-05:00"
+
+
+def _range_bounds(start_month: str, end_month: str) -> tuple[str, str]:
+    start, _ = _month_bounds(start_month)
+    _, end = _month_bounds(end_month)
+    return start, end
+
+
+def _fold_key(start_month: str, end_month: str) -> str:
+    return f"{start_month.replace('-', '_')}_{end_month.replace('-', '_')}"
+
+
+def _ref_month(ref: FeedArtifactRef) -> str:
+    return str(getattr(ref, "month", "") or "unknown_month")
 
 
 def _saved_bar_path(ref: FeedArtifactRef) -> Path:
@@ -102,12 +144,14 @@ def _run_detector(
     write: bool,
 ) -> DetectorRunRef:
     symbol = ref.symbol
-    task_key_path = output_dir / "detectors" / symbol / "task_key.json"
-    detector_output_root = trading_data_root / "storage" / "runtime" / DETECTOR_SOURCE.replace(".", "_") / symbol / output_dir.name
+    ref_month = _ref_month(ref)
+    task_key_path = output_dir / "detectors" / symbol / ref_month / "task_key.json"
+    detector_output_root = trading_data_root / "storage" / "runtime" / DETECTOR_SOURCE.replace(".", "_") / symbol / ref_month / output_dir.name
     receipt_path = detector_output_root / "completion_receipt.json"
     if ref.row_count <= 0:
         return DetectorRunRef(
             symbol=symbol,
+            month=ref_month,
             task_key_path=str(task_key_path),
             receipt_path=str(receipt_path),
             saved_event_path=None,
@@ -115,7 +159,7 @@ def _run_detector(
             status="skipped_zero_bar_rows",
         )
     task_key = {
-        "task_id": f"layer_04_event_overlay_detector_{symbol}_{output_dir.name.replace('-', '_')}",
+        "task_id": f"layer_04_event_overlay_detector_{symbol}_{ref_month.replace('-', '_')}_{output_dir.name.replace('-', '_')}",
         "source": DETECTOR_SOURCE,
         "params": {
             "bars_csv_path": str(_saved_bar_path(ref)),
@@ -134,8 +178,8 @@ def _run_detector(
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs" / "detectors"
         log_dir.mkdir(parents=True, exist_ok=True)
-        (log_dir / f"{symbol}.stdout.log").write_text(result.stdout, encoding="utf-8")
-        (log_dir / f"{symbol}.stderr.log").write_text(result.stderr, encoding="utf-8")
+        (log_dir / f"{symbol}_{ref_month}.stdout.log").write_text(result.stdout, encoding="utf-8")
+        (log_dir / f"{symbol}_{ref_month}.stderr.log").write_text(result.stderr, encoding="utf-8")
         if result.returncode != 0:
             raise TaskSystemError(f"Layer 4 detector failed for {symbol}: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
@@ -143,7 +187,7 @@ def _run_detector(
         event_count = int((payload.get("row_counts") or {}).get("equity_abnormal_activity_event") or 0)
         references = [str(item) for item in payload.get("references") or []]
         saved_event_path = next((item for item in references if item.endswith("equity_abnormal_activity_event.csv")), None)
-    return DetectorRunRef(symbol=symbol, task_key_path=str(task_key_path), receipt_path=str(receipt_path), saved_event_path=saved_event_path, event_count=event_count, status=status)
+    return DetectorRunRef(symbol=symbol, month=ref_month, task_key_path=str(task_key_path), receipt_path=str(receipt_path), saved_event_path=saved_event_path, event_count=event_count, status=status)
 
 
 def _read_detector_events(run: DetectorRunRef) -> Iterable[dict[str, Any]]:
@@ -165,6 +209,7 @@ def _read_detector_events(run: DetectorRunRef) -> Iterable[dict[str, Any]]:
                 "dedup_status": "canonical",
                 "source_priority": "source_detector",
                 "coverage_reason": "local_equity_abnormal_activity_detector_over_reviewed_bars",
+                "fold_month": run.month,
                 "event_time": event_time,
                 "available_time": event_time,
                 "information_role_type": "prior_signal",
@@ -182,16 +227,17 @@ def _read_detector_events(run: DetectorRunRef) -> Iterable[dict[str, Any]]:
 
 
 def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_month: str, end_month: str, events: Sequence[Mapping[str, Any]]) -> Path:
-    start, end = _month_bounds(start_month)
+    start, end = _range_bounds(start_month, end_month)
+    fold_key = _fold_key(start_month, end_month)
     task_key = {
-        "task_id": f"layer_04_event_overlay_{start_month.replace('-', '_')}",
+        "task_id": f"layer_04_event_overlay_{fold_key}",
         "source": SOURCE,
         "params": {
             "start": start,
             "end": end,
             "events": list(events),
         },
-        "output_root": str(trading_data_root / "storage" / "runtime" / SOURCE / f"layer_04_event_overlay_{start_month.replace('-', '_')}"),
+        "output_root": str(trading_data_root / "storage" / "runtime" / SOURCE / f"layer_04_event_overlay_{fold_key}"),
         "manager_stage_id": "layer_04_event_overlay.data_acquisition",
         "source_policy": "local_event_index_over_source_detector_outputs_no_provider_calls",
     }
@@ -212,18 +258,21 @@ def materialize_layer_four_event_overlay_inputs(
     run_id: str | None = None,
     write: bool = False,
 ) -> LayerFourEventOverlayMaterialization:
-    if start_month != end_month:
-        raise TaskSystemError("Layer 4 event-overlay materialization currently expects one chronological month per run")
     if not manager_storage_root.is_absolute():
         manager_storage_root = Path.cwd() / manager_storage_root
-    output_dir = manager_storage_root / output_root / start_month
+    fold_key = _fold_key(start_month, end_month)
+    output_dir = manager_storage_root / output_root / fold_key
     output_dir.mkdir(parents=True, exist_ok=True)
-    run_id = run_id or f"layer_04_event_overlay_{start_month.replace('-', '_')}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
-    refs = discover_layer_two_feed_artifacts(
-        start_month=start_month,
-        trading_data_root=trading_data_root,
-        trading_storage_root=trading_storage_root,
-        universe_path=universe_path,
+    run_id = run_id or f"layer_04_event_overlay_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    refs = tuple(
+        ref
+        for month in _iter_months(start_month, end_month)
+        for ref in discover_layer_two_feed_artifacts(
+            start_month=month,
+            trading_data_root=trading_data_root,
+            trading_storage_root=trading_storage_root,
+            universe_path=universe_path,
+        )
     )
     if not refs:
         raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 4 event-overlay materialization")
