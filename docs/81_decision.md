@@ -3248,7 +3248,7 @@ After every executed progress decision or chronological month advancement, the d
 ## D141 - Pause monthly scheduler progression and adopt rolling-fold promotion runtime
 
 Date: 2026-05-14
-Status: Accepted
+Status: Superseded by D153 for fold cadence; retained for the 4+1+1 split and worker-boundary charter.
 
 ### Context
 
@@ -3262,7 +3262,7 @@ Pause the current historical task progression before changing the model/evaluati
 
 - four bounded month-ingest workers prepare reusable month-scoped substrate: provider/raw data, cleaned monthly data, point-in-time features, feature-ready manifests, and coverage evidence;
 - one serial model/promotion worker consumes only complete frozen fold manifests and owns model generation, validation/calibration, test evaluation, promotion evidence preparation, and the agent promotion decision;
-- rolling folds use `fold_size_months = 6`, `train_months = 4`, `validation_months = 1`, `test_months = 1`, and default `fold_step_months = 1`;
+- folds use `fold_size_months = 6`, `train_months = 4`, `validation_months = 1`, `test_months = 1`; D153 later corrected active runtime cadence to non-overlapping `fold_step_months = 6`;
 - validation/test are post-model candidate evaluations, not pre-model work; pre-model ingest workers may prepare labels, split candidates, and manifests but must not evaluate a candidate that does not yet exist;
 - promotion is one scheduler task that packages evidence packet build, gate checks, baseline comparison, split-stability check, leakage check, calibration/test report, agent review, and durable decision write;
 - promotion decision results are `approved`, `deferred`, or `rejected` for this scheduler task boundary;
@@ -3515,7 +3515,7 @@ Status: Accepted
 
 ### Context
 
-After `Model Worker 1` started the first complete fold (`2016-01` through `2016-06`), Layer 1/2 model generation, evaluation, and Promotion Review succeeded. The next stage exposed a stale implementation assumption: Layer 3 target-state input materialization still rejected `start_month != end_month`, even though the accepted dataset unit for Layer 3+ is one selected target/instrument over one six-month rolling fold.
+After `Model Worker 1` started the first complete fold (`2016-01` through `2016-06`), Layer 1/2 model generation, evaluation, and Promotion Review succeeded. The next stage exposed a stale implementation assumption: Layer 3 target-state input materialization still rejected `start_month != end_month`, even though the accepted dataset unit for Layer 3+ is one selected target/instrument over one non-overlapping six-month fold.
 
 ### Decision
 
@@ -3528,3 +3528,23 @@ Layer 3 target-state materialization creates one target candidate per symbol for
 - `Model Worker 1` can continue past Layer 1/2 into Layer 3+ without violating the accepted dataset-unit contract.
 - The six-month fold stays explicit through task ids, output paths, source windows, and summary receipts.
 - Single-month runtime assumptions in future Layer 3+ stage code are considered bugs unless explicitly documented as month-scoped substrate preparation, not model-worker execution.
+
+
+## D153 - Model Worker folds are non-overlapping half-year batches
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+Runtime evidence showed `Model Worker 1` selected `fold_2016-02_2016-07` after finishing `fold_2016-01_2016-06`. That was caused by the earlier rolling-window selector stepping one month at a time. Chentong clarified the intended cadence: the historical model-training batches should be `2016-01..2016-06`, then `2016-07..2016-12`, not overlapping windows.
+
+### Decision
+
+Model Worker folds are non-overlapping half-year groups. The active fold size remains six months with a 4+1+1 train/validation/test split inside each fold, but the fold step is six months. The first valid fold is `fold_2016-01_2016-06`; the next valid fold is `fold_2016-07_2016-12`. Overlapping folds such as `fold_2016-02_2016-07` are invalid runtime selections.
+
+### Consequences
+
+- `Model Worker 1` advances fold starts by six months, not one month.
+- Month-ingest workers may continue preparing every chronological month as substrate.
+- Any runtime checkpoint or model output produced for an overlapping fold must be archived as invalid runtime evidence and must not be used for model/promotion status.

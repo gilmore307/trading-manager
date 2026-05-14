@@ -16,7 +16,7 @@ month-scoped ingest planning
   -> source normalization
   -> point-in-time feature generation
   -> monthly feature-ready manifests and coverage evidence
-  -> frozen rolling-fold input manifest
+  -> frozen non-overlapping half-year fold input manifest
   -> serial model generation
   -> validation/calibration and test evaluation
   -> promotion evidence packet
@@ -36,7 +36,7 @@ Layer 8 option buckets expand from near expirations to farther expirations: curr
 The next historical runtime uses two classes of work lanes:
 
 - `month_ingest_workers = 4`: bounded workers that prepare month-scoped provider/raw data, cleaned data, point-in-time features, feature-ready manifests, and coverage evidence. These workers may run in parallel only when output scopes are partitioned by month/layer/stage and protected by ingest/publish locks.
-- `model_promotion_workers = 1`: a single serial worker that consumes complete frozen rolling-fold manifests and owns model generation, validation/calibration, test evaluation, promotion evidence preparation, and agent promotion decision tasks.
+- `model_promotion_workers = 1`: a single serial worker that consumes complete frozen non-overlapping half-year fold manifests and owns model generation, validation/calibration, test evaluation, promotion evidence preparation, and agent promotion decision tasks.
 
 Rolling-fold policy:
 
@@ -52,7 +52,7 @@ Promotion is a single scheduler task, not a loose sequence of independent chores
 
 Reusable substrate after this charter change: downloaded provider data, monthly cleaned data, point-in-time features, feature-ready manifests, and coverage evidence. Supersedable artifacts: model rows, evaluation summaries, split artifacts, promotion metrics, promotion review/decision packets, and dashboard model/eval/promotion status produced under the old local/monthly split policy.
 
-SQL/storage coordination must prevent the serial model/promotion worker from reading half-finished or mixed-version data. It may read only frozen rolling-fold manifests with explicit artifact refs, ready signals, coverage evidence, and versioned input scope. It must not read unqualified `latest`, uncommitted staging, or partial month rows.
+SQL/storage coordination must prevent the serial model/promotion worker from reading half-finished or mixed-version data. It may read only frozen non-overlapping half-year fold manifests with explicit artifact refs, ready signals, coverage evidence, and versioned input scope. It must not read unqualified `latest`, uncommitted staging, or partial month rows.
 
 Accepted lock families for implementation:
 

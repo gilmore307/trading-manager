@@ -313,6 +313,78 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNone(selection)
 
+    def test_model_worker_uses_non_overlapping_six_month_folds(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                foundation_stage_ids = [
+                    stage.stage_id
+                    for layer in plan.layers
+                    if layer.layer in {1, 2}
+                    for stage in layer.stages
+                    if stage.stage_type in {"data_acquisition", "feature_generation"}
+                ]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=foundation_stage_ids,
+                    write=True,
+                )
+
+            first_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-12")
+            self.assertIsNotNone(first_selection)
+            assert first_selection is not None
+            first_state_path = seed_model_worker_fold_state(storage_root=storage_root, selection=first_selection, selected_target_symbol="AAPL")
+            first_plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            all_first_stage_ids = [stage.stage_id for layer in first_plan.layers for stage in layer.stages]
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                state_path=first_state_path,
+                completed_stage_ids=all_first_stage_ids,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+
+            overlapping_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-07")
+
+            for month in rolling_fold_months("2016-07"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                foundation_stage_ids = [
+                    stage.stage_id
+                    for layer in plan.layers
+                    if layer.layer in {1, 2}
+                    for stage in layer.stages
+                    if stage.stage_type in {"data_acquisition", "feature_generation"}
+                ]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=foundation_stage_ids,
+                    write=True,
+                )
+
+            next_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-12")
+
+        self.assertIsNone(overlapping_selection)
+        self.assertIsNotNone(next_selection)
+        assert next_selection is not None
+        self.assertEqual(next_selection.fold_id, "fold_2016-07_2016-12")
+        self.assertEqual(next_selection.fold_months, ("2016-07", "2016-08", "2016-09", "2016-10", "2016-11", "2016-12"))
+
     def test_auto_work_selection_jumps_past_externally_completed_months(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"

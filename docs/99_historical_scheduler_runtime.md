@@ -136,7 +136,7 @@ The historical scheduler caps normal provider-download month selection at the la
 The service has two independent historical work selectors:
 
 - Month-ingest lanes keep up to four Layer 1/2 month-scoped substrate tasks moving.
-- `Model Worker 1` selects the earliest complete six-month rolling fold whose Layer 1/2 substrate is ready for all six months.
+- `Model Worker 1` selects the earliest complete non-overlapping six-month fold whose Layer 1/2 substrate is ready for all six months. Fold cadence is half-year batches: `2016-01..2016-06`, then `2016-07..2016-12`; overlapping monthly windows such as `2016-02..2016-07` are invalid.
 
 A model fold writes a separate checkpoint under `storage/runtime/model_training_fold_state_<start>_<end>.json`. This preserves the month-scoped `model_training_workflow_state_YYYY-MM.json` checkpoints while allowing fold-scoped model generation, model evaluation, Promotion Review, and maintenance to run as soon as a 4+1+1 fold is ready.
 
@@ -144,6 +144,6 @@ For the bootstrap fold, `2016-01` through `2016-04` are train months, `2016-05` 
 
 ### Layer 3+ fold scope
 
-`Model Worker 1` runs Layer 3+ work as one selected target/instrument over the complete six-month fold. Month-scoped artifacts from Layer 1/2 remain reusable substrate, but manager-owned Layer 3+ task keys, feature windows, model generation, model evaluation, and Promotion Review use the fold `start_month` and `end_month` together.
+`Model Worker 1` runs Layer 3+ work as one selected target/instrument over the complete non-overlapping six-month fold. Month-scoped artifacts from Layer 1/2 remain reusable substrate, but manager-owned Layer 3+ task keys, feature windows, model generation, model evaluation, and Promotion Review use the fold `start_month` and `end_month` together.
 
 For the first fold, Layer 3+ execution scope is `2016-01` through `2016-06`, not six independent month-local runs.

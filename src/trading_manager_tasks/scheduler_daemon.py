@@ -285,7 +285,7 @@ def select_month_ingest_worker_months(
 
 @dataclass(frozen=True)
 class ModelWorkerFoldSelection:
-    """Model-worker selection for the next complete six-month rolling fold."""
+    """Model-worker selection for the next complete non-overlapping six-month fold."""
 
     contract_type: str = "manager_model_worker_fold_selection"
     fold_id: str = "fold_2016-01_2016-06"
@@ -302,12 +302,21 @@ class ModelWorkerFoldSelection:
 
 
 def rolling_fold_months(start_month: str, *, month_count: int = 6) -> tuple[str, ...]:
-    """Return the inclusive month sequence for one frozen rolling fold."""
+    """Return the inclusive month sequence for one frozen six-month fold."""
 
     months = [start_month]
     while len(months) < month_count:
         months.append(next_month(months[-1]))
     return tuple(months)
+
+
+def _advance_fold_start_month(start_month: str, *, month_count: int = 6) -> str:
+    """Return the next non-overlapping fold start month."""
+
+    month = start_month
+    for _ in range(month_count):
+        month = next_month(month)
+    return month
 
 
 def model_worker_fold_state_path(start_month: str, end_month: str, *, root: Path = DEFAULT_RUNTIME_DIR) -> Path:
@@ -364,7 +373,7 @@ def select_model_worker_fold(
     default_start_month: str = "2016-01",
     max_month: str | None = None,
 ) -> ModelWorkerFoldSelection | None:
-    """Select the earliest complete six-month fold with open Model Worker work."""
+    """Select the earliest complete non-overlapping six-month fold with open Model Worker work."""
 
     max_month = max_month or completed_historical_month_cutoff()
     runtime_root = storage_root / "runtime"
@@ -410,7 +419,7 @@ def select_model_worker_fold(
                     reason_code="complete_foundation_fold_ready",
                     state_path=str(state_path),
                 )
-        candidate = next_month(candidate)
+        candidate = _advance_fold_start_month(candidate)
     return None
 
 
