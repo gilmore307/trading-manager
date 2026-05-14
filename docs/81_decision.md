@@ -3585,7 +3585,7 @@ The dashboard showed `2026-05 · Layer 1 · Data Acquisition` as a Ready task wh
 
 Dashboard historical task timelines must apply the same completed-month cutoff as month-ingest worker selection. Month-scoped task rows whose month is after `completed_historical_month_cutoff()` are not included in `historical_task_progress_summary.chart_payload.task_timeline`, even if daemon state or a workflow checkpoint names the month. Fold rows are hidden when their fold end month is after the cutoff.
 
-Task detail presentation also omits the dedicated safety-boundary card. Current progress is rendered as a progress bar, using stage-coverage counts when attached and a status-based fallback for active rows without a coverage artifact.
+Task detail presentation also omits the dedicated safety-boundary card. Current progress is rendered as a progress bar, using stage-coverage counts when attached and a status-based fallback for active rows without a coverage artifact. Month-ingest lane-head display covers every month-scoped substrate layer, not only Layers 1-2, so Layers 3/4/8 data-acquisition and feature-generation lanes remain visible while catch-up proceeds.
 
 ### Consequences
 

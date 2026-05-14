@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping, TextIO
 
-from .model_training_workflow import build_model_training_workflow_plan
+from .model_training_workflow import MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, completed_historical_month_cutoff, select_month_ingest_worker_months
 from .scheduler_status import (
@@ -610,7 +610,7 @@ def _task_timeline(
                 layer = int(raw_stage.get("layer"))
             except (TypeError, ValueError):
                 continue
-            if layer not in {1, 2}:
+            if layer not in MONTHLY_SUBSTRATE_LAYERS:
                 continue
             task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
             worker_info = _worker_info_for_stage(raw_stage, month=task_month)
