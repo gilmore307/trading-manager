@@ -24,7 +24,7 @@ from .control_plane import TaskSystemError
 
 TARGET_CONTEXT_AGENT_REVIEW_REQUEST_CONTRACT = "target_layer2_context_agent_review_request"
 TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT = "target_layer2_context_agent_review_decision"
-DEFAULT_MAPPING_CSV = Path("/root/projects/trading-storage/main/shared/layer_2_target_context_mapping.csv")
+DEFAULT_MAPPING_CSV = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
 DEFAULT_OUTPUT_ROOT = Path("storage/runtime/target_layer2_context_agent_review")
 DEFAULT_AGENT_REF = "openclaw_agent_under_owner_observation"
 DEFAULT_REVIEW_SCOPE = "target_layer2_context_mapping"
@@ -159,7 +159,7 @@ def build_target_context_agent_review_request(
         "agent_ref": agent_ref,
         "requested_by": requested_by,
         "review_scope": review_scope,
-        "mapping_ref": "trading-storage/main/shared/layer_2_target_context_mapping.csv",
+        "mapping_ref": "trading-storage/main/shared/layer_02_target_context_mapping.csv",
         "mapping_path": str(mapping_csv),
         "mapping_content_sha256": digest,
         "target_symbols": selected_targets,

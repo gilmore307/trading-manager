@@ -24,7 +24,7 @@ CHRONOLOGICAL_FORWARD_POLICY_REF = "chronological_forward_backfill_policy"
 DEFAULT_POLICY_REFS = ("monthly_backfill", CHRONOLOGICAL_FORWARD_POLICY_REF, "autonomous_historical_provider_acquisition")
 DEFAULT_PROJECTS_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
-    DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "layer_1_2_market_context_etf_universe.csv"
+    DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "layer_01_02_market_context_etf_universe.csv"
 )
 LAYER_ONE_MODEL_LAYER = "layer_01_market_regime"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
@@ -300,7 +300,7 @@ def _plan_source_window(
                 "timeframe": universe_member.timeframe,
                 "bar_grain": universe_member.bar_grain,
                 "model_layer": universe_member.model_layer,
-                "universe_ref": "trading-storage/main/shared/layer_1_2_market_context_etf_universe.csv",
+                "universe_ref": "trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv",
                 "universe_type": universe_member.universe_type,
                 "exposure_type": universe_member.exposure_type,
             }

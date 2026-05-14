@@ -25,7 +25,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
-DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_1_2_market_context_etf_universe.csv")
+DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime/layer_04_event_overlay/input_materialization")
 DETECTOR_SOURCE = "source_04_event_overlay.equity_abnormal_activity"
 SOURCE = "source_04_event_overlay"

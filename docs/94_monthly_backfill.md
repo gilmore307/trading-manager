@@ -46,7 +46,7 @@ PYTHONPATH=src python3 scripts/tasks/plan_monthly_backfill.py \
 
 The planner emits deterministic dry-run `manager_request` dictionaries. It does not insert SQL rows, call providers, or persist task payload bodies.
 
-For Layer 1 `MarketRegimeModel` training, `01_feed_alpaca_bars` expands over every `model_layer = layer_01_market_regime` row in `trading-storage/main/shared/layer_1_2_market_context_etf_universe.csv`. Each ETF symbol gets its own monthly request and storage path so missing history, provider errors, and receipts stay isolated by symbol. The current reviewed Layer 1 universe has 22 market-state ETFs.
+For Layer 1 `MarketRegimeModel` training, `01_feed_alpaca_bars` expands over every `model_layer = layer_01_market_regime` row in `trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv`. Each ETF symbol gets its own monthly request and storage path so missing history, provider errors, and receipts stay isolated by symbol. The current reviewed Layer 1 universe has 19 market-state ETFs.
 
 For Layer 2 `SectorContextModel` training, pass `--model-layer layer_02_sector_context` to the planner or use the dedicated Layer 2 preparation command below. Layer 2 expands over the reviewed sector/industry ETF rows from the same shared universe file. The current reviewed Layer 2 universe has 25 sector/industry ETFs and uses autonomous historical provider dispatch under manager request, resource, receipt, and terminal-coverage controls.
 

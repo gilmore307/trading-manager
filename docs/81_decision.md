@@ -1901,7 +1901,7 @@ Retire `trading-main/storage/` and move the checked-in reusable non-code assets 
 Canonical paths are now:
 
 - `trading-storage/main/templates/` for reusable drafting and implementation templates.
-- `trading-storage/main/shared/` for reviewed shared static files such as `layer_1_2_market_context_etf_universe.csv`.
+- `trading-storage/main/shared/` for reviewed shared static files such as `layer_01_02_market_context_etf_universe.csv`.
 
 `trading-main` keeps the registry and template operating rules; `trading-storage` owns the checked-in asset location.
 
@@ -1909,7 +1909,7 @@ Canonical paths are now:
 
 - No top-level `storage/` directory remains in `trading-main`.
 - Registry rows for shared storage assets use `trading-storage/main/...` payloads and `/root/projects/trading-storage/main/...` absolute paths where direct local locators are required.
-- Cross-repository code and docs should reference `trading-storage/main/shared/layer_1_2_market_context_etf_universe.csv` for the reviewed ETF universe CSV.
+- Cross-repository code and docs should reference `trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv` for the reviewed ETF universe CSV.
 - New shared fields, statuses, type values, helpers, or vocabulary introduced by templates still route through `trading-main` SQL registry migrations.
 
 ## D088 - Register market-regime derived output as data_derived
@@ -3301,7 +3301,7 @@ Target-to-Layer-2 context mapping is now a reviewed shared contract. Some rows, 
 
 ### Decision
 
-Register a manager-owned script-called agent review path for `layer_2_target_context_mapping.csv`. The script builds `target_layer2_context_agent_review_request` artifacts, may call a reviewed local agent runner when explicitly configured, and records `target_layer2_context_agent_review_decision` artifacts.
+Register a manager-owned script-called agent review path for `layer_02_target_context_mapping.csv`. The script builds `target_layer2_context_agent_review_request` artifacts, may call a reviewed local agent runner when explicitly configured, and records `target_layer2_context_agent_review_decision` artifacts.
 
 This review path is evidence-only. It may approve, defer, reject, queue, or record agent-call failure for mapping rows, but it must not dispatch providers, activate models, mutate broker/accounts, execute storage lifecycle operations, or edit Layer 1/2 universe files. Proxy rows remain target-specific auxiliary evidence references unless a separate reviewed artifact explicitly changes the Layer 1/2 universe.
 
@@ -3324,9 +3324,9 @@ The storage-owned shared CSV files under `trading-storage/main/shared/` now carr
 
 Register the renamed shared paths:
 
-- `layer_1_2_market_context_etf_universe.csv`
-- `layer_1_2_market_context_relative_strength_combinations.csv`
-- `layer_2_target_context_mapping.csv`
+- `layer_01_02_market_context_etf_universe.csv`
+- `layer_01_02_market_context_relative_strength_combinations.csv`
+- `layer_02_target_context_mapping.csv`
 
 The mixed Layer 1/2 files keep `model_layer` as the authoritative per-row discriminator. The target-context mapping remains a Layer 3+ target-study helper that maps targets to Layer 2 context and auxiliary proxies.
 
