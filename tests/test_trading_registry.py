@@ -763,7 +763,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("model_01_market_regime", rows["MODEL_01_MARKET_REGIME_DIAGNOSTICS"]["applies_to"])
 
     def test_market_regime_etf_universe_shared_csv_columns_are_registered(self):
-        shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_etf_universe.csv")
+        shared_path = Path("/root/projects/trading-storage/main/shared/layer_1_2_market_context_etf_universe.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         self.assertEqual(len(rows), 44)
@@ -784,8 +784,8 @@ class RegistryHelperTests(unittest.TestCase):
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
-        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["payload"], "trading-storage/main/shared/market_regime_etf_universe.csv")
-        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-storage/main/shared/market_regime_etf_universe.csv")
+        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["payload"], "trading-storage/main/shared/layer_1_2_market_context_etf_universe.csv")
+        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-storage/main/shared/layer_1_2_market_context_etf_universe.csv")
         expected_fields = {
             "SYMBOL": "symbol",
             "UNIVERSE_TYPE": "universe_type",
@@ -809,10 +809,10 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("market_regime_etf_universe", registry[key]["applies_to"])
             if key not in {"SYMBOL", "ISSUER_NAME", "INTERPRETATION"}:
-                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_regime_etf_universe.csv")
+                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/layer_1_2_market_context_etf_universe.csv")
 
     def test_market_regime_relative_strength_combinations_shared_csv_is_registered(self):
-        shared_path = Path("/root/projects/trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
+        shared_path = Path("/root/projects/trading-storage/main/shared/layer_1_2_market_context_relative_strength_combinations.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         self.assertEqual(len(rows), 52)
@@ -846,11 +846,11 @@ class RegistryHelperTests(unittest.TestCase):
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
         self.assertEqual(
             registry["MARKET_REGIME_RELATIVE_STRENGTH_COMBINATIONS_SHARED_CSV"]["payload"],
-            "trading-storage/main/shared/market_regime_relative_strength_combinations.csv",
+            "trading-storage/main/shared/layer_1_2_market_context_relative_strength_combinations.csv",
         )
         self.assertEqual(
             registry["MARKET_REGIME_RELATIVE_STRENGTH_COMBINATIONS_SHARED_CSV"]["path"],
-            "/root/projects/trading-storage/main/shared/market_regime_relative_strength_combinations.csv",
+            "/root/projects/trading-storage/main/shared/layer_1_2_market_context_relative_strength_combinations.csv",
         )
         expected_fields = {
             "COMBINATION_ID": ("identity_field", "combination_id"),
@@ -867,11 +867,11 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["kind"], kind)
             self.assertEqual(registry[key]["payload"], payload)
             if key not in {"INTERPRETATION", "MODEL_LAYER"}:
-                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
+                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/layer_1_2_market_context_relative_strength_combinations.csv")
             self.assertIn("market_regime_relative_strength_combinations", registry[key]["applies_to"])
 
     def test_target_layer2_context_mapping_shared_csv_is_registered(self):
-        shared_path = Path("/root/projects/trading-storage/main/shared/target_layer2_context_mapping.csv")
+        shared_path = Path("/root/projects/trading-storage/main/shared/layer_2_target_context_mapping.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         self.assertEqual(len(rows), 3)
@@ -904,11 +904,11 @@ class RegistryHelperTests(unittest.TestCase):
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
         self.assertEqual(
             registry["TARGET_LAYER2_CONTEXT_MAPPING_SHARED_CSV"]["payload"],
-            "trading-storage/main/shared/target_layer2_context_mapping.csv",
+            "trading-storage/main/shared/layer_2_target_context_mapping.csv",
         )
         self.assertEqual(
             registry["TARGET_LAYER2_CONTEXT_MAPPING_SHARED_CSV"]["path"],
-            "/root/projects/trading-storage/main/shared/target_layer2_context_mapping.csv",
+            "/root/projects/trading-storage/main/shared/layer_2_target_context_mapping.csv",
         )
         self.assertEqual(registry["TARGET_LAYER2_CONTEXT_MAPPING_V1"]["payload"], "target_layer2_context_mapping_v1")
         self.assertEqual(registry["TARGET_SYMBOL"]["payload"], "target_symbol")
@@ -930,7 +930,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key, (kind, payload) in expected_fields.items():
             self.assertEqual(registry[key]["kind"], kind)
             self.assertEqual(registry[key]["payload"], payload)
-            self.assertEqual(registry[key]["path"], "trading-storage/main/shared/target_layer2_context_mapping.csv")
+            self.assertEqual(registry[key]["path"], "trading-storage/main/shared/layer_2_target_context_mapping.csv")
             self.assertIn("target_layer2_context_mapping", registry[key]["applies_to"])
 
     def test_target_context_agent_review_script_is_registered(self):
