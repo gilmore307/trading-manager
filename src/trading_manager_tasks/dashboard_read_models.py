@@ -429,13 +429,43 @@ def _active_month_stages(status: HistoricalSchedulerStatus, storage_root: Path) 
 
 
 
-def _worker_info_for_stage(raw_stage: Mapping[str, Any]) -> dict[str, str]:
+def _month_ingest_worker_info(month: str | None) -> dict[str, str]:
+    if isinstance(month, str) and len(month) >= 7:
+        try:
+            year = int(month[:4])
+            month_number = int(month[5:7])
+            absolute_month = year * 12 + month_number
+            base_month = 2016 * 12 + 1
+            lane = ((absolute_month - base_month) % 4) + 1
+        except ValueError:
+            lane = 0
+    else:
+        lane = 0
+    if lane <= 0:
+        return {
+            "worker_id": "month_ingest_worker_unassigned",
+            "worker_label": "Month Ingest Worker",
+            "worker_kind": "month_ingest_worker",
+        }
+    return {
+        "worker_id": f"month_ingest_worker_{lane}",
+        "worker_label": f"Month Ingest Worker {lane}",
+        "worker_kind": "month_ingest_worker",
+    }
+
+
+def _model_worker_info() -> dict[str, str]:
+    return {"worker_id": "model_worker_1", "worker_label": "Model Worker 1", "worker_kind": "model_worker"}
+
+
+def _worker_info_for_stage(raw_stage: Mapping[str, Any], *, month: str | None = None) -> dict[str, str]:
     """Return the public worker assignment shown in task previews.
 
-    This is an operator-facing ownership label, not a process/thread id.
-    Provider acquisition stages run through the bounded provider worker pool;
-    ordinary safe stages run through the scheduler-owned stage worker for their
-    work type.
+    This is an operator-facing pipeline lane, not a raw process/thread id.
+    Month-scoped data acquisition and feature generation belong to one of the
+    four accepted month-ingest workers. Fold/model/promotion stages belong to
+    the single model worker. Lower-level provider request thread slots remain
+    visible separately in provider-dispatch detail previews.
     """
 
     explicit_id = raw_stage.get("worker_id") or raw_stage.get("worker_ref")
@@ -448,26 +478,11 @@ def _worker_info_for_stage(raw_stage: Mapping[str, Any]) -> dict[str, str]:
         return {"worker_id": worker_id, "worker_label": worker_label, "worker_kind": worker_kind}
 
     stage_type = str(raw_stage.get("stage_type") or "unknown")
-    provider_calls_allowed = raw_stage.get("provider_calls_allowed") is True
-    if stage_type == "data_acquisition" and provider_calls_allowed:
-        return {
-            "worker_id": "provider_stage_worker_pool",
-            "worker_label": "Provider Worker Pool",
-            "worker_kind": "provider_pool",
-        }
-    if stage_type == "data_acquisition":
-        return {"worker_id": "input_materialization_worker", "worker_label": "Input Materialization Worker", "worker_kind": "scheduler_stage"}
-    if stage_type == "feature_generation":
-        return {"worker_id": "feature_generation_worker", "worker_label": "Feature Generation Worker", "worker_kind": "scheduler_stage"}
-    if stage_type == "model_generation":
-        return {"worker_id": "fold_model_generation_worker", "worker_label": "Fold Model Generation Worker", "worker_kind": "fold_worker"}
-    if stage_type == "model_evaluation":
-        return {"worker_id": "fold_model_evaluation_worker", "worker_label": "Fold Model Evaluation Worker", "worker_kind": "fold_worker"}
-    if stage_type == "promotion_review":
-        return {"worker_id": "fold_promotion_review_worker", "worker_label": "Fold Promotion Review Worker", "worker_kind": "fold_worker"}
-    if stage_type == "maintenance":
-        return {"worker_id": "maintenance_worker", "worker_label": "Maintenance Worker", "worker_kind": "scheduler_stage"}
-    return {"worker_id": "scheduler_stage_worker", "worker_label": "Scheduler Stage Worker", "worker_kind": "scheduler_stage"}
+    if stage_type in {"data_acquisition", "feature_generation"}:
+        return _month_ingest_worker_info(month)
+    if stage_type in {"model_generation", "model_evaluation", "promotion_review", "maintenance"}:
+        return _model_worker_info()
+    return {"worker_id": "scheduler_control_worker", "worker_label": "Scheduler Control Worker", "worker_kind": "scheduler_control"}
 
 def _task_timeline(
     status: HistoricalSchedulerStatus,
@@ -533,10 +548,11 @@ def _task_timeline(
             if not isinstance(receipt_refs, list):
                 receipt_refs = []
             dataset_unit = raw_stage.get("dataset_unit") if isinstance(raw_stage.get("dataset_unit"), Mapping) else None
-            worker_info = _worker_info_for_stage(raw_stage)
+            task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
+            worker_info = _worker_info_for_stage(raw_stage, month=task_month)
             task: dict[str, Any] = {
                 "sequence": len(tasks) + 1,
-                "month": raw_stage.get("month") or raw_stage.get("start_month") or timeline_month,
+                "month": task_month,
                 "task_id": stage_id,
                 "task_label": _public_stage_name(stage_id, raw_stage.get("stage_type")),
                 "task_state": task_state,

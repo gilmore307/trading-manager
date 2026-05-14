@@ -3427,3 +3427,22 @@ Chentong asked that each task preview show which worker owns or executes it. The
 - Dashboard task rows can show the owning worker directly in the compact preview and detail panel.
 - Provider dispatch previews can explain which provider worker slot would run each selected request.
 - Raw thread internals remain hidden; the read model exposes stable sanitized worker identity only.
+
+## D148 - Dashboard task workers use 4-lane month ingest identity
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The first task-worker dashboard pass labeled rows by stage type, such as input materialization worker or feature generation worker. That was misleading because the accepted historical runtime shape is four month-ingest workers plus one model worker.
+
+### Decision
+
+Dashboard task rows for month-scoped `data_acquisition` and `feature_generation` expose worker identity as `month_ingest_worker_1` through `month_ingest_worker_4`, assigned by the month's stable 4-lane cohort position. Model generation, evaluation, Promotion Review, and maintenance rows expose the serial `model_worker_1` identity. Lower-level provider request slots may still appear in provider-dispatch detail previews, but the primary task timeline worker is the owning month/model worker lane.
+
+### Consequences
+
+- Collapsed task previews and worker filters align with the 4 month-ingest + 1 model-worker runtime contract.
+- Stage-type labels no longer masquerade as worker identities.
+- Provider thread slots remain a subordinate detail, not the task owner shown in the main task timeline.
