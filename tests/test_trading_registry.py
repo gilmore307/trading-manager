@@ -870,6 +870,69 @@ class RegistryHelperTests(unittest.TestCase):
                 self.assertEqual(registry[key]["path"], "trading-storage/main/shared/market_regime_relative_strength_combinations.csv")
             self.assertIn("market_regime_relative_strength_combinations", registry[key]["applies_to"])
 
+    def test_target_layer2_context_mapping_shared_csv_is_registered(self):
+        shared_path = Path("/root/projects/trading-storage/main/shared/target_layer2_context_mapping.csv")
+        with shared_path.open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(
+            list(rows[0].keys()),
+            [
+                "target_symbol",
+                "target_asset_class",
+                "spot_ref",
+                "layer2_context_symbol",
+                "layer2_mapping_method_type",
+                "listed_proxy_symbol",
+                "optionable_proxy_symbol",
+                "optionable_proxy_status",
+                "proxy_role_type",
+                "proxy_use",
+                "review_status",
+                "interpretation",
+            ],
+        )
+        by_target = {row["target_symbol"]: row for row in rows}
+        self.assertEqual(set(by_target), {"BTC", "ETH", "SOL"})
+        self.assertEqual(by_target["BTC"]["layer2_context_symbol"], "BKCH")
+        self.assertEqual(by_target["BTC"]["listed_proxy_symbol"], "IBIT")
+        self.assertEqual(by_target["BTC"]["optionable_proxy_status"], "accepted_optionable_proxy")
+        self.assertEqual(by_target["ETH"]["optionable_proxy_status"], "verify_before_option_use")
+        self.assertEqual(by_target["SOL"]["optionable_proxy_status"], "verify_before_option_use")
+
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            registry = {row["key"]: row for row in csv.DictReader(csv_file)}
+        self.assertEqual(
+            registry["TARGET_LAYER2_CONTEXT_MAPPING_SHARED_CSV"]["payload"],
+            "trading-storage/main/shared/target_layer2_context_mapping.csv",
+        )
+        self.assertEqual(
+            registry["TARGET_LAYER2_CONTEXT_MAPPING_SHARED_CSV"]["path"],
+            "/root/projects/trading-storage/main/shared/target_layer2_context_mapping.csv",
+        )
+        self.assertEqual(registry["TARGET_LAYER2_CONTEXT_MAPPING_V1"]["payload"], "target_layer2_context_mapping_v1")
+        self.assertEqual(registry["TARGET_SYMBOL"]["payload"], "target_symbol")
+        self.assertIn("target_layer2_context_mapping", registry["TARGET_SYMBOL"]["applies_to"])
+        self.assertEqual(registry["INTERPRETATION"]["payload"], "interpretation")
+        self.assertIn("target_layer2_context_mapping", registry["INTERPRETATION"]["applies_to"])
+        expected_fields = {
+            "TARGET_LAYER2_CONTEXT_TARGET_ASSET_CLASS": ("classification_field", "target_asset_class"),
+            "TARGET_LAYER2_CONTEXT_SPOT_REF": ("identity_field", "spot_ref"),
+            "TARGET_LAYER2_CONTEXT_SYMBOL": ("identity_field", "layer2_context_symbol"),
+            "TARGET_LAYER2_MAPPING_METHOD_TYPE": ("classification_field", "layer2_mapping_method_type"),
+            "TARGET_LISTED_PROXY_SYMBOL": ("identity_field", "listed_proxy_symbol"),
+            "TARGET_OPTIONABLE_PROXY_SYMBOL": ("identity_field", "optionable_proxy_symbol"),
+            "TARGET_OPTIONABLE_PROXY_STATUS": ("classification_field", "optionable_proxy_status"),
+            "TARGET_PROXY_ROLE_TYPE": ("classification_field", "proxy_role_type"),
+            "TARGET_PROXY_USE": ("text_field", "proxy_use"),
+            "TARGET_LAYER2_CONTEXT_REVIEW_STATUS": ("classification_field", "review_status"),
+        }
+        for key, (kind, payload) in expected_fields.items():
+            self.assertEqual(registry[key]["kind"], kind)
+            self.assertEqual(registry[key]["payload"], payload)
+            self.assertEqual(registry[key]["path"], "trading-storage/main/shared/target_layer2_context_mapping.csv")
+            self.assertIn("target_layer2_context_mapping", registry[key]["applies_to"])
+
     def test_registered_payload_formats_match_sql_constraint(self):
         constraint_blocks = []
         for migration in sorted(Path("scripts/registry/sql/schema_migrations").glob("*.sql")):
