@@ -3208,7 +3208,7 @@ Server load and memory usage stayed very low while historical acquisition work r
 
 ### Decision
 
-Historical provider data-acquisition slices may execute multiple provider request commands concurrently through bounded worker threads. The scheduler still selects one workflow stage per tick, but provider-stage execution can process a configured request batch with a dynamic worker count selected from request count, configured max workers, current 1-minute load, CPU count, available memory, per-worker memory budget, and reserved memory. The initial service defaults are a 60-second tick, next-request limit 12, and maximum 4 provider worker threads.
+Historical provider data-acquisition slices may execute multiple provider request commands concurrently through bounded worker threads. The scheduler still selects one workflow stage per tick, but provider-stage execution can process a configured request batch with a dynamic worker count selected from request count, configured max workers, current 1-minute load, CPU count, available memory, per-worker memory budget, and reserved memory. The measured service defaults are a 5-second tick, next-request limit 12, and maximum 4 provider worker threads. The shorter tick is preferred over broader task-type parallelism while individual feature/model/evaluation stages remain short and serial safety is still valuable.
 
 ### Consequences
 
