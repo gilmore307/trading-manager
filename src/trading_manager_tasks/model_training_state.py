@@ -35,6 +35,7 @@ def resolve_workflow_state_path(
 
 
 StageProgressStatus = Literal["pending", "blocked", "ready", "succeeded", "failed", "not_applicable"]
+TERMINAL_STAGE_STATUSES = {"succeeded", "failed", "not_applicable"}
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,10 @@ class StageProgress:
     receipt_refs: tuple[str, ...] = ()
     last_reason: str | None = None
     updated_utc: str | None = None
+    created_at_utc: str | None = None
+    started_at_utc: str | None = None
+    ended_at_utc: str | None = None
+    status_updated_at_utc: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
@@ -108,7 +113,18 @@ def _stage_from_plan(stage: WorkflowStage, *, now: str) -> StageProgress:
         blockers=stage.blockers,
         approval_gate_required=stage.approval_gate_required,
         updated_utc=now,
+        created_at_utc=now,
+        status_updated_at_utc=now,
     )
+
+
+def _stage_with_update(stage: StageProgress, *, now: str, **changes: Any) -> StageProgress:
+    next_status = changes.get("status", stage.status)
+    if next_status != stage.status and "status_updated_at_utc" not in changes:
+        changes["status_updated_at_utc"] = now
+    if "updated_utc" not in changes:
+        changes["updated_utc"] = now
+    return replace(stage, **changes)
 
 
 def initial_workflow_state(plan: ModelTrainingWorkflowPlan) -> WorkflowState:
@@ -134,16 +150,18 @@ def load_workflow_state(path: Path, plan: ModelTrainingWorkflowPlan) -> Workflow
         return initial_workflow_state(plan)
     by_plan = {stage.stage_id: stage for layer in plan.layers for stage in layer.stages}
     loaded = {}
+    now = utc_now_iso()
     for row in payload.get("stages", []):
         if not isinstance(row, Mapping) or row.get("stage_id") not in by_plan:
             continue
         stage = by_plan[str(row["stage_id"])]
+        status = str(row.get("status") or "pending")
         loaded[stage.stage_id] = StageProgress(
             stage_id=stage.stage_id,
             layer=stage.layer,
             layer_key=stage.layer_key,
             stage_type=stage.stage_type,
-            status=str(row.get("status") or "pending"),  # type: ignore[arg-type]
+            status=status,  # type: ignore[arg-type]
             command=stage.command,
             blockers=stage.blockers,
             approval_gate_required=stage.approval_gate_required,
@@ -152,8 +170,11 @@ def load_workflow_state(path: Path, plan: ModelTrainingWorkflowPlan) -> Workflow
             receipt_refs=tuple(str(item) for item in row.get("receipt_refs") or []),
             last_reason=row.get("last_reason"),
             updated_utc=row.get("updated_utc"),
+            created_at_utc=row.get("created_at_utc"),
+            started_at_utc=row.get("started_at_utc"),
+            ended_at_utc=row.get("ended_at_utc"),
+            status_updated_at_utc=row.get("status_updated_at_utc"),
         )
-    now = utc_now_iso()
     stages = tuple(loaded.get(stage.stage_id) or _stage_from_plan(stage, now=now) for layer in plan.layers for stage in layer.stages)
     state = WorkflowState(
         contract_type="manager_model_training_workflow_state",
@@ -259,9 +280,9 @@ def refresh_workflow_state(state: WorkflowState, *, plan: ModelTrainingWorkflowP
             if stage.approval_gate_required and approval_status != "approved":
                 status = "blocked"
                 reason = f"waiting for {stage.approval_gate_required}"
-            stage = replace(stage, status=status, last_reason=reason if status == "blocked" else _ready_last_reason(stage), updated_utc=now)
+            stage = _stage_with_update(stage, status=status, last_reason=reason if status == "blocked" else _ready_last_reason(stage), now=now)
         else:
-            stage = replace(stage, status="blocked", last_reason=reason, updated_utc=now)
+            stage = _stage_with_update(stage, status="blocked", last_reason=reason, now=now)
         refreshed.append(stage)
         working[stage.stage_id] = stage
     return replace(state, stages=tuple(refreshed), updated_utc=now)
@@ -333,7 +354,32 @@ def _attach_stage_evidence(
         found = True
         receipts = tuple(dict.fromkeys([*stage.receipt_refs, *[str(item) for item in receipt_refs]]))
         artifacts = tuple(dict.fromkeys([*stage.artifact_refs, *[str(item) for item in artifact_refs]]))
-        changed.append(replace(stage, receipt_refs=receipts, artifact_refs=artifacts, last_reason=reason or stage.last_reason, updated_utc=now))
+        changed.append(_stage_with_update(stage, receipt_refs=receipts, artifact_refs=artifacts, last_reason=reason or stage.last_reason, now=now))
+    if not found:
+        raise ValueError(f"unknown workflow stage: {stage_id}")
+    return replace(state, stages=tuple(changed), updated_utc=now)
+
+
+def mark_stage_started(state: WorkflowState, *, stage_id: str, started_at: str | None = None, reason: str | None = None) -> WorkflowState:
+    now = started_at or utc_now_iso()
+    changed = []
+    found = False
+    for stage in state.stages:
+        if stage.stage_id != stage_id:
+            changed.append(stage)
+            continue
+        found = True
+        if stage.status in TERMINAL_STAGE_STATUSES:
+            changed.append(stage)
+            continue
+        changed.append(
+            _stage_with_update(
+                stage,
+                started_at_utc=stage.started_at_utc or now,
+                last_reason=reason or stage.last_reason,
+                now=now,
+            )
+        )
     if not found:
         raise ValueError(f"unknown workflow stage: {stage_id}")
     return replace(state, stages=tuple(changed), updated_utc=now)
@@ -346,8 +392,9 @@ def mark_stage_succeeded(
     receipt_ref: str | None = None,
     artifact_refs: Iterable[str] = (),
     reason: str | None = None,
+    ended_at: str | None = None,
 ) -> WorkflowState:
-    now = utc_now_iso()
+    now = ended_at or utc_now_iso()
     changed = []
     found = False
     for stage in state.stages:
@@ -357,14 +404,53 @@ def mark_stage_succeeded(
         found = True
         receipts = tuple(dict.fromkeys([*stage.receipt_refs, *([receipt_ref] if receipt_ref else [])]))
         artifacts = tuple(dict.fromkeys([*stage.artifact_refs, *[str(item) for item in artifact_refs]]))
+        status_is_changing = stage.status != "succeeded"
+        ended_at_utc = stage.ended_at_utc or (now if status_is_changing else None)
         changed.append(
-            replace(
+            _stage_with_update(
                 stage,
                 status="succeeded",
                 receipt_refs=receipts,
                 artifact_refs=artifacts,
                 last_reason=reason or "stage completed from manager evidence",
-                updated_utc=now,
+                started_at_utc=stage.started_at_utc,
+                ended_at_utc=ended_at_utc,
+                now=now,
+            )
+        )
+    if not found:
+        raise ValueError(f"unknown workflow stage: {stage_id}")
+    return replace(state, stages=tuple(changed), updated_utc=now)
+
+
+def mark_stage_failed(
+    state: WorkflowState,
+    *,
+    stage_id: str,
+    receipt_ref: str | None = None,
+    reason: str | None = None,
+    ended_at: str | None = None,
+) -> WorkflowState:
+    now = ended_at or utc_now_iso()
+    changed = []
+    found = False
+    for stage in state.stages:
+        if stage.stage_id != stage_id:
+            changed.append(stage)
+            continue
+        found = True
+        receipts = tuple(dict.fromkeys([*stage.receipt_refs, *([receipt_ref] if receipt_ref else [])]))
+        status_is_changing = stage.status != "failed"
+        ended_at_utc = stage.ended_at_utc or (now if status_is_changing else None)
+        changed.append(
+            _stage_with_update(
+                stage,
+                status="failed",
+                receipt_refs=receipts,
+                last_reason=reason or "stage execution failed",
+                started_at_utc=stage.started_at_utc,
+                ended_at_utc=ended_at_utc,
+                now=now,
             )
         )
     if not found:
@@ -382,12 +468,12 @@ def mark_stage_approved(state: WorkflowState, *, stage_id: str, approval_ref: st
             continue
         found = True
         changed.append(
-            replace(
+            _stage_with_update(
                 stage,
                 approval_status="approved",
                 artifact_refs=tuple(dict.fromkeys([*stage.artifact_refs, approval_ref])),
                 last_reason="approval gate satisfied",
-                updated_utc=now,
+                now=now,
             )
         )
     if not found:
@@ -678,6 +764,8 @@ __all__ = [
     "ingest_stage_coverage_reports",
     "load_workflow_state",
     "mark_stage_approved",
+    "mark_stage_failed",
+    "mark_stage_started",
     "mark_stage_succeeded",
     "next_ready_or_blocked_stage",
     "refresh_workflow_state",

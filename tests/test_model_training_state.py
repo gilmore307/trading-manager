@@ -8,6 +8,8 @@ from pathlib import Path
 from trading_manager_tasks.model_training_state import (
     advance_workflow_state,
     initial_workflow_state,
+    mark_stage_started,
+    mark_stage_succeeded,
     next_ready_or_blocked_stage,
     workflow_state_path_for_month,
 )
@@ -172,6 +174,73 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertEqual(len(acquisition.receipt_refs), 2)
             self.assertIn("storage://bars/0.csv", acquisition.artifact_refs)
             self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "ready")
+
+    def test_lifecycle_timestamps_are_recorded_on_creation_start_and_terminal_transition(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage = tmp / "storage"
+            _write_task_keys(storage, model_layer=LAYER_ONE_MODEL_LAYER)
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage,
+                state_path=tmp / "workflow_state.json",
+                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                write=False,
+            )
+            stage_id = "layer_01_market_regime.data_acquisition"
+            stage = {stage.stage_id: stage for stage in state.stages}[stage_id]
+            self.assertIsNotNone(stage.created_at_utc)
+            self.assertIsNotNone(stage.status_updated_at_utc)
+            self.assertIsNone(stage.started_at_utc)
+            self.assertIsNone(stage.ended_at_utc)
+
+            state = mark_stage_started(state, stage_id=stage_id, started_at="2026-05-13T10:00:00+00:00")
+            state = mark_stage_succeeded(state, stage_id=stage_id, ended_at="2026-05-13T10:05:00+00:00")
+            stage = {stage.stage_id: stage for stage in state.stages}[stage_id]
+            self.assertEqual(stage.started_at_utc, "2026-05-13T10:00:00+00:00")
+            self.assertEqual(stage.ended_at_utc, "2026-05-13T10:05:00+00:00")
+            self.assertEqual(stage.status_updated_at_utc, "2026-05-13T10:05:00+00:00")
+
+    def test_terminal_stage_without_lifecycle_is_not_backfilled_when_reobserved(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state_path = tmp / "workflow_state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-01",
+                        "updated_utc": "2026-05-12T00:00:00+00:00",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "status": "succeeded",
+                                "updated_utc": "2026-05-12T00:00:00+00:00",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                state_path=state_path,
+                completed_stage_ids=["layer_01_market_regime.data_acquisition"],
+                write=False,
+            )
+
+            stage = {stage.stage_id: stage for stage in state.stages}["layer_01_market_regime.data_acquisition"]
+            self.assertEqual(stage.status, "succeeded")
+            self.assertIsNone(stage.created_at_utc)
+            self.assertIsNone(stage.started_at_utc)
+            self.assertIsNone(stage.ended_at_utc)
+            self.assertIsNone(stage.status_updated_at_utc)
 
     def test_default_checkpoint_path_is_month_scoped(self):
         path = workflow_state_path_for_month("2016-02", root=Path("storage/runtime"))

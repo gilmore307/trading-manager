@@ -3194,7 +3194,7 @@ Chentong asked to see each task's generated time, start time, end time, and stat
 ### Consequences
 
 - Dashboard task detail panels can show generated, started, ended, and status-updated timestamps per child task.
-- Missing timestamps are rendered as not recorded rather than fabricated for open/future work. Terminal rows may use the workflow status update time as the stage end time and, when no finer receipt start time exists, as the best available operational start marker so completed/skipped rows are not shown as never started.
+- Missing timestamps are rendered as not recorded rather than inferred. Past terminal rows without recorded lifecycle metadata are not backfilled from status-update timestamps; future rows must record lifecycle metadata as scheduler/workflow state changes happen.
 - Dashboard remains read-only and storage-hosted; timestamp enrichment stays in the manager semantic producer.
 
 ## D139 - Use bounded dynamic provider worker threads for historical acquisition

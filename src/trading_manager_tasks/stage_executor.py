@@ -20,6 +20,8 @@ from .model_training_state import (
     resolve_workflow_state_path,
     WorkflowState,
     advance_workflow_state,
+    mark_stage_failed,
+    mark_stage_started,
     mark_stage_succeeded,
     next_ready_or_blocked_stage,
     refresh_workflow_state,
@@ -307,6 +309,11 @@ def execute_next_ready_stage(
         raise TaskSystemError("no ready or approval-blocked workflow stage")
     if stage.status != "ready":
         raise TaskSystemError(f"next stage is not executable without approval: {stage.stage_id}")
+    stage_id = stage.stage_id
+    state = mark_stage_started(state, stage_id=stage_id, reason="stage execution started by manager stage executor")
+    if write:
+        write_workflow_state(state_path, state)
+    stage = next(updated_stage for updated_stage in state.stages if updated_stage.stage_id == stage_id)
     stage = replace(stage, command=_resolve_command_placeholders(stage.command, start_month=start_month, end_month=end_month))
     summary = execute_stage_process(
         stage,
@@ -326,6 +333,13 @@ def execute_next_ready_stage(
         )
         plan = build_model_training_workflow_plan(start_month=start_month, end_month=end_month, storage_root=storage_root)
         updated = refresh_workflow_state(updated, plan=plan)
+    elif summary.status == "failed":
+        updated = mark_stage_failed(
+            state,
+            stage_id=stage.stage_id,
+            receipt_ref=summary.receipt_path,
+            reason=summary.reason or "stage command returned non-zero status",
+        )
     if write:
         write_workflow_state(state_path, updated)
     return summary, updated

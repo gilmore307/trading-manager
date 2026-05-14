@@ -380,17 +380,7 @@ def _task_timestamp_fields(raw_stage: Mapping[str, Any], *, storage_root: Path) 
     status_updated = raw_stage.get("status_updated_at_utc") or raw_stage.get("status_updated_utc") or raw_stage.get("updated_utc")
     started = raw_stage.get("started_at_utc") or raw_stage.get("started_at") or _min_timestamp(receipt_started)
     ended = raw_stage.get("ended_at_utc") or raw_stage.get("completed_at_utc") or raw_stage.get("completed_at") or _max_timestamp(receipt_ended)
-    stage_status = str(raw_stage.get("status") or "")
-    if ended is None and stage_status in {"succeeded", "failed", "not_applicable"}:
-        ended = status_updated
-    created = raw_stage.get("created_at_utc") or raw_stage.get("created_utc") or raw_stage.get("created_at") or started or status_updated
-    if started is None and stage_status in {"succeeded", "failed", "not_applicable"}:
-        # Older workflow-state rows often retained only the stage status-update
-        # time and stage-coverage refs, not a manager stage-execution receipt
-        # with explicit start metadata. For terminal rows, expose the best
-        # available operational timestamp so dashboard users can distinguish a
-        # completed/skipped task from one that has never begun.
-        started = created or status_updated or ended
+    created = raw_stage.get("created_at_utc") or raw_stage.get("created_utc") or raw_stage.get("created_at")
     return {
         "created_at_utc": str(created) if created else None,
         "started_at_utc": str(started) if started else None,

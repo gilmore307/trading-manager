@@ -163,7 +163,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task_timeline[1]["month"], "2019-05")
         self.assertEqual(task_timeline[1]["detail"]["last_execution"]["return_code"], 1)
         self.assertEqual(task_timeline[2]["stage_type"], "feature_generation")
-        self.assertEqual(task_timeline[0]["created_at_utc"], "2026-05-12T09:00:00Z")
+        self.assertIsNone(task_timeline[0]["created_at_utc"])
         self.assertEqual(task_timeline[0]["started_at_utc"], "2026-05-12T09:00:00Z")
         self.assertEqual(task_timeline[0]["ended_at_utc"], "2026-05-12T09:30:00Z")
         self.assertEqual(task_timeline[0]["status_updated_at_utc"], "2026-05-12T10:00:00Z")
@@ -176,7 +176,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn(payload["severity"], {"critical", "high", "medium", "low", "info"})
 
 
-    def test_terminal_task_without_receipt_timing_uses_status_update_for_start_and_end(self):
+    def test_terminal_task_without_recorded_timing_is_not_backfilled_from_status_update(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -224,9 +224,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task = payload["chart_payload"]["task_timeline"][0]
         self.assertEqual(task["task_state"], "completed")
-        self.assertEqual(task["created_at_utc"], "2026-05-12T10:00:00Z")
-        self.assertEqual(task["started_at_utc"], "2026-05-12T10:00:00Z")
-        self.assertEqual(task["ended_at_utc"], "2026-05-12T10:00:00Z")
+        self.assertIsNone(task["created_at_utc"])
+        self.assertIsNone(task["started_at_utc"])
+        self.assertIsNone(task["ended_at_utc"])
         self.assertEqual(task["status_updated_at_utc"], "2026-05-12T10:00:00Z")
 
     def test_task_timeline_includes_completed_month_groups_before_current_month(self):
