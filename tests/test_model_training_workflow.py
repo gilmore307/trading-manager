@@ -23,9 +23,15 @@ def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") ->
 
 
 class ModelTrainingWorkflowTests(unittest.TestCase):
-    def test_full_stack_plan_covers_all_eight_layers_and_stage_types(self):
+    def test_full_stack_plan_covers_all_eight_layers_and_stage_types_after_foundation_catch_up(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-06",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
 
         self.assertEqual(plan.contract_type, "manager_model_training_workflow_plan")
         self.assertEqual(plan.layer_count, FULL_LAYER_COUNT)
@@ -34,20 +40,33 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             expected_stage_types = [
                 "data_acquisition",
                 "feature_generation",
+                "model_generation",
+                "model_evaluation",
+                "promotion_review",
+                "maintenance",
             ]
-            if layer.layer >= 3:
-                expected_stage_types.extend([
-                    "model_generation",
-                    "model_evaluation",
-                    "promotion_review",
-                    "maintenance",
-                ])
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertIn(f"model_{layer.layer:02d}_", " ".join(layer.model_generate_command))
             self.assertIn(f"model_{layer.layer:02d}_", " ".join(layer.model_evaluate_command))
             self.assertTrue(layer.progression_mode)
             self.assertTrue(layer.candidate_axis)
             self.assertTrue(layer.candidate_progression_policy)
+
+    def test_foundation_catch_up_months_do_not_expose_model_or_promotion_review_stages(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertTrue(plan.foundation_catch_up_only)
+        for layer in plan.layers:
+            self.assertEqual([stage.stage_type for stage in layer.stages], ["data_acquisition", "feature_generation"])
+            self.assertNotIn("model_generation", {stage.stage_type for stage in layer.stages})
+            self.assertNotIn("model_evaluation", {stage.stage_type for stage in layer.stages})
+            self.assertNotIn("promotion_review", {stage.stage_type for stage in layer.stages})
 
     def test_layer_one_acquisition_waits_for_task_key_preparation_then_auto_dispatch(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

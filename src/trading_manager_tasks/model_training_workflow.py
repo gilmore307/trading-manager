@@ -593,7 +593,7 @@ def _build_layer_workflow(
                 ),
             )
         )
-    if foundation_catch_up_only and layer in FOUNDATION_CATCH_UP_LAYERS:
+    if foundation_catch_up_only:
         return LayerWorkflow(
             layer=layer,
             layer_key=key,

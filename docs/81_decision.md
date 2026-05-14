@@ -3374,7 +3374,7 @@ The historical scheduler treats Layer 1/2 data acquisition and feature generatio
 
 - Layer 1 and Layer 2 data/feature stages may advance month-by-month toward the current month.
 - A month is eligible for chronological advancement once Layer 1/2 `data_acquisition` and `feature_generation` are complete for that month.
-- Layer 1/2 month-scoped workflow states expose only `data_acquisition` and `feature_generation` during foundation catch-up. They must not show month-local `model_generation`, `model_evaluation`, `promotion_review`, or `maintenance` stages because model/promotion work is fold-scoped, not month-scoped.
+- Month-scoped workflow states expose only reusable substrate stages (`data_acquisition` and `feature_generation`) during foundation catch-up. They must not show month-local `model_generation`, `model_evaluation`, `promotion_review`, or `maintenance` stages for any layer because model/promotion work is fold-scoped, not month-scoped.
 - Layer 3+ target-symbol work remains blocked with `layer_01_02_historical_catch_up_to_current_required` in addition to its target/upstream blockers.
 - Existing downloaded provider data, cleaned rows, and deterministic feature substrate may be reused when contract-valid.
 - Existing model candidates, evaluation summaries, promotion-review evidence, activation evidence, and later review artifacts are superseded as current promotion basis and must be rebuilt/revalidated after the foundation substrate is caught up.
@@ -3383,7 +3383,7 @@ The historical scheduler treats Layer 1/2 data acquisition and feature generatio
 
 - The default scheduler posture is no longer “finish every layer for a month before moving on.” It is “catch up Layer 1/2 historical substrate first.”
 - The first selected Layer 3+ target (`AAPL`) remains a parked runtime default until foundation catch-up is accepted as current.
-- Dashboard/task-state surfaces should show month-ingest catch-up for Layer 1/2 and the parked Layer 3+ blocker, not fake month-local model/Promotion Review stages.
+- Dashboard/task-state surfaces should show month-ingest catch-up substrate and parked Layer 3+ blockers, not fake month-local model/Promotion Review stages.
 - Provider dispatch, model activation, broker/account mutation, and storage lifecycle authority remain unchanged.
 
 ## D146 - Promotion is one fold-scoped task, not preparation
