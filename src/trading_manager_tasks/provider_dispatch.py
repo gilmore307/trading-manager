@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,6 +27,29 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 from .stage_coverage import collect_stage_coverage
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
+DEFAULT_PROVIDER_STAGE_MIN_WORKERS = 1
+DEFAULT_PROVIDER_STAGE_MAX_WORKERS = 4
+DEFAULT_PROVIDER_STAGE_WORKER_MEMORY_MB = 512
+DEFAULT_PROVIDER_STAGE_RESERVED_MEMORY_MB = 2048
+DEFAULT_PROVIDER_STAGE_LOAD_TARGET_PER_CPU = 0.70
+
+
+@dataclass(frozen=True)
+class ProviderWorkerSelection:
+    dynamic_enabled: bool
+    requested_max_workers: int
+    selected_worker_count: int
+    request_count: int
+    cpu_count: int
+    load_1m: float | None
+    load_target_per_cpu: float
+    memory_available_mb: int | None
+    worker_memory_mb: int
+    reserved_memory_mb: int
+    reason: str
+
+    def summary_row(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -55,6 +79,7 @@ class ProviderDispatchSummary:
     model_activation_performed: bool
     broker_execution_performed: bool
     items: tuple[ProviderDispatchItem, ...]
+    worker_selection: ProviderWorkerSelection
 
     def summary_row(self) -> dict[str, Any]:
         return {
@@ -67,6 +92,7 @@ class ProviderDispatchSummary:
             "dispatch_performed": self.dispatch_performed,
             "model_activation_performed": self.model_activation_performed,
             "broker_execution_performed": self.broker_execution_performed,
+            "worker_selection": self.worker_selection.summary_row(),
             "items": [item.summary_row() for item in self.items],
         }
 
@@ -111,6 +137,93 @@ def _command(task_key_path: Path, request_id: str) -> list[str]:
         "--run-id",
         _run_id(request_id),
     ]
+
+
+def _available_memory_mb() -> int | None:
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) // 1024
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
+def select_provider_worker_count(
+    *,
+    request_count: int,
+    execute_provider_calls: bool,
+    dynamic_workers: bool = True,
+    max_workers: int = DEFAULT_PROVIDER_STAGE_MAX_WORKERS,
+    min_workers: int = DEFAULT_PROVIDER_STAGE_MIN_WORKERS,
+    load_target_per_cpu: float = DEFAULT_PROVIDER_STAGE_LOAD_TARGET_PER_CPU,
+    worker_memory_mb: int = DEFAULT_PROVIDER_STAGE_WORKER_MEMORY_MB,
+    reserved_memory_mb: int = DEFAULT_PROVIDER_STAGE_RESERVED_MEMORY_MB,
+) -> ProviderWorkerSelection:
+    if max_workers <= 0:
+        raise TaskSystemError("max_workers must be positive")
+    if min_workers <= 0:
+        raise TaskSystemError("min_workers must be positive")
+    requested_max = max(min_workers, max_workers)
+    cpu_count = os.cpu_count() or 1
+    load_1m = None
+    try:
+        load_1m = os.getloadavg()[0]
+    except (AttributeError, OSError):
+        pass
+    memory_available_mb = _available_memory_mb()
+    if not execute_provider_calls or request_count <= 0:
+        return ProviderWorkerSelection(
+            dynamic_enabled=dynamic_workers,
+            requested_max_workers=requested_max,
+            selected_worker_count=0,
+            request_count=request_count,
+            cpu_count=cpu_count,
+            load_1m=load_1m,
+            load_target_per_cpu=load_target_per_cpu,
+            memory_available_mb=memory_available_mb,
+            worker_memory_mb=worker_memory_mb,
+            reserved_memory_mb=reserved_memory_mb,
+            reason="provider dispatch planning only; no worker slots active",
+        )
+    if not dynamic_workers:
+        selected = min(request_count, requested_max)
+        return ProviderWorkerSelection(
+            dynamic_enabled=False,
+            requested_max_workers=requested_max,
+            selected_worker_count=selected,
+            request_count=request_count,
+            cpu_count=cpu_count,
+            load_1m=load_1m,
+            load_target_per_cpu=load_target_per_cpu,
+            memory_available_mb=memory_available_mb,
+            worker_memory_mb=worker_memory_mb,
+            reserved_memory_mb=reserved_memory_mb,
+            reason="fixed worker count bounded by request count",
+        )
+    load_capacity = requested_max
+    if load_1m is not None:
+        load_headroom = max(0.0, (cpu_count * load_target_per_cpu) - load_1m)
+        load_capacity = max(min_workers, int(load_headroom // 0.5) or min_workers)
+    memory_capacity = requested_max
+    if memory_available_mb is not None:
+        memory_headroom = max(0, memory_available_mb - reserved_memory_mb)
+        memory_capacity = max(min_workers, memory_headroom // max(1, worker_memory_mb))
+    selected = max(min_workers, min(request_count, requested_max, load_capacity, memory_capacity))
+    reason = "dynamic worker count selected from request count, load headroom, and available memory"
+    return ProviderWorkerSelection(
+        dynamic_enabled=True,
+        requested_max_workers=requested_max,
+        selected_worker_count=selected,
+        request_count=request_count,
+        cpu_count=cpu_count,
+        load_1m=load_1m,
+        load_target_per_cpu=load_target_per_cpu,
+        memory_available_mb=memory_available_mb,
+        worker_memory_mb=worker_memory_mb,
+        reserved_memory_mb=reserved_memory_mb,
+        reason=reason,
+    )
 
 
 def _filter_requests(
@@ -163,6 +276,8 @@ def dispatch_layer_provider_acquisition(
     skip_registered_failures: bool = False,
     reject_terminal_coverage: bool = False,
     database_url: str | None = None,
+    dynamic_workers: bool = True,
+    max_workers: int = DEFAULT_PROVIDER_STAGE_MAX_WORKERS,
 ) -> ProviderDispatchSummary:
     """Plan or dispatch a layer Alpaca-bars acquisition batch.
 
@@ -227,15 +342,21 @@ def dispatch_layer_provider_acquisition(
         )
         for request in skipped_requests
     ]
-    dispatch_count = 0
-    for request in live_requests:
+    worker_selection = select_provider_worker_count(
+        request_count=len(live_requests),
+        execute_provider_calls=execute_provider_calls,
+        dynamic_workers=dynamic_workers,
+        max_workers=max_workers,
+    )
+
+    def dispatch_one(request: Mapping[str, Any]) -> ProviderDispatchItem:
         source_path = _task_key_path(storage_root, request).resolve()
         if not source_path.exists():
             raise TaskSystemError(f"task key does not exist: {source_path}")
         task_key = json.loads(source_path.read_text(encoding="utf-8"))
         if not isinstance(task_key, Mapping):
             raise TaskSystemError(f"task key must be a JSON object: {source_path}")
-        runtime_task_key = (storage_root / "runtime" / "provider_task_keys" / request["request_id"] / "task_key.json").resolve()
+        runtime_task_key = (storage_root / "runtime" / "provider_task_keys" / str(request["request_id"]) / "task_key.json").resolve()
         command_path = source_path
         if execute_provider_calls:
             runtime_task_key.parent.mkdir(parents=True, exist_ok=True)
@@ -258,22 +379,30 @@ def dispatch_layer_provider_acquisition(
             )
             return_code = result.returncode
             status = "dispatched_succeeded" if result.returncode == 0 else "dispatched_failed"
-            dispatch_count += 1
             error_tail = "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part) if result.returncode != 0 else None
             if result.returncode != 0 and not continue_on_error:
                 raise TaskSystemError(f"provider dispatch failed for {request['request_id']}: {error_tail}")
-        items.append(
-            ProviderDispatchItem(
-                request_id=str(request["request_id"]),
-                task_key_path=str(source_path),
-                runtime_task_key_path=str(runtime_task_key) if execute_provider_calls else None,
-                command=command,
-                receipt_path=receipt_path,
-                status=status,
-                return_code=return_code,
-                error_summary=error_tail,
-            )
+        return ProviderDispatchItem(
+            request_id=str(request["request_id"]),
+            task_key_path=str(source_path),
+            runtime_task_key_path=str(runtime_task_key) if execute_provider_calls else None,
+            command=command,
+            receipt_path=receipt_path,
+            status=status,
+            return_code=return_code,
+            error_summary=error_tail,
         )
+
+    if worker_selection.selected_worker_count > 1:
+        by_id: dict[str, ProviderDispatchItem] = {}
+        with ThreadPoolExecutor(max_workers=worker_selection.selected_worker_count) as executor:
+            futures = {executor.submit(dispatch_one, request): str(request["request_id"]) for request in live_requests}
+            for future in as_completed(futures):
+                by_id[futures[future]] = future.result()
+        items.extend(by_id[str(request["request_id"])] for request in live_requests)
+    else:
+        items.extend(dispatch_one(request) for request in live_requests)
+    dispatch_count = sum(1 for item in items if item.status in {"dispatched_succeeded", "dispatched_failed"})
     return ProviderDispatchSummary(
         contract_type="manager_provider_dispatch_summary",
         stage_id=f"{model_layer}.data_acquisition",
@@ -285,6 +414,7 @@ def dispatch_layer_provider_acquisition(
         model_activation_performed=False,
         broker_execution_performed=False,
         items=tuple(items),
+        worker_selection=worker_selection,
     )
 
 
@@ -321,6 +451,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--skip-registered-failures", action="store_true", help="Skip requests with accepted_skip entries in the manager failure register.")
     parser.add_argument("--database-url")
+    parser.add_argument("--dynamic-workers", action=argparse.BooleanOptionalAction, default=True, help="Select provider workers dynamically from load and memory headroom.")
+    parser.add_argument("--max-workers", type=int, default=DEFAULT_PROVIDER_STAGE_MAX_WORKERS, help="Maximum provider worker threads for one bounded dispatch slice.")
     parser.add_argument("--reject-terminal-coverage", action="store_true", help="When executing, reject request ids already ready or reviewed-terminal in stage coverage.")
     parser.add_argument("--write", action="store_true", help="Write dispatch summary JSON to --output-path.")
     parser.add_argument("--output-path", type=Path, help="Optional dispatch summary output path.")
@@ -339,6 +471,8 @@ def main(argv: list[str] | None = None) -> int:
         skip_registered_failures=args.skip_registered_failures,
         reject_terminal_coverage=args.reject_terminal_coverage,
         database_url=args.database_url,
+        dynamic_workers=args.dynamic_workers,
+        max_workers=args.max_workers,
     )
     if args.write:
         if args.output_path is None:
@@ -352,6 +486,8 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "ProviderDispatchItem",
     "ProviderDispatchSummary",
+    "ProviderWorkerSelection",
+    "select_provider_worker_count",
     "dispatch_layer_provider_acquisition",
     "dispatch_layer_one_provider_acquisition",
     "write_dispatch_summary",

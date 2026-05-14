@@ -319,6 +319,7 @@ def _execute_autonomous_provider_stage(
     storage_root: Path,
     component_src_root: Path,
     next_limit: int,
+    max_workers: int,
 ) -> dict[str, Any]:
     model_layer = PROVIDER_STAGE_MODEL_LAYERS[stage_id]
     preparation, _requests, _payloads, _validations = prepare_layer_historical_training_batch(
@@ -337,6 +338,8 @@ def _execute_autonomous_provider_stage(
         end_month=end_month,
         packet_storage_root=storage_root,
         next_limit=next_limit,
+        max_workers=max_workers,
+        dynamic_workers=True,
         auto_execute_provider_calls=True,
     )
     reconcile = reconcile_provider_stage(
@@ -387,6 +390,7 @@ def run_scheduler_once(
     execute_safe_offline_stages: bool = False,
     execute_autonomous_provider_stages: bool = False,
     provider_stage_next_limit: int = 5,
+    provider_stage_max_workers: int = 4,
 ) -> SchedulerDecision:
     """Run one scheduler tick.
 
@@ -479,6 +483,7 @@ def run_scheduler_once(
             storage_root=storage_root,
             component_src_root=component_src_root,
             next_limit=provider_stage_next_limit,
+            max_workers=provider_stage_max_workers,
         )
         return SchedulerDecision(
             contract_type="manager_scheduler_decision",
@@ -637,6 +642,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-safe-offline-stages", action="store_true", help="Execute one ready offline workflow stage and record its receipt/state. Provider stages use --execute-autonomous-provider-stages instead.")
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Execute one bounded autonomous provider-dispatch/reconcile slice when a provider acquisition stage is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one scheduler tick.")
+    parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one scheduler tick.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
@@ -666,6 +672,7 @@ def main(argv: list[str] | None = None) -> int:
         execute_safe_offline_stages=args.execute_safe_offline_stages,
         execute_autonomous_provider_stages=args.execute_autonomous_provider_stages,
         provider_stage_next_limit=args.provider_stage_next_limit,
+        provider_stage_max_workers=args.provider_stage_max_workers,
     )
     write_scheduler_decision(decision, output=sys.stdout)
     return 0

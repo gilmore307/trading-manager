@@ -74,6 +74,8 @@ def run_stage_controller_step(
     packet_root: Path | None = None,
     packet_storage_root: Path = Path("storage"),
     next_limit: int = 5,
+    max_workers: int = 4,
+    dynamic_workers: bool = True,
     database_url: str | None = None,
     auto_create_packet: bool | None = None,
     auto_execute_provider_calls: bool = True,
@@ -112,6 +114,8 @@ def run_stage_controller_step(
                 skip_registered_failures=True,
                 reject_terminal_coverage=True,
                 database_url=database_url,
+                dynamic_workers=dynamic_workers,
+                max_workers=max_workers,
             )
             provider_calls = summary.provider_calls
             dispatch_performed = summary.dispatch_performed
@@ -169,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--packet-root", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--packet-storage-root", type=Path, default=Path("storage"))
     parser.add_argument("--next-limit", type=int, default=5)
+    parser.add_argument("--max-workers", type=int, default=4)
+    parser.add_argument("--dynamic-workers", action=argparse.BooleanOptionalAction, default=True, help="Select provider workers dynamically from load and memory headroom.")
     parser.add_argument("--database-url")
     parser.add_argument("--no-execute-provider-calls", action="store_true", help="Plan only; do not execute the ready autonomous provider slice.")
     parser.add_argument("--dashboard-path", type=Path)
@@ -182,6 +188,8 @@ def main(argv: list[str] | None = None) -> int:
         packet_root=args.packet_root,
         packet_storage_root=args.packet_storage_root,
         next_limit=args.next_limit,
+        max_workers=args.max_workers,
+        dynamic_workers=args.dynamic_workers,
         database_url=args.database_url,
         auto_execute_provider_calls=not args.no_execute_provider_calls,
         dashboard_path=args.dashboard_path,

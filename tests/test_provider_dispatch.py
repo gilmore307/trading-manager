@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from trading_manager_tasks.historical_training import prepare_layer_one_historical_training_batch, prepare_layer_two_historical_training_batch
 from trading_manager_tasks.monthly_backfill import LAYER_TWO_MODEL_LAYER
-from trading_manager_tasks.provider_dispatch import dispatch_layer_one_provider_acquisition, dispatch_layer_provider_acquisition
+from trading_manager_tasks.provider_dispatch import dispatch_layer_one_provider_acquisition, dispatch_layer_provider_acquisition, select_provider_worker_count
 
 
 class ProviderDispatchTests(unittest.TestCase):
@@ -35,6 +35,7 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(dispatch.dispatch_count, 0)
         self.assertEqual(dispatch.provider_calls, 0)
         self.assertFalse(dispatch.dispatch_performed)
+        self.assertEqual(dispatch.worker_selection.selected_worker_count, 0)
         self.assertEqual(dispatch.items[0].status, "validated_not_dispatched")
         self.assertIn("data_feed.01_feed_alpaca_bars", dispatch.items[0].command)
         self.assertTrue(Path(dispatch.items[0].task_key_path).is_absolute())
@@ -112,6 +113,52 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(dispatch.request_count, 2)
         self.assertEqual(dispatch.validation_count, 0)
         self.assertEqual(len(dispatch.items), 2)
+
+    def test_dynamic_worker_selection_uses_load_and_memory_bounds(self):
+        with patch("trading_manager_tasks.provider_dispatch.os.cpu_count", return_value=16), patch(
+            "trading_manager_tasks.provider_dispatch.os.getloadavg", return_value=(0.2, 0.1, 0.1)
+        ), patch("trading_manager_tasks.provider_dispatch._available_memory_mb", return_value=24_000):
+            selection = select_provider_worker_count(request_count=10, execute_provider_calls=True, max_workers=4)
+        self.assertTrue(selection.dynamic_enabled)
+        self.assertEqual(selection.selected_worker_count, 4)
+        self.assertEqual(selection.requested_max_workers, 4)
+
+    def test_execute_dispatch_can_use_multiple_provider_worker_threads(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            prepare_layer_one_historical_training_batch(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                write=True,
+                validate_handoff=False,
+            )
+            with patch("trading_manager_tasks.provider_dispatch.os.cpu_count", return_value=16), patch(
+                "trading_manager_tasks.provider_dispatch.os.getloadavg", return_value=(0.1, 0.1, 0.1)
+            ), patch("trading_manager_tasks.provider_dispatch._available_memory_mb", return_value=24_000), patch(
+                "trading_manager_tasks.provider_dispatch.subprocess.run",
+                return_value=SimpleNamespace(returncode=0, stdout="", stderr=""),
+            ) as run_mock:
+                dispatch = dispatch_layer_one_provider_acquisition(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp,
+                    trading_data_root=tmp,
+                    symbols=("SPY", "QQQ", "TLT"),
+                    execute_provider_calls=True,
+                    max_workers=3,
+                )
+        self.assertEqual(dispatch.worker_selection.selected_worker_count, 3)
+        self.assertEqual(dispatch.dispatch_count, 3)
+        self.assertEqual(run_mock.call_count, 3)
+        self.assertEqual(
+            set(item.request_id for item in dispatch.items),
+            {
+                "mgrreq_backfill_alpaca_bars_qqq_2016_01",
+                "mgrreq_backfill_alpaca_bars_spy_2016_01",
+                "mgrreq_backfill_alpaca_bars_tlt_2016_01",
+            },
+        )
 
     def test_execute_dispatch_rejects_terminal_coverage_when_enabled(self):
         with tempfile.TemporaryDirectory() as raw_tmp, patch(

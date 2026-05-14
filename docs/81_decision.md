@@ -3196,3 +3196,22 @@ Chentong asked to see each task's generated time, start time, end time, and stat
 - Dashboard task detail panels can show generated, started, ended, and status-updated timestamps per child task.
 - Missing timestamps are rendered as not recorded rather than fabricated, except terminal rows may use the workflow status update time as the stage end time when no finer receipt end time exists.
 - Dashboard remains read-only and storage-hosted; timestamp enrichment stays in the manager semantic producer.
+
+## D139 - Use bounded dynamic provider worker threads for historical acquisition
+
+Date: 2026-05-13
+Status: Accepted
+
+### Context
+
+Server load and memory usage stayed very low while historical acquisition work remained queued. Chentong asked to increase utilization with direct multithreading and to choose the thread count dynamically from load and memory.
+
+### Decision
+
+Historical provider data-acquisition slices may execute multiple provider request commands concurrently through bounded worker threads. The scheduler still selects one workflow stage per tick, but provider-stage execution can process a configured request batch with a dynamic worker count selected from request count, configured max workers, current 1-minute load, CPU count, available memory, per-worker memory budget, and reserved memory. The initial service defaults are a 60-second tick, next-request limit 12, and maximum 4 provider worker threads.
+
+### Consequences
+
+- Provider acquisition can better use the host when load and memory headroom are available.
+- Existing hard boundaries remain: no broker/account mutation, no model activation, no unbounded provider dispatch, no duplicate terminal request execution, and failures still flow through receipts, coverage, and failure registration.
+- Current Status exposes a scheduler parallelism/thread card so the owner can see selected workers, max workers, request batch size, tick interval, load target, and memory budget.

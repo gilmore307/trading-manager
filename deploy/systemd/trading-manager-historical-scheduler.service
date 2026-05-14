@@ -10,7 +10,9 @@ WorkingDirectory=/root/projects/trading-manager
 Environment=PYTHONPATH=/root/projects/trading-manager/src
 Environment=TRADING_MANAGER_HISTORICAL_START_MONTH=2016-01
 Environment=TRADING_MANAGER_HISTORICAL_END_MONTH=2016-01
-Environment=TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300
+Environment=TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=60
+Environment=TRADING_MANAGER_PROVIDER_STAGE_NEXT_LIMIT=12
+Environment=TRADING_MANAGER_PROVIDER_STAGE_MAX_WORKERS=4
 Environment=TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=false
 EnvironmentFile=-/etc/default/trading-manager-historical-scheduler
 ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py \
@@ -20,6 +22,8 @@ ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_auto
   --execute-safe-preparation \
   --execute-safe-offline-stages \
   --execute-autonomous-provider-stages \
+  --provider-stage-next-limit ${TRADING_MANAGER_PROVIDER_STAGE_NEXT_LIMIT} \
+  --provider-stage-max-workers ${TRADING_MANAGER_PROVIDER_STAGE_MAX_WORKERS} \
   --auto-select-next-work \
   --advance-month-on-complete
 Restart=always
