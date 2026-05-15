@@ -316,16 +316,10 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             }
             for layer, key in layer_slugs.items():
                 prefix = f"layer_{layer:02d}_{key}"
-                completions.extend(
-                    [
-                        f"{prefix}.data_acquisition",
-                        f"{prefix}.feature_generation",
-                        f"{prefix}.model_generation",
-                        f"{prefix}.model_evaluation",
-                        f"{prefix}.promotion_review",
-                        f"{prefix}.maintenance",
-                    ]
-                )
+                stage_types = ["model_generation", "model_evaluation", "promotion_review", "maintenance"]
+                if layer not in {5, 6, 7}:
+                    stage_types = ["data_acquisition", "feature_generation", *stage_types]
+                completions.extend(f"{prefix}.{stage_type}" for stage_type in stage_types)
             state = advance_workflow_state(
                 storage_root=tmp,
                 state_path=state_path,
@@ -339,7 +333,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertIsNone(layer_eight_acquisition.approval_gate_required)
             self.assertTrue(any(token.endswith("review_layer_eight_option_expression_gate.py") for token in layer_eight_acquisition.command))
 
-    def test_not_applicable_layers_can_progress_from_upstream_completion(self):
+    def test_layers_without_input_tasks_can_progress_from_upstream_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             state_path = tmp / "workflow_state.json"
@@ -371,8 +365,8 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 write=False,
             )
             stage_by_id = {stage.stage_id: stage for stage in state.stages}
-            self.assertEqual(stage_by_id["layer_05_alpha_confidence.data_acquisition"].status, "not_applicable")
-            self.assertEqual(stage_by_id["layer_05_alpha_confidence.feature_generation"].status, "not_applicable")
+            self.assertNotIn("layer_05_alpha_confidence.data_acquisition", stage_by_id)
+            self.assertNotIn("layer_05_alpha_confidence.feature_generation", stage_by_id)
             self.assertEqual(stage_by_id["layer_05_alpha_confidence.model_generation"].status, "ready")
 
 

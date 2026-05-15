@@ -369,6 +369,78 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task_timeline = payload["chart_payload"]["task_timeline"]
         self.assertFalse(any(task["month"] == "2026-05" for task in task_timeline))
 
+    def test_task_timeline_omits_nonexistent_no_feature_layer_input_tasks(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2019-04.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2019-04",
+                        "end_month": "2019-04",
+                        "stages": [
+                            {
+                                "stage_id": "layer_05_alpha_confidence.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 5,
+                                "layer_key": "layer_05_alpha_confidence",
+                                "status": "not_applicable",
+                            },
+                            {
+                                "stage_id": "layer_05_alpha_confidence.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 5,
+                                "layer_key": "layer_05_alpha_confidence",
+                                "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "layer_05_alpha_confidence.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 5,
+                                "layer_key": "layer_05_alpha_confidence",
+                                "status": "blocked",
+                            },
+                            {
+                                "stage_id": "layer_08_option_expression.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 8,
+                                "layer_key": "layer_08_option_expression",
+                                "status": "not_applicable",
+                                "last_reason": "no active Layer 7 target chain ready for option-expression expansion",
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps({"current_month": "2019-04", "last_completed_months": ["2019-04"]}) + "\n", encoding="utf-8")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage",
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
+
+        task_timeline = payload["chart_payload"]["task_timeline"]
+        self.assertFalse(
+            any(task["layer"] == 5 and task["stage_type"] in {"data_acquisition", "feature_generation"} for task in task_timeline)
+        )
+        self.assertTrue(any(task["layer"] == 5 and task["stage_type"] == "model_generation" for task in task_timeline))
+        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_08_option_expression.data_acquisition")
+        self.assertEqual(real_skip["task_state"], "skipped")
+        self.assertIn("no active Layer 7", real_skip["reason"])
+
     def test_planned_task_timeline_uses_service_target_symbol(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

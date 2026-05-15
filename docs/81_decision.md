@@ -3630,3 +3630,24 @@ The scheduler auto-selection path could advance from the latest completed workfl
 - Before May ends, the resident scheduler must not select, publish, or auto-advance into `2026-05` / `2605` work.
 - The dashboard cutoff remains a defensive display guard, but scheduler selection itself now enforces the same boundary.
 - Tests cover both advancement after a completed month and stale/open workflow states beyond the cutoff.
+
+## D158 - Nonexistent layer input tasks are omitted, not skipped
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+The dashboard task timeline showed Layer 5-7 `data_acquisition` / `feature_generation` rows as skipped or not applicable even though those stages do not exist in the accepted model workflow. Layers 5-7 consume upstream model/control-plane artifacts and do not own dedicated trading-data input surfaces.
+
+### Decision
+
+The workflow graph must not create Layer 5-7 input-preparation stages. Those layers begin at `model_generation` after their upstream layer dependencies are complete. Dashboard task rows must omit stale Layer 5-7 input-stage evidence if older checkpoints contain it.
+
+`skipped` remains reserved for a real stage the system could have executed but intentionally bypassed because reviewed evidence shows it is already complete or unnecessary for a concrete reason.
+
+### Consequences
+
+- `layer_05_alpha_confidence`, `layer_06_position_projection`, and `layer_07_underlying_action` no longer expose nonexistent `data_acquisition` / `feature_generation` tasks.
+- Historical dashboards no longer use `skipped` to mean “this task type does not exist.”
+- Real not-applicable stage outcomes, such as reviewed no-work option-expression gates, may still appear as skipped when the stage itself is part of the workflow and carries a reason.

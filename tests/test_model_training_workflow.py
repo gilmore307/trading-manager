@@ -46,6 +46,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "promotion_review",
                 "maintenance",
             ]
+            if layer.layer in {5, 6, 7}:
+                expected_stage_types = ["model_generation", "model_evaluation", "promotion_review", "maintenance"]
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertIn(f"model_{layer.layer:02d}_", " ".join(layer.model_generate_command))
             self.assertIn(f"model_{layer.layer:02d}_", " ".join(layer.model_evaluate_command))
@@ -64,7 +66,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertTrue(plan.foundation_catch_up_only)
         for layer in plan.layers:
-            self.assertEqual([stage.stage_type for stage in layer.stages], ["data_acquisition", "feature_generation"])
+            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in MONTHLY_SUBSTRATE_LAYERS else []
+            self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertNotIn("model_generation", {stage.stage_type for stage in layer.stages})
             self.assertNotIn("model_evaluation", {stage.stage_type for stage in layer.stages})
             self.assertNotIn("promotion_review", {stage.stage_type for stage in layer.stages})
@@ -137,9 +140,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.foundation_catch_up_layers, MONTHLY_SUBSTRATE_LAYERS)
         self.assertEqual(plan.reusable_substrate_stage_types, ("data_acquisition", "feature_generation"))
         for layer in plan.layers:
+            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in MONTHLY_SUBSTRATE_LAYERS else []
             self.assertEqual(
                 [stage.stage_type for stage in layer.stages],
-                ["data_acquisition", "feature_generation"],
+                expected_stage_types,
             )
         layer_three_acquisition = plan.layers[2].stages[0]
         self.assertNotIn(FOUNDATION_CATCH_UP_BLOCKER, layer_three_acquisition.blockers)
@@ -315,13 +319,21 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("single-leg", plan.layers[7].candidate_progression_policy)
         self.assertIn("active_target_chain_complete", plan.layers[7].stages[0].blockers)
 
-    def test_layers_without_dedicated_data_features_are_explicit_not_applicable(self):
+    def test_layers_without_dedicated_data_features_do_not_create_nonexistent_tasks(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-06",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
         for layer_number in (5, 6, 7):
             layer = plan.layers[layer_number - 1]
-            self.assertEqual(layer.stages[0].status, "not_applicable")
-            self.assertEqual(layer.stages[1].status, "not_applicable")
+            stage_types = [stage.stage_type for stage in layer.stages]
+            self.assertNotIn("data_acquisition", stage_types)
+            self.assertNotIn("feature_generation", stage_types)
+            self.assertEqual(stage_types, ["model_generation", "model_evaluation", "promotion_review", "maintenance"])
             self.assertIn("no-dedicated-trading-data-feature-stage", " ".join(layer.feature_command))
 
     def test_dataset_units_are_layer_aware_and_target_visible(self):
@@ -331,6 +343,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 start_month="2016-01",
                 end_month="2016-06",
                 selected_target_symbol="aapl",
+                foundation_catch_up_only=False,
             )
 
         self.assertEqual(plan.selected_target_symbol, "AAPL")

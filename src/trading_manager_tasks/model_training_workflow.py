@@ -24,7 +24,7 @@ LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
 DATASET_UNIT_MONTHS = 6
 FOUNDATION_CATCH_UP_LAYERS = (1, 2)
-MONTHLY_SUBSTRATE_LAYERS = tuple(range(1, 9))
+MONTHLY_SUBSTRATE_LAYERS = (1, 2, 3, 4, 8)
 FOUNDATION_CATCH_UP_STAGE_TYPES = ("data_acquisition", "feature_generation")
 FOUNDATION_CATCH_UP_BLOCKER = "layer_01_02_historical_catch_up_to_current_required"
 POST_MODEL_GENERATION_REBUILD_BLOCKER = "post_model_generation_rebuild_required_after_layer_01_02_catch_up"
@@ -551,53 +551,43 @@ def _build_layer_workflow(
 
     acquisition_blockers = _with_target_blocker(acquisition_blockers, layer=layer, selected_target_symbol=selected_target_symbol)
 
-    stages = [
-        WorkflowStage(
-            stage_id=f"{key}.data_acquisition",
-            layer=layer,
-            layer_key=key,
-            stage_type="data_acquisition",
-            description=str(meta["data_surface"]),
-            status=acquisition_status,
-            command=acquisition_command,
-            dataset_unit=dataset_unit,
-            blockers=acquisition_blockers,
-            approval_gate_required=acquisition_gate,
-            safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
-            provider_calls_allowed=layer in {1, 2},
-        )
-    ]
-    if meta.get("feature_cli") is None:
+    stages: list[WorkflowStage] = []
+    has_monthly_input_stage = layer in MONTHLY_SUBSTRATE_LAYERS
+    if has_monthly_input_stage:
         stages.append(
             WorkflowStage(
-                stage_id=f"{key}.feature_generation",
+                stage_id=f"{key}.data_acquisition",
                 layer=layer,
                 layer_key=key,
-                stage_type="feature_generation",
-                description="No dedicated trading-data feature surface; consume upstream model/control-plane artifacts.",
-                status="not_applicable",
-                command=feature,
+                stage_type="data_acquisition",
+                description=str(meta["data_surface"]),
+                status=acquisition_status,
+                command=acquisition_command,
                 dataset_unit=dataset_unit,
+                blockers=acquisition_blockers,
+                approval_gate_required=acquisition_gate,
+                safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
+                provider_calls_allowed=layer in {1, 2},
             )
         )
-    else:
-        stages.append(
-            WorkflowStage(
-                stage_id=f"{key}.feature_generation",
-                layer=layer,
-                layer_key=key,
-                stage_type="feature_generation",
-                description="Generate deterministic feature rows from materialized local inputs.",
-                status="blocked",
-                command=feature,
-                dataset_unit=dataset_unit,
-                blockers=_with_target_blocker(
-                    (f"{key}.data_acquisition_complete",),
+        if meta.get("feature_cli") is not None:
+            stages.append(
+                WorkflowStage(
+                    stage_id=f"{key}.feature_generation",
                     layer=layer,
-                    selected_target_symbol=selected_target_symbol,
-                ),
+                    layer_key=key,
+                    stage_type="feature_generation",
+                    description="Generate deterministic feature rows from materialized local inputs.",
+                    status="blocked",
+                    command=feature,
+                    dataset_unit=dataset_unit,
+                    blockers=_with_target_blocker(
+                        (f"{key}.data_acquisition_complete",),
+                        layer=layer,
+                        selected_target_symbol=selected_target_symbol,
+                    ),
+                )
             )
-        )
     if foundation_catch_up_only:
         return LayerWorkflow(
             layer=layer,
@@ -622,7 +612,8 @@ def _build_layer_workflow(
             "model_generation",
             generate,
             "Generate offline model/state-vector rows from a complete frozen rolling-fold train manifest, never from one month alone.",
-            tuple(f"upstream_layer_{dep:02d}_complete" for dep in meta["depends_on_layers"]) + (f"{key}.feature_or_input_ready",),
+            tuple(f"upstream_layer_{dep:02d}_complete" for dep in meta["depends_on_layers"])
+            + ((f"{key}.feature_or_input_ready",) if has_monthly_input_stage else ()),
         ),
         (
             "model_evaluation",

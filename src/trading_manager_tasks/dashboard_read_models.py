@@ -536,6 +536,19 @@ def _worker_info_for_stage(
         return _model_worker_info()
     return {"worker_id": "scheduler_control_worker", "worker_label": "Scheduler Control Worker", "worker_kind": "scheduler_control"}
 
+
+
+def _is_presentable_task_stage(raw_stage: Mapping[str, Any]) -> bool:
+    stage_type = str(raw_stage.get("stage_type") or "")
+    try:
+        layer = int(raw_stage.get("layer"))
+    except (TypeError, ValueError):
+        layer = 0
+    if layer in {5, 6, 7} and stage_type in {"data_acquisition", "feature_generation"}:
+        return False
+    return True
+
+
 def _task_timeline(
     status: HistoricalSchedulerStatus,
     *,
@@ -625,6 +638,8 @@ def _task_timeline(
             stage_id = str(raw_stage.get("stage_id") or "")
             if not stage_id or str(raw_stage.get("status") or "") in {"succeeded", "not_applicable"}:
                 continue
+            if not _is_presentable_task_stage(raw_stage):
+                continue
             stage_type = str(raw_stage.get("stage_type") or "")
             if stage_type not in {"data_acquisition", "feature_generation"}:
                 continue
@@ -663,6 +678,8 @@ def _task_timeline(
             if not isinstance(raw_stage, Mapping):
                 continue
             stage_id = str(raw_stage.get("stage_id") or "")
+            if not stage_id or not _is_presentable_task_stage(raw_stage):
+                continue
             stage_status = str(raw_stage.get("status") or "unknown")
             is_terminal = stage_status in {"succeeded", "not_applicable"}
             task_month_for_state = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
