@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
 
 from trading_manager_tasks.control_plane import TaskSystemError
-from trading_manager_tasks.layer_four_event_overlay import materialize_layer_four_event_overlay_inputs
+from trading_manager_tasks.layer_four_event_overlay import _discover_event_feed_artifacts, materialize_layer_four_event_overlay_inputs
 
 
 def _write_layer_two_bar_artifact(storage_root: Path, symbol: str, month: str, row_count: int = 1) -> None:
@@ -216,6 +217,25 @@ class LayerFourEventOverlayTests(unittest.TestCase):
             self.assertTrue(all(count == 1 for count in summary.event_feed_coverage.values()))
             self.assertEqual(len(task_key["params"]["event_artifact_paths"]), 4)
             self.assertEqual(summary.provider_calls, 0)
+
+    def test_uses_latest_reviewed_feed_artifact_per_source_month(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            trading_data_root = tmp / "trading-data"
+            feed_root = trading_data_root / "storage" / "monthly_backfill" / "trading_economics_calendar_web" / "2016-01" / "runs"
+            old_path = feed_root / "run_old" / "saved" / "trading_economics_calendar_event.csv"
+            new_path = feed_root / "run_new" / "saved" / "trading_economics_calendar_event.csv"
+            old_path.parent.mkdir(parents=True, exist_ok=True)
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            old_path.write_text("old\n", encoding="utf-8")
+            new_path.write_text("new\n", encoding="utf-8")
+            os.utime(old_path, (1, 1))
+            os.utime(new_path, (2, 2))
+
+            paths, coverage = _discover_event_feed_artifacts(trading_data_root=trading_data_root, start_month="2016-01", end_month="2016-01")
+
+            self.assertEqual(coverage["trading_economics_calendar_web"], 1)
+            self.assertEqual(paths, [str(new_path)])
 
     def test_write_blocks_when_required_event_feed_artifacts_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

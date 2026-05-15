@@ -253,8 +253,10 @@ def _discover_event_feed_artifacts(*, trading_data_root: Path, start_month: str,
             candidates = sorted((base / source_id / month).glob(f"runs/*/saved/{filename}"))
             candidates.extend(sorted((base / source_id / month).glob(f"saved/{filename}")))
             unique = [candidate for candidate in dict.fromkeys(candidates) if candidate.exists()]
-            coverage[source_id] += len(unique)
-            paths.extend(str(candidate) for candidate in unique)
+            if unique:
+                latest = max(unique, key=lambda candidate: (candidate.stat().st_mtime_ns, str(candidate)))
+                coverage[source_id] += 1
+                paths.append(str(latest))
     return paths, coverage
 
 
