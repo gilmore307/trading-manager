@@ -3800,3 +3800,11 @@ Accepted: 2026-05-15
 Manager cannot accept option volume alone as directional proof. Option-direction promotion requires right, side/aggressor evidence when available, sweep/block context, opening/open-interest context, IV/skew/term-structure context, and signed directional forward labels.
 
 Initial hypotheses such as ask-side call activity = bullish and ask-side put activity = bearish must be evaluated, not assumed. If direction evidence is ambiguous, option activity can still support path expansion or risk evidence but must remain `unknown_direction_activity` or `review_required` direction.
+
+## D171 - Manager must block directional judgment until abnormality coverage is complete
+
+Accepted: 2026-05-15
+
+Manager may run diagnostic pilots for abnormal-activity label shape, but it must not treat those pilots as directional conclusion or model-promotion evidence while abnormality coverage is incomplete. Adding more symbols does not fix incomplete abnormality evidence.
+
+A reviewed activity-price proof must first satisfy `abnormality_coverage_complete` across the accepted abnormality families and, for option activity, include side/aggressor, ask/bid touch, sweep/block, opening/closing or OI-change, IV/skew/term-structure, underlying confirmation/divergence, and direction confidence evidence. Until then, outputs remain `diagnostic_only_abnormality_incomplete`.
