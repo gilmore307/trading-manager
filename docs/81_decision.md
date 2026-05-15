@@ -3876,3 +3876,11 @@ Status: accepted.
 The second itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_RESULT_ARTIFACT_Q4_2025_SCOUTING_STUDY` as diagnostic evidence. It found official SEC result artifacts for all 12 Q4 2025 scheduled-shell events and partial XBRL metric-direction interpretation for 11 events.
 
 Manager governance must treat SEC submission/companyfacts joins as official result-artifact coverage and partial reported-metric interpretation only. They do not establish consensus beat/miss, guidance raise/cut, management-commentary interpretation, or signed alpha. Earnings/guidance remains `scouting` until official guidance/result interpretation, expectation baselines, verified option-abnormality controls, and stability evidence are present.
+
+## D179 - Earnings plus option-abnormality amplifier remains blocked without no-option controls
+
+Status: accepted.
+
+The third itemized earnings/guidance scout may register `EARNINGS_OPTION_ABNORMALITY_SPLIT_SCOUT_20260515` as diagnostic blocker evidence. Existing reviewed option-matrix coverage overlaps two canonical earnings rows (`CVX`, `XOM` on `2026-05-01`), both with verified option abnormality, and provides zero verified earnings-without-option-abnormality controls.
+
+Manager governance must not infer an earnings+option amplifier edge from this artifact. The comparison remains blocked until matched earnings dates with verified no-option-abnormality coverage under the same option-event standard are acquired or verified.
