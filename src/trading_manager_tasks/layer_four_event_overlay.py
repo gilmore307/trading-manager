@@ -29,6 +29,12 @@ DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/sha
 DEFAULT_OUTPUT_ROOT = Path("runtime/layer_04_event_overlay/input_materialization")
 DETECTOR_SOURCE = "source_04_event_overlay.equity_abnormal_activity"
 SOURCE = "source_04_event_overlay"
+REQUIRED_EVENT_FEED_ARTIFACTS = {
+    "alpaca_news": "equity_news.csv",
+    "gdelt_news": "gdelt_article.csv",
+    "sec_company_financials": "sec_company_fact.csv",
+    "trading_economics_calendar_web": "trading_economics_calendar_event.csv",
+}
 
 
 @dataclass(frozen=True)
@@ -54,6 +60,8 @@ class LayerFourEventOverlayMaterialization:
     detector_event_count: int
     source_event_count: int
     detector_runs: tuple[DetectorRunRef, ...]
+    event_feed_artifact_paths: tuple[str, ...]
+    event_feed_coverage: dict[str, int]
     source_task_key_path: str
     source_receipt_path: str | None
     provider_calls: int = 0
@@ -69,6 +77,8 @@ class LayerFourEventOverlayMaterialization:
             "detector_event_count": self.detector_event_count,
             "source_event_count": self.source_event_count,
             "detector_runs": [item.summary_row() for item in self.detector_runs],
+            "event_feed_artifact_paths": list(self.event_feed_artifact_paths),
+            "event_feed_coverage": dict(self.event_feed_coverage),
             "source_task_key_path": self.source_task_key_path,
             "source_receipt_path": self.source_receipt_path,
             "provider_calls": self.provider_calls,
@@ -226,7 +236,32 @@ def _read_detector_events(run: DetectorRunRef) -> Iterable[dict[str, Any]]:
     return events
 
 
-def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_month: str, end_month: str, events: Sequence[Mapping[str, Any]]) -> Path:
+
+def _discover_event_feed_artifacts(*, trading_data_root: Path, start_month: str, end_month: str) -> tuple[list[str], dict[str, int]]:
+    """Return reviewed saved feed artifacts available for Layer 4 event extraction.
+
+    The bridge is intentionally local-artifact only. It never dispatches feed
+    work or performs provider calls; the coverage gate refuses to let Layer 4+
+    advance when required event feeds are absent.
+    """
+
+    base = trading_data_root / "storage" / "monthly_backfill"
+    paths: list[str] = []
+    coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
+    for month in _iter_months(start_month, end_month):
+        for source_id, filename in REQUIRED_EVENT_FEED_ARTIFACTS.items():
+            candidates = sorted((base / source_id / month).glob(f"runs/*/saved/{filename}"))
+            candidates.extend(sorted((base / source_id / month).glob(f"saved/{filename}")))
+            unique = [candidate for candidate in dict.fromkeys(candidates) if candidate.exists()]
+            coverage[source_id] += len(unique)
+            paths.extend(str(candidate) for candidate in unique)
+    return paths, coverage
+
+
+def _missing_event_feed_artifacts(coverage: Mapping[str, int]) -> list[str]:
+    return [source_id for source_id in REQUIRED_EVENT_FEED_ARTIFACTS if int(coverage.get(source_id) or 0) <= 0]
+
+def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_month: str, end_month: str, events: Sequence[Mapping[str, Any]], event_artifact_paths: Sequence[str]) -> Path:
     start, end = _range_bounds(start_month, end_month)
     fold_key = _fold_key(start_month, end_month)
     task_key = {
@@ -236,6 +271,7 @@ def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_m
             "start": start,
             "end": end,
             "events": list(events),
+            "event_artifact_paths": list(event_artifact_paths),
         },
         "output_root": str(trading_data_root / "storage" / "runtime" / SOURCE / f"layer_04_event_overlay_{fold_key}"),
         "manager_stage_id": "layer_04_event_overlay.data_acquisition",
@@ -276,12 +312,20 @@ def materialize_layer_four_event_overlay_inputs(
     )
     if not refs:
         raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 4 event-overlay materialization")
+    event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(trading_data_root=trading_data_root, start_month=start_month, end_month=end_month)
+    missing_feed_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
+    if write and missing_feed_artifacts:
+        raise TaskSystemError(
+            "Layer 4 event-overlay coverage is incomplete; missing reviewed feed artifacts for "
+            + ",".join(missing_feed_artifacts)
+        )
     detector_runs = tuple(_run_detector(ref, output_dir=output_dir, trading_data_root=trading_data_root, run_id=run_id, write=write) for ref in refs)
     events = [event for detector_run in detector_runs for event in _read_detector_events(detector_run)]
-    if not events and write:
-        raise TaskSystemError("Layer 4 local detectors emitted zero event rows; review no-event context policy before advancing")
-    source_task_key_path = _write_source_task_key(output_dir=output_dir, trading_data_root=trading_data_root, start_month=start_month, end_month=end_month, events=events)
+    if not events and not event_artifact_paths and write:
+        raise TaskSystemError("Layer 4 emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
+    source_task_key_path = _write_source_task_key(output_dir=output_dir, trading_data_root=trading_data_root, start_month=start_month, end_month=end_month, events=events, event_artifact_paths=event_artifact_paths)
     source_receipt_path: str | None = None
+    source_event_count = len(events)
     if write:
         command = ["python3", "-m", "data_source.source_04_event_overlay", str(source_task_key_path), "--run-id", run_id]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
@@ -294,14 +338,17 @@ def materialize_layer_four_event_overlay_inputs(
         payload = json.loads(result.stdout)
         references = [str(item) for item in payload.get("references") or []]
         source_receipt_path = next((item for item in references if item.endswith("completion_receipt.json")), None)
+        source_event_count = int((payload.get("row_counts") or {}).get(SOURCE) or source_event_count)
     summary = LayerFourEventOverlayMaterialization(
         contract_type="manager_layer_four_event_overlay_input_materialization",
         start_month=start_month,
         end_month=end_month,
         detector_run_count=len(detector_runs),
         detector_event_count=sum(item.event_count for item in detector_runs),
-        source_event_count=len(events),
+        source_event_count=source_event_count,
         detector_runs=detector_runs,
+        event_feed_artifact_paths=tuple(event_artifact_paths),
+        event_feed_coverage=event_feed_coverage,
         source_task_key_path=str(source_task_key_path),
         source_receipt_path=source_receipt_path,
     )

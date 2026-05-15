@@ -51,7 +51,13 @@
 - `test_layer_four_event_overlay.py` verifies:
   - local Layer 4 event-overlay source materialization from completed Layer 2 feed artifacts;
   - detector/source task-key evidence generation for `source_04_event_overlay` without provider dispatch;
+  - reviewed local news/SEC/macro feed artifact discovery and write-mode coverage blocking;
   - zero provider calls, model activation, or broker execution in dry-run materialization.
+
+- `test_model_training_invalidation.py` verifies:
+  - state-only invalidation of stale Layer 4+ workflow stages after event-source contract repair;
+  - preservation of Layer 1-3 workflow stages;
+  - dry-run invalidation leaves state files unchanged.
 
 - `test_layer_eight_option_expression.py` verifies:
   - Layer 8 option-expression gate review over completed Layer 7 rows;

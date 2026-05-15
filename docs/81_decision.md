@@ -3651,3 +3651,25 @@ The workflow graph must not create Layer 5-7 input-preparation stages. Those lay
 - `layer_05_alpha_confidence`, `layer_06_position_projection`, and `layer_07_underlying_action` no longer expose nonexistent `data_acquisition` / `feature_generation` tasks.
 - Historical dashboards no longer use `skipped` to mean “this task type does not exist.”
 - Real not-applicable stage outcomes, such as reviewed no-work option-expression gates, may still appear as skipped when the stage itself is part of the workflow and carries a reason.
+
+## D159 - Layer 4 event overlay requires complete reviewed event-source coverage
+
+Date: 2026-05-14
+Status: Accepted
+
+### Context
+
+Layer 4-8 historical outputs had advanced with `source_04_event_overlay` populated only by local equity abnormal-activity rows. That made downstream event, alpha-confidence, projection, action, and option-expression outputs provisional because critical news, SEC/financial disclosure, and macro-calendar evidence was absent.
+
+### Decision
+
+Layer 4 write-mode materialization must require reviewed local artifacts for `alpaca_news`, `gdelt_news`, `sec_company_financials`, and `trading_economics_calendar_web` before it can write `source_04_event_overlay` rows or unlock downstream Layer 4+ model stages. The event source now accepts `event_artifact_paths` and normalizes supported feed artifacts into canonical overview rows: Alpaca news to `symbol_news`, GDELT to `macro_news` / `sector_news` / `symbol_news` by available scope hints, Trading Economics calendar rows to `macro_data`, and SEC submissions/facts/concepts/frames to `sec_filing` / financial-disclosure events.
+
+Existing Layer 4-8 workflow stages produced from abnormal-activity-only inputs must be marked stale/rebuild-required before any rebuild. The invalidation is state-only: it does not delete artifacts, call providers, activate models, submit broker actions, mutate accounts, or write dashboard read models.
+
+### Consequences
+
+- Missing event feed artifacts block Layer 4 data-acquisition write mode instead of allowing incomplete event inputs to proceed.
+- Layer 1-3 outputs remain preserved unless their own inputs change.
+- Layer 4-8 must be regenerated only after event-source artifacts are backfilled and coverage passes.
+- The scheduler stays stopped until event-source coverage, stale-state marking, and downstream rebuild policy are verified.
