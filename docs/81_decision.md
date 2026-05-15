@@ -3858,3 +3858,13 @@ The layer is worth building for canonical event timelines, point-in-time lifecyc
 Manager must not treat the current evidence as approval for broad event alpha, standalone option-flow alpha, raw news-proximity amplification, or a promoted `EventActivityBridgeModel`. Current statuses remain: standalone option abnormality `deferred_low_signal`, strict option abnormality refinement `deferred_low_signal`, raw option abnormality plus raw-news proximity `deferred_low_signal`, and earnings/guidance `scouting`.
 
 Earnings/guidance may continue only through canonical-source scouting: more seasons/symbols, official SEC/company result and guidance artifacts, verified no-option-abnormality controls when option activity is part of the claim, point-in-time interpretation, and normal promotion evidence before any `pilot_training` or activation review.
+
+## D177 - Earnings/guidance event-alone scout remains direction-neutral scouting
+
+Status: accepted.
+
+The first itemized post-judgment test may register `EARNINGS_GUIDANCE_EVENT_ALONE_Q4_2025_SCOUTING_STUDY` as diagnostic evidence for the earnings/guidance family, not as promotion evidence.
+
+The Q4 2025 scheduled-shell slice paired 12 canonical Nasdaq earnings-calendar events with 36 same-symbol non-earnings controls. It showed direction-neutral path expansion versus controls, especially 5d path range, but directional returns did not improve.
+
+Manager governance must therefore keep earnings/guidance in `scouting`: continue with official SEC/company result and guidance interpretation, then compare earnings-with-option-abnormality versus earnings-without-option-abnormality. Scheduled shells alone must not authorize event alpha, signed-direction claims, or model activation.
