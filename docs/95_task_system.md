@@ -184,15 +184,16 @@ PYTHONPATH=src python3 scripts/tasks/rehearse_realtime_shadow_handoff.py \
 
 The rehearsal invokes execution fixture builders, model route-plan validation, and manager receipt normalization, but still performs zero provider calls, model activation, broker calls, order construction, persistence, or account mutation.
 
-After Layer 4 is complete, Layers 5-7 may advance through the safe offline executor by reading already-persisted SQL rows:
+After Layer 3 is complete, base Layers 4-7 may advance through the safe offline executor by reading already-persisted SQL rows without requiring event-overlay/source_04 inputs:
 
-- Layer 5 reads Layer 1-4 context and writes `trading_model.model_05_alpha_confidence`.
-- Layer 6 reads Layer 5 alpha confidence and writes `trading_model.model_06_position_projection` using flat/no-pending position context defaults.
-- Layer 7 reads Layer 5/6 context and writes `trading_model.model_07_underlying_action` as offline planning evidence only.
+- Base Layer 4 reads Layer 1-3 target context and writes the legacy physical `trading_model.model_05_alpha_confidence`.
+- Base Layer 5 reads alpha confidence and writes the legacy physical `trading_model.model_06_position_projection` using flat/no-pending position context defaults.
+- Base Layer 6 reads Layer 5 projection context and writes the legacy physical `trading_model.model_07_underlying_action` as offline planning evidence only.
+- Base Layer 7 reads the completed Layer 6 chain and writes legacy option-expression/trading-guidance evidence through `trading_model.model_08_option_expression` when the reviewed gate admits it.
 
 These stages remain safe only while the stage receipts show `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`; promotion review output remains evidence until the agent promotion-decision path approves or defers activation.
 
-Before Layer 8 option-expression acquisition, review the completed Layer 7 target chain without calling providers:
+Before base Layer 7 trading-guidance / legacy option-expression acquisition, review the completed Layer 6 target chain without calling providers:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.py \
@@ -201,9 +202,9 @@ PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.p
   --write
 ```
 
-The artifact is `manager_layer_08_option_expression_gate_review`. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active Layer 7 action chains, and records a reviewed no-provider skip when all Layer 7 rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action is bounded autonomous provider dispatch; if no active request previews exist, the review itself is sufficient evidence to complete Layer 8 data acquisition as a no-provider skip.
+The legacy artifact is still `manager_layer_08_option_expression_gate_review` until the physical implementation is renamed. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active base Layer 6 action chains, and records a reviewed no-provider skip when all action rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action is bounded autonomous provider dispatch; if no active request previews exist, the review itself is sufficient evidence to complete base Layer 7 data acquisition as a no-provider skip.
 
-Layer 8 feature generation now runs through the manager adapter `scripts/tasks/execute_layer_eight_option_feature_generation.py`. When the gate review is `no_provider_skip_accepted` with zero active requests, the adapter writes `layer_08_option_expression_feature_generation_no_provider_skip_receipt_YYYY-MM.json` and treats `feature_08_option_expression` as a reviewed no-op. When active option requests were approved and acquired, the same adapter delegates to trading-data `feature_08_option_expression` with month-scoped source windows.
+Base Layer 7 legacy option-expression feature generation runs through the manager adapter `scripts/tasks/execute_layer_eight_option_feature_generation.py`. When the gate review is `no_provider_skip_accepted` with zero active requests, the adapter writes `layer_08_option_expression_feature_generation_no_provider_skip_receipt_YYYY-MM.json` and treats `feature_08_option_expression` as a reviewed no-op. When active option requests were approved and acquired, the same adapter delegates to trading-data `feature_08_option_expression` with month-scoped source windows.
 
 Validate that a materialized payload is component-readable before dispatching work:
 

@@ -27,7 +27,8 @@ DEFAULT_DATASET_EVIDENCE_PATH = Path("storage/runtime/dataset_expansion/evidence
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 
 MODEL_IDS_BY_LAYER: dict[int, str] = {
-    int(meta["layer"]): f"model_{int(meta['layer']):02d}_{meta['slug']}" for meta in LAYER_METADATA
+    int(meta["layer"]): f"model_{int(meta.get('physical_layer', meta['layer'])):02d}_{meta.get('physical_slug', meta['slug'])}"
+    for meta in LAYER_METADATA
 }
 LAYER_KEYS_BY_LAYER: dict[int, str] = {
     int(meta["layer"]): workflow_layer_key(int(meta["layer"]), str(meta["slug"])) for meta in LAYER_METADATA
@@ -278,7 +279,7 @@ def collect_dataset_evidence_from_rows(
 
     layers: list[DatasetEvidenceLayerSummary] = []
     global_warnings = list(warnings)
-    for layer in range(1, 9):
+    for layer in sorted(MODEL_IDS_BY_LAYER):
         model_id = MODEL_IDS_BY_LAYER[layer]
         model_snapshots = [row for row in snapshot_rows if row.get("model_id") == model_id]
         role_accumulator: dict[DatasetRole, dict[str, Any]] = {

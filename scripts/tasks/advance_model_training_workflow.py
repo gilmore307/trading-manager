@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Advance the durable manager-owned Layer 1-8 model-training workflow state."""
+"""Advance the durable manager-owned base Layer 1-7 model-training workflow state."""
 
 from __future__ import annotations
 

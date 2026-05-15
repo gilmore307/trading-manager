@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal, Mapping, TextIO
 
 from .historical_training import HistoricalTrainingBatchPreparation, prepare_layer_one_historical_training_batch
-from .model_training_workflow import DATASET_UNIT_MONTHS
+from .model_training_workflow import DATASET_UNIT_MONTHS, LAYER_METADATA
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DatasetRole = Literal["train", "calibration", "validation", "test", "forward_holdout", "shadow_monitoring"]
@@ -32,27 +32,11 @@ PROMOTION_GAPS_REQUIRING_FORWARD_HOLDOUT = {
     "baseline_instability",
 }
 
-LAYER_SLUGS: dict[int, str] = {
-    1: "market_regime",
-    2: "sector_context",
-    3: "target_state_vector",
-    4: "event_overlay",
-    5: "alpha_confidence",
-    6: "position_projection",
-    7: "underlying_action",
-    8: "option_expression",
-}
-
+LAYER_SLUGS: dict[int, str] = {int(meta["layer"]): str(meta["slug"]) for meta in LAYER_METADATA}
 LAYER_DEPENDENCIES: dict[int, tuple[int, ...]] = {
-    1: (),
-    2: (1,),
-    3: (1, 2),
-    4: (1, 2, 3),
-    5: (1, 2, 3, 4),
-    6: (5,),
-    7: (5, 6),
-    8: (7,),
+    int(meta["layer"]): tuple(int(dep) for dep in meta["depends_on_layers"]) for meta in LAYER_METADATA
 }
+DATASET_EXPANSION_LAYERS: tuple[int, ...] = tuple(sorted(LAYER_SLUGS))
 
 DEFAULT_MINIMUM_MONTHS: dict[DatasetRole, int] = {
     "train": 60,
@@ -214,13 +198,13 @@ def load_dataset_evidence(path: Path | None) -> tuple[LayerDatasetEvidence, ...]
     """Load manager-visible dataset evidence, or return empty layer evidence."""
 
     if path is None or not path.exists():
-        return tuple(LayerDatasetEvidence(layer=layer, layer_key=layer_key(layer), roles=()) for layer in range(1, 9))
+        return tuple(LayerDatasetEvidence(layer=layer, layer_key=layer_key(layer), roles=()) for layer in DATASET_EXPANSION_LAYERS)
     payload = json.loads(path.read_text(encoding="utf-8"))
     layers_payload = payload.get("layers") if isinstance(payload, Mapping) else None
     if not isinstance(layers_payload, Mapping):
         raise ValueError("dataset evidence JSON must contain object field 'layers'")
     rows = []
-    for layer in range(1, 9):
+    for layer in DATASET_EXPANSION_LAYERS:
         row = layers_payload.get(str(layer)) or layers_payload.get(layer) or {}
         if not isinstance(row, Mapping):
             row = {}
@@ -253,7 +237,7 @@ def decide_dataset_expansion(
     """
 
     by_layer = {item.layer: item for item in evidence}
-    for layer in range(1, 9):
+    for layer in DATASET_EXPANSION_LAYERS:
         layer_evidence = by_layer[layer]
         upstream_ready, upstream_reason = _upstream_ready(layer, by_layer, minimum_months)
         if not upstream_ready:
@@ -302,7 +286,7 @@ def _decision_for_role(
     reason: str,
     selected_target_symbol: str | None,
 ) -> DatasetExpansionDecision:
-    provider_backed = layer_evidence.layer in {1, 8}
+    provider_backed = layer_evidence.layer in {1, 2, 7}
     normalized_target = selected_target_symbol.strip().upper() if selected_target_symbol else None
     target_required = layer_evidence.layer >= 3
     target_missing = target_required and normalized_target is None
@@ -310,8 +294,8 @@ def _decision_for_role(
         action = "prepare_layer_one_historical_training_batch"
     elif target_missing:
         action = "select_target_symbol_for_six_month_unit"
-    elif layer_evidence.layer == 8:
-        action = "prepare_option_expression_acquisition"
+    elif layer_evidence.layer == 7:
+        action = "prepare_trading_guidance_option_expression_gate"
     else:
         action = "queue_offline_dataset_materialization"
     dataset_unit_kind = "six_month_panel" if layer_evidence.layer in {1, 2} else "target_symbol_six_month"

@@ -38,7 +38,7 @@
   - non-stressful host resource snapshot collection.
 
 - `test_model_training_workflow.py` verifies:
-  - full Layer 1-8 manager workflow graph coverage;
+  - base Layer 1-7 manager workflow graph coverage;
   - per-layer data acquisition, feature, model generation, evaluation, promotion-review, and maintenance stages;
   - Layer 1 task-key preparation to autonomous provider dispatch gate progression;
   - explicit no-dedicated-feature handling for Layers 5-7.
@@ -129,7 +129,7 @@
 
 - `test_model_promotion.py` verifies:
   - unified model promotion review request planning;
-  - registered model target coverage across Layers 1-8;
+  - registered model target coverage across the legacy physical model targets;
   - one shared `model_promotion_review` request kind for all model layers.
 
 - `test_provider_dispatch.py` verifies:

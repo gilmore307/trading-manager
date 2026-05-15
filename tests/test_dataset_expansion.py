@@ -16,7 +16,7 @@ class DatasetExpansionTests(unittest.TestCase):
     def empty_evidence(self):
         return tuple(
             LayerDatasetEvidence(layer=layer, layer_key=f"layer_{layer:02d}_test", roles=())
-            for layer in range(1, 9)
+            for layer in range(1, 8)
         )
 
     def complete_layer(self, layer: int, *, gaps=(), approved=False):
@@ -72,7 +72,7 @@ class DatasetExpansionTests(unittest.TestCase):
         self.assertEqual(decision.dataset_role, "train")
 
     def test_manager_expands_forward_holdout_for_split_stability_gap(self):
-        evidence = [self.complete_layer(layer) for layer in range(1, 9)]
+        evidence = [self.complete_layer(layer) for layer in range(1, 8)]
         evidence[2] = self.complete_layer(3, gaps=("split_stability",))
 
         decision = decide_dataset_expansion(tuple(evidence), selected_target_symbol="AAPL")
@@ -87,7 +87,7 @@ class DatasetExpansionTests(unittest.TestCase):
         self.assertIn("split_stability", decision.reason)
 
     def test_later_layer_expansion_blocks_until_target_symbol_is_named(self):
-        evidence = [self.complete_layer(layer) for layer in range(1, 9)]
+        evidence = [self.complete_layer(layer) for layer in range(1, 8)]
         evidence[2] = self.complete_layer(3, gaps=("coverage",))
 
         plan = build_dataset_expansion_plan(
@@ -147,7 +147,7 @@ class DatasetExpansionTests(unittest.TestCase):
 
             self.assertEqual(evidence[0].role("train").month_count, 60)
             self.assertEqual(evidence[0].promotion_gaps, ("coverage",))
-            self.assertEqual(len(evidence), 8)
+            self.assertEqual(len(evidence), 7)
 
 
 if __name__ == "__main__":
