@@ -3868,3 +3868,11 @@ The first itemized post-judgment test may register `EARNINGS_GUIDANCE_EVENT_ALON
 The Q4 2025 scheduled-shell slice paired 12 canonical Nasdaq earnings-calendar events with 36 same-symbol non-earnings controls. It showed direction-neutral path expansion versus controls, especially 5d path range, but directional returns did not improve.
 
 Manager governance must therefore keep earnings/guidance in `scouting`: continue with official SEC/company result and guidance interpretation, then compare earnings-with-option-abnormality versus earnings-without-option-abnormality. Scheduled shells alone must not authorize event alpha, signed-direction claims, or model activation.
+
+## D178 - SEC result artifacts are partial interpretation, not guidance surprise
+
+Status: accepted.
+
+The second itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_RESULT_ARTIFACT_Q4_2025_SCOUTING_STUDY` as diagnostic evidence. It found official SEC result artifacts for all 12 Q4 2025 scheduled-shell events and partial XBRL metric-direction interpretation for 11 events.
+
+Manager governance must treat SEC submission/companyfacts joins as official result-artifact coverage and partial reported-metric interpretation only. They do not establish consensus beat/miss, guidance raise/cut, management-commentary interpretation, or signed alpha. Earnings/guidance remains `scouting` until official guidance/result interpretation, expectation baselines, verified option-abnormality controls, and stability evidence are present.
