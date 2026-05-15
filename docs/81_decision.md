@@ -3736,3 +3736,13 @@ Manager-side event-risk-governor planning must preserve lifecycle class and cloc
 Accepted lifecycle classes are `scheduled_known_outcome_later`, `unscheduled_surprise`, `scheduled_recurring_data_release`, `multi_stage_developing_event`, and `unknown`. Required lifecycle clocks, when known, include `event_awareness_time`, `event_scheduled_time`, `source_published_time`, `available_time`, `interpretation_time`, `resolution_time`, and `reaction_window`.
 
 Scheduled-known catalysts may create pre-event risk/planning records before outcome release, but result values and realized reaction are invalid before point-in-time availability. Surprise events cannot have a specific pre-event event row; only background hazard/vulnerability evidence may predate first source visibility. Registry rows must expose this lifecycle contract before cross-repository implementation depends on it.
+
+## D164 - Abnormal activity event rows cannot duplicate model-owned bars
+
+Accepted: 2026-05-15
+
+Manager-side event-risk planning must treat abnormal activity as residual/provenance evidence, not as a second route for ordinary bars and liquidity features already consumed by the base model stack.
+
+Allowed event-risk uses are compact detector refs, residual unexplained board/tape disturbance after upstream context conditioning, discrete price-action tokens, and cross-source abnormal evidence not already represented in base inputs. Forbidden uses are re-emitting `equity_bar`, `equity_liquidity_bar`, volatility, gap, volume, spread, trend, VWAP, or target-state features as independent event alpha.
+
+Registry rows should expose this residual abnormal-activity policy before future implementation or dashboard surfaces depend on abnormal-activity event counts.
