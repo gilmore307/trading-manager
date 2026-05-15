@@ -65,6 +65,11 @@ FEED_TASK_DEFAULTS: dict[str, FeedTaskDefaults] = {
         feed_id="05_feed_gdelt_news",
         params={"topic_categories": ["politics", "economy", "technology"], "focus": "us_market", "max_rows": 100, "dry_run": True},
     ),
+    "07_feed_trading_economics_calendar_web": FeedTaskDefaults(
+        source_id="trading_economics_calendar_web",
+        feed_id="07_feed_trading_economics_calendar_web",
+        params={"country": "United States", "importance": "3", "allow_live_fetch": False},
+    ),
     "08_feed_sec_company_financials": FeedTaskDefaults(
         source_id="sec_company_financials",
         feed_id="08_feed_sec_company_financials",
@@ -201,6 +206,9 @@ def _task_params(row: Mapping[str, Any], defaults: FeedTaskDefaults, start_date:
     elif feed_id == "05_feed_gdelt_news":
         params.setdefault("start_date", start_date)
         params.setdefault("end_date", end_date_exclusive)
+    elif feed_id == "07_feed_trading_economics_calendar_web":
+        params.setdefault("start", start_date)
+        params.setdefault("end", end_date_exclusive)
     elif feed_id in {"10_feed_thetadata_option_primary_tracking", "11_feed_thetadata_option_event_timeline"}:
         params.setdefault("start_date", start_date)
         params.setdefault("end_date", end_date_exclusive)

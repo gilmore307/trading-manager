@@ -59,6 +59,10 @@
   - preservation of Layer 1-3 workflow stages;
   - dry-run invalidation leaves state files unchanged.
 
+- `test_event_feed_backfill.py` verifies:
+  - required Layer 4 event-feed task-key preparation for Alpaca news, GDELT news, Trading Economics calendar, and SEC company financials;
+  - event-feed preparation writes task keys without provider calls, model activation, broker execution, or dashboard read-model writes.
+
 - `test_layer_eight_option_expression.py` verifies:
   - Layer 8 option-expression gate review over completed Layer 7 rows;
   - reviewed no-provider skip behavior when all Layer 7 rows are no-trade/maintain/neutral;
