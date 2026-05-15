@@ -3743,6 +3743,8 @@ Accepted: 2026-05-15
 
 Manager-side event-risk planning must treat abnormal activity as residual/provenance evidence, not as a second route for ordinary bars and liquidity features already consumed by the base model stack.
 
-Allowed event-risk uses are compact detector refs, residual unexplained board/tape disturbance after upstream context conditioning, discrete price-action tokens, and cross-source abnormal evidence not already represented in base inputs. Forbidden uses are re-emitting `equity_bar`, `equity_liquidity_bar`, volatility, gap, volume, spread, trend, VWAP, or target-state features as independent event alpha.
+Allowed event-risk uses are compact detector refs, residual unexplained board/tape disturbance after upstream context conditioning, discrete price-action tokens, and cross-source abnormal evidence not already represented in base inputs. Accepted abnormal-activity evidence categories are `price_action_pattern`, `residual_market_structure_disturbance`, `microstructure_liquidity_disruption`, and `option_derivatives_abnormality`.
+
+Forbidden uses are re-emitting `equity_bar`, `equity_liquidity_bar`, volatility, gap, volume, spread, trend, VWAP, or target-state features as independent event alpha.
 
 Registry rows should expose this residual abnormal-activity policy before future implementation or dashboard surfaces depend on abnormal-activity event counts.
