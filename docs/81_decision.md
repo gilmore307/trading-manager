@@ -3776,3 +3776,11 @@ Accepted: 2026-05-15
 Manager governance requires the activity-price proof gate to be cross-sectional. One clean small-cap case may justify a pilot, but it cannot justify `EventActivityBridgeModel` promotion or EventRiskGovernor consumption.
 
 The proof study must span company-size buckets, sector/theme buckets, event families, activity classes, and bridge relation types. Acceptance requires forward price/path relationship, incremental residual value, non-story-stock support, out-of-sample stability, leakage controls, and reviewed failure modes.
+
+## D168 - Manager proof gate treats abnormal activity as direction-neutral tradability first
+
+Accepted: 2026-05-15
+
+Manager governance must not accept signed average forward return as the primary activity-price proof metric. The proof gate must first evaluate absolute forward movement and tradeable path expansion because both upside and downside paths can be traded.
+
+Directional alpha, reversal/continuation classification, and expression choice are later stages. The first gate asks whether abnormal activity changes the future price/path distribution enough to be useful.
