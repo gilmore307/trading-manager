@@ -3748,3 +3748,13 @@ Allowed event-risk uses are compact detector refs, residual unexplained board/ta
 Forbidden uses are re-emitting `equity_bar`, `equity_liquidity_bar`, volatility, gap, volume, spread, trend, VWAP, or target-state features as independent event alpha.
 
 Registry rows should expose this residual abnormal-activity policy before future implementation or dashboard surfaces depend on abnormal-activity event counts.
+
+## D165 - Event-activity bridge is the event-to-price/odds connector
+
+Accepted: 2026-05-15
+
+`event_activity_bridge` is the accepted manager-visible contract for connecting event evidence to price, flow, liquidity, option, and prediction-market activity. It supports cases where hard-to-standardize news can be represented through standardized activity relationships.
+
+Accepted relation types are `pre_event_precursor`, `co_event_reaction`, `post_event_absorption`, `event_activity_divergence`, and `unresolved_latent_hazard`. Accepted explanation statuses are `explained_by_known_event`, `partially_explained`, `unexplained`, `later_explained`, and `review_required`.
+
+Manager records must preserve both event refs and activity refs. Pre-event activity is latent hazard evidence, not proof that a future event was known. Later explanations are follow-up evidence and must not mutate the original point-in-time record.

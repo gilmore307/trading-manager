@@ -65,6 +65,32 @@ Manager implications:
 - A surprise-news request cannot include a pre-event specific-event record; only background hazard/vulnerability evidence may predate the first credible source.
 - Multi-stage events should add immutable stage/update refs rather than overwrite the original event row.
 
+## Event-Activity Bridge Control-Plane Rule
+
+`event_activity_bridge` is the accepted contract for connecting event evidence to price, flow, liquidity, option, and prediction-market activity. It is especially useful when raw news is too hard to standardize semantically but observable activity gives a stable point-in-time lead/lag or confirmation/divergence structure.
+
+Accepted relation types:
+
+```text
+pre_event_precursor
+co_event_reaction
+post_event_absorption
+event_activity_divergence
+unresolved_latent_hazard
+```
+
+Accepted explanation statuses:
+
+```text
+explained_by_known_event
+partially_explained
+unexplained
+later_explained
+review_required
+```
+
+Manager must preserve both sides of the bridge: event refs and activity refs. It must not let a later explanation rewrite the original point-in-time record; later explanations create follow-up bridge evidence for training/evaluation.
+
 ## Control-Plane Responsibilities
 
 `trading-manager` may:
