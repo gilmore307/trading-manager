@@ -215,6 +215,10 @@ class LayerFourEventOverlayTests(unittest.TestCase):
 
             self.assertEqual(set(summary.event_feed_coverage), set(artifacts))
             self.assertTrue(all(count == 1 for count in summary.event_feed_coverage.values()))
+            self.assertGreaterEqual(summary.event_feed_row_coverage["alpaca_news"], 1)
+            self.assertGreaterEqual(summary.event_feed_row_coverage["gdelt_news"], 1)
+            self.assertGreaterEqual(summary.event_feed_row_coverage["sec_company_financials"], 1)
+            self.assertGreaterEqual(summary.event_feed_row_coverage["trading_economics_calendar_web"], 1)
             self.assertEqual(len(task_key["params"]["event_artifact_paths"]), 4)
             self.assertEqual(summary.provider_calls, 0)
 
@@ -236,6 +240,37 @@ class LayerFourEventOverlayTests(unittest.TestCase):
 
             self.assertEqual(coverage["trading_economics_calendar_web"], 1)
             self.assertEqual(paths, [str(new_path)])
+
+    def test_write_blocks_when_reviewed_event_feed_artifacts_have_zero_in_window_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            trading_data_root = tmp / "trading-data"
+            storage_root = trading_data_root / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            _write_layer_two_bar_artifact(storage_root, "XLF", "2016-01")
+            feed_root = trading_data_root / "storage" / "monthly_backfill"
+            artifacts = {
+                "alpaca_news": ("equity_news.csv", "id,timeline_headline,created_at,updated_at,symbols,summary,event_link_url\nn1,Headline,2016-01-04T10:00:00-05:00,2016-01-04T10:01:00-05:00,XLF,Summary,https://example.com/news\n"),
+                "gdelt_news": ("gdelt_article.csv", "article_id,seen_at,source_domain,event_link_url,title,source_theme_tags,organizations,tone,impact_scope\ng1,2016-02-04T09:00:00-05:00,reuters.com,https://example.com/gdelt,Fed news,ECON,Federal Reserve,-1,market\n"),
+                "sec_company_financials": ("sec_company_fact.csv", "cik,entity_name,taxonomy,tag,label,description,unit,fy,fp,form,filed,frame,end,value,accession_number,symbol\n1,Test Inc,us-gaap,Revenues,Revenue,,USD,2016,Q1,10-Q,2016-01-05,,2015-12-31,1,a1,XLF\n"),
+                "trading_economics_calendar_web": ("trading_economics_calendar_event.csv", "event_time,country,event,source_event_type,reference,actual,previous,consensus,te_forecast,revised,importance,symbol,source_url\n2016-01-08T08:30:00-05:00,United States,Payrolls,Labour,Dec,200K,180K,190K,,,3,,https://tradingeconomics.com/united-states/calendar\n"),
+            }
+            for source_id, (filename, content) in artifacts.items():
+                path = feed_root / source_id / "2016-01" / "runs" / "run_001" / "saved" / filename
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+
+            with self.assertRaisesRegex(TaskSystemError, "zero in-window rows.*gdelt_news"):
+                materialize_layer_four_event_overlay_inputs(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    manager_storage_root=tmp / "manager-storage",
+                    trading_data_root=trading_data_root,
+                    trading_storage_root=storage_root,
+                    universe_path=universe_path,
+                    write=True,
+                )
 
     def test_write_blocks_when_required_event_feed_artifacts_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

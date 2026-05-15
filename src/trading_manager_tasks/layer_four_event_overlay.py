@@ -16,6 +16,7 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
@@ -35,6 +36,13 @@ REQUIRED_EVENT_FEED_ARTIFACTS = {
     "sec_company_financials": "sec_company_fact.csv",
     "trading_economics_calendar_web": "trading_economics_calendar_event.csv",
 }
+EVENT_FEED_TIME_FIELDS = {
+    "alpaca_news": ("created_at", "updated_at"),
+    "gdelt_news": ("seen_at", "gdelt_date"),
+    "sec_company_financials": ("filing_date", "filed", "end", "report_date"),
+    "trading_economics_calendar_web": ("event_time",),
+}
+ET = ZoneInfo("America/New_York")
 
 
 @dataclass(frozen=True)
@@ -62,6 +70,7 @@ class LayerFourEventOverlayMaterialization:
     detector_runs: tuple[DetectorRunRef, ...]
     event_feed_artifact_paths: tuple[str, ...]
     event_feed_coverage: dict[str, int]
+    event_feed_row_coverage: dict[str, int]
     source_task_key_path: str
     source_receipt_path: str | None
     provider_calls: int = 0
@@ -79,6 +88,7 @@ class LayerFourEventOverlayMaterialization:
             "detector_runs": [item.summary_row() for item in self.detector_runs],
             "event_feed_artifact_paths": list(self.event_feed_artifact_paths),
             "event_feed_coverage": dict(self.event_feed_coverage),
+            "event_feed_row_coverage": dict(self.event_feed_row_coverage),
             "source_task_key_path": self.source_task_key_path,
             "source_receipt_path": self.source_receipt_path,
             "provider_calls": self.provider_calls,
@@ -263,6 +273,73 @@ def _discover_event_feed_artifacts(*, trading_data_root: Path, start_month: str,
 def _missing_event_feed_artifacts(coverage: Mapping[str, int]) -> list[str]:
     return [source_id for source_id in REQUIRED_EVENT_FEED_ARTIFACTS if int(coverage.get(source_id) or 0) <= 0]
 
+
+def _parse_event_feed_time(value: str) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if len(text) == 10 and text[4] == "-" and text[7] == "-":
+        return datetime.fromisoformat(f"{text}T00:00:00-05:00").astimezone(ET)
+    if len(text) == 14 and text.isdigit():
+        return datetime.strptime(text, "%Y%m%d%H%M%S").replace(tzinfo=UTC).astimezone(ET)
+    if len(text) == 8 and text.isdigit():
+        return datetime.strptime(text, "%Y%m%d").replace(tzinfo=UTC).astimezone(ET)
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=ET)
+    return parsed.astimezone(ET)
+
+
+def _event_feed_source_from_path(path: str | Path) -> str | None:
+    text = str(path)
+    for source_id in REQUIRED_EVENT_FEED_ARTIFACTS:
+        if f"/{source_id}/" in text or text.startswith(f"{source_id}/"):
+            return source_id
+    return None
+
+
+def _event_feed_window_row_count(source_id: str, path: Path, *, start: datetime, end: datetime) -> int:
+    fields = EVENT_FEED_TIME_FIELDS[source_id]
+    count = 0
+    with path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            event_time = None
+            for field in fields:
+                value = row.get(field)
+                if value:
+                    event_time = _parse_event_feed_time(value)
+                    if event_time is not None:
+                        break
+            if event_time is not None and start <= event_time < end:
+                count += 1
+    return count
+
+
+def _event_feed_row_coverage(event_artifact_paths: Sequence[str], *, start_month: str, end_month: str) -> dict[str, int]:
+    start_text, end_text = _range_bounds(start_month, end_month)
+    start = _parse_event_feed_time(start_text)
+    end = _parse_event_feed_time(end_text)
+    if start is None or end is None:
+        raise TaskSystemError(f"invalid Layer 4 event-feed coverage bounds: {start_text} -> {end_text}")
+    coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
+    for raw_path in event_artifact_paths:
+        source_id = _event_feed_source_from_path(raw_path)
+        if source_id is None:
+            continue
+        path = Path(raw_path)
+        if not path.exists():
+            continue
+        coverage[source_id] += _event_feed_window_row_count(source_id, path, start=start, end=end)
+    return coverage
+
+
+def _missing_event_feed_rows(row_coverage: Mapping[str, int]) -> list[str]:
+    return [source_id for source_id in REQUIRED_EVENT_FEED_ARTIFACTS if int(row_coverage.get(source_id) or 0) <= 0]
+
+
 def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_month: str, end_month: str, events: Sequence[Mapping[str, Any]], event_artifact_paths: Sequence[str]) -> Path:
     start, end = _range_bounds(start_month, end_month)
     fold_key = _fold_key(start_month, end_month)
@@ -315,11 +392,18 @@ def materialize_layer_four_event_overlay_inputs(
     if not refs:
         raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 4 event-overlay materialization")
     event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(trading_data_root=trading_data_root, start_month=start_month, end_month=end_month)
+    event_feed_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
     missing_feed_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
+    missing_feed_rows = _missing_event_feed_rows(event_feed_row_coverage)
     if write and missing_feed_artifacts:
         raise TaskSystemError(
             "Layer 4 event-overlay coverage is incomplete; missing reviewed feed artifacts for "
             + ",".join(missing_feed_artifacts)
+        )
+    if write and missing_feed_rows:
+        raise TaskSystemError(
+            "Layer 4 event-overlay coverage is incomplete; reviewed feed artifacts have zero in-window rows for "
+            + ",".join(missing_feed_rows)
         )
     detector_runs = tuple(_run_detector(ref, output_dir=output_dir, trading_data_root=trading_data_root, run_id=run_id, write=write) for ref in refs)
     events = [event for detector_run in detector_runs for event in _read_detector_events(detector_run)]
@@ -351,6 +435,7 @@ def materialize_layer_four_event_overlay_inputs(
         detector_runs=detector_runs,
         event_feed_artifact_paths=tuple(event_artifact_paths),
         event_feed_coverage=event_feed_coverage,
+        event_feed_row_coverage=event_feed_row_coverage,
         source_task_key_path=str(source_task_key_path),
         source_receipt_path=source_receipt_path,
     )

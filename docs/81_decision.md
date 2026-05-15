@@ -3669,7 +3669,7 @@ Existing Layer 4-8 workflow stages produced from abnormal-activity-only inputs m
 
 ### Consequences
 
-- Missing event feed artifacts block Layer 4 data-acquisition write mode instead of allowing incomplete event inputs to proceed.
+- Missing event feed artifacts, or reviewed artifacts with zero requested-window rows, block Layer 4 data-acquisition write mode instead of allowing incomplete event inputs to proceed.
 - Layer 1-3 outputs remain preserved unless their own inputs change.
 - Layer 4-8 must be regenerated only after event-source artifacts are backfilled and coverage passes.
 - The scheduler stays stopped until event-source coverage, stale-state marking, and downstream rebuild policy are verified.
@@ -3693,7 +3693,7 @@ Prepared task keys remain no-provider evidence: GDELT keys now default to `dry_r
 
 - The Layer 4 coverage blocker now has an explicit, reviewable dispatch step instead of an implied manual provider call path.
 - Operators can preview exact event-feed commands and paths without provider calls, then run a deliberately bounded subset via `--feed-id`, `--request-id`, or `--limit` plus `--execute-provider-calls`.
-- Layer 4 write-mode should remain blocked until dispatch receipts exist and the event-source coverage gate confirms all required feed artifacts are reviewed.
+- Layer 4 write-mode should remain blocked until dispatch receipts exist and the event-source coverage gate confirms all required feed artifacts are reviewed and contain requested-window rows.
 
 ## D161 - Browser-scraped sources use persistent session cookies, not per-task browser login
 
