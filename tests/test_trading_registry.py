@@ -78,6 +78,23 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn("trading-strategy", row["payload"])
             self.assertNotIn("trading-strategy", row["path"])
 
+    def test_event_risk_governor_layer_reorder_terms_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        reorder = rows["MODEL_LAYER_CONCEPTUAL_REORDER_POLICY"]
+        self.assertIn("layer_04_alpha_confidence", reorder["payload"])
+        self.assertIn("layer_07_trading_guidance", reorder["payload"])
+        self.assertIn("layer_08_event_risk_governor", reorder["payload"])
+
+        self.assertEqual(rows["TRADING_GUIDANCE_MODEL"]["payload"], "trading_guidance_model")
+        self.assertEqual(rows["TRADING_GUIDANCE_RECORD"]["payload"], "trading_guidance_record")
+        self.assertEqual(rows["EVENT_RISK_GOVERNOR"]["payload"], "event_risk_governor")
+        self.assertEqual(rows["EVENT_RISK_INTERVENTION"]["payload"], "event_risk_intervention")
+        self.assertIn("flatten_candidate", rows["EVENT_RISK_INTERVENTION_STATUS_VALUES"]["payload"])
+        self.assertIn("broker order", rows["EVENT_RISK_INTERVENTION"]["note"])
+        self.assertIn("legacy_physical_surfaces", rows["LEGACY_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
+
     def test_data_feed_and_data_source_rows_are_separated(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}

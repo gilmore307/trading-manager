@@ -3716,3 +3716,13 @@ When cookies expire, the refresh path renews the authenticated browser session a
 - Provider dispatch remains reviewable and bounded through manager task keys and receipts.
 - Feed parsers must enforce requested-window filtering and report out-of-window skips in receipt evidence.
 - Secrets and cookies stay outside Git; repository code and registry rows may name aliases/policies only.
+
+## D162 - Layer 8 event-risk governor follows Layer 7 trading guidance
+
+Accepted: 2026-05-15
+
+The active conceptual model stack moves event intelligence from Layer 4 to Layer 8. Layers 4-7 move forward: AlphaConfidenceModel becomes conceptual Layer 4, PositionProjectionModel Layer 5, UnderlyingActionModel Layer 6, and TradingGuidanceModel / OptionExpressionModel Layer 7. Layer 8 is EventRiskGovernor / EventIntelligenceOverlay.
+
+Manager orchestration must treat Layer 7 as the base trading-guidance candidate and Layer 8 as a post-guidance event-risk intervention boundary. Layer 8 can block new entries, cap exposure, request exposure reduction, nominate flatten/clear candidates, nominate halt candidates, or require human review when high-risk point-in-time events are detected. These are decision/risk-record interventions, not direct broker/account mutations.
+
+Until a dedicated implementation migration is accepted, existing physical stage, script, table, and package names may remain legacy (`layer_04_event_overlay`, `layer_05_alpha_confidence`, `layer_06_position_projection`, `layer_07_underlying_action`, `layer_08_option_expression`). Registry rows must distinguish active conceptual layer order from legacy physical implementation names.
