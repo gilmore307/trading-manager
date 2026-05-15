@@ -116,3 +116,9 @@ Before this bridge can become a separate model layer, manager must require an ac
 Registry rows make shared names visible and reviewable. They do not make a model production-active.
 
 Promotion remains governed by `docs/96_model_promotion.md`: model repositories produce evidence, `trading-manager` records promotion requests and script-called agent decisions, and activation requires an approved agent decision plus an activation record. Closeout documentation does not override those gates.
+
+## Cross-Section Activity-Price Study Governance
+
+The manager control plane must treat the activity-price proof gate as a reviewed cross-sectional study, not a single-symbol anecdote. Pilot symbols such as RCAT may debug data joins and event/activity windows, but promotion requires size, sector/theme, and event-family coverage.
+
+The accepted study must record cohort definition, controls, forward labels, horizon set, split policy, failure modes, and whether evidence is sufficient to open an `EventActivityBridgeModel` promotion task.

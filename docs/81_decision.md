@@ -3768,3 +3768,11 @@ Manager governance requires an activity-price proof gate before `event_activity_
 The gate must verify forward price/path relationship, incremental residual value after existing model controls, cross-market confirmation value, and out-of-sample stability. Describing the current move is insufficient.
 
 If the proof fails, abnormal activity remains descriptive/provenance evidence only. If it passes, manager may open a reviewed promotion task for `EventActivityBridgeModel`; promotion still requires normal dataset, split, label, leakage, and review evidence.
+
+## D167 - Manager requires cross-sectional activity-price proof before bridge-model promotion
+
+Accepted: 2026-05-15
+
+Manager governance requires the activity-price proof gate to be cross-sectional. One clean small-cap case may justify a pilot, but it cannot justify `EventActivityBridgeModel` promotion or EventRiskGovernor consumption.
+
+The proof study must span company-size buckets, sector/theme buckets, event families, activity classes, and bridge relation types. Acceptance requires forward price/path relationship, incremental residual value, non-story-stock support, out-of-sample stability, leakage controls, and reviewed failure modes.
