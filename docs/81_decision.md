@@ -3784,3 +3784,11 @@ Accepted: 2026-05-15
 Manager governance must not accept signed average forward return as the primary activity-price proof metric. The proof gate must first evaluate absolute forward movement and tradeable path expansion because both upside and downside paths can be traded.
 
 Directional alpha, reversal/continuation classification, and expression choice are later stages. The first gate asks whether abnormal activity changes the future price/path distribution enough to be useful.
+
+## D169 - Directional activity proof is a second gate after path expansion
+
+Accepted: 2026-05-15
+
+Manager governance separates two activity-price gates: first, direction-neutral path expansion; second, directional orientation. A signal such as call-buying surge may be bullish, but it must be proven with point-in-time option side/aggressor evidence and signed directional forward labels.
+
+Directional proof must not be inferred from future price movement. If directional evidence is mixed or weak, the activity can still remain useful as volatility/path-expansion or risk evidence, but it must not be treated as directional alpha.
