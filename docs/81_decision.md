@@ -3726,3 +3726,13 @@ The active conceptual model stack moves event intelligence from Layer 4 to Layer
 Manager orchestration must treat Layer 7 as the base trading-guidance candidate and Layer 8 as a post-guidance event-risk intervention boundary. Layer 8 can block new entries, cap exposure, request exposure reduction, nominate flatten/clear candidates, nominate halt candidates, or require human review when high-risk point-in-time events are detected. These are decision/risk-record interventions, not direct broker/account mutations.
 
 Until a dedicated implementation migration is accepted, existing physical stage, script, table, and package names may remain legacy (`layer_04_event_overlay`, `layer_05_alpha_confidence`, `layer_06_position_projection`, `layer_07_underlying_action`, `layer_08_option_expression`). Registry rows must distinguish active conceptual layer order from legacy physical implementation names.
+
+## D163 - Event lifecycle contract is registered for event-risk governance
+
+Accepted: 2026-05-15
+
+Manager-side event-risk-governor planning must preserve lifecycle class and clocks so scheduled catalysts are not treated like surprise headlines.
+
+Accepted lifecycle classes are `scheduled_known_outcome_later`, `unscheduled_surprise`, `scheduled_recurring_data_release`, `multi_stage_developing_event`, and `unknown`. Required lifecycle clocks, when known, include `event_awareness_time`, `event_scheduled_time`, `source_published_time`, `available_time`, `interpretation_time`, `resolution_time`, and `reaction_window`.
+
+Scheduled-known catalysts may create pre-event risk/planning records before outcome release, but result values and realized reaction are invalid before point-in-time availability. Surprise events cannot have a specific pre-event event row; only background hazard/vulnerability evidence may predate first source visibility. Registry rows must expose this lifecycle contract before cross-repository implementation depends on it.
