@@ -3892,3 +3892,11 @@ Status: accepted.
 The fourth itemized earnings/guidance scout may register `EARNINGS_OPTION_NO_ABNORMALITY_CONTROL_PROBE_20260515` as blocker evidence. The sampled probe covered the eight canonical earnings rows not covered by the prior option matrix, using five candidate strikes and both CALL/PUT under the same option-event standard. It found zero verified no sampled option-abnormality controls. Six rows emitted verified option abnormality on all sampled contracts; `PFE` and `RKLB` had partial contract coverage due ThetaData HTTP 472 failures but still emitted abnormality on successful sampled contracts.
 
 Manager governance must treat this as continued structural blockage, not as positive or negative amplifier proof. The sampled-control scope is not full-chain proof, and the EventRiskGovernor boundary does not expand.
+
+## D181 - Current option-event standard is saturated on reviewed non-earnings windows
+
+Status: accepted.
+
+The sixth itemized earnings/guidance scout may register `OPTION_ABNORMALITY_NON_EARNINGS_SATURATION_20260515` as blocker evidence. The reviewed complete-evidence option matrix contains 34 same-symbol non-earnings symbol/date windows, and all 34 emitted complete option-abnormality events under the current standard, with at least 14 complete events per non-earnings symbol/date.
+
+Manager governance must treat the current option-event standard as saturated for no-abnormality control design in this sample. Do not keep searching the same sample for clean earnings-without-option-abnormality controls. Any future earnings+option amplifier test requires either a revised/tighter abnormality standard or a broader control universe where verified no-abnormality coverage exists.
