@@ -3826,3 +3826,13 @@ Raw option abnormality did not prove robust incremental price/path value against
 Manager governance must therefore require a reviewed `event_family_scouting_packet_v1` before any event family enters model training, risk-intervention promotion, or `event_activity_bridge` promotion work. The packet must define inclusion/exclusion rules, canonical source precedence, lifecycle clocks, materiality/surprise rules, scope routing, abnormal-activity bridge rules, control design, forward-label design, coverage gates, review triggers, and early-stop criteria.
 
 Current statuses: standalone option abnormality, threshold-only option abnormality refinement, and raw option abnormality plus raw-news proximity are `deferred_low_signal`. Earnings/guidance remains `scouting` only and requires canonical earnings/report sources, lifecycle split, surprise/magnitude fields, verified non-event controls, and split stability before promotion work.
+
+## D174 - Earnings/guidance family starts as a canonical-source scouting packet
+
+Status: accepted.
+
+The `earnings_guidance_event_family` may be scouted because the raw event-risk amplifier diagnostic found a small positive earnings/guidance slice, but it remains `scouting` only. It must not be promoted from Alpaca/GDELT headline keywords.
+
+Canonical precedence is: SEC/company official release or filing artifacts first, company IR release/transcript when an accepted route exists, Nasdaq earnings calendar only as a scheduling shell, high-quality news only as narrative residual, and Alpaca/GDELT as discovery/context only. Option/price/liquidity activity may only be bridge evidence.
+
+Manager governance must require the packet's clocks, controls, minimum coverage, and no-leakage gates before the family can move to pilot training. In particular, result/guidance fields are invalid before release artifact visibility, and controls must include verified non-event/non-earnings windows rather than same-symbol price controls alone.
