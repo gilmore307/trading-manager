@@ -3884,3 +3884,11 @@ Status: accepted.
 The third itemized earnings/guidance scout may register `EARNINGS_OPTION_ABNORMALITY_SPLIT_SCOUT_20260515` as diagnostic blocker evidence. Existing reviewed option-matrix coverage overlaps two canonical earnings rows (`CVX`, `XOM` on `2026-05-01`), both with verified option abnormality, and provides zero verified earnings-without-option-abnormality controls.
 
 Manager governance must not infer an earnings+option amplifier edge from this artifact. The comparison remains blocked until matched earnings dates with verified no-option-abnormality coverage under the same option-event standard are acquired or verified.
+
+## D180 - Sampled option-control probe did not produce no-abnormality earnings controls
+
+Status: accepted.
+
+The fourth itemized earnings/guidance scout may register `EARNINGS_OPTION_NO_ABNORMALITY_CONTROL_PROBE_20260515` as blocker evidence. The sampled probe covered the eight canonical earnings rows not covered by the prior option matrix, using five candidate strikes and both CALL/PUT under the same option-event standard. It found zero verified no sampled option-abnormality controls. Six rows emitted verified option abnormality on all sampled contracts; `PFE` and `RKLB` had partial contract coverage due ThetaData HTTP 472 failures but still emitted abnormality on successful sampled contracts.
+
+Manager governance must treat this as continued structural blockage, not as positive or negative amplifier proof. The sampled-control scope is not full-chain proof, and the EventRiskGovernor boundary does not expand.
