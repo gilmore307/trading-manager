@@ -3900,3 +3900,11 @@ Status: accepted.
 The sixth itemized earnings/guidance scout may register `OPTION_ABNORMALITY_NON_EARNINGS_SATURATION_20260515` as blocker evidence. The reviewed complete-evidence option matrix contains 34 same-symbol non-earnings symbol/date windows, and all 34 emitted complete option-abnormality events under the current standard, with at least 14 complete events per non-earnings symbol/date.
 
 Manager governance must treat the current option-event standard as saturated for no-abnormality control design in this sample. Do not keep searching the same sample for clean earnings-without-option-abnormality controls. Any future earnings+option amplifier test requires either a revised/tighter abnormality standard or a broader control universe where verified no-abnormality coverage exists.
+
+## D182 - Earnings/guidance signed-direction readiness requires guidance and expectations
+
+Status: accepted.
+
+The seventh itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_READINESS_SCOUT_Q4_2025` as blocker evidence for signed-direction claims. The scout found 12 official SEC result artifacts and 11 partial point-in-time result-context rows, but zero official company guidance interpretations, zero consensus or accepted expectation baselines, and zero signed-direction-ready rows.
+
+Manager governance must keep earnings/guidance in direction-neutral event-risk scouting. SEC result artifacts alone do not authorize beat/miss, guidance raise/cut, signed-alpha, model activation, or EventRiskGovernor escalation beyond reviewed risk context. Signed claims require official company release/exhibit/transcript guidance interpretation plus point-in-time expectation baselines.
