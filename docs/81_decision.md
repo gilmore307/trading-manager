@@ -3808,3 +3808,11 @@ Accepted: 2026-05-15
 Manager may run diagnostic pilots for abnormal-activity label shape, but it must not treat those pilots as directional conclusion or model-promotion evidence while abnormality coverage is incomplete. Adding more symbols does not fix incomplete abnormality evidence.
 
 A reviewed activity-price proof must first satisfy `abnormality_coverage_complete` across the accepted abnormality families and, for option activity, include side/aggressor, ask/bid touch, sweep/block, opening/closing or OI-change, IV/skew/term-structure, underlying confirmation/divergence, and direction confidence evidence. Until then, outputs remain `diagnostic_only_abnormality_incomplete`.
+
+## D172 - Manager tracks option abnormality evidence coverage fields
+
+Accepted: 2026-05-15
+
+Manager registry/governance must track the concrete option event evidence fields required by the abnormality coverage gate. The presence of an event row is not enough; directional or promotion review needs explicit field coverage for bid/ask touch, trade notional, side evidence, sweep/block, OI/opening-vs-closing, IV-change, skew, term structure, underlying confirmation/divergence, direction confidence, and abnormality coverage status.
+
+Rows with missing upstream evidence remain diagnostic and must not satisfy `abnormality_coverage_complete`.
