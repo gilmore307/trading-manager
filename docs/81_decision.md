@@ -3694,3 +3694,25 @@ Prepared task keys remain no-provider evidence: GDELT keys now default to `dry_r
 - The Layer 4 coverage blocker now has an explicit, reviewable dispatch step instead of an implied manual provider call path.
 - Operators can preview exact event-feed commands and paths without provider calls, then run a deliberately bounded subset via `--feed-id`, `--request-id`, or `--limit` plus `--execute-provider-calls`.
 - Layer 4 write-mode should remain blocked until dispatch receipts exist and the event-source coverage gate confirms all required feed artifacts are reviewed.
+
+## D161 - Browser-scraped sources use persistent session cookies, not per-task browser login
+
+Date: 2026-05-15
+Status: Accepted
+
+### Context
+
+Trading Economics historical calendar acquisition is an accepted logged-in website route, not a historical API route. The same operational shape should apply to any future provider where the accepted source is browser-visible data rather than a first-class API.
+
+### Decision
+
+Manager-owned browser-scraped data tasks use a shared session-cookie policy. A persistent authenticated browser profile/session may stay available for login, consent, and cookie refresh. Normal provider dispatch tasks consume the exported local cookie jar through bounded feed commands; they do not open a new browser and log in for each task, and they do not depend on mutating a long-lived page/tab as the ordinary data path.
+
+When cookies expire, the refresh path renews the authenticated browser session and cookie jar before rerunning the feed task. If the provider presents captcha, MFA, WAF, or permission prompts, the task must stop for operator action instead of bypassing the provider control.
+
+### Consequences
+
+- Trading Economics and future browser-scraped feeds should follow the same session-maintainer + cookie-consuming feed pattern.
+- Provider dispatch remains reviewable and bounded through manager task keys and receipts.
+- Feed parsers must enforce requested-window filtering and report out-of-window skips in receipt evidence.
+- Secrets and cookies stay outside Git; repository code and registry rows may name aliases/policies only.
