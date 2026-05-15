@@ -108,17 +108,19 @@ class StageExecutorTests(unittest.TestCase):
             self.assertEqual(summary.provider_calls, 0)
 
     def test_refuses_provider_dispatch_data_acquisition_command(self):
-        stage = StageProgress(
-            stage_id="layer_01_market_regime.data_acquisition",
-            layer=1,
-            layer_key="layer_01_market_regime",
-            stage_type="data_acquisition",
-            status="ready",
-            command=["python3", "scripts/tasks/dispatch_and_reconcile_provider_stage.py"],
-            blockers=(),
-        )
-        with self.assertRaises(TaskSystemError):
-            execute_stage_process(stage)
+        for script in ("dispatch_and_reconcile_provider_stage.py", "dispatch_event_feed_backfill.py"):
+            stage = StageProgress(
+                stage_id="layer_01_market_regime.data_acquisition",
+                layer=1,
+                layer_key="layer_01_market_regime",
+                stage_type="data_acquisition",
+                status="ready",
+                command=["python3", f"scripts/tasks/{script}"],
+                blockers=(),
+            )
+            with self.subTest(script=script):
+                with self.assertRaises(TaskSystemError):
+                    execute_stage_process(stage)
 
     def test_refuses_unapproved_local_data_acquisition_command(self):
         stage = StageProgress(

@@ -63,6 +63,10 @@
   - required Layer 4 event-feed task-key preparation for Alpaca news, GDELT news, Trading Economics calendar, and SEC company financials;
   - event-feed preparation writes task keys without provider calls, model activation, broker execution, or dashboard read-model writes.
 
+- `test_event_feed_dispatch.py` verifies:
+  - Layer 4 event-feed dispatch defaults to validation-only with zero provider calls;
+  - explicit dispatch writes runtime task keys that enable only the selected event-feed provider controls.
+
 - `test_layer_eight_option_expression.py` verifies:
   - Layer 8 option-expression gate review over completed Layer 7 rows;
   - reviewed no-provider skip behavior when all Layer 7 rows are no-trade/maintain/neutral;

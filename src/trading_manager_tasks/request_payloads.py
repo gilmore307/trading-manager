@@ -207,8 +207,8 @@ def _task_params(row: Mapping[str, Any], defaults: FeedTaskDefaults, start_date:
         params.setdefault("start_date", start_date)
         params.setdefault("end_date", end_date_exclusive)
     elif feed_id == "07_feed_trading_economics_calendar_web":
-        params.setdefault("start", start_date)
-        params.setdefault("end", end_date_exclusive)
+        params.setdefault("start_date", start_date)
+        params.setdefault("end_date", end_date_exclusive)
     elif feed_id in {"10_feed_thetadata_option_primary_tracking", "11_feed_thetadata_option_event_timeline"}:
         params.setdefault("start_date", start_date)
         params.setdefault("end_date", end_date_exclusive)

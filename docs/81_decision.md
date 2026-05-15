@@ -3673,3 +3673,24 @@ Existing Layer 4-8 workflow stages produced from abnormal-activity-only inputs m
 - Layer 1-3 outputs remain preserved unless their own inputs change.
 - Layer 4-8 must be regenerated only after event-source artifacts are backfilled and coverage passes.
 - The scheduler stays stopped until event-source coverage, stale-state marking, and downstream rebuild policy are verified.
+
+## D160 - Layer 4 event-feed backfill dispatch is a separate bounded provider surface
+
+Date: 2026-05-15
+Status: Accepted
+
+### Context
+
+Layer 4 event-source coverage requires reviewed Alpaca news, GDELT news, SEC company financials, and Trading Economics calendar artifacts before `source_04_event_overlay` write-mode may rebuild Layer 4+ outputs. The first repair slice added preparation of reviewed event-feed task keys, but preparation alone could not acquire the missing artifacts and one prepared GDELT default still looked provider-enabled even though the preparation command is supposed to perform zero provider calls.
+
+### Decision
+
+Layer 4 event-feed acquisition now has a dedicated manager dispatch surface: `scripts/tasks/dispatch_event_feed_backfill.py`. The command defaults to validation-only, reads the reviewed task keys prepared by `prepare_layer_four_event_feed_backfill.py`, and performs provider calls only when `--execute-provider-calls` is explicit. In execute mode it writes a runtime task key that flips only the selected feed's live/acquisition controls (`allow_live_provider_calls`, `autonomous_historical_provider_acquisition`, GDELT `dry_run=false`, or Trading Economics `allow_live_fetch=true`) and then invokes the matching `trading-data` feed module. It still performs no model activation, broker execution, account mutation, or dashboard read-model writes.
+
+Prepared task keys remain no-provider evidence: GDELT keys now default to `dry_run=true`, Trading Economics keys use the feed's accepted `start_date` / `end_date` parameters, and the safe offline stage executor refuses the event-feed dispatcher just as it refuses other provider-dispatch commands.
+
+### Consequences
+
+- The Layer 4 coverage blocker now has an explicit, reviewable dispatch step instead of an implied manual provider call path.
+- Operators can preview exact event-feed commands and paths without provider calls, then run a deliberately bounded subset via `--feed-id`, `--request-id`, or `--limit` plus `--execute-provider-calls`.
+- Layer 4 write-mode should remain blocked until dispatch receipts exist and the event-source coverage gate confirms all required feed artifacts are reviewed.

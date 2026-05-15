@@ -41,6 +41,7 @@ from .dataset_expansion import (
     build_dataset_expansion_plan,
     decide_dataset_expansion,
 )
+from .event_feed_dispatch import EventFeedDispatchSummary, dispatch_event_feed_backfill
 from .monthly_backfill import (
     DEFAULT_SOURCES,
     MonthlyWindow,
@@ -112,6 +113,7 @@ __all__ = [
     "DatasetExpansionDecision",
     "DatasetExpansionPlan",
     "DatasetRoleEvidence",
+    "EventFeedDispatchSummary",
     "LayerDatasetEvidence",
     "HISTORICAL_TASK_PROGRESS_CONTRACT",
     "HistoricalSchedulerStatus",
@@ -151,6 +153,7 @@ __all__ = [
     "fetch_manager_requests",
     "fetch_task_summary",
     "decide_dataset_expansion",
+    "dispatch_event_feed_backfill",
     "iter_monthly_windows",
     "materialize_request_payload",
     "materialize_request_payloads",

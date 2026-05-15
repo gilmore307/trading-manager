@@ -131,7 +131,9 @@ def _validate_safe_stage(stage: StageProgress) -> None:
     if stage.stage_type not in SAFE_OFFLINE_STAGE_TYPES:
         raise TaskSystemError(f"stage type is not safe offline executable: {stage.stage_type}")
     if stage.stage_type == "data_acquisition" and any(
-        token.endswith("dispatch_and_reconcile_provider_stage.py") or token.endswith("dispatch_provider_acquisition.py")
+        token.endswith("dispatch_and_reconcile_provider_stage.py")
+        or token.endswith("dispatch_provider_acquisition.py")
+        or token.endswith("dispatch_event_feed_backfill.py")
         for token in stage.command
     ):
         raise TaskSystemError(f"provider-dispatch stage requires the autonomous provider-stage controller: {stage.stage_id}")

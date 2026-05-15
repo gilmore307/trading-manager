@@ -29,6 +29,7 @@ For the docs-level registry guide, see [`docs/91_registry.md`](../docs/91_regist
 - `tasks/summarize_stage_run.py` — writes or prints the single `manager_stage_run_dashboard` human-facing receipt for stage coverage, next autonomous provider-dispatch preview, and next safe action.
 - `tasks/run_stage_controller.py` — runs one conservative stage-control step, executing at most one bounded autonomous provider-dispatch slice and stopping at model/storage/broker gates.
 - `tasks/dispatch_provider_acquisition.py` — runs bounded autonomous Layer 1/2 Alpaca-bars provider acquisition selected by `--model-layer` when `--execute-provider-calls` is explicit.
+- `tasks/dispatch_event_feed_backfill.py` — validates or explicitly dispatches bounded Layer 4 event-feed acquisition from reviewed task keys; provider calls require `--execute-provider-calls`.
 - `tasks/reconcile_provider_stage.py` — safely reconciles existing provider-stage completion receipts into manager control-plane rows, stage coverage, and workflow state without dispatching providers.
 - `tasks/review_layer_eight_option_expression_gate.py` — reviews completed Layer 7 rows for active option-expression target chains, emits Layer 8 provider-acquisition previews or a reviewed no-provider skip, and never calls providers.
 - `tasks/execute_layer_eight_option_feature_generation.py` — executes the Layer 8 feature stage by writing a reviewed no-provider/no-feature skip receipt or delegating to trading-data feature generation after provider acquisition.
@@ -66,6 +67,7 @@ PYTHONPATH=src python3 scripts/tasks/collect_dataset_evidence.py --write --outpu
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --collect-evidence-from-db --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/dispatch_provider_acquisition.py --start-month 2016-01 --end-month 2016-01 --model-layer layer_01_market_regime --execute-provider-calls
+PYTHONPATH=src python3 scripts/tasks/dispatch_event_feed_backfill.py --start-month 2016-01 --end-month 2016-01 --feed-id 05_feed_gdelt_news
 PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.py --start-month 2016-01 --end-month 2016-01 --write
 PYTHONPATH=src python3 scripts/tasks/execute_layer_eight_option_feature_generation.py --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/execute_model_training_stage.py --start-month 2016-01 --end-month 2016-01 --write

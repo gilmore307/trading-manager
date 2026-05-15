@@ -119,7 +119,7 @@ def _enrich_payload(payload: dict[str, Any], *, target_symbol: str, target_cik: 
                 "focus": "us_market",
                 "impact_scope": "market;sector;symbol",
                 "max_rows": 250,
-                "dry_run": False,
+                "dry_run": True,
                 "query_terms": [
                     target_symbol.upper(),
                     "earnings",
