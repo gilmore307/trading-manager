@@ -122,3 +122,9 @@ Promotion remains governed by `docs/96_model_promotion.md`: model repositories p
 The manager control plane must treat the activity-price proof gate as a reviewed cross-sectional study, not a single-symbol anecdote. Pilot symbols such as RCAT may debug data joins and event/activity windows, but promotion requires size, sector/theme, and event-family coverage.
 
 The accepted study must record cohort definition, controls, forward labels, horizon set, split policy, failure modes, and whether evidence is sufficient to open an `EventActivityBridgeModel` promotion task.
+
+## Option-Activity Direction Study Governance
+
+Manager must treat option-direction evidence as a second-gate study after direction-neutral path expansion. A call-buying surge may be bullish only when side/aggressor/opening evidence supports that interpretation. Raw call or put volume alone is insufficient for directional promotion.
+
+Reviewed option-direction study tasks must preserve the underlying contract, right, side/aggressor evidence, sweep/block context, opening/open-interest context, IV/skew context, and signed directional forward labels for both underlying and option contract where available.

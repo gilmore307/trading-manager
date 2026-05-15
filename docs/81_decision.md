@@ -3792,3 +3792,11 @@ Accepted: 2026-05-15
 Manager governance separates two activity-price gates: first, direction-neutral path expansion; second, directional orientation. A signal such as call-buying surge may be bullish, but it must be proven with point-in-time option side/aggressor evidence and signed directional forward labels.
 
 Directional proof must not be inferred from future price movement. If directional evidence is mixed or weak, the activity can still remain useful as volatility/path-expansion or risk evidence, but it must not be treated as directional alpha.
+
+## D170 - Option-direction proof requires side/aggressor and opening evidence
+
+Accepted: 2026-05-15
+
+Manager cannot accept option volume alone as directional proof. Option-direction promotion requires right, side/aggressor evidence when available, sweep/block context, opening/open-interest context, IV/skew/term-structure context, and signed directional forward labels.
+
+Initial hypotheses such as ask-side call activity = bullish and ask-side put activity = bearish must be evaluated, not assumed. If direction evidence is ambiguous, option activity can still support path expansion or risk evidence but must remain `unknown_direction_activity` or `review_required` direction.
