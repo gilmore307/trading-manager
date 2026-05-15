@@ -93,6 +93,8 @@ Manager must preserve both sides of the bridge: event refs and activity refs. It
 
 Before this bridge can become a separate model layer, manager must require an activity-price proof gate. The gate must show forward price/path relationship, incremental residual value after existing model controls, cross-market confirmation value, and out-of-sample stability. Current-move description alone is not sufficient.
 
+Manager must also require event-family scouting before broad event-risk training. Raw option abnormality plus raw news proximity is not a sufficient promotion unit. A reviewed `event_family_scouting_packet_v1` must define family inclusion/exclusion rules, lifecycle clocks, materiality/surprise rules, source precedence, abnormal-activity bridge rules, controls, forward labels, coverage gates, and early-stop criteria. Current accepted statuses: standalone option abnormality, threshold-only option refinement, and raw-news-proximate option abnormality are `deferred_low_signal`; earnings/guidance is only `scouting`.
+
 ## Control-Plane Responsibilities
 
 `trading-manager` may:

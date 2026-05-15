@@ -3816,3 +3816,13 @@ Accepted: 2026-05-15
 Manager registry/governance must track the concrete option event evidence fields required by the abnormality coverage gate. The presence of an event row is not enough; directional or promotion review needs explicit field coverage for bid/ask touch, trade notional, side evidence, sweep/block, OI/opening-vs-closing, IV-change, skew, term structure, underlying confirmation/divergence, direction confidence, and abnormality coverage status.
 
 Rows with missing upstream evidence remain diagnostic and must not satisfy `abnormality_coverage_complete`.
+
+## D173 - Event-risk amplification requires event-family scouting
+
+Status: accepted.
+
+Raw option abnormality did not prove robust incremental price/path value against matched controls, strict threshold refinements did not rescue the relationship, and raw Alpaca-news proximity was too broad to separate event-risk amplification from ordinary news saturation.
+
+Manager governance must therefore require a reviewed `event_family_scouting_packet_v1` before any event family enters model training, risk-intervention promotion, or `event_activity_bridge` promotion work. The packet must define inclusion/exclusion rules, canonical source precedence, lifecycle clocks, materiality/surprise rules, scope routing, abnormal-activity bridge rules, control design, forward-label design, coverage gates, review triggers, and early-stop criteria.
+
+Current statuses: standalone option abnormality, threshold-only option abnormality refinement, and raw option abnormality plus raw-news proximity are `deferred_low_signal`. Earnings/guidance remains `scouting` only and requires canonical earnings/report sources, lifecycle split, surprise/magnitude fields, verified non-event controls, and split stability before promotion work.
