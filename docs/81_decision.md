@@ -3836,3 +3836,13 @@ The `earnings_guidance_event_family` may be scouted because the raw event-risk a
 Canonical precedence is: SEC/company official release or filing artifacts first, company IR release/transcript when an accepted route exists, Nasdaq earnings calendar only as a scheduling shell, high-quality news only as narrative residual, and Alpaca/GDELT as discovery/context only. Option/price/liquidity activity may only be bridge evidence.
 
 Manager governance must require the packet's clocks, controls, minimum coverage, and no-leakage gates before the family can move to pilot training. In particular, result/guidance fields are invalid before release artifact visibility, and controls must include verified non-event/non-earnings windows rather than same-symbol price controls alone.
+
+## D175 - Earnings/guidance overview materialization is shell/result split
+
+Status: accepted.
+
+Layer 4 may materialize `earnings_guidance` overview rows as the first implementation slice of the earnings/guidance scouting packet. Calendar-discovery `release_calendar.csv` rows from `nasdaq_earnings_calendar` are scheduled-shell rows only and use `approved_calendar` source priority. They must not carry result, beat/miss, guidance, or post-release interpretation facts.
+
+SEC/company official result artifacts may materialize as earnings/guidance result rows when the artifact is a 10-Q/10-K or earnings-related 8-K. These rows establish canonical result visibility, not final event-family interpretation or promotion evidence.
+
+News and option activity remain discovery/residual/bridge evidence unless linked to the canonical shell/result rows and reviewed under the scouting packet controls.
