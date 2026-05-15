@@ -91,6 +91,8 @@ review_required
 
 Manager must preserve both sides of the bridge: event refs and activity refs. It must not let a later explanation rewrite the original point-in-time record; later explanations create follow-up bridge evidence for training/evaluation.
 
+Before this bridge can become a separate model layer, manager must require an activity-price proof gate. The gate must show forward price/path relationship, incremental residual value after existing model controls, cross-market confirmation value, and out-of-sample stability. Current-move description alone is not sufficient.
+
 ## Control-Plane Responsibilities
 
 `trading-manager` may:

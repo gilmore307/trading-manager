@@ -3758,3 +3758,13 @@ Accepted: 2026-05-15
 Accepted relation types are `pre_event_precursor`, `co_event_reaction`, `post_event_absorption`, `event_activity_divergence`, and `unresolved_latent_hazard`. Accepted explanation statuses are `explained_by_known_event`, `partially_explained`, `unexplained`, `later_explained`, and `review_required`.
 
 Manager records must preserve both event refs and activity refs. Pre-event activity is latent hazard evidence, not proof that a future event was known. Later explanations are follow-up evidence and must not mutate the original point-in-time record.
+
+## D166 - Activity-price proof gate precedes EventActivityBridgeModel promotion
+
+Accepted: 2026-05-15
+
+Manager governance requires an activity-price proof gate before `event_activity_bridge` may be promoted into a separate model layer or used as risk-intervention evidence.
+
+The gate must verify forward price/path relationship, incremental residual value after existing model controls, cross-market confirmation value, and out-of-sample stability. Describing the current move is insufficient.
+
+If the proof fails, abnormal activity remains descriptive/provenance evidence only. If it passes, manager may open a reviewed promotion task for `EventActivityBridgeModel`; promotion still requires normal dataset, split, label, leakage, and review evidence.
