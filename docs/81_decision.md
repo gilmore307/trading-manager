@@ -3846,3 +3846,15 @@ Layer 4 may materialize `earnings_guidance` overview rows as the first implement
 SEC/company official result artifacts may materialize as earnings/guidance result rows when the artifact is a 10-Q/10-K or earnings-related 8-K. These rows establish canonical result visibility, not final event-family interpretation or promotion evidence.
 
 News and option activity remain discovery/residual/bridge evidence unless linked to the canonical shell/result rows and reviewed under the scouting packet controls.
+
+## D176 - Event layer is accepted only as bounded risk governance
+
+Status: accepted.
+
+After the option-abnormality, matched-control, strict-filter, raw-news, and canonical earnings/guidance scouting passes, manager governance accepts the event layer only as a bounded `EventRiskGovernor / EventIntelligenceOverlay`.
+
+The layer is worth building for canonical event timelines, point-in-time lifecycle clocks, shell/result separation, event-family interpretations, event/activity bridge provenance, uncertainty, review requirements, entry blocks, exposure caps, reduce/flatten candidates, and audit explanations.
+
+Manager must not treat the current evidence as approval for broad event alpha, standalone option-flow alpha, raw news-proximity amplification, or a promoted `EventActivityBridgeModel`. Current statuses remain: standalone option abnormality `deferred_low_signal`, strict option abnormality refinement `deferred_low_signal`, raw option abnormality plus raw-news proximity `deferred_low_signal`, and earnings/guidance `scouting`.
+
+Earnings/guidance may continue only through canonical-source scouting: more seasons/symbols, official SEC/company result and guidance artifacts, verified no-option-abnormality controls when option activity is part of the claim, point-in-time interpretation, and normal promotion evidence before any `pilot_training` or activation review.
