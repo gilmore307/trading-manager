@@ -3908,3 +3908,11 @@ Status: accepted.
 The seventh itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_READINESS_SCOUT_Q4_2025` as blocker evidence for signed-direction claims. The scout found 12 official SEC result artifacts and 11 partial point-in-time result-context rows, but zero official company guidance interpretations, zero consensus or accepted expectation baselines, and zero signed-direction-ready rows.
 
 Manager governance must keep earnings/guidance in direction-neutral event-risk scouting. SEC result artifacts alone do not authorize beat/miss, guidance raise/cut, signed-alpha, model activation, or EventRiskGovernor escalation beyond reviewed risk context. Signed claims require official company release/exhibit/transcript guidance interpretation plus point-in-time expectation baselines.
+
+## D183 - Earnings/guidance artifact coverage requires local official document text
+
+Status: accepted.
+
+The eighth itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_ARTIFACT_COVERAGE_SCOUT_Q4_2025` as blocker evidence. The scout found SEC result filing references for all 12 Q4 2025 earnings events, but zero local official filing/release/transcript text artifacts, zero accepted guidance interpretations, zero expectation baselines, and zero signed-direction-ready rows.
+
+Manager governance must not treat SEC filing metadata, normalized companyfacts, or price reaction as guidance interpretation. Guidance/outlook claims require local official company document text, reviewed guidance interpretation, and point-in-time expectation baselines. Until then, earnings/guidance remains direction-neutral EventRiskGovernor context only.
