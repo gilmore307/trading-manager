@@ -24,11 +24,11 @@ MODEL_LAYER_ORDER = (
     "layer_01_market_regime",
     "layer_02_sector_context",
     "layer_03_target_state_vector",
+    "layer_04_alpha_confidence",
+    "layer_05_position_projection",
+    "layer_06_underlying_action",
+    "layer_07_option_expression",
     "layer_08_event_risk_governor",
-    "layer_05_alpha_confidence",
-    "layer_06_position_projection",
-    "layer_07_underlying_action",
-    "layer_08_option_expression",
 )
 
 FORBIDDEN_HANDOFF_ACTIONS = (
