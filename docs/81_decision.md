@@ -4008,3 +4008,19 @@ Status: accepted.
 The prior official guidance extraction pass consumed the 12 prior official document text artifacts and accepted explicit guidance/outlook sections only. It found 1 event with accepted prior-company-guidance baseline context and 3 accepted spans; 11 selected prior filings had no accepted prior guidance context after rejecting generic/boilerplate language.
 
 This result is baseline context only. It does not establish guidance surprise, raise/cut, signed direction, alpha, model activation, broker/account mutation, or stronger EventRiskGovernor intervention. The low coverage indicates the prior source-selection route must be refined toward previous earnings/outlook-bearing documents or another accepted company-IR/source route. Revenue consensus remains a separate gap.
+
+## D195 - Prior earnings exhibits improve prior-guidance baseline coverage but remain non-claim evidence
+
+Status: accepted.
+
+The refined prior-guidance route targets official prior-quarter earnings/outlook-bearing SEC exhibits rather than primary 8-K wrapper filings or arbitrary nearby official documents. The no-provider extraction pass over 21 fetched exhibit documents accepted prior-company-guidance baseline context for 7 of 12 diagnostic events, across 8 accepted exhibit documents and 42 accepted spans.
+
+Manager governance may treat these rows as `prior_company_guidance` expectation-baseline context only. They do not establish guidance surprise, raise/cut, beat/miss, signed direction, alpha, model activation, broker/account mutation, or stronger EventRiskGovernor intervention. Signed earnings/guidance claims still require current result/guidance comparison plus accepted point-in-time expectation baselines.
+
+## D196 - Revenue consensus remains a future route candidate until persisted pre-event artifacts exist
+
+Status: accepted.
+
+Existing Nasdaq earnings-calendar artifacts remain EPS-only and are rejected for historical PIT baseline use when captured after events or when actual/surprise fields are present. A Trading Economics earnings page reconnaissance shows revenue-consensus-like columns, so Trading Economics may be a future revenue-consensus baseline route.
+
+Manager governance must not treat this reconnaissance as accepted historical evidence. Revenue-consensus baselines require persisted pre-event artifacts with source provenance, symbol/date/fiscal-period identity, parseable `captured_at` / `as_of_time` clocks, and exclusion of actual/result/surprise fields. Until those artifacts exist, revenue beat/miss, signed earnings/guidance direction, alpha, model activation, and stronger EventRiskGovernor intervention remain blocked.
