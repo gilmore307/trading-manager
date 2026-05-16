@@ -25,7 +25,7 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
                         "stages": [
                             {"stage_id": "layer_03_target_state_vector.model_generation", "layer": 3, "status": "succeeded", "artifact_refs": []},
                             {"stage_id": "layer_08_event_risk_governor.model_generation", "layer": 8, "status": "succeeded", "artifact_refs": ["old"]},
-                            {"stage_id": "layer_08_option_expression.model_evaluation", "layer": 8, "status": "ready", "artifact_refs": []},
+                            {"stage_id": "layer_07_option_expression.model_evaluation", "layer": 8, "status": "ready", "artifact_refs": []},
                         ],
                     }
                 ),
@@ -39,7 +39,7 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
             self.assertEqual(summary.invalidated_stage_count, 2)
             self.assertEqual(by_stage["layer_03_target_state_vector.model_generation"]["status"], "succeeded")
             self.assertEqual(by_stage["layer_08_event_risk_governor.model_generation"]["status"], "failed")
-            self.assertIn("rebuild_from_layer_08_event_risk_required", by_stage["layer_08_option_expression.model_evaluation"]["last_reason"])
+            self.assertIn("rebuild_from_layer_08_event_risk_required", by_stage["layer_07_option_expression.model_evaluation"]["last_reason"])
             self.assertIn("manager://stale_downstream_from_layer_08_event_source_rebuild_required", by_stage["layer_08_event_risk_governor.model_generation"]["artifact_refs"])
 
     def test_dry_run_does_not_write(self) -> None:

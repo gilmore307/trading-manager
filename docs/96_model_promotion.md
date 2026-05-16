@@ -43,7 +43,7 @@ Plan review requests without mutating SQL:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py \
-  --model model_08_option_expression \
+  --model model_07_option_expression \
   --candidate-ref trading-model://promotion-candidates/mpcand_example \
   --evaluation-run-ref trading-model://eval-runs/mdevrun_example \
   --evidence-ref storage://trading-model/evidence/example.json
@@ -115,10 +115,10 @@ This table is the manager-side promotion target map. It records review targets a
 | 1 | `model_01_market_regime` | `MarketRegimeModel` | `market_context_state` | registered `1_*` market-context score tokens |
 | 2 | `model_02_sector_context` | `SectorContextModel` | `sector_context_state` | registered `2_*` sector-context score tokens |
 | 3 | `model_03_target_state_vector` | `TargetStateVectorModel` | `target_context_state` | registered `3_*` target-state score-family tokens |
-| 4 | `model_04_alpha_confidence` | `AlphaConfidenceModel` | `alpha_confidence_vector` | legacy physical `model_05_alpha_confidence` evidence and `5_*` score tokens until migration |
-| 5 | `model_05_position_projection` | `PositionProjectionModel` | `position_projection_vector` | legacy physical `model_06_position_projection` evidence and `6_*` score tokens until migration |
-| 6 | `model_06_underlying_action` | `UnderlyingActionModel` | `underlying_action_plan` | legacy physical `model_07_underlying_action` evidence and `7_*` score tokens until migration |
-| 7 | `model_07_option_expression` | `OptionExpressionModel` under `TradingGuidanceModel` | `option_expression_plan` | legacy physical `model_08_option_expression` evidence and `8_*` score tokens until migration |
+| 4 | `model_04_alpha_confidence` | `AlphaConfidenceModel` | `alpha_confidence_vector` | current `model_04_alpha_confidence` evidence and `4_*` score tokens |
+| 5 | `model_05_position_projection` | `PositionProjectionModel` | `position_projection_vector` | current `model_05_position_projection` evidence and `5_*` score tokens |
+| 6 | `model_06_underlying_action` | `UnderlyingActionModel` | `underlying_action_plan` | current `model_06_underlying_action` evidence and `6_*` score tokens |
+| 7 | `model_07_option_expression` | `OptionExpressionModel` under `TradingGuidanceModel` | `option_expression_plan` | current `model_07_option_expression` evidence and `7_*` score tokens |
 | 8 | `model_08_event_risk_governor` | `EventRiskGovernor` | `event_context_vector` / `event_risk_intervention` | registered event-context score-family tokens |
 
 ## Guardrails

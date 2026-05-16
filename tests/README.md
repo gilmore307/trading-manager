@@ -50,7 +50,7 @@
 
 - `test_layer_eight_event_risk_governor.py` verifies:
   - local Layer 8 event-risk source materialization from completed Layer 2 feed artifacts;
-  - detector/source task-key evidence generation for `source_04_event_overlay` without provider dispatch;
+  - detector/source task-key evidence generation for `source_08_event_risk_governor` without provider dispatch;
   - reviewed local news/SEC/macro feed artifact discovery and write-mode coverage blocking;
   - zero provider calls, model activation, or broker execution in dry-run materialization.
 
@@ -68,14 +68,14 @@
   - explicit dispatch writes runtime task keys that enable only the selected event-feed provider controls.
 
 - `test_layer_eight_option_expression.py` verifies:
-  - legacy `layer_08_option_expression` gate review over completed conceptual Layer 6 / physical Layer 7 rows;
+  - legacy `layer_07_option_expression` gate review over completed conceptual Layer 6 / physical Layer 7 rows;
   - reviewed no-provider skip behavior when all Layer 7 rows are no-trade/maintain/neutral;
   - active Layer 7 target chains producing ThetaData/source_05 option-snapshot request previews without provider calls.
 
 - `test_layer_eight_feature_stage.py` verifies:
   - manager-owned Layer 8 feature-stage adapter behavior;
   - first-class no-provider/no-feature skip receipt generation after a reviewed zero-active-target gate;
-  - delegation to trading-data `feature_08_option_expression` with month-scoped source windows after active-path acquisition.
+  - delegation to trading-data `feature_07_option_expression` with month-scoped source windows after active-path acquisition.
 
 - `test_model_training_state.py` verifies:
   - durable `manager_model_training_workflow_state` initialization;
@@ -129,7 +129,7 @@
 
 - `test_model_promotion.py` verifies:
   - unified model promotion review request planning;
-  - registered model target coverage across the legacy physical model targets;
+  - registered model target coverage across the current model targets;
   - one shared `model_promotion_review` request kind for all model layers.
 
 - `test_provider_dispatch.py` verifies:

@@ -87,7 +87,7 @@ PYTHONPATH=src python3 scripts/tasks/record_realtime_shadow_handoff.py --decisio
 PYTHONPATH=src python3 scripts/tasks/rehearse_realtime_shadow_handoff.py --decision-time 2026-05-11T13:30:00+00:00 --historical-dataset-snapshot-ref trading-model://snapshots/historical/unit --frozen-model-config-ref trading-model://configs/frozen/unit
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl
-PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_08_option_expression --candidate-ref trading-model://promotion-candidates/mpcand_example
+PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_07_option_expression --candidate-ref trading-model://promotion-candidates/mpcand_example
 PYTHONPATH=src python3 scripts/tasks/build_review_decision.py --review-target-ref storage://trading-model/promotion-candidates/mpcand_example.json --decision-status defer --decision-reason "missing production calibration evidence"
 PYTHONPATH=src python3 scripts/tasks/call_agent_for_error.py --source-component trading-manager.stage_executor --source-repo trading-manager --summary "stage command returned non-zero status" --stderr-path storage/runtime/model_training_stage_logs/example.stderr.log --notify-discord
 ```

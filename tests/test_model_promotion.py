@@ -63,13 +63,13 @@ class ModelPromotionRequestTests(unittest.TestCase):
 
     def test_accepts_legacy_physical_aliases_for_unmigrated_surfaces(self):
         request = build_model_promotion_review_request(
-            model="model_08_option_expression",
+            model="model_07_option_expression",
             candidate_ref="trading-model://promotion-candidates/mpcand_example",
         )
 
         self.assertEqual(request["model_id"], "model_07_option_expression")
         self.assertEqual(request["model_layer"], "layer_07_option_expression")
-        self.assertEqual(request["evidence_component_id"], "model_08_option_expression")
+        self.assertEqual(request["evidence_component_id"], "model_07_option_expression")
 
     def test_rejects_unknown_model_target(self):
         with self.assertRaises(TaskSystemError):

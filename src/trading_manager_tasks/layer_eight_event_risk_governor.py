@@ -1,6 +1,6 @@
 """Safe Layer 8 event-risk input materialization.
 
-This module builds ``source_04_event_overlay`` rows only from already-saved local
+This module builds ``source_08_event_risk_governor`` rows only from already-saved local
 Layer 2 bar artifacts. It may run the trading-data equity abnormal activity
 source-detector, but it performs no provider calls, no model activation, no
 broker execution, and no storage lifecycle mutation.
@@ -28,8 +28,8 @@ DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime/layer_08_event_risk_governor/input_materialization")
-DETECTOR_SOURCE = "source_04_event_overlay.equity_abnormal_activity"
-SOURCE = "source_04_event_overlay"
+DETECTOR_SOURCE = "source_08_event_risk_governor.equity_abnormal_activity"
+SOURCE = "source_08_event_risk_governor"
 REQUIRED_EVENT_FEED_ARTIFACTS = {
     "alpaca_news": "equity_news.csv",
     "gdelt_news": "gdelt_article.csv",
@@ -194,7 +194,7 @@ def _run_detector(
     event_count = 0
     status = "prepared"
     if write:
-        command = ["python3", "-m", "data_source.source_04_event_overlay.equity_abnormal_activity", str(task_key_path), "--run-id", f"{run_id}_{symbol.lower()}"]
+        command = ["python3", "-m", "data_source.source_08_event_risk_governor.equity_abnormal_activity", str(task_key_path), "--run-id", f"{run_id}_{symbol.lower()}"]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs" / "detectors"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -413,14 +413,14 @@ def materialize_layer_eight_event_risk_governor_inputs(
     source_receipt_path: str | None = None
     source_event_count = len(events)
     if write:
-        command = ["python3", "-m", "data_source.source_04_event_overlay", str(source_task_key_path), "--run-id", run_id]
+        command = ["python3", "-m", "data_source.source_08_event_risk_governor", str(source_task_key_path), "--run-id", run_id]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         (log_dir / "source_04.stdout.log").write_text(result.stdout, encoding="utf-8")
         (log_dir / "source_04.stderr.log").write_text(result.stderr, encoding="utf-8")
         if result.returncode != 0:
-            raise TaskSystemError(f"source_04_event_overlay materialization failed: {result.stderr.strip() or result.stdout.strip()}")
+            raise TaskSystemError(f"source_08_event_risk_governor materialization failed: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
         references = [str(item) for item in payload.get("references") or []]
         source_receipt_path = next((item for item in references if item.endswith("completion_receipt.json")), None)
@@ -450,7 +450,7 @@ def write_summary(summary: LayerEightEventRiskMaterialization, *, output: TextIO
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize Layer 8 source_04_event_overlay rows from local reviewed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize Layer 8 source_08_event_risk_governor rows from local reviewed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

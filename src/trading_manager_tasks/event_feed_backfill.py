@@ -1,7 +1,7 @@
 """Layer 8 event-feed backfill preparation helpers.
 
 This module prepares the reviewed local feed artifacts required by the Layer 4
-`source_04_event_overlay` coverage gate. It only writes manager task-key files;
+`source_08_event_risk_governor` coverage gate. It only writes manager task-key files;
 it does not call providers, activate models, submit broker orders, mutate
 accounts, or write dashboard read models.
 """

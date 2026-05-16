@@ -1439,7 +1439,7 @@ The registry no longer keeps field-like rows that only described retired `tradin
 Consequences:
 
 - Field-like kinds (`field`, `identity_field`, `path_field`, `temporal_field`, `classification_field`, `text_field`, and `parameter_field`) must not carry obsolete `*_template`, `option_template`, or `data_kind_template` `applies_to` values.
-- Retained final-SQL fields have `applies_to` values such as `bundle_01_market_regime`, `bundle_02_security_selection`, `bundle_03_strategy_selection`, `bundle_05_option_expression`, `bundle_06_position_execution`, or `bundle_07_event_overlay`.
+- Retained final-SQL fields have `applies_to` values such as `bundle_01_market_regime`, `bundle_02_security_selection`, `bundle_03_strategy_selection`, `bundle_05_option_expression`, `bundle_05_position_execution`, or `bundle_07_event_overlay`.
 - Preview/template file paths are not evidence for retaining field rows. If a field is not part of a current SQL contract or valid non-template artifact, it should be removed instead of preserved as vocabulary clutter.
 
 ## D070 - Retired data-kind previews are not active registry items
@@ -1493,7 +1493,7 @@ Name accepted numbered bundle SQL tables after the writing bundle, using portabl
 - `trading_source.bundle_02_security_selection`
 - `trading_source.bundle_03_strategy_selection`
 - `trading_source.bundle_05_option_expression`
-- `trading_source.bundle_06_position_execution`
+- `trading_source.bundle_05_position_execution`
 - `trading_source.bundle_07_event_overlay`
 
 CLI/package names may use hyphens where appropriate, but SQL identifiers use underscores.
@@ -1520,7 +1520,7 @@ Accepted numbered `trading-source` bundle SQL outputs live under schema `trading
 - `trading_source.bundle_02_security_selection`
 - `trading_source.bundle_03_strategy_selection`
 - `trading_source.bundle_05_option_expression`
-- `trading_source.bundle_06_position_execution`
+- `trading_source.bundle_05_position_execution`
 - `trading_source.bundle_07_event_overlay`
 
 ### Consequences
@@ -2719,7 +2719,7 @@ Status: Accepted
 
 ### Context
 
-Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. Layers 3-7 operate over an open target-candidate space, including the conceptual Layer 7 option-expression boundary whose physical stage token remains `layer_08_option_expression` until a dedicated migration. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
+Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. Layers 3-7 operate over an open target-candidate space, including the conceptual Layer 7 option-expression boundary whose physical stage token remains `layer_07_option_expression` until a dedicated migration. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
 
 ### Decision
 
@@ -2728,7 +2728,7 @@ Use segmented workflow progression:
 - Layer 1 continues chronological month-by-month after its own month-level receipts are ready; it does not wait for downstream layers.
 - Layer 2 continues chronological month-by-month once Layer 1 context exists; it does not wait for Layers 3-8.
 - Layers 3-7 run target-major by default: select one target candidate and complete Layers 3 -> 4 -> 5 -> 6 -> 7 before admitting the next target candidate, unless a reviewed coverage exception is recorded.
-- Conceptual Layer 7 option-expression contract/bucket expansion, currently carried by legacy physical `layer_08_option_expression`, starts only after the selected target's upstream Layer 1-6 context/target/action chain is complete.
+- Conceptual Layer 7 option-expression contract/bucket expansion, currently carried by legacy physical `layer_07_option_expression`, starts only after the selected target's upstream Layer 1-6 context/target/action chain is complete.
 
 ### Consequences
 
@@ -2765,20 +2765,20 @@ Status: Accepted
 
 ### Context
 
-The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. Layers 1-7 reached safe/offline completion for the month. The legacy physical `layer_08_option_expression` stage was blocked by the option-expression acquisition gate until the completed target chain could be reviewed.
+The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. Layers 1-7 reached safe/offline completion for the month. The legacy physical `layer_07_option_expression` stage was blocked by the option-expression acquisition gate until the completed target chain could be reviewed.
 
 ### Decision
 
 Close the current `2016-01` Layer 1-8 safe workflow section as complete for mechanism validation.
 
-Legacy physical `layer_08_option_expression` acquisition is closed by reviewed no-provider skip for this month because every upstream action row resolved to `no_trade` / `none`; there were no active target chains and therefore no warranted option-chain provider request. The stage generated 279 deterministic `no_option_expression` rows from completed upstream database rows. The run made zero provider calls, performed no dispatch, did not activate a model, did not perform broker/order/account mutation, and did not mutate storage lifecycle state.
+Legacy physical `layer_07_option_expression` acquisition is closed by reviewed no-provider skip for this month because every upstream action row resolved to `no_trade` / `none`; there were no active target chains and therefore no warranted option-chain provider request. The stage generated 279 deterministic `no_option_expression` rows from completed upstream database rows. The run made zero provider calls, performed no dispatch, did not activate a model, did not perform broker/order/account mutation, and did not mutate storage lifecycle state.
 
 Promotion decisions for Layers 1-8 remain deferred. This closeout validates workflow mechanics and safe offline progression only; it is not production model activation and not authorization to bypass manager provider-dispatch controls.
 
 ### Consequences
 
 - The next chronological month can start from safe internal preparation and provider-dispatch review.
-- If a future month has active upstream target/action chains, the legacy physical `layer_08_option_expression` stage must stop at provider-dispatch review unless manager provider dispatch is executed.
+- If a future month has active upstream target/action chains, the legacy physical `layer_07_option_expression` stage must stop at provider-dispatch review unless manager provider dispatch is executed.
 - Deferred promotion evidence remains a separate production-readiness track.
 - Runtime workflow checkpoints should be treated as month-scoped evidence when moving chronologically, so a later month should use an explicit month-specific state path unless/until the scheduler owns month checkpoint rotation.
 
@@ -2789,7 +2789,7 @@ Status: Accepted
 
 ### Context
 
-The `2016-02` historical workflow completed the safe/offline stack through the legacy physical `layer_08_option_expression` stage. Layer 1 and Layer 2 provider acquisition used bounded autonomous dispatch before execution; downstream target/action/expression stages advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and the legacy option-expression stage exposed a no-provider feature-stage skip gap.
+The `2016-02` historical workflow completed the safe/offline stack through the legacy physical `layer_07_option_expression` stage. Layer 1 and Layer 2 provider acquisition used bounded autonomous dispatch before execution; downstream target/action/expression stages advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and the legacy option-expression stage exposed a no-provider feature-stage skip gap.
 
 ### Decision
 
@@ -2797,7 +2797,7 @@ Close `2016-02` as complete for safe workflow mechanics. The final month-scoped 
 
 Accept the accompanying mechanism-hardening changes before starting `2016-03`:
 
-- Legacy physical option-expression feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_08_option_expression` after completed active-path acquisition.
+- Legacy physical option-expression feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_07_option_expression` after completed active-path acquisition.
 - Workflow CLIs default to scheduler-owned month-scoped checkpoints: `storage/runtime/model_training_workflow_state_YYYY-MM.json`.
 - Workflow state records `provider_calls_observed` separately from safe/offline `provider_calls`, so provider acquisition calls are visible without misclassifying offline stages as provider-calling stages.
 - Autonomous provider dispatch no longer creates provider-dispatch reviews; bounded request ids, terminal-coverage rejection, receipts, and reconcile coverage are the control surface.
@@ -2847,8 +2847,8 @@ The March 2016 chronological historical workflow continued after January and Feb
 - Layer 1 coverage report: `storage/runtime/stage_coverage/layer_01_market_regime_data_acquisition_2016-03.json` has expected 22, ready 22, failed 0, pending 0.
 - Layer 2 coverage report: `storage/runtime/stage_coverage/layer_02_sector_context_data_acquisition_2016-03.json` has expected 25, ready 25, failed 0, pending 0.
 - Workflow checkpoint: `storage/runtime/model_training_workflow_state_2016-03.json` has `next_stage: null`, 42 succeeded stages, and 6 not-applicable stages.
-- Legacy physical `layer_08_option_expression` gate review: `storage/runtime/layer_08_option_expression/gate_review/layer_08_option_expression_gate_review_2016-03.json` has `status: no_provider_skip_accepted`, `total_layer_7_rows: 318`, `active_request_count: 0`, and `active_target_chain_count: 0`.
-- Legacy physical `layer_08_option_expression` feature generation has a no-provider/no-feature skip receipt at `storage/runtime/layer_08_option_expression/gate_review/layer_08_option_expression_feature_generation_no_provider_skip_receipt_2016-03.json`.
+- Legacy physical `layer_07_option_expression` gate review: `storage/runtime/layer_07_option_expression/gate_review/layer_07_option_expression_gate_review_2016-03.json` has `status: no_provider_skip_accepted`, `total_layer_7_rows: 318`, `active_request_count: 0`, and `active_target_chain_count: 0`.
+- Legacy physical `layer_07_option_expression` feature generation has a no-provider/no-feature skip receipt at `storage/runtime/layer_07_option_expression/gate_review/layer_07_option_expression_feature_generation_no_provider_skip_receipt_2016-03.json`.
 
 ### Decision
 
@@ -3648,7 +3648,7 @@ The workflow graph must not create Layer 5-7 input-preparation stages. Those lay
 
 ### Consequences
 
-- `layer_05_alpha_confidence`, `layer_06_position_projection`, and `layer_07_underlying_action` no longer expose nonexistent `data_acquisition` / `feature_generation` tasks.
+- `layer_04_alpha_confidence`, `layer_05_position_projection`, and `layer_06_underlying_action` no longer expose nonexistent `data_acquisition` / `feature_generation` tasks.
 - Historical dashboards no longer use `skipped` to mean “this task type does not exist.”
 - Real not-applicable stage outcomes, such as reviewed no-work option-expression gates, may still appear as skipped when the stage itself is part of the workflow and carries a reason.
 
@@ -3659,11 +3659,11 @@ Status: Accepted
 
 ### Context
 
-Layer 4-8 historical outputs had advanced with `source_04_event_overlay` populated only by local equity abnormal-activity rows. That made downstream event, alpha-confidence, projection, action, and option-expression outputs provisional because critical news, SEC/financial disclosure, and macro-calendar evidence was absent.
+Layer 4-8 historical outputs had advanced with `source_08_event_risk_governor` populated only by local equity abnormal-activity rows. That made downstream event, alpha-confidence, projection, action, and option-expression outputs provisional because critical news, SEC/financial disclosure, and macro-calendar evidence was absent.
 
 ### Decision
 
-Layer 8 event-risk write-mode materialization must require reviewed local artifacts for `alpaca_news`, `gdelt_news`, `sec_company_financials`, and `trading_economics_calendar_web` before it can write `source_04_event_overlay` rows or unlock event-risk model stages. The event source now accepts `event_artifact_paths` and normalizes supported feed artifacts into canonical overview rows: Alpaca news to `symbol_news`, GDELT to `macro_news` / `sector_news` / `symbol_news` by available scope hints, Trading Economics calendar rows to `macro_data`, and SEC submissions/facts/concepts/frames to `sec_filing` / financial-disclosure events. Manager preparation for those artifacts is explicit through `scripts/tasks/prepare_layer_eight_event_feed_backfill.py`; it writes reviewed task keys only and performs no provider calls until a separate bounded acquisition command is invoked.
+Layer 8 event-risk write-mode materialization must require reviewed local artifacts for `alpaca_news`, `gdelt_news`, `sec_company_financials`, and `trading_economics_calendar_web` before it can write `source_08_event_risk_governor` rows or unlock event-risk model stages. The event source now accepts `event_artifact_paths` and normalizes supported feed artifacts into canonical overview rows: Alpaca news to `symbol_news`, GDELT to `macro_news` / `sector_news` / `symbol_news` by available scope hints, Trading Economics calendar rows to `macro_data`, and SEC submissions/facts/concepts/frames to `sec_filing` / financial-disclosure events. Manager preparation for those artifacts is explicit through `scripts/tasks/prepare_layer_eight_event_feed_backfill.py`; it writes reviewed task keys only and performs no provider calls until a separate bounded acquisition command is invoked.
 
 Existing Layer 4-8 workflow stages produced from abnormal-activity-only inputs must be marked stale/rebuild-required before any rebuild. The invalidation is state-only: it does not delete artifacts, call providers, activate models, submit broker actions, mutate accounts, or write dashboard read models.
 
@@ -3681,7 +3681,7 @@ Status: Accepted
 
 ### Context
 
-Layer 8 event-source coverage requires reviewed Alpaca news, GDELT news, SEC company financials, and Trading Economics calendar artifacts before `source_04_event_overlay` write-mode may rebuild Layer 4+ outputs. The first repair slice added preparation of reviewed event-feed task keys, but preparation alone could not acquire the missing artifacts and one prepared GDELT default still looked provider-enabled even though the preparation command is supposed to perform zero provider calls.
+Layer 8 event-source coverage requires reviewed Alpaca news, GDELT news, SEC company financials, and Trading Economics calendar artifacts before `source_08_event_risk_governor` write-mode may rebuild Layer 4+ outputs. The first repair slice added preparation of reviewed event-feed task keys, but preparation alone could not acquire the missing artifacts and one prepared GDELT default still looked provider-enabled even though the preparation command is supposed to perform zero provider calls.
 
 ### Decision
 
@@ -3725,7 +3725,7 @@ The active conceptual model stack moves event intelligence from Layer 4 to Layer
 
 Manager orchestration must treat Layer 7 as the base trading-guidance candidate and Layer 8 as a post-guidance event-risk intervention boundary. Layer 8 can block new entries, cap exposure, request exposure reduction, nominate flatten/clear candidates, nominate halt candidates, or require human review when high-risk point-in-time events are detected. These are decision/risk-record interventions, not direct broker/account mutations.
 
-Until a dedicated implementation migration is accepted, existing physical stage, script, table, and package names may remain legacy (`layer_08_event_risk_governor`, `layer_05_alpha_confidence`, `layer_06_position_projection`, `layer_07_underlying_action`, `layer_08_option_expression`). Registry rows must distinguish active conceptual layer order from legacy physical implementation names.
+Current-version stage, script, table, package, and registry names must follow the accepted conceptual order: `layer_04_alpha_confidence`, `layer_05_position_projection`, `layer_06_underlying_action`, `layer_07_option_expression`, and `layer_08_event_risk_governor`. Historical migration files and old storage artifacts may retain prior names.
 
 ## D163 - Event lifecycle contract is registered for event-risk governance
 

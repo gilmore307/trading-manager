@@ -297,7 +297,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(layer.layer_key, "layer_04_alpha_confidence")
         self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation", "model_evaluation", "promotion_review", "maintenance"])
         self.assertNotIn("materialize_layer_eight_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
-        self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
+        self.assertIn("generate_model_04_alpha_confidence.py", " ".join(layer.model_generate_command))
         self.assertIn("--from-database", layer.model_generate_command)
         self.assertIn("--output-jsonl", layer.model_generate_command)
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
@@ -305,10 +305,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
     def test_base_layers_four_to_seven_use_legacy_physical_model_rows_and_conservative_review(self):
         expected_scripts = {
-            3: "generate_model_05_alpha_confidence.py",
-            4: "generate_model_06_position_projection.py",
-            5: "generate_model_07_underlying_action.py",
-            6: "generate_model_08_option_expression.py",
+            3: "generate_model_04_alpha_confidence.py",
+            4: "generate_model_05_position_projection.py",
+            5: "generate_model_06_underlying_action.py",
+            6: "generate_model_07_option_expression.py",
         }
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(

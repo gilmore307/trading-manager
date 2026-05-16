@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize Layer 8 source_04_event_overlay rows from local reviewed artifacts."""
+"""Materialize Layer 8 source_08_event_risk_governor rows from local reviewed artifacts."""
 
 from __future__ import annotations
 

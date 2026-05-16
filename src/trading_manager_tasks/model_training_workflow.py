@@ -3,8 +3,8 @@
 The manager owns orchestration across the base model stack. Event intelligence is
 now the separate Layer 8 risk-governor overlay and is intentionally omitted from
 this base runtime graph so Layers 1-7 can progress without a hard event/source
-dependency. Legacy physical model/source names remain mapped here until a
-dedicated implementation migration renames them.
+dependency. Current model/source names now follow conceptual layer numbering;
+historical migrations/artifacts are not rewritten.
 """
 
 from __future__ import annotations
@@ -206,7 +206,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "candidate_progression_policy": "continue the active target candidate chain after Layer 3 target state is ready; event intelligence is not a hard prerequisite for base alpha confidence",
         "data_surface": "target context state plus labels; no dedicated trading-data source and no event-overlay requirement",
         "feature_cli": None,
-        "physical_layer": 5,
+        "physical_layer": 4,
         "physical_slug": "alpha_confidence",
     },
     {
@@ -219,7 +219,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "candidate_progression_policy": "continue the active target candidate chain after Layer 4 alpha confidence is ready",
         "data_surface": "alpha confidence plus position/risk/cost context; no dedicated trading-data source",
         "feature_cli": None,
-        "physical_layer": 6,
+        "physical_layer": 5,
         "physical_slug": "position_projection",
     },
     {
@@ -232,7 +232,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "candidate_progression_policy": "continue the active target candidate chain after Layer 5 position projection is ready",
         "data_surface": "model/control-plane underlying-action context; no dedicated trading-data source",
         "feature_cli": None,
-        "physical_layer": 7,
+        "physical_layer": 6,
         "physical_slug": "underlying_action",
     },
     {
@@ -243,9 +243,9 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "base_trading_guidance_after_target_chain_complete",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
         "candidate_progression_policy": "finish the active base target chain through Layer 7 trading guidance; option-expression contract/bucket expansion uses reviewed gate evidence and does not depend on event-overlay/source_04 inputs",
-        "data_surface": "agent-reviewed trading-guidance/option-expression gate review; provider-backed option-expression sources only when active base Layer 6 target chains require them plus feature_08_option_expression",
-        "feature_cli": "trading-data-feature-08-option-expression",
-        "physical_layer": 8,
+        "data_surface": "agent-reviewed trading-guidance/option-expression gate review; provider-backed option-expression sources only when active base Layer 6 target chains require them plus feature_07_option_expression",
+        "feature_cli": "trading-data-feature-07-option-expression",
+        "physical_layer": 7,
         "physical_slug": "option_expression",
     },
 )
@@ -258,11 +258,11 @@ REVIEW_SCRIPT_NAMES: dict[int, str] = {
     1: "review_market_regime_promotion.py",
     2: "review_sector_context_promotion.py",
     3: "review_target_state_vector_promotion.py",
-    4: "review_event_overlay_promotion.py",
-    5: "review_alpha_confidence_promotion.py",
-    6: "review_position_projection_promotion.py",
-    7: "review_underlying_action_promotion.py",
-    8: "review_option_expression_promotion.py",
+    4: "review_alpha_confidence_promotion.py",
+    5: "review_position_projection_promotion.py",
+    6: "review_underlying_action_promotion.py",
+    7: "review_option_expression_promotion.py",
+    8: "review_event_risk_governor_promotion.py",
 }
 
 
@@ -339,15 +339,15 @@ FEATURE_MODULES: dict[str, str] = {
     "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime.from_feed_artifacts",
     "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context.from_feed_artifacts",
     "trading-data-feature-03-target-state-vector": "data_feature.feature_03_target_state_vector",
-    "trading-data-feature-04-event-overlay": "data_feature.feature_04_event_overlay",
-    "trading-data-feature-08-option-expression": "data_feature.feature_08_option_expression",
+    "trading-data-feature-08-event-risk-governor": "data_feature.feature_08_event_risk_governor",
+    "trading-data-feature-07-option-expression": "data_feature.feature_07_option_expression",
 }
 
 
 def feature_command(feature_cli: str | None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
-    if feature_cli == "trading-data-feature-08-option-expression":
+    if feature_cli == "trading-data-feature-07-option-expression":
         return [
             "PYTHONPATH=src",
             "python3",
@@ -360,7 +360,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-feature-01-market-regime", "trading-data-feature-02-sector-context"}:
         command.extend(["--month", "${START_MONTH}"])
-    if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-04-event-overlay"}:
+    if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-08-event-risk-governor"}:
         command.extend([
             "--source-start",
             "${START_MONTH_START_ET}",
