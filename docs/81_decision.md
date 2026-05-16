@@ -3924,3 +3924,11 @@ Status: accepted.
 The ninth itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_ARTIFACT_COVERAGE_WITH_DOCUMENTS_Q4_2025` as diagnostic blocker evidence. Bounded SEC document acquisition fetched 12/12 selected official filing documents for the Q4 2025 earnings slice, and the follow-up coverage gate found 12 local official document text artifacts.
 
 Manager governance must treat this as resolving the local official-document-text prerequisite only. The documents remain uninterpreted for guidance/outlook, and there are still zero point-in-time expectation baselines and zero signed-direction-ready rows. Earnings/guidance may remain direction-neutral EventRiskGovernor context, but it must not become beat/miss, guidance raise/cut, signed-alpha, model-activation, or stronger event-risk intervention evidence until reviewed guidance/result interpretation and expectation baselines are present.
+
+## D185 - Guidance-text candidates are review queue evidence, not accepted guidance interpretation
+
+Status: accepted.
+
+The tenth itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_TEXT_CANDIDATE_SCOUT_Q4_2025` as diagnostic review-queue evidence. The scout scanned the 12 acquired official SEC document text artifacts and found 11 events with candidate guidance/outlook-like non-boilerplate spans and one event with boilerplate/safe-harbor-only matches.
+
+Manager governance must treat these spans as extraction candidates only. SEC filings contain safe-harbor, accounting, generic expectation, and risk language that can resemble guidance. Candidate spans do not establish guidance raise/cut, beat/miss, signed alpha, model activation, or stronger EventRiskGovernor intervention. Signed earnings/guidance claims remain blocked until reviewed guidance/result interpretation and point-in-time expectation baselines are present.
