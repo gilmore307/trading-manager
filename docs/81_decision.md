@@ -4000,3 +4000,11 @@ Status: accepted.
 The selected prior official filing documents were fetched through the accepted SEC filing document feed and local text coverage is present for 12/12 diagnostic events.
 
 This resolves the prior-company-guidance document-text coverage blocker, but accepted prior guidance baseline rows remain zero. The documents are `prior_official_document_text_present_uninterpreted`; reviewed extraction and comparison to current guidance/result evidence remain required. Revenue consensus remains a separate expectation-baseline route gap.
+
+## D194 - Prior official guidance extraction is partial baseline context only
+
+Status: accepted.
+
+The prior official guidance extraction pass consumed the 12 prior official document text artifacts and accepted explicit guidance/outlook sections only. It found 1 event with accepted prior-company-guidance baseline context and 3 accepted spans; 11 selected prior filings had no accepted prior guidance context after rejecting generic/boilerplate language.
+
+This result is baseline context only. It does not establish guidance surprise, raise/cut, signed direction, alpha, model activation, broker/account mutation, or stronger EventRiskGovernor intervention. The low coverage indicates the prior source-selection route must be refined toward previous earnings/outlook-bearing documents or another accepted company-IR/source route. Revenue consensus remains a separate gap.
