@@ -67,6 +67,13 @@
   - Layer 8 event-feed dispatch defaults to validation-only with zero provider calls;
   - explicit dispatch writes runtime task keys that enable only the selected event-feed provider controls.
 
+- `test_event_model_regeneration_plan.py` verifies:
+  - non-mutating `manager_event_model_regeneration_plan_v1` construction after the EventRiskGovernor redo closeout;
+  - preservation of Layer 1/2 persistent data and valid base Layer 3-7 outputs;
+  - supersession of old event-overlay/abnormal-activity-only Layer 8 artifacts;
+  - storage cleanup remaining blocked until reviewed regeneration closes;
+  - provider calls limited to the explicit event-feed dispatch step.
+
 - `test_layer_eight_option_expression.py` verifies:
   - legacy `layer_07_option_expression` gate review over completed conceptual Layer 6 / physical Layer 7 rows;
   - reviewed no-provider skip behavior when all Layer 7 rows are no-trade/maintain/neutral;
