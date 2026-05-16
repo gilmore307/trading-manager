@@ -27,7 +27,7 @@ Data source and feature surfaces may keep source-family numbering that reflects 
 
 - `source_08_event_risk_governor` feeds the conceptual Layer 8 event-risk-governor evidence path, under the current conceptual number.
 - `source_05_option_expression` feeds conceptual Layer 7 trading-guidance / option-expression inputs; it is not Layer 5 PositionProjectionModel.
-- `feature_07_option_expression` is the deterministic option-expression feature surface produced from accepted option-expression inputs; its physical number remains legacy until migration.
+- `feature_07_option_expression` is the current deterministic option-expression feature surface produced from accepted option-expression inputs.
 - `source_06_position_execution` is selected-contract/position-execution context for option-expression review; it is not conceptual Layer 6 UnderlyingActionModel.
 
 When a source/feature/model name crosses repository boundaries, the canonical shared name must be registered through `scripts/registry/` before implementation depends on it.
