@@ -6,7 +6,7 @@ A `state_vector_value` row may represent:
 
 - Layer 1/2 compact scalar score names such as `1_market_direction_score` or `2_sector_relative_direction_score`;
 - Layer 3 score-family names such as `3_target_direction_score_<window>` or `3_tradability_score_<window>`;
-- Layer 4 event-context score-family names such as `4_event_gap_risk_score_<horizon>` or `4_event_market_impact_score_<horizon>`;
+- Layer 8 event-context score-family names such as `4_event_gap_risk_score_<horizon>` or `4_event_market_impact_score_<horizon>`;
 - Layer 5 final adjusted alpha-confidence score-family names such as `5_alpha_direction_score_<horizon>` or `5_alpha_tradability_score_<horizon>`;
 - Layer 6 position-projection score-family names such as `6_target_exposure_score_<horizon>` or `6_position_gap_score_<horizon>`;
 - Layer 7 underlying-action score-family names such as `7_underlying_trade_eligibility_score_<horizon>` or `7_underlying_action_confidence_score_<horizon>`;

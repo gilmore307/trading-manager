@@ -151,16 +151,16 @@ PYTHONPATH=src python3 scripts/tasks/materialize_layer_three_target_state_inputs
 
 This emits `manager_layer_three_target_state_input_materialization` evidence, merges completed Layer 2 Alpaca bar artifacts into a `source_03_target_state` task key, and delegates normalization to `trading-data`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation.
 
-Materialize Layer 4 event-overlay inputs from local source-detector outputs over already reviewed Layer 2 feed artifacts:
+Materialize Layer 8 event-risk inputs from local source-detector outputs over already reviewed Layer 2 feed artifacts:
 
 ```bash
-PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_overlay_inputs.py \
+PYTHONPATH=src python3 scripts/tasks/materialize_layer_eight_event_risk_governor_inputs.py \
   --start-month 2016-01 \
   --end-month 2016-01 \
   --write
 ```
 
-This emits `manager_layer_four_event_overlay_input_materialization` evidence, runs only the local `source_04_event_overlay.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes compact detector/residual event overview rows through `source_04_event_overlay`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. The detector may cite saved bars/liquidity as provenance, but manager must not treat ordinary bar/liquidity features already consumed by the base model stack as new independent event alpha. Layer 2 feed artifacts with zero saved bar rows are recorded as `skipped_zero_bar_rows` before detector execution; this preserves not-yet-listed/no-data evidence without failing the local detector. Required event-feed artifacts must exist and report nonzero requested-window row coverage before write mode can proceed. If all executed local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
+This emits `manager_layer_eight_event_risk_governor_input_materialization` evidence, runs only the local `source_04_event_overlay.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes compact detector/residual event overview rows through `source_04_event_overlay`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. The detector may cite saved bars/liquidity as provenance, but manager must not treat ordinary bar/liquidity features already consumed by the base model stack as new independent event alpha. Layer 2 feed artifacts with zero saved bar rows are recorded as `skipped_zero_bar_rows` before detector execution; this preserves not-yet-listed/no-data evidence without failing the local detector. Required event-feed artifacts must exist and report nonzero requested-window row coverage before write mode can proceed. If all executed local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
 
 Record a realtime shadow decision handoff receipt when execution/model scaffolds have produced a realtime decision input snapshot and model route plan:
 

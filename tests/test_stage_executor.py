@@ -84,16 +84,16 @@ class StageExecutorTests(unittest.TestCase):
             self.assertTrue(Path(summary.agent_error_request_path or "").exists())
             self.assertTrue(Path(summary.agent_error_diagnosis_path or "").exists())
 
-    def test_executes_approved_layer_four_local_data_acquisition_command(self):
+    def test_executes_approved_layer_eight_event_risk_local_data_acquisition_command(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_04_event_overlay.data_acquisition",
-                layer=4,
-                layer_key="layer_04_event_overlay",
+                stage_id="layer_08_event_risk_governor.data_acquisition",
+                layer=8,
+                layer_key="layer_08_event_risk_governor",
                 stage_type="data_acquisition",
                 status="ready",
-                command=["python3", "materialize_layer_four_event_overlay_inputs.py"],
+                command=["python3", "materialize_layer_eight_event_risk_governor_inputs.py"],
                 blockers=(),
             )
             summary = execute_stage_process(

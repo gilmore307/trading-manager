@@ -189,13 +189,13 @@ class RegistryHelperTests(unittest.TestCase):
         }:
             self.assertIn(expected_target_state_vector_payload, {row["payload"] for row in rows.values()})
         self.assertEqual(rows["MODEL_VECTOR_TAXONOMY"]["payload"], "trading-model/docs/92_vector_taxonomy.md")
-        self.assertEqual(rows["EVENT_OVERLAY_MODEL"]["payload"], "event_overlay_model")
-        self.assertEqual(rows["MODEL_04_EVENT_OVERLAY"]["payload"], "model_04_event_overlay")
+        self.assertEqual(rows["EVENT_RISK_GOVERNOR"]["payload"], "event_risk_governor")
+        self.assertEqual(rows["MODEL_08_EVENT_RISK_GOVERNOR"]["payload"], "model_08_event_risk_governor")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR"]["payload"], "event_context_vector")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
         self.assertIn("price_action", rows["EVENT_CATEGORY_TYPE_VALUES"]["payload"])
         self.assertIn("false_breakout", rows["PRICE_ACTION_EVENT_TYPES"]["payload"])
-        self.assertIn("layer_04_event_overlay_event_not_new_model_layer", rows["PRICE_ACTION_EVENT_LAYER_POLICY"]["payload"])
+        self.assertIn("layer_08_event_risk_governor_event_not_new_model_layer", rows["PRICE_ACTION_EVENT_LAYER_POLICY"]["payload"])
         self.assertIn("4_event_presence_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("4_event_target_relevance_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertEqual(rows["ALPHA_CONFIDENCE_MODEL"]["payload"], "alpha_confidence_model")
@@ -301,9 +301,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["kind"], "script")
         self.assertIn("review_target_state_vector_production_substrate.py", rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["path"])
         expected_layer_script_paths = {
-            "MODEL_04_EVENT_OVERLAY_GENERATE": "scripts/models/model_04_event_overlay/generate_model_04_event_overlay.py",
-            "MODEL_04_EVENT_OVERLAY_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_04_event_overlay/evaluate_model_04_event_overlay.py",
-            "MODEL_04_EVENT_OVERLAY_REVIEW_PROMOTION": "scripts/models/model_04_event_overlay/review_event_overlay_promotion.py",
+            "MODEL_08_EVENT_RISK_GOVERNOR_GENERATE": "scripts/models/model_08_event_risk_governor/generate_model_08_event_risk_governor.py",
+            "MODEL_08_EVENT_RISK_GOVERNOR_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_08_event_risk_governor/evaluate_model_08_event_risk_governor.py",
+            "MODEL_08_EVENT_RISK_GOVERNOR_REVIEW_PROMOTION": "scripts/models/model_08_event_risk_governor/review_event_risk_governor_promotion.py",
             "MODEL_05_ALPHA_CONFIDENCE_GENERATE": "scripts/models/model_05_alpha_confidence/generate_model_05_alpha_confidence.py",
             "MODEL_05_ALPHA_CONFIDENCE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_05_alpha_confidence/evaluate_model_05_alpha_confidence.py",
             "MODEL_05_ALPHA_CONFIDENCE_REVIEW_PROMOTION": "scripts/models/model_05_alpha_confidence/review_alpha_confidence_promotion.py",
@@ -399,8 +399,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("TARGET_STATE_VECTOR_TRAILING_STATE_WINDOWS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS", rows)
         self.assertNotIn("04_TRADE_QUALITY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
-        self.assertNotIn("06_EVENT_OVERLAY_MODEL_INPUTS", rows)
-        self.assertNotIn("06_EVENT_OVERLAY_MODEL_INPUTS_BUNDLE_CONFIG", rows)
+        self.assertNotIn("06_EVENT_RISK_GOVERNOR_INPUTS", rows)
+        self.assertNotIn("06_EVENT_RISK_GOVERNOR_INPUTS_BUNDLE_CONFIG", rows)
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS", rows)
         self.assertNotIn("07_PORTFOLIO_RISK_MODEL_INPUTS_BUNDLE_CONFIG", rows)
 
@@ -503,7 +503,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["DASHBOARD_HISTORICAL_TASK_TIMELINE"]["payload"], "historical_task_progress_summary.chart_payload.task_timeline")
         self.assertIn("task_timeline", rows["DASHBOARD_HISTORICAL_TASK_PROGRESS_PAGE"]["applies_to"])
         self.assertIn("layer_07_trading_guidance", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
-        self.assertNotIn("layer_04_event_overlay", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertNotIn("layer_08_event_risk_governor", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
         self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
@@ -659,7 +659,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("model_03_target_state_vector", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
         self.assertIn("target_state_vector_model", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
         self.assertIn("source_04_event_overlay", data_features["FEATURE_04_EVENT_OVERLAY"]["applies_to"])
-        self.assertIn("event_overlay_model", data_features["FEATURE_04_EVENT_OVERLAY"]["applies_to"])
+        self.assertIn("event_risk_governor", data_features["FEATURE_04_EVENT_OVERLAY"]["applies_to"])
         self.assertIn("source_05_option_expression", data_features["FEATURE_08_OPTION_EXPRESSION"]["applies_to"])
         self.assertIn("option_expression_model", data_features["FEATURE_08_OPTION_EXPRESSION"]["applies_to"])
         self.assertNotIn("feature_snapshots", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])

@@ -48,8 +48,8 @@
   - source task-key, candidate, and merged-bar evidence generation without embedding large rows in the task key;
   - zero provider calls, model activation, or broker execution in dry-run materialization.
 
-- `test_layer_four_event_overlay.py` verifies:
-  - local Layer 4 event-overlay source materialization from completed Layer 2 feed artifacts;
+- `test_layer_eight_event_risk_governor.py` verifies:
+  - local Layer 8 event-risk source materialization from completed Layer 2 feed artifacts;
   - detector/source task-key evidence generation for `source_04_event_overlay` without provider dispatch;
   - reviewed local news/SEC/macro feed artifact discovery and write-mode coverage blocking;
   - zero provider calls, model activation, or broker execution in dry-run materialization.
@@ -60,11 +60,11 @@
   - dry-run invalidation leaves state files unchanged.
 
 - `test_event_feed_backfill.py` verifies:
-  - required Layer 4 event-feed task-key preparation for Alpaca news, GDELT news, Trading Economics calendar, and SEC company financials;
+  - required Layer 8 event-feed task-key preparation for Alpaca news, GDELT news, Trading Economics calendar, and SEC company financials;
   - event-feed preparation writes task keys without provider calls, model activation, broker execution, or dashboard read-model writes.
 
 - `test_event_feed_dispatch.py` verifies:
-  - Layer 4 event-feed dispatch defaults to validation-only with zero provider calls;
+  - Layer 8 event-feed dispatch defaults to validation-only with zero provider calls;
   - explicit dispatch writes runtime task keys that enable only the selected event-feed provider controls.
 
 - `test_layer_eight_option_expression.py` verifies:

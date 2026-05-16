@@ -1403,7 +1403,7 @@ Layer 06 is now the position/execution model-input bundle and Layer 07 is now th
 
 Registry changes:
 
-- `06_EVENT_OVERLAY_MODEL_INPUTS` became `06_BUNDLE_POSITION_EXECUTION` with payload `06_bundle_position_execution`.
+- `06_EVENT_RISK_GOVERNOR_INPUTS` became `06_BUNDLE_POSITION_EXECUTION` with payload `06_bundle_position_execution`.
 - `07_PORTFOLIO_RISK_MODEL_INPUTS` became `07_BUNDLE_EVENT_OVERLAY` with payload `07_bundle_event_overlay`.
 - The old 06/07 bundle config rows were removed because those manifest-style configs were obsolete.
 - Event overlay references, including equity abnormal activity, now apply to `07_bundle_event_overlay`.
@@ -2479,7 +2479,7 @@ Status: Accepted
 
 The registry owns the shared Layer 4 price-action vocabulary: `price_action` as an `event_category_type` value and canonical event tokens `false_breakout`, `false_breakdown`, `liquidity_sweep_high`, `liquidity_sweep_low`, `bull_trap`, and `bear_trap`.
 
-The registry policy is explicit: price-action evidence is Layer 4 event-overlay evidence and optional Layer 3/5 context. It is not a new model layer, not an action signal, and not execution permission.
+The registry policy is explicit: price-action evidence is Layer 8 event-risk evidence and optional Layer 3/5 context. It is not a new model layer, not an action signal, and not execution permission.
 
 ## D110 - Manager scheduler should automate historical training while protecting live capacity
 
@@ -3521,7 +3521,7 @@ After `Model Worker 1` started the first complete fold (`2016-01` through `2016-
 
 All Layer 3+ model-worker stages use the same six-month fold unit as their execution scope. Local input materializers must accept `start_month`/`end_month` fold ranges and may not assume one chronological month per run. Month-scoped provider/feed artifacts remain reusable substrate, but the manager-owned task key and downstream source/model stage are fold-scoped.
 
-Layer 3 target-state materialization creates one target candidate per symbol for the fold and merges all reviewed Layer 2 bar artifacts from the six-month range. Layer 4 event-overlay materialization prepares detector task keys per symbol-month and then writes one fold-scoped source task key covering the full six-month event window.
+Layer 3 target-state materialization creates one target candidate per symbol for the fold and merges all reviewed Layer 2 bar artifacts from the six-month range. Layer 8 event-risk materialization prepares detector task keys per symbol-month and then writes one fold-scoped source task key covering the full six-month event window.
 
 ### Consequences
 
@@ -3652,7 +3652,7 @@ The workflow graph must not create Layer 5-7 input-preparation stages. Those lay
 - Historical dashboards no longer use `skipped` to mean “this task type does not exist.”
 - Real not-applicable stage outcomes, such as reviewed no-work option-expression gates, may still appear as skipped when the stage itself is part of the workflow and carries a reason.
 
-## D159 - Layer 4 event overlay requires complete reviewed event-source coverage
+## D159 - Layer 8 event overlay requires complete reviewed event-source coverage
 
 Date: 2026-05-14
 Status: Accepted
@@ -3663,7 +3663,7 @@ Layer 4-8 historical outputs had advanced with `source_04_event_overlay` populat
 
 ### Decision
 
-Layer 4 write-mode materialization must require reviewed local artifacts for `alpaca_news`, `gdelt_news`, `sec_company_financials`, and `trading_economics_calendar_web` before it can write `source_04_event_overlay` rows or unlock downstream Layer 4+ model stages. The event source now accepts `event_artifact_paths` and normalizes supported feed artifacts into canonical overview rows: Alpaca news to `symbol_news`, GDELT to `macro_news` / `sector_news` / `symbol_news` by available scope hints, Trading Economics calendar rows to `macro_data`, and SEC submissions/facts/concepts/frames to `sec_filing` / financial-disclosure events. Manager preparation for those artifacts is explicit through `scripts/tasks/prepare_layer_four_event_feed_backfill.py`; it writes reviewed task keys only and performs no provider calls until a separate bounded acquisition command is invoked.
+Layer 8 event-risk write-mode materialization must require reviewed local artifacts for `alpaca_news`, `gdelt_news`, `sec_company_financials`, and `trading_economics_calendar_web` before it can write `source_04_event_overlay` rows or unlock event-risk model stages. The event source now accepts `event_artifact_paths` and normalizes supported feed artifacts into canonical overview rows: Alpaca news to `symbol_news`, GDELT to `macro_news` / `sector_news` / `symbol_news` by available scope hints, Trading Economics calendar rows to `macro_data`, and SEC submissions/facts/concepts/frames to `sec_filing` / financial-disclosure events. Manager preparation for those artifacts is explicit through `scripts/tasks/prepare_layer_eight_event_feed_backfill.py`; it writes reviewed task keys only and performs no provider calls until a separate bounded acquisition command is invoked.
 
 Existing Layer 4-8 workflow stages produced from abnormal-activity-only inputs must be marked stale/rebuild-required before any rebuild. The invalidation is state-only: it does not delete artifacts, call providers, activate models, submit broker actions, mutate accounts, or write dashboard read models.
 
@@ -3674,18 +3674,18 @@ Existing Layer 4-8 workflow stages produced from abnormal-activity-only inputs m
 - Layer 4-8 must be regenerated only after event-source artifacts are backfilled and coverage passes.
 - The scheduler stays stopped until event-source coverage, stale-state marking, and downstream rebuild policy are verified.
 
-## D160 - Layer 4 event-feed backfill dispatch is a separate bounded provider surface
+## D160 - Layer 8 event-feed backfill dispatch is a separate bounded provider surface
 
 Date: 2026-05-15
 Status: Accepted
 
 ### Context
 
-Layer 4 event-source coverage requires reviewed Alpaca news, GDELT news, SEC company financials, and Trading Economics calendar artifacts before `source_04_event_overlay` write-mode may rebuild Layer 4+ outputs. The first repair slice added preparation of reviewed event-feed task keys, but preparation alone could not acquire the missing artifacts and one prepared GDELT default still looked provider-enabled even though the preparation command is supposed to perform zero provider calls.
+Layer 8 event-source coverage requires reviewed Alpaca news, GDELT news, SEC company financials, and Trading Economics calendar artifacts before `source_04_event_overlay` write-mode may rebuild Layer 4+ outputs. The first repair slice added preparation of reviewed event-feed task keys, but preparation alone could not acquire the missing artifacts and one prepared GDELT default still looked provider-enabled even though the preparation command is supposed to perform zero provider calls.
 
 ### Decision
 
-Layer 4 event-feed acquisition now has a dedicated manager dispatch surface: `scripts/tasks/dispatch_event_feed_backfill.py`. The command defaults to validation-only, reads the reviewed task keys prepared by `prepare_layer_four_event_feed_backfill.py`, and performs provider calls only when `--execute-provider-calls` is explicit. In execute mode it writes a runtime task key that flips only the selected feed's live/acquisition controls (`allow_live_provider_calls`, `autonomous_historical_provider_acquisition`, GDELT `dry_run=false`, or Trading Economics `allow_live_fetch=true`) and then invokes the matching `trading-data` feed module. It still performs no model activation, broker execution, account mutation, or dashboard read-model writes.
+Layer 8 event-feed acquisition now has a dedicated manager dispatch surface: `scripts/tasks/dispatch_event_feed_backfill.py`. The command defaults to validation-only, reads the reviewed task keys prepared by `prepare_layer_eight_event_feed_backfill.py`, and performs provider calls only when `--execute-provider-calls` is explicit. In execute mode it writes a runtime task key that flips only the selected feed's live/acquisition controls (`allow_live_provider_calls`, `autonomous_historical_provider_acquisition`, GDELT `dry_run=false`, or Trading Economics `allow_live_fetch=true`) and then invokes the matching `trading-data` feed module. It still performs no model activation, broker execution, account mutation, or dashboard read-model writes.
 
 Prepared task keys remain no-provider evidence: GDELT keys now default to `dry_run=true`, Trading Economics keys use the feed's accepted `start_date` / `end_date` parameters, and the safe offline stage executor refuses the event-feed dispatcher just as it refuses other provider-dispatch commands.
 
@@ -3725,7 +3725,7 @@ The active conceptual model stack moves event intelligence from Layer 4 to Layer
 
 Manager orchestration must treat Layer 7 as the base trading-guidance candidate and Layer 8 as a post-guidance event-risk intervention boundary. Layer 8 can block new entries, cap exposure, request exposure reduction, nominate flatten/clear candidates, nominate halt candidates, or require human review when high-risk point-in-time events are detected. These are decision/risk-record interventions, not direct broker/account mutations.
 
-Until a dedicated implementation migration is accepted, existing physical stage, script, table, and package names may remain legacy (`layer_04_event_overlay`, `layer_05_alpha_confidence`, `layer_06_position_projection`, `layer_07_underlying_action`, `layer_08_option_expression`). Registry rows must distinguish active conceptual layer order from legacy physical implementation names.
+Until a dedicated implementation migration is accepted, existing physical stage, script, table, and package names may remain legacy (`layer_08_event_risk_governor`, `layer_05_alpha_confidence`, `layer_06_position_projection`, `layer_07_underlying_action`, `layer_08_option_expression`). Registry rows must distinguish active conceptual layer order from legacy physical implementation names.
 
 ## D163 - Event lifecycle contract is registered for event-risk governance
 

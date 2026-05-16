@@ -283,7 +283,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
         self.assertIn("real_database_evaluation", layer.promotion_review_command)
 
-    def test_layer_four_alpha_confidence_has_no_event_materializer_or_event_source_blocker(self):
+    def test_alpha_confidence_has_no_event_risk_materializer_or_event_source_blocker(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -296,7 +296,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         layer = plan.layers[3]
         self.assertEqual(layer.layer_key, "layer_04_alpha_confidence")
         self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation", "model_evaluation", "promotion_review", "maintenance"])
-        self.assertNotIn("materialize_layer_four_event_overlay_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
+        self.assertNotIn("materialize_layer_eight_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
         self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
         self.assertIn("--from-database", layer.model_generate_command)
         self.assertIn("--output-jsonl", layer.model_generate_command)

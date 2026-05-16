@@ -115,7 +115,7 @@ This table is the manager-side promotion target map. It records review targets a
 | 1 | `model_01_market_regime` | `MarketRegimeModel` | `market_context_state` | registered `1_*` market-context score tokens |
 | 2 | `model_02_sector_context` | `SectorContextModel` | `sector_context_state` | registered `2_*` sector-context score tokens |
 | 3 | `model_03_target_state_vector` | `TargetStateVectorModel` | `target_context_state` | registered `3_*` target-state score-family tokens |
-| 4 | `model_04_event_overlay` | `EventOverlayModel` | `event_context_vector` | registered `4_*` event-context score-family tokens |
+| 8 | `model_08_event_risk_governor` | `EventRiskGovernor` | `event_context_vector` / `event_risk_intervention` | registered event-context score-family tokens |
 | 5 | `model_05_alpha_confidence` | `AlphaConfidenceModel` | `alpha_confidence_vector` | registered `5_*` alpha-confidence score-family tokens |
 | 6 | `model_06_position_projection` | `PositionProjectionModel` | `position_projection_vector` | registered `6_*` position-projection score-family tokens |
 | 7 | `model_07_underlying_action` | `UnderlyingActionModel` | `underlying_action_plan` | `underlying_action_vector` and registered `7_*` underlying-action score-family tokens |

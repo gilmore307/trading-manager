@@ -13,7 +13,7 @@ from typing import Any, Iterable, TextIO
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_RUNTIME_ROOT = Path("runtime")
-DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_04_required"
+DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_08_event_risk_required"
 
 
 @dataclass(frozen=True)
@@ -62,11 +62,11 @@ def invalidate_layer_downstream_outputs(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     runtime_root: Path | None = None,
     state_paths: Iterable[Path] = (),
-    layer_floor: int = 4,
+    layer_floor: int = 8,
     reason: str = DEFAULT_REASON,
     write: bool = False,
 ) -> InvalidationSummary:
-    """Mark stale Layer ``layer_floor``+ workflow stages as failed/rebuild-required.
+    """Mark stale event-risk-dependent workflow stages as failed/rebuild-required.
 
     This is deliberately state-only and offline: it never deletes artifacts, calls
     providers, activates models, submits orders, or writes storage read models.
@@ -129,11 +129,11 @@ def write_summary(summary: InvalidationSummary, *, output: TextIO) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Mark stale Layer 4+ model-training workflow stages as rebuild-required without deleting artifacts.")
+    parser = argparse.ArgumentParser(description="Mark stale event-risk-dependent model-training workflow stages as rebuild-required without deleting artifacts.")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--runtime-root", type=Path)
     parser.add_argument("--state-path", action="append", type=Path, default=[])
-    parser.add_argument("--layer-floor", type=int, default=4)
+    parser.add_argument("--layer-floor", type=int, default=8)
     parser.add_argument("--reason", default=DEFAULT_REASON)
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args(argv)

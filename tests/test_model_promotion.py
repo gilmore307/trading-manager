@@ -21,7 +21,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
             "model_01_market_regime",
             "model_02_sector_context",
             "model_03_target_state_vector",
-            "model_04_event_overlay",
+            "model_08_event_risk_governor",
             "model_05_alpha_confidence",
             "model_06_position_projection",
             "model_07_underlying_action",

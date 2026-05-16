@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mark Layer 4+ historical model outputs stale after event-source contract repair."""
+"""Mark event-risk-dependent historical model outputs stale after event-source contract repair."""
 
 from trading_manager_tasks.model_training_invalidation import main
 

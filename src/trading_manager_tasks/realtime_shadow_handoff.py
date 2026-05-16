@@ -24,7 +24,7 @@ MODEL_LAYER_ORDER = (
     "layer_01_market_regime",
     "layer_02_sector_context",
     "layer_03_target_state_vector",
-    "layer_04_event_overlay",
+    "layer_08_event_risk_governor",
     "layer_05_alpha_confidence",
     "layer_06_position_projection",
     "layer_07_underlying_action",

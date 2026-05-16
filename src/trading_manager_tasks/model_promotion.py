@@ -55,7 +55,7 @@ MODEL_PROMOTION_TARGETS: tuple[ModelPromotionTarget, ...] = (
     ModelPromotionTarget("layer_01_market_regime", "model_01_market_regime", "MarketRegimeModel", "market_context_state", "model_01_market_regime"),
     ModelPromotionTarget("layer_02_sector_context", "model_02_sector_context", "SectorContextModel", "sector_context_state", "model_02_sector_context"),
     ModelPromotionTarget("layer_03_target_state_vector", "model_03_target_state_vector", "TargetStateVectorModel", "target_context_state", "model_03_target_state_vector"),
-    ModelPromotionTarget("layer_04_event_overlay", "model_04_event_overlay", "EventOverlayModel", "event_context_vector", "model_04_event_overlay"),
+    ModelPromotionTarget("layer_08_event_risk_governor", "model_08_event_risk_governor", "EventRiskGovernor", "event_context_vector", "model_08_event_risk_governor"),
     ModelPromotionTarget("layer_05_alpha_confidence", "model_05_alpha_confidence", "AlphaConfidenceModel", "alpha_confidence_vector", "model_05_alpha_confidence"),
     ModelPromotionTarget("layer_06_position_projection", "model_06_position_projection", "PositionProjectionModel", "position_projection_vector", "model_06_position_projection"),
     ModelPromotionTarget("layer_07_underlying_action", "model_07_underlying_action", "UnderlyingActionModel", "underlying_action_plan", "model_07_underlying_action"),
