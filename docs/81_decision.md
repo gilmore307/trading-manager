@@ -3960,3 +3960,11 @@ The thirteenth itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_
 Those existing artifacts are rejected as historical point-in-time baselines because they were captured after the events and include actual EPS / surprise fields. They may prove a future EPS-consensus monitoring route exists, but only clean pre-event snapshots with preserved `captured_at` / `as_of_time` clocks may satisfy the baseline gate. The audited route does not provide revenue consensus or prior-guidance/guidance-consensus coverage.
 
 Signed beat/miss, guidance raise/cut, alpha, model activation, and stronger EventRiskGovernor intervention remain blocked.
+
+## D189 - Nasdaq future earnings calendar can seed EPS-consensus snapshots
+
+Status: accepted.
+
+A bounded live probe of the Nasdaq earnings calendar for future date `2026-05-18` returned 43 earnings rows, 19 EPS forecast-like rows, zero actual EPS rows, and zero surprise rows. This confirms Nasdaq can be used as a future EPS-consensus snapshot candidate route when captured before the event.
+
+The route is not accepted for historical reconstruction after an event has passed. Production baseline artifacts must persist `captured_at` / `as_of_time`, preserve the source URL/ref, and exclude post-event actual EPS and surprise fields from baseline use. The probed route does not provide revenue consensus or prior-guidance/guidance-consensus baselines; those remain separate source-route gaps.
