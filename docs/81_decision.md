@@ -3932,3 +3932,11 @@ Status: accepted.
 The tenth itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_TEXT_CANDIDATE_SCOUT_Q4_2025` as diagnostic review-queue evidence. The scout scanned the 12 acquired official SEC document text artifacts and found 11 events with candidate guidance/outlook-like non-boilerplate spans and one event with boilerplate/safe-harbor-only matches.
 
 Manager governance must treat these spans as extraction candidates only. SEC filings contain safe-harbor, accounting, generic expectation, and risk language that can resemble guidance. Candidate spans do not establish guidance raise/cut, beat/miss, signed alpha, model activation, or stronger EventRiskGovernor intervention. Signed earnings/guidance claims remain blocked until reviewed guidance/result interpretation and point-in-time expectation baselines are present.
+
+## D186 - Partial official guidance context is not guidance surprise or signed direction
+
+Status: accepted.
+
+The eleventh itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_INTERPRETATION_REVIEW_Q4_2025` as reviewed partial-context evidence. The review classified official-document candidate spans and found 9 events with partial future operating/financial guidance context and 3 events with no accepted guidance context after rejecting boilerplate/accounting/risk language.
+
+Manager governance may use these rows as direction-neutral event context only. They do not establish guidance raise/cut, beat/miss, signed alpha, model activation, or stronger EventRiskGovernor intervention because point-in-time expectation baselines remain absent and accepted raise/cut rows remain zero.
