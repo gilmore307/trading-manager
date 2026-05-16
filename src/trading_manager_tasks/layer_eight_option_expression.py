@@ -1,10 +1,11 @@
-"""Layer 8 option-expression gate review helpers.
+"""Legacy physical option-expression gate review helpers.
 
-This module is deliberately no-provider. It reviews completed Layer 7 rows for
-option-expression-worthy underlying actions before ThetaData option-snapshot
-acquisition is prepared. If the month has no active underlying action chain,
-the correct Layer 8 acquisition outcome is a reviewed no-provider skip, not an
-empty provider request.
+This module is deliberately no-provider. It reviews completed conceptual Layer 6
+underlying-action rows for option-expression-worthy actions before ThetaData
+option-snapshot acquisition is prepared for the conceptual Layer 7 trading-guidance
+boundary. If the month has no active underlying action chain, the correct legacy
+``layer_08_option_expression`` acquisition outcome is a reviewed no-provider skip,
+not an empty provider request.
 """
 
 from __future__ import annotations
@@ -282,7 +283,7 @@ def write_gate_review(review: LayerEightGateReview, *, output: TextIO) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Review the Layer 8 option-expression acquisition gate without provider calls.")
+    parser = argparse.ArgumentParser(description="Review the legacy layer_08 option-expression acquisition gate without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--database-url")

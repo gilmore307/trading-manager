@@ -168,13 +168,13 @@ Layer 7 is direct stock/ETF planned action modeling. Current accepted shared nam
 - `underlying_action_model` — canonical Layer 7 model id;
 - `model_07_underlying_action` — future model-owned output/table surface;
 - `underlying_action_plan` — conceptual point-in-time direct-underlying action plan output;
-- `underlying_action_vector` — conceptual point-in-time score/vector output for Layer 7.
+- `underlying_action_vector` — conceptual point-in-time score/vector output for Layer 6.
 
-Accepted compact `7_*` state-vector values are scalar underlying-action score-family tokens, not broker orders, option-contract fields, or execution outputs. Keep these axes separate: trade eligibility, signed action direction, trade intensity, entry quality, expected return, adverse risk, reward/risk, liquidity fit, holding-time fit, and action confidence.
+Accepted compact `7_*` state-vector values are legacy physical scalar underlying-action score-family tokens, not broker orders, option-contract fields, or execution outputs. Keep these axes separate: trade eligibility, signed action direction, trade intensity, entry quality, expected return, adverse risk, reward/risk, liquidity fit, holding-time fit, and action confidence.
 
 `planned_quantity` and `planned_notional_usd` are plan payload fields, not final order quantities. `entry_plan` is not order type. `stop_loss_price` and `take_profit_price` are thesis fields, not broker stop/limit orders.
 
-Layer 7 must not emit broker order fields, route orders, mutate broker/account state, or choose option symbol/right/strike/expiration/DTE/delta/Greeks/specific contract refs. Option expression belongs to the trading-guidance boundary before Layer 8 event-risk governance; execution belongs outside `trading-model`.
+Layer 6 must not emit broker order fields, route orders, mutate broker/account state, or choose option symbol/right/strike/expiration/DTE/delta/Greeks/specific contract refs. Option expression belongs to the conceptual Layer 7 trading-guidance boundary before Layer 8 event-risk governance; execution belongs outside `trading-model`.
 
 ## Trading-Guidance / Option-Expression Boundary
 
@@ -185,10 +185,10 @@ Option-expression modeling follows Layer 7 underlying action planning and preced
 - `option_expression_plan` — primary offline option-expression plan output;
 - `expression_vector` — scalar/vector score output for option-expression quality by horizon;
 - `source_05_option_expression` — option-expression input source surface owned by `trading-data`, despite the source-family number `05`;
-- `feature_08_option_expression` — deterministic model-facing Layer 8 option-expression feature surface;
+- `feature_08_option_expression` — legacy physical deterministic model-facing option-expression feature surface for conceptual Layer 7;
 - `source_06_position_execution` — selected-contract/position-execution context source used by option-expression review, despite the source-family number `06`.
 
-Layer 8 may use Layer 7 underlying price-path assumptions plus point-in-time option-chain context to choose option-expression and contract constraints. It still must not place orders, emit broker order instructions, process fills, or mutate broker/account state. Source-family numbers such as `source_05_*` and `source_06_*` are not automatically model-layer numbers; check the registered row and accepted model boundary before inferring ownership.
+Conceptual Layer 7 may use Layer 6 underlying price-path assumptions plus point-in-time option-chain context to choose option-expression and contract constraints. It still must not place orders, emit broker order instructions, process fills, or mutate broker/account state. Source-family numbers such as `source_05_*` and `source_06_*` are not automatically model-layer numbers; check the registered row and accepted model boundary before inferring ownership.
 
 ## Registration Trigger
 

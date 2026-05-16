@@ -2719,7 +2719,7 @@ Status: Accepted
 
 ### Context
 
-Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. Layers 3-7 operate over an open target-candidate space, and Layer 8 expands into an even larger option-contract/expression space. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
+Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. Layers 3-7 operate over an open target-candidate space, including the conceptual Layer 7 option-expression boundary whose physical stage token remains `layer_08_option_expression` until a dedicated migration. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
 
 ### Decision
 
@@ -2728,7 +2728,7 @@ Use segmented workflow progression:
 - Layer 1 continues chronological month-by-month after its own month-level receipts are ready; it does not wait for downstream layers.
 - Layer 2 continues chronological month-by-month once Layer 1 context exists; it does not wait for Layers 3-8.
 - Layers 3-7 run target-major by default: select one target candidate and complete Layers 3 -> 4 -> 5 -> 6 -> 7 before admitting the next target candidate, unless a reviewed coverage exception is recorded.
-- Layer 8 starts option-expression contract/bucket expansion only after the selected target's upstream Layer 1-7 context/target chain is complete.
+- Conceptual Layer 7 option-expression contract/bucket expansion, currently carried by legacy physical `layer_08_option_expression`, starts only after the selected target's upstream Layer 1-6 context/target/action chain is complete.
 
 ### Consequences
 
@@ -2765,20 +2765,20 @@ Status: Accepted
 
 ### Context
 
-The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. Layers 1-7 reached safe/offline completion for the month. Layer 8 was blocked by the option-expression acquisition gate until the completed Layer 7 target chain could be reviewed.
+The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. Layers 1-7 reached safe/offline completion for the month. The legacy physical `layer_08_option_expression` stage was blocked by the option-expression acquisition gate until the completed target chain could be reviewed.
 
 ### Decision
 
 Close the current `2016-01` Layer 1-8 safe workflow section as complete for mechanism validation.
 
-Layer 8 option-expression acquisition is closed by reviewed no-provider skip for this month because every Layer 7 row resolved to `no_trade` / `none`; there were no active target chains and therefore no warranted option-chain provider request. Layer 8 generated 279 deterministic `no_option_expression` rows from completed Layer 7 database rows. The run made zero provider calls, performed no dispatch, did not activate a model, did not perform broker/order/account mutation, and did not mutate storage lifecycle state.
+Legacy physical `layer_08_option_expression` acquisition is closed by reviewed no-provider skip for this month because every upstream action row resolved to `no_trade` / `none`; there were no active target chains and therefore no warranted option-chain provider request. The stage generated 279 deterministic `no_option_expression` rows from completed upstream database rows. The run made zero provider calls, performed no dispatch, did not activate a model, did not perform broker/order/account mutation, and did not mutate storage lifecycle state.
 
 Promotion decisions for Layers 1-8 remain deferred. This closeout validates workflow mechanics and safe offline progression only; it is not production model activation and not authorization to bypass manager provider-dispatch controls.
 
 ### Consequences
 
 - The next chronological month can start from safe internal preparation and provider-dispatch review.
-- If a future month has active Layer 7 target chains, Layer 8 must stop at provider-dispatch review unless manager provider dispatch is executed.
+- If a future month has active upstream target/action chains, the legacy physical `layer_08_option_expression` stage must stop at provider-dispatch review unless manager provider dispatch is executed.
 - Deferred promotion evidence remains a separate production-readiness track.
 - Runtime workflow checkpoints should be treated as month-scoped evidence when moving chronologically, so a later month should use an explicit month-specific state path unless/until the scheduler owns month checkpoint rotation.
 
@@ -2789,15 +2789,15 @@ Status: Accepted
 
 ### Context
 
-The `2016-02` historical workflow completed Layers 1-8 through safe/offline maintenance. Layer 1 and Layer 2 provider acquisition used bounded autonomous dispatch before execution; downstream Layers 3-8 advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and Layer 8 exposed a no-provider feature-stage skip gap.
+The `2016-02` historical workflow completed the safe/offline stack through the legacy physical `layer_08_option_expression` stage. Layer 1 and Layer 2 provider acquisition used bounded autonomous dispatch before execution; downstream target/action/expression stages advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and the legacy option-expression stage exposed a no-provider feature-stage skip gap.
 
 ### Decision
 
-Close `2016-02` as complete for safe workflow mechanics. The final month-scoped state has no next stage, with all required stages succeeded or not applicable. Layer 7 produced only `no_trade` rows, and Layer 8 correctly produced deterministic `no_option_expression` rows without ThetaData/provider acquisition.
+Close `2016-02` as complete for safe workflow mechanics. The final month-scoped state has no next stage, with all required stages succeeded or not applicable. The upstream action stage produced only `no_trade` rows, and the legacy physical option-expression stage correctly produced deterministic `no_option_expression` rows without ThetaData/provider acquisition.
 
 Accept the accompanying mechanism-hardening changes before starting `2016-03`:
 
-- Layer 8 feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_08_option_expression` after completed active-path acquisition.
+- Legacy physical option-expression feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_08_option_expression` after completed active-path acquisition.
 - Workflow CLIs default to scheduler-owned month-scoped checkpoints: `storage/runtime/model_training_workflow_state_YYYY-MM.json`.
 - Workflow state records `provider_calls_observed` separately from safe/offline `provider_calls`, so provider acquisition calls are visible without misclassifying offline stages as provider-calling stages.
 - Autonomous provider dispatch no longer creates provider-dispatch reviews; bounded request ids, terminal-coverage rejection, receipts, and reconcile coverage are the control surface.
@@ -2806,7 +2806,7 @@ Accept the accompanying mechanism-hardening changes before starting `2016-03`:
 
 - `2016-03` may begin from safe internal preparation after this hardening is committed and verified.
 - Production promotion remains deferred until reviewed evidence proves sufficient rows/labels, baseline improvement, split stability, no leakage, and an agent-approved promotion decision.
-- Active Layer 8 provider acquisition remains guarded by bounded provider-dispatch review, terminal coverage, receipts, and reconcile coverage.
+- Active legacy physical option-expression provider acquisition remains guarded by bounded provider-dispatch review, terminal coverage, receipts, and reconcile coverage.
 - Storage lifecycle mutation remains outside this closeout and requires lifecycle policy/protected-set execution surfaces.
 
 ## D125 - Owner-observed agent automation replaces routine manual provider guardrails
@@ -2847,8 +2847,8 @@ The March 2016 chronological historical workflow continued after January and Feb
 - Layer 1 coverage report: `storage/runtime/stage_coverage/layer_01_market_regime_data_acquisition_2016-03.json` has expected 22, ready 22, failed 0, pending 0.
 - Layer 2 coverage report: `storage/runtime/stage_coverage/layer_02_sector_context_data_acquisition_2016-03.json` has expected 25, ready 25, failed 0, pending 0.
 - Workflow checkpoint: `storage/runtime/model_training_workflow_state_2016-03.json` has `next_stage: null`, 42 succeeded stages, and 6 not-applicable stages.
-- Layer 8 gate review: `storage/runtime/layer_08_option_expression/gate_review/layer_08_option_expression_gate_review_2016-03.json` has `status: no_provider_skip_accepted`, `total_layer_7_rows: 318`, `active_request_count: 0`, and `active_target_chain_count: 0`.
-- Layer 8 feature generation has a no-provider/no-feature skip receipt at `storage/runtime/layer_08_option_expression/gate_review/layer_08_option_expression_feature_generation_no_provider_skip_receipt_2016-03.json`.
+- Legacy physical `layer_08_option_expression` gate review: `storage/runtime/layer_08_option_expression/gate_review/layer_08_option_expression_gate_review_2016-03.json` has `status: no_provider_skip_accepted`, `total_layer_7_rows: 318`, `active_request_count: 0`, and `active_target_chain_count: 0`.
+- Legacy physical `layer_08_option_expression` feature generation has a no-provider/no-feature skip receipt at `storage/runtime/layer_08_option_expression/gate_review/layer_08_option_expression_feature_generation_no_provider_skip_receipt_2016-03.json`.
 
 ### Decision
 

@@ -89,11 +89,11 @@ The manager walks layers in dependency order and expands the earliest layer with
 |---|---|---|
 | Layers 1-2 | One six-month chronological panel. | No single target symbol applies; the unit is the reviewed market/sector panel over the six-month window. |
 | Layers 3-7 | One single-stock target symbol over one six-month window. | The task introduction/plan must name `target_symbol`; if omitted, the task remains blocked with `selected_target_symbol_required`. |
-| Layer 8 | One single-stock target symbol over one six-month window, then option-expression buckets for that completed target chain. | The task inherits the selected `target_symbol` from the Layer 3-7 chain before contract/bucket expansion begins. |
+| Conceptual Layer 7 option-expression / legacy `layer_08_option_expression` | One single-stock target symbol over one six-month window, then option-expression buckets for that completed target chain. | The task inherits the selected `target_symbol` from the Layer 3-7 chain before contract/bucket expansion begins. |
 
 1. Layers 1-2 are finite six-month panel flows: continue chronological six-month units after each layer's own receipts are ready; do not wait for downstream Layers 3-8.
 2. Layers 3-7 are target-major serial flows: select one single-stock target symbol, complete Layers 3 -> 4 -> 5 -> 6 -> 7 for that target over the six-month unit, then admit the next target symbol unless a reviewed coverage exception is recorded.
-3. Layer 8 is option-expression expansion and begins only after the selected target's upstream Layer 1-7 context/target chain is complete.
+3. Conceptual Layer 7 option-expression expansion begins only after the selected target's upstream Layer 1-6 context/target/action chain is complete; the physical stage token remains `layer_08_option_expression` until a dedicated migration.
 4. Every Layer 3+ expansion/task plan must expose `selected_target_symbol`, `dataset_unit_kind=target_symbol_six_month`, and `dataset_unit_months=6` in the emitted plan/state/dashboard rows.
 5. Fill train, then calibration, then validation, then test.
 6. Use `forward_holdout` only after the base split ladder exists and evidence gaps such as coverage, drift, split stability, stale holdout, regime coverage, or baseline instability remain.
