@@ -3950,3 +3950,13 @@ The twelfth itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_EXP
 Baseline artifacts must identify the event and symbol, preserve source provenance, and carry parseable `captured_at` and `as_of_time` clocks. With date-only event clocks, baselines must predate the event date; same-day baselines require timestamped release clocks before acceptance. Missing values remain `missing`/`partial`; official text, SEC metadata, companyfacts, market reaction, or option abnormality must not substitute for a point-in-time expectation baseline.
 
 The current diagnostic slice has 12 missing baseline events and zero signed-direction-ready rows. Signed beat/miss, guidance raise/cut, alpha, model activation, and stronger EventRiskGovernor intervention remain blocked until accepted baseline artifacts and reviewed result/guidance comparisons exist.
+
+## D188 - Existing Nasdaq calendar rows are not accepted historical PIT baselines
+
+Status: accepted.
+
+The thirteenth itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_BASELINE_SOURCE_AUDIT_Q4_2025` as a source-route audit. The audit found matching Nasdaq earnings-calendar rows for all 12 diagnostic events and EPS forecast-like fields in all 12 rows.
+
+Those existing artifacts are rejected as historical point-in-time baselines because they were captured after the events and include actual EPS / surprise fields. They may prove a future EPS-consensus monitoring route exists, but only clean pre-event snapshots with preserved `captured_at` / `as_of_time` clocks may satisfy the baseline gate. The audited route does not provide revenue consensus or prior-guidance/guidance-consensus coverage.
+
+Signed beat/miss, guidance raise/cut, alpha, model activation, and stronger EventRiskGovernor intervention remain blocked.
