@@ -3976,3 +3976,11 @@ Status: accepted.
 `trading-manager` owns preparation of future Nasdaq earnings EPS-consensus baseline snapshot task keys. The task key targets `trading-execution` `calendar_discovery` for one future earnings-calendar date and writes parameters under `storage/earnings_guidance_baseline/nasdaq_earnings_calendar/YYYY-MM-DD/task_key.json`.
 
 Preparation is no-provider by default and records zero model activation, zero broker/account mutation, and zero dashboard writes. Later provider dispatch must occur before the event date and the baseline-use policy must consume only pre-event EPS forecast fields; post-event actual EPS and surprise fields are forbidden as baseline inputs. This route covers EPS consensus only. Revenue consensus and prior-guidance/guidance-consensus routes remain separate gaps.
+
+## D191 - Execution emits clean Nasdaq EPS baseline artifacts only before release
+
+Status: accepted.
+
+`trading-execution` `calendar_discovery` now supports `baseline_capture_mode = future_pre_event_eps_consensus_snapshot`. The execution runtime may emit `saved/earnings_guidance_expectation_baseline.csv` from Nasdaq earnings-calendar rows, but only for clean pre-event `epsForecast` values captured before `release_time`.
+
+Rows containing actual EPS (`eps`) or `surprise` are skipped and warned. This output is EPS-consensus baseline evidence only; it does not establish beat/miss, guidance raise/cut, signed alpha, model activation, broker/account mutation, or stronger EventRiskGovernor intervention. Revenue consensus and guidance expectation baselines remain separate gaps.
