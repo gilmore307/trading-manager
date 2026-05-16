@@ -287,8 +287,8 @@ def _decision_for_role(
     selected_target_symbol: str | None,
 ) -> DatasetExpansionDecision:
     provider_backed = layer_evidence.layer in {1, 2, 7}
-    normalized_target = selected_target_symbol.strip().upper() if selected_target_symbol else None
     target_required = layer_evidence.layer >= 3
+    normalized_target = selected_target_symbol.strip().upper() if selected_target_symbol and target_required else None
     target_missing = target_required and normalized_target is None
     if layer_evidence.layer == 1:
         action = "prepare_layer_one_historical_training_batch"
@@ -375,6 +375,7 @@ def build_dataset_expansion_plan(
             note="No dataset expansion gap selected from current evidence.",
         )
 
+    plan_target_symbol = decision.target_symbol if decision and decision.target_required else None
     plan = DatasetExpansionPlan(
         contract_type="manager_dataset_expansion_plan",
         start_month=start_month,
@@ -383,7 +384,7 @@ def build_dataset_expansion_plan(
         evidence=evidence,
         selected_decision=decision,
         implementation=implementation,
-        selected_target_symbol=selected_target_symbol.strip().upper() if selected_target_symbol else None,
+        selected_target_symbol=plan_target_symbol,
     )
     if write:
         output_path.parent.mkdir(parents=True, exist_ok=True)

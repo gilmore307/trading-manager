@@ -46,6 +46,25 @@ class DatasetExpansionTests(unittest.TestCase):
         self.assertFalse(decision.model_activation_allowed)
         self.assertFalse(decision.broker_execution_allowed)
 
+    def test_panel_layers_do_not_inherit_selected_target_symbol(self):
+        decision = decide_dataset_expansion(self.empty_evidence(), selected_target_symbol="AAPL")
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.layer, 1)
+        self.assertEqual(decision.dataset_unit_kind, "six_month_panel")
+        self.assertFalse(decision.target_required)
+        self.assertIsNone(decision.target_symbol)
+        self.assertIn("fixed Layer 1 panel", decision.task_scope_description)
+
+        plan = build_dataset_expansion_plan(
+            start_month="2016-01",
+            end_month="2016-06",
+            evidence=self.empty_evidence(),
+            selected_target_symbol="AAPL",
+        )
+        self.assertIsNone(plan.selected_target_symbol)
+        self.assertIsNone(plan.selected_decision.target_symbol)
+
     def test_manager_fills_calibration_before_validation_or_test(self):
         evidence = list(self.empty_evidence())
         evidence[0] = LayerDatasetEvidence(
