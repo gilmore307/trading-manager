@@ -4024,3 +4024,13 @@ Status: accepted.
 Existing Nasdaq earnings-calendar artifacts remain EPS-only and are rejected for historical PIT baseline use when captured after events or when actual/surprise fields are present. A Trading Economics earnings page reconnaissance shows revenue-consensus-like columns, so Trading Economics may be a future revenue-consensus baseline route.
 
 Manager governance must not treat this reconnaissance as accepted historical evidence. Revenue-consensus baselines require persisted pre-event artifacts with source provenance, symbol/date/fiscal-period identity, parseable `captured_at` / `as_of_time` clocks, and exclusion of actual/result/surprise fields. Until those artifacts exist, revenue beat/miss, signed earnings/guidance direction, alpha, model activation, and stronger EventRiskGovernor intervention remain blocked.
+
+## D197 - Event-family association analysis must be fine-grained
+
+Status: accepted.
+
+Manager governance must treat event ingestion categories such as `symbol_news`, `sector_news`, `macro_news`, `sec_filing`, `earnings_guidance`, and abnormal-activity buckets as routing categories only. They are not accepted modeling families and must not be pooled into one broad event model or one broad news model for price/path association proof.
+
+Every event family that may influence model training, risk intervention, or promotion review must have its own narrow `event_family_scouting_packet_v1` and independent association study. News must be decomposed into concrete mechanism-level families before analysis, such as product/customer news, management change, analyst-rating change, legal/regulatory action, supply-chain disruption, sector regulation, commodity/input-cost shock, geopolitical/fiscal shock, CPI/inflation, FOMC/rates, NFP/employment, credit/liquidity stress, equity offering/dilution, buyback, M&A, insider/ownership, accounting restatement, bankruptcy/restructuring, and earnings/guidance result or narrative-residual families.
+
+If a proposed family is still too broad to define a plausible mechanism, canonical source precedence, point-in-time clocks, matched-control design, and label windows, it must be split again before training. Cross-family composition is allowed only after the component families have separate evidence, controls, failure modes, and early-stop status.
