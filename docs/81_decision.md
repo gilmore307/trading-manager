@@ -3968,3 +3968,11 @@ Status: accepted.
 A bounded live probe of the Nasdaq earnings calendar for future date `2026-05-18` returned 43 earnings rows, 19 EPS forecast-like rows, zero actual EPS rows, and zero surprise rows. This confirms Nasdaq can be used as a future EPS-consensus snapshot candidate route when captured before the event.
 
 The route is not accepted for historical reconstruction after an event has passed. Production baseline artifacts must persist `captured_at` / `as_of_time`, preserve the source URL/ref, and exclude post-event actual EPS and surprise fields from baseline use. The probed route does not provide revenue consensus or prior-guidance/guidance-consensus baselines; those remain separate source-route gaps.
+
+## D190 - Manager prepares future Nasdaq EPS baseline snapshot task keys
+
+Status: accepted.
+
+`trading-manager` owns preparation of future Nasdaq earnings EPS-consensus baseline snapshot task keys. The task key targets `trading-execution` `calendar_discovery` for one future earnings-calendar date and writes parameters under `storage/earnings_guidance_baseline/nasdaq_earnings_calendar/YYYY-MM-DD/task_key.json`.
+
+Preparation is no-provider by default and records zero model activation, zero broker/account mutation, and zero dashboard writes. Later provider dispatch must occur before the event date and the baseline-use policy must consume only pre-event EPS forecast fields; post-event actual EPS and surprise fields are forbidden as baseline inputs. This route covers EPS consensus only. Revenue consensus and prior-guidance/guidance-consensus routes remain separate gaps.

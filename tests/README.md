@@ -163,6 +163,11 @@
   - current-only feeds staying out of historical backfill requests;
   - dry-run `manager_request` JSONL shape.
 
+- `test_nasdaq_earnings_baseline.py` verifies:
+  - future Nasdaq earnings EPS-baseline snapshot request planning by date;
+  - `calendar_discovery` task-key preparation for trading-execution without provider calls, model activation, broker execution, or dashboard writes;
+  - baseline-use controls that restrict future use to pre-event EPS forecast fields and exclude actual/surprise fields.
+
 - `test_request_payloads.py` verifies:
   - `storage://trading-manager/...` parameter refs resolve to local storage-root paths;
   - monthly backfill requests materialize component-readable `task_key.json` payloads;

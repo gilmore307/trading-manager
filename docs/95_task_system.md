@@ -371,3 +371,14 @@ The coverage report is evidence only when partial. It marks a workflow stage suc
 - Historical provider acquisition is autonomous after manager payload preparation; dry-run planning, payload materialization, and handoff validation remain no-provider preparation. Broker/order/account mutation remains execution-owned, and model activation still requires a separate agent promotion decision.
 - Autonomous provider dispatch is data-acquisition-only; it must not permit broker orders, fills, account mutation, model activation, or execution-side lifecycle changes.
 - Secrets must be aliases/config refs only.
+
+Prepare future Nasdaq earnings EPS-consensus baseline snapshots without provider calls:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/prepare_nasdaq_earnings_baseline_snapshots.py \
+  --start-date 2026-05-18 \
+  --end-date 2026-05-18 \
+  --write-files
+```
+
+The script writes `calendar_discovery` task keys for `trading-execution` under `storage/earnings_guidance_baseline/nasdaq_earnings_calendar/YYYY-MM-DD/task_key.json`. It performs zero provider calls, zero model activation, zero broker execution, and zero dashboard read-model writes. Provider dispatch, when separately approved by the accepted route, must occur before the event date and the resulting baseline artifact may use only pre-event EPS forecast fields; post-event actual EPS and surprise fields are excluded from baseline use.
