@@ -3984,3 +3984,19 @@ Status: accepted.
 `trading-execution` `calendar_discovery` now supports `baseline_capture_mode = future_pre_event_eps_consensus_snapshot`. The execution runtime may emit `saved/earnings_guidance_expectation_baseline.csv` from Nasdaq earnings-calendar rows, but only for clean pre-event `epsForecast` values captured before `release_time`.
 
 Rows containing actual EPS (`eps`) or `surprise` are skipped and warned. This output is EPS-consensus baseline evidence only; it does not establish beat/miss, guidance raise/cut, signed alpha, model activation, broker/account mutation, or stronger EventRiskGovernor intervention. Revenue consensus and guidance expectation baselines remain separate gaps.
+
+## D192 - Prior official filings can seed prior-company-guidance baselines
+
+Status: accepted.
+
+A bounded SEC submission acquisition plus source audit selected pre-event official SEC filing candidates for all 12 earnings/guidance diagnostic events. The audit consumed 35,010 SEC submission rows and selected 12 prior official source candidates.
+
+These candidates are accepted as source candidates only. They do not establish guidance surprise, signed direction, alpha, model activation, or EventRiskGovernor escalation until official document text is present and reviewed prior-guidance extraction produces accepted baseline rows.
+
+## D193 - Prior official guidance document coverage is necessary but not sufficient
+
+Status: accepted.
+
+The selected prior official filing documents were fetched through the accepted SEC filing document feed and local text coverage is present for 12/12 diagnostic events.
+
+This resolves the prior-company-guidance document-text coverage blocker, but accepted prior guidance baseline rows remain zero. The documents are `prior_official_document_text_present_uninterpreted`; reviewed extraction and comparison to current guidance/result evidence remain required. Revenue consensus remains a separate expectation-baseline route gap.
