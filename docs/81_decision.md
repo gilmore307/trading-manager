@@ -4034,3 +4034,11 @@ Manager governance must treat event ingestion categories such as `symbol_news`, 
 Every event family that may influence model training, risk intervention, or promotion review must have its own narrow `event_family_scouting_packet_v1` and independent association study. News must be decomposed into concrete mechanism-level families before analysis, such as product/customer news, management change, analyst-rating change, legal/regulatory action, supply-chain disruption, sector regulation, commodity/input-cost shock, geopolitical/fiscal shock, CPI/inflation, FOMC/rates, NFP/employment, credit/liquidity stress, equity offering/dilution, buyback, M&A, insider/ownership, accounting restatement, bankruptcy/restructuring, and earnings/guidance result or narrative-residual families.
 
 If a proposed family is still too broad to define a plausible mechanism, canonical source precedence, point-in-time clocks, matched-control design, and label windows, it must be split again before training. Cross-family composition is allowed only after the component families have separate evidence, controls, failure modes, and early-stop status.
+
+## D198 - Event-family remaining closeout is disposition, not promotion
+
+Status: accepted.
+
+The all-family closeout artifact may account for every fine-grained EventRiskGovernor family in one pass, but it must not convert unresolved routing buckets into training families or alpha claims. A closeout row is an administrative disposition: risk/control candidate, deferred low-signal, packet required, PIT baseline required, residual definition required, liquidity evidence required, or review-required.
+
+Current closeout accepts only `earnings_guidance_scheduled_shell` and `cpi_inflation_release` as risk/control candidates, not standalone directional alpha. `option_derivatives_abnormality` remains `deferred_low_signal` under the current matched-control definition. The remaining families stay blocked until their family packets, point-in-time baselines, residual definitions, liquidity evidence, source precedence, and matched controls exist.
