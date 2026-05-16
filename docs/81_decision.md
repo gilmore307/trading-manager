@@ -3940,3 +3940,13 @@ Status: accepted.
 The eleventh itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_INTERPRETATION_REVIEW_Q4_2025` as reviewed partial-context evidence. The review classified official-document candidate spans and found 9 events with partial future operating/financial guidance context and 3 events with no accepted guidance context after rejecting boilerplate/accounting/risk language.
 
 Manager governance may use these rows as direction-neutral event context only. They do not establish guidance raise/cut, beat/miss, signed alpha, model activation, or stronger EventRiskGovernor intervention because point-in-time expectation baselines remain absent and accepted raise/cut rows remain zero.
+
+## D187 - Point-in-time expectation baselines are the signed earnings/guidance gate
+
+Status: accepted.
+
+The twelfth itemized earnings/guidance scout may register `EARNINGS_GUIDANCE_EXPECTATION_BASELINE_READINESS_Q4_2025` as the signed-claim readiness gate. Accepted baseline artifact types are `eps_consensus`, `revenue_consensus`, `prior_company_guidance`, and `guidance_consensus_or_analyst_range`.
+
+Baseline artifacts must identify the event and symbol, preserve source provenance, and carry parseable `captured_at` and `as_of_time` clocks. With date-only event clocks, baselines must predate the event date; same-day baselines require timestamped release clocks before acceptance. Missing values remain `missing`/`partial`; official text, SEC metadata, companyfacts, market reaction, or option abnormality must not substitute for a point-in-time expectation baseline.
+
+The current diagnostic slice has 12 missing baseline events and zero signed-direction-ready rows. Signed beat/miss, guidance raise/cut, alpha, model activation, and stronger EventRiskGovernor intervention remain blocked until accepted baseline artifacts and reviewed result/guidance comparisons exist.
