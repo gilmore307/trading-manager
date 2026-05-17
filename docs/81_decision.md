@@ -4075,4 +4075,6 @@ Status: accepted.
 
 The all-family event/price association artifact must emit one row for every fine-grained EventRiskGovernor family. A row may be measured, screening-only, blocked by a required precondition, or not measurable because no local dated labels exist; these statuses must not be collapsed into a broad “no association” claim.
 
+The expanded local screening pass may use every available local bar symbol for the screening month to improve stability, but expanded proxy coverage is still screening evidence only. It may identify threshold-review candidates for the next grading step, not accepted model outputs.
+
 Accepted current associations remain limited to risk/control evidence: `cpi_inflation_release` has risk/volatility association from actual-vs-expectation surprise, and `earnings_guidance_scheduled_shell` has direction-neutral scheduled path-risk association. Local keyword/proxy screening associations from news or GDELT rows are not accepted for model use until canonical source/parser, interpretation/deduplication, matched-control, point-in-time baseline, residual-detector, and liquidity/depth gates are satisfied. No measured row currently authorizes standalone directional event alpha, model training, activation, broker/account mutation, destructive SQL, or artifact deletion.
