@@ -189,7 +189,7 @@ class RegistryHelperTests(unittest.TestCase):
             "3_tradability_score_<window>",
         }:
             self.assertIn(expected_target_state_vector_payload, {row["payload"] for row in rows.values()})
-        self.assertEqual(rows["MODEL_VECTOR_TAXONOMY"]["payload"], "trading-model/docs/92_vector_taxonomy.md")
+        self.assertEqual(rows["MODEL_VECTOR_TAXONOMY"]["payload"], "trading-model/docs/13_vector_taxonomy.md")
         self.assertEqual(rows["EVENT_RISK_GOVERNOR"]["payload"], "event_risk_governor")
         self.assertEqual(rows["MODEL_09_EVENT_RISK_GOVERNOR"]["payload"], "model_09_event_risk_governor")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR"]["payload"], "event_context_vector")
