@@ -114,7 +114,7 @@ def build_event_model_regeneration_plan(
         superseded_surfaces=(
             "event_risk_or_abnormal_activity_only_outputs_without_required_evidence",
             "event_risk_governor_outputs_built_before_required_event_feed_coverage",
-            "promotion_review_artifacts_claiming_event_alpha_without_closeout_gate_evidence",
+            "promotion_review_artifacts_claiming_event_alpha_without_acceptance_gate_evidence",
             "model_run_metadata_that_depends_on_non_current_event_risk_inputs_after_reviewed_rebuild_exists",
         ),
         invalidation_scope=(
@@ -123,10 +123,10 @@ def build_event_model_regeneration_plan(
         ),
         regeneration_steps=(
             RegenerationStep(
-                step_id="01_build_closeout_report",
+                step_id="01_build_acceptance_report",
                 owner_repo="trading-model",
-                action="emit event_model_closeout_report_v1 from accepted final judgment",
-                command_ref="python3 scripts/models/model_09_event_risk_governor/build_event_model_closeout_report.py",
+                action="emit event_model_acceptance_report_v1 from accepted final judgment",
+                command_ref="python3 scripts/models/model_09_event_risk_governor/build_event_model_acceptance_report.py",
                 status="ready_offline",
                 mutation_class="report_artifact_only",
                 provider_calls_allowed=False,
@@ -205,7 +205,7 @@ def build_event_model_regeneration_plan(
         ),
         storage_cleanup_gate=(
             "Do not delete dashboard snapshots, model-run metadata, or event diagnostic artifacts until the regenerated "
-            "EventRiskGovernor fold has closeout/evaluation/review evidence and Chentong approves a storage lifecycle apply step."
+            "EventRiskGovernor fold has acceptance/evaluation/review evidence and Chentong approves a storage lifecycle apply step."
         ),
         notes=(
             "Layer 1 and Layer 2 data are persistent foundations: compress/archive only, never auto-delete.",

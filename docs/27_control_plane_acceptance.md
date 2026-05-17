@@ -1,4 +1,4 @@
-# Manager Control-Plane Closeout
+# Manager Control-Plane Acceptance
 
 The manager control-plane MVP is accepted when it can plan work, validate inputs, record component results, summarize state, and enforce gates without taking over component runtimes.
 
@@ -22,6 +22,6 @@ The manager control-plane MVP is accepted when it can plan work, validate inputs
 - Broker/order/fill/account mutation.
 - Dashboard app implementation.
 
-## Closeout Rule
+## Acceptance Rule
 
 Manager control-plane acceptance does not imply production readiness for any model, event family, storage policy, provider volume, or execution path. Each downstream boundary keeps its own evidence gate.
