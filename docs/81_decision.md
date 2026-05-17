@@ -4088,3 +4088,13 @@ When expanded local association measurement classifies an event family as measur
 The current queue-scoped deletions are `mna_transaction`, `product_launch_or_failure`, and `sector_demand_shock`. The current `option_derivatives_abnormality` definition is also deleted from threshold work, but only at the definition level; the broader family may be retested after a revised abnormality standard exists.
 
 This decision does not authorize physical artifact deletion, destructive SQL, model training, model activation, broker/account mutation, or standalone directional-alpha promotion.
+
+## D204 - Reverse price-anomaly discovery is allowed as hypothesis generation
+
+Status: accepted.
+
+Event-family discovery may run in the reverse direction: identify local price anomalies first, then inspect nearby point-in-time event artifacts for repeated event-family commonalities or enrichment. This helps reduce confirmation bias from starting only with preselected event families.
+
+Reverse discovery is hypothesis generation only. A family found by this route still requires canonical event interpretation, deduplication, symbol/sector relevance, matched controls, point-in-time clocks, and stability before threshold acceptance, model training, activation, or risk intervention use.
+
+The current reverse scan keeps `legal_regulatory_investigation` as a reverse-discovery candidate under the local enrichment rule. This does not authorize standalone directional alpha, model training, activation, broker/account mutation, destructive SQL, or artifact deletion.
