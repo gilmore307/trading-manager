@@ -28,8 +28,6 @@ requirements.txt  Shared environment dependency ledger.
 
 ## Documentation Spine
 
-Docs numbering follows the shared trading-repository rule: `00-69` is the current reading path, `70-79` is reserved reference material, `80-89` is fixed ledger/governance files, and `90-99` is appendix/compatibility material only. Active docs should not use `100+` numbers.
-
 ```text
 docs/00_scope.md                         Repository boundary.
 docs/01_context.md                       Repository map and operating assumptions.
