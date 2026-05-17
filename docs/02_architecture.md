@@ -1,6 +1,14 @@
-# Model Stack Control Plane
+# Architecture
 
 This file is the manager-side map of the current Layer 1-9 stack. It is a routing and boundary guide, not the model-design authority.
+
+## Module Map
+
+| Docs band | Implementation surface | Purpose |
+|---|---|---|
+| `10_*` | `src/trading_registry/`, `scripts/registry/`, template surfaces | Registry and template authority. |
+| `20_*` | `src/trading_manager_tasks/`, `scripts/tasks/`, scheduler/service definitions | Manager task system, historical planning, promotion, scheduler, and control-plane acceptance. |
+| `30_*` | `src/trading_bigquery/`, `src/trading_web_search/`, shared helper policy | Shared helper package boundary. |
 
 ## Stack Map
 

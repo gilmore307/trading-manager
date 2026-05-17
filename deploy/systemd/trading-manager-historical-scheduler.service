@@ -1,6 +1,6 @@
 [Unit]
 Description=Trading Manager Historical Modeling Scheduler
-Documentation=file:/root/projects/trading-manager/docs/10_historical_scheduler_runtime.md
+Documentation=file:/root/projects/trading-manager/docs/26_historical_scheduler_runtime.md
 After=network-online.target
 Wants=network-online.target
 
