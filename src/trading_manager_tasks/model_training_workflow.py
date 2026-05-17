@@ -1,11 +1,9 @@
-"""Base Layer 1-8 historical model-training workflow graph.
+"""Historical base-stack workflow graph.
 
-The manager owns orchestration across the full historical-modeling system service.
-This module defines the base Layers 1-8 progression graph only; Layer 9
-EventRiskGovernor is service-owned as a residual/risk overlay lane and remains
-outside this base graph so Layers 1-8 can progress without a hard event/source
-dependency. Current model/source names now follow conceptual layer numbering;
-historical migrations/artifacts are not rewritten.
+The manager owns orchestration across the historical-modeling service. This
+module defines the base trading stack progression. Layer 9 EventRiskGovernor is
+service-owned as a residual risk-governance lane and is not a hard prerequisite
+for base-stack progress.
 """
 
 from __future__ import annotations
@@ -22,7 +20,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
-FULL_LAYER_COUNT = 8
+BASE_STACK_LAYER_COUNT = 8
 BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 8)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
@@ -123,7 +121,7 @@ class LayerWorkflow:
 
 @dataclass(frozen=True)
 class ModelTrainingWorkflowPlan:
-    """Manager-owned base Layer 1-8 workflow plan inside the Layer 1-9 service."""
+    """Manager-owned base-stack workflow plan inside the historical service."""
 
     contract_type: str
     start_month: str
@@ -182,7 +180,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1,),
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "six_month_window;sector_or_industry_symbol",
-        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists, then continue forward without waiting for Layers 3-8",
+        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists, then continue forward without waiting for target-chain layers",
         "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
@@ -193,7 +191,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1, 2),
         "progression_mode": "target_major_serial_chain",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id",
-        "candidate_progression_policy": "for one selected target symbol and one six-month unit, complete Layers 3-8 in order before admitting the next target unless a reviewed coverage exception is recorded",
+        "candidate_progression_policy": "for one selected target symbol and one six-month unit, complete the downstream target chain in order before admitting the next target unless a reviewed coverage exception is recorded",
         "data_surface": "target candidate/source_03 inputs plus feature_03_target_state_vector",
         "feature_cli": "trading-data-feature-03-target-state-vector",
     },
@@ -216,7 +214,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "target_major_serial_chain",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;alpha_context_id",
         "candidate_progression_policy": "continue the active target candidate chain after Layer 4 event failure risk is ready; event discovery remains separate from base alpha confidence",
-        "data_surface": "target context state, event_failure_risk_vector, and labels; no dedicated trading-data source and no event-overlay requirement",
+        "data_surface": "target context state, event_failure_risk_vector, and labels; no dedicated trading-data source and no raw event-feed requirement",
         "feature_cli": None,
     },
     {
@@ -719,7 +717,7 @@ def write_workflow_plan(plan: ModelTrainingWorkflowPlan, *, output: TextIO) -> N
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Plan the manager-owned base Layer 1-8 historical model-training workflow.")
+    parser = argparse.ArgumentParser(description="Plan the manager-owned historical base-stack workflow.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
@@ -747,7 +745,7 @@ __all__ = [
     "DATASET_UNIT_MONTHS",
     "DatasetUnit",
     "BASE_INPUT_STAGE_LAYERS",
-    "FULL_LAYER_COUNT",
+    "BASE_STACK_LAYER_COUNT",
     "FOUNDATION_CATCH_UP_BLOCKER",
     "FOUNDATION_CATCH_UP_LAYERS",
     "MONTHLY_SUBSTRATE_LAYERS",

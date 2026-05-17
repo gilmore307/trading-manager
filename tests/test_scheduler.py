@@ -7,7 +7,7 @@ from unittest.mock import patch
 from datetime import UTC, datetime
 from pathlib import Path
 
-from trading_manager_tasks.model_training_workflow import FULL_LAYER_COUNT
+from trading_manager_tasks.model_training_workflow import BASE_STACK_LAYER_COUNT
 from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 from trading_manager_tasks.scheduler import (
     ResourceSnapshot,
@@ -107,7 +107,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.next_internal_stage, "autonomous_historical_provider_acquisition")
         self.assertIsNone(decision.approval_gate_required)
         self.assertIsNotNone(decision.execution_summary)
-        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], FULL_LAYER_COUNT)
+        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], BASE_STACK_LAYER_COUNT)
         self.assertFalse(decision.dispatch_performed)
         self.assertEqual(decision.provider_calls, 0)
 
@@ -155,7 +155,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertIsNotNone(decision.execution_summary)
         self.assertEqual(decision.execution_summary["request_count"], 19)
         self.assertEqual(decision.execution_summary["handoff_validation_count"], 19)
-        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], FULL_LAYER_COUNT)
+        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], BASE_STACK_LAYER_COUNT)
         self.assertEqual(decision.execution_summary["workflow_plan"]["next_stage"]["stage_id"], "layer_01_market_regime.data_acquisition")
 
     def test_scheduler_progresses_to_autonomous_provider_acquisition_after_layer_one_payloads_exist(self):
@@ -172,7 +172,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.reason_code, "autonomous_provider_stage_ready")
         self.assertEqual(decision.selected_work, "layer_01_market_regime.data_acquisition")
         self.assertIsNone(decision.approval_gate_required)
-        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], FULL_LAYER_COUNT)
+        self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], BASE_STACK_LAYER_COUNT)
 
     def test_safe_offline_stage_flag_does_not_execute_provider_acquisition(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

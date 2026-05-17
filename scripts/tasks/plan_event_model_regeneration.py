@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan safe EventRiskGovernor regeneration after the event-model redo closeout."""
+"""Plan safe EventRiskGovernor regeneration."""
 
 from trading_manager_tasks.event_model_regeneration_plan import main
 

@@ -83,7 +83,7 @@ def run_stage_controller_step(
 ) -> tuple[StageRunControllerReceipt, StageRunDashboard]:
     """Run one controller step and return receipt plus refreshed dashboard."""
 
-    _ = auto_create_packet  # legacy API argument; packet creation was removed.
+    _ = auto_create_packet  # compatibility argument; packet creation is no longer performed here.
     output_dashboard_path = dashboard_path or default_dashboard_path(stage_id=stage_id, start_month=start_month)
     before = build_stage_run_dashboard(
         stage_id=stage_id,

@@ -1,4 +1,4 @@
-"""Durable state progression for the base Layer 1-8 model-training workflow."""
+"""Durable state progression for the historical base-stack workflow."""
 
 from __future__ import annotations
 
@@ -742,7 +742,7 @@ def write_state_output(state: WorkflowState, *, output: TextIO) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Advance the durable base Layer 1-8 model-training workflow state.")
+    parser = argparse.ArgumentParser(description="Advance the durable historical base-stack workflow state.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

@@ -124,7 +124,7 @@ class SchedulerStatusTests(unittest.TestCase):
         self.assertIsNone(row["blocked_reason"])
         self.assertEqual(row["latest_decision"]["decision_log_row_count"], 1)
 
-    def test_status_ignores_stale_completed_legacy_decision(self):
+    def test_status_ignores_stale_completed_previous_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"

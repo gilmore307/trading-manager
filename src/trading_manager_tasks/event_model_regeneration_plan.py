@@ -1,8 +1,8 @@
-"""Safe regeneration plan after the EventRiskGovernor redo closeout.
+"""Safe EventRiskGovernor regeneration plan.
 
 The plan is intentionally non-mutating. It defines what to preserve, what to
-supersede/rebuild, and the ordered manager/model/data/storage gates required
-before any later storage cleanup review.
+rebuild, and which manager/model/data/storage gates are required before any
+later storage cleanup review.
 """
 from __future__ import annotations
 
@@ -107,19 +107,19 @@ def build_event_model_regeneration_plan(
         preserved_surfaces=(
             "reviewed_provider_data_and_monthly_cleaned_data_when_point_in_time_valid",
             "layer_01_market_regime_and_layer_02_sector_context_persistent_foundation_data",
-            "base_layer_03_08_outputs_that_do_not_consume_legacy_event_overlay_or_abnormal_activity_only_inputs",
-            "event_redo_diagnostic_evidence_artifacts_for_comparison_debug_and_audit",
+            "base_target_chain_outputs_without_event_risk_or_abnormal_activity_only_inputs",
+            "event_risk_diagnostic_evidence_artifacts_for_comparison_debug_and_audit",
             "storage_artifacts_and_dashboard_snapshots_until_regeneration_review_completes",
         ),
         superseded_surfaces=(
-            "legacy_event_overlay_or_abnormal_activity_only_layer_8_outputs",
+            "event_risk_or_abnormal_activity_only_outputs_without_required_evidence",
             "event_risk_governor_outputs_built_before_required_event_feed_coverage",
             "promotion_review_artifacts_claiming_event_alpha_without_closeout_gate_evidence",
-            "model_run_metadata_that_depends_on_the_old_event_model_route_after_reviewed_rebuild_exists",
+            "model_run_metadata_that_depends_on_non_current_event_risk_inputs_after_reviewed_rebuild_exists",
         ),
         invalidation_scope=(
-            "state_only_layer_09_event_risk_governor_and_event_adjusted_outputs; base Layers 1-8 remain reusable "
-            "unless a specific artifact consumed legacy event-overlay/source rows or violates the rolling-fold policy"
+            "state_only_layer_09_event_risk_governor_and_event_adjusted_outputs; base-stack outputs remain reusable "
+            "unless a specific artifact consumed non-current event-risk/source rows or violates the rolling-fold policy"
         ),
         regeneration_steps=(
             RegenerationStep(
@@ -163,7 +163,7 @@ def build_event_model_regeneration_plan(
                 requires_review_before_apply=False,
             ),
             RegenerationStep(
-                step_id="05_generate_feature_08_and_model_08",
+                step_id="05_generate_feature_09_and_model_09",
                 owner_repo="trading-data;trading-model",
                 action="generate feature_09_event_risk_governor then model_09_event_risk_governor/event_context_vector outputs",
                 command_ref="trading-data-feature-09-event-risk-governor; python3 scripts/models/model_09_event_risk_governor/generate_model_09_event_risk_governor.py",
@@ -177,7 +177,7 @@ def build_event_model_regeneration_plan(
                 owner_repo="trading-model;trading-manager",
                 action="evaluate EventRiskGovernor with direction-neutral risk labels first, then submit conservative manager promotion review",
                 command_ref="python3 scripts/models/model_09_event_risk_governor/evaluate_model_09_event_risk_governor.py; PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_09_event_risk_governor",
-                status="blocked_until_model_08_ready",
+                status="blocked_until_model_09_ready",
                 mutation_class="promotion_evidence_and_review_request_only",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,
@@ -185,7 +185,7 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="07_state_only_invalidation_if_old_outputs_remain",
                 owner_repo="trading-manager",
-                action="mark stale old event-risk-dependent workflow stages rebuild-required without deleting artifacts",
+                action="mark stale event-risk-dependent workflow stages rebuild-required without deleting artifacts",
                 command_ref="PYTHONPATH=src python3 scripts/tasks/invalidate_layer_nine_event_downstream_outputs.py --write",
                 status="review_before_write",
                 mutation_class="workflow_state_only_no_artifact_deletion",
@@ -204,12 +204,12 @@ def build_event_model_regeneration_plan(
             ),
         ),
         storage_cleanup_gate=(
-            "Do not delete dashboard snapshots, model-run metadata, or old event diagnostic artifacts until the regenerated "
+            "Do not delete dashboard snapshots, model-run metadata, or event diagnostic artifacts until the regenerated "
             "EventRiskGovernor fold has closeout/evaluation/review evidence and Chentong approves a storage lifecycle apply step."
         ),
         notes=(
             "Layer 1 and Layer 2 data are persistent foundations: compress/archive only, never auto-delete.",
-            "The event redo closes as risk governance, not signed alpha or option-flow promotion.",
+            "The event-risk lane is risk governance, not signed alpha or option-flow promotion.",
             "Current earnings/guidance route remains blocked for signed claims by missing comparable current guidance and PIT expectation baselines.",
             "This plan is non-mutating; executable steps remain separate reviewed tools.",
         ),
@@ -227,7 +227,7 @@ def write_plan_file(plan: EventModelRegenerationPlan, path: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Plan safe EventRiskGovernor regeneration after the event-model redo closeout.")
+    parser = argparse.ArgumentParser(description="Plan safe EventRiskGovernor regeneration.")
     parser.add_argument("--start-month", required=True)
     parser.add_argument("--end-month", required=True)
     parser.add_argument("--target-symbol", default=DEFAULT_TARGET_SYMBOL)

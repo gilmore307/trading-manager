@@ -55,6 +55,7 @@ MODEL_PROMOTION_TARGETS: tuple[ModelPromotionTarget, ...] = (
     ModelPromotionTarget("layer_01_market_regime", "model_01_market_regime", "MarketRegimeModel", "market_context_state", "model_01_market_regime"),
     ModelPromotionTarget("layer_02_sector_context", "model_02_sector_context", "SectorContextModel", "sector_context_state", "model_02_sector_context"),
     ModelPromotionTarget("layer_03_target_state_vector", "model_03_target_state_vector", "TargetStateVectorModel", "target_context_state", "model_03_target_state_vector"),
+    ModelPromotionTarget("layer_04_event_failure_risk", "model_04_event_failure_risk", "EventFailureRiskModel", "event_failure_risk_vector", "model_04_event_failure_risk"),
     ModelPromotionTarget("layer_05_alpha_confidence", "model_05_alpha_confidence", "AlphaConfidenceModel", "alpha_confidence_vector", "model_05_alpha_confidence"),
     ModelPromotionTarget("layer_06_position_projection", "model_06_position_projection", "PositionProjectionModel", "position_projection_vector", "model_06_position_projection"),
     ModelPromotionTarget("layer_07_underlying_action", "model_07_underlying_action", "UnderlyingActionModel", "underlying_action_plan", "model_07_underlying_action"),
@@ -64,17 +65,6 @@ MODEL_PROMOTION_TARGETS: tuple[ModelPromotionTarget, ...] = (
 
 TARGETS_BY_MODEL_ID = {target.model_id: target for target in MODEL_PROMOTION_TARGETS}
 TARGETS_BY_LAYER_ID = {target.layer_id: target for target in MODEL_PROMOTION_TARGETS}
-LEGACY_TARGET_ALIASES = {
-    "layer_05_alpha_confidence": TARGETS_BY_LAYER_ID["layer_05_alpha_confidence"],
-    "model_05_alpha_confidence": TARGETS_BY_LAYER_ID["layer_05_alpha_confidence"],
-    "layer_06_position_projection": TARGETS_BY_LAYER_ID["layer_06_position_projection"],
-    "model_06_position_projection": TARGETS_BY_LAYER_ID["layer_06_position_projection"],
-    "layer_07_underlying_action": TARGETS_BY_LAYER_ID["layer_07_underlying_action"],
-    "model_07_underlying_action": TARGETS_BY_LAYER_ID["layer_07_underlying_action"],
-    "layer_08_option_expression": TARGETS_BY_LAYER_ID["layer_08_option_expression"],
-    "model_08_option_expression": TARGETS_BY_LAYER_ID["layer_08_option_expression"],
-}
-
 
 def promotion_target(value: str) -> ModelPromotionTarget:
     """Return the canonical model promotion target for a model or layer id."""
@@ -88,10 +78,7 @@ def promotion_target(value: str) -> ModelPromotionTarget:
         return TARGETS_BY_LAYER_ID[normalized]
     except KeyError:
         pass
-    try:
-        return LEGACY_TARGET_ALIASES[normalized]
-    except KeyError as error:
-        raise TaskSystemError(f"unknown model promotion target: {value}") from error
+    raise TaskSystemError(f"unknown model promotion target: {value}")
 
 
 def _list(values: Iterable[str] | None) -> list[str]:

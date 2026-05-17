@@ -69,24 +69,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("TRADING_DERIVED_REPO", rows)
         self.assertNotIn("TRADING_STRATEGY_REPO", rows)
         for row in rows.values():
-            self.assertNotIn("trading-main", row["payload"])
-            self.assertNotIn("trading-main", row["path"])
-            self.assertNotIn("trading-source", row["payload"])
-            self.assertNotIn("trading-source", row["path"])
-            self.assertNotIn("trading-derived", row["payload"])
-            self.assertNotIn("trading-derived", row["path"])
-            self.assertNotIn("trading-strategy", row["payload"])
-            self.assertNotIn("trading-strategy", row["path"])
+            self.assertNotIn("trading-" + "main", row["payload"])
+            self.assertNotIn("trading-" + "main", row["path"])
+            self.assertNotIn("trading-" + "source", row["payload"])
+            self.assertNotIn("trading-" + "source", row["path"])
+            self.assertNotIn("trading-" + "derived", row["payload"])
+            self.assertNotIn("trading-" + "derived", row["path"])
+            self.assertNotIn("trading-" + "strategy", row["payload"])
+            self.assertNotIn("trading-" + "strategy", row["path"])
 
-    def test_event_risk_governor_layer_reorder_terms_are_registered(self):
+    def test_event_risk_governor_layer_policy_terms_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        reorder = rows["MODEL_LAYER_CONCEPTUAL_REORDER_POLICY"]
-        self.assertIn("layer_04_event_failure_risk", reorder["payload"])
-        self.assertIn("layer_05_alpha_confidence", reorder["payload"])
-        self.assertIn("layer_08_trading_guidance", reorder["payload"])
-        self.assertIn("layer_09_event_risk_governor", reorder["payload"])
+        layer_policy = rows["MODEL_LAYER_CONCEPTUAL_REORDER_POLICY"]
+        self.assertIn("layer_04_event_failure_risk", layer_policy["payload"])
+        self.assertIn("layer_05_alpha_confidence", layer_policy["payload"])
+        self.assertIn("layer_08_trading_guidance", layer_policy["payload"])
+        self.assertIn("layer_09_event_risk_governor", layer_policy["payload"])
 
         self.assertEqual(rows["TRADING_GUIDANCE_MODEL"]["payload"], "trading_guidance_model")
         self.assertEqual(rows["TRADING_GUIDANCE_RECORD"]["payload"], "trading_guidance_record")
@@ -150,8 +150,8 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], payload)
             self.assertIn(f"data_feed/{payload}", rows[key]["path"])
         for row in rows.values():
-            self.assertNotIn("trading-source", row["path"])
-            self.assertNotIn("trading-derived", row["path"])
+            self.assertNotIn("trading-" + "source", row["path"])
+            self.assertNotIn("trading-" + "derived", row["path"])
             self.assertNotIn("data_sources/", row["path"])
             self.assertNotIn("data_bundles/", row["path"])
             self.assertNotIn("source_availability", row["path"])

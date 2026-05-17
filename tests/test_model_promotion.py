@@ -16,11 +16,12 @@ from trading_manager_tasks.model_promotion import (
 
 class ModelPromotionRequestTests(unittest.TestCase):
     def test_all_model_layers_use_one_request_kind(self):
-        self.assertEqual(len(MODEL_PROMOTION_TARGETS), 8)
+        self.assertEqual(len(MODEL_PROMOTION_TARGETS), 9)
         self.assertEqual({target.model_id for target in MODEL_PROMOTION_TARGETS}, {
             "model_01_market_regime",
             "model_02_sector_context",
             "model_03_target_state_vector",
+            "model_04_event_failure_risk",
             "model_05_alpha_confidence",
             "model_06_position_projection",
             "model_07_underlying_action",
@@ -61,7 +62,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertIn("activation_record_if_agent_approved", request["expected_outputs"])
 
 
-    def test_accepts_legacy_physical_aliases_for_unmigrated_surfaces(self):
+    def test_accepts_layer_or_model_ids_for_current_surfaces(self):
         request = build_model_promotion_review_request(
             model="model_08_option_expression",
             candidate_ref="trading-model://promotion-candidates/mpcand_example",

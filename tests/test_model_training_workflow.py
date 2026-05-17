@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.model_training_workflow import (
-    FULL_LAYER_COUNT,
+    BASE_STACK_LAYER_COUNT,
     FOUNDATION_CATCH_UP_BLOCKER,
     MONTHLY_SUBSTRATE_LAYERS,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
@@ -35,7 +35,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
 
         self.assertEqual(plan.contract_type, "manager_model_training_workflow_plan")
-        self.assertEqual(plan.layer_count, FULL_LAYER_COUNT)
+        self.assertEqual(plan.layer_count, BASE_STACK_LAYER_COUNT)
         self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 9)))
         for layer in plan.layers:
             expected_stage_types = [
