@@ -1,57 +1,40 @@
 # Source
 
-`src/` stores importable, reusable implementation code for `trading-manager` shared helper packages.
+`src/` contains importable Python packages owned by `trading-manager`.
 
-The formal cross-repository helper runtime surface is Python. Package metadata lives in root `pyproject.toml`; importable source lives under this directory.
+## Boundary
 
-## Layout
+- `src/` owns reusable implementation modules.
+- `scripts/` owns executable entrypoints and may import `src/`.
+- `src/` must not import `scripts/`.
+- Component-specific data/model/storage/execution/dashboard runtime logic belongs in component repositories.
 
-```text
-src/
-  README.md
-  trading_registry/      Python registry reader and secret-resolution package.
-  trading_manager_tasks/ Manager-owned request planning helpers.
-  trading_web_search/    Python web-search helper package backed by Brave Search.
-  trading_bigquery/      Dependency-light BigQuery REST helper using registry secret aliases.
-```
+## Packages
 
-Tests live under `tests/`. Executable maintenance entrypoints live under `scripts/`.
+| Package | Role |
+|---|---|
+| `trading_registry` | Registry reader and secret-alias resolver. |
+| `trading_manager_tasks` | Request, receipt, scheduler, evidence, review, and status helpers. |
+| `trading_web_search` | Web-search helper wrapper. |
+| `trading_bigquery` | Dependency-light BigQuery REST helper using registry secret aliases. |
 
 ## Install
-
-From the shared environment:
 
 ```bash
 /root/projects/trading-manager/.venv/bin/python -m pip install -r /root/projects/trading-manager/requirements.txt
 /root/projects/trading-manager/.venv/bin/python -m pip install -e /root/projects/trading-manager
 ```
 
-## Test
+## Verify
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests
+python3 -m compileall -q src scripts
 ```
 
-## Allowed Here
+## Rules
 
-- generic SQL helpers;
-- artifact path/reference helpers;
-- manifest helpers;
-- request, ready-signal, task-summary, and unified model-promotion request helpers;
-- component completion receipt normalization helpers;
-- shared validation utilities;
-- reusable Python packages consumed by component repositories.
-
-## Not Allowed Here
-
-- executable maintenance wrappers or one-off operational commands;
-- component runtime implementations;
-- broker/exchange trading daemons;
-- strategy logic;
-- model training logic;
-- dashboard application code;
-- secrets or credentials.
-
-Use `scripts/` for executable commands. `scripts/` may import `src/`; `src/` must not import `scripts/`.
-
-See `../docs/90_helpers.md` for the docs-level helper operating guide.
+- Keep helper APIs id/input oriented where registry stability matters.
+- Do not hard-code secret values.
+- Do not place executable wrappers here.
+- Do not place generated artifacts, logs, caches, or provider payloads here.

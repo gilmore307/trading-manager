@@ -1,17 +1,13 @@
 # Registry Rules
 
-This directory owns normative registry rules that constrain SQL row shape, kind routing, and shared naming decisions.
-
-Rules here are not loose review notes. Each Markdown file should own one aspect of registry governance and should be kept current when the SQL table, allowed kinds, or cross-repository naming contract changes.
+This directory owns cross-kind rules for the trading registry.
 
 ## Files
 
-- `kind-routing.md` — cross-kind tie-breakers when a row could plausibly fit more than one `kind`.
-- `data-kind-contract.md` — requirements for active `data_kind` rows and source/feed/final-shape separation.
-- `model-layer-naming.md` — registry naming rules for model-layer source, feature, and model surfaces.
+- `kind-routing.md` — tie-breakers when a proposed row could fit multiple kinds.
+- `data-kind-contract.md` — when a concept may become a final saved `data_kind`.
+- `model-layer-naming.md` — naming rules for model-layer source, feature, and model surfaces.
 
 ## Boundary
 
-- Per-kind scope/range/rejection definitions live in `../kinds/<kind>.md`.
-- Concrete rows live in SQL migrations under `../sql/schema_migrations/` and the generated snapshot `../current.csv`.
-- Historical investigation evidence may be summarized here only when it supports a continuing rule; dated watch-list prose should be promoted, resolved, or deleted.
+Per-kind meanings live in `../kinds/`. Concrete rows live in SQL migrations. This directory should contain durable rules only, not dated investigation notes or migration history.

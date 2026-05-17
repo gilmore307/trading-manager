@@ -1,21 +1,25 @@
 # Payload Format
 
-## Kind Boundary
+## Meaning
 
-Registered values allowed in the `trading_registry.payload_format` column.
+`payload_format` names values allowed in the trading_registry.payload_format column.
 
-## Range
+## Register Here
 
-Use this kind for payload value-format tokens that describe how consumers should interpret the text stored in a row's `payload` column.
+Register format tokens that tell consumers how to interpret registry row payload text.
 
-The SQL `trading_registry_payload_format_check` constraint and the registered `payload_format` rows must stay aligned.
+## Do Not Register Here
 
-## Reject Or Re-scope
+- field names;
+- status values;
+- helper functions;
+- source files;
+- component-local parsing notes;
 
-Reject or re-scope entries that are actually:
+## Row Rules
 
-- registry fields; use `field`;
-- status/outcome values; use the relevant status kind;
-- helper methods or source files; use `script` only for stable callable helper/automation exports;
-- local parsing helpers or test utilities;
-- one-off component-local formats that are not part of the trading-wide registry contract.
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

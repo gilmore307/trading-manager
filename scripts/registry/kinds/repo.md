@@ -1,17 +1,24 @@
 # Repo
 
-## Kind Boundary
+## Meaning
 
-Canonical repository identifiers. The row payload owns the repository name; the optional `path` column may hold the repository root path.
+`repo` names canonical trading repository identifiers.
 
-## Range
+## Register Here
 
-Register repository entries only. Use payload for the repository name, `path` column for the repository root path, and `term` for conceptual definitions.
+Register repository entries with payload as repository name and optional path as repository root.
 
-## Reject Or Re-scope
+## Do Not Register Here
 
-Reject or re-scope entries that are actually:
-
-- standalone repository root path rows;
+- standalone path rows;
 - concept definitions;
-- package/module names that are not repositories;
+- packages/modules that are not repositories;
+- component runtime names;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

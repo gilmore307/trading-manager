@@ -58,9 +58,9 @@ Provider calls require manager request scope, coverage/resource checks, and the 
 
 Service locks, scheduler state, workflow checkpoints, decision logs, and status summaries live under ignored runtime paths unless intentionally promoted into durable storage. They are operational state, not source docs.
 
-## D015 - Documentation favors current contracts over route history
+## D015 - Documentation favors current contracts
 
-Active docs should describe the current system from first principles. Route-change narrative, obsolete naming, and superseded plans should be removed from active explanations unless they are necessary to operate current code.
+Active docs should describe the current system from first principles. Obsolete naming, abandoned approaches, and transitional planning notes should be removed from active explanations unless they are necessary to operate current code.
 
 ## D210 - Activity bridge non-overlap is mandatory
 

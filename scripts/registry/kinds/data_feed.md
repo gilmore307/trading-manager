@@ -1,23 +1,26 @@
 # Data Feed
 
-## Kind Boundary
+## Meaning
 
-Implemented provider/API/web/file feed identifiers that fetch, parse, probe, or normalize the smallest external data-access surface owned by `trading-data`.
+`data_feed` names implemented provider/API/web/file feed interfaces.
 
-A data feed is not a control-plane-facing source output and is not a final saved data shape. It names the provider-facing boundary that source pipelines, feed-interface probes, or availability checks call.
+## Register Here
 
-## Range
+Register smallest implemented external data-access surfaces used by trading-data feed adapters or availability checks.
 
-Register data feeds when they have an implemented feed directory, feed-interface catalog entry, or execution-owned feed discovery adapter.
+## Do Not Register Here
 
-Use `payload` for the stable snake_case feed key. Use `path` for the implementation directory or feed-interface owner path, normally under `trading-data/src/data_feed/NN_feed_<surface>`.
+- control-plane source outputs;
+- final data shapes;
+- provider organizations;
+- credentials;
+- helper functions;
+- model outputs;
 
-## Reject Or Re-scope
+## Row Rules
 
-Reject or re-scope entries that are actually:
-
-- control-plane-facing runnable source outputs, which belong in `data_source`;
-- final saved output/data shapes, which belong in `data_kind`;
-- provider/company names, which belong in `provider`;
-- credentials or secret aliases, which belong in `config`;
-- callable helper exports, which belong in `script`.
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

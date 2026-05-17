@@ -1,24 +1,26 @@
 # Feed Capability
 
-## Kind Boundary
+## Meaning
 
-Provider/feed capability identifiers for feed-level record families, endpoint families, raw inputs, transient evidence, or entitlement-gated provider categories that may inform implemented data feeds but are not accepted final saved data shapes.
+`feed_capability` names record families, endpoint families, entitlement-gated capabilities, or raw inputs exposed by a provider/feed.
 
-A feed capability is narrower than a `data_feed` connector and broader than a runtime field. It records what a feed can expose or what a feed adapter may use internally, without granting `data_kind` status.
+## Register Here
 
-## Range
+Register capabilities useful for entitlement review, feed planning, and adapter documentation before they become saved contracts.
 
-Register feed capabilities when the concept is useful for feed availability, entitlement review, adapter planning, or documenting transient/raw inputs.
+## Do Not Register Here
 
-Use `payload` for the stable snake_case capability key. Use `path` for public provider documentation when that is the best locator. Use `applies_to` for the owning data feed, provider, or feed-interface scope.
+- final data shapes;
+- implemented feed connectors;
+- control-plane source outputs;
+- provider organizations;
+- ordinary glossary terms;
+- runtime fields;
 
-## Reject Or Re-scope
+## Row Rules
 
-Reject or re-scope entries that are actually:
-
-- final saved data shapes with accepted current storage contracts, which belong in `data_kind`;
-- implemented feed connectors, which belong in `data_feed`;
-- control-plane-facing source outputs, which belong in `data_source`;
-- provider/company/feed-owner names, which belong in `provider`;
-- ordinary glossary-only concepts with no feed/interface role, which belong in `term`;
-- runtime fields, which belong in `field`.
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

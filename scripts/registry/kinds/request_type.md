@@ -1,18 +1,25 @@
 # Request Type
 
-## Kind Boundary
+## Meaning
 
-Registered request type values used to classify cross-repository work requests.
+`request_type` classifies cross-repository manager work requests.
 
-## Range
+## Register Here
 
-Register request type values only. Do not register request instances, workflow names, task lifecycle states, or component-local queue names here.
+Register request type values only.
 
-## Reject Or Re-scope
-
-Reject or re-scope entries that are actually:
+## Do Not Register Here
 
 - request instances;
 - workflow names;
-- task lifecycle states;
+- task lifecycle statuses;
 - component-local queue names;
+- script names;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

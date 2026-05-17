@@ -1,15 +1,28 @@
-# identity_field
+# Identity Field
 
-Canonical shared field names whose values identify or name an entity, artifact, source, instrument, task, report, or row.
+## Meaning
 
-Use this kind for fields such as `id`, `event_id`, `symbol`, `issuer_name`, `fund_name`, `title`, `timeline_headline`, `contract_symbol`, `cusip`, and `sedol`.
+`identity_field` names fields whose values identify or name an entity, artifact, source, instrument, task, report, or row.
 
-Rules:
+## Register Here
 
-- The row payload is the field/column name and should use `payload_format = field_name` unless the reviewed external contract requires another format.
-- Use a single-name payload only for genuinely generic shared identity fields such as `id`, `symbol`, or `title`; scoped identity fields should use prefix + semantic suffix, such as `data_task_run_id`, `issuer_name`, or `option_event_detail_standard_id`.
-- Identity fields are not measurements, scores, counts, temporal values, classification axes, paths, URLs, or references.
-- Use `path_field` when the value locates or references an artifact, file, URL, repository path, source reference, or output reference.
-- Use `classification_field` when the value comes from a controlled vocabulary/classification axis, even if it labels a row.
-- Use `temporal_field` when the value is a date/time/timestamp.
-- Keep source operational metadata that is not a durable identity/locator in `field`.
+Register ids, symbols, names, titles, headlines, contract symbols, CUSIPs, SEDOLs, and stable entity identifiers.
+
+## Do Not Register Here
+
+- measurements;
+- scores;
+- counts;
+- timestamps;
+- status values;
+- classification axes;
+- paths/URLs/refs;
+- free-text summaries;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

@@ -1,31 +1,28 @@
 # Data Source
 
-## Kind Boundary
+## Meaning
 
-Manager-facing `trading-data` source-output identifiers accepted for task routing, runner dispatch, model-input source tables, and completion receipts.
+`data_source` names manager-facing trading-data source-output boundaries.
 
-A data source is a source-backed output boundary that a manager can request directly. Provider/API/web/file connectors are not data sources; they belong in `data_feed`.
+## Register Here
 
-## Range
+Register source_NN_* outputs that manager can request directly and that can appear in task keys, runner routing, receipts, or model-input planning.
 
-Register data sources when they may appear in control-plane-facing task keys, runner routing, source READMEs, completion receipts, or model-input planning docs.
+## Do Not Register Here
 
-Use `payload` for the concrete `source_NN_<layer>` source key. Use `path` for the canonical control-plane-facing implementation directory, normally under `trading-data/src/data_source/source_NN_<layer>`.
+- provider feed adapters;
+- feature outputs;
+- final data shapes;
+- provider names;
+- credentials;
+- runtime fields;
+- scripts;
+- templates;
 
-## Reject Or Re-scope
+## Row Rules
 
-Reject or re-scope entries that are actually:
-
-- provider/API/web/file feeds, which belong in `data_feed`;
-- control-plane-facing deterministic feature outputs, which belong in `data_feature`;
-- final saved dataset shapes independent of the producing source, which belong in `data_kind`;
-- provider/company names, which belong in `provider`;
-- credentials or secret aliases, which belong in `config`;
-- runtime JSON fields, which belong in `field`;
-- scripts or Python symbols, which belong in `script`;
-- template files, which belong in `template`;
-- shared checked-in data/config artifacts, which belong in `shared_artifact`.
-
-## Naming Rule
-
-Source keys should be stable snake_case and use the accepted `source_NN_<layer>` pattern, such as `source_01_market_regime`. Source-specific task/run IDs should use the source key as their prefix.
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

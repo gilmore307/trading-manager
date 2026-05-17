@@ -1,30 +1,27 @@
 # Data Feature
 
-## Kind Boundary
+## Meaning
 
-Manager-facing `trading-data` deterministic feature-output identifiers accepted for feature routing, model-input planning, storage contracts, and completion receipts.
+`data_feature` names deterministic model-facing feature surfaces produced by trading-data.
 
-A data-feature boundary is a point-in-time feature surface produced from accepted feed/source data for direct model consumption. Provider/API/web/file connectors belong in `data_feed`; model-scoped observed-data tables belong in `data_source`; model outputs and evaluation artifacts belong in `trading-model` contracts.
+## Register Here
 
-## Range
+Register feature_NN_* outputs that can appear in feature routing, model-input planning, receipts, or storage contracts.
 
-Register data-feature rows when they may appear in data/feature task keys, feature runner routing, model-input planning docs, storage contracts, completion receipts, or cross-repository handoffs.
+## Do Not Register Here
 
-Use `payload` for the concrete `feature_NN_<layer>` feature key. Use `path` for the canonical implementation directory when accepted, normally under `trading-data/src/data_feature/feature_NN_<layer>`.
+- provider feeds;
+- source-backed observed outputs;
+- model outputs;
+- final saved data shapes;
+- runtime fields;
+- scripts;
+- credentials;
 
-## Reject Or Re-scope
+## Row Rules
 
-Reject or re-scope entries that are actually:
-
-- provider/API/web/file feeds, which belong in `data_feed`;
-- source-backed observed-data outputs, which belong in `data_source`;
-- model outputs, evaluation labels, evaluation runs, or metrics, which belong in model-owned contracts;
-- shared checked-in data/config artifacts, which belong in `shared_artifact`;
-- runtime fields, which belong in field-like kinds;
-- scripts or Python symbols, which belong in `script`;
-- provider/company names, which belong in `provider`;
-- credentials or secret aliases, which belong in `config`.
-
-## Naming Rule
-
-Feature keys should be stable snake_case and use the accepted `feature_NN_<layer>` pattern, such as `feature_01_market_regime`, mirroring the `source_NN_<layer>` source naming pattern.
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

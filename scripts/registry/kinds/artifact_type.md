@@ -1,18 +1,26 @@
 # Artifact Type
 
-## Kind Boundary
+## Meaning
 
-Registered artifact type values used to classify durable outputs produced and consumed across trading repositories.
+`artifact_type` classifies durable artifact categories produced or consumed across repositories.
 
-## Range
+## Register Here
 
-Register artifact type values only. Do not register artifact instances, filesystem paths, output templates, or manifest schemas here.
+Register artifact category values such as model outputs, receipts, reports, logs, manifests, dashboard payloads, and evidence bundles.
 
-## Reject Or Re-scope
-
-Reject or re-scope entries that are actually:
+## Do Not Register Here
 
 - artifact instance paths;
-- output templates;
-- manifest types;
+- filesystem locators;
+- manifest schemas;
 - request types;
+- template files;
+- status values;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

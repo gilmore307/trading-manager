@@ -1,16 +1,27 @@
-# Registry kind: text_field
+# Text Field
 
-Canonical shared field names whose values are human-readable free-text, narrative notes, explanations, summaries, caveats, diagnostics, errors, or documentation-oriented text columns.
+## Meaning
 
-Use this kind for fields such as `summary`, `coverage_reason`, `known_caveats`, `acceptance_summary`, `change_summary`, `maintenance_summary`, `task_status_summary`, `error`, and registry `note`.
+`text_field` names fields whose values are human-readable text.
 
-## Boundaries
+## Register Here
 
-- Text fields explain, describe, summarize, or annotate; they are not scalar measurements, identifiers, locators, statuses, temporal values, or classification axes.
-- Use `identity_field` for names, ids, symbols, titles/headlines, and other identity/naming fields.
-- Use `path_field` for URLs, paths, references, files, and output locators.
-- Use `classification_field` for categorical axes and `status_value` for allowed status values.
-- Error details belong here when their purpose is diagnostic explanation; status outcomes remain `status_value`.
-- Use `parameter_field` for request/task parameter objects, parameter lists, and documented parameter collections.
-- Keep structured numeric/model context fields in `field` unless their primary purpose is narrative explanation.
-- The row payload is the field/column name and should use `payload_format = field_name` unless a reviewed external contract requires another format.
+Register summaries, explanations, caveats, diagnostics, errors, notes, known issues, acceptance text, and documentation-oriented text columns.
+
+## Do Not Register Here
+
+- numeric metrics;
+- identifiers;
+- paths/URLs/refs;
+- temporal values;
+- classification axes;
+- status values;
+- parameter objects;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

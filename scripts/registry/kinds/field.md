@@ -1,34 +1,28 @@
 # Field
 
-## Kind Boundary
+## Meaning
 
-Canonical shared non-identity, non-temporal, non-classification field names used in task records, receipts, manifests, requests, review artifacts, maintenance outputs, and helper-facing schemas.
+`field` names shared non-identity, non-temporal, non-classification, non-path, non-text, non-parameter schema slots.
 
-## Range
+## Register Here
 
-Register field names only. Do not use this kind for status values, repository names, config values, artifact instances, or free-form documentation labels.
+Register metrics, counts, booleans, structured JSON slots, numeric values, and generic contract fields used in shared records.
 
-## Reject Or Re-scope
-
-Reject or re-scope entries that are actually:
+## Do Not Register Here
 
 - status values;
 - repository names;
-- identity/name/title/reference fields;
-- temporal/date/time fields;
+- identity/name fields;
+- temporal fields;
 - classification axes;
-- filesystem paths;
-- config defaults;
+- paths/URLs/refs;
+- free-text notes;
+- parameter objects;
 
-## Usage Metadata
+## Row Rules
 
-Every `field` entry must populate `trading_registry.applies_to`. Use semicolon-separated scopes when a field belongs to multiple tables, files, contracts, templates, or data shapes. Do not add a field entry until its first valid usage scope is known.
-
-## Naming Rule
-
-Prefer the broadest truthful field key.
-
-- Reusable metrics or columns should use generic metric/category keys, such as `BAR_CLOSE`, `QUOTE_BID`, `TRADE_SIZE`, or `GREEK_DELTA`.
-- Asset-class keys are acceptable when the field is inherently asset-class-specific, such as option contract fields.
-- Scenario-specific prefixes belong only to fields whose meaning is specific to that scenario, such as `OPTION_EVENT_DETAIL_PRICE_VS_ASK`.
-- Do not keep implementation/template-era prefixes like `OPTION_TEMPLATE_*` when the field is a reusable current data field.
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

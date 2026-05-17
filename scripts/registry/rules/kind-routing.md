@@ -1,73 +1,56 @@
-# Registry Kind Routing Rules
+# Kind Routing Rules
 
-## Purpose
+Use the narrowest kind that states what the row actually is.
 
-This file owns cross-kind tie-breakers for `trading_registry.kind`. Use it when a proposed row could plausibly fit multiple kinds.
+## Field-Like Rows
 
-Per-kind scope/range/rejection definitions still live in `../kinds/<kind>.md`.
-
-## Field-Like Kinds
-
-Use the narrowest true field kind:
-
-| Row role | Registry kind |
+| Row role | Kind |
 |---|---|
-| Non-identity, non-temporal, non-classification scalar or structured slot | `field` |
-| Entity id, symbol, name, title, headline, or other identity/name slot | `identity_field` |
-| File path, URL, source reference, output reference, repository path, or artifact locator slot | `path_field` |
-| Date, time, datetime, timestamp, availability, effective-time, or window-bound slot | `temporal_field` |
-| Categorical/type/status/scope/tags semantic axis slot | `classification_field` |
-| Free-text summary, explanation, caveat, diagnostic, error, or note slot | `text_field` |
-| Request/task parameter object or parameter collection slot | `parameter_field` |
+| entity id, symbol, name, title, headline | `identity_field` |
+| path, URL, source ref, output ref, artifact locator | `path_field` |
+| date, time, timestamp, availability/effective/window bound | `temporal_field` |
+| category/type/scope/tag/status slot | `classification_field` |
+| free-text summary, explanation, error, caveat, note | `text_field` |
+| request/task parameter object or parameter collection | `parameter_field` |
+| metric, count, boolean, score, generic structured slot | `field` |
 
-Rules:
+Allowed values for a status slot are `status_value`; the slot carrying them is `classification_field`.
 
-- `field` is the fallback only after identity/path/temporal/classification/text/parameter meanings are ruled out.
-- Allowed values for a status or policy axis are `status_value`; the slot that carries those values is `classification_field`.
-- Every field-like row must populate `applies_to` with its first concrete table, template, receipt, or contract scope.
+## Data Rows
 
-## Status And Type Values
-
-- Use `status_value` for allowed state or policy values such as lifecycle, review, test, docs, maintenance, acceptance, readiness, and artifact-sync values.
-- Put the status domain in `applies_to`, for example `task_lifecycle_status` or `artifact_sync_policy_type`.
-- Do not create one registry kind per status domain.
-- Use `state_vector_value` only for reviewed core scalar score tokens inside an accepted model state-vector contract.
-- Preserve the exact reviewed score token in `state_vector_value.payload`; these payloads should carry compact numeric layer prefixes such as `1_*` through `8_*`.
-- Do not route state-vector block/group names, diagnostics, routing/audit fields, windows, enum values, research payloads, or unresolved source-mapping placeholders into `state_vector_value`; keep them in model-local docs/contracts unless a later manager-phase durable interface review promotes them through a narrower registry kind.
-- Use field-like kinds only for separate storage/schema slots whose primary reviewed role is physical carriage, not for the same state-vector payload token.
-- Use `artifact_type`, `manifest_type`, `ready_signal_type`, `request_type`, and `payload_format` only for values whose structural role is materially different from a generic status/policy value.
-
-## Data Production Kinds
-
-| Row role | Registry kind |
+| Row role | Kind |
 |---|---|
-| Current provider/source owner identity | `provider` |
-| Implemented provider/API/web/file feed connector | `data_feed` |
-| Feed-level record family, raw input, endpoint family, transient evidence, or entitlement-gated category | `feed_capability` |
-| Control-plane-facing runnable source output | `data_source` |
-| Deterministic model-facing feature output produced by `trading-data` | `data_feature` |
-| Accepted final saved data shape with a current storage contract | `data_kind` |
+| provider organization/platform/source owner | `provider` |
+| implemented feed adapter or data-access interface | `data_feed` |
+| feed endpoint family, record family, entitlement capability | `feed_capability` |
+| manager-requestable source output | `data_source` |
+| deterministic model-facing feature output | `data_feature` |
+| final saved data shape with accepted storage contract | `data_kind` |
 
-Rules:
+## Automation Rows
 
-- Provider documentation URLs belong on `provider`, `feed_capability`, or glossary `term` rows, not on `data_kind` rows unless the URL is the accepted final data-shape contract.
-- Feed connectors and source outputs are not final data shapes by default.
-- Model outputs, evaluation tables, promotion tables, and diagnostics belong to model-owned contracts unless separately registered as shared terms/fields/statuses.
+| Row role | Kind |
+|---|---|
+| stable callable command/export | `script` |
+| reusable checked-in template | `template` |
+| durable checked-in shared data/config file | `shared_artifact` |
+| repository identity | `repo` |
+| non-secret config or secret alias | `config` |
+| request category | `request_type` |
+| artifact category | `artifact_type` |
+| manifest category | `manifest_type` |
+| ready-signal category | `ready_signal_type` |
+| registry payload-format token | `payload_format` |
+| glossary concept | `term` |
 
-## Locators And Config
+## Rejection Defaults
 
-- Direct locators belong in the nullable `path` column on the entity row. Do not add a `path` kind.
-- Use `config` for machine-consumed non-secret config values and secret aliases.
-- Use `term` for human-facing definitions when no machine-consumed kind fits.
-- Never store raw secrets in SQL payloads, paths, notes, or generated CSV snapshots.
+Do not register:
 
-## Scripts, Templates, And Artifacts
-
-- Use `script` for stable callable helper or automation surfaces, not ordinary source files, packages, test helpers, generated snapshots, or broad directories.
-- Use `template` for reusable checked-in templates or template generator surfaces.
-- Use `shared_artifact` for durable checked-in shared data/config assets that are not templates.
-- Use `artifact_type` for allowed artifact classification values, not artifact instances.
-
-## Review Trigger
-
-If a proposed row does not fit these rules cleanly, update this file or the relevant `../kinds/<kind>.md` before adding SQL rows. Do not encode unresolved ambiguity only in `note`.
+- secret values;
+- generated payload blobs;
+- runtime scratch paths;
+- unreviewed experiment labels;
+- ordinary implementation files as scripts;
+- duplicate semantics under different keys;
+- broad terms when a concrete field/status/source/feed kind applies.

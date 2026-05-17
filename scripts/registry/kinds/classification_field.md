@@ -1,23 +1,26 @@
-# classification_field
+# Classification Field
 
-Canonical shared field names whose values classify, categorize, bucket, label, scope, or otherwise assign a row to a semantic class.
+## Meaning
 
-Use this kind for fields such as `event_type`, `source_type`, `impact_scope`, `universe_type`, `exposure_type`, `option_right_type`, `sector_type`, `asset_class`, and other categorical axes.
+`classification_field` names fields whose values classify, bucket, type, tag, scope, or categorize a row.
 
-Rules:
+## Register Here
 
-- The row payload is the field/column name and should use `payload_format = field_name`.
-- Register the semantic classification axis once, then list every consuming template, receipt, or table in `applies_to`.
-- Do not create separate rows only because one template previously used a suffix such as `_hint`, `_event`, or a component prefix.
-- Prefer stable lowercase token values for classifications unless a source contract explicitly requires another reviewed encoding.
-- Use explicit semantic names:
-  - `*_type` for class/type/taxonomy distinctions, including source-provided category labels such as `source_event_type`.
-  - `*_status` for state/status slots.
-  - `*_scope` for scope/coverage axes.
-  - `*_policy_type` for strategy/policy type axes such as `artifact_sync_policy_type`.
-  - `*_tags` for multi-label tag sets.
-  - `kind` only for registry-native schema terms such as `data_kind` or `registry_item_kind`; otherwise prefer `*_type`.
-- Avoid vague standalone names such as `category`, `kind`, `type`, `right`, `outcome`, `readiness`, or `side_hint` unless they are fixed external/source schema names that cannot be normalized.
-- Keep date/time fields in `temporal_field`.
-- Keep identifiers, names, and titles in `identity_field`; keep URLs, paths, and references in `path_field`.
-- Keep free-text descriptions, summaries, numeric metrics, and structured JSON payload slots in `field` unless the value is itself a classification label.
+Register field names such as event_type, source_type, impact_scope, universe_type, asset_class, option_right_type, policy_type, and tags.
+
+## Do Not Register Here
+
+- status values themselves;
+- identity/name fields;
+- temporal fields;
+- path/reference fields;
+- free-text summaries;
+- numeric measurements;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

@@ -31,9 +31,7 @@ requirements.txt  Shared environment dependency ledger.
 ```text
 docs/00_scope.md                         Boundary of this repository.
 docs/01_context.md                       Repository map and operating assumptions.
-docs/02_layer_01_market_regime.md        Manager boundary for Layer 1.
-docs/03_layer_02_sector_context.md       Manager boundary for Layer 2.
-docs/04_model_stack_control_plane.md     Current Layer 1-9 control-plane map.
+docs/02_model_stack_control_plane.md     Current Layer 1-9 control-plane map and layer boundaries.
 docs/80_task.md                          Current active tasks and gates.
 docs/81_decision.md                      Current decision ledger.
 docs/82_memory.md                        Durable note policy.

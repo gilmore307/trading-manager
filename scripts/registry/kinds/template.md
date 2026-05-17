@@ -1,21 +1,25 @@
 # Template
 
-## Kind Boundary
+## Meaning
 
-Reusable checked-in template identifiers for task keys, receipts, source-scaffold files, and other stable template artifacts. Retired data-kind preview shapes should not be registered.
+`template` names reusable checked-in template files or template generator surfaces.
 
-## Range
+## Register Here
 
-Register templates only when the row points to a durable template file or template generator surface that other repositories may reference.
+Register durable task-key, receipt, scaffold, source-contract, report, or payload templates used across repository boundaries.
 
-Use `payload` for the workspace-relative template path or callable template export name. Use `path` for the canonical local checkout path when useful for automation/review.
-
-## Reject Or Re-scope
-
-Reject or re-scope entries that are actually:
+## Do Not Register Here
 
 - runtime artifact instances;
 - live shared data files;
-- helper functions, which belong in `script`;
-- provider/source implementations, which belong in `data_source`;
-- final saved data categories, which belong in `data_kind`.
+- helper functions;
+- source implementations;
+- final saved data categories;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

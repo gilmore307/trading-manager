@@ -1,22 +1,26 @@
 # Shared Artifact
 
-## Kind Boundary
+## Meaning
 
-Durable checked-in shared artifacts that are data/config assets rather than templates, scripts, terms, or final data-kind categories.
+`shared_artifact` names durable checked-in shared data/config assets.
 
-## Range
+## Register Here
 
-Register shared artifacts when multiple repositories intentionally consume one stable checked-in file and the registry needs to expose its canonical locator.
+Register stable files intentionally consumed by multiple repositories and useful to expose through a registry locator.
 
-Use `payload` for the workspace-relative artifact path or stable artifact key. Use `path` for the canonical local checkout path when useful for automation/review.
+## Do Not Register Here
 
-## Reject Or Re-scope
-
-Reject or re-scope entries that are actually:
-
-- template files, which belong in `template`;
+- templates;
 - runtime output instances;
-- provider/source adapters, which belong in `data_source`;
-- control-plane-facing deterministic feature output boundaries, which belong in `data_feature`;
-- final saved dataset categories, which belong in `data_kind`;
-- non-secret config defaults, which belong in `config`.
+- provider adapters;
+- feature outputs;
+- final data kinds;
+- non-secret config defaults;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

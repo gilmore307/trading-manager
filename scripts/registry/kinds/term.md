@@ -1,24 +1,27 @@
 # Term
 
-## Kind Boundary
+## Meaning
 
-Approved shared terminology and definitions.
+`term` names approved shared concepts and definitions.
 
-## Range
+## Register Here
 
-Register durable terminology definitions only. Do not use this kind for implementation notes, task state, or local comments.
+Register durable glossary terms that help cross-repository contracts use the same language.
 
-## Reject Or Re-scope
-
-Reject or re-scope entries that are actually:
+## Do Not Register Here
 
 - task state;
 - component-local notes;
 - config values;
 - field names;
-- provider/feed-owner identities, which belong in `provider`;
-- provider/feed endpoint or record-family capabilities, which belong in `feed_capability`;
+- provider identities;
+- feed endpoint capabilities;
+- implementation files;
 
-## Path Usage
+## Row Rules
 
-Glossary/reference terminology may use `path` for canonical public documentation when that URL is a useful shared locator. Provider/source-owner home pages belong on `provider` rows; endpoint-family documentation belongs on `feed_capability` rows.
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.

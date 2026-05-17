@@ -1,19 +1,27 @@
 # Script
 
-## Kind Boundary
+## Meaning
 
-Canonical callable helper or automation export records. The row payload should describe the usable helper/export; the optional `path` column should hold the concrete source-file locator.
+`script` names stable callable commands or automation exports.
 
-## Range
+## Register Here
 
-Register stable callable helper or automation exports only. Use payload for the usable helper/export description and `path` column for the concrete source-file locator. Do not register package constants, generated files, or broad directories.
+Register executable entrypoints under scripts/ or stable helper exports intended for automation.
 
-## Reject Or Re-scope
-
-Reject or re-scope entries that are actually:
+## Do Not Register Here
 
 - directories;
+- ordinary source files;
 - generated files;
-- test scripts or test fixtures;
+- test scripts;
+- fixtures;
 - runtime artifact paths;
 - generic terms;
+
+## Row Rules
+
+- `payload` must hold the stable registered value, not prose.
+- `path` is optional and should point only to the canonical locator when the row names a locateable thing.
+- `applies_to` should name the first real consumer scope when the value is not global.
+- Use the narrowest valid kind; if another kind is more precise, use that kind instead.
+- Never register secrets, generated blobs, local scratch files, or unreviewed experiment labels.
