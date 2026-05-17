@@ -151,7 +151,7 @@ PYTHONPATH=src python3 scripts/tasks/materialize_layer_three_target_state_inputs
 
 This emits `manager_layer_three_target_state_input_materialization` evidence, merges completed Layer 2 Alpaca bar artifacts into a `source_03_target_state` task key, and delegates normalization to `trading-data`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation.
 
-Materialize Layer 8 event-risk inputs from local source-detector outputs over already reviewed Layer 2 feed artifacts:
+Materialize legacy `source_08` / conceptual Layer 9 event-risk inputs from local source-detector outputs over already reviewed Layer 2 feed artifacts:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/materialize_layer_eight_event_risk_governor_inputs.py \

@@ -2477,9 +2477,9 @@ No active manager-phase tasks remain. Future work is deferred until a concrete c
 Date: 2026-05-09
 Status: Accepted
 
-The registry owns the shared Layer 4 price-action vocabulary: `price_action` as an `event_category_type` value and canonical event tokens `false_breakout`, `false_breakdown`, `liquidity_sweep_high`, `liquidity_sweep_low`, `bull_trap`, and `bear_trap`.
+The registry owns the shared price-action vocabulary: `price_action` as an `event_category_type` value and canonical event tokens `false_breakout`, `false_breakdown`, `liquidity_sweep_high`, `liquidity_sweep_low`, `bull_trap`, and `bear_trap`.
 
-The registry policy is explicit: price-action evidence is Layer 8 event-risk evidence and optional Layer 3/5 context. It is not a new model layer, not an action signal, and not execution permission.
+The registry policy is explicit: price-action evidence is legacy event-risk-governor evidence and optional target/alpha context. Under the current conceptual stack it belongs to Layer 9 residual governance unless promoted through reviewed Layer 4 event-failure-risk evidence. It is not a new standalone model layer, not an action signal, and not execution permission.
 
 ## D110 - Manager scheduler should automate historical training while protecting live capacity
 
@@ -2719,16 +2719,16 @@ Status: Accepted
 
 ### Context
 
-Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. Layers 3-7 operate over an open target-candidate space, including the conceptual Layer 7 option-expression boundary whose physical stage token remains `layer_07_option_expression` until a dedicated migration. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
+Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. After D208, Layers 3-8 operate over an open target-candidate space, including the conceptual Layer 8 option-expression boundary whose physical stage token remains legacy `layer_07_option_expression` until a dedicated migration. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
 
 ### Decision
 
 Use segmented workflow progression:
 
 - Layer 1 continues chronological month-by-month after its own month-level receipts are ready; it does not wait for downstream layers.
-- Layer 2 continues chronological month-by-month once Layer 1 context exists; it does not wait for Layers 3-8.
-- Layers 3-7 run target-major by default: select one target candidate and complete Layers 3 -> 4 -> 5 -> 6 -> 7 before admitting the next target candidate, unless a reviewed coverage exception is recorded.
-- Conceptual Layer 7 option-expression contract/bucket expansion, currently carried by legacy physical `layer_07_option_expression`, starts only after the selected target's upstream Layer 1-6 context/target/action chain is complete.
+- Layer 2 continues chronological month-by-month once Layer 1 context exists; it does not wait for Layers 3-9.
+- Layers 3-8 run target-major by default: select one target candidate and complete conceptual Layers 3 -> 4 -> 5 -> 6 -> 7 -> 8 before admitting the next target candidate, unless a reviewed coverage exception is recorded.
+- Conceptual Layer 8 option-expression contract/bucket expansion, currently carried by legacy physical `layer_07_option_expression`, starts only after the selected target's prior market-through-underlying-action context chain is complete.
 
 ### Consequences
 
@@ -2765,7 +2765,7 @@ Status: Accepted
 
 ### Context
 
-The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. Layers 1-7 reached safe/offline completion for the month. The legacy physical `layer_07_option_expression` stage was blocked by the option-expression acquisition gate until the completed target chain could be reviewed.
+The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. The prerequisite safe/offline stages reached completion for the month. The legacy physical `layer_07_option_expression` stage was blocked by the option-expression acquisition gate until the completed target chain could be reviewed.
 
 ### Decision
 
@@ -3521,7 +3521,7 @@ After `Model Worker 1` started the first complete fold (`2016-01` through `2016-
 
 All Layer 3+ model-worker stages use the same six-month fold unit as their execution scope. Local input materializers must accept `start_month`/`end_month` fold ranges and may not assume one chronological month per run. Month-scoped provider/feed artifacts remain reusable substrate, but the manager-owned task key and downstream source/model stage are fold-scoped.
 
-Layer 3 target-state materialization creates one target candidate per symbol for the fold and merges all reviewed Layer 2 bar artifacts from the six-month range. Layer 8 event-risk materialization prepares detector task keys per symbol-month and then writes one fold-scoped source task key covering the full six-month event window.
+Layer 3 target-state materialization creates one target candidate per symbol for the fold and merges all reviewed Layer 2 bar artifacts from the six-month range. Legacy `source_08` / conceptual Layer 9 event-risk materialization prepares detector task keys per symbol-month and then writes one fold-scoped source task key covering the full six-month event window.
 
 ### Consequences
 
@@ -3663,13 +3663,13 @@ Layer 4-8 historical outputs had advanced with `source_08_event_risk_governor` p
 
 ### Decision
 
-Layer 8 event-risk write-mode materialization must require reviewed local artifacts for `alpaca_news`, `gdelt_news`, `sec_company_financials`, and `trading_economics_calendar_web` before it can write `source_08_event_risk_governor` rows or unlock event-risk model stages. The event source now accepts `event_artifact_paths` and normalizes supported feed artifacts into canonical overview rows: Alpaca news to `symbol_news`, GDELT to `macro_news` / `sector_news` / `symbol_news` by available scope hints, Trading Economics calendar rows to `macro_data`, and SEC submissions/facts/concepts/frames to `sec_filing` / financial-disclosure events. Manager preparation for those artifacts is explicit through `scripts/tasks/prepare_layer_eight_event_feed_backfill.py`; it writes reviewed task keys only and performs no provider calls until a separate bounded acquisition command is invoked.
+Legacy `source_08` / conceptual Layer 9 event-risk write-mode materialization must require reviewed local artifacts for `alpaca_news`, `gdelt_news`, `sec_company_financials`, and `trading_economics_calendar_web` before it can write `source_08_event_risk_governor` rows or unlock event-risk model stages. The event source now accepts `event_artifact_paths` and normalizes supported feed artifacts into canonical overview rows: Alpaca news to `symbol_news`, GDELT to `macro_news` / `sector_news` / `symbol_news` by available scope hints, Trading Economics calendar rows to `macro_data`, and SEC submissions/facts/concepts/frames to `sec_filing` / financial-disclosure events. Manager preparation for those artifacts is explicit through `scripts/tasks/prepare_layer_eight_event_feed_backfill.py`; it writes reviewed task keys only and performs no provider calls until a separate bounded acquisition command is invoked.
 
-Existing Layer 4-8 workflow stages produced from abnormal-activity-only inputs must be marked stale/rebuild-required before any rebuild. The invalidation is state-only: it does not delete artifacts, call providers, activate models, submit broker actions, mutate accounts, or write dashboard read models.
+Existing legacy event-governor-dependent workflow stages produced from abnormal-activity-only inputs must be marked stale/rebuild-required before any rebuild. The invalidation is state-only: it does not delete artifacts, call providers, activate models, submit broker actions, mutate accounts, or write dashboard read models.
 
 ### Consequences
 
-- Missing event feed artifacts, or reviewed artifacts with zero requested-window rows, block Layer 4 data-acquisition write mode instead of allowing incomplete event inputs to proceed.
+- Missing event feed artifacts, or reviewed artifacts with zero requested-window rows, block legacy event-risk data-acquisition write mode instead of allowing incomplete event inputs to proceed.
 - Layer 1-3 outputs remain preserved unless their own inputs change.
 - Layer 4-8 must be regenerated only after event-source artifacts are backfilled and coverage passes.
 - The scheduler stays stopped until event-source coverage, stale-state marking, and downstream rebuild policy are verified.
@@ -3717,15 +3717,16 @@ When cookies expire, the refresh path renews the authenticated browser session a
 - Feed parsers must enforce requested-window filtering and report out-of-window skips in receipt evidence.
 - Secrets and cookies stay outside Git; repository code and registry rows may name aliases/policies only.
 
-## D162 - Layer 8 event-risk governor follows Layer 7 trading guidance
+## D162 - Event-risk governor follows base trading guidance
 
 Accepted: 2026-05-15
+Status: Superseded by D208 for exact layer numbers
 
-The active conceptual model stack moves event intelligence from Layer 4 to Layer 8. Layers 4-7 move forward: AlphaConfidenceModel becomes conceptual Layer 4, PositionProjectionModel Layer 5, UnderlyingActionModel Layer 6, and TradingGuidanceModel / OptionExpressionModel Layer 7. Layer 8 is EventRiskGovernor / EventIntelligenceOverlay.
+This historical decision moved event intelligence out of the hard upstream alpha path. D208 later inserted Layer 4 EventFailureRiskModel and shifted EventRiskGovernor to conceptual Layer 9.
 
-Manager orchestration must treat Layer 7 as the base trading-guidance candidate and Layer 8 as a post-guidance event-risk intervention boundary. Layer 8 can block new entries, cap exposure, request exposure reduction, nominate flatten/clear candidates, nominate halt candidates, or require human review when high-risk point-in-time events are detected. These are decision/risk-record interventions, not direct broker/account mutations.
+Manager orchestration must treat conceptual Layer 8 as the base trading-guidance / option-expression candidate and conceptual Layer 9 as a post-guidance event-risk intervention boundary. Layer 9 can block new entries, cap exposure, request exposure reduction, nominate flatten/clear candidates, nominate halt candidates, require human review, or propose Layer 4 promotion packets when high-risk point-in-time events are detected. These are decision/risk-record interventions, not direct broker/account mutations and not automatic event-family promotion.
 
-Current-version stage, script, table, package, and registry names must follow the accepted conceptual order: `layer_04_alpha_confidence`, `layer_05_position_projection`, `layer_06_underlying_action`, `layer_07_option_expression`, and `layer_08_event_risk_governor`. Historical migration files and old storage artifacts may retain prior names.
+Current physical stage, script, table, package, and registry names remain legacy in this governance-only slice: `layer_04_alpha_confidence`, `layer_05_position_projection`, `layer_06_underlying_action`, `layer_07_option_expression`, and `layer_08_event_risk_governor` are compatibility surfaces until a dedicated code/SQL renumbering migration is reviewed.
 
 ## D163 - Event lifecycle contract is registered for event-risk governance
 
@@ -4103,17 +4104,17 @@ The current reverse scan keeps `legal_regulatory_investigation` as a reverse-dis
 
 Status: accepted.
 
-The production event-layer route should be base-stack first. Layers 1-7 analyze market, sector, target, alpha confidence, position projection, underlying action, and option/trading guidance context. Only behavior that remains abnormal after that base-stack explanation should become `residual_anomaly_context` for Layer 8 review.
+The production event-layer route should be base-stack first. After D208, Layers 1-8 analyze market, sector, target, accepted event-failure risk, alpha confidence, position projection, underlying action, and option/trading guidance context. Only behavior that remains abnormal after that base-stack explanation should become `residual_anomaly_context` for Layer 9 review.
 
-Layer 8 then inspects point-in-time event evidence around the residual anomaly to determine whether a canonical event family plausibly explains, amplifies, contradicts, or fails to explain the anomaly. Its outputs are coverage, correction, explanation, warning, uncertainty, path-risk, entry-block/exposure-cap, reduce/flatten-review, or human-review hints.
+Layer 9 then inspects point-in-time event evidence around the residual anomaly to determine whether a canonical event family plausibly explains, amplifies, contradicts, or fails to explain the anomaly. Its outputs are coverage, correction, explanation, warning, uncertainty, path-risk, entry-block/exposure-cap, reduce/flatten-review, human-review hints, or Layer 4 promotion packets after evidence review.
 
-This preserves EventRiskGovernor / EventIntelligenceOverlay as an overlay and correction layer. It must not replace Layers 1-7, emit standalone directional event alpha, directly produce buy/sell/hold, choose option contracts, mutate broker/account state, or bypass manager review.
+This preserves EventRiskGovernor / EventIntelligenceOverlay as an overlay and correction layer. It must not replace Layers 1-8, emit standalone directional event alpha, directly produce buy/sell/hold, choose option contracts, mutate broker/account state, auto-promote event families into Layer 4, or bypass manager review.
 
 ## D206 - Realtime event monitoring uses an observation pool; research may scan all events
 
 Status: accepted.
 
-Historical model research may search all point-in-time events, news, filings, macro releases, and other visible evidence to explain residual anomalies. This broad search is allowed because its purpose is discovery: identify which event families repeatedly explain residual price/path/volume/liquidity/option anomalies after the Layers 1-7 base stack has done its work.
+Historical model research may search all point-in-time events, news, filings, macro releases, and other visible evidence to explain residual anomalies. This broad search is allowed because its purpose is discovery: identify which event families repeatedly explain residual price/path/volume/liquidity/option anomalies after the Layers 1-8 base stack has done its work.
 
 Realtime operation must not continuously read and classify every possible event/news stream. It should monitor only reviewed event families in the active observation pool, plus explicitly accepted probationary observation families. New families enter this pool only when residual-anomaly research shows explanatory value or accepted risk/control value.
 
@@ -4125,6 +4126,31 @@ Current active observation-pool seeds are `cpi_inflation_release` and `earnings_
 
 Status: accepted.
 
-`MODEL_08_RESIDUAL_ANOMALY_EVENT_DISCOVERY_BUILD` is the first manager-registered implementation surface for the residual-anomaly EventRiskGovernor route. It starts from Layers 1-7 evaluation residuals, then searches nearby point-in-time event families for explanation, observation-pool, and strategy-promotion review evidence.
+`MODEL_08_RESIDUAL_ANOMALY_EVENT_DISCOVERY_BUILD` is the first manager-registered legacy physical implementation surface for the residual-anomaly EventRiskGovernor route. It starts from Layers 1-8 base-stack evaluation residuals, then searches nearby point-in-time event families for explanation, observation-pool, and strategy-promotion review evidence.
 
-This registration is intentionally pre-service. It authorizes a local callable artifact builder only. It does not authorize realtime daemon start, provider calls, model training, model activation, broker/account mutation, destructive SQL, artifact deletion, automatic observation-pool addition, or automatic strategy-layer event promotion. Strategy promotion remains blocked unless the script emits an `event_family_strategy_promotion_review_packet_v1` and agent review accepts the promotion.
+This registration is intentionally pre-service. It authorizes a local callable artifact builder only under the legacy `MODEL_08_*` physical namespace. It does not authorize realtime daemon start, provider calls, model training, model activation, broker/account mutation, destructive SQL, artifact deletion, automatic observation-pool addition, or automatic Layer 4 event-failure-risk promotion. Strategy promotion remains blocked unless the script emits an `event_family_strategy_promotion_review_packet_v1` and agent review accepts the promotion.
+
+## D208 - Layer 4 EventFailureRiskModel inserted before alpha confidence
+
+Date: 2026-05-17
+Status: Accepted
+
+The conceptual model stack now inserts `EventFailureRiskModel` at Layer 4 and shifts the later layers forward:
+
+```text
+Layer 1: MarketRegimeModel
+Layer 2: SectorContextModel
+Layer 3: TargetStateVectorModel
+Layer 4: EventFailureRiskModel
+Layer 5: AlphaConfidenceModel
+Layer 6: PositionProjectionModel
+Layer 7: UnderlyingActionModel
+Layer 8: TradingGuidanceModel / OptionExpressionModel
+Layer 9: EventRiskGovernor / EventIntelligenceOverlay
+```
+
+Layer 4 contains only agent-accepted, empirically reviewed event/strategy-failure factors. Its output is `event_failure_risk_vector`; it may condition alpha confidence, entry permission, exposure caps, strategy disable pressure, and path-risk amplification, but it must not emit buy/sell/hold, choose expression/contract, size positions, route orders, mutate accounts, or perform destructive SQL/storage actions.
+
+Layer 9 remains the residual event-risk governor and research surface. It may explain residual anomalies, maintain the observation pool, warn/cap/block/review base guidance, and generate event-family promotion packets. A family can move from Layer 9 discovery/observation into Layer 4 only after a script-emitted evidence packet, matched controls/split/leakage/PIT review, incremental value review, and explicit agent/manager acceptance.
+
+This decision is architecture/governance only. Current physical script/package/table names such as `model_04_alpha_confidence`, `model_05_position_projection`, `model_06_underlying_action`, `model_07_option_expression`, `model_08_event_risk_governor`, `MODEL_08_*`, and `source_08_event_risk_governor` remain legacy implementation surfaces until a dedicated code/SQL renumbering migration is reviewed.

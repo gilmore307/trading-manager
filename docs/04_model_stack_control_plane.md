@@ -2,33 +2,34 @@
 
 ## Purpose
 
-This file gives `trading-manager` a concise manager-side view of the accepted Layer 1-8 model stack.
+This file gives `trading-manager` a concise manager-side view of the accepted conceptual Layer 1-9 model stack.
 
 It is not the model design authority. Detailed model semantics, features, labels, evaluation code, and local deterministic scaffolds belong in `trading-model` and `trading-data`. This file owns only the control-plane interpretation that `trading-manager` needs for request planning, registry naming, promotion review, and boundary enforcement.
 
+This file also records the current transition caveat: the conceptual order changed on 2026-05-17, but physical script/package/table names are intentionally not renamed in this slice. Legacy names remain valid implementation surfaces until a dedicated code/SQL renumbering migration is reviewed.
+
 ## Manager-Side Stack Summary
 
-| Layer | Model surface | Primary concept | Manager-facing output/handoff | Boundary reminder |
-|---|---|---|---|---|
-| 1 | `model_01_market_regime` | Market context | `market_context_state` | Conditions downstream layers; does not rank sectors, targets, strategies, positions, options, or actions. |
-| 2 | `model_02_sector_context` | Sector/industry context | `sector_context_state` | Conditions anonymous target candidates; does not select final symbols or actions. |
-| 3 | `model_03_target_state_vector` | Anonymous target context | `target_context_state` | Produces target-state evidence; does not emit alpha confidence, position size, option expression, or final action. |
-| 4 | `model_04_alpha_confidence` | Calibrated alpha confidence | `alpha_confidence_vector` | Estimates adjusted alpha/EV/risk; does not choose target exposure, action, option contract, or order. Active physical code uses `model_04_alpha_confidence`. |
-| 5 | `model_05_position_projection` | Target holding-state projection | `position_projection_vector` | Projects abstract exposure/gap/utility; does not emit buy/sell/hold orders or mutate broker/account state. Active physical code uses `model_05_position_projection`. |
-| 6 | `model_06_underlying_action` | Offline direct-underlying action thesis | `underlying_action_plan` plus `underlying_action_vector` | Plans direct stock/ETF thesis fields; not broker order construction or routing. Active physical code uses `model_06_underlying_action`. |
-| 7 | `model_07_trading_guidance` | Offline trading guidance / option-expression thesis | `trading_guidance_record` plus expression/underlying plan refs | Produces the base offline guidance candidate for review; not order placement, fills, or account mutation. Active physical option-expression code uses `model_07_option_expression`. |
-| 8 | `event_risk_governor` | Event intelligence / risk overlay | `event_risk_intervention` plus event-adjusted risk guidance | Reviews the Layer 7 base guidance candidate for high-risk point-in-time events; may block/cap/reduce/nominate flatten/halt/review, but cannot mutate broker/account state. |
+| Conceptual layer | Model boundary | Current physical surface | Primary concept | Manager-facing output/handoff | Boundary reminder |
+|---|---|---|---|---|---|
+| 1 | `MarketRegimeModel` | `model_01_market_regime` | Market context | `market_context_state` | Conditions downstream layers; does not rank sectors, targets, strategies, positions, options, or actions. |
+| 2 | `SectorContextModel` | `model_02_sector_context` | Sector/industry context | `sector_context_state` | Conditions anonymous target candidates; does not select final symbols or actions. |
+| 3 | `TargetStateVectorModel` | `model_03_target_state_vector` | Anonymous target context | `target_context_state` | Produces target-state evidence; does not emit alpha confidence, position size, option expression, or final action. |
+| 4 | `EventFailureRiskModel` | governance/contract docs only; no renamed runtime package yet | Reviewed event/strategy-failure risk | `event_failure_risk_vector` | Consumes only agent-accepted event/strategy-failure evidence; may recommend alpha/entry/cap/disable conditioning, but not buy/sell/hold, sizing, expression choice, broker mutation, or destructive SQL/storage action. |
+| 5 | `AlphaConfidenceModel` | legacy `model_04_alpha_confidence` | Calibrated alpha confidence | `alpha_confidence_vector` | Estimates adjusted alpha/EV/risk after accepted event-failure conditioning; does not choose target exposure, action, option contract, or order. |
+| 6 | `PositionProjectionModel` | legacy `model_05_position_projection` | Target holding-state projection | `position_projection_vector` | Projects abstract exposure/gap/utility; does not emit buy/sell/hold orders or mutate broker/account state. |
+| 7 | `UnderlyingActionModel` | legacy `model_06_underlying_action` | Offline direct-underlying action thesis | `underlying_action_plan` plus `underlying_action_vector` | Plans direct stock/ETF thesis fields; not broker order construction or routing. |
+| 8 | `TradingGuidanceModel / OptionExpressionModel` | legacy `model_07_option_expression` | Offline trading guidance / option-expression thesis | `trading_guidance_record`, `option_expression_plan`, and expression/underlying plan refs | Produces the base offline guidance candidate for review; not order placement, fills, or account mutation. |
+| 9 | `EventRiskGovernor / EventIntelligenceOverlay` | legacy `model_08_event_risk_governor` plus `source_08_event_risk_governor` | Residual event intelligence / risk overlay | `event_risk_intervention`, observation-pool evidence, and promotion-review packets | Reviews residual anomalies after the base stack; may warn/block/cap/review or propose Layer 4 promotion packets, but cannot auto-promote families or mutate broker/account state. |
 
 ## Source/Feature Numbering Is Not Always Model-Layer Numbering
 
-Model surfaces use `model_NN_*` where `NN` is the model layer.
+Model semantics use the conceptual layer order above. Physical implementation names currently preserve legacy numbering for compatibility. Data source and feature surfaces may also keep source-family numbering that reflects the accepted data-production contract rather than the model layer number. Current important examples:
 
-Data source and feature surfaces may keep source-family numbering that reflects the accepted data-production contract rather than the model layer number. Current important examples:
-
-- `source_08_event_risk_governor` feeds the conceptual Layer 8 event-risk-governor evidence path, under the current conceptual number.
-- `source_05_option_expression` feeds conceptual Layer 7 trading-guidance / option-expression inputs; it is not Layer 5 PositionProjectionModel.
-- `feature_07_option_expression` is the current deterministic option-expression feature surface produced from accepted option-expression inputs.
-- `source_06_position_execution` is selected-contract/position-execution context for option-expression review; it is not conceptual Layer 6 UnderlyingActionModel.
+- `source_08_event_risk_governor` feeds the conceptual Layer 9 event-risk-governor evidence path, but keeps the legacy source id.
+- `source_05_option_expression` feeds conceptual Layer 8 trading-guidance / option-expression inputs; it is not Layer 5 AlphaConfidenceModel.
+- `feature_07_option_expression` is the current deterministic option-expression feature surface produced from accepted option-expression inputs; it is legacy physical numbering for conceptual Layer 8.
+- `source_06_position_execution` is selected-contract/position-execution context for option-expression review; it is not conceptual Layer 6 PositionProjectionModel.
 
 When a source/feature/model name crosses repository boundaries, the canonical shared name must be registered through `scripts/registry/` before implementation depends on it.
 
