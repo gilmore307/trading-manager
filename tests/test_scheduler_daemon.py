@@ -5,6 +5,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -434,6 +435,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_iterations=1,
                 execute_safe_preparation=True,
                 auto_select_next_work=True,
+                source_existing_bootstrap=False,
                 config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
             )
 
@@ -467,6 +469,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 interval_seconds=0,
                 max_iterations=1,
                 advance_month_on_complete=True,
+                source_existing_bootstrap=False,
                 config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
             )
 
@@ -475,6 +478,32 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(state.last_reason_code, "month_workflow_complete")
         self.assertEqual(state.last_next_internal_stage, "chronological_month_advanced")
         self.assertTrue(state.service_managed)
+
+
+    def test_daemon_runs_source_existing_bootstrap_on_start_by_default(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            with patch("trading_manager_tasks.scheduler_daemon.run_source_existing_bootstrap") as bootstrap:
+                run_daemon_loop(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp / "manager-storage",
+                    component_src_root=self._fake_data_src(tmp),
+                    state_path=tmp / "runtime" / "state.json",
+                    lock_path=tmp / "runtime" / "scheduler.lock",
+                    decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                    interval_seconds=0,
+                    max_iterations=1,
+                    execute_safe_preparation=True,
+                    selected_target_symbol="AAPL",
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                )
+
+        bootstrap.assert_called_once()
+        _, kwargs = bootstrap.call_args
+        self.assertEqual(kwargs["start_month"], "2016-01")
+        self.assertEqual(kwargs["selected_target_symbol"], "AAPL")
+        self.assertTrue(kwargs["write"])
 
     def test_daemon_loop_persists_state_and_decision_log(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -493,6 +522,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 interval_seconds=0,
                 max_iterations=1,
                 execute_safe_preparation=True,
+                source_existing_bootstrap=False,
                 config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
             )
 
@@ -524,6 +554,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_iterations=2,
                 execute_safe_preparation=True,
                 drain_ready_stages=True,
+                source_existing_bootstrap=False,
                 config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
             )
 
@@ -548,6 +579,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 execute_safe_preparation=True,
                 refresh_dashboard_on_decision=True,
                 dashboard_refresh_command=(sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).write_text('refreshed')"),
+                source_existing_bootstrap=False,
                 config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
             )
 

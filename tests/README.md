@@ -91,6 +91,11 @@
   - not-applicable feature/source stages for Layers 5-7;
   - month-scoped checkpoint path derivation and separate `provider_calls_observed` accounting.
 
+- `test_source_existing_bootstrap.py` verifies:
+  - startup source-existing bootstrap coverage from preserved `trading_data.source_*` rows;
+  - data-acquisition stage seeding without provider calls, model activation, or broker execution;
+  - partial source coverage remaining blocked from workflow-state seeding.
+
 - `test_provider_dispatch.py` verifies:
   - Layer 1 provider-dispatch approval validation;
   - default plan-only behavior with zero provider calls;
@@ -200,6 +205,7 @@
   - `manager_scheduler_daemon_state` checkpoint round-tripping and resume-scope updates;
   - single-instance lock behavior;
   - error checkpointing for restart-safe failure visibility;
+  - default source-existing bootstrap on daemon startup;
   - persistent daemon loop state/log writing without provider dispatch.
 
 - `test_scheduler_status.py` verifies:

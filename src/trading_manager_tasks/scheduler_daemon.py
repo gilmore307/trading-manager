@@ -25,6 +25,7 @@ from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .model_training_state import advance_workflow_state
 from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .source_existing_bootstrap import run_source_existing_bootstrap
 from .scheduler import (
     DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
     DEFAULT_MAX_LOAD_PER_CPU,
@@ -852,6 +853,8 @@ def run_daemon_loop(
     refresh_dashboard_on_decision: bool = False,
     dashboard_refresh_service_unit: str = DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT,
     dashboard_refresh_command: tuple[str, ...] | None = None,
+    source_existing_bootstrap: bool = True,
+    source_bootstrap_database_url: str | None = None,
     config: SchedulerConfig = SchedulerConfig(),
     output: TextIO | None = None,
 ) -> SchedulerDaemonState:
@@ -869,6 +872,15 @@ def run_daemon_loop(
         end_month=end_month,
         resume_month_cursor=advance_month_on_complete,
     )
+    if source_existing_bootstrap:
+        run_source_existing_bootstrap(
+            start_month=start_month,
+            end_month=completed_historical_month_cutoff(),
+            selected_target_symbol=selected_target_symbol,
+            storage_root=storage_root,
+            database_url=source_bootstrap_database_url,
+            write=True,
+        )
     if auto_select_next_work:
         state = apply_auto_work_selection(
             state,
@@ -1092,6 +1104,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--drain-max-seconds", type=float, default=DEFAULT_DRAIN_MAX_SECONDS, help="Maximum wall-clock seconds for one back-to-back drain cycle.")
     parser.add_argument("--refresh-dashboard-on-decision", action="store_true", help="Trigger the storage-owned dashboard read-model refresh service after each executed scheduler decision.")
     parser.add_argument("--dashboard-refresh-service-unit", default=DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT, help="systemd service unit to start for event-driven dashboard read-model refresh.")
+    parser.add_argument("--disable-source-existing-bootstrap", action="store_true", help="Disable startup source-existing bootstrap. Default service startup inspects source tables and seeds workflow acquisition state so existing source data is reused.")
+    parser.add_argument("--source-bootstrap-database-url", help="Database URL for startup source-existing bootstrap; defaults to OpenClaw database resolution.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
@@ -1129,6 +1143,8 @@ def main(argv: list[str] | None = None) -> int:
         drain_max_seconds=args.drain_max_seconds,
         refresh_dashboard_on_decision=args.refresh_dashboard_on_decision,
         dashboard_refresh_service_unit=args.dashboard_refresh_service_unit,
+        source_existing_bootstrap=not args.disable_source_existing_bootstrap,
+        source_bootstrap_database_url=args.source_bootstrap_database_url,
         config=config,
         output=sys.stdout,
     )
