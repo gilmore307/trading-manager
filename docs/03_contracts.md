@@ -112,6 +112,21 @@ consumer_scope
 evidence_ref
 ```
 
+### `scheduler_lock_v1`
+
+Schema: `schemas/scheduler_lock_v1.schema.json`.
+
+A stable lock identity for historical scheduler coordination.
+
+```text
+lock_scope
+lock_key
+lock_path
+month / stage_id / provider_id / partition_id / model_id / candidate_ref as applicable
+```
+
+Lock scopes are `daemon`, `month_stage`, `provider_partition`, `reconcile`, and `promotion`. Provider partition locks permit concurrent partition work only; reconcile locks own stage-state transitions.
+
 ## Review and Promotion Contracts
 
 - `manager_dataset_evidence` summarizes snapshot/split/label/eval/control-plane coverage.

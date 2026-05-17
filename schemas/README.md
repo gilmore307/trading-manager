@@ -11,5 +11,6 @@ Current first slice:
 - `run_manifest_v1.schema.json`
 - `artifact_ref_v1.schema.json`
 - `ready_signal_v1.schema.json`
+- `scheduler_lock_v1.schema.json`
 
 Large component payloads remain by reference; these schemas validate ids, status values, refs, clocks, and readiness facts only.

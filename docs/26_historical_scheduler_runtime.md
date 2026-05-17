@@ -25,10 +25,26 @@ Default runtime files:
 | File | Purpose |
 |---|---|
 | `historical_scheduler_state.json` | Resume checkpoint and latest decision context. |
-| `historical_scheduler.lock` | Single-instance guard. |
+| `historical_scheduler.lock` | Single-instance daemon guard. |
 | `historical_scheduler_decisions.jsonl` | Append-only scheduler decisions. |
 | `model_training_workflow_state_YYYY-MM.json` | Month-scoped workflow checkpoint. |
 | `source_existing_bootstrap/latest.json` | Evidence for preserved source coverage. |
+
+## Lock Contract
+
+Schema: `schemas/scheduler_lock_v1.schema.json`.
+
+The scheduler uses stable lock identities before increasing concurrency. Locks are coordination contracts, not authorization to call providers, mutate storage lifecycle, activate models, or touch broker/account state.
+
+| Scope | Key shape | Owner |
+|---|---|---|
+| `daemon` | `lock:daemon:historical_scheduler` | One process-level service instance. |
+| `month_stage` | `lock:stage:<month>:<stage_id>` | One workflow transition lane for a month/stage. |
+| `provider_partition` | `lock:provider:<month>:<stage_id>:<provider_id>:<partition_id>` | One provider worker partition; writes partition receipts only. |
+| `reconcile` | `lock:reconcile:<month>:<stage_id>` | One receipt reconciliation and stage-state transition. |
+| `promotion` | `lock:promotion:<model_id>:<candidate_ref>` | One model promotion candidate review lane. |
+
+Provider workers must not directly advance terminal workflow state. They write partitioned receipts; the reconcile lane owns stage coverage and workflow-state transitions.
 
 ## Normal Inspection
 

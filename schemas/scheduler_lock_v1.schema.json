@@ -1,0 +1,302 @@
+{
+  "$defs": {
+    "month": {
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+      "type": "string"
+    },
+    "non_empty_string": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/scheduler_lock_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "candidate_ref": {
+          "type": "null"
+        },
+        "contract_type": {
+          "const": "scheduler_lock_v1"
+        },
+        "lock_key": {
+          "const": "lock:daemon:historical_scheduler"
+        },
+        "lock_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "lock_scope": {
+          "const": "daemon"
+        },
+        "model_id": {
+          "type": "null"
+        },
+        "month": {
+          "type": "null"
+        },
+        "partition_id": {
+          "type": "null"
+        },
+        "provider_id": {
+          "type": "null"
+        },
+        "stage_id": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "contract_type",
+        "lock_scope",
+        "lock_key",
+        "lock_path"
+      ]
+    },
+    {
+      "properties": {
+        "candidate_ref": {
+          "type": "null"
+        },
+        "contract_type": {
+          "const": "scheduler_lock_v1"
+        },
+        "lock_key": {
+          "pattern": "^lock:stage:",
+          "type": "string"
+        },
+        "lock_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "lock_scope": {
+          "const": "month_stage"
+        },
+        "model_id": {
+          "type": "null"
+        },
+        "month": {
+          "$ref": "#/$defs/month"
+        },
+        "partition_id": {
+          "type": "null"
+        },
+        "provider_id": {
+          "type": "null"
+        },
+        "stage_id": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      },
+      "required": [
+        "contract_type",
+        "lock_scope",
+        "lock_key",
+        "lock_path",
+        "month",
+        "stage_id"
+      ]
+    },
+    {
+      "properties": {
+        "candidate_ref": {
+          "type": "null"
+        },
+        "contract_type": {
+          "const": "scheduler_lock_v1"
+        },
+        "lock_key": {
+          "pattern": "^lock:provider:",
+          "type": "string"
+        },
+        "lock_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "lock_scope": {
+          "const": "provider_partition"
+        },
+        "model_id": {
+          "type": "null"
+        },
+        "month": {
+          "$ref": "#/$defs/month"
+        },
+        "partition_id": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "provider_id": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "stage_id": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      },
+      "required": [
+        "contract_type",
+        "lock_scope",
+        "lock_key",
+        "lock_path",
+        "month",
+        "stage_id",
+        "provider_id",
+        "partition_id"
+      ]
+    },
+    {
+      "properties": {
+        "candidate_ref": {
+          "type": "null"
+        },
+        "contract_type": {
+          "const": "scheduler_lock_v1"
+        },
+        "lock_key": {
+          "pattern": "^lock:reconcile:",
+          "type": "string"
+        },
+        "lock_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "lock_scope": {
+          "const": "reconcile"
+        },
+        "model_id": {
+          "type": "null"
+        },
+        "month": {
+          "$ref": "#/$defs/month"
+        },
+        "partition_id": {
+          "type": "null"
+        },
+        "provider_id": {
+          "type": "null"
+        },
+        "stage_id": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      },
+      "required": [
+        "contract_type",
+        "lock_scope",
+        "lock_key",
+        "lock_path",
+        "month",
+        "stage_id"
+      ]
+    },
+    {
+      "properties": {
+        "candidate_ref": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "contract_type": {
+          "const": "scheduler_lock_v1"
+        },
+        "lock_key": {
+          "pattern": "^lock:promotion:",
+          "type": "string"
+        },
+        "lock_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "lock_scope": {
+          "const": "promotion"
+        },
+        "model_id": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "month": {
+          "type": "null"
+        },
+        "partition_id": {
+          "type": "null"
+        },
+        "provider_id": {
+          "type": "null"
+        },
+        "stage_id": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "contract_type",
+        "lock_scope",
+        "lock_key",
+        "lock_path",
+        "model_id",
+        "candidate_ref"
+      ]
+    }
+  ],
+  "properties": {
+    "candidate_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contract_type": {
+      "const": "scheduler_lock_v1"
+    },
+    "lock_key": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "lock_path": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "lock_scope": {
+      "enum": [
+        "daemon",
+        "month_stage",
+        "provider_partition",
+        "reconcile",
+        "promotion"
+      ]
+    },
+    "model_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "month": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "partition_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "provider_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stage_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "contract_type",
+    "lock_scope",
+    "lock_key",
+    "lock_path"
+  ],
+  "title": "scheduler_lock_v1",
+  "type": "object"
+}

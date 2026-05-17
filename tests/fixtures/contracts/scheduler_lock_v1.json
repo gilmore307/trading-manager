@@ -1,0 +1,12 @@
+{
+  "contract_type": "scheduler_lock_v1",
+  "lock_scope": "provider_partition",
+  "lock_key": "lock:provider:2016-01:layer_01_market_regime.data_acquisition:alpaca:SPY",
+  "lock_path": "storage/runtime/locks/provider/2016-01/layer_01_market_regime.data_acquisition/alpaca/SPY.lock",
+  "month": "2016-01",
+  "stage_id": "layer_01_market_regime.data_acquisition",
+  "provider_id": "alpaca",
+  "partition_id": "SPY",
+  "model_id": null,
+  "candidate_ref": null
+}

@@ -46,6 +46,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_safe_error_repair.py`
 - `test_scheduler.py`
 - `test_scheduler_daemon.py`
+- `test_scheduler_locks.py`
 - `test_scheduler_status.py`
 - `test_source_existing_bootstrap.py`
 - `test_stable_semantic_ids.py`
