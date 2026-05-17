@@ -4120,3 +4120,11 @@ Realtime operation must not continuously read and classify every possible event/
 If an event family demonstrates stable, predictive, incremental behavior across splits, controls, base-stack residuals, and regimes, it may be proposed for promotion from correction/explanation overlay into strategy-decision scope. This promotion is never automatic: a script must emit an evidence packet and call agent review for a final accept/defer/reject decision before manager records any production scope change.
 
 Current active observation-pool seeds are `cpi_inflation_release` and `earnings_guidance_scheduled_shell`; current probationary observation candidate is `legal_regulatory_investigation`. No current event family is approved for strategy-decision promotion.
+
+## D207 - Residual-anomaly event discovery is a callable builder, not service activation
+
+Status: accepted.
+
+`MODEL_08_RESIDUAL_ANOMALY_EVENT_DISCOVERY_BUILD` is the first manager-registered implementation surface for the residual-anomaly EventRiskGovernor route. It starts from Layers 1-7 evaluation residuals, then searches nearby point-in-time event families for explanation, observation-pool, and strategy-promotion review evidence.
+
+This registration is intentionally pre-service. It authorizes a local callable artifact builder only. It does not authorize realtime daemon start, provider calls, model training, model activation, broker/account mutation, destructive SQL, artifact deletion, automatic observation-pool addition, or automatic strategy-layer event promotion. Strategy promotion remains blocked unless the script emits an `event_family_strategy_promotion_review_packet_v1` and agent review accepts the promotion.
