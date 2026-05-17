@@ -110,6 +110,8 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], BASE_STACK_LAYER_COUNT)
         self.assertFalse(decision.dispatch_performed)
         self.assertEqual(decision.provider_calls, 0)
+        self.assertEqual(decision.lock_plan["contract_type"], "scheduler_lock_plan_v1")
+        self.assertIn("daemon", decision.lock_plan["required_lock_scopes"])
 
     def test_scheduler_backs_off_during_regular_trading_day_window(self):
         decision = run_scheduler_once(
@@ -173,6 +175,14 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.selected_work, "layer_01_market_regime.data_acquisition")
         self.assertIsNone(decision.approval_gate_required)
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], BASE_STACK_LAYER_COUNT)
+        self.assertEqual(
+            decision.lock_plan["required_lock_scopes"],
+            ["daemon", "month_stage", "reconcile", "provider_partition"],
+        )
+        self.assertEqual(
+            decision.lock_plan["lock_templates"][0]["lock_key_template"],
+            "lock:provider:2016-01:layer_01_market_regime.data_acquisition:<provider_id>:<partition_id>",
+        )
 
     def test_safe_offline_stage_flag_does_not_execute_provider_acquisition(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

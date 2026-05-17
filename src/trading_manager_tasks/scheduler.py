@@ -28,6 +28,7 @@ from .stage_executor import execute_next_ready_stage
 from .stage_reconcile import DEFAULT_COMPONENT_STORAGE_ROOT, reconcile_provider_stage
 from .stage_run_controller import run_stage_controller_step
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .scheduler_locks import scheduler_lock_plan
 
 NEW_YORK = ZoneInfo("America/New_York")
 PROTECTION_START = time(9, 20)
@@ -100,6 +101,7 @@ class SchedulerDecision:
     broker_execution_performed: bool = False
     storage_lifecycle_mutation_performed: bool = False
     execution_summary: dict[str, Any] | None = None
+    lock_plan: dict[str, Any] | None = None
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -437,6 +439,7 @@ def run_scheduler_once(
             selected_work=None,
             command=[],
             next_internal_stage="historical_training_work_loop",
+            lock_plan=scheduler_lock_plan(month=start_month, selected_work=None, next_internal_stage="historical_training_work_loop"),
         )
     if not res_gate.allowed:
         return SchedulerDecision(
@@ -451,6 +454,7 @@ def run_scheduler_once(
             selected_work=None,
             command=[],
             next_internal_stage="historical_training_work_loop",
+            lock_plan=scheduler_lock_plan(month=start_month, selected_work=None, next_internal_stage="historical_training_work_loop"),
         )
 
     workflow_plan = build_model_training_workflow_plan(
@@ -485,6 +489,11 @@ def run_scheduler_once(
             command=[],
             next_internal_stage="chronological_month_advance",
             execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+            lock_plan=scheduler_lock_plan(
+                month=start_month,
+                selected_work="advance_chronological_month_cursor",
+                next_internal_stage="chronological_month_advance",
+            ),
         )
     if workflow_next_stage and workflow_next_stage.status == "ready" and workflow_next_stage.stage_id in PROVIDER_STAGE_MODEL_LAYERS:
         if not execute_autonomous_provider_stages:
@@ -501,6 +510,11 @@ def run_scheduler_once(
                 command=workflow_next_stage.command,
                 next_internal_stage="autonomous_historical_provider_acquisition",
                 execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+                lock_plan=scheduler_lock_plan(
+                    month=start_month,
+                    selected_work=workflow_next_stage.stage_id,
+                    next_internal_stage="autonomous_historical_provider_acquisition",
+                ),
             )
         execution_summary = _execute_autonomous_provider_stage(
             stage_id=workflow_next_stage.stage_id,
@@ -530,6 +544,11 @@ def run_scheduler_once(
             broker_execution_performed=bool(execution_summary.get("broker_execution_performed")),
             storage_lifecycle_mutation_performed=bool(execution_summary.get("storage_lifecycle_mutation_performed")),
             execution_summary=execution_summary,
+            lock_plan=scheduler_lock_plan(
+                month=start_month,
+                selected_work=workflow_next_stage.stage_id,
+                next_internal_stage="autonomous_historical_provider_acquisition",
+            ),
         )
     if workflow_next_stage and workflow_next_stage.status == "ready":
         if not execute_safe_offline_stages:
@@ -546,6 +565,11 @@ def run_scheduler_once(
                 command=workflow_next_stage.command,
                 next_internal_stage=workflow_next_stage.stage_type,
                 execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+                lock_plan=scheduler_lock_plan(
+                    month=start_month,
+                    selected_work=workflow_next_stage.stage_id,
+                    next_internal_stage=workflow_next_stage.stage_type,
+                ),
             )
         execution, updated_workflow_state = execute_next_ready_stage(
             start_month=start_month,
@@ -578,6 +602,11 @@ def run_scheduler_once(
                 "workflow_plan": workflow_plan.summary_row(),
                 "workflow_state": updated_workflow_state.summary_row(),
             },
+            lock_plan=scheduler_lock_plan(
+                month=start_month,
+                selected_work=workflow_next_stage.stage_id,
+                next_internal_stage=workflow_next_stage.stage_type,
+            ),
         )
 
     preparation_model_layer = _next_preparation_model_layer(workflow_plan=workflow_plan, workflow_state=workflow_state)
@@ -596,6 +625,11 @@ def run_scheduler_once(
             command=next_stage.command if next_stage else [],
             next_internal_stage=next_stage.stage_type if next_stage else "historical_training_work_loop",
             execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+            lock_plan=scheduler_lock_plan(
+                month=start_month,
+                selected_work=next_stage.stage_id if next_stage else "model_training_workflow",
+                next_internal_stage=next_stage.stage_type if next_stage else "historical_training_work_loop",
+            ),
         )
 
     selected_work = _preparation_selected_work(preparation_model_layer)
@@ -614,6 +648,11 @@ def run_scheduler_once(
             command=command,
             next_internal_stage="autonomous_historical_provider_acquisition",
             execution_summary={"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+            lock_plan=scheduler_lock_plan(
+                month=start_month,
+                selected_work=selected_work,
+                next_internal_stage="autonomous_historical_provider_acquisition",
+            ),
         )
 
     if preparation_model_layer == LAYER_ONE_MODEL_LAYER:
@@ -660,6 +699,11 @@ def run_scheduler_once(
         next_internal_stage="autonomous_historical_provider_acquisition",
         execution_summary=summary.summary_row()
         | {"workflow_plan": refreshed_workflow_plan.summary_row(), "workflow_state": refreshed_workflow_state.summary_row()},
+        lock_plan=scheduler_lock_plan(
+            month=start_month,
+            selected_work=selected_work,
+            next_internal_stage="autonomous_historical_provider_acquisition",
+        ),
     )
 
 

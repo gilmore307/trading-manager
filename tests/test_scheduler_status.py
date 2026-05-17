@@ -123,6 +123,11 @@ class SchedulerStatusTests(unittest.TestCase):
         self.assertEqual(row["provider_status"]["status"], "provider_stage_autonomous_ready")
         self.assertIsNone(row["blocked_reason"])
         self.assertEqual(row["latest_decision"]["decision_log_row_count"], 1)
+        self.assertEqual(row["lock_plan"]["contract_type"], "scheduler_lock_plan_v1")
+        self.assertEqual(
+            row["lock_plan"]["required_lock_scopes"],
+            ["daemon", "month_stage", "reconcile", "provider_partition"],
+        )
 
     def test_status_ignores_stale_completed_previous_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

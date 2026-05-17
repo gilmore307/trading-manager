@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 DEFAULT_STORAGE_ROOT = Path("storage")
 DEFAULT_RUNTIME_DIR = DEFAULT_STORAGE_ROOT / "runtime"
@@ -158,6 +158,56 @@ def promotion_lock_ref(model_id: str, candidate_ref: str, *, locks_dir: Path = D
     )
 
 
+def scheduler_lock_plan(
+    *,
+    month: str | None,
+    selected_work: str | None,
+    next_internal_stage: str | None,
+    locks_dir: Path = DEFAULT_LOCKS_DIR,
+    daemon_lock_path: Path = DEFAULT_DAEMON_LOCK_PATH,
+) -> dict[str, Any]:
+    """Return read-only lock requirements for the selected scheduler work.
+
+    This is a planning/status surface only. It does not acquire locks, start
+    workers, dispatch providers, or advance workflow state.
+    """
+
+    lock_refs: list[dict[str, str | None]] = [daemon_lock_ref(daemon_lock_path).summary_row()]
+    templates: list[dict[str, str]] = []
+    scopes = ["daemon"]
+    if month and selected_work:
+        if next_internal_stage == "chronological_month_advance":
+            stage_ref = month_stage_lock_ref(month, "chronological_month_advance", locks_dir=locks_dir)
+            lock_refs.append(stage_ref.summary_row())
+            scopes.append("month_stage")
+        elif selected_work.startswith("layer_"):
+            stage_ref = month_stage_lock_ref(month, selected_work, locks_dir=locks_dir)
+            lock_refs.append(stage_ref.summary_row())
+            scopes.append("month_stage")
+            if next_internal_stage == "autonomous_historical_provider_acquisition":
+                reconcile_ref = reconcile_lock_ref(month, selected_work, locks_dir=locks_dir)
+                lock_refs.append(reconcile_ref.summary_row())
+                scopes.append("reconcile")
+                templates.append(
+                    {
+                        "lock_scope": "provider_partition",
+                        "lock_key_template": f"lock:provider:{month}:{selected_work}:<provider_id>:<partition_id>",
+                        "lock_path_template": str(locks_dir / "provider" / month / lock_token(selected_work) / "<provider_id>" / "<partition_id>.lock"),
+                    }
+                )
+                scopes.append("provider_partition")
+    return {
+        "contract_type": "scheduler_lock_plan_v1",
+        "lock_contract_type": "scheduler_lock_v1",
+        "selected_work": selected_work,
+        "next_internal_stage": next_internal_stage,
+        "required_lock_scopes": sorted(set(scopes), key=scopes.index),
+        "lock_refs": lock_refs,
+        "lock_templates": templates,
+        "mutation_performed": False,
+    }
+
+
 __all__ = [
     "DEFAULT_DAEMON_LOCK_PATH",
     "DEFAULT_LOCKS_DIR",
@@ -168,4 +218,5 @@ __all__ = [
     "promotion_lock_ref",
     "provider_partition_lock_ref",
     "reconcile_lock_ref",
+    "scheduler_lock_plan",
 ]

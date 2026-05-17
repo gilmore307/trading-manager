@@ -34,7 +34,7 @@ Default runtime files:
 
 Schema: `schemas/scheduler_lock_v1.schema.json`.
 
-The scheduler uses stable lock identities before increasing concurrency. Locks are coordination contracts, not authorization to call providers, mutate storage lifecycle, activate models, or touch broker/account state.
+The scheduler uses stable lock identities before increasing concurrency. Locks are coordination contracts, not authorization to call providers, mutate storage lifecycle, activate models, or touch broker/account state. Dry-run scheduler decisions and read-only scheduler status include `scheduler_lock_plan_v1` so operators can see the required daemon/stage/provider/reconcile lock lanes before any worker launch.
 
 | Scope | Key shape | Owner |
 |---|---|---|
@@ -67,6 +67,7 @@ model_activation_performed
 storage_lifecycle_mutation_performed
 broker_execution_performed
 lock_state
+lock_plan
 selected_month
 selected_stage
 latest_decision

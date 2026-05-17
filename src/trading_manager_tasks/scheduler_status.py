@@ -19,6 +19,7 @@ from typing import Any, Iterable, Mapping, TextIO
 
 from .scheduler_daemon import DEFAULT_DECISION_LOG_PATH, DEFAULT_LOCK_PATH, DEFAULT_STATE_PATH, _process_exists, select_next_historical_work
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .scheduler_locks import scheduler_lock_plan
 
 DEFAULT_SERVICE_TEMPLATE_PATH = Path("deploy/systemd/trading-manager-historical-scheduler.service")
 DEFAULT_SERVICE_ENV_PATH = Path("deploy/systemd/trading-manager-historical-scheduler.env")
@@ -91,6 +92,7 @@ class HistoricalSchedulerStatus:
     state_file: FileStatus
     decision_log_file: FileStatus
     lock: LockStatus
+    lock_plan: dict[str, Any]
     service_template: FileStatus
     service_env: FileStatus
     daemon_wrapper: FileStatus
@@ -397,6 +399,14 @@ def collect_historical_scheduler_status(
     current_stage = workflow.next_stage_id or str((current_decision or {}).get("selected_work") or "") or None
     if current_stage is None and current_month:
         current_stage = "prepare_layer_one_historical_training_batch" if not workflow.exists else "historical_work_selected"
+    current_next_internal_stage = str((current_decision or {}).get("next_internal_stage") or workflow.next_stage_type or "") or None
+    current_lock_plan = (current_decision or {}).get("lock_plan")
+    if not isinstance(current_lock_plan, Mapping):
+        current_lock_plan = scheduler_lock_plan(
+            month=current_month,
+            selected_work=current_stage,
+            next_internal_stage=current_next_internal_stage,
+        )
     service_runtime_ready = bool(
         service_template.exists
         and service_env.exists
@@ -440,6 +450,7 @@ def collect_historical_scheduler_status(
         state_file=state_file,
         decision_log_file=decision_log_file,
         lock=lock,
+        lock_plan=dict(current_lock_plan),
         service_template=service_template,
         service_env=service_env,
         daemon_wrapper=daemon_wrapper,
