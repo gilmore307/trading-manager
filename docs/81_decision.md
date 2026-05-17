@@ -4042,3 +4042,11 @@ Status: accepted.
 The all-family closeout artifact may account for every fine-grained EventRiskGovernor family in one pass, but it must not convert unresolved routing buckets into training families or alpha claims. A closeout row is an administrative disposition: risk/control candidate, deferred low-signal, packet required, PIT baseline required, residual definition required, liquidity evidence required, or review-required.
 
 Current closeout accepts only `earnings_guidance_scheduled_shell` and `cpi_inflation_release` as risk/control candidates, not standalone directional alpha. `option_derivatives_abnormality` remains `deferred_low_signal` under the current matched-control definition. The remaining families stay blocked until their family packets, point-in-time baselines, residual definitions, liquidity evidence, source precedence, and matched controls exist.
+
+## D199 - Event-family packet completion precedes final judgment
+
+Status: accepted.
+
+Before any final EventRiskGovernor association conclusion is made, every fine-grained event family must have an explicit `event_family_scouting_packet_v1` precondition packet. The packet is a governance/evidence-design artifact, not empirical proof. It must define source precedence, point-in-time clocks, event identity and measure fields, baseline requirements, matched-control design, price/path labels, residual requirements, liquidity requirements, and early-stop rules.
+
+Completing all packets removes the generic missing-packet blocker, but it does not authorize model training, promotion, activation, broker/account mutation, destructive SQL, or artifact deletion. Final family conclusions remain withheld until each family has its required empirical association study and any remaining PIT expectation/comparable baseline, residual-over-base-state, liquidity/depth, or revised-abnormality evidence.
