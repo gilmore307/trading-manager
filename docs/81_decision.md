@@ -4078,3 +4078,13 @@ The all-family event/price association artifact must emit one row for every fine
 The expanded local screening pass may use every available local bar symbol for the screening month to improve stability, but expanded proxy coverage is still screening evidence only. It may identify threshold-review candidates for the next grading step, not accepted model outputs.
 
 Accepted current associations remain limited to risk/control evidence: `cpi_inflation_release` has risk/volatility association from actual-vs-expectation surprise, and `earnings_guidance_scheduled_shell` has direction-neutral scheduled path-risk association. Local keyword/proxy screening associations from news or GDELT rows are not accepted for model use until canonical source/parser, interpretation/deduplication, matched-control, point-in-time baseline, residual-detector, and liquidity/depth gates are satisfied. No measured row currently authorizes standalone directional event alpha, model training, activation, broker/account mutation, destructive SQL, or artifact deletion.
+
+## D203 - No-correlation families are deleted from threshold queues, not evidence storage
+
+Status: accepted.
+
+When expanded local association measurement classifies an event family as measured no-clear-local-association, that family should be deleted from the next active threshold/grading queue. This deletion is queue-scoped only: source artifacts, historical association rows, and audit evidence must remain available so the decision can be reviewed or reversed if a materially better source/parser changes the evidence basis.
+
+The current queue-scoped deletions are `mna_transaction`, `product_launch_or_failure`, and `sector_demand_shock`. The current `option_derivatives_abnormality` definition is also deleted from threshold work, but only at the definition level; the broader family may be retested after a revised abnormality standard exists.
+
+This decision does not authorize physical artifact deletion, destructive SQL, model training, model activation, broker/account mutation, or standalone directional-alpha promotion.
