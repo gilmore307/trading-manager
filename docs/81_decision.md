@@ -4050,3 +4050,11 @@ Status: accepted.
 Before any final EventRiskGovernor association conclusion is made, every fine-grained event family must have an explicit `event_family_scouting_packet_v1` precondition packet. The packet is a governance/evidence-design artifact, not empirical proof. It must define source precedence, point-in-time clocks, event identity and measure fields, baseline requirements, matched-control design, price/path labels, residual requirements, liquidity requirements, and early-stop rules.
 
 Completing all packets removes the generic missing-packet blocker, but it does not authorize model training, promotion, activation, broker/account mutation, destructive SQL, or artifact deletion. Final family conclusions remain withheld until each family has its required empirical association study and any remaining PIT expectation/comparable baseline, residual-over-base-state, liquidity/depth, or revised-abnormality evidence.
+
+## D200 - Local empirical coverage scan is readiness, not final association
+
+Status: accepted.
+
+After every fine-grained event family has a precondition packet, manager governance may use a local empirical coverage scan to determine which families already have local source/study artifacts, which have candidate events requiring interpretation/deduplication and matched-control labels, and which remain blocked by source/parser coverage, point-in-time baselines, residual detectors, liquidity/depth evidence, or revised abnormality definitions.
+
+This scan is readiness evidence only. It must not be interpreted as a final correlation result, model-training approval, risk-promotion approval, broker/account mutation approval, destructive SQL approval, artifact deletion approval, or standalone alpha conclusion. Final event-family conclusions remain withheld until the family-specific empirical association studies and their required PIT/control/residual/liquidity gates are complete.
