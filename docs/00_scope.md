@@ -1,91 +1,29 @@
 # Scope
 
-## Purpose
-
-`trading-manager` is the system-level documentation and contract repository for the full trading project.
-
-It defines the global architecture, repository relationships, cross-repository workflow, control-plane orchestration responsibilities, shared artifact contracts, manifest contracts, ready-signal contracts, request contracts, and project-level governance rules for the trading system.
-
-This repository exists to keep the multi-repository trading system coherent. It also owns the former manager/control-plane responsibility for request generation, readiness checks, lifecycle routing, retries, recovery, manual override, and promotion policy. It does not implement data production, modeling, trade execution, persistent storage, or dashboard runtime code.
+`trading-manager` is the trading system's control-plane and shared-contract repository.
 
 ## In Scope
 
-- Define the global trading-system architecture.
-- Define the official trading repository map.
-- Define cross-repository workflow and handoff rules.
-- Own control-plane request generation, readiness checks, retry/recovery policy, lifecycle routing, manual override rules, and promotion routing.
-- Define shared artifact contracts.
-- Define shared manifest contracts.
-- Define shared ready-signal contracts.
-- Define shared request contracts.
-- Maintain the trading-wide registry for fields, identifiers, statuses, artifact types, request types, and shared helper surfaces.
-- Store trading-wide templates; see `docs/92_templates.md`.
-- Store shared helper code used across trading repositories.
-- Record system-level acceptance rules.
-- Record system-level architectural decisions.
-- Track system-level planning tasks before they are delegated to component repositories.
-- Preserve durable system-level memory that does not belong to a single component repository.
-- Anchor the shared local trading development environment through a gitignored `.venv/` directory.
+- Repository map and cross-repository responsibility boundaries.
+- Trading-wide registry, registry rules, and generated registry snapshot.
+- Shared Python helper packages used by manager scripts and component repos.
+- Control-plane contracts: requests, input bindings, run manifests, run steps, artifact references, ready signals, task summaries, review decisions, promotion decisions, and scheduler state.
+- Manager-owned task planning and component handoff validation.
+- Historical-modeling scheduler policy and resident-service state.
+- Dataset expansion policy, evidence collection, and safe information-pass planning.
+- Promotion-review and activation-gate policy.
+- System-level task, decision, and memory records.
 
 ## Out of Scope
 
-- Market data collection.
-- Market data normalization.
-- Persistent market-data storage.
-- Strategy backtesting or simulation.
-- Strategy-family implementation.
-- Model training.
-- Market-state discovery implementation.
-- Strategy selection implementation.
-- Live or paper trade execution.
-- Broker or exchange order placement.
-- Dashboard frontend implementation.
-- Dashboard backend/server implementation.
-- Component-repository internal task queues or run state once work has moved into that component repo.
-- Raw data, generated artifacts, notebooks, logs, or research outputs.
-- Secrets, credentials, API tokens, brokerage credentials, or exchange keys.
-- Source code for runtime trading components.
-- General-purpose non-trading infrastructure that does not serve the trading system.
+- Provider/feed adapter implementation.
+- Data cleaning, feature construction, and data-production runtime.
+- Model training algorithms and model package implementation.
+- Broker, exchange, order, fill, account, or position mutation.
+- Persistent market-data storage layout and retention execution.
+- Dashboard application code.
+- Generated artifacts, caches, logs, local runtime state, and secrets.
 
-## Owner Intent
+## Authority Rule
 
-The owner intends the trading project to be a large, core multi-repository system on this server.
-
-`trading-manager` should act as the stable global coordination layer for that system. It should keep project shape, repository relationships, shared contracts, and architecture decisions explicit before implementation work spreads across component repositories.
-
-The project should prefer strict boundaries, durable contracts, and evidence-based acceptance over fast but vague implementation.
-
-## Boundary Rules
-
-- `trading-manager` is the trading platform main repository: docs, contracts, control-plane orchestration policy, registries, templates, shared helpers, and shared environment anchor.
-- `trading-manager` may contain shared helper code used across trading repositories; see `docs/90_helpers.md`.
-- `trading-manager` must not contain component runtime implementations; control-plane scripts may create requests or review evidence, but must not fetch provider data, build features, train models, execute trades, or render dashboards.
-- `trading-manager` must not contain market data or generated trading artifacts.
-- `trading-manager` must not contain secrets or credentials.
-- `trading-manager` may contain a local gitignored `.venv/` directory as the shared trading development environment anchor.
-- The `.venv/` directory is runtime infrastructure, not repository content.
-- Component repositories may implement or consume contracts defined here, but they must not redefine incompatible local versions of global contracts.
-- Each component repository must keep its own docs spine; `trading-manager` does not replace component-level documentation.
-- Trading-wide status vocabularies and registrable fields are maintained in `trading-manager/scripts/`; see `docs/91_registry.md` for registry-specific rules.
-- A fact should live in the narrowest authoritative home:
-  - system-wide facts live here;
-  - component-specific facts live in the relevant component repository;
-  - trading-wide registered names and vocabularies live in `trading-manager/scripts/`, with operating rules in `docs/91_registry.md`.
-- Market-state discovery must not use strategy returns or strategy performance as input. Strategy results may only be attached after market states have already been discovered.
-- `trading-storage` owns shared persistent storage contracts for trading artifacts; `trading-manager` defines the system-level relationship to those contracts.
-
-## Out-of-Scope Signals
-
-A request should be rejected or re-scoped if it asks `trading-manager` to:
-
-- implement trading runtime code;
-- fetch or normalize market data;
-- run backtests;
-- train models;
-- execute orders;
-- store generated data or artifacts;
-- become a dumping ground for component-specific implementation notes;
-- duplicate status vocabulary outside `trading-manager/scripts/`;
-- override a component repo's local docs instead of referencing them;
-- accept a cross-repository behavior without a documented contract;
-- define market states using strategy returns or strategy profitability.
+Manager may plan, gate, route, validate, summarize, and record evidence. Manager may not silently take over component responsibilities. If work requires data production, modeling, storage mutation, execution, or UI implementation, manager must issue a contract or handoff instead of embedding that runtime locally.

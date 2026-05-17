@@ -1,44 +1,24 @@
 # Memory
 
-## Durable Local Notes
+This file records how durable project memory should be handled for `trading-manager`.
 
-- `trading-manager` should stay strict: global docs, contracts, registry, templates, shared helpers, plus the gitignored shared environment anchor.
-- Do not let `trading-manager` become a dumping ground for component-local implementation detail.
-- Keep trading statuses and registrable fields in `trading-manager/scripts/`, not scattered through docs.
-- The market-state contamination rule is a core system invariant.
+## Durable Homes
 
-- Registry Markdown kind files under `scripts/registry/kinds/` define boundaries only; concrete entries live in SQL, GitHub visibility comes from generated `scripts/registry/current.csv`, and registry operating rules live in `docs/91_registry.md`.
-- Contract drafting templates belong under `trading-storage/main/templates/contracts/`, not as numbered docs; `90_helpers.md`, `91_registry.md`, and `92_templates.md` are approved platform-function guides.
-- Stale canceled-project registry entries were removed because GitHub history is the restore path.
-- Registry ids are stable automation references; keys are human-readable and unsafe for durable automation dereferencing.
-- Registry `path` is a nullable column for direct locators, not a registry kind.
-- Every field registry entry must have non-empty `applies_to`; multiple scopes use semicolon-separated values.
-- Public helper methods are individually registered as script entries when they are part of the approved shared helper surface.
-- Registered helper APIs are id-only: get key, payload, path, or secret text by stable registry id.
-- Registry keys are output/display labels, not helper inputs.
+- Current operating rules: docs in this repository.
+- Active tasks: `docs/80_task.md`.
+- Active decisions: `docs/81_decision.md`.
+- Registry vocabulary: SQL migrations and generated `scripts/registry/current.csv`.
+- Runtime state: ignored `storage/runtime/` files.
+- Historical path: Git history and append-only SQL migrations.
 
-- `docs/90_helpers.md`, `docs/91_registry.md`, and `docs/92_templates.md` are platform-function guides for `trading-manager`; `00_scope.md`, `01_context.md`, and `80_`/`81_`/`82_` remain platform governance docs while `02_`/`03_` own layer workflow and acceptance.
-- Future global helpers, reusable templates, and shared fields/status/type values discovered in component work must be recorded through `trading-manager` before they become cross-repository contracts.
-- Official registry helper runtime surface is the Python `trading_registry` package under `src/`; the older non-Python helper implementation was removed.
-- Shared environment baseline is Python 3.12 at `/root/projects/trading-manager/.venv`, installed with `pip` from root `requirements.txt`.
-- Trading repositories are private by default; visibility changes need explicit owner approval and a pre-change review.
-- Component runtime helpers should align with the Python `.venv` unless a future explicit decision accepts another runtime.
-- Registry `payload_format` is a registered value-format vocabulary, not just text/file storage; use the narrowest registered format and keep SQL constraint values aligned with `kind=payload_format` rows.
-- Registry kind vocabulary belongs to the SQL kind constraint and `scripts/registry/kinds/*.md`; do not mirror it as runtime package validators unless a real runtime consumer requires it.
-- Test scripts are repository-local verification assets, not registry `script` rows; each test directory README must inventory every first-party test script and what it verifies.
-- OKX is registered as a provider term for crypto data acquisition and trading. Registry config row `OKX_SECRET_ALIAS` points to source-level alias `okx` and path `/root/secrets/okx.json`; JSON fields are `api_key`, `secret_key`, `passphrase`, `allowed_ip_address`, and `api_key_remark_name`.
-- Source secrets use one JSON file per feed/provider under `/root/secrets/<source>.json`; reusable JSON key names such as `api_key`, `secret_key`, `passphrase`, `endpoint`, `allowed_ip_address`, `api_key_remark_name`, and `pat` are registered as `field` rows with `applies_to=source_secret_file_schema`.
-- Alpaca is registered as a provider term for stock/ETF bars, quotes, trades, and news data acquisition. Registry config row `ALPACA_SECRET_ALIAS` points to source-level alias `alpaca` and path `/root/secrets/alpaca.json`; JSON fields are `api_key`, `secret_key`, and `endpoint`.
-- ThetaData is registered as an options-data provider term for chain timeline, quote, trade, OHLC, Greeks, and related options datasets. Credentials and ThetaTerminal `creds.txt`/JAR placement are intentionally deferred until the source connector boundary is designed.
-- Obsolete macro-provider references and secret aliases for FRED, Census, BEA, BLS, and U.S. Treasury Fiscal Data are not active registry rows; re-add any of them only through a current accepted feed interface.
-- Provider `term` rows can use `path` for official documentation URLs only when the reference remains current and useful; source-secret `config` rows keep `path` pointed at local `/root/secrets/<source>.json` files.
-- Retired `calendar_discovery` rows and FOMC/Nasdaq earnings calendar discovery terms are not active registry vocabulary; current event/calendar acquisition routes through accepted `trading-data` sources/feeds such as Trading Economics calendar web.
-- Registered workflow terms for historical data acquisition: `HISTORICAL_DATA_ACQUISITION`, `DATA_TASK_KEY_FILE`, and `DATA_TASK_COMPLETION_RECEIPT`. Control plane issues task key files; `trading-data` sources execute historical acquisition/cleaning scripts; storage owns durable SQL outputs and completion receipts once contracts are accepted.
-- The earlier `TRADING_SOURCE_DEVELOPMENT_STORAGE_ROOT` draft config was pruned from active registry rows; any local data-production staging remains disposable until durable storage contracts are accepted.
-- Added reusable draft data task templates under `trading-storage/main/templates/data_tasks/`: task key, source README, fetch spec, clean spec, save spec, completion receipt, and fixture policy. These support API-specific `trading-data` source design but are not accepted concrete schemas yet.
-- Data source sources should default to one `pipeline.py` with `fetch`, `clean`, `save`, and `write_receipt` functions; split into separate modules only when complexity justifies it. Source README files carry API-specific details.
-- Data task key and completion receipt templates should stay minimal and operational. Removed unused metadata such as provider documentation URL from runtime JSON templates; provider docs belong in scripts/source README.
-- A data task key is stable across periodic/scheduled runs. Per-run details belong in the task-level completion receipt under `runs[]`; run output directories should use `storage/<task-id>/runs/<run-id>/`.
-- Registered all current minimal data task JSON fields as registry `field` rows: task key fields `task_id`, `source`, `credential_config_id`, `params`, `output_root`; receipt fields `task_id`, `source`, `runs`; run fields `run_id`, `status`, `started_at`, `completed_at`, `output_dir`, `outputs`, `row_counts`, `error`.
-- 2026-04-30: Merged the old `trading-source` / `trading-derived` data-production split into canonical `trading-data`. Active chain is `feed_* -> source_NN_* -> feature_NN_* -> model_NN_*`; Layer 1 SQL chain is `trading_data.source_01_market_regime -> trading_data.feature_01_market_regime -> trading_model.model_01_market_regime`. Registry now uses `TRADING_DATA_REPO`, `data_feature`, and `FEATURE_01_MARKET_REGIME`; active `data_derived` is retired.
-- 2026-04-30: Merged the unimplemented `trading-manager` control-plane/documentation boundary into `trading-manager`. Active control-plane request generation, readiness checks, lifecycle routing, retry/recovery policy, manual override, and promotion coordination now belong to `trading-manager`; the standalone `trading-manager` repository is retired.
+## Rule
+
+Do not keep route-change narrative in active docs once the current contract is clear. If a fact matters operationally, write the current rule. If only history matters, rely on Git or migration history.
+
+## Not Stored Here
+
+- Secrets or credentials.
+- Generated provider data.
+- Model artifacts and large payloads.
+- Broker/account state.
+- Dashboard build outputs.
