@@ -4098,3 +4098,13 @@ Event-family discovery may run in the reverse direction: identify local price an
 Reverse discovery is hypothesis generation only. A family found by this route still requires canonical event interpretation, deduplication, symbol/sector relevance, matched controls, point-in-time clocks, and stability before threshold acceptance, model training, activation, or risk intervention use.
 
 The current reverse scan keeps `legal_regulatory_investigation` as a reverse-discovery candidate under the local enrichment rule. This does not authorize standalone directional alpha, model training, activation, broker/account mutation, destructive SQL, or artifact deletion.
+
+## D205 - EventRiskGovernor explains and corrects residual base-stack anomalies
+
+Status: accepted.
+
+The production event-layer route should be base-stack first. Layers 1-7 analyze market, sector, target, alpha confidence, position projection, underlying action, and option/trading guidance context. Only behavior that remains abnormal after that base-stack explanation should become `residual_anomaly_context` for Layer 8 review.
+
+Layer 8 then inspects point-in-time event evidence around the residual anomaly to determine whether a canonical event family plausibly explains, amplifies, contradicts, or fails to explain the anomaly. Its outputs are coverage, correction, explanation, warning, uncertainty, path-risk, entry-block/exposure-cap, reduce/flatten-review, or human-review hints.
+
+This preserves EventRiskGovernor / EventIntelligenceOverlay as an overlay and correction layer. It must not replace Layers 1-7, emit standalone directional event alpha, directly produce buy/sell/hold, choose option contracts, mutate broker/account state, or bypass manager review.
