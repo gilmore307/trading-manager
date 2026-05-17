@@ -4187,3 +4187,23 @@ review_required_overlap_unknown
 Only `not_in_upstream_features` and `residual_after_upstream_conditioning` may support model-side event-risk scoring or intervention evidence. `review_required_overlap_unknown` is provenance/review context only and must not become incremental event evidence, alpha, a Layer 4 promotion packet, or a production risk intervention.
 
 This prevents circular explanation where a strategy/base-stack failure triggers Layer 9 and Layer 9 then reuses the same bar, liquidity, or option-expression inputs as if they were new event evidence. Layer 9 may still reference upstream states for audit/explanation, but it must not re-score duplicated upstream features as independent event/activity bridge signal.
+
+## D211 - Startup abnormality scope is narrow and non-duplicative
+
+Date: 2026-05-17
+Status: Accepted
+
+The Layer 9 EventRiskGovernor may keep Activity Bridge evidence at startup only within a narrow abnormality scope. The included categories are:
+
+```text
+price_action_pattern
+residual_market_structure_disturbance
+microstructure_liquidity_disruption
+option_derivatives_abnormality
+```
+
+Startup examples are limited to compact point-in-time detector refs for false breakout/breakdown, liquidity sweep high/low, bull/bear trap, residual board/tape disturbance after upstream conditioning, spread/depth/quote-quality/halt or one-sided liquidity disruption, and reviewed option IV/skew/term-structure/volume/OI/liquidity disturbance.
+
+Excluded startup scope: raw return/volume/spread/liquidity z-scores alone, ordinary `equity_bar` / `equity_liquidity_bar` / target-state / option-expression / Layer 8 guidance fields, strategy/base-stack failure labels, post-event realized labels, and detector thresholds without reviewed calibration.
+
+This scope is a startup governance boundary, not proof of model value. Any expansion requires a reviewed event-family or bridge artifact with point-in-time clocks, non-overlap proof, matched controls, leakage review, and explicit manager/agent acceptance.
