@@ -164,20 +164,21 @@ WHERE model_layer LIKE '%layer_07_option_expression%'
 
 UPDATE trading_data.source_09_event_risk_governor
 SET source_name = replace(replace(replace(source_name, 'source_04_event_overlay', 'source_09_event_risk_governor'), 'source_08_event_risk_governor', 'source_09_event_risk_governor'), 'event_overlay', 'event_risk_governor'),
-    reference = replace(replace(replace(replace(reference, 'source_04_event_overlay', 'source_09_event_risk_governor'), 'source_08_event_risk_governor', 'source_09_event_risk_governor'), 'layer_04_event_overlay', 'layer_09_event_risk_governor'), 'event_overlay', 'event_risk_governor')
+    reference = replace(replace(replace(replace(replace(reference, 'source_04_event_overlay', 'source_09_event_risk_governor'), 'source_08_event_risk_governor', 'source_09_event_risk_governor'), 'layer_04_event_overlay', 'layer_09_event_risk_governor'), 'layer_08_event_risk_governor', 'layer_09_event_risk_governor'), 'event_overlay', 'event_risk_governor')
 WHERE source_name LIKE '%source_04_event_overlay%'
    OR source_name LIKE '%source_08_event_risk_governor%'
    OR source_name LIKE '%event_overlay%'
    OR reference LIKE '%source_04_event_overlay%'
    OR reference LIKE '%source_08_event_risk_governor%'
    OR reference LIKE '%layer_04_event_overlay%'
+   OR reference LIKE '%layer_08_event_risk_governor%'
    OR reference LIKE '%event_overlay%';
 
 UPDATE trading_data.feature_09_event_risk_governor
 SET run_id = replace(replace(replace(run_id, 'feature_04_event_overlay', 'feature_09_event_risk_governor'), 'feature_08_event_risk_governor', 'feature_09_event_risk_governor'), 'layer_04_event_overlay', 'layer_09_event_risk_governor'),
     source_run_ref = replace(replace(replace(source_run_ref, 'source_04_event_overlay', 'source_09_event_risk_governor'), 'source_08_event_risk_governor', 'source_09_event_risk_governor'), 'layer_04_event_overlay', 'layer_09_event_risk_governor'),
-    feature_payload_json = replace(replace(replace(replace(replace(feature_payload_json::text, '"4_event_', '"9_event_'), '"8_event_', '"9_event_'), 'feature_04_event_overlay', 'feature_09_event_risk_governor'), 'source_04_event_overlay', 'source_09_event_risk_governor'), 'event_overlay', 'event_risk_governor')::jsonb,
-    feature_quality_diagnostics = replace(replace(replace(replace(replace(feature_quality_diagnostics::text, '"4_event_', '"9_event_'), '"8_event_', '"9_event_'), 'feature_04_event_overlay', 'feature_09_event_risk_governor'), 'source_04_event_overlay', 'source_09_event_risk_governor'), 'event_overlay', 'event_risk_governor')::jsonb
+    feature_payload_json = replace(replace(replace(replace(replace(replace(feature_payload_json::text, '"4_event_', '"9_event_'), '"8_event_', '"9_event_'), 'feature_04_event_overlay', 'feature_09_event_risk_governor'), 'feature_08_event_risk_governor', 'feature_09_event_risk_governor'), 'source_04_event_overlay', 'source_09_event_risk_governor'), 'event_overlay', 'event_risk_governor')::jsonb,
+    feature_quality_diagnostics = replace(replace(replace(replace(replace(replace(replace(feature_quality_diagnostics::text, '"4_event_', '"9_event_'), '"8_event_', '"9_event_'), 'feature_04_event_overlay', 'feature_09_event_risk_governor'), 'feature_08_event_risk_governor', 'feature_09_event_risk_governor'), 'source_04_event_overlay', 'source_09_event_risk_governor'), 'source_08_event_risk_governor', 'source_09_event_risk_governor'), 'event_overlay', 'event_risk_governor')::jsonb
 WHERE run_id LIKE '%feature_04_event_overlay%'
    OR run_id LIKE '%feature_08_event_risk_governor%'
    OR source_run_ref LIKE '%source_04_event_overlay%'
@@ -187,6 +188,8 @@ WHERE run_id LIKE '%feature_04_event_overlay%'
    OR feature_payload_json::text LIKE '%event_overlay%'
    OR feature_quality_diagnostics::text LIKE '%4\_event\_%' ESCAPE '\'
    OR feature_quality_diagnostics::text LIKE '%8\_event\_%' ESCAPE '\'
+   OR feature_quality_diagnostics::text LIKE '%source_08_event_risk_governor%'
+   OR feature_quality_diagnostics::text LIKE '%feature_08_event_risk_governor%'
    OR feature_quality_diagnostics::text LIKE '%event_overlay%';
 
 COMMIT;
