@@ -20,6 +20,7 @@ def _decision_input_snapshot() -> dict[str, object]:
         ("layer_01_market_regime", "model_01_market_regime", "market_context_state"),
         ("layer_02_sector_context", "model_02_sector_context", "sector_context_state"),
         ("layer_03_target_state_vector", "model_03_target_state_vector", "target_context_state"),
+        ("layer_04_event_failure_risk", "model_04_event_failure_risk", "event_failure_risk_vector"),
         ("layer_05_alpha_confidence", "model_05_alpha_confidence", "alpha_confidence_vector"),
         ("layer_06_position_projection", "model_06_position_projection", "position_projection_vector"),
         ("layer_07_underlying_action", "model_07_underlying_action", "underlying_action_plan"),
@@ -113,7 +114,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
         self.assertEqual(receipt["contract_type"], "component_completion_receipt")
         self.assertEqual(receipt["receipt_kind"], "manager_realtime_shadow_handoff_receipt")
         self.assertEqual(receipt["status"], "succeeded")
-        self.assertEqual(receipt["runs"][0]["row_counts"]["layer_routes"], 8)
+        self.assertEqual(receipt["runs"][0]["row_counts"]["layer_routes"], 9)
         self.assertFalse(receipt["model_activation_performed"])
         self.assertFalse(receipt["broker_order_construction_performed"])
 
@@ -193,7 +194,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
         self.assertEqual(bundle["rehearsal_status"], "ready")
         self.assertEqual(bundle["provider_calls_performed"], 0)
         self.assertFalse(bundle["broker_order_construction_performed"])
-        self.assertEqual(len(bundle["route_plan"]["layer_routes"]), 8)
+        self.assertEqual(len(bundle["route_plan"]["layer_routes"]), 9)
         self.assertEqual(bundle["manager_handoff"]["receipt"]["status"], "succeeded")
 
     def test_cli_emits_bundle(self) -> None:

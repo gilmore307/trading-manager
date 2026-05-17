@@ -1,5 +1,5 @@
 {
-  "$id": "https://gilmore307.github.io/trading-manager/schemas/manager_request_v1.schema.json",
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/manager_request.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -98,6 +98,6 @@
     "priority",
     "dry_run"
   ],
-  "title": "manager_request_v1",
+  "title": "manager_request",
   "type": "object"
 }

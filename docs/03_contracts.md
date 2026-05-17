@@ -15,9 +15,9 @@ Machine-verifiable JSON Schemas in `schemas/` are the contract authority for dur
 
 ## Core Contracts
 
-### `manager_request_v1`
+### `manager_request`
 
-Schema: `schemas/manager_request_v1.schema.json`.
+Schema: `schemas/manager_request.schema.json`.
 
 A manager-issued request for component work.
 
@@ -35,9 +35,9 @@ parameter_ref or payload_ref
 created_time
 ```
 
-### `input_binding_v1`
+### `input_binding`
 
-Schema: `schemas/input_binding_v1.schema.json`.
+Schema: `schemas/input_binding.schema.json`.
 
 A durable binding between a request and the input refs it may use.
 
@@ -49,9 +49,9 @@ schema_ref
 available_time or as_of_time
 ```
 
-### `run_manifest_v1`
+### `run_manifest`
 
-Schema: `schemas/run_manifest_v1.schema.json`.
+Schema: `schemas/run_manifest.schema.json`.
 
 A normalized component run summary.
 
@@ -66,7 +66,7 @@ ended_time
 receipt_ref
 ```
 
-### `run_step_v1`
+### `run_step`
 
 Optional step-level detail for long runs.
 
@@ -79,9 +79,9 @@ started_time
 ended_time
 ```
 
-### `artifact_ref_v1`
+### `artifact_ref`
 
-Schema: `schemas/artifact_ref_v1.schema.json`.
+Schema: `schemas/artifact_ref.schema.json`.
 
 A reference to an output artifact without copying the artifact body into SQL.
 
@@ -96,9 +96,9 @@ retention_policy
 lifecycle_status
 ```
 
-### `ready_signal_v1`
+### `ready_signal`
 
-Schema: `schemas/ready_signal_v1.schema.json`.
+Schema: `schemas/ready_signal.schema.json`.
 
 A component or manager signal that a declared output is usable for a declared consumer scope.
 
@@ -112,9 +112,9 @@ consumer_scope
 evidence_ref
 ```
 
-### `scheduler_lock_v1`
+### `scheduler_lock`
 
-Schema: `schemas/scheduler_lock_v1.schema.json`.
+Schema: `schemas/scheduler_lock.schema.json`.
 
 A stable lock identity for historical scheduler coordination.
 
@@ -125,7 +125,7 @@ lock_path
 month / stage_id / provider_id / partition_id / model_id / candidate_ref as applicable
 ```
 
-Lock scopes are `daemon`, `month_stage`, `provider_partition`, `reconcile`, and `promotion`. Provider partition locks permit concurrent partition work only; reconcile locks own stage-state transitions. Dry-run decisions and status snapshots expose `scheduler_lock_plan_v1` with the lock refs/templates required for the selected work.
+Lock scopes are `daemon`, `month_stage`, `provider_partition`, `reconcile`, and `promotion`. Provider partition locks permit concurrent partition work only; reconcile locks own stage-state transitions. Dry-run decisions and status snapshots expose `scheduler_lock_plan` with the lock refs/templates required for the selected work.
 
 ## Review and Promotion Contracts
 

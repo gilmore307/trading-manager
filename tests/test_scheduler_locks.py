@@ -16,7 +16,7 @@ from trading_manager_tasks.scheduler_locks import (
 )
 
 
-SCHEMA = json.loads(Path("schemas/scheduler_lock_v1.schema.json").read_text(encoding="utf-8"))
+SCHEMA = json.loads(Path("schemas/scheduler_lock.schema.json").read_text(encoding="utf-8"))
 
 
 class SchedulerLocksTest(unittest.TestCase):
@@ -33,7 +33,7 @@ class SchedulerLocksTest(unittest.TestCase):
 
     def test_daemon_lock_ref_preserves_current_single_instance_path(self) -> None:
         ref = daemon_lock_ref()
-        self.assertEqual(ref.contract_type, "scheduler_lock_v1")
+        self.assertEqual(ref.contract_type, "scheduler_lock")
         self.assertEqual(ref.lock_scope, "daemon")
         self.assertEqual(ref.lock_key, "lock:daemon:historical_scheduler")
         self.assertEqual(ref.lock_path, "storage/runtime/historical_scheduler.lock")

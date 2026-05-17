@@ -16,12 +16,12 @@ The task system is the manager control-plane lifecycle for component work.
 
 ## Core Rows
 
-- `manager_request_v1` — requested work.
-- `input_binding_v1` — approved input refs.
-- `run_manifest_v1` — component run summary.
-- `run_step_v1` — optional step detail.
-- `artifact_ref_v1` — output refs.
-- `ready_signal_v1` — declared readiness for a consumer scope.
+- `manager_request` — requested work.
+- `input_binding` — approved input refs.
+- `run_manifest` — component run summary.
+- `run_step` — optional step detail.
+- `artifact_ref` — output refs.
+- `ready_signal` — declared readiness for a consumer scope.
 - `task_summary` — derived read model; it does not own state.
 
 ## Priority Values

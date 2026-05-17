@@ -110,7 +110,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], BASE_STACK_LAYER_COUNT)
         self.assertFalse(decision.dispatch_performed)
         self.assertEqual(decision.provider_calls, 0)
-        self.assertEqual(decision.lock_plan["contract_type"], "scheduler_lock_plan_v1")
+        self.assertEqual(decision.lock_plan["contract_type"], "scheduler_lock_plan")
         self.assertIn("daemon", decision.lock_plan["required_lock_scopes"])
 
     def test_scheduler_backs_off_during_regular_trading_day_window(self):

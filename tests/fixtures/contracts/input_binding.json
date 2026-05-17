@@ -10,7 +10,7 @@
   "version_ref": "sha256:example",
   "entity_scope": "SPY",
   "time_window": "2016-01",
-  "schema_ref": "schema://source_panel_v1",
+  "schema_ref": "schema://source_panel",
   "quality_ref": null,
   "lineage_ref": "storage://trading-manager/example/lineage.json"
 }

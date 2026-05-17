@@ -9,7 +9,7 @@
       "type": "string"
     }
   },
-  "$id": "https://gilmore307.github.io/trading-manager/schemas/scheduler_lock_v1.schema.json",
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/scheduler_lock.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "oneOf": [
@@ -19,7 +19,7 @@
           "type": "null"
         },
         "contract_type": {
-          "const": "scheduler_lock_v1"
+          "const": "scheduler_lock"
         },
         "lock_key": {
           "const": "lock:daemon:historical_scheduler"
@@ -60,7 +60,7 @@
           "type": "null"
         },
         "contract_type": {
-          "const": "scheduler_lock_v1"
+          "const": "scheduler_lock"
         },
         "lock_key": {
           "pattern": "^lock:stage:",
@@ -104,7 +104,7 @@
           "type": "null"
         },
         "contract_type": {
-          "const": "scheduler_lock_v1"
+          "const": "scheduler_lock"
         },
         "lock_key": {
           "pattern": "^lock:provider:",
@@ -150,7 +150,7 @@
           "type": "null"
         },
         "contract_type": {
-          "const": "scheduler_lock_v1"
+          "const": "scheduler_lock"
         },
         "lock_key": {
           "pattern": "^lock:reconcile:",
@@ -194,7 +194,7 @@
           "$ref": "#/$defs/non_empty_string"
         },
         "contract_type": {
-          "const": "scheduler_lock_v1"
+          "const": "scheduler_lock"
         },
         "lock_key": {
           "pattern": "^lock:promotion:",
@@ -241,7 +241,7 @@
       ]
     },
     "contract_type": {
-      "const": "scheduler_lock_v1"
+      "const": "scheduler_lock"
     },
     "lock_key": {
       "minLength": 1,
@@ -297,6 +297,6 @@
     "lock_key",
     "lock_path"
   ],
-  "title": "scheduler_lock_v1",
+  "title": "scheduler_lock",
   "type": "object"
 }

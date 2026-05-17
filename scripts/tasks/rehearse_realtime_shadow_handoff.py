@@ -62,6 +62,25 @@ def main() -> int:
         }
     )
     decision_input = execution_fixture["decision_input_snapshot"]
+    if args.model_layers is None:
+        rows = decision_input.setdefault("layer_input_refs", [])
+        present_layers = {row.get("model_layer") for row in rows if isinstance(row, dict)}
+        if "layer_04_event_failure_risk" not in present_layers:
+            rows.append(
+                {
+                    "contract_type": "execution_model_decision_layer_input",
+                    "decision_input_snapshot_id": decision_input.get("decision_input_snapshot_id"),
+                    "model_layer": "layer_04_event_failure_risk",
+                    "model_id": "model_04_event_failure_risk",
+                    "expected_model_output": "event_failure_risk_vector",
+                    "feature_ref": f"realtime-feature://{decision_input.get('decision_input_snapshot_id')}/layer_04_event_failure_risk",
+                    "upstream_context_refs": [],
+                    "frozen_model_config_ref": args.frozen_model_config_ref,
+                    "historical_dataset_snapshot_ref": args.historical_dataset_snapshot_ref,
+                    "realtime_feature_snapshot_ref": decision_input.get("realtime_feature_snapshot_ref"),
+                    "decision_handoff_status": "ready_for_historical_model_decision_input",
+                }
+            )
     route_plan = build_realtime_decision_route_plan(
         {
             "decision_input_snapshot": decision_input,

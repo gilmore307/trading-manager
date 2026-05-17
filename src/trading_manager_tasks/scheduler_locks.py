@@ -71,7 +71,7 @@ def daemon_lock_ref(lock_path: Path = DEFAULT_DAEMON_LOCK_PATH) -> SchedulerLock
     """Return the process-level single-daemon lock contract."""
 
     return SchedulerLockRef(
-        contract_type="scheduler_lock_v1",
+        contract_type="scheduler_lock",
         lock_scope="daemon",
         lock_key="lock:daemon:historical_scheduler",
         lock_path=str(lock_path),
@@ -85,7 +85,7 @@ def month_stage_lock_ref(month: str, stage_id: str, *, locks_dir: Path = DEFAULT
     stage_id = _require(stage_id, "stage_id")
     path = locks_dir / "stage" / month / f"{lock_token(stage_id)}.lock"
     return SchedulerLockRef(
-        contract_type="scheduler_lock_v1",
+        contract_type="scheduler_lock",
         lock_scope="month_stage",
         lock_key=f"lock:stage:{month}:{stage_id}",
         lock_path=str(path),
@@ -115,7 +115,7 @@ def provider_partition_lock_ref(
     partition_id = _require(partition_id, "partition_id")
     path = locks_dir / "provider" / month / lock_token(stage_id) / lock_token(provider_id) / f"{lock_token(partition_id)}.lock"
     return SchedulerLockRef(
-        contract_type="scheduler_lock_v1",
+        contract_type="scheduler_lock",
         lock_scope="provider_partition",
         lock_key=f"lock:provider:{month}:{stage_id}:{provider_id}:{partition_id}",
         lock_path=str(path),
@@ -133,7 +133,7 @@ def reconcile_lock_ref(month: str, stage_id: str, *, locks_dir: Path = DEFAULT_L
     stage_id = _require(stage_id, "stage_id")
     path = locks_dir / "reconcile" / month / f"{lock_token(stage_id)}.lock"
     return SchedulerLockRef(
-        contract_type="scheduler_lock_v1",
+        contract_type="scheduler_lock",
         lock_scope="reconcile",
         lock_key=f"lock:reconcile:{month}:{stage_id}",
         lock_path=str(path),
@@ -149,7 +149,7 @@ def promotion_lock_ref(model_id: str, candidate_ref: str, *, locks_dir: Path = D
     candidate_ref = _require(candidate_ref, "candidate_ref")
     path = locks_dir / "promotion" / lock_token(model_id) / f"{lock_token(candidate_ref)}.lock"
     return SchedulerLockRef(
-        contract_type="scheduler_lock_v1",
+        contract_type="scheduler_lock",
         lock_scope="promotion",
         lock_key=f"lock:promotion:{model_id}:{candidate_ref}",
         lock_path=str(path),
@@ -197,8 +197,8 @@ def scheduler_lock_plan(
                 )
                 scopes.append("provider_partition")
     return {
-        "contract_type": "scheduler_lock_plan_v1",
-        "lock_contract_type": "scheduler_lock_v1",
+        "contract_type": "scheduler_lock_plan",
+        "lock_contract_type": "scheduler_lock",
         "selected_work": selected_work,
         "next_internal_stage": next_internal_stage,
         "required_lock_scopes": sorted(set(scopes), key=scopes.index),

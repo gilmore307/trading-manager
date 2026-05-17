@@ -6,11 +6,11 @@ The schemas are the cross-repository contract authority for concise control-plan
 
 Current first slice:
 
-- `manager_request_v1.schema.json`
-- `input_binding_v1.schema.json`
-- `run_manifest_v1.schema.json`
-- `artifact_ref_v1.schema.json`
-- `ready_signal_v1.schema.json`
-- `scheduler_lock_v1.schema.json`
+- `manager_request.schema.json`
+- `input_binding.schema.json`
+- `run_manifest.schema.json`
+- `artifact_ref.schema.json`
+- `ready_signal.schema.json`
+- `scheduler_lock.schema.json`
 
 Large component payloads remain by reference; these schemas validate ids, status values, refs, clocks, and readiness facts only.

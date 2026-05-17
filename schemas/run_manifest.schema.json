@@ -1,5 +1,5 @@
 {
-  "$id": "https://gilmore307.github.io/trading-manager/schemas/run_manifest_v1.schema.json",
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/run_manifest.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -70,6 +70,6 @@
     "status",
     "started_at_utc"
   ],
-  "title": "run_manifest_v1",
+  "title": "run_manifest",
   "type": "object"
 }

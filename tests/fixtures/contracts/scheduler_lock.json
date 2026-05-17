@@ -1,5 +1,5 @@
 {
-  "contract_type": "scheduler_lock_v1",
+  "contract_type": "scheduler_lock",
   "lock_scope": "provider_partition",
   "lock_key": "lock:provider:2016-01:layer_01_market_regime.data_acquisition:alpaca:SPY",
   "lock_path": "storage/runtime/locks/provider/2016-01/layer_01_market_regime.data_acquisition/alpaca/SPY.lock",

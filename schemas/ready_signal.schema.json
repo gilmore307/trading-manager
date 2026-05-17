@@ -1,5 +1,5 @@
 {
-  "$id": "https://gilmore307.github.io/trading-manager/schemas/ready_signal_v1.schema.json",
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/ready_signal.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -64,6 +64,6 @@
     "status",
     "review_required"
   ],
-  "title": "ready_signal_v1",
+  "title": "ready_signal",
   "type": "object"
 }

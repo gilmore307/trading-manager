@@ -1,5 +1,5 @@
 {
-  "$id": "https://gilmore307.github.io/trading-manager/schemas/input_binding_v1.schema.json",
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/input_binding.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "anyOf": [
@@ -95,6 +95,6 @@
     "input_ref",
     "schema_ref"
   ],
-  "title": "input_binding_v1",
+  "title": "input_binding",
   "type": "object"
 }

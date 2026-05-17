@@ -13,7 +13,7 @@ Monthly backfill planning creates deterministic manager requests for historical 
 
 ```text
 plan monthly window
--> create manager_request_v1 rows or dry-run previews
+-> create manager_request rows or dry-run previews
 -> materialize request payloads
 -> validate handoff
 -> dispatch provider acquisition only with explicit provider flag

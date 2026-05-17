@@ -1,5 +1,5 @@
 {
-  "$id": "https://gilmore307.github.io/trading-manager/schemas/artifact_ref_v1.schema.json",
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/artifact_ref.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -65,6 +65,6 @@
     "schema_ref",
     "lifecycle_status"
   ],
-  "title": "artifact_ref_v1",
+  "title": "artifact_ref",
   "type": "object"
 }
