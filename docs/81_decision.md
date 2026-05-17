@@ -4168,3 +4168,22 @@ Manager governance therefore distinguishes two boundaries:
 - progression dependency: Layer 9 is not a hard prerequisite for base Layers 1-8 progression, and remains an auditable post-guidance residual/event-risk overlay lane.
 
 This decision preserves all safety gates. Layer 9 may prepare evidence, run bounded historical event-feed acquisition through reviewed task keys, generate risk/control overlays, review residual anomalies, and produce promotion-review packets. It must not start realtime trading, mutate broker/order/fill/account state, activate production models automatically, destructively mutate storage, auto-promote event families into Layer 4, or replace the Layers 1-8 base stack.
+
+## D210 - Activity bridge evidence requires upstream non-overlap proof
+
+Date: 2026-05-17
+Status: Accepted
+
+Activity bridge evidence may remain in the Layer 9 EventRiskGovernor route only if it is not a second copy of information already consumed by the upstream Layers 1-8 path. Price-action, liquidity, and option-activity legs must carry or reference a non-overlap audit trail for the same decision context.
+
+Accepted statuses are:
+
+```text
+not_in_upstream_features
+residual_after_upstream_conditioning
+review_required_overlap_unknown
+```
+
+Only `not_in_upstream_features` and `residual_after_upstream_conditioning` may support model-side event-risk scoring or intervention evidence. `review_required_overlap_unknown` is provenance/review context only and must not become incremental event evidence, alpha, a Layer 4 promotion packet, or a production risk intervention.
+
+This prevents circular explanation where a strategy/base-stack failure triggers Layer 9 and Layer 9 then reuses the same bar, liquidity, or option-expression inputs as if they were new event evidence. Layer 9 may still reference upstream states for audit/explanation, but it must not re-score duplicated upstream features as independent event/activity bridge signal.
