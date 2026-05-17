@@ -4108,3 +4108,15 @@ The production event-layer route should be base-stack first. Layers 1-7 analyze 
 Layer 8 then inspects point-in-time event evidence around the residual anomaly to determine whether a canonical event family plausibly explains, amplifies, contradicts, or fails to explain the anomaly. Its outputs are coverage, correction, explanation, warning, uncertainty, path-risk, entry-block/exposure-cap, reduce/flatten-review, or human-review hints.
 
 This preserves EventRiskGovernor / EventIntelligenceOverlay as an overlay and correction layer. It must not replace Layers 1-7, emit standalone directional event alpha, directly produce buy/sell/hold, choose option contracts, mutate broker/account state, or bypass manager review.
+
+## D206 - Realtime event monitoring uses an observation pool; research may scan all events
+
+Status: accepted.
+
+Historical model research may search all point-in-time events, news, filings, macro releases, and other visible evidence to explain residual anomalies. This broad search is allowed because its purpose is discovery: identify which event families repeatedly explain residual price/path/volume/liquidity/option anomalies after the Layers 1-7 base stack has done its work.
+
+Realtime operation must not continuously read and classify every possible event/news stream. It should monitor only reviewed event families in the active observation pool, plus explicitly accepted probationary observation families. New families enter this pool only when residual-anomaly research shows explanatory value or accepted risk/control value.
+
+If an event family demonstrates stable, predictive, incremental behavior across splits, controls, base-stack residuals, and regimes, it may be proposed for promotion from correction/explanation overlay into strategy-decision scope. This promotion is never automatic: a script must emit an evidence packet and call agent review for a final accept/defer/reject decision before manager records any production scope change.
+
+Current active observation-pool seeds are `cpi_inflation_release` and `earnings_guidance_scheduled_shell`; current probationary observation candidate is `legal_regulatory_investigation`. No current event family is approved for strategy-decision promotion.
