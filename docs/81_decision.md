@@ -4058,3 +4058,13 @@ Status: accepted.
 After every fine-grained event family has a precondition packet, manager governance may use a local empirical coverage scan to determine which families already have local source/study artifacts, which have candidate events requiring interpretation/deduplication and matched-control labels, and which remain blocked by source/parser coverage, point-in-time baselines, residual detectors, liquidity/depth evidence, or revised abnormality definitions.
 
 This scan is readiness evidence only. It must not be interpreted as a final correlation result, model-training approval, risk-promotion approval, broker/account mutation approval, destructive SQL approval, artifact deletion approval, or standalone alpha conclusion. Final event-family conclusions remain withheld until the family-specific empirical association studies and their required PIT/control/residual/liquidity gates are complete.
+
+## D201 - Final current-cycle event-layer posture is risk governor, not event alpha
+
+Status: accepted.
+
+After completing all-family packet coverage, local empirical coverage, and the reviewed CPI, earnings/guidance, option-abnormality, and source-readiness diagnostics, the final current-cycle event-model posture is: build `EventRiskGovernor / EventIntelligenceOverlay` as a bounded risk/intelligence overlay, not as a standalone event-alpha model.
+
+Current evidence accepts only `cpi_inflation_release` and `earnings_guidance_scheduled_shell` for risk/control use. CPI surprise may support macro event-risk/control context once canonical TE expectation-history coverage is complete. Earnings/guidance scheduled shells may support direction-neutral scheduled path-risk context. No event family is accepted for standalone directional alpha.
+
+Manager governance must keep all other families blocked, deferred, or research-queue only until their family-specific gates are satisfied: canonical interpretation/dedup, matched controls, PIT expectation/comparable baselines, residual-over-base-state detectors, liquidity/depth evidence, or revised option-abnormality definitions as applicable. The EventRiskGovernor may emit event presence/lifecycle, evidence quality, uncertainty, path/gap/liquidity risk, review flags, entry-block/exposure-cap hints, reduce/flatten review candidates, and audit explanations. It must not emit buy/sell/hold, directional alpha override, position size, target exposure, option contract selection, order instructions, broker/account mutation, automatic activation, destructive SQL, or artifact deletion.
