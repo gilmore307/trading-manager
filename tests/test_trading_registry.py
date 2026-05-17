@@ -94,7 +94,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EVENT_RISK_INTERVENTION"]["payload"], "event_risk_intervention")
         self.assertIn("flatten_candidate", rows["EVENT_RISK_INTERVENTION_STATUS_VALUES"]["payload"])
         self.assertIn("broker order", rows["EVENT_RISK_INTERVENTION"]["note"])
-        self.assertIn("legacy_physical_surfaces", rows["LEGACY_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
+        self.assertIn("current_physical_surfaces_aligned_with_nine_layer_order", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
 
     def test_data_feed_and_data_source_rows_are_separated(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -356,10 +356,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("trading_storage_protected_set_physical_execution", rows["STORAGE_LIFECYCLE_MANAGER_CONTROL_POLICY"]["payload"])
         self.assertIn("promotion_classifies_artifacts", rows["PROMOTION_STORAGE_LIFECYCLE_BOUNDARY_POLICY"]["payload"])
         self.assertIn("manager_schedules_lifecycle", rows["PROMOTION_STORAGE_LIFECYCLE_BOUNDARY_POLICY"]["payload"])
-        self.assertIn("near_to_far_listed_expirations", rows["LAYER_07_OPTION_BUCKET_EXPIRATION_POLICY"]["payload"])
-        self.assertIn("three_listed_strike_levels_below", rows["LAYER_07_OPTION_BUCKET_STRIKE_POLICY"]["payload"])
-        self.assertIn("no_acquisition_time_prefilter_for_model_construction", rows["LAYER_07_OPTION_BUCKET_PREFILTER_POLICY"]["payload"])
-        self.assertIn("single_leg_only", rows["LAYER_07_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
+        self.assertIn("near_to_far_listed_expirations", rows["LAYER_08_OPTION_BUCKET_EXPIRATION_POLICY"]["payload"])
+        self.assertIn("three_listed_strike_levels_below", rows["LAYER_08_OPTION_BUCKET_STRIKE_POLICY"]["payload"])
+        self.assertIn("no_acquisition_time_prefilter_for_model_construction", rows["LAYER_08_OPTION_BUCKET_PREFILTER_POLICY"]["payload"])
+        self.assertIn("single_leg_only", rows["LAYER_08_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
         self.assertNotIn("live_" + "calls_disabled_by_default", rows["DATA_PRODUCTION_HARDENING_POLICY"]["payload"])
         self.assertEqual(rows["MANAGER_CONTROLLED_INFORMATION_PASS"]["payload"], "manager_controlled_information_pass")
         self.assertIn("plan_controlled_information_pass.py", rows["MANAGER_CONTROLLED_INFORMATION_PASS_PLAN"]["path"])

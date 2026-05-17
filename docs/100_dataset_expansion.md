@@ -93,7 +93,7 @@ The manager walks layers in dependency order and expands the earliest layer with
 
 1. Layers 1-2 are finite six-month panel flows: continue chronological six-month units after each layer's own receipts are ready; do not wait for downstream Layers 3-9.
 2. Layers 3-8 are target-major serial flows: select one single-stock target symbol, complete conceptual Layers 3 -> 4 -> 5 -> 6 -> 7 -> 8 for that target over the six-month unit, then admit the next target symbol unless a reviewed coverage exception is recorded.
-3. Conceptual Layer 8 option-expression expansion begins only after the selected target's prior market-through-underlying-action context chain is complete; the active physical stage token remains `layer_08_option_expression` until a dedicated renumbering migration.
+3. Conceptual Layer 8 option-expression expansion begins only after the selected target's prior market-through-underlying-action context chain is complete; the active physical stage token is `layer_08_option_expression`.
 4. Every Layer 3+ expansion/task plan must expose `selected_target_symbol`, `dataset_unit_kind=target_symbol_six_month`, and `dataset_unit_months=6` in the emitted plan/state/dashboard rows.
 5. Fill train, then calibration, then validation, then test.
 6. Use `forward_holdout` only after the base split ladder exists and evidence gaps such as coverage, drift, split stability, stale holdout, regime coverage, or baseline instability remain.

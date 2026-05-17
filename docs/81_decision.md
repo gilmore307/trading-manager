@@ -2578,17 +2578,17 @@ Status: Accepted
 
 ### Context
 
-The historical scheduler daemon must not remain a Layer 1-only loop. The current phase requires all eight models to be automatically orchestrable by manager for data/input preparation, training/generation, evaluation, review preparation, and maintenance, while preserving provider, activation, and broker gates.
+The historical scheduler daemon must not remain a Layer 1-only loop. The current phase requires the base Layers 1-8 plus the separate Layer 9 event-risk overlay to be automatically orchestrable by manager for data/input preparation, training/generation, evaluation, review preparation, and maintenance, while preserving provider, activation, and broker gates.
 
 ### Decision
 
-Add `manager_model_training_workflow_plan` as the manager-owned full-stack workflow graph. The graph covers Layers 1-8 and defines six stages per layer: data acquisition, feature/input generation, model generation, model evaluation, promotion, and maintenance.
+Add `manager_model_training_workflow_plan` as the manager-owned base-stack workflow graph. The graph covers base Layers 1-8 and defines six stages per layer: data acquisition, feature/input generation, model generation, model evaluation, promotion, and maintenance. Layer 9 EventRiskGovernor remains a separately orchestrated residual-risk overlay.
 
 Layer-specific data surfaces remain honest: Layers 5-7 do not invent trading-data feature surfaces; they consume upstream model/control-plane/position-risk artifacts. Provider-backed stages run through autonomous manager dispatch; model activation remains blocked behind an approving decision artifact; broker execution remains outside manager.
 
 ### Consequences
 
-- Scheduler decisions now carry the full eight-layer workflow plan instead of only a Layer 1 preparation summary.
+- Scheduler decisions now carry the full base Layers 1-8 workflow plan plus separate Layer 9 overlay readiness instead of only a Layer 1 preparation summary.
 - Once Layer 1 task keys exist, the scheduler advances to the internal stage `layer_01_market_regime.data_acquisition` and reports autonomous historical provider acquisition as the next guarded stage.
 - The next implementation boundary is durable stage completion from provider dispatch and component receipts, not more ad hoc layer-specific scripting.
 
@@ -2719,7 +2719,7 @@ Status: Accepted
 
 ### Context
 
-Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. After D208, Layers 3-8 operate over an open target-candidate space, including the conceptual Layer 8 option-expression boundary whose physical stage token remains legacy `layer_08_option_expression` until a dedicated migration. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
+Layers 1-2 have finite, controlled panel spaces: Layer 1 is a fixed broad-market/cross-asset panel and Layer 2 is a fixed sector/industry panel. After D208, Layers 3-8 operate over an open target-candidate space, including the Layer 8 option-expression boundary whose current stage token is `layer_08_option_expression`. Treating all layers as a synchronized all-models-per-month loop would either block finite background panels behind downstream work or explode the open candidate space.
 
 ### Decision
 
@@ -2727,8 +2727,8 @@ Use segmented workflow progression:
 
 - Layer 1 continues chronological month-by-month after its own month-level receipts are ready; it does not wait for downstream layers.
 - Layer 2 continues chronological month-by-month once Layer 1 context exists; it does not wait for Layers 3-9.
-- Layers 3-8 run target-major by default: select one target candidate and complete conceptual Layers 3 -> 4 -> 5 -> 6 -> 7 -> 8 before admitting the next target candidate, unless a reviewed coverage exception is recorded.
-- Conceptual Layer 8 option-expression contract/bucket expansion, currently carried by legacy physical `layer_08_option_expression`, starts only after the selected target's prior market-through-underlying-action context chain is complete.
+- Layers 3-8 run target-major by default: select one target candidate and complete Layers 3 -> 4 -> 5 -> 6 -> 7 -> 8 before admitting the next target candidate, unless a reviewed coverage exception is recorded.
+- Layer 8 option-expression contract/bucket expansion, carried by `layer_08_option_expression`, starts only after the selected target's prior market-through-underlying-action context chain is complete.
 
 ### Consequences
 
@@ -2765,20 +2765,20 @@ Status: Accepted
 
 ### Context
 
-The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. The prerequisite safe/offline stages reached completion for the month. The legacy physical `layer_08_option_expression` stage was blocked by the option-expression acquisition gate until the completed target chain could be reviewed.
+The formal historical workflow began at `2016-01` under the no-provider continuation rule: ordinary continuation may prepare, validate, reconcile, and run local/offline stages, but provider execution runs only through explicit manager provider dispatch. The prerequisite safe/offline stages reached completion for the month. The `layer_08_option_expression` stage was blocked by the option-expression acquisition gate until the completed target chain could be reviewed.
 
 ### Decision
 
 Close the current `2016-01` Layer 1-8 safe workflow section as complete for mechanism validation.
 
-Legacy physical `layer_08_option_expression` acquisition is closed by reviewed no-provider skip for this month because every upstream action row resolved to `no_trade` / `none`; there were no active target chains and therefore no warranted option-chain provider request. The stage generated 279 deterministic `no_option_expression` rows from completed upstream database rows. The run made zero provider calls, performed no dispatch, did not activate a model, did not perform broker/order/account mutation, and did not mutate storage lifecycle state.
+`layer_08_option_expression` acquisition is closed by reviewed no-provider skip for this month because every upstream action row resolved to `no_trade` / `none`; there were no active target chains and therefore no warranted option-chain provider request. The stage generated 279 deterministic `no_option_expression` rows from completed upstream database rows. The run made zero provider calls, performed no dispatch, did not activate a model, did not perform broker/order/account mutation, and did not mutate storage lifecycle state.
 
 Promotion decisions for Layers 1-8 remain deferred. This closeout validates workflow mechanics and safe offline progression only; it is not production model activation and not authorization to bypass manager provider-dispatch controls.
 
 ### Consequences
 
 - The next chronological month can start from safe internal preparation and provider-dispatch review.
-- If a future month has active upstream target/action chains, the legacy physical `layer_08_option_expression` stage must stop at provider-dispatch review unless manager provider dispatch is executed.
+- If a future month has active upstream target/action chains, the `layer_08_option_expression` stage must stop at provider-dispatch review unless manager provider dispatch is executed.
 - Deferred promotion evidence remains a separate production-readiness track.
 - Runtime workflow checkpoints should be treated as month-scoped evidence when moving chronologically, so a later month should use an explicit month-specific state path unless/until the scheduler owns month checkpoint rotation.
 
@@ -2789,15 +2789,15 @@ Status: Accepted
 
 ### Context
 
-The `2016-02` historical workflow completed the safe/offline stack through the legacy physical `layer_08_option_expression` stage. Layer 1 and Layer 2 provider acquisition used bounded autonomous dispatch before execution; downstream target/action/expression stages advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and the option-expression stage exposed a no-provider feature-stage skip gap.
+The `2016-02` historical workflow completed the safe/offline stack through the `layer_08_option_expression` stage. Layer 1 and Layer 2 provider acquisition used bounded autonomous dispatch before execution; downstream target/action/expression stages advanced without additional provider calls, broker/account mutation, model activation, or storage lifecycle mutation. During the run, Layer 4 exposed a zero-row bar artifact handling gap and the option-expression stage exposed a no-provider feature-stage skip gap.
 
 ### Decision
 
-Close `2016-02` as complete for safe workflow mechanics. The final month-scoped state has no next stage, with all required stages succeeded or not applicable. The upstream action stage produced only `no_trade` rows, and the legacy physical option-expression stage correctly produced deterministic `no_option_expression` rows without ThetaData/provider acquisition.
+Close `2016-02` as complete for safe workflow mechanics. The final month-scoped state has no next stage, with all required stages succeeded or not applicable. The upstream action stage produced only `no_trade` rows, and the option-expression stage correctly produced deterministic `no_option_expression` rows without ThetaData/provider acquisition.
 
 Accept the accompanying mechanism-hardening changes before starting `2016-03`:
 
-- Legacy physical option-expression feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_08_option_expression` after completed active-path acquisition.
+- Option-expression feature generation is mediated by `scripts/tasks/execute_layer_eight_option_feature_generation.py`, which writes a first-class no-provider/no-feature skip receipt when the reviewed gate has zero active target chains, or delegates to trading-data `feature_08_option_expression` after completed active-path acquisition.
 - Workflow CLIs default to scheduler-owned month-scoped checkpoints: `storage/runtime/model_training_workflow_state_YYYY-MM.json`.
 - Workflow state records `provider_calls_observed` separately from safe/offline `provider_calls`, so provider acquisition calls are visible without misclassifying offline stages as provider-calling stages.
 - Autonomous provider dispatch no longer creates provider-dispatch reviews; bounded request ids, terminal-coverage rejection, receipts, and reconcile coverage are the control surface.
@@ -2806,7 +2806,7 @@ Accept the accompanying mechanism-hardening changes before starting `2016-03`:
 
 - `2016-03` may begin from safe internal preparation after this hardening is committed and verified.
 - Production promotion remains deferred until reviewed evidence proves sufficient rows/labels, baseline improvement, split stability, no leakage, and an agent-approved promotion decision.
-- Active legacy physical option-expression provider acquisition remains guarded by bounded provider-dispatch review, terminal coverage, receipts, and reconcile coverage.
+- Active option-expression provider acquisition remains guarded by bounded provider-dispatch review, terminal coverage, receipts, and reconcile coverage.
 - Storage lifecycle mutation remains outside this closeout and requires lifecycle policy/protected-set execution surfaces.
 
 ## D125 - Owner-observed agent automation replaces routine manual provider guardrails
@@ -3722,11 +3722,11 @@ When cookies expire, the refresh path renews the authenticated browser session a
 Accepted: 2026-05-15
 Status: Superseded by D208 for exact layer numbers
 
-This historical decision moved event intelligence out of the hard upstream alpha path. D208 later inserted Layer 4 EventFailureRiskModel and shifted EventRiskGovernor to conceptual Layer 9.
+This historical decision moved event intelligence out of the hard upstream alpha path. D208 later inserted Layer 4 EventFailureRiskModel and shifted EventRiskGovernor to Layer 9.
 
-Manager orchestration must treat conceptual Layer 8 as the base trading-guidance / option-expression candidate and conceptual Layer 9 as a post-guidance event-risk intervention boundary. Layer 9 can block new entries, cap exposure, request exposure reduction, nominate flatten/clear candidates, nominate halt candidates, require human review, or propose Layer 4 promotion packets when high-risk point-in-time events are detected. These are decision/risk-record interventions, not direct broker/account mutations and not automatic event-family promotion.
+Manager orchestration must treat Layer 8 as the base trading-guidance / option-expression candidate and Layer 9 as a post-guidance event-risk intervention boundary. Layer 9 can block new entries, cap exposure, request exposure reduction, nominate flatten/clear candidates, nominate halt candidates, require human review, or propose Layer 4 promotion packets when high-risk point-in-time events are detected. These are decision/risk-record interventions, not direct broker/account mutations and not automatic event-family promotion.
 
-Current physical stage, script, table, package, and registry names remain legacy in this governance-only slice: `layer_05_alpha_confidence`, `layer_06_position_projection`, `layer_07_underlying_action`, `layer_08_option_expression`, and `layer_09_event_risk_governor` are compatibility surfaces until a dedicated code/SQL renumbering migration is reviewed.
+Current physical stage, script, table, package, and registry names now use the nine-layer numbering: `layer_04_event_failure_risk`, `layer_05_alpha_confidence`, `layer_06_position_projection`, `layer_07_underlying_action`, `layer_08_option_expression`, and `layer_09_event_risk_governor`. Historical/applied migration records may retain earlier names.
 
 ## D163 - Event lifecycle contract is registered for event-risk governance
 
@@ -4126,9 +4126,9 @@ Current active observation-pool seeds are `cpi_inflation_release` and `earnings_
 
 Status: accepted.
 
-`MODEL_09_RESIDUAL_ANOMALY_EVENT_DISCOVERY_BUILD` is the first manager-registered legacy physical implementation surface for the residual-anomaly EventRiskGovernor route. It starts from Layers 1-8 base-stack evaluation residuals, then searches nearby point-in-time event families for explanation, observation-pool, and strategy-promotion review evidence.
+`MODEL_09_RESIDUAL_ANOMALY_EVENT_DISCOVERY_BUILD` is the first manager-registered current implementation surface for the residual-anomaly EventRiskGovernor route. It starts from Layers 1-8 base-stack evaluation residuals, then searches nearby point-in-time event families for explanation, observation-pool, and strategy-promotion review evidence.
 
-This registration is intentionally pre-service. It authorizes a local callable artifact builder only under the legacy `MODEL_09_*` physical namespace. It does not authorize realtime daemon start, provider calls, model training, model activation, broker/account mutation, destructive SQL, artifact deletion, automatic observation-pool addition, or automatic Layer 4 event-failure-risk promotion. Strategy promotion remains blocked unless the script emits an `event_family_strategy_promotion_review_packet_v1` and agent review accepts the promotion.
+This registration is intentionally pre-service. It authorizes a local callable artifact builder only under the current `MODEL_09_*` namespace. It does not authorize realtime daemon start, provider calls, model training, model activation, broker/account mutation, destructive SQL, artifact deletion, automatic observation-pool addition, or automatic Layer 4 event-failure-risk promotion. Strategy promotion remains blocked unless the script emits an `event_family_strategy_promotion_review_packet_v1` and agent review accepts the promotion.
 
 ## D208 - Layer 4 EventFailureRiskModel inserted before alpha confidence
 
@@ -4153,4 +4153,4 @@ Layer 4 contains only agent-accepted, empirically reviewed event/strategy-failur
 
 Layer 9 remains the residual event-risk governor and research surface. It may explain residual anomalies, maintain the observation pool, warn/cap/block/review base guidance, and generate event-family promotion packets. A family can move from Layer 9 discovery/observation into Layer 4 only after a script-emitted evidence packet, matched controls/split/leakage/PIT review, incremental value review, and explicit agent/manager acceptance.
 
-This decision is architecture/governance only. Current physical script/package/table names such as `model_05_alpha_confidence`, `model_06_position_projection`, `model_07_underlying_action`, `model_08_option_expression`, `model_09_event_risk_governor`, `MODEL_09_*`, and `source_09_event_risk_governor` remain legacy implementation surfaces until a dedicated code/SQL renumbering migration is reviewed.
+This decision is architecture/governance only. Current physical script/package/table names now include `model_04_event_failure_risk`, `model_05_alpha_confidence`, `model_06_position_projection`, `model_07_underlying_action`, `model_08_option_expression`, `model_09_event_risk_governor`, `MODEL_09_*`, and `source_09_event_risk_governor`; historical/applied migration records may retain earlier names.

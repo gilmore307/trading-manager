@@ -78,10 +78,10 @@ For accepted model state/context outputs, only reviewed core scalar score tokens
 Current accepted model-layer intent is direction-neutral tradability first:
 
 ```text
-market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> alpha_confidence_vector -> position_projection_vector -> underlying_action_plan/vector -> trading_guidance/option_expression_plan -> event_risk_intervention
+market_context_state -> sector_context_state -> anonymous_target_feature_vector -> target_context_state -> event_failure_risk_vector -> alpha_confidence_vector -> position_projection_vector -> underlying_action_plan/vector -> trading_guidance/option_expression_plan -> event_risk_intervention
 ```
 
-Layer 3 direction evidence is not alpha confidence. Layer 4 `alpha_confidence_model` owns alpha direction, strength, expected residual return, confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha remains diagnostic unless separately promoted. Layer 5 `position_projection_model` owns target holding-state projection from final adjusted alpha plus current/pending position, cost, portfolio exposure, and risk-budget context. Layer 6 `underlying_action_model` owns offline direct-underlying action thesis outputs. Layer 7 trading guidance includes option-expression planning through `model_08_option_expression`. Layer 8 `event_risk_governor` / `model_09_event_risk_governor` owns point-in-time event-risk governance after base trading guidance. Event evidence, alpha confidence, position projection, underlying-action planning, option-expression planning, and event-risk intervention are model/control-plane review surfaces, not broker execution surfaces.
+Layer 3 direction evidence is not alpha confidence. Layer 4 `event_failure_risk_model` owns reviewed event/strategy-failure conditioning before alpha confidence. Layer 5 `alpha_confidence_model` owns alpha direction, strength, expected residual return, confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha remains diagnostic unless separately promoted. Layer 6 `position_projection_model` owns target holding-state projection from final adjusted alpha plus current/pending position, cost, portfolio exposure, and risk-budget context. Layer 7 `underlying_action_model` owns offline direct-underlying action thesis outputs. Layer 8 trading guidance includes option-expression planning through `model_08_option_expression`. Layer 9 `event_risk_governor` / `model_09_event_risk_governor` owns point-in-time event-risk governance after base trading guidance. Event failure risk, alpha confidence, position projection, underlying-action planning, option-expression planning, and event-risk intervention are model/control-plane review surfaces, not broker execution surfaces.
 
 ## Layer 1 Boundary
 
@@ -110,7 +110,7 @@ Layer 3 is target state-vector construction. Current accepted shared names are:
 - `feature_03_target_state_vector` — deterministic market/sector/target/cross-state feature surface produced by `trading-data`;
 - `target_state_vector_model` — canonical Layer 3 model id;
 - `model_03_target_state_vector` — model-owned output/table surface;
-- `target_context_state` — conceptual model-facing anonymous target context/state output; historical physical implementation names such as `model_03_target_state_vector` remain unchanged until a separate migration is accepted.
+- `target_context_state` — model-facing anonymous target context/state output; current physical implementation name is `model_03_target_state_vector`.
 
 `trading-manager` owns target-state request naming and orchestration. `trading-data` owns deterministic point-in-time feature production. `trading-model` owns labels, training, evaluation, promotion evidence, and model-output semantics.
 
@@ -122,73 +122,83 @@ Direction-neutral TargetStateVector names must keep signed direction evidence se
 
 Layer 3 target-state fields may use compact `3_*` payloads only after the target-state contract requires concrete shared fields. Do not register generated feature columns, model-local feature-group internals, label families, embedding names, or cluster labels merely because they appear in TargetStateVectorModel design notes. Layer 3 preprocessing vector block names such as `target_behavior_vector`, `event_risk_context_vector`, and `candidate_quality_vector` remain model-local until implementation/evaluation proves a reviewed cross-repository contract needs them.
 
-## Layer 8 Event-Risk Boundary
+## Layer 4 Event-Failure-Risk Boundary
 
-Layer 8 is point-in-time event-risk governance after base trading guidance. Current accepted shared names are:
+Layer 4 is reviewed event/strategy-failure-risk conditioning before alpha confidence. Current accepted shared names are:
+
+- `event_failure_risk_model` — canonical Layer 4 model id;
+- `model_04_event_failure_risk` — current model-owned output/table surface;
+- `event_failure_risk_vector` — reviewed pre-alpha failure-risk conditioning output.
+
+Layer 4 may only consume agent-accepted, empirically reviewed event/strategy-failure factors. It must not ingest arbitrary raw events, discover new event families, emit standalone directional alpha, choose actions/expressions, or mutate broker/account state.
+
+## Layer 5 Alpha-Confidence Boundary
+
+Layer 5 is calibrated alpha-confidence modeling. Current accepted shared names are:
+
+- `alpha_confidence_model` — canonical Layer 5 model id;
+- `model_05_alpha_confidence` — current model-owned output/table surface;
+- `alpha_confidence_vector` — point-in-time confidence/EV/risk output.
+
+Accepted compact `5_*` state-vector values are final adjusted scalar alpha-confidence score-family tokens, not target-state evidence, event-context evidence, position-projection fields, underlying-action fields, option-expression fields, or final-action outputs. Keep these scalar axes separate: alpha direction, alpha strength, expected residual return, alpha confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha fields remain diagnostics unless separately promoted.
+
+Do not register action/routing fields, no-trade decisions, position size, target exposure, account-risk allocation, option contract, strike, DTE, delta, or final verdict as Layer 5 state-vector values. Target holding-state projection belongs to Layer 6; planned direct-underlying action belongs to Layer 7; option expression belongs to Layer 8.
+
+## Layer 6 Position-Projection Boundary
+
+Layer 6 is target holding-state projection. Current accepted shared names are:
+
+- `position_projection_model` — canonical Layer 6 model id;
+- `model_06_position_projection` — current model-owned output/table surface;
+- `position_projection_vector` — point-in-time target holding-state output.
+
+Accepted compact `6_*` state-vector values are scalar position-projection score-family tokens, not buy/sell/hold actions, option-expression fields, order quantities, or execution outputs. Keep these axes separate: target position bias, target exposure, current-position alignment, position gap, position gap magnitude, expected position utility, cost-to-adjust pressure, risk-budget fit, position-state stability, and projection confidence.
+
+`6_target_exposure_score_<horizon>` is abstract normalized risk exposure, not shares/contracts/order quantity. `6_position_gap_score_<horizon>` is target exposure minus effective current exposure, where effective current exposure includes pending exposure adjusted by fill probability. It is not an execution instruction.
+
+Layer 6 must not output buy/sell/hold/open/close/reverse, choose instruments, read option chains, choose strike/DTE/Greeks, route orders, or mutate broker/account state. Planned direct-underlying action belongs to Layer 7; option expression belongs to Layer 8; execution belongs outside `trading-model`.
+
+## Layer 7 Underlying-Action Boundary
+
+Layer 7 is direct stock/ETF planned action modeling. Current accepted shared names are:
+
+- `underlying_action_model` — canonical Layer 7 model id;
+- `model_07_underlying_action` — current model-owned output/table surface;
+- `underlying_action_plan` — point-in-time direct-underlying action plan output;
+- `underlying_action_vector` — point-in-time score/vector output for Layer 7.
+
+Accepted compact `7_*` state-vector values are scalar underlying-action score-family tokens, not broker orders, option-contract fields, or execution outputs. Keep these axes separate: trade eligibility, signed action direction, trade intensity, entry quality, expected return, adverse risk, reward/risk, liquidity fit, holding-time fit, and action confidence.
+
+`planned_quantity` and `planned_notional_usd` are plan payload fields, not final order quantities. `entry_plan` is not order type. `stop_loss_price` and `take_profit_price` are thesis fields, not broker stop/limit orders.
+
+Layer 7 must not emit broker order fields, route orders, mutate broker/account state, or choose option symbol/right/strike/expiration/DTE/delta/Greeks/specific contract refs. Option expression belongs to the Layer 8 trading-guidance boundary before Layer 9 event-risk governance; execution belongs outside `trading-model`.
+
+## Layer 8 Trading-Guidance / Option-Expression Boundary
+
+Option-expression modeling follows Layer 7 underlying action planning and precedes Layer 9 event-risk governance. Current accepted shared names are:
+
+- `option_expression_model` — canonical Layer 8 option-expression model id;
+- `model_08_option_expression` — current model-owned option-expression output/table surface;
+- `option_expression_plan` — primary offline option-expression plan output;
+- `expression_vector` — scalar/vector score output for option-expression quality by horizon;
+- `source_05_option_expression` — option-expression input source surface owned by `trading-data`, despite the source-family number `05`;
+- `feature_08_option_expression` — current deterministic model-facing option-expression feature surface for Layer 8;
+- `source_06_position_execution` — selected-contract/position-execution context source used by option-expression review, despite the source-family number `06`.
+
+Layer 8 may use Layer 7 underlying price-path assumptions plus point-in-time option-chain context to choose option-expression and contract constraints. It still must not place orders, emit broker order instructions, process fills, or mutate broker/account state. Source-family numbers such as `source_05_*` and `source_06_*` are not automatically model-layer numbers; check the registered row and accepted model boundary before inferring ownership.
+
+## Layer 9 Event-Risk Boundary
+
+Layer 9 is point-in-time event-risk governance after base trading guidance. Current accepted shared names are:
 
 - `source_09_event_risk_governor` — event overview source/index table owned by `trading-data`;
-- `event_risk_governor` — canonical Layer 8 model id;
+- `event_risk_governor` — canonical Layer 9 model id;
 - `model_09_event_risk_governor` — model-owned implementation/output surface;
 - `event_context_vector` / `event_risk_intervention` — point-in-time event-risk context and intervention output.
 
 Accepted event-risk score-family tokens are scalar event-context evidence, not generic source columns and not alpha/trade/action outputs. Keep these scalar axes separate: event presence, timing proximity, intensity, target-conditioned direction bias, target-context alignment, uncertainty, gap risk, reversal risk, liquidity disruption, contagion risk, evidence quality, impact scope, scope confidence, escalation risk, and target relevance.
 
-Event scope vocabulary must distinguish native event scope from impact scope. Source fields such as `scope_type` describe the event overview row; Layer 8 impact-scope score families describe modeled event impact by horizon. Enum-like audit/routing families such as `9_event_dominant_impact_scope_<horizon>` are current Layer 8 model-local tokens unless a later manager-phase interface review promotes them through a narrower non-scalar kind. Do not register every artifact field, event lifecycle enum, event block name, or news/SEC/NLP detail as a shared registry row until implementation proves a durable cross-repository contract.
-
-## Layer 4 Alpha-Confidence Boundary
-
-Layer 4 is calibrated alpha-confidence modeling. Current accepted shared names are:
-
-- `alpha_confidence_model` — canonical Layer 4 model id;
-- `model_05_alpha_confidence` — current model-owned output/table surface;
-- `alpha_confidence_vector` — conceptual point-in-time confidence/EV/risk output.
-
-Accepted compact `4_*` state-vector values are final adjusted scalar alpha-confidence score-family tokens, not target-state evidence, event-context evidence, position-projection fields, underlying-action fields, option-expression fields, or final-action outputs. Keep these scalar axes separate: alpha direction, alpha strength, expected residual return, alpha confidence, signal reliability, path quality, reversal risk, drawdown risk, and alpha-level tradability. Base/unadjusted Layer 1/2/3 alpha fields remain diagnostics unless separately promoted.
-
-Do not register action/routing fields, no-trade decisions, position size, target exposure, account-risk allocation, option contract, strike, DTE, delta, or final verdict as Layer 4 state-vector values. Target holding-state projection belongs to Layer 5; planned direct-underlying action belongs to Layer 6; option expression belongs to Layer 7.
-
-## Layer 5 Position-Projection Boundary
-
-Layer 5 is target holding-state projection. Current accepted shared names are:
-
-- `position_projection_model` — canonical Layer 5 model id;
-- `model_06_position_projection` — current model-owned output/table surface;
-- `position_projection_vector` — conceptual point-in-time target holding-state output.
-
-Accepted compact `5_*` state-vector values are scalar position-projection score-family tokens, not buy/sell/hold actions, option-expression fields, order quantities, or execution outputs. Keep these axes separate: target position bias, target exposure, current-position alignment, position gap, position gap magnitude, expected position utility, cost-to-adjust pressure, risk-budget fit, position-state stability, and projection confidence.
-
-`6_target_exposure_score_<horizon>` is abstract normalized risk exposure, not shares/contracts/order quantity. `6_position_gap_score_<horizon>` is target exposure minus effective current exposure, where effective current exposure includes pending exposure adjusted by fill probability. It is not an execution instruction.
-
-Layer 5 must not output buy/sell/hold/open/close/reverse, choose instruments, read option chains, choose strike/DTE/Greeks, route orders, or mutate broker/account state. Planned direct-underlying action belongs to Layer 6; option expression belongs to Layer 7; execution belongs outside `trading-model`.
-
-## Layer 6 Underlying-Action Boundary
-
-Layer 6 is direct stock/ETF planned action modeling. Current accepted shared names are:
-
-- `underlying_action_model` — canonical Layer 6 model id;
-- `model_07_underlying_action` — current model-owned output/table surface;
-- `underlying_action_plan` — conceptual point-in-time direct-underlying action plan output;
-- `underlying_action_vector` — conceptual point-in-time score/vector output for Layer 6.
-
-Accepted compact `6_*` state-vector values are scalar underlying-action score-family tokens, not broker orders, option-contract fields, or execution outputs. Keep these axes separate: trade eligibility, signed action direction, trade intensity, entry quality, expected return, adverse risk, reward/risk, liquidity fit, holding-time fit, and action confidence.
-
-`planned_quantity` and `planned_notional_usd` are plan payload fields, not final order quantities. `entry_plan` is not order type. `stop_loss_price` and `take_profit_price` are thesis fields, not broker stop/limit orders.
-
-Layer 6 must not emit broker order fields, route orders, mutate broker/account state, or choose option symbol/right/strike/expiration/DTE/delta/Greeks/specific contract refs. Option expression belongs to the conceptual Layer 8 trading-guidance boundary before Layer 9 event-risk governance; execution belongs outside `trading-model`.
-
-## Trading-Guidance / Option-Expression Boundary
-
-Option-expression modeling follows Layer 7 underlying action planning and precedes Layer 9 event-risk governance. Current accepted shared names are:
-
-- `option_expression_model` — canonical option-expression model id;
-- `model_08_option_expression` — current model-owned option-expression output/table surface;
-- `option_expression_plan` — primary offline option-expression plan output;
-- `expression_vector` — scalar/vector score output for option-expression quality by horizon;
-- `source_05_option_expression` — option-expression input source surface owned by `trading-data`, despite the source-family number `05`;
-- `feature_08_option_expression` — current deterministic model-facing option-expression feature surface for conceptual Layer 8;
-- `source_06_position_execution` — selected-contract/position-execution context source used by option-expression review, despite the source-family number `06`.
-
-Conceptual Layer 7 may use Layer 6 underlying price-path assumptions plus point-in-time option-chain context to choose option-expression and contract constraints. It still must not place orders, emit broker order instructions, process fills, or mutate broker/account state. Source-family numbers such as `source_05_*` and `source_06_*` are not automatically model-layer numbers; check the registered row and accepted model boundary before inferring ownership.
+Event scope vocabulary must distinguish native event scope from impact scope. Source fields such as `scope_type` describe the event overview row; Layer 9 impact-scope score families describe modeled event impact by horizon. Enum-like audit/routing families such as `9_event_dominant_impact_scope_<horizon>` are current Layer 9 model-local tokens unless a later manager-phase interface review promotes them through a narrower non-scalar kind. Do not register every artifact field, event lifecycle enum, event block name, or news/SEC/NLP detail as a shared registry row until implementation proves a durable cross-repository contract needs them.
 
 ## Registration Trigger
 

@@ -10,7 +10,7 @@ A `state_vector_value` row may represent:
 - Layer 5 final adjusted alpha-confidence score-family names such as `5_alpha_direction_score_<horizon>` or `5_alpha_tradability_score_<horizon>`;
 - Layer 6 position-projection score-family names such as `6_target_exposure_score_<horizon>` or `6_position_gap_score_<horizon>`;
 - Layer 7 underlying-action score-family names such as `7_underlying_trade_eligibility_score_<horizon>` or `7_underlying_action_confidence_score_<horizon>`;
-- Legacy `8_*` option-expression score-family names for the conceptual Layer 7 option-expression boundary, such as `8_option_contract_fit_score_<horizon>` or `8_option_expression_confidence_score_<horizon>`.
+- Current `8_*` option-expression score-family names for the Layer 8 option-expression boundary, such as `8_option_contract_fit_score_<horizon>` or `8_option_expression_confidence_score_<horizon>`.
 
 Payloads must match the reviewed model contract exactly. Use compact numeric prefixes because core score tokens carry layer ownership directly.
 

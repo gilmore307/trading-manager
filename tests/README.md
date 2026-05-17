@@ -75,7 +75,7 @@
   - provider calls limited to the explicit event-feed dispatch step.
 
 - `test_layer_eight_option_expression.py` verifies:
-  - `layer_08_option_expression` gate review over completed conceptual Layer 6 / physical Layer 7 rows;
+  - `layer_08_option_expression` gate review over completed Layer 7 rows;
   - reviewed no-provider skip behavior when all Layer 7 rows are no-trade/maintain/neutral;
   - active Layer 7 target chains producing ThetaData/source_05 option-snapshot request previews without provider calls.
 

@@ -17,7 +17,7 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         self.assertEqual(row["fold_months"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
         self.assertIn("layer_01_market_regime_and_layer_02_sector_context_persistent_foundation_data", row["preserved_surfaces"])
         self.assertIn("legacy_event_overlay_or_abnormal_activity_only_layer_8_outputs", row["superseded_surfaces"])
-        self.assertIn("base Layers 1-7 remain reusable", row["invalidation_scope"])
+        self.assertIn("base Layers 1-8 remain reusable", row["invalidation_scope"])
         self.assertFalse(row["write_performed"])
         self.assertFalse(row["model_activation_performed"])
         self.assertFalse(row["broker_execution_performed"])

@@ -107,7 +107,7 @@ def build_event_model_regeneration_plan(
         preserved_surfaces=(
             "reviewed_provider_data_and_monthly_cleaned_data_when_point_in_time_valid",
             "layer_01_market_regime_and_layer_02_sector_context_persistent_foundation_data",
-            "base_layer_03_07_outputs_that_do_not_consume_legacy_event_overlay_or_abnormal_activity_only_inputs",
+            "base_layer_03_08_outputs_that_do_not_consume_legacy_event_overlay_or_abnormal_activity_only_inputs",
             "event_redo_diagnostic_evidence_artifacts_for_comparison_debug_and_audit",
             "storage_artifacts_and_dashboard_snapshots_until_regeneration_review_completes",
         ),
@@ -118,7 +118,7 @@ def build_event_model_regeneration_plan(
             "model_run_metadata_that_depends_on_the_old_event_model_route_after_reviewed_rebuild_exists",
         ),
         invalidation_scope=(
-            "state_only_layer_09_event_risk_governor_and_event_adjusted_outputs; base Layers 1-7 remain reusable "
+            "state_only_layer_09_event_risk_governor_and_event_adjusted_outputs; base Layers 1-8 remain reusable "
             "unless a specific artifact consumed legacy event-overlay/source rows or violates the rolling-fold policy"
         ),
         regeneration_steps=(
