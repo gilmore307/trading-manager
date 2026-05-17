@@ -1,8 +1,9 @@
 """Base Layer 1-8 historical model-training workflow graph.
 
-The manager owns orchestration across the base model stack. Event intelligence is
-now the separate Layer 9 risk-governor overlay and is intentionally omitted from
-this base runtime graph so Layers 1-8 can progress without a hard event/source
+The manager owns orchestration across the full historical-modeling system service.
+This module defines the base Layers 1-8 progression graph only; Layer 9
+EventRiskGovernor is service-owned as a residual/risk overlay lane and remains
+outside this base graph so Layers 1-8 can progress without a hard event/source
 dependency. Current model/source names now follow conceptual layer numbering;
 historical migrations/artifacts are not rewritten.
 """
@@ -122,7 +123,7 @@ class LayerWorkflow:
 
 @dataclass(frozen=True)
 class ModelTrainingWorkflowPlan:
-    """Manager-owned base Layer 1-8 workflow plan."""
+    """Manager-owned base Layer 1-8 workflow plan inside the Layer 1-9 service."""
 
     contract_type: str
     start_month: str

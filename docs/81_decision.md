@@ -2578,7 +2578,7 @@ Status: Accepted
 
 ### Context
 
-The historical scheduler daemon must not remain a Layer 1-only loop. The current phase requires the base Layers 1-8 plus the separate Layer 9 event-risk overlay to be automatically orchestrable by manager for data/input preparation, training/generation, evaluation, review preparation, and maintenance, while preserving provider, activation, and broker gates.
+The historical scheduler daemon must not remain a Layer 1-only loop. The current phase requires base Layers 1-8 plus the service-owned Layer 9 event-risk overlay lane to be automatically orchestrable by manager as one historical-modeling system service for data/input preparation, training/generation, evaluation, review preparation, and maintenance, while preserving provider, activation, and broker gates.
 
 ### Decision
 
@@ -4154,3 +4154,17 @@ Layer 4 contains only agent-accepted, empirically reviewed event/strategy-failur
 Layer 9 remains the residual event-risk governor and research surface. It may explain residual anomalies, maintain the observation pool, warn/cap/block/review base guidance, and generate event-family promotion packets. A family can move from Layer 9 discovery/observation into Layer 4 only after a script-emitted evidence packet, matched controls/split/leakage/PIT review, incremental value review, and explicit agent/manager acceptance.
 
 This decision is architecture/governance only. Current physical script/package/table names now include `model_04_event_failure_risk`, `model_05_alpha_confidence`, `model_06_position_projection`, `model_07_underlying_action`, `model_08_option_expression`, `model_09_event_risk_governor`, `MODEL_09_*`, and `source_09_event_risk_governor`; historical/applied migration records may retain earlier names.
+
+## D209 - Layer 9 belongs to the historical-modeling system service
+
+Date: 2026-05-17
+Status: Accepted
+
+Chentong clarified that Layer 9 EventRiskGovernor / EventIntelligenceOverlay is part of the same historical-modeling system service as the earlier model layers. It must not be treated as an external/manual side project simply because it is a residual/risk overlay.
+
+Manager governance therefore distinguishes two boundaries:
+
+- service boundary: the resident historical-modeling system service owns Layers 1-9, including Layer 9 source/feature/model/evaluation/review/regeneration surfaces;
+- progression dependency: Layer 9 is not a hard prerequisite for base Layers 1-8 progression, and remains an auditable post-guidance residual/event-risk overlay lane.
+
+This decision preserves all safety gates. Layer 9 may prepare evidence, run bounded historical event-feed acquisition through reviewed task keys, generate risk/control overlays, review residual anomalies, and produce promotion-review packets. It must not start realtime trading, mutate broker/order/fill/account state, activate production models automatically, destructively mutate storage, auto-promote event families into Layer 4, or replace the Layers 1-8 base stack.
