@@ -1,0 +1,13 @@
+{
+  "run_id": "run_example_001",
+  "contract_type": "run_manifest",
+  "request_id": "mgr_req_example_001",
+  "component_id": "trading-data",
+  "component_kind": "data_component",
+  "repo_id": "trading-data",
+  "status": "succeeded",
+  "started_at_utc": "2026-05-17T00:00:00Z",
+  "ended_at_utc": "2026-05-17T00:01:00Z",
+  "parameter_ref": "storage://trading-manager/example/request_payload.json",
+  "error_summary": null
+}

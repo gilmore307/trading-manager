@@ -1,0 +1,100 @@
+{
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/input_binding_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "required": [
+        "available_at_utc"
+      ]
+    },
+    {
+      "required": [
+        "as_of_utc"
+      ]
+    }
+  ],
+  "properties": {
+    "as_of_utc": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "available_at_utc": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "binding_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "contract_type": {
+      "const": "input_binding"
+    },
+    "entity_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "input_ref": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "input_role": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "lineage_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "quality_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "request_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schema_ref": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "time_window": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "version_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "binding_id",
+    "contract_type",
+    "request_id",
+    "input_role",
+    "input_ref",
+    "schema_ref"
+  ],
+  "title": "input_binding_v1",
+  "type": "object"
+}

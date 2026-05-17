@@ -1,0 +1,12 @@
+{
+  "ready_signal_id": "ready_example_001",
+  "contract_type": "ready_signal",
+  "signal_kind": "component_task_ready",
+  "producer_component_id": "trading-data",
+  "producer_run_id": "run_example_001",
+  "artifact_refs": ["artifact_example_001"],
+  "status": "ready",
+  "consumer_hint": "trading-model",
+  "blocking_reason": null,
+  "review_required": false
+}

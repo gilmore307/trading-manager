@@ -1,0 +1,69 @@
+{
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/ready_signal_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_refs": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "blocking_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "consumer_hint": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contract_type": {
+      "const": "ready_signal"
+    },
+    "producer_component_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "producer_run_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "ready_signal_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "review_required": {
+      "type": "boolean"
+    },
+    "signal_kind": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "partial",
+        "failed",
+        "blocked",
+        "cancelled"
+      ]
+    }
+  },
+  "required": [
+    "ready_signal_id",
+    "contract_type",
+    "signal_kind",
+    "producer_component_id",
+    "producer_run_id",
+    "artifact_refs",
+    "status",
+    "review_required"
+  ],
+  "title": "ready_signal_v1",
+  "type": "object"
+}

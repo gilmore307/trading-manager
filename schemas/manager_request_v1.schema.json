@@ -1,0 +1,103 @@
+{
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/manager_request_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contract_type": {
+      "const": "manager_request"
+    },
+    "deadline_at_utc": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "expected_outputs": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "parameter_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "policy_refs": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "priority": {
+      "enum": [
+        "critical",
+        "high",
+        "normal",
+        "low",
+        "backlog"
+      ]
+    },
+    "request_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "request_kind": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "requested_by": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "requested",
+        "running",
+        "succeeded",
+        "failed",
+        "blocked",
+        "cancelled",
+        "ready",
+        "partial",
+        "superseded",
+        "expired",
+        "deleted"
+      ]
+    },
+    "target_component_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "target_component_kind": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "target_repo_id": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "request_id",
+    "contract_type",
+    "request_kind",
+    "status",
+    "requested_by",
+    "target_component_id",
+    "target_component_kind",
+    "target_repo_id",
+    "expected_outputs",
+    "policy_refs",
+    "priority",
+    "dry_run"
+  ],
+  "title": "manager_request_v1",
+  "type": "object"
+}

@@ -1,0 +1,75 @@
+{
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/run_manifest_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "component_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "component_kind": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "contract_type": {
+      "const": "run_manifest"
+    },
+    "ended_at_utc": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "error_summary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parameter_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "repo_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "request_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "run_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "started_at_utc": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "blocked",
+        "cancelled",
+        "partial",
+        "ready",
+        "running"
+      ]
+    }
+  },
+  "required": [
+    "run_id",
+    "contract_type",
+    "request_id",
+    "component_id",
+    "component_kind",
+    "repo_id",
+    "status",
+    "started_at_utc"
+  ],
+  "title": "run_manifest_v1",
+  "type": "object"
+}

@@ -160,7 +160,11 @@ def export_registry_csv(db_url: str, csv_path: Path = DEFAULT_CSV_PATH) -> None:
     csv_data = run_psql_stdout(db_url, REGISTRY_EXPORT_SQL)
     csv_path.write_text(csv_data, encoding="utf-8")
     row_count = max(len(csv_data.splitlines()) - 1, 0)
-    print(f"exported {row_count} registry rows to {csv_path.relative_to(REPO_ROOT)}")
+    try:
+        display_path = csv_path.relative_to(REPO_ROOT)
+    except ValueError:
+        display_path = csv_path
+    print(f"exported {row_count} registry rows to {display_path}")
 
 
 def main() -> int:

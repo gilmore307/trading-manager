@@ -1,0 +1,16 @@
+{
+  "request_id": "mgr_req_example_001",
+  "contract_type": "manager_request",
+  "request_kind": "historical_training_preparation",
+  "status": "requested",
+  "requested_by": "trading-manager",
+  "target_component_id": "trading-data",
+  "target_component_kind": "data_component",
+  "target_repo_id": "trading-data",
+  "expected_outputs": ["storage://trading-data/example/output.csv"],
+  "policy_refs": ["registry://config/SQL_LAYER_TABLE_NAMING_POLICY"],
+  "priority": "normal",
+  "deadline_at_utc": null,
+  "parameter_ref": "storage://trading-manager/example/request_payload.json",
+  "dry_run": true
+}

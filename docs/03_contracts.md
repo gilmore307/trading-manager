@@ -2,6 +2,8 @@
 
 Manager contracts are concise, durable control-plane facts. They let components work independently while preserving auditability and downstream readiness.
 
+Machine-verifiable JSON Schemas in `schemas/` are the contract authority for durable manager rows. Python helpers may normalize convenience inputs, but checked-in examples and future `--write` paths must validate against those schemas before rows are treated as durable evidence or readiness state.
+
 ## Persistence Policy
 
 | Material | Home | Rule |
@@ -14,6 +16,8 @@ Manager contracts are concise, durable control-plane facts. They let components 
 ## Core Contracts
 
 ### `manager_request_v1`
+
+Schema: `schemas/manager_request_v1.schema.json`.
 
 A manager-issued request for component work.
 
@@ -33,6 +37,8 @@ created_time
 
 ### `input_binding_v1`
 
+Schema: `schemas/input_binding_v1.schema.json`.
+
 A durable binding between a request and the input refs it may use.
 
 ```text
@@ -44,6 +50,8 @@ available_time or as_of_time
 ```
 
 ### `run_manifest_v1`
+
+Schema: `schemas/run_manifest_v1.schema.json`.
 
 A normalized component run summary.
 
@@ -73,6 +81,8 @@ ended_time
 
 ### `artifact_ref_v1`
 
+Schema: `schemas/artifact_ref_v1.schema.json`.
+
 A reference to an output artifact without copying the artifact body into SQL.
 
 ```text
@@ -87,6 +97,8 @@ lifecycle_status
 ```
 
 ### `ready_signal_v1`
+
+Schema: `schemas/ready_signal_v1.schema.json`.
 
 A component or manager signal that a declared output is usable for a declared consumer scope.
 

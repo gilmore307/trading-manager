@@ -1,0 +1,12 @@
+{
+  "artifact_id": "artifact_example_001",
+  "contract_type": "artifact_ref",
+  "artifact_kind": "component_completion_receipt",
+  "producer_run_id": "run_example_001",
+  "uri": "storage://trading-data/example/receipt.json",
+  "content_hash": "sha256:example",
+  "schema_ref": "schema://component_completion_receipt_v1",
+  "row_count": 10,
+  "lifecycle_status": "active",
+  "media_type": "application/json"
+}

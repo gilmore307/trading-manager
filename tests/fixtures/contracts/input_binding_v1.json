@@ -1,0 +1,16 @@
+{
+  "binding_id": "input_binding_example_001",
+  "contract_type": "input_binding",
+  "request_id": "mgr_req_example_001",
+  "run_id": null,
+  "input_role": "source_panel",
+  "input_ref": "storage://trading-data/example/source_panel.csv",
+  "available_at_utc": "2026-05-17T00:00:00Z",
+  "as_of_utc": null,
+  "version_ref": "sha256:example",
+  "entity_scope": "SPY",
+  "time_window": "2016-01",
+  "schema_ref": "schema://source_panel_v1",
+  "quality_ref": null,
+  "lineage_ref": "storage://trading-manager/example/lineage.json"
+}

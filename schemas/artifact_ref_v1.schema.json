@@ -1,0 +1,70 @@
+{
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/artifact_ref_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "artifact_kind": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "content_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contract_type": {
+      "const": "artifact_ref"
+    },
+    "lifecycle_status": {
+      "enum": [
+        "active",
+        "failed",
+        "superseded",
+        "expired",
+        "deleted",
+        "quarantined"
+      ]
+    },
+    "media_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "producer_run_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "row_count": {
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "schema_ref": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "uri": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "contract_type",
+    "artifact_kind",
+    "producer_run_id",
+    "uri",
+    "schema_ref",
+    "lifecycle_status"
+  ],
+  "title": "artifact_ref_v1",
+  "type": "object"
+}

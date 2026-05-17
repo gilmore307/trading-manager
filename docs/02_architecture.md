@@ -12,17 +12,17 @@ This file is the manager-side map of the current Layer 1-9 stack. It is a routin
 
 ## Stack Map
 
-| Layer | Boundary | Main concept | Manager-facing handoff | Hard boundary |
-|---|---|---|---|---|
-| 1 | `MarketRegimeModel` | Broad-market context | `market_context_state` | No sector/target/action choice. |
-| 2 | `SectorContextModel` | Sector/industry context | `sector_context_state` | No final symbol/action choice. |
-| 3 | `TargetStateVectorModel` | Anonymous target context | `target_context_state` | No alpha, exposure, option, or action. |
-| 4 | `EventFailureRiskModel` | Reviewed event/strategy-failure conditioning | `event_failure_risk_vector` | Consumes only accepted evidence packets; no action or execution. |
-| 5 | `AlphaConfidenceModel` | Calibrated alpha confidence | `alpha_confidence_vector` | No exposure, option contract, or order. |
-| 6 | `PositionProjectionModel` | Abstract holding-state projection | `position_projection_vector` | No buy/sell/hold order. |
-| 7 | `UnderlyingActionModel` | Offline underlying thesis | `underlying_action_plan` | Not broker routing or order construction. |
-| 8 | `TradingGuidanceModel / OptionExpressionModel` | Offline guidance and option-expression plan | `trading_guidance_record`, `option_expression_plan` | Not execution and not event-risk override. |
-| 9 | `EventRiskGovernor / EventIntelligenceOverlay` | Residual event-risk review | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
+| Layer | Boundary | Physical token family | Main concept | Manager-facing handoff | Hard boundary |
+|---|---|---|---|---|---|
+| 1 | `MarketRegimeModel` | `layer_01_market_regime`, `model_01_market_regime` | Broad-market context | `market_context_state` | No sector/target/action choice. |
+| 2 | `SectorContextModel` | `layer_02_sector_context`, `model_02_sector_context` | Sector/industry context | `sector_context_state` | No final symbol/action choice. |
+| 3 | `TargetStateVectorModel` | `layer_03_target_state_vector`, `model_03_target_state_vector` | Anonymous target context | `target_context_state` | No alpha, exposure, option, or action. |
+| 4 | `EventFailureRiskModel` | `layer_04_event_failure_risk`, `model_04_event_failure_risk` | Reviewed event/strategy-failure conditioning | `event_failure_risk_vector` | Consumes only accepted evidence packets; no action or execution. |
+| 5 | `AlphaConfidenceModel` | `layer_05_alpha_confidence`, `model_05_alpha_confidence` | Calibrated alpha confidence | `alpha_confidence_vector` | No exposure, option contract, or order. |
+| 6 | `PositionProjectionModel` | `layer_06_position_projection`, `model_06_position_projection` | Abstract holding-state projection | `position_projection_vector` | No buy/sell/hold order. |
+| 7 | `UnderlyingActionModel` | `layer_07_underlying_action`, `model_07_underlying_action` | Offline underlying thesis | `underlying_action_plan` | Not broker routing or order construction. |
+| 8 | `TradingGuidanceModel / OptionExpressionModel` | `layer_08_option_expression`, `model_08_option_expression` | Offline guidance and option-expression plan | `trading_guidance_record`, `option_expression_plan` | Not execution and not event-risk override. |
+| 9 | `EventRiskGovernor / EventIntelligenceOverlay` | `layer_09_event_risk_governor`, `model_09_event_risk_governor` | Residual event-risk review | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
 
 ## Physical Surface Rule
 
