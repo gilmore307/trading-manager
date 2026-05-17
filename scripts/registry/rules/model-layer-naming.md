@@ -16,7 +16,9 @@ This file owns shared naming rules for model-layer source, feature, and model su
 | 8 | TradingGuidanceModel / OptionExpressionModel | `model_08_option_expression` |
 | 9 | EventRiskGovernor / EventIntelligenceOverlay | `model_09_event_risk_governor` |
 
-## Surface Patterns
+## SQL Table Surface Patterns
+
+Layer-owned SQL tables must put the zero-padded layer number directly after the surface stem:
 
 ```text
 source_NN_<surface_slug>
@@ -26,7 +28,7 @@ model_NN_<layer_slug>_explainability
 model_NN_<layer_slug>_diagnostics
 ```
 
-For `model_NN_*`, `NN` is the accepted model-layer number. For `source_NN_*` and `feature_NN_*`, `NN` follows the registered data-source or feature-surface contract and must be checked against the row meaning.
+For `model_NN_*`, `NN` is the accepted model-layer number. For `source_NN_*` and `feature_NN_*`, `NN` follows the registered data-source or feature-surface contract and must be checked against the row meaning. Layer-neutral governance, control-plane, registry, receipt, and audit tables must not invent a fake layer number; they should carry layer refs in row fields when needed.
 
 ## Current Shared Source/Feature Examples
 
