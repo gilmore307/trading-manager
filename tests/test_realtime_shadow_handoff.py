@@ -172,6 +172,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
             [
                 sys.executable,
                 "scripts/tasks/rehearse_realtime_shadow_handoff.py",
+                "--fixture-only",
                 "--decision-time",
                 "2026-05-11T13:30:00+00:00",
                 "--available-time",
@@ -184,7 +185,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
                 "trading-model://configs/frozen/unit",
             ],
             check=True,
-            cwd="/root/projects/trading-manager",
+            cwd=Path(__file__).resolve().parents[1],
             env={"PYTHONPATH": "src"},
             text=True,
             capture_output=True,

@@ -19,6 +19,7 @@ from .control_plane import CompletionReceiptRows, TaskSystemError, _error_summar
 from .failure_register import persist_failure_register_rows, validate_failure_register_row
 from .model_training_state import advance_workflow_state, resolve_workflow_state_path
 from .request_payloads import DEFAULT_STORAGE_ROOT as DEFAULT_MANAGER_STORAGE_ROOT
+from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, reconcile_lock_ref
 from .stage_coverage import StageCoverageReport, collect_stage_coverage, write_stage_coverage
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 
@@ -230,7 +231,7 @@ def default_coverage_report_path(*, stage_id: str, start_month: str) -> Path:
     return DEFAULT_COVERAGE_OUTPUT_ROOT / f"{safe_stage}_{start_month}.json"
 
 
-def reconcile_provider_stage(
+def _reconcile_provider_stage_unlocked(
     *,
     stage_id: str,
     start_month: str = "2016-01",
@@ -324,6 +325,51 @@ def reconcile_provider_stage(
     )
 
 
+def reconcile_provider_stage(
+    *,
+    stage_id: str,
+    start_month: str = "2016-01",
+    end_month: str = "2016-01",
+    component_storage_root: Path = DEFAULT_COMPONENT_STORAGE_ROOT,
+    manager_storage_root: Path = DEFAULT_MANAGER_STORAGE_ROOT,
+    database_url: str | None = None,
+    persist_control_plane: bool = False,
+    failure_proposal_path: Path | None = None,
+    write_failure_proposal: bool = False,
+    persist_failure_register: bool = False,
+    collect_coverage: bool = True,
+    coverage_report_path: Path | None = None,
+    write_coverage_report: bool = False,
+    advance_workflow: bool = False,
+    workflow_state_path: Path | None = None,
+    write_workflow_state: bool = False,
+    selected_target_symbol: str | None = None,
+    locks_dir: Path = DEFAULT_LOCKS_DIR,
+) -> StageReconcileSummary:
+    """Run safe offline receipt/control-plane/coverage reconciliation under its reconcile lock."""
+
+    with acquire_scheduler_lock(reconcile_lock_ref(start_month, stage_id, locks_dir=locks_dir)):
+        return _reconcile_provider_stage_unlocked(
+            stage_id=stage_id,
+            start_month=start_month,
+            end_month=end_month,
+            component_storage_root=component_storage_root,
+            manager_storage_root=manager_storage_root,
+            database_url=database_url,
+            persist_control_plane=persist_control_plane,
+            failure_proposal_path=failure_proposal_path,
+            write_failure_proposal=write_failure_proposal,
+            persist_failure_register=persist_failure_register,
+            collect_coverage=collect_coverage,
+            coverage_report_path=coverage_report_path,
+            write_coverage_report=write_coverage_report,
+            advance_workflow=advance_workflow,
+            workflow_state_path=workflow_state_path,
+            write_workflow_state=write_workflow_state,
+            selected_target_symbol=selected_target_symbol,
+        )
+
+
 def write_stage_reconcile_summary(summary: StageReconcileSummary, *, output: TextIO) -> None:
     json.dump(summary.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
@@ -347,7 +393,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--advance-workflow", action="store_true", help="Ingest the written coverage report into workflow state.")
     parser.add_argument("--workflow-state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to storage/runtime/model_training_workflow_state_YYYY-MM.json.")
     parser.add_argument("--write-workflow-state", action="store_true")
+    parser.add_argument("--target-symbol", help="Optional target symbol for Layer 3+ workflow-state routing.")
     parser.add_argument("--write-summary", action="store_true", help="Write reconcile summary JSON to --summary-output-path.")
+    parser.add_argument("--locks-dir", type=Path, default=DEFAULT_LOCKS_DIR)
     parser.add_argument("--summary-output-path", type=Path)
     args = parser.parse_args(argv)
 
@@ -369,6 +417,7 @@ def main(argv: list[str] | None = None) -> int:
         workflow_state_path=args.workflow_state_path,
         write_workflow_state=args.write_workflow_state,
         selected_target_symbol=args.target_symbol,
+        locks_dir=args.locks_dir,
     )
     if args.write_summary:
         if args.summary_output_path is None:

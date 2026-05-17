@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
 from jsonschema import validate
 
 from trading_manager_tasks.scheduler_locks import (
+    acquire_scheduler_lock,
     daemon_lock_ref,
     lock_token,
     month_stage_lock_ref,
@@ -80,6 +82,20 @@ class SchedulerLocksTest(unittest.TestCase):
     def test_invalid_month_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             month_stage_lock_ref("2016-13", "stage")
+
+    def test_acquire_scheduler_lock_creates_and_releases_lock_file(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            locks_dir = Path(raw_tmp) / "locks"
+            ref = month_stage_lock_ref("2016-01", "layer_01_market_regime.data_acquisition", locks_dir=locks_dir)
+            path = Path(ref.lock_path)
+
+            with acquire_scheduler_lock(ref):
+                self.assertTrue(path.exists())
+                with self.assertRaisesRegex(RuntimeError, "scheduler lock is active"):
+                    with acquire_scheduler_lock(ref):
+                        pass
+
+            self.assertFalse(path.exists())
 
     def test_lock_paths_can_use_custom_lock_root(self) -> None:
         ref = reconcile_lock_ref("2016-01", "layer_01_market_regime.data_acquisition", locks_dir=Path("runtime/locks"))

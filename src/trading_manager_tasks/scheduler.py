@@ -28,7 +28,7 @@ from .stage_executor import execute_next_ready_stage
 from .stage_reconcile import DEFAULT_COMPONENT_STORAGE_ROOT, reconcile_provider_stage
 from .stage_run_controller import run_stage_controller_step
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .scheduler_locks import scheduler_lock_plan
+from .scheduler_locks import acquire_scheduler_lock, month_stage_lock_ref, scheduler_lock_plan
 
 NEW_YORK = ZoneInfo("America/New_York")
 PROTECTION_START = time(9, 20)
@@ -325,27 +325,29 @@ def _execute_autonomous_provider_stage(
     selected_target_symbol: str | None,
 ) -> dict[str, Any]:
     model_layer = PROVIDER_STAGE_MODEL_LAYERS[stage_id]
-    preparation, _requests, _payloads, _validations = prepare_layer_historical_training_batch(
-        model_layer=model_layer,
-        start_month=start_month,
-        end_month=end_month,
-        storage_root=storage_root,
-        component_src_root=component_src_root,
-        write=True,
-        persist_sql=True,
-        validate_handoff=True,
-    )
     state_path = workflow_state_path_for_month(start_month, root=storage_root / "runtime")
-    started_state = advance_workflow_state(
-        start_month=start_month,
-        end_month=end_month,
-        storage_root=storage_root,
-        state_path=state_path,
-        selected_target_symbol=selected_target_symbol,
-        write=False,
-    )
-    started_state = mark_stage_started(started_state, stage_id=stage_id, reason="provider acquisition stage started by scheduler")
-    write_workflow_state(state_path, started_state)
+    locks_dir = storage_root / "runtime" / "locks"
+    with acquire_scheduler_lock(month_stage_lock_ref(start_month, stage_id, locks_dir=locks_dir)):
+        preparation, _requests, _payloads, _validations = prepare_layer_historical_training_batch(
+            model_layer=model_layer,
+            start_month=start_month,
+            end_month=end_month,
+            storage_root=storage_root,
+            component_src_root=component_src_root,
+            write=True,
+            persist_sql=True,
+            validate_handoff=True,
+        )
+        started_state = advance_workflow_state(
+            start_month=start_month,
+            end_month=end_month,
+            storage_root=storage_root,
+            state_path=state_path,
+            selected_target_symbol=selected_target_symbol,
+            write=False,
+        )
+        started_state = mark_stage_started(started_state, stage_id=stage_id, reason="provider acquisition stage started by scheduler")
+        write_workflow_state(state_path, started_state)
     controller_receipt, dashboard = run_stage_controller_step(
         stage_id=stage_id,
         start_month=start_month,
@@ -355,6 +357,7 @@ def _execute_autonomous_provider_stage(
         max_workers=max_workers,
         dynamic_workers=True,
         auto_execute_provider_calls=True,
+        locks_dir=locks_dir,
     )
     reconcile = reconcile_provider_stage(
         stage_id=stage_id,
@@ -370,6 +373,7 @@ def _execute_autonomous_provider_stage(
         advance_workflow=True,
         write_workflow_state=True,
         selected_target_symbol=selected_target_symbol,
+        locks_dir=locks_dir,
     )
     refreshed_state = advance_workflow_state(
         start_month=start_month,
@@ -571,17 +575,20 @@ def run_scheduler_once(
                     next_internal_stage=workflow_next_stage.stage_type,
                 ),
             )
-        execution, updated_workflow_state = execute_next_ready_stage(
-            start_month=start_month,
-            end_month=end_month,
-            storage_root=storage_root,
-            state_path=resolved_state_path,
-            receipt_root=storage_root / "runtime" / "model_training_stage_receipts",
-            log_root=storage_root / "runtime" / "model_training_stage_logs",
-            selected_target_symbol=selected_target_symbol,
-            foundation_catch_up_only=foundation_catch_up_only,
-            write=True,
-        )
+        with acquire_scheduler_lock(
+            month_stage_lock_ref(start_month, workflow_next_stage.stage_id, locks_dir=storage_root / "runtime" / "locks")
+        ):
+            execution, updated_workflow_state = execute_next_ready_stage(
+                start_month=start_month,
+                end_month=end_month,
+                storage_root=storage_root,
+                state_path=resolved_state_path,
+                receipt_root=storage_root / "runtime" / "model_training_stage_receipts",
+                log_root=storage_root / "runtime" / "model_training_stage_logs",
+                selected_target_symbol=selected_target_symbol,
+                foundation_catch_up_only=foundation_catch_up_only,
+                write=True,
+            )
         return SchedulerDecision(
             contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),
@@ -660,15 +667,16 @@ def run_scheduler_once(
     else:
         def prepare(**kwargs: Any):
             return prepare_layer_historical_training_batch(model_layer=preparation_model_layer, **kwargs)
-    summary, _requests, _payloads, _validations = prepare(
-        start_month=start_month,
-        end_month=end_month,
-        storage_root=storage_root,
-        component_src_root=component_src_root,
-        write=True,
-        persist_sql=False,
-        validate_handoff=True,
-    )
+    with acquire_scheduler_lock(month_stage_lock_ref(start_month, selected_work, locks_dir=storage_root / "runtime" / "locks")):
+        summary, _requests, _payloads, _validations = prepare(
+            start_month=start_month,
+            end_month=end_month,
+            storage_root=storage_root,
+            component_src_root=component_src_root,
+            write=True,
+            persist_sql=False,
+            validate_handoff=True,
+        )
     refreshed_workflow_plan = build_model_training_workflow_plan(
         start_month=start_month,
         end_month=end_month,

@@ -11,12 +11,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from contextlib import ExitStack
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
 from .control_plane import TaskSystemError
 from .provider_dispatch import dispatch_layer_provider_acquisition
+from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, provider_partition_lock_ref
 from .stage_run_dashboard import (
     SUPPORTED_DASHBOARD_STAGE_IDS,
     StageRunDashboard,
@@ -80,6 +82,7 @@ def run_stage_controller_step(
     auto_create_packet: bool | None = None,
     auto_execute_provider_calls: bool = True,
     dashboard_path: Path | None = None,
+    locks_dir: Path = DEFAULT_LOCKS_DIR,
 ) -> tuple[StageRunControllerReceipt, StageRunDashboard]:
     """Run one controller step and return receipt plus refreshed dashboard."""
 
@@ -103,20 +106,33 @@ def run_stage_controller_step(
     if before.next_action == "autonomous_provider_dispatch_ready" and request_ids:
         action_taken = "execute_autonomous_provider_dispatch"
         if auto_execute_provider_calls:
-            summary = dispatch_layer_provider_acquisition(
-                model_layer=_model_layer_for_stage(stage_id),
-                start_month=start_month,
-                end_month=end_month,
-                storage_root=packet_storage_root,
-                request_ids=request_ids,
-                execute_provider_calls=True,
-                continue_on_error=True,
-                skip_registered_failures=True,
-                reject_terminal_coverage=True,
-                database_url=database_url,
-                dynamic_workers=dynamic_workers,
-                max_workers=max_workers,
-            )
+            with ExitStack() as stack:
+                for request_id in sorted(set(request_ids)):
+                    stack.enter_context(
+                        acquire_scheduler_lock(
+                            provider_partition_lock_ref(
+                                start_month,
+                                stage_id,
+                                "alpaca_bars",
+                                request_id,
+                                locks_dir=locks_dir,
+                            )
+                        )
+                    )
+                summary = dispatch_layer_provider_acquisition(
+                    model_layer=_model_layer_for_stage(stage_id),
+                    start_month=start_month,
+                    end_month=end_month,
+                    storage_root=packet_storage_root,
+                    request_ids=request_ids,
+                    execute_provider_calls=True,
+                    continue_on_error=True,
+                    skip_registered_failures=True,
+                    reject_terminal_coverage=True,
+                    database_url=database_url,
+                    dynamic_workers=dynamic_workers,
+                    max_workers=max_workers,
+                )
             provider_calls = summary.provider_calls
             dispatch_performed = summary.dispatch_performed
             action_status = "completed" if summary.dispatch_performed else "planned_no_dispatch"
@@ -178,6 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--database-url")
     parser.add_argument("--no-execute-provider-calls", action="store_true", help="Plan only; do not execute the ready autonomous provider slice.")
     parser.add_argument("--dashboard-path", type=Path)
+    parser.add_argument("--locks-dir", type=Path, default=DEFAULT_LOCKS_DIR)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--output-path", type=Path)
     args = parser.parse_args(argv)
@@ -193,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         database_url=args.database_url,
         auto_execute_provider_calls=not args.no_execute_provider_calls,
         dashboard_path=args.dashboard_path,
+        locks_dir=args.locks_dir,
     )
     if args.write:
         output_path = args.output_path or Path("storage/runtime/stage_run_controller") / f"{args.stage_id.replace('.', '_')}_{args.start_month}.json"

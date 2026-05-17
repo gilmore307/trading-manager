@@ -11,8 +11,17 @@
 
 ## Registry Commands
 
+Clean local/CI verification without DB credentials:
+
+```bash
+python3 scripts/registry/check_registry_current_matches_migrations.py --allow-missing-db
+```
+
+Operator/server verification and mutation with DB access:
+
 ```bash
 python3 scripts/registry/apply_registry_migrations.py --dry-run
+python3 scripts/registry/check_registry_current_matches_migrations.py
 python3 scripts/registry/apply_registry_migrations.py
 python3 scripts/registry/apply_registry_migrations.py --export-only
 ```

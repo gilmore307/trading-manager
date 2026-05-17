@@ -62,15 +62,23 @@ Concrete registry entries live in the SQL-backed `trading_registry` table.
 
 ## Normal Verification
 
+Clean local/CI environments without database credentials use the no-DB registry snapshot check:
+
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests
 python3 scripts/docs/check_docs_spine.py
 python3 scripts/docs/check_layer_tokens.py
 python3 scripts/contracts/validate_contract_examples.py
-python3 scripts/registry/apply_registry_migrations.py --dry-run
-python3 scripts/registry/check_registry_current_matches_migrations.py
+python3 scripts/registry/check_registry_current_matches_migrations.py --allow-missing-db
 python3 -m compileall -q src scripts
 git diff --check
+```
+
+Operator/server environments with registry DB access should additionally run the strict DB-backed registry gate:
+
+```bash
+python3 scripts/registry/apply_registry_migrations.py --dry-run
+python3 scripts/registry/check_registry_current_matches_migrations.py
 ```
 
 ## Shared Environment

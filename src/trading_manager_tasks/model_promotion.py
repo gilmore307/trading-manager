@@ -14,7 +14,9 @@ import argparse
 import hashlib
 import json
 import sys
+from contextlib import ExitStack
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterable, Mapping, TextIO
 
 from .control_plane import (
@@ -24,6 +26,7 @@ from .control_plane import (
     validate_manager_request,
     write_jsonl,
 )
+from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, promotion_lock_ref
 
 REQUEST_KIND = "model_promotion_review"
 TARGET_COMPONENT_ID = "manager_model_promotion_review"
@@ -210,6 +213,7 @@ def model_promotion_review_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--format", choices=("jsonl", "json"), default="jsonl")
     parser.add_argument("--write", action="store_true", help="Persist request rows to trading_manager.manager_request.")
     parser.add_argument("--database-url")
+    parser.add_argument("--locks-dir", type=Path, default=DEFAULT_LOCKS_DIR)
     args = parser.parse_args(argv)
 
     rows = build_model_promotion_review_requests(
@@ -223,6 +227,13 @@ def model_promotion_review_main(argv: list[str] | None = None) -> int:
         dry_run=not args.write,
     )
     if args.write:
-        persist_manager_requests([validate_manager_request(row) for row in rows], database_url=args.database_url)
+        with ExitStack() as stack:
+            for row in sorted(rows, key=lambda item: (str(item.get("model_id")), str(item.get("candidate_ref")))):
+                stack.enter_context(
+                    acquire_scheduler_lock(
+                        promotion_lock_ref(str(row["model_id"]), str(row["candidate_ref"]), locks_dir=args.locks_dir)
+                    )
+                )
+            persist_manager_requests([validate_manager_request(row) for row in rows], database_url=args.database_url)
     write_requests(rows, output=sys.stdout, output_format=args.format)
     return 0

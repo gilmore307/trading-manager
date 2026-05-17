@@ -23,8 +23,22 @@ A registry row has a stable `id`, a `kind`, a human-readable `key`, a typed `pay
 
 ## Workflow
 
+Clean local/CI verification without DB credentials:
+
+```bash
+python3 scripts/registry/check_registry_current_matches_migrations.py --allow-missing-db
+```
+
+Operator/server verification with DB access:
+
 ```bash
 python3 scripts/registry/apply_registry_migrations.py --dry-run
+python3 scripts/registry/check_registry_current_matches_migrations.py
+```
+
+Registry mutation/export on the operator server:
+
+```bash
 python3 scripts/registry/apply_registry_migrations.py
 python3 scripts/registry/apply_registry_migrations.py --export-only
 ```

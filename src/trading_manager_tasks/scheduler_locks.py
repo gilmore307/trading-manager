@@ -2,16 +2,20 @@
 
 The daemon may have one process-level lock, but historical work needs narrower
 contract keys before provider concurrency expands. These helpers define stable
-lock identities and paths without starting services, dispatching providers, or
-mutating workflow state.
+lock identities and provide local file-backed acquisition without starting
+services, dispatching providers, or mutating workflow state by themselves.
 """
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 
 DEFAULT_STORAGE_ROOT = Path("storage")
 DEFAULT_RUNTIME_DIR = DEFAULT_STORAGE_ROOT / "runtime"
@@ -158,6 +162,66 @@ def promotion_lock_ref(model_id: str, candidate_ref: str, *, locks_dir: Path = D
     )
 
 
+def _process_exists(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+@contextmanager
+def acquire_scheduler_lock(ref: SchedulerLockRef, *, stale_after_seconds: int = 6 * 60 * 60) -> Iterator[SchedulerLockRef]:
+    """Acquire one filesystem scheduler lock for a narrow work lane.
+
+    The lock is intentionally local and file-backed so clean environments can
+    exercise concurrency guards without a database or service. If a recorded PID
+    is dead, the stale lock is replaced immediately; malformed locks are replaced
+    only after ``stale_after_seconds``.
+    """
+
+    path = Path(ref.lock_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "contract_type": ref.contract_type,
+        "lock_scope": ref.lock_scope,
+        "lock_key": ref.lock_key,
+        "pid": os.getpid(),
+        "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    acquired = False
+    try:
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError as exc:
+            existing_text = path.read_text(encoding="utf-8") if path.exists() else "{}"
+            try:
+                existing = json.loads(existing_text)
+            except json.JSONDecodeError:
+                existing = {}
+            existing_pid = int(existing.get("pid") or 0)
+            age = time.time() - path.stat().st_mtime if path.exists() else 0
+            if existing_pid > 0:
+                if _process_exists(existing_pid):
+                    raise RuntimeError(f"scheduler lock is active: {ref.lock_key} at {path}") from exc
+            elif age < stale_after_seconds:
+                raise RuntimeError(f"scheduler lock is active: {ref.lock_key} at {path}") from exc
+            path.unlink(missing_ok=True)
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, sort_keys=True)
+            handle.write("\n")
+        acquired = True
+        yield ref
+    finally:
+        if acquired:
+            path.unlink(missing_ok=True)
+
+
 def scheduler_lock_plan(
     *,
     month: str | None,
@@ -212,6 +276,7 @@ __all__ = [
     "DEFAULT_DAEMON_LOCK_PATH",
     "DEFAULT_LOCKS_DIR",
     "SchedulerLockRef",
+    "acquire_scheduler_lock",
     "daemon_lock_ref",
     "lock_token",
     "month_stage_lock_ref",

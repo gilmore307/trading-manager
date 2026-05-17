@@ -42,6 +42,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_realtime_shadow_handoff.py`
 - `test_request_handoff.py`
 - `test_request_payloads.py`
+- `test_request_schema_validation.py`
 - `test_review_decision.py`
 - `test_safe_error_repair.py`
 - `test_scheduler.py`
