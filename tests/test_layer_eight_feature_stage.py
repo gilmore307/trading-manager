@@ -15,12 +15,12 @@ class LayerEightFeatureStageTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             review_root = tmp / "gate_review"
             review_root.mkdir(parents=True)
-            review_path = review_root / "layer_07_option_expression_gate_review_2016-02.json"
+            review_path = review_root / "layer_08_option_expression_gate_review_2016-02.json"
             review_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_layer_07_option_expression_gate_review",
-                        "stage_id": "layer_07_option_expression.data_acquisition",
+                        "contract_type": "manager_layer_08_option_expression_gate_review",
+                        "stage_id": "layer_08_option_expression.data_acquisition",
                         "start_month": "2016-02",
                         "end_month": "2016-02",
                         "status": "no_provider_skip_accepted",
@@ -43,18 +43,18 @@ class LayerEightFeatureStageTests(unittest.TestCase):
             self.assertEqual(summary.mode, "no_provider_no_option_skip")
             self.assertEqual(summary.provider_calls, 0)
             receipt = json.loads(Path(summary.receipt_path or "").read_text(encoding="utf-8"))
-            self.assertEqual(receipt["manager_stage_id"], "layer_07_option_expression.feature_generation")
-            self.assertEqual(receipt["runs"][0]["row_counts"]["feature_07_option_expression_rows_required"], 0)
+            self.assertEqual(receipt["manager_stage_id"], "layer_08_option_expression.feature_generation")
+            self.assertEqual(receipt["runs"][0]["row_counts"]["feature_08_option_expression_rows_required"], 0)
 
     def test_active_gate_review_delegates_to_trading_data_feature_generator(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_eight_feature_stage.subprocess.run") as run:
             tmp = Path(raw_tmp)
             review_root = tmp / "gate_review"
             review_root.mkdir(parents=True)
-            (review_root / "layer_07_option_expression_gate_review_2016-02.json").write_text(
+            (review_root / "layer_08_option_expression_gate_review_2016-02.json").write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_layer_07_option_expression_gate_review",
+                        "contract_type": "manager_layer_08_option_expression_gate_review",
                         "status": "approval_required",
                         "active_request_count": 2,
                     }

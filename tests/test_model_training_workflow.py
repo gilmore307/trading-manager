@@ -24,7 +24,7 @@ def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") ->
 
 
 class ModelTrainingWorkflowTests(unittest.TestCase):
-    def test_base_stack_plan_covers_all_seven_layers_and_stage_types_after_foundation_catch_up(self):
+    def test_base_stack_plan_covers_all_eight_layers_and_stage_types_after_foundation_catch_up(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -36,7 +36,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertEqual(plan.contract_type, "manager_model_training_workflow_plan")
         self.assertEqual(plan.layer_count, FULL_LAYER_COUNT)
-        self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 8)))
+        self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 9)))
         for layer in plan.layers:
             expected_stage_types = [
                 "data_acquisition",
@@ -46,7 +46,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "promotion_review",
                 "maintenance",
             ]
-            if layer.layer in {4, 5, 6}:
+            if layer.layer in {4, 5, 6, 7}:
                 expected_stage_types = ["model_generation", "model_evaluation", "promotion_review", "maintenance"]
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertIn("model_", " ".join(layer.model_generate_command))
@@ -225,7 +225,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
 
-    def test_layer_seven_trading_guidance_feature_generation_uses_legacy_option_adapter_with_no_provider_skip_support(self):
+    def test_layer_eight_option_expression_feature_generation_uses_option_adapter_with_no_provider_skip_support(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -235,14 +235,14 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        command = plan.layers[6].feature_command
+        command = plan.layers[7].feature_command
 
         self.assertIn("scripts/tasks/execute_layer_eight_option_feature_generation.py", command)
         self.assertIn("--start-month", command)
         self.assertIn("${START_MONTH}", command)
         self.assertIn("--end-month", command)
 
-    def test_layer_seven_trading_guidance_data_acquisition_runs_gate_review_without_provider_approval(self):
+    def test_layer_eight_option_expression_data_acquisition_runs_gate_review_without_provider_approval(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -252,7 +252,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        stage = plan.layers[6].stages[0]
+        stage = plan.layers[7].stages[0]
 
         self.assertIsNone(stage.approval_gate_required)
         self.assertIn("scripts/tasks/review_layer_eight_option_expression_gate.py", stage.command)
@@ -293,22 +293,23 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        layer = plan.layers[3]
-        self.assertEqual(layer.layer_key, "layer_04_alpha_confidence")
+        layer = plan.layers[4]
+        self.assertEqual(layer.layer_key, "layer_05_alpha_confidence")
         self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation", "model_evaluation", "promotion_review", "maintenance"])
-        self.assertNotIn("materialize_layer_eight_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
-        self.assertIn("generate_model_04_alpha_confidence.py", " ".join(layer.model_generate_command))
+        self.assertNotIn("materialize_layer_nine_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
+        self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
         self.assertIn("--from-database", layer.model_generate_command)
         self.assertIn("--output-jsonl", layer.model_generate_command)
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
 
-    def test_base_layers_four_to_seven_use_legacy_physical_model_rows_and_conservative_review(self):
+    def test_base_layers_four_to_eight_use_current_physical_model_rows_and_conservative_review(self):
         expected_scripts = {
-            3: "generate_model_04_alpha_confidence.py",
-            4: "generate_model_05_position_projection.py",
-            5: "generate_model_06_underlying_action.py",
-            6: "generate_model_07_option_expression.py",
+            3: "generate_model_04_event_failure_risk.py",
+            4: "generate_model_05_alpha_confidence.py",
+            5: "generate_model_06_position_projection.py",
+            6: "generate_model_07_underlying_action.py",
+            7: "generate_model_08_option_expression.py",
         }
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
@@ -341,11 +342,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertEqual(plan.layers[0].progression_mode, "background_panel_continuous")
         self.assertEqual(plan.layers[1].progression_mode, "sector_panel_continuous")
-        self.assertTrue(all(plan.layers[index].progression_mode == "target_major_serial_chain" for index in range(2, 6)))
-        self.assertEqual(plan.layers[6].progression_mode, "base_trading_guidance_after_target_chain_complete")
-        self.assertEqual(plan.layers[6].depends_on_layers, (6,))
-        self.assertIn("does not depend on event-overlay", plan.layers[6].candidate_progression_policy)
-        self.assertIn("upstream_layer_06_complete", plan.layers[6].stages[0].blockers)
+        self.assertTrue(all(plan.layers[index].progression_mode == "target_major_serial_chain" for index in range(2, 7)))
+        self.assertEqual(plan.layers[7].progression_mode, "base_trading_guidance_after_target_chain_complete")
+        self.assertEqual(plan.layers[7].depends_on_layers, (7,))
+        self.assertIn("does not depend on Layer 9", plan.layers[7].candidate_progression_policy)
+        self.assertIn("upstream_layer_07_complete", plan.layers[7].stages[0].blockers)
 
     def test_layers_without_dedicated_data_features_do_not_create_nonexistent_tasks(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -356,7 +357,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
-        for layer_number in (4, 5, 6):
+        for layer_number in (4, 5, 6, 7):
             layer = plan.layers[layer_number - 1]
             stage_types = [stage.stage_type for stage in layer.stages]
             self.assertNotIn("data_acquisition", stage_types)

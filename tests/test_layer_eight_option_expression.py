@@ -62,7 +62,7 @@ class LayerEightOptionExpressionGateTests(unittest.TestCase):
         review = build_layer_eight_gate_review(start_month="2016-01", end_month="2016-01", layer_7_rows=rows)
 
         self.assertEqual(len(previews), 1)
-        self.assertTrue(previews[0].request_id.startswith("mgrreq_layer7_option_snapshot_aapl_2016_01_"))
+        self.assertTrue(previews[0].request_id.startswith("mgrreq_layer8_option_snapshot_aapl_2016_01_"))
         self.assertEqual(previews[0].provider, "thetadata")
         self.assertEqual(previews[0].target_component_id, "source_05_option_expression")
         self.assertEqual(previews[0].snapshot_time, "2016-01-05T09:31:00-05:00")
@@ -77,7 +77,7 @@ class LayerEightOptionExpressionGateTests(unittest.TestCase):
             receipt_text = receipt_path.read_text(encoding="utf-8")
 
             self.assertTrue(review_path.exists())
-            self.assertIn('"manager_stage_id": "layer_07_option_expression.data_acquisition"', receipt_text)
+            self.assertIn('"manager_stage_id": "layer_08_option_expression.data_acquisition"', receipt_text)
             self.assertIn('"status": "succeeded"', receipt_text)
             self.assertIn('"provider_calls": 0', receipt_text)
             self.assertIn('"broker_execution_performed": false', receipt_text)

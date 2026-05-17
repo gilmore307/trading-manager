@@ -151,16 +151,16 @@ PYTHONPATH=src python3 scripts/tasks/materialize_layer_three_target_state_inputs
 
 This emits `manager_layer_three_target_state_input_materialization` evidence, merges completed Layer 2 Alpaca bar artifacts into a `source_03_target_state` task key, and delegates normalization to `trading-data`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation.
 
-Materialize legacy `source_08` / conceptual Layer 9 event-risk inputs from local source-detector outputs over already reviewed Layer 2 feed artifacts:
+Materialize `source_09` Layer 9 event-risk inputs from local source-detector outputs over already reviewed Layer 2 feed artifacts:
 
 ```bash
-PYTHONPATH=src python3 scripts/tasks/materialize_layer_eight_event_risk_governor_inputs.py \
+PYTHONPATH=src python3 scripts/tasks/materialize_layer_nine_event_risk_governor_inputs.py \
   --start-month 2016-01 \
   --end-month 2016-01 \
   --write
 ```
 
-This emits `manager_layer_eight_event_risk_governor_input_materialization` evidence, runs only the local `source_08_event_risk_governor.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes compact detector/residual event overview rows through `source_08_event_risk_governor`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. The detector may cite saved bars/liquidity as provenance, but manager must not treat ordinary bar/liquidity features already consumed by the base model stack as new independent event alpha. Layer 2 feed artifacts with zero saved bar rows are recorded as `skipped_zero_bar_rows` before detector execution; this preserves not-yet-listed/no-data evidence without failing the local detector. Required event-feed artifacts must exist and report nonzero requested-window row coverage before write mode can proceed. If all executed local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
+This emits `manager_layer_nine_event_risk_governor_input_materialization` evidence, runs only the local `source_09_event_risk_governor.equity_abnormal_activity` detector over saved bar CSV artifacts, then writes compact detector/residual event overview rows through `source_09_event_risk_governor`. It performs zero provider calls, zero model activation, zero broker execution, and no storage lifecycle mutation. The detector may cite saved bars/liquidity as provenance, but manager must not treat ordinary bar/liquidity features already consumed by the base model stack as new independent event alpha. Layer 2 feed artifacts with zero saved bar rows are recorded as `skipped_zero_bar_rows` before detector execution; this preserves not-yet-listed/no-data evidence without failing the local detector. Required event-feed artifacts must exist and report nonzero requested-window row coverage before write mode can proceed. If all executed local detectors emit zero events, the stage must stop for an explicit no-event context policy review instead of fabricating event rows.
 
 Record a realtime shadow decision handoff receipt when execution/model scaffolds have produced a realtime decision input snapshot and model route plan:
 
@@ -186,14 +186,14 @@ The rehearsal invokes execution fixture builders, model route-plan validation, a
 
 After Layer 3 is complete, base Layers 4-7 may advance through the safe offline executor by reading already-persisted SQL rows without requiring event-overlay/source_04 inputs:
 
-- Base Layer 4 reads Layer 1-3 target context and writes the current `trading_model.model_04_alpha_confidence`.
-- Base Layer 5 reads alpha confidence and writes the current `trading_model.model_05_position_projection` using flat/no-pending position context defaults.
-- Base Layer 6 reads Layer 5 projection context and writes the current `trading_model.model_06_underlying_action` as offline planning evidence only.
-- Base Layer 7 reads the completed Layer 6 chain and writes legacy option-expression/trading-guidance evidence through `trading_model.model_07_option_expression` when the reviewed gate admits it.
+- Base Layer 5 reads Layer 1-3 target context plus Layer 4 event-failure-risk context and writes `trading_model.model_05_alpha_confidence`.
+- Base Layer 6 reads alpha confidence and writes `trading_model.model_06_position_projection` using flat/no-pending position context defaults.
+- Base Layer 7 reads Layer 6 projection context and writes `trading_model.model_07_underlying_action` as offline planning evidence only.
+- Base Layer 7 reads the completed Layer 6 chain and writes option-expression/trading-guidance evidence through `trading_model.model_08_option_expression` when the reviewed gate admits it.
 
 These stages remain safe only while the stage receipts show `provider_calls=0`, `model_activation_performed=false`, and `broker_execution_performed=false`; promotion review output remains evidence until the agent promotion-decision path approves or defers activation.
 
-Before base Layer 7 trading-guidance / legacy option-expression acquisition, review the completed Layer 6 target chain without calling providers:
+Before base Layer 8 trading-guidance / option-expression acquisition, review the completed Layer 6 target chain without calling providers:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.py \
@@ -202,9 +202,9 @@ PYTHONPATH=src python3 scripts/tasks/review_layer_eight_option_expression_gate.p
   --write
 ```
 
-The legacy artifact is still `manager_layer_07_option_expression_gate_review` until the physical implementation is renamed. It reads `trading_model.model_06_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active base Layer 6 action chains, and records a reviewed no-provider skip when all action rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action is bounded autonomous provider dispatch; if no active request previews exist, the review itself is sufficient evidence to complete base Layer 7 data acquisition as a no-provider skip.
+The legacy artifact is still `manager_layer_08_option_expression_gate_review` until the physical implementation is renamed. It reads `trading_model.model_07_underlying_action`, previews future `source_05_option_expression` / ThetaData option-snapshot requests only for active base Layer 6 action chains, and records a reviewed no-provider skip when all action rows are no-trade/maintain/neutral. This review performs zero provider calls, zero broker execution, zero model activation, and zero storage lifecycle mutation. If active request previews exist, the next action is bounded autonomous provider dispatch; if no active request previews exist, the review itself is sufficient evidence to complete base Layer 7 data acquisition as a no-provider skip.
 
-Base Layer 7 legacy option-expression feature generation runs through the manager adapter `scripts/tasks/execute_layer_eight_option_feature_generation.py`. When the gate review is `no_provider_skip_accepted` with zero active requests, the adapter writes `layer_07_option_expression_feature_generation_no_provider_skip_receipt_YYYY-MM.json` and treats `feature_07_option_expression` as a reviewed no-op. When active option requests were approved and acquired, the same adapter delegates to trading-data `feature_07_option_expression` with month-scoped source windows.
+Base Layer 7 option-expression feature generation runs through the manager adapter `scripts/tasks/execute_layer_eight_option_feature_generation.py`. When the gate review is `no_provider_skip_accepted` with zero active requests, the adapter writes `layer_08_option_expression_feature_generation_no_provider_skip_receipt_YYYY-MM.json` and treats `feature_08_option_expression` as a reviewed no-op. When active option requests were approved and acquired, the same adapter delegates to trading-data `feature_08_option_expression` with month-scoped source windows.
 
 Validate that a materialized payload is component-readable before dispatching work:
 
@@ -292,7 +292,7 @@ Plan a unified model promotion review request:
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py \
-  --model model_07_option_expression \
+  --model model_08_option_expression \
   --candidate-ref trading-model://promotion-candidates/mpcand_example
 ```
 

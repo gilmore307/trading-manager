@@ -1,8 +1,8 @@
-"""Base Layer 1-7 historical model-training workflow graph.
+"""Base Layer 1-8 historical model-training workflow graph.
 
 The manager owns orchestration across the base model stack. Event intelligence is
-now the separate Layer 8 risk-governor overlay and is intentionally omitted from
-this base runtime graph so Layers 1-7 can progress without a hard event/source
+now the separate Layer 9 risk-governor overlay and is intentionally omitted from
+this base runtime graph so Layers 1-8 can progress without a hard event/source
 dependency. Current model/source names now follow conceptual layer numbering;
 historical migrations/artifacts are not rewritten.
 """
@@ -21,8 +21,8 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
-FULL_LAYER_COUNT = 7
-BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 7)
+FULL_LAYER_COUNT = 8
+BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 8)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
 DATASET_UNIT_MONTHS = 6
@@ -122,7 +122,7 @@ class LayerWorkflow:
 
 @dataclass(frozen=True)
 class ModelTrainingWorkflowPlan:
-    """Manager-owned base Layer 1-7 workflow plan."""
+    """Manager-owned base Layer 1-8 workflow plan."""
 
     contract_type: str
     start_month: str
@@ -181,7 +181,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1,),
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "six_month_window;sector_or_industry_symbol",
-        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists, then continue forward without waiting for Layers 3-7",
+        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists, then continue forward without waiting for Layers 3-8",
         "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
@@ -192,61 +192,64 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1, 2),
         "progression_mode": "target_major_serial_chain",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id",
-        "candidate_progression_policy": "for one selected target symbol and one six-month unit, complete Layers 3-7 in order before admitting the next target unless a reviewed coverage exception is recorded",
+        "candidate_progression_policy": "for one selected target symbol and one six-month unit, complete Layers 3-8 in order before admitting the next target unless a reviewed coverage exception is recorded",
         "data_surface": "target candidate/source_03 inputs plus feature_03_target_state_vector",
         "feature_cli": "trading-data-feature-03-target-state-vector",
     },
     {
         "layer": 4,
-        "slug": "alpha_confidence",
-        "model_name": "AlphaConfidenceModel",
+        "slug": "event_failure_risk",
+        "model_name": "EventFailureRiskModel",
         "depends_on_layers": (3,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;alpha_context_id",
-        "candidate_progression_policy": "continue the active target candidate chain after Layer 3 target state is ready; event intelligence is not a hard prerequisite for base alpha confidence",
-        "data_surface": "target context state plus labels; no dedicated trading-data source and no event-overlay requirement",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_failure_context_id",
+        "candidate_progression_policy": "continue the active target candidate chain after Layer 3 target state is ready; only reviewed event/strategy-failure evidence can condition this layer",
+        "data_surface": "agent-reviewed event/strategy-failure evidence plus target state; no dedicated trading-data source and no raw event alpha requirement",
         "feature_cli": None,
-        "physical_layer": 4,
-        "physical_slug": "alpha_confidence",
     },
     {
         "layer": 5,
-        "slug": "position_projection",
-        "model_name": "PositionProjectionModel",
+        "slug": "alpha_confidence",
+        "model_name": "AlphaConfidenceModel",
         "depends_on_layers": (4,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;position_context_id",
-        "candidate_progression_policy": "continue the active target candidate chain after Layer 4 alpha confidence is ready",
-        "data_surface": "alpha confidence plus position/risk/cost context; no dedicated trading-data source",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;alpha_context_id",
+        "candidate_progression_policy": "continue the active target candidate chain after Layer 4 event failure risk is ready; event discovery remains separate from base alpha confidence",
+        "data_surface": "target context state, event_failure_risk_vector, and labels; no dedicated trading-data source and no event-overlay requirement",
         "feature_cli": None,
-        "physical_layer": 5,
-        "physical_slug": "position_projection",
     },
     {
         "layer": 6,
-        "slug": "underlying_action",
-        "model_name": "UnderlyingActionModel",
+        "slug": "position_projection",
+        "model_name": "PositionProjectionModel",
         "depends_on_layers": (5,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;underlying_action_context_id",
-        "candidate_progression_policy": "continue the active target candidate chain after Layer 5 position projection is ready",
-        "data_surface": "model/control-plane underlying-action context; no dedicated trading-data source",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;position_context_id",
+        "candidate_progression_policy": "continue the active target candidate chain after Layer 5 alpha confidence is ready",
+        "data_surface": "alpha confidence plus position/risk/cost context; no dedicated trading-data source",
         "feature_cli": None,
-        "physical_layer": 6,
-        "physical_slug": "underlying_action",
     },
     {
         "layer": 7,
-        "slug": "trading_guidance",
-        "model_name": "TradingGuidanceModel / OptionExpressionModel",
+        "slug": "underlying_action",
+        "model_name": "UnderlyingActionModel",
         "depends_on_layers": (6,),
+        "progression_mode": "target_major_serial_chain",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;underlying_action_context_id",
+        "candidate_progression_policy": "continue the active target candidate chain after Layer 6 position projection is ready",
+        "data_surface": "model/control-plane underlying-action context; no dedicated trading-data source",
+        "feature_cli": None,
+    },
+    {
+        "layer": 8,
+        "slug": "option_expression",
+        "model_name": "OptionExpressionModel",
+        "depends_on_layers": (7,),
         "progression_mode": "base_trading_guidance_after_target_chain_complete",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
-        "candidate_progression_policy": "finish the active base target chain through Layer 7 trading guidance; option-expression contract/bucket expansion uses reviewed gate evidence and does not depend on event-overlay/source_04 inputs",
-        "data_surface": "agent-reviewed trading-guidance/option-expression gate review; provider-backed option-expression sources only when active base Layer 6 target chains require them plus feature_07_option_expression",
-        "feature_cli": "trading-data-feature-07-option-expression",
-        "physical_layer": 7,
-        "physical_slug": "option_expression",
+        "candidate_progression_policy": "finish the active base target chain through Layer 8 option expression; option-expression contract/bucket expansion uses reviewed gate evidence and does not depend on Layer 9 event-risk-governor inputs",
+        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 7 target chains require them plus feature_08_option_expression",
+        "feature_cli": "trading-data-feature-08-option-expression",
     },
 )
 
@@ -258,11 +261,12 @@ REVIEW_SCRIPT_NAMES: dict[int, str] = {
     1: "review_market_regime_promotion.py",
     2: "review_sector_context_promotion.py",
     3: "review_target_state_vector_promotion.py",
-    4: "review_alpha_confidence_promotion.py",
-    5: "review_position_projection_promotion.py",
-    6: "review_underlying_action_promotion.py",
-    7: "review_option_expression_promotion.py",
-    8: "review_event_risk_governor_promotion.py",
+    4: "review_event_failure_risk_promotion.py",
+    5: "review_alpha_confidence_promotion.py",
+    6: "review_position_projection_promotion.py",
+    7: "review_underlying_action_promotion.py",
+    8: "review_option_expression_promotion.py",
+    9: "review_event_risk_governor_promotion.py",
 }
 
 
@@ -339,15 +343,15 @@ FEATURE_MODULES: dict[str, str] = {
     "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime.from_feed_artifacts",
     "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context.from_feed_artifacts",
     "trading-data-feature-03-target-state-vector": "data_feature.feature_03_target_state_vector",
-    "trading-data-feature-08-event-risk-governor": "data_feature.feature_08_event_risk_governor",
-    "trading-data-feature-07-option-expression": "data_feature.feature_07_option_expression",
+    "trading-data-feature-09-event-risk-governor": "data_feature.feature_09_event_risk_governor",
+    "trading-data-feature-08-option-expression": "data_feature.feature_08_option_expression",
 }
 
 
 def feature_command(feature_cli: str | None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
-    if feature_cli == "trading-data-feature-07-option-expression":
+    if feature_cli == "trading-data-feature-08-option-expression":
         return [
             "PYTHONPATH=src",
             "python3",
@@ -360,7 +364,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-feature-01-market-regime", "trading-data-feature-02-sector-context"}:
         command.extend(["--month", "${START_MONTH}"])
-    if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-08-event-risk-governor"}:
+    if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-09-event-risk-governor"}:
         command.extend([
             "--source-start",
             "${START_MONTH_START_ET}",
@@ -526,7 +530,7 @@ def _build_layer_workflow(
             "${END_MONTH}",
             "--write",
         ]
-    elif layer == 7:
+    elif layer == 8:
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
@@ -714,7 +718,7 @@ def write_workflow_plan(plan: ModelTrainingWorkflowPlan, *, output: TextIO) -> N
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Plan the manager-owned base Layer 1-7 historical model-training workflow.")
+    parser = argparse.ArgumentParser(description="Plan the manager-owned base Layer 1-8 historical model-training workflow.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

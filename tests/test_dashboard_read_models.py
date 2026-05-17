@@ -383,31 +383,31 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2019-04",
                         "stages": [
                             {
-                                "stage_id": "layer_04_alpha_confidence.data_acquisition",
+                                "stage_id": "layer_05_alpha_confidence.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 5,
-                                "layer_key": "layer_04_alpha_confidence",
+                                "layer_key": "layer_05_alpha_confidence",
                                 "status": "not_applicable",
                             },
                             {
-                                "stage_id": "layer_04_alpha_confidence.feature_generation",
+                                "stage_id": "layer_05_alpha_confidence.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 5,
-                                "layer_key": "layer_04_alpha_confidence",
+                                "layer_key": "layer_05_alpha_confidence",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_04_alpha_confidence.model_generation",
+                                "stage_id": "layer_05_alpha_confidence.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": 5,
-                                "layer_key": "layer_04_alpha_confidence",
+                                "layer_key": "layer_05_alpha_confidence",
                                 "status": "blocked",
                             },
                             {
-                                "stage_id": "layer_07_option_expression.data_acquisition",
+                                "stage_id": "layer_08_option_expression.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 8,
-                                "layer_key": "layer_07_option_expression",
+                                "layer_key": "layer_08_option_expression",
                                 "status": "not_applicable",
                                 "last_reason": "no active Layer 7 target chain ready for option-expression expansion",
                             },
@@ -437,7 +437,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             any(task["layer"] == 5 and task["stage_type"] in {"data_acquisition", "feature_generation"} for task in task_timeline)
         )
         self.assertTrue(any(task["layer"] == 5 and task["stage_type"] == "model_generation" for task in task_timeline))
-        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_07_option_expression.data_acquisition")
+        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_08_option_expression.data_acquisition")
         self.assertEqual(real_skip["task_state"], "skipped")
         self.assertIn("no active Layer 7", real_skip["reason"])
 

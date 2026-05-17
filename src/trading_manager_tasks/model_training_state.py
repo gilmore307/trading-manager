@@ -1,4 +1,4 @@
-"""Durable state progression for the base Layer 1-7 model-training workflow."""
+"""Durable state progression for the base Layer 1-8 model-training workflow."""
 
 from __future__ import annotations
 
@@ -226,10 +226,10 @@ def _layer_complete(layer_number: int, stages: Mapping[str, StageProgress]) -> b
 def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     if blocker in {"layer_01_task_key_preparation", FOUNDATION_CATCH_UP_BLOCKER, POST_MODEL_GENERATION_REBUILD_BLOCKER}:
         return False
-    if blocker == "upstream_layers_01_07_complete":
-        return all(_layer_complete(layer_number, stages) for layer_number in range(1, 8))
+    if blocker == "upstream_layers_01_08_complete":
+        return all(_layer_complete(layer_number, stages) for layer_number in range(1, 9))
     if blocker == "active_target_chain_complete":
-        return _layer_complete(7, stages)
+        return _layer_complete(8, stages)
     if blocker.startswith("upstream_layer_") and blocker.endswith("_complete"):
         layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_complete"))
         return _layer_complete(layer_number, stages)
@@ -742,7 +742,7 @@ def write_state_output(state: WorkflowState, *, output: TextIO) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Advance the durable base Layer 1-7 model-training workflow state.")
+    parser = argparse.ArgumentParser(description="Advance the durable base Layer 1-8 model-training workflow state.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

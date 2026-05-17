@@ -118,7 +118,7 @@ def build_event_model_regeneration_plan(
             "model_run_metadata_that_depends_on_the_old_event_model_route_after_reviewed_rebuild_exists",
         ),
         invalidation_scope=(
-            "state_only_layer_08_event_risk_governor_and_event_adjusted_outputs; base Layers 1-7 remain reusable "
+            "state_only_layer_09_event_risk_governor_and_event_adjusted_outputs; base Layers 1-7 remain reusable "
             "unless a specific artifact consumed legacy event-overlay/source rows or violates the rolling-fold policy"
         ),
         regeneration_steps=(
@@ -126,7 +126,7 @@ def build_event_model_regeneration_plan(
                 step_id="01_build_closeout_report",
                 owner_repo="trading-model",
                 action="emit event_model_closeout_report_v1 from accepted final judgment",
-                command_ref="python3 scripts/models/model_08_event_risk_governor/build_event_model_closeout_report.py",
+                command_ref="python3 scripts/models/model_09_event_risk_governor/build_event_model_closeout_report.py",
                 status="ready_offline",
                 mutation_class="report_artifact_only",
                 provider_calls_allowed=False,
@@ -136,7 +136,7 @@ def build_event_model_regeneration_plan(
                 step_id="02_prepare_event_feed_backfill_task_keys",
                 owner_repo="trading-manager",
                 action="prepare required monthly event-feed task keys for the fold without provider calls",
-                command_ref="PYTHONPATH=src python3 scripts/tasks/prepare_layer_eight_event_feed_backfill.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write-files",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/prepare_layer_nine_event_feed_backfill.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write-files",
                 status="ready_offline",
                 mutation_class="manager_task_key_write_only",
                 provider_calls_allowed=False,
@@ -153,10 +153,10 @@ def build_event_model_regeneration_plan(
                 requires_review_before_apply=True,
             ),
             RegenerationStep(
-                step_id="04_materialize_source_08_event_risk_governor",
+                step_id="04_materialize_source_09_event_risk_governor",
                 owner_repo="trading-manager",
-                action="materialize source_08_event_risk_governor rows from reviewed local event feeds and detector evidence",
-                command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_layer_eight_event_risk_governor_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
+                action="materialize source_09_event_risk_governor rows from reviewed local event feeds and detector evidence",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_layer_nine_event_risk_governor_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
                 status="blocked_until_event_feed_coverage_ready",
                 mutation_class="local_source_materialization_receipt",
                 provider_calls_allowed=False,
@@ -165,9 +165,9 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="05_generate_feature_08_and_model_08",
                 owner_repo="trading-data;trading-model",
-                action="generate feature_08_event_risk_governor then model_08_event_risk_governor/event_context_vector outputs",
-                command_ref="trading-data-feature-08-event-risk-governor; python3 scripts/models/model_08_event_risk_governor/generate_model_08_event_risk_governor.py",
-                status="blocked_until_source_08_ready",
+                action="generate feature_09_event_risk_governor then model_09_event_risk_governor/event_context_vector outputs",
+                command_ref="trading-data-feature-09-event-risk-governor; python3 scripts/models/model_09_event_risk_governor/generate_model_09_event_risk_governor.py",
+                status="blocked_until_source_09_ready",
                 mutation_class="offline_model_artifact_generation",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,
@@ -176,7 +176,7 @@ def build_event_model_regeneration_plan(
                 step_id="06_evaluate_and_review_without_activation",
                 owner_repo="trading-model;trading-manager",
                 action="evaluate EventRiskGovernor with direction-neutral risk labels first, then submit conservative manager promotion review",
-                command_ref="python3 scripts/models/model_08_event_risk_governor/evaluate_model_08_event_risk_governor.py; PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_08_event_risk_governor",
+                command_ref="python3 scripts/models/model_09_event_risk_governor/evaluate_model_09_event_risk_governor.py; PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_09_event_risk_governor",
                 status="blocked_until_model_08_ready",
                 mutation_class="promotion_evidence_and_review_request_only",
                 provider_calls_allowed=False,
@@ -186,7 +186,7 @@ def build_event_model_regeneration_plan(
                 step_id="07_state_only_invalidation_if_old_outputs_remain",
                 owner_repo="trading-manager",
                 action="mark stale old event-risk-dependent workflow stages rebuild-required without deleting artifacts",
-                command_ref="PYTHONPATH=src python3 scripts/tasks/invalidate_layer_eight_event_downstream_outputs.py --write",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/invalidate_layer_nine_event_downstream_outputs.py --write",
                 status="review_before_write",
                 mutation_class="workflow_state_only_no_artifact_deletion",
                 provider_calls_allowed=False,

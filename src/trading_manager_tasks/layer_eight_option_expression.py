@@ -2,9 +2,9 @@
 
 This module is deliberately no-provider. It reviews completed conceptual Layer 6
 underlying-action rows for option-expression-worthy actions before ThetaData
-option-snapshot acquisition is prepared for the Layer 7 trading-guidance
+option-snapshot acquisition is prepared for the Layer 8 trading-guidance
 boundary. If the month has no active underlying action chain, the correct
-``layer_07_option_expression`` acquisition outcome is a reviewed no-provider skip,
+``layer_08_option_expression`` acquisition outcome is a reviewed no-provider skip,
 not an empty provider request.
 """
 
@@ -22,8 +22,8 @@ from typing import Any, Iterable, Mapping, Sequence, TextIO
 from .control_plane import TaskSystemError
 
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
-DEFAULT_OUTPUT_ROOT = Path("storage/runtime/layer_07_option_expression/gate_review")
-STAGE_ID = "layer_07_option_expression.data_acquisition"
+DEFAULT_OUTPUT_ROOT = Path("storage/runtime/layer_08_option_expression/gate_review")
+STAGE_ID = "layer_08_option_expression.data_acquisition"
 ACTIVE_ACTION_TYPES = {
     "increase_long",
     "decrease_long",
@@ -126,7 +126,7 @@ def _request_id(row: Mapping[str, Any], *, start_month: str) -> str:
     underlying = str(row.get("underlying") or "unknown").lower()
     snapshot = _safe_token(str(row.get("snapshot_time") or row.get("tradeable_time") or row.get("available_time") or "unknown"))
     target = _short_target(str(row.get("target_candidate_id") or "target"))
-    return f"mgrreq_layer7_option_snapshot_{underlying}_{start_month.replace('-', '_')}_{snapshot}_{target}"
+    return f"mgrreq_layer8_option_snapshot_{underlying}_{start_month.replace('-', '_')}_{snapshot}_{target}"
 
 
 def _is_active_layer_7_row(row: Mapping[str, Any]) -> bool:
@@ -186,7 +186,7 @@ def build_layer_eight_gate_review(
         reason = "Layer 7 produced no active underlying-action chain for Layer 8; all rows are no-trade/maintain/neutral, so no option-chain provider call is warranted for this month."
         recommended_next_action = "record_layer_08_data_acquisition_no_provider_skip"
     return LayerEightGateReview(
-        contract_type="manager_layer_07_option_expression_gate_review",
+        contract_type="manager_layer_08_option_expression_gate_review",
         stage_id=STAGE_ID,
         start_month=start_month,
         end_month=end_month,
@@ -223,11 +223,11 @@ def fetch_layer_7_rows(*, database_url: str, start_month: str, end_month: str) -
           ts.underlying,
           COALESCE(l7.tradeable_time, l7.available_time) AS snapshot_time,
           l7.underlying_action_plan_ref,
-          l7."6_resolved_underlying_action_type" AS action_type,
-          l7."6_resolved_action_side" AS action_side,
-          l7."6_resolved_dominant_horizon" AS dominant_horizon,
-          l7."6_resolved_action_confidence_score" AS action_confidence_score
-        FROM trading_model.model_06_underlying_action l7
+          l7."7_resolved_underlying_action_type" AS action_type,
+          l7."7_resolved_action_side" AS action_side,
+          l7."7_resolved_dominant_horizon" AS dominant_horizon,
+          l7."7_resolved_action_confidence_score" AS action_confidence_score
+        FROM trading_model.model_07_underlying_action l7
         LEFT JOIN target_symbols ts USING (target_candidate_id)
         WHERE l7.available_time::timestamptz >= %s::timestamptz
           AND l7.available_time::timestamptz < %s::timestamptz
@@ -241,8 +241,8 @@ def fetch_layer_7_rows(*, database_url: str, start_month: str, end_month: str) -
 
 def write_gate_review_artifacts(review: LayerEightGateReview, *, output_root: Path = DEFAULT_OUTPUT_ROOT) -> tuple[Path, Path]:
     output_root.mkdir(parents=True, exist_ok=True)
-    review_path = output_root / f"layer_07_option_expression_gate_review_{review.start_month}.json"
-    receipt_path = output_root / f"layer_07_option_expression_gate_review_receipt_{review.start_month}.json"
+    review_path = output_root / f"layer_08_option_expression_gate_review_{review.start_month}.json"
+    receipt_path = output_root / f"layer_08_option_expression_gate_review_receipt_{review.start_month}.json"
     review_payload = review.summary_row()
     review_payload["evidence_refs"] = [*review_payload["evidence_refs"], str(review_path), str(receipt_path)]
     review_path.write_text(json.dumps(review_payload, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
@@ -257,7 +257,7 @@ def write_gate_review_artifacts(review: LayerEightGateReview, *, output_root: Pa
         "completed_at": now,
         "runs": [
             {
-                "run_id": f"layer_07_option_expression_gate_review_{review.start_month}",
+                "run_id": f"layer_08_option_expression_gate_review_{review.start_month}",
                 "status": receipt_status,
                 "output_refs": [str(review_path)],
                 "row_counts": {
@@ -295,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
         start_month=args.start_month,
         end_month=args.end_month,
         layer_7_rows=rows,
-        evidence_refs=("sql:trading_model.model_06_underlying_action", "sql:trading_data.source_03_target_state"),
+        evidence_refs=("sql:trading_model.model_07_underlying_action", "sql:trading_data.source_03_target_state"),
     )
     if args.write:
         review_path, receipt_path = write_gate_review_artifacts(review, output_root=args.output_root)

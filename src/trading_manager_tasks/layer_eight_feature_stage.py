@@ -23,10 +23,10 @@ from typing import Any, Mapping, TextIO
 
 from .control_plane import TaskSystemError
 
-DEFAULT_GATE_REVIEW_ROOT = Path("storage/runtime/layer_07_option_expression/gate_review")
+DEFAULT_GATE_REVIEW_ROOT = Path("storage/runtime/layer_08_option_expression/gate_review")
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
-FEATURE_STAGE_ID = "layer_07_option_expression.feature_generation"
-DATA_ACQUISITION_STAGE_ID = "layer_07_option_expression.data_acquisition"
+FEATURE_STAGE_ID = "layer_08_option_expression.feature_generation"
+DATA_ACQUISITION_STAGE_ID = "layer_08_option_expression.data_acquisition"
 
 
 @dataclass(frozen=True)
@@ -80,12 +80,12 @@ def _read_json(path: Path) -> Mapping[str, Any]:
 
 
 def _gate_review_path(start_month: str, *, gate_review_root: Path) -> Path:
-    return gate_review_root / f"layer_07_option_expression_gate_review_{start_month}.json"
+    return gate_review_root / f"layer_08_option_expression_gate_review_{start_month}.json"
 
 
 def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: Path, gate_review: Mapping[str, Any], output_root: Path) -> Path:
     output_root.mkdir(parents=True, exist_ok=True)
-    receipt_path = output_root / f"layer_07_option_expression_feature_generation_no_provider_skip_receipt_{start_month}.json"
+    receipt_path = output_root / f"layer_08_option_expression_feature_generation_no_provider_skip_receipt_{start_month}.json"
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     receipt = {
         "contract_type": "component_completion_receipt",
@@ -96,13 +96,13 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
         "completed_at": now,
         "runs": [
             {
-                "run_id": f"layer_07_option_expression_feature_generation_no_provider_skip_{start_month}",
+                "run_id": f"layer_08_option_expression_feature_generation_no_provider_skip_{start_month}",
                 "status": "succeeded",
                 "output_refs": [str(gate_review_path)],
                 "row_counts": {
                     "active_layer_8_request_candidates": int(gate_review.get("active_request_count") or 0),
                     "source_05_option_expression_rows_required": 0,
-                    "feature_07_option_expression_rows_required": 0,
+                    "feature_08_option_expression_rows_required": 0,
                 },
             }
         ],
@@ -135,7 +135,7 @@ def execute_layer_eight_feature_stage(
 
     review_path = _gate_review_path(start_month, gate_review_root=gate_review_root)
     review = _read_json(review_path)
-    if review.get("contract_type") != "manager_layer_07_option_expression_gate_review":
+    if review.get("contract_type") != "manager_layer_08_option_expression_gate_review":
         raise TaskSystemError(f"unsupported Layer 8 gate review contract_type: {review_path}")
     if review.get("status") == "no_provider_skip_accepted" and int(review.get("active_request_count") or 0) == 0:
         receipt_path = _write_skip_receipt(
@@ -159,13 +159,13 @@ def execute_layer_eight_feature_stage(
     command = (
         "python3",
         "-m",
-        "data_feature.feature_07_option_expression",
+        "data_feature.feature_08_option_expression",
         "--source-start",
         _month_start(start_month),
         "--source-end",
         _exclusive_month_start(end_month),
         "--run-id",
-        f"feature_07_option_expression_{start_month}",
+        f"feature_08_option_expression_{start_month}",
     )
     result = subprocess.run(
         list(command),

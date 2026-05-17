@@ -13,7 +13,8 @@ from typing import Any, Iterable, TextIO
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_RUNTIME_ROOT = Path("runtime")
-DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_08_event_risk_required"
+DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_09_event_risk_required"
+DEFAULT_SOURCE_LAYER = 9
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,7 @@ def invalidate_layer_downstream_outputs(
     state_paths: Iterable[Path] = (),
     layer_floor: int = 8,
     reason: str = DEFAULT_REASON,
+    source_layer: int = DEFAULT_SOURCE_LAYER,
     write: bool = False,
 ) -> InvalidationSummary:
     """Mark stale event-risk-dependent workflow stages as failed/rebuild-required.
@@ -94,7 +96,7 @@ def invalidate_layer_downstream_outputs(
                     stage["status_updated_at_utc"] = now
                     stage["updated_utc"] = now
                     refs = list(stage.get("artifact_refs") or [])
-                    marker = f"manager://stale_downstream_from_layer_{layer_floor:02d}_event_source_rebuild_required"
+                    marker = f"manager://stale_downstream_from_layer_{source_layer:02d}_event_source_rebuild_required"
                     if marker not in refs:
                         refs.append(marker)
                     stage["artifact_refs"] = refs
@@ -134,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runtime-root", type=Path)
     parser.add_argument("--state-path", action="append", type=Path, default=[])
     parser.add_argument("--layer-floor", type=int, default=8)
+    parser.add_argument("--source-layer", type=int, default=DEFAULT_SOURCE_LAYER)
     parser.add_argument("--reason", default=DEFAULT_REASON)
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args(argv)
@@ -143,13 +146,14 @@ def main(argv: list[str] | None = None) -> int:
         state_paths=args.state_path,
         layer_floor=args.layer_floor,
         reason=args.reason,
+        source_layer=args.source_layer,
         write=args.write,
     )
     write_summary(summary, output=sys.stdout)
     return 0
 
 
-__all__ = ["DEFAULT_REASON", "InvalidationSummary", "invalidate_layer_downstream_outputs"]
+__all__ = ["DEFAULT_REASON", "DEFAULT_SOURCE_LAYER", "InvalidationSummary", "invalidate_layer_downstream_outputs"]
 
 
 if __name__ == "__main__":  # pragma: no cover

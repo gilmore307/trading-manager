@@ -21,11 +21,11 @@ class ModelPromotionRequestTests(unittest.TestCase):
             "model_01_market_regime",
             "model_02_sector_context",
             "model_03_target_state_vector",
-            "model_04_alpha_confidence",
-            "model_05_position_projection",
-            "model_06_underlying_action",
-            "model_07_option_expression",
-            "model_08_event_risk_governor",
+            "model_05_alpha_confidence",
+            "model_06_position_projection",
+            "model_07_underlying_action",
+            "model_08_option_expression",
+            "model_09_event_risk_governor",
         })
 
         requests = build_model_promotion_review_requests(
@@ -38,7 +38,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
 
     def test_builds_valid_manager_request_for_any_model_layer(self):
         request = build_model_promotion_review_request(
-            model="layer_07_option_expression",
+            model="layer_08_option_expression",
             candidate_ref="trading-model://promotion-candidates/mpcand_example",
             evaluation_run_refs=["trading-model://eval-runs/mdevrun_example"],
             evidence_refs=["storage://trading-model/evidence/example.json"],
@@ -49,8 +49,8 @@ class ModelPromotionRequestTests(unittest.TestCase):
         normalized = validate_manager_request(request)
         self.assertEqual(normalized["request_kind"], "model_promotion_review")
         self.assertEqual(normalized["priority"], "high")
-        self.assertEqual(request["model_id"], "model_07_option_expression")
-        self.assertEqual(request["model_layer"], "layer_07_option_expression")
+        self.assertEqual(request["model_id"], "model_08_option_expression")
+        self.assertEqual(request["model_layer"], "layer_08_option_expression")
         self.assertEqual(request["output_contract"], "option_expression_plan")
         self.assertEqual(request["candidate_ref"], "trading-model://promotion-candidates/mpcand_example")
         self.assertEqual(request["evaluation_run_refs"], ["trading-model://eval-runs/mdevrun_example"])
@@ -63,13 +63,13 @@ class ModelPromotionRequestTests(unittest.TestCase):
 
     def test_accepts_legacy_physical_aliases_for_unmigrated_surfaces(self):
         request = build_model_promotion_review_request(
-            model="model_07_option_expression",
+            model="model_08_option_expression",
             candidate_ref="trading-model://promotion-candidates/mpcand_example",
         )
 
-        self.assertEqual(request["model_id"], "model_07_option_expression")
-        self.assertEqual(request["model_layer"], "layer_07_option_expression")
-        self.assertEqual(request["evidence_component_id"], "model_07_option_expression")
+        self.assertEqual(request["model_id"], "model_08_option_expression")
+        self.assertEqual(request["model_layer"], "layer_08_option_expression")
+        self.assertEqual(request["evidence_component_id"], "model_08_option_expression")
 
     def test_rejects_unknown_model_target(self):
         with self.assertRaises(TaskSystemError):
