@@ -27,7 +27,7 @@ DEFAULT_DATASET_EVIDENCE_PATH = Path("storage/runtime/dataset_expansion/evidence
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 
 MODEL_IDS_BY_LAYER: dict[int, str] = {
-    int(meta["layer"]): f"model_{int(meta.get('physical_layer', meta['layer'])):02d}_{meta.get('physical_slug', meta['slug'])}"
+    int(meta["layer"]): f"{meta['slug']}_model" if meta["slug"] != "target_state_vector" else "target_state_vector_model"
     for meta in LAYER_METADATA
 }
 LAYER_KEYS_BY_LAYER: dict[int, str] = {

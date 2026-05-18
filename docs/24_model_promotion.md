@@ -27,6 +27,6 @@ Layer 9 event-risk research may propose a promotion packet. Layer 4 may consume 
 ## Useful Commands
 
 ```bash
-PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_08_option_expression --candidate-ref trading-model://promotion-candidates/mpcand_example
+PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model option_expression_model --candidate-ref trading-model://promotion-candidates/mpcand_example
 PYTHONPATH=src python3 scripts/tasks/build_agent_model_promotion_decision.py --review-target-ref storage://trading-model/promotion-candidates/mpcand_example.json --decision-status defer --decision-reason "missing production calibration evidence"
 ```

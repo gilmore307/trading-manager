@@ -96,6 +96,52 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("broker order", rows["EVENT_RISK_INTERVENTION"]["note"])
         self.assertIn("current_physical_surfaces_aligned_with_nine_layer_order", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
 
+    def test_active_model_control_plane_registry_rows_use_stable_model_ids(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        numbered_model_pattern = re.compile(r"model_[0-9]{2}_[a-z_]+")
+        stable_targets = rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"].split(";")
+        self.assertEqual(
+            stable_targets,
+            [
+                "market_regime_model",
+                "sector_context_model",
+                "target_state_vector_model",
+                "event_failure_risk_model",
+                "alpha_confidence_model",
+                "position_projection_model",
+                "underlying_action_model",
+                "option_expression_model",
+                "event_risk_governor",
+            ],
+        )
+        expected_receipt_model_sequence = [
+            ("layer_1", "market_regime_model"),
+            ("layer_2", "sector_context_model"),
+            ("layer_3", "target_state_vector_model"),
+            ("layer_4", "event_failure_risk_model"),
+            ("layer_5", "alpha_confidence_model"),
+            ("layer_6", "position_projection_model"),
+            ("layer_7", "underlying_action_model"),
+            ("layer_8", "option_expression_model"),
+            ("layer_9", "event_risk_governor"),
+        ]
+        receipt_entries = rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"].split(";")
+        self.assertEqual(
+            [(entry.split(":", 2)[0], entry.split(":", 2)[1]) for entry in receipt_entries],
+            expected_receipt_model_sequence,
+        )
+        self.assertEqual(len(receipt_entries), 9)
+        self.assertIn("no_persisted_decision_receipt", receipt_entries[-1])
+
+        for key in (
+            "MODEL_PROMOTION_UNIFIED_TARGETS",
+            "MODEL_LAYER_03_PRODUCTION_EVAL_SUBSTRATE_RECEIPT",
+            "MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS",
+        ):
+            self.assertNotRegex(rows[key]["payload"], numbered_model_pattern)
+
     def test_data_feed_and_data_source_rows_are_separated(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -279,8 +325,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_PROMOTION_REVIEW"]["payload"], "model_promotion_review")
         self.assertIn("every model layer", rows["MODEL_PROMOTION_REVIEW"]["note"])
         self.assertIn("activation_requires_approved_review_decision", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
-        self.assertIn("model_08_option_expression", rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"])
-        self.assertIn("current conceptual and physical layer order", rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["note"])
+        self.assertEqual(
+            rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"],
+            "market_regime_model;sector_context_model;target_state_vector_model;event_failure_risk_model;alpha_confidence_model;position_projection_model;underlying_action_model;option_expression_model;event_risk_governor",
+        )
+        self.assertIn("Canonical stable model ids", rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["note"])
         self.assertEqual(rows["MANAGER_MODEL_PROMOTION_REVIEW_PLAN"]["kind"], "script")
         self.assertEqual(rows["MANAGER_TASK_SYSTEM_REHEARSAL"]["kind"], "script")
         self.assertEqual(rows["MANAGER_TASK_SYSTEM_REHEARSAL"]["payload"], "PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py")

@@ -4,17 +4,23 @@ This file owns shared naming rules for model-layer source, feature, and model su
 
 ## Current Layer Stack
 
-| Layer | Boundary | Model surface |
-|---|---|---|
-| 1 | MarketRegimeModel | `model_01_market_regime` |
-| 2 | SectorContextModel | `model_02_sector_context` |
-| 3 | TargetStateVectorModel | `model_03_target_state_vector` |
-| 4 | EventFailureRiskModel | `model_04_event_failure_risk` |
-| 5 | AlphaConfidenceModel | `model_05_alpha_confidence` |
-| 6 | PositionProjectionModel | `model_06_position_projection` |
-| 7 | UnderlyingActionModel | `model_07_underlying_action` |
-| 8 | TradingGuidanceModel / OptionExpressionModel | `model_08_option_expression` |
-| 9 | EventRiskGovernor / EventIntelligenceOverlay | `model_09_event_risk_governor` |
+| Layer | Boundary | Stable model id | Physical model surface |
+|---|---|---|---|
+| 1 | MarketRegimeModel | `market_regime_model` | `model_01_market_regime` |
+| 2 | SectorContextModel | `sector_context_model` | `model_02_sector_context` |
+| 3 | TargetStateVectorModel | `target_state_vector_model` | `model_03_target_state_vector` |
+| 4 | EventFailureRiskModel | `event_failure_risk_model` | `model_04_event_failure_risk` |
+| 5 | AlphaConfidenceModel | `alpha_confidence_model` | `model_05_alpha_confidence` |
+| 6 | PositionProjectionModel | `position_projection_model` | `model_06_position_projection` |
+| 7 | UnderlyingActionModel | `underlying_action_model` | `model_07_underlying_action` |
+| 8 | TradingGuidanceModel / OptionExpressionModel | `option_expression_model` | `model_08_option_expression` |
+| 9 | EventRiskGovernor / EventIntelligenceOverlay | `event_risk_governor` | `model_09_event_risk_governor` |
+
+## Stable Id Rule
+
+Use the stable model id for semantic interfaces: `model_id` fields, promotion targets, manager requests, completion/evaluation receipts, CLI `--model` arguments, scheduler/control-plane routing, and active registry payloads that name a model as an interface.
+
+Use `model_NN_*` only for physical implementation surfaces: import/package paths, script paths, SQL table names, source/feature/model artifact surface names, physical-surface audit rows, and legacy-normalization migrations.
 
 ## SQL Table Surface Patterns
 
@@ -78,7 +84,7 @@ Before adding or changing a model-layer registry row, verify:
 - the layer boundary is current;
 - the row uses the narrowest kind;
 - source/feature/model numbers are intentional;
-- payload matches the accepted physical/contract token;
+- payload uses the stable id when it names a model interface, and the physical token only when it names a path/table/artifact surface;
 - path points to the owning repo artifact when useful;
 - no obsolete alias is kept only for convenience;
 - tests and registry dry-run pass.

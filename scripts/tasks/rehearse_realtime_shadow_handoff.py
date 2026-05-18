@@ -17,16 +17,29 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
+
+PHYSICAL_MODEL_SURFACES_BY_ID = {
+    "market_regime_model": "model_01_market_regime",
+    "sector_context_model": "model_02_sector_context",
+    "target_state_vector_model": "model_03_target_state_vector",
+    "event_failure_risk_model": "model_04_event_failure_risk",
+    "alpha_confidence_model": "model_05_alpha_confidence",
+    "position_projection_model": "model_06_position_projection",
+    "underlying_action_model": "model_07_underlying_action",
+    "option_expression_model": "model_08_option_expression",
+    "event_risk_governor": "model_09_event_risk_governor",
+}
+
 LOCAL_LAYER_INPUTS = (
-    ("layer_01_market_regime", "model_01_market_regime", "market_context_state"),
-    ("layer_02_sector_context", "model_02_sector_context", "sector_context_state"),
-    ("layer_03_target_state_vector", "model_03_target_state_vector", "target_context_state"),
-    ("layer_04_event_failure_risk", "model_04_event_failure_risk", "event_failure_risk_vector"),
-    ("layer_05_alpha_confidence", "model_05_alpha_confidence", "alpha_confidence_vector"),
-    ("layer_06_position_projection", "model_06_position_projection", "position_projection_vector"),
-    ("layer_07_underlying_action", "model_07_underlying_action", "underlying_action_plan"),
-    ("layer_08_option_expression", "model_08_option_expression", "option_expression_plan"),
-    ("layer_09_event_risk_governor", "model_09_event_risk_governor", "event_context_vector"),
+    ("layer_01_market_regime", "market_regime_model", "market_context_state"),
+    ("layer_02_sector_context", "sector_context_model", "sector_context_state"),
+    ("layer_03_target_state_vector", "target_state_vector_model", "target_context_state"),
+    ("layer_04_event_failure_risk", "event_failure_risk_model", "event_failure_risk_vector"),
+    ("layer_05_alpha_confidence", "alpha_confidence_model", "alpha_confidence_vector"),
+    ("layer_06_position_projection", "position_projection_model", "position_projection_vector"),
+    ("layer_07_underlying_action", "underlying_action_model", "underlying_action_plan"),
+    ("layer_08_option_expression", "option_expression_model", "option_expression_plan"),
+    ("layer_09_event_risk_governor", "event_risk_governor", "event_context_vector"),
 )
 
 
@@ -100,6 +113,7 @@ def _local_route_plan(decision_input: Mapping[str, Any], *, mode: str) -> dict[s
         if not isinstance(row, Mapping):
             continue
         model_id = row.get("model_id")
+        physical_model_surface = PHYSICAL_MODEL_SURFACES_BY_ID.get(str(model_id), str(model_id))
         layer_routes.append(
             {
                 "contract_type": "model_realtime_decision_layer_route",
@@ -111,7 +125,7 @@ def _local_route_plan(decision_input: Mapping[str, Any], *, mode: str) -> dict[s
                 "upstream_context_refs": row.get("upstream_context_refs") or [],
                 "frozen_model_config_ref": row.get("frozen_model_config_ref"),
                 "historical_dataset_snapshot_ref": row.get("historical_dataset_snapshot_ref"),
-                "generator_entrypoint_ref": f"trading-model/scripts/models/{model_id}/generate_{model_id}.py",
+                "generator_entrypoint_ref": f"trading-model/scripts/models/{physical_model_surface}/generate_{physical_model_surface}.py",
                 "generation_mode": "shadow_monitoring" if mode != "dry_run" else "fixture_replay",
                 "route_status": "ready_for_fixture_shadow_generation",
             }
@@ -190,7 +204,7 @@ def main() -> int:
                     "contract_type": "execution_model_decision_layer_input",
                     "decision_input_snapshot_id": decision_input.get("decision_input_snapshot_id"),
                     "model_layer": "layer_04_event_failure_risk",
-                    "model_id": "model_04_event_failure_risk",
+                    "model_id": "event_failure_risk_model",
                     "expected_model_output": "event_failure_risk_vector",
                     "feature_ref": f"realtime-feature://{decision_input.get('decision_input_snapshot_id')}/layer_04_event_failure_risk",
                     "upstream_context_refs": [],

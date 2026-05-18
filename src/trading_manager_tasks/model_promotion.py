@@ -55,15 +55,15 @@ class ModelPromotionTarget:
 
 
 MODEL_PROMOTION_TARGETS: tuple[ModelPromotionTarget, ...] = (
-    ModelPromotionTarget("layer_01_market_regime", "model_01_market_regime", "MarketRegimeModel", "market_context_state", "model_01_market_regime"),
-    ModelPromotionTarget("layer_02_sector_context", "model_02_sector_context", "SectorContextModel", "sector_context_state", "model_02_sector_context"),
-    ModelPromotionTarget("layer_03_target_state_vector", "model_03_target_state_vector", "TargetStateVectorModel", "target_context_state", "model_03_target_state_vector"),
-    ModelPromotionTarget("layer_04_event_failure_risk", "model_04_event_failure_risk", "EventFailureRiskModel", "event_failure_risk_vector", "model_04_event_failure_risk"),
-    ModelPromotionTarget("layer_05_alpha_confidence", "model_05_alpha_confidence", "AlphaConfidenceModel", "alpha_confidence_vector", "model_05_alpha_confidence"),
-    ModelPromotionTarget("layer_06_position_projection", "model_06_position_projection", "PositionProjectionModel", "position_projection_vector", "model_06_position_projection"),
-    ModelPromotionTarget("layer_07_underlying_action", "model_07_underlying_action", "UnderlyingActionModel", "underlying_action_plan", "model_07_underlying_action"),
-    ModelPromotionTarget("layer_08_option_expression", "model_08_option_expression", "OptionExpressionModel", "option_expression_plan", "model_08_option_expression"),
-    ModelPromotionTarget("layer_09_event_risk_governor", "model_09_event_risk_governor", "EventRiskGovernor", "event_context_vector", "model_09_event_risk_governor"),
+    ModelPromotionTarget("layer_01_market_regime", "market_regime_model", "MarketRegimeModel", "market_context_state", "market_regime_model"),
+    ModelPromotionTarget("layer_02_sector_context", "sector_context_model", "SectorContextModel", "sector_context_state", "sector_context_model"),
+    ModelPromotionTarget("layer_03_target_state_vector", "target_state_vector_model", "TargetStateVectorModel", "target_context_state", "target_state_vector_model"),
+    ModelPromotionTarget("layer_04_event_failure_risk", "event_failure_risk_model", "EventFailureRiskModel", "event_failure_risk_vector", "event_failure_risk_model"),
+    ModelPromotionTarget("layer_05_alpha_confidence", "alpha_confidence_model", "AlphaConfidenceModel", "alpha_confidence_vector", "alpha_confidence_model"),
+    ModelPromotionTarget("layer_06_position_projection", "position_projection_model", "PositionProjectionModel", "position_projection_vector", "position_projection_model"),
+    ModelPromotionTarget("layer_07_underlying_action", "underlying_action_model", "UnderlyingActionModel", "underlying_action_plan", "underlying_action_model"),
+    ModelPromotionTarget("layer_08_option_expression", "option_expression_model", "OptionExpressionModel", "option_expression_plan", "option_expression_model"),
+    ModelPromotionTarget("layer_09_event_risk_governor", "event_risk_governor", "EventRiskGovernor", "event_context_vector", "event_risk_governor"),
 )
 
 TARGETS_BY_MODEL_ID = {target.model_id: target for target in MODEL_PROMOTION_TARGETS}

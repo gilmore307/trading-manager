@@ -25,7 +25,7 @@ class DatasetEvidenceTests(unittest.TestCase):
             snapshot_rows=[
                 {
                     "snapshot_id": "snap_l1",
-                    "model_id": "model_01_market_regime",
+                    "model_id": "market_regime_model",
                     "data_start_time": "2016-01-01T00:00:00",
                     "data_end_time": "2022-12-31T00:00:00",
                     "feature_row_count": 1000,
@@ -58,7 +58,7 @@ class DatasetEvidenceTests(unittest.TestCase):
                 },
             ],
             label_rows=[{"label_id": "lbl1", "snapshot_id": "snap_l1"}],
-            eval_run_rows=[{"eval_run_id": "eval1", "model_id": "model_01_market_regime", "snapshot_id": "snap_l1", "run_status": "succeeded"}],
+            eval_run_rows=[{"eval_run_id": "eval1", "model_id": "market_regime_model", "snapshot_id": "snap_l1", "run_status": "succeeded"}],
         )
 
         layer_one = collection.summary_row()["layers"]["1"]
@@ -74,7 +74,7 @@ class DatasetEvidenceTests(unittest.TestCase):
 
     def test_collected_evidence_feeds_dataset_expansion_planner(self):
         collection = collect_dataset_evidence_from_rows(
-            snapshot_rows=[{"snapshot_id": "snap_l1", "model_id": "model_01_market_regime", "feature_row_count": 1000}],
+            snapshot_rows=[{"snapshot_id": "snap_l1", "model_id": "market_regime_model", "feature_row_count": 1000}],
             split_rows=[
                 {"split_id": "train", "snapshot_id": "snap_l1", "split_name": "train", "split_start_time": "2016-01-01", "split_end_time": "2020-12-31"},
                 {"split_id": "cal", "snapshot_id": "snap_l1", "split_name": "calibration", "split_start_time": "2021-01-01", "split_end_time": "2021-12-31"},
@@ -103,10 +103,10 @@ class DatasetEvidenceTests(unittest.TestCase):
                 {"split_id": name, "snapshot_id": "snap_l1", "split_name": name, "split_start_time": start, "split_end_time": end}
             )
         collection = collect_dataset_evidence_from_rows(
-            snapshot_rows=[{"snapshot_id": "snap_l1", "model_id": "model_01_market_regime", "feature_row_count": 1000}],
+            snapshot_rows=[{"snapshot_id": "snap_l1", "model_id": "market_regime_model", "feature_row_count": 1000}],
             split_rows=split_rows,
             label_rows=[{"label_id": "lbl1", "snapshot_id": "snap_l1"}],
-            eval_run_rows=[{"eval_run_id": "eval1", "model_id": "model_01_market_regime", "snapshot_id": "snap_l1", "run_status": "succeeded"}],
+            eval_run_rows=[{"eval_run_id": "eval1", "model_id": "market_regime_model", "snapshot_id": "snap_l1", "run_status": "succeeded"}],
             metric_rows=[
                 {
                     "metric_id": "metric1",

@@ -10,15 +10,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 LAYERS = (
-    (1, ("MarketRegimeModel",), "layer_01_market_regime", "model_01_market_regime", "market_context_state"),
-    (2, ("SectorContextModel",), "layer_02_sector_context", "model_02_sector_context", "sector_context_state"),
-    (3, ("TargetStateVectorModel",), "layer_03_target_state_vector", "model_03_target_state_vector", "target_context_state"),
-    (4, ("EventFailureRiskModel",), "layer_04_event_failure_risk", "model_04_event_failure_risk", "event_failure_risk_vector"),
-    (5, ("AlphaConfidenceModel",), "layer_05_alpha_confidence", "model_05_alpha_confidence", "alpha_confidence_vector"),
-    (6, ("PositionProjectionModel",), "layer_06_position_projection", "model_06_position_projection", "position_projection_vector"),
-    (7, ("UnderlyingActionModel",), "layer_07_underlying_action", "model_07_underlying_action", "underlying_action_plan"),
-    (8, ("TradingGuidanceModel", "OptionExpressionModel"), "layer_08_option_expression", "model_08_option_expression", "option_expression_plan"),
-    (9, ("EventRiskGovernor", "EventIntelligenceOverlay"), "layer_09_event_risk_governor", "model_09_event_risk_governor", "event_risk_intervention"),
+    (1, ("MarketRegimeModel",), "layer_01_market_regime", "market_regime_model", "model_01_market_regime", "market_context_state"),
+    (2, ("SectorContextModel",), "layer_02_sector_context", "sector_context_model", "model_02_sector_context", "sector_context_state"),
+    (3, ("TargetStateVectorModel",), "layer_03_target_state_vector", "target_state_vector_model", "model_03_target_state_vector", "target_context_state"),
+    (4, ("EventFailureRiskModel",), "layer_04_event_failure_risk", "event_failure_risk_model", "model_04_event_failure_risk", "event_failure_risk_vector"),
+    (5, ("AlphaConfidenceModel",), "layer_05_alpha_confidence", "alpha_confidence_model", "model_05_alpha_confidence", "alpha_confidence_vector"),
+    (6, ("PositionProjectionModel",), "layer_06_position_projection", "position_projection_model", "model_06_position_projection", "position_projection_vector"),
+    (7, ("UnderlyingActionModel",), "layer_07_underlying_action", "underlying_action_model", "model_07_underlying_action", "underlying_action_plan"),
+    (8, ("TradingGuidanceModel", "OptionExpressionModel"), "layer_08_option_expression", "option_expression_model", "model_08_option_expression", "option_expression_plan"),
+    (9, ("EventRiskGovernor", "EventIntelligenceOverlay"), "layer_09_event_risk_governor", "event_risk_governor", "model_09_event_risk_governor", "event_risk_intervention"),
 )
 
 FILES_TO_CHECK = (
@@ -58,12 +58,13 @@ def main() -> int:
     texts = {rel: read(rel) for rel in FILES_TO_CHECK}
     registry = current_registry_text()
 
-    for number, boundaries, layer_token, model_token, handoff in LAYERS:
+    for number, boundaries, layer_token, stable_model_id, model_token, handoff in LAYERS:
         architecture = texts["docs/02_architecture.md"]
         numbering = texts["docs/28_numbering_physical_contract.md"]
         promotion = texts["src/trading_manager_tasks/model_promotion.py"]
         for rel, text in texts.items():
-            for token in (layer_token, model_token):
+            required_tokens = (layer_token, stable_model_id) if rel == "src/trading_manager_tasks/model_promotion.py" else (layer_token, model_token)
+            for token in required_tokens:
                 if token not in text:
                     fail(f"{rel} missing {token}")
         for value in (*boundaries, handoff):
@@ -73,7 +74,7 @@ def main() -> int:
             fail(f"docs/28_numbering_physical_contract.md missing one of {boundaries}")
         if not any(boundary in promotion for boundary in boundaries):
             fail(f"model_promotion.py missing one of {boundaries}")
-        for token in (layer_token, model_token):
+        for token in (layer_token, stable_model_id, model_token):
             if token not in registry:
                 fail(f"scripts/registry/current.csv missing {token}")
 
