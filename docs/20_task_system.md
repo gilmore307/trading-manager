@@ -50,6 +50,7 @@ Trading Economics calendar handling is split into two manager-owned routes:
 
 1. Historical seed: a one-time bootstrap from reviewed saved monthly `07_feed_trading_economics_calendar_web` CSV artifacts into `trading_data.source_09_event_risk_governor`. The planner merges all in-window rows across runs into one filtered per-month artifact, excludes wrong-window rows, and prepares a `source_09_event_risk_governor` task key. Raw monthly CSV originals may be deletion candidates only after successful SQL ingest and manifest review.
 2. Recent poll: an ongoing realtime-maintenance task key for the logged-out visible recent calendar page. It uses `date_range_mode=recent`, `use_authenticated_cookies=false`, and no API/download/export route. The realtime system owns scheduling this poll and upserting planned/released macro events into SQL.
+3. Due-release refresh: when a scheduled event reaches its release time, the realtime system should fetch immediately. If the fetch fails, retry once after 10 seconds under `te_recent_release_fetch_retry_after_10s_once`; successful fetches that still lack `actual` values should be treated as delayed/pending evidence and rescheduled by release-state policy, not as broker/trading authority.
 
 Training should read TE macro events from SQL first. If gaps remain, the manager may fill them with reviewed authenticated TE historical fetches or public macro web-search provenance rows; fallback provenance must remain explicit.
 

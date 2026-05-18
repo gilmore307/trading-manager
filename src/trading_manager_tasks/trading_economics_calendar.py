@@ -272,12 +272,14 @@ def _recent_task_key(*, start: date, end: date, output_root: str) -> dict[str, A
             "realtime_provider_maintenance": True,
             "allowed_providers": ["trading_economics"],
             "allowed_endpoint_families": ["calendar_web"],
-            "max_requests": 1,
+            "max_requests": 2,
             "max_time_window": "45d",
+            "retry_policy_ref": "te_recent_release_fetch_retry_after_10s_once",
+            "release_refresh_policy_ref": "immediate_due_release_refresh_then_10s_failure_retry",
             "model_activation_performed": False,
             "broker_execution_performed": False,
         },
-        "policy_refs": ["logged_out_recent_calendar", "no_api_or_download_export", "no_model_activation", "no_broker_execution"],
+        "policy_refs": ["logged_out_recent_calendar", "immediate_due_release_refresh", "retry_after_10s_once_on_fetch_failure", "no_api_or_download_export", "no_model_activation", "no_broker_execution"],
     }
 
 
