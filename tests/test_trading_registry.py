@@ -357,6 +357,7 @@ class RegistryHelperTests(unittest.TestCase):
             "MODEL_09_EVENT_RISK_GOVERNOR_REVIEW_PROMOTION": "scripts/models/model_09_event_risk_governor/review_event_risk_governor_promotion.py",
             "MODEL_05_ALPHA_CONFIDENCE_GENERATE": "scripts/models/model_05_alpha_confidence/generate_model_05_alpha_confidence.py",
             "MODEL_05_ALPHA_CONFIDENCE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_05_alpha_confidence/evaluate_model_05_alpha_confidence.py",
+            "MODEL_01_MARKET_REGIME_DIAGNOSE_SUBSTRATE": "scripts/models/model_01_market_regime/diagnose_model_01_market_regime_substrate.py",
             "MODEL_05_ALPHA_CONFIDENCE_REVIEW_PROMOTION": "scripts/models/model_05_alpha_confidence/review_alpha_confidence_promotion.py",
             "MODEL_06_POSITION_PROJECTION_GENERATE": "scripts/models/model_06_position_projection/generate_model_06_position_projection.py",
             "MODEL_06_POSITION_PROJECTION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_06_position_projection/evaluate_model_06_position_projection.py",
