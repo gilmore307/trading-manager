@@ -95,7 +95,13 @@ def _parse_event_date(value: str) -> date | None:
     try:
         return datetime.fromisoformat(text).date()
     except ValueError:
-        return None
+        pass
+    for pattern in ("%A %B %d %Y", "%A %b %d %Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, pattern).date()
+        except ValueError:
+            continue
+    return None
 
 
 def _read_csv_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
@@ -115,10 +121,41 @@ def _row_count(path: Path, *, month: str | None = None) -> int:
     return len(_in_month_rows(path, month=month)[1])
 
 
-def _write_filtered_artifact(*, source: TeCalendarArtifact, storage_root: Path) -> TeCalendarArtifact:
-    source_path = Path(source.path)
-    fieldnames, rows = _in_month_rows(source_path, month=source.month)
-    target = storage_root / "runtime" / "te_calendar" / "historical_seed" / "filtered_artifacts" / source.month / "trading_economics_calendar_event.csv"
+def _month_artifact_paths(month_dir: Path) -> list[Path]:
+    return sorted(month_dir.glob("runs/*/saved/trading_economics_calendar_event.csv"))
+
+
+def _merge_month_rows(*, month: str, paths: list[Path]) -> tuple[list[str], list[dict[str, str]], list[str]]:
+    fieldnames: list[str] = []
+    rows: list[dict[str, str]] = []
+    source_paths: list[str] = []
+    for path in paths:
+        path_fieldnames, path_rows = _in_month_rows(path, month=month)
+        if not path_rows:
+            continue
+        for field in path_fieldnames:
+            if field not in fieldnames:
+                fieldnames.append(field)
+        rows.extend(path_rows)
+        source_paths.append(str(path.resolve()))
+    unique: list[dict[str, str]] = []
+    seen: set[tuple[str, ...]] = set()
+    for row in rows:
+        key = tuple(str(row.get(field, "")) for field in fieldnames)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(row)
+    return fieldnames, unique, source_paths
+
+
+def _filtered_artifact_path(*, month: str, storage_root: Path) -> Path:
+    return storage_root / "runtime" / "te_calendar" / "historical_seed" / "filtered_artifacts" / month / "trading_economics_calendar_event.csv"
+
+
+def _write_filtered_month_artifact(*, month: str, month_dir: Path, storage_root: Path) -> TeCalendarArtifact:
+    fieldnames, rows, source_paths = _merge_month_rows(month=month, paths=_month_artifact_paths(month_dir))
+    target = _filtered_artifact_path(month=month, storage_root=storage_root)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -126,37 +163,30 @@ def _write_filtered_artifact(*, source: TeCalendarArtifact, storage_root: Path) 
         writer.writerows(rows)
     manifest = {
         "contract_type": "te_calendar_historical_seed_filtered_artifact_v1",
-        "month": source.month,
-        "source_artifact_path": source.path,
+        "month": month,
+        "source_artifact_paths": source_paths,
         "filtered_artifact_path": str(target.resolve()),
         "row_count": len(rows),
-        "filter": "event_time month equals containing historical backfill month",
+        "filter": "event_time month equals containing historical backfill month; exact duplicate rows removed across runs",
         "raw_original_deleted": False,
     }
     (target.parent / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return TeCalendarArtifact(month=source.month, path=str(target.resolve()), row_count=len(rows), selected=True)
+    return TeCalendarArtifact(month=month, path=str(target.resolve()), row_count=len(rows), selected=True)
 
 
-def _latest_nonempty_artifact(month_dir: Path) -> TeCalendarArtifact | None:
-    candidates: list[tuple[int, float, Path, int]] = []
-    for path in month_dir.glob("runs/*/saved/trading_economics_calendar_event.csv"):
-        rows = _row_count(path, month=month_dir.name)
-        if rows > 0:
-            candidates.append((rows, path.stat().st_mtime, path, rows))
-    if not candidates:
+def _month_artifact_summary(month_dir: Path, *, storage_root: Path) -> TeCalendarArtifact | None:
+    _, rows, _ = _merge_month_rows(month=month_dir.name, paths=_month_artifact_paths(month_dir))
+    if not rows:
         return None
-    # Prefer the richest in-month artifact, then latest run time. This avoids
-    # selecting wrong-window/current-page artifacts saved under an older month.
-    _, _, path, rows = sorted(candidates, key=lambda item: (item[0], item[1], str(item[2])))[-1]
-    return TeCalendarArtifact(month=month_dir.name, path=str(path.resolve()), row_count=rows, selected=True)
+    return TeCalendarArtifact(month=month_dir.name, path=str(_filtered_artifact_path(month=month_dir.name, storage_root=storage_root).resolve()), row_count=len(rows), selected=True)
 
 
-def discover_historical_seed_artifacts(*, start_month: str, end_month: str, trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT) -> tuple[list[TeCalendarArtifact], list[str]]:
+def discover_historical_seed_artifacts(*, start_month: str, end_month: str, trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT, storage_root: Path = DEFAULT_STORAGE_ROOT) -> tuple[list[TeCalendarArtifact], list[str]]:
     root = trading_data_root / DEFAULT_TE_MONTHLY_ROOT
     selected: list[TeCalendarArtifact] = []
     missing: list[str] = []
     for month in _month_list(start_month, end_month):
-        artifact = _latest_nonempty_artifact(root / month)
+        artifact = _month_artifact_summary(root / month, storage_root=storage_root)
         if artifact is None:
             missing.append(month)
         else:
@@ -189,8 +219,9 @@ def _historical_seed_task_key(*, start_month: str, end_month: str, artifacts: li
 
 
 def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT, storage_root: Path = DEFAULT_STORAGE_ROOT, write_files: bool = False) -> TeHistoricalSeedSummary:
-    artifacts, missing = discover_historical_seed_artifacts(start_month=start_month, end_month=end_month, trading_data_root=trading_data_root)
-    seed_artifacts = [_write_filtered_artifact(source=artifact, storage_root=storage_root) for artifact in artifacts] if write_files else artifacts
+    artifacts, missing = discover_historical_seed_artifacts(start_month=start_month, end_month=end_month, trading_data_root=trading_data_root, storage_root=storage_root)
+    monthly_root = trading_data_root / DEFAULT_TE_MONTHLY_ROOT
+    seed_artifacts = [_write_filtered_month_artifact(month=artifact.month, month_dir=monthly_root / artifact.month, storage_root=storage_root) for artifact in artifacts] if write_files else artifacts
     task_key_path: Path | None = None
     task_hash: str | None = None
     if not missing:

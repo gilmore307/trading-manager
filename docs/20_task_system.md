@@ -48,7 +48,7 @@ Failures should become durable evidence, not chat-only notes. The failure regist
 
 Trading Economics calendar handling is split into two manager-owned routes:
 
-1. Historical seed: a one-time bootstrap from reviewed saved monthly `07_feed_trading_economics_calendar_web` CSV artifacts into `trading_data.source_09_event_risk_governor`. The planner selects one non-empty artifact per month and prepares a `source_09_event_risk_governor` task key. Raw monthly CSV originals may be deletion candidates only after successful SQL ingest and manifest review.
+1. Historical seed: a one-time bootstrap from reviewed saved monthly `07_feed_trading_economics_calendar_web` CSV artifacts into `trading_data.source_09_event_risk_governor`. The planner merges all in-window rows across runs into one filtered per-month artifact, excludes wrong-window rows, and prepares a `source_09_event_risk_governor` task key. Raw monthly CSV originals may be deletion candidates only after successful SQL ingest and manifest review.
 2. Recent poll: an ongoing realtime-maintenance task key for the logged-out visible recent calendar page. It uses `date_range_mode=recent`, `use_authenticated_cookies=false`, and no API/download/export route. The realtime system owns scheduling this poll and upserting planned/released macro events into SQL.
 
 Training should read TE macro events from SQL first. If gaps remain, the manager may fill them with reviewed authenticated TE historical fetches or public macro web-search provenance rows; fallback provenance must remain explicit.
