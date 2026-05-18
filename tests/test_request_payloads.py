@@ -7,6 +7,7 @@ from pathlib import Path
 
 from trading_manager_tasks.monthly_backfill import load_market_regime_universe, plan_monthly_backfill_requests
 from trading_manager_tasks.request_payloads import (
+    ALPACA_BARS_MONTHLY_MAX_PAGES,
     PARAMETER_SCHEMA_REF,
     build_request_task_payload,
     materialize_request_payload,
@@ -46,6 +47,7 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
         self.assertEqual(payload["params"]["timeframe"], request["timeframe"])
         self.assertEqual(payload["params"]["start"], "2016-01-01")
         self.assertEqual(payload["params"]["end"], "2016-02-01")
+        self.assertEqual(payload["params"]["max_pages"], ALPACA_BARS_MONTHLY_MAX_PAGES)
         self.assertEqual(payload["output_root"], "storage/monthly_backfill/alpaca_bars/SPY/2016-01")
         self.assertFalse(payload["manager_controls"]["allow_live_provider_calls"])
         self.assertFalse(payload["manager_controls"]["autonomous_historical_provider_acquisition"])

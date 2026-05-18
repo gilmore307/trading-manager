@@ -28,6 +28,7 @@ from .control_plane import (
 REQUEST_KIND = "data_backfill_month"
 PARAMETER_SCHEMA_REF = "manager_request_parameter_payload"
 DEFAULT_STORAGE_ROOT = Path("storage")
+ALPACA_BARS_MONTHLY_MAX_PAGES = 30
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,13 @@ FEED_TASK_DEFAULTS: dict[str, FeedTaskDefaults] = {
     "01_feed_alpaca_bars": FeedTaskDefaults(
         source_id="alpaca_bars",
         feed_id="01_feed_alpaca_bars",
-        params={"symbol": "SPY", "timeframe": "1Day", "adjustment": "raw", "limit": 1000, "max_pages": 1},
+        params={
+            "symbol": "SPY",
+            "timeframe": "1Day",
+            "adjustment": "raw",
+            "limit": 1000,
+            "max_pages": ALPACA_BARS_MONTHLY_MAX_PAGES,
+        },
     ),
     "02_feed_alpaca_liquidity": FeedTaskDefaults(
         source_id="alpaca_liquidity",
@@ -413,6 +420,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 __all__ = [
+    "ALPACA_BARS_MONTHLY_MAX_PAGES",
     "FEED_TASK_DEFAULTS",
     "PARAMETER_SCHEMA_REF",
     "REQUEST_KIND",
