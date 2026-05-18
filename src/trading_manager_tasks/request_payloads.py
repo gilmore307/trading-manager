@@ -247,6 +247,22 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
         if symbol and feed_id == "01_feed_alpaca_bars"
         else f"storage/monthly_backfill/{defaults.source_id}/{month}"
     )
+    manager_controls: dict[str, Any] = {
+        "parameter_ref": parameter_ref,
+        "allow_live_provider_calls": not bool(request.get("dry_run", True)),
+        "autonomous_historical_provider_acquisition": not bool(request.get("dry_run", True)),
+        "secrets_policy": "secret_aliases_only",
+    }
+    if feed_id == "01_feed_alpaca_bars":
+        manager_controls.update(
+            {
+                "allowed_providers": ["alpaca"],
+                "allowed_endpoint_families": ["bars"],
+                "max_symbols": 1,
+                "max_requests": 1,
+                "max_time_window": "31d",
+            }
+        )
     return {
         "contract_type": PARAMETER_SCHEMA_REF,
         "task_id": request["request_id"],
@@ -264,12 +280,7 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
         "output_root": output_root,
         "expected_outputs": expected_outputs,
         "policy_refs": list(request.get("policy_refs") or []),
-        "manager_controls": {
-            "parameter_ref": parameter_ref,
-            "allow_live_provider_calls": not bool(request.get("dry_run", True)),
-            "autonomous_historical_provider_acquisition": not bool(request.get("dry_run", True)),
-            "secrets_policy": "secret_aliases_only",
-        },
+        "manager_controls": manager_controls,
     }
 
 

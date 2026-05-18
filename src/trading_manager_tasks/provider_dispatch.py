@@ -32,6 +32,13 @@ DEFAULT_PROVIDER_STAGE_MAX_WORKERS = 4
 DEFAULT_PROVIDER_STAGE_WORKER_MEMORY_MB = 512
 DEFAULT_PROVIDER_STAGE_RESERVED_MEMORY_MB = 2048
 DEFAULT_PROVIDER_STAGE_LOAD_TARGET_PER_CPU = 0.70
+ALPACA_BARS_PROVIDER_POLICY = {
+    "allowed_providers": ["alpaca"],
+    "allowed_endpoint_families": ["bars"],
+    "max_symbols": 1,
+    "max_requests": 1,
+    "max_time_window": "31d",
+}
 
 
 @dataclass(frozen=True)
@@ -112,6 +119,7 @@ def _autonomous_provider_task_key(task_key: Mapping[str, Any]) -> dict[str, Any]
     runtime_key["dry_run"] = False
     runtime_key["production_mode"] = "historical_provider_acquisition"
     controls = dict(runtime_key.get("manager_controls") or {})
+    controls.update(ALPACA_BARS_PROVIDER_POLICY)
     controls["allow_live_provider_calls"] = True
     controls["autonomous_historical_provider_acquisition"] = True
     runtime_key["manager_controls"] = controls

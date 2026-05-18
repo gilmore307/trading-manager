@@ -49,6 +49,11 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
         self.assertEqual(payload["output_root"], "storage/monthly_backfill/alpaca_bars/SPY/2016-01")
         self.assertFalse(payload["manager_controls"]["allow_live_provider_calls"])
         self.assertFalse(payload["manager_controls"]["autonomous_historical_provider_acquisition"])
+        self.assertEqual(payload["manager_controls"]["allowed_providers"], ["alpaca"])
+        self.assertEqual(payload["manager_controls"]["allowed_endpoint_families"], ["bars"])
+        self.assertEqual(payload["manager_controls"]["max_symbols"], 1)
+        self.assertEqual(payload["manager_controls"]["max_requests"], 1)
+        self.assertEqual(payload["manager_controls"]["max_time_window"], "31d")
 
     def test_materialization_writes_payload_and_request_input_binding(self):
         request = _spy_layer_one_request()

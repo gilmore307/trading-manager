@@ -250,7 +250,11 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(payload["production_mode"], "historical_provider_acquisition")
         self.assertTrue(payload["manager_controls"]["allow_live_provider_calls"])
         self.assertTrue(payload["manager_controls"]["autonomous_historical_provider_acquisition"])
-        self.assertTrue(payload["manager_controls"]["allow_live_provider_calls"])
+        self.assertEqual(payload["manager_controls"]["allowed_providers"], ["alpaca"])
+        self.assertEqual(payload["manager_controls"]["allowed_endpoint_families"], ["bars"])
+        self.assertEqual(payload["manager_controls"]["max_symbols"], 1)
+        self.assertEqual(payload["manager_controls"]["max_requests"], 1)
+        self.assertEqual(payload["manager_controls"]["max_time_window"], "31d")
         self.assertIn("autonomous_historical_provider_acquisition", payload.get("policy_refs", []))
 
     def test_layer_one_dispatch_skips_registered_accepted_failures(self):
