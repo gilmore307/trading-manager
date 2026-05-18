@@ -36,3 +36,7 @@ The scheduler should advance Layer 1/2 foundation coverage before ordinary Layer
 ## Event-Risk Lane
 
 Layer 9 is part of the historical-modeling service boundary, but it is not a prerequisite for base-stack progression. It produces residual event-risk evidence, interventions, and promotion-review packets under the same no-broker safety rules.
+
+## Dashboard Refresh Events
+
+The resident service triggers the storage-owned dashboard read-model refresh whenever it writes workflow-state progress, including stage-start transitions. The storage refresh timer remains a fallback calibration route; it is not the primary dashboard progress path.

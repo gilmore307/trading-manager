@@ -30,6 +30,8 @@ Default runtime files:
 | `model_training_workflow_state_YYYY-MM.json` | Month-scoped workflow checkpoint. |
 | `source_existing_bootstrap/latest.json` | Evidence for preserved source coverage. |
 
+Workflow-state writes emit a dashboard refresh event when `TRADING_MANAGER_DASHBOARD_REFRESH_ON_WORKFLOW_STATE_WRITE=true`. The event starts the storage-owned read-model refresh service with `--no-block`, so WebSocket subscribers see newly materialized dashboard snapshots immediately after state transitions while the 5-second storage timer remains a fallback.
+
 ## Lock Contract
 
 Schema: `schemas/scheduler_lock.schema.json`.

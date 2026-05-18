@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from trading_manager_tasks.model_training_state import (
     advance_workflow_state,
@@ -11,6 +12,7 @@ from trading_manager_tasks.model_training_state import (
     mark_stage_started,
     mark_stage_succeeded,
     next_ready_or_blocked_stage,
+    write_workflow_state,
     workflow_state_path_for_month,
 )
 from trading_manager_tasks.model_training_workflow import build_model_training_workflow_plan
@@ -367,6 +369,18 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertNotIn("layer_05_alpha_confidence.data_acquisition", stage_by_id)
             self.assertNotIn("layer_05_alpha_confidence.feature_generation", stage_by_id)
             self.assertEqual(stage_by_id["layer_04_event_failure_risk.model_generation"].status, "ready")
+
+    def test_workflow_state_write_triggers_dashboard_refresh_when_enabled(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            plan = build_model_training_workflow_plan(storage_root=tmp / "storage", start_month="2016-01", end_month="2016-01")
+            state = initial_workflow_state(plan)
+            state_path = tmp / "workflow_state.json"
+
+            with patch("trading_manager_tasks.model_training_state.trigger_dashboard_refresh_from_workflow_state_write") as trigger:
+                write_workflow_state(state_path, state)
+
+        trigger.assert_called_once_with(state_path=state_path)
 
 
 if __name__ == "__main__":

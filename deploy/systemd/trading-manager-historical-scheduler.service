@@ -18,6 +18,9 @@ Environment=TRADING_MANAGER_MONTH_INGEST_WORKERS=3
 Environment=TRADING_MANAGER_DRAIN_MAX_STEPS=50
 Environment=TRADING_MANAGER_DRAIN_MAX_SECONDS=300
 Environment=TRADING_MANAGER_DASHBOARD_REFRESH_SERVICE_UNIT=trading-storage-dashboard-read-model-refresh.service
+Environment=TRADING_MANAGER_DASHBOARD_REFRESH_ON_WORKFLOW_STATE_WRITE=true
+Environment=TRADING_MANAGER_DASHBOARD_REFRESH_NO_BLOCK=true
+Environment=TRADING_MANAGER_DASHBOARD_REFRESH_TRIGGER_TIMEOUT_SECONDS=5
 Environment=TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=false
 EnvironmentFile=-/etc/default/trading-manager-historical-scheduler
 ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py \

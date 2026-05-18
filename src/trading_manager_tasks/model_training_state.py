@@ -19,6 +19,7 @@ from .model_training_workflow import (
     build_model_training_workflow_plan,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .dashboard_refresh_events import trigger_dashboard_refresh_from_workflow_state_write
 
 DEFAULT_WORKFLOW_STATE_PATH = Path("storage/runtime/model_training_workflow_state.json")
 DEFAULT_WORKFLOW_STATE_ROOT = Path("storage/runtime")
@@ -208,6 +209,7 @@ def write_workflow_state(path: Path, state: WorkflowState) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(state.summary_row(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     tmp.replace(path)
+    trigger_dashboard_refresh_from_workflow_state_write(state_path=path)
 
 
 def _stage_map(state: WorkflowState) -> dict[str, StageProgress]:
