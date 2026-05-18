@@ -266,7 +266,7 @@ def build_request_task_payload(row: Mapping[str, Any]) -> dict[str, Any]:
                 "allowed_providers": ["alpaca"],
                 "allowed_endpoint_families": ["bars"],
                 "max_symbols": 1,
-                "max_requests": 1,
+                "max_requests": ALPACA_BARS_MONTHLY_MAX_PAGES,
                 "max_time_window": "31d",
             }
         )

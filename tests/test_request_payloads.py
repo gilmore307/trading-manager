@@ -54,7 +54,7 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
         self.assertEqual(payload["manager_controls"]["allowed_providers"], ["alpaca"])
         self.assertEqual(payload["manager_controls"]["allowed_endpoint_families"], ["bars"])
         self.assertEqual(payload["manager_controls"]["max_symbols"], 1)
-        self.assertEqual(payload["manager_controls"]["max_requests"], 1)
+        self.assertEqual(payload["manager_controls"]["max_requests"], ALPACA_BARS_MONTHLY_MAX_PAGES)
         self.assertEqual(payload["manager_controls"]["max_time_window"], "31d")
 
     def test_materialization_writes_payload_and_request_input_binding(self):

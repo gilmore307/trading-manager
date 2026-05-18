@@ -24,6 +24,7 @@ from .failure_register import accepted_failure_request_ids_from_register
 from .historical_training import prepare_layer_historical_training_batch
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .request_payloads import ALPACA_BARS_MONTHLY_MAX_PAGES
 from .stage_coverage import collect_stage_coverage
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
@@ -36,7 +37,7 @@ ALPACA_BARS_PROVIDER_POLICY = {
     "allowed_providers": ["alpaca"],
     "allowed_endpoint_families": ["bars"],
     "max_symbols": 1,
-    "max_requests": 1,
+    "max_requests": ALPACA_BARS_MONTHLY_MAX_PAGES,
     "max_time_window": "31d",
 }
 

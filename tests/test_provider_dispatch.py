@@ -9,6 +9,7 @@ from unittest.mock import patch
 from trading_manager_tasks.historical_training import prepare_layer_one_historical_training_batch, prepare_layer_two_historical_training_batch
 from trading_manager_tasks.monthly_backfill import LAYER_TWO_MODEL_LAYER
 from trading_manager_tasks.provider_dispatch import dispatch_layer_one_provider_acquisition, dispatch_layer_provider_acquisition, select_provider_worker_count
+from trading_manager_tasks.request_payloads import ALPACA_BARS_MONTHLY_MAX_PAGES
 
 
 class ProviderDispatchTests(unittest.TestCase):
@@ -253,7 +254,7 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(payload["manager_controls"]["allowed_providers"], ["alpaca"])
         self.assertEqual(payload["manager_controls"]["allowed_endpoint_families"], ["bars"])
         self.assertEqual(payload["manager_controls"]["max_symbols"], 1)
-        self.assertEqual(payload["manager_controls"]["max_requests"], 1)
+        self.assertEqual(payload["manager_controls"]["max_requests"], ALPACA_BARS_MONTHLY_MAX_PAGES)
         self.assertEqual(payload["manager_controls"]["max_time_window"], "31d")
         self.assertIn("autonomous_historical_provider_acquisition", payload.get("policy_refs", []))
 
