@@ -1,8 +1,8 @@
-"""Layer 8 feature-generation stage adapter.
+"""Layer 9 option-expression feature-stage adapter.
 
-The Layer 8 feature stage has two valid paths:
+The Layer 9 option-expression feature stage has two valid paths:
 
-* if the reviewed Layer 8 gate accepted a no-provider/no-active-target skip,
+* if the reviewed Layer 9 gate accepted a no-provider/no-active-target skip,
   feature generation is also a reviewed no-op because no source_05 option
   rows are required for deterministic no-option model rows;
 * otherwise, after provider acquisition has populated source_05, the
@@ -23,15 +23,15 @@ from typing import Any, Mapping, TextIO
 
 from .control_plane import TaskSystemError
 
-DEFAULT_GATE_REVIEW_ROOT = Path("storage/runtime/layer_08_option_expression/gate_review")
+DEFAULT_GATE_REVIEW_ROOT = Path("storage/runtime/layer_09_option_expression/gate_review")
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
-FEATURE_STAGE_ID = "layer_08_option_expression.feature_generation"
-DATA_ACQUISITION_STAGE_ID = "layer_08_option_expression.data_acquisition"
+FEATURE_STAGE_ID = "layer_09_option_expression.feature_generation"
+DATA_ACQUISITION_STAGE_ID = "layer_09_option_expression.data_acquisition"
 
 
 @dataclass(frozen=True)
-class LayerEightFeatureStageSummary:
-    """Result for the Layer 8 feature-generation adapter."""
+class LayerNineFeatureStageSummary:
+    """Result for the Layer 9 option-expression feature-generation adapter."""
 
     contract_type: str
     stage_id: str
@@ -72,20 +72,20 @@ def _exclusive_month_start(month: str) -> str:
 
 def _read_json(path: Path) -> Mapping[str, Any]:
     if not path.exists():
-        raise TaskSystemError(f"required Layer 8 gate review artifact is missing: {path}")
+        raise TaskSystemError(f"required Layer 9 gate review artifact is missing: {path}")
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, Mapping):
-        raise TaskSystemError(f"Layer 8 gate review artifact must be a JSON object: {path}")
+        raise TaskSystemError(f"Layer 9 gate review artifact must be a JSON object: {path}")
     return payload
 
 
 def _gate_review_path(start_month: str, *, gate_review_root: Path) -> Path:
-    return gate_review_root / f"layer_08_option_expression_gate_review_{start_month}.json"
+    return gate_review_root / f"layer_09_option_expression_gate_review_{start_month}.json"
 
 
 def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: Path, gate_review: Mapping[str, Any], output_root: Path) -> Path:
     output_root.mkdir(parents=True, exist_ok=True)
-    receipt_path = output_root / f"layer_08_option_expression_feature_generation_no_provider_skip_receipt_{start_month}.json"
+    receipt_path = output_root / f"layer_09_option_expression_feature_generation_no_provider_skip_receipt_{start_month}.json"
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     receipt = {
         "contract_type": "component_completion_receipt",
@@ -96,11 +96,11 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
         "completed_at": now,
         "runs": [
             {
-                "run_id": f"layer_08_option_expression_feature_generation_no_provider_skip_{start_month}",
+                "run_id": f"layer_09_option_expression_feature_generation_no_provider_skip_{start_month}",
                 "status": "succeeded",
                 "output_refs": [str(gate_review_path)],
                 "row_counts": {
-                    "active_layer_8_request_candidates": int(gate_review.get("active_request_count") or 0),
+                    "active_layer_9_request_candidates": int(gate_review.get("active_request_count") or 0),
                     "source_05_option_expression_rows_required": 0,
                     "feature_08_option_expression_rows_required": 0,
                 },
@@ -112,8 +112,8 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
         "broker_execution_performed": False,
         "storage_lifecycle_mutation_performed": False,
         "reason": (
-            "Reviewed Layer 8 gate accepted no-provider/no-active-target skip; "
-            "source_05 and feature_07 rows are not required before deterministic no-option model generation."
+            "Reviewed Layer 9 gate accepted no-provider/no-active-target skip; "
+            "source_05 and feature_08 rows are not required before deterministic no-option model generation."
         ),
         "evidence_refs": [str(gate_review_path)],
         "start_month": start_month,
@@ -123,20 +123,20 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
     return receipt_path
 
 
-def execute_layer_eight_feature_stage(
+def execute_layer_nine_feature_stage(
     *,
     start_month: str,
     end_month: str,
     gate_review_root: Path = DEFAULT_GATE_REVIEW_ROOT,
     output_root: Path = DEFAULT_GATE_REVIEW_ROOT,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
-) -> LayerEightFeatureStageSummary:
-    """Execute Layer 8 feature generation through the correct reviewed path."""
+) -> LayerNineFeatureStageSummary:
+    """Execute Layer 9 option-expression feature generation through the correct reviewed path."""
 
     review_path = _gate_review_path(start_month, gate_review_root=gate_review_root)
     review = _read_json(review_path)
-    if review.get("contract_type") != "manager_layer_08_option_expression_gate_review":
-        raise TaskSystemError(f"unsupported Layer 8 gate review contract_type: {review_path}")
+    if review.get("contract_type") != "manager_layer_09_option_expression_gate_review":
+        raise TaskSystemError(f"unsupported Layer 9 gate review contract_type: {review_path}")
     if review.get("status") == "no_provider_skip_accepted" and int(review.get("active_request_count") or 0) == 0:
         receipt_path = _write_skip_receipt(
             start_month=start_month,
@@ -145,8 +145,8 @@ def execute_layer_eight_feature_stage(
             gate_review=review,
             output_root=output_root,
         )
-        return LayerEightFeatureStageSummary(
-            contract_type="manager_layer_08_feature_generation_stage",
+        return LayerNineFeatureStageSummary(
+            contract_type="manager_layer_09_option_expression_feature_generation_stage",
             stage_id=FEATURE_STAGE_ID,
             start_month=start_month,
             end_month=end_month,
@@ -180,8 +180,8 @@ def execute_layer_eight_feature_stage(
         print(result.stdout, end="", file=sys.stderr)
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
-    return LayerEightFeatureStageSummary(
-        contract_type="manager_layer_08_feature_generation_stage",
+    return LayerNineFeatureStageSummary(
+        contract_type="manager_layer_09_option_expression_feature_generation_stage",
         stage_id=FEATURE_STAGE_ID,
         start_month=start_month,
         end_month=end_month,
@@ -194,35 +194,35 @@ def execute_layer_eight_feature_stage(
     )
 
 
-def write_layer_eight_feature_stage_summary(summary: LayerEightFeatureStageSummary, *, output: TextIO) -> None:
+def write_layer_nine_feature_stage_summary(summary: LayerNineFeatureStageSummary, *, output: TextIO) -> None:
     json.dump(summary.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Execute Layer 8 feature generation with reviewed no-provider skip support.")
+    parser = argparse.ArgumentParser(description="Execute Layer 9 option-expression feature generation with reviewed no-provider skip support.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--gate-review-root", type=Path, default=DEFAULT_GATE_REVIEW_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_GATE_REVIEW_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
     args = parser.parse_args(argv)
-    summary = execute_layer_eight_feature_stage(
+    summary = execute_layer_nine_feature_stage(
         start_month=args.start_month,
         end_month=args.end_month,
         gate_review_root=args.gate_review_root,
         output_root=args.output_root,
         trading_data_root=args.trading_data_root,
     )
-    write_layer_eight_feature_stage_summary(summary, output=sys.stdout)
+    write_layer_nine_feature_stage_summary(summary, output=sys.stdout)
     return 0 if summary.status == "succeeded" else 1
 
 
 __all__ = [
     "FEATURE_STAGE_ID",
-    "LayerEightFeatureStageSummary",
-    "execute_layer_eight_feature_stage",
-    "write_layer_eight_feature_stage_summary",
+    "LayerNineFeatureStageSummary",
+    "execute_layer_nine_feature_stage",
+    "write_layer_nine_feature_stage_summary",
 ]
 
 

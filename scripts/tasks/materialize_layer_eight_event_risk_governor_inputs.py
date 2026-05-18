@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from trading_manager_tasks.layer_nine_event_risk_governor import main
+from trading_manager_tasks.layer_eight_event_risk_governor import main
 
 
 if __name__ == "__main__":

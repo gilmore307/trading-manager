@@ -1,9 +1,9 @@
 """Historical base-stack workflow graph.
 
 The manager owns orchestration across the historical-modeling service. This
-module defines the base trading stack progression. Layer 9 EventRiskGovernor is
-service-owned as a residual risk-governance lane and is not a hard prerequisite
-for base-stack progress.
+module defines the base trading stack progression. Layer 8 EventRiskGovernor
+governs the Layer 7 direct-underlying thesis before Layer 9 trading-guidance
+and option-expression handoff.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
-BASE_STACK_LAYER_COUNT = 8
-BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 8)
+BASE_STACK_LAYER_COUNT = 9
+BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 8, 9)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
 DATASET_UNIT_MONTHS = 6
@@ -241,12 +241,23 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
     },
     {
         "layer": 8,
-        "slug": "option_expression",
-        "model_name": "OptionExpressionModel",
+        "slug": "event_risk_governor",
+        "model_name": "EventRiskGovernor",
         "depends_on_layers": (7,),
-        "progression_mode": "base_trading_guidance_after_target_chain_complete",
+        "progression_mode": "event_risk_governance_before_final_guidance",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_risk_context_id",
+        "candidate_progression_policy": "review the active Layer 7 underlying thesis against accepted event-risk evidence before Layer 9 guidance/expression proceeds",
+        "data_surface": "source_09_event_risk_governor plus feature_09_event_risk_governor from reviewed local event/feed evidence; no broker/account mutation",
+        "feature_cli": "trading-data-feature-09-event-risk-governor",
+    },
+    {
+        "layer": 9,
+        "slug": "option_expression",
+        "model_name": "TradingGuidanceModel / OptionExpressionModel",
+        "depends_on_layers": (7, 8),
+        "progression_mode": "final_trading_guidance_after_underlying_and_event_risk_review",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
-        "candidate_progression_policy": "finish the active base target chain through Layer 8 option expression; option-expression contract/bucket expansion uses reviewed gate evidence and does not depend on Layer 9 event-risk-governor inputs",
+        "candidate_progression_policy": "finish the active base target chain through Layer 9 trading guidance / option expression after Layer 8 event-risk-governor review",
         "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 7 target chains require them plus feature_08_option_expression",
         "feature_cli": "trading-data-feature-08-option-expression",
     },
@@ -264,8 +275,8 @@ REVIEW_SCRIPT_NAMES: dict[int, str] = {
     5: "review_alpha_confidence_promotion.py",
     6: "review_position_projection_promotion.py",
     7: "review_underlying_action_promotion.py",
-    8: "review_option_expression_promotion.py",
-    9: "review_event_risk_governor_promotion.py",
+    8: "review_event_risk_governor_promotion.py",
+    9: "review_option_expression_promotion.py",
 }
 
 
@@ -286,14 +297,14 @@ def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
         ])
-    if layer in {3, 4, 5, 6, 7, 8} and verb == "generate":
+    if layer in {3, 4, 5, 6, 7, 8, 9} and verb == "generate":
         command.extend([
             "--from-database",
             "--source-start",
             "${START_MONTH_START_ET}",
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
-            "--output-jsonl" if layer in {4, 5, 6, 7, 8} else "--output",
+            "--output-jsonl" if layer in {4, 5, 6, 7, 8, 9} else "--output",
             f"/root/projects/trading-model/storage/runtime/{physical_model_key}/model_rows_${{START_MONTH}}.jsonl",
         ])
     if layer in {1, 2} and verb == "evaluate":
@@ -302,7 +313,7 @@ def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None
             "--output-json",
             f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
         ])
-    if layer in {3, 4, 5, 6, 7, 8} and verb == "evaluate":
+    if layer in {3, 4, 5, 6, 7, 8, 9} and verb == "evaluate":
         command.extend([
             "--from-database",
             "--source-start",
@@ -312,7 +323,7 @@ def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None
             "--output-json",
             f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
         ])
-        if layer in {4, 5, 6, 7, 8}:
+        if layer in {4, 5, 6, 7, 8, 9}:
             command.extend(["--evidence-source", "database_rows_fixture_outcomes"])
     if layer in {1, 2} and verb == "review":
         command.extend([
@@ -328,7 +339,7 @@ def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None
             "real_database_evaluation",
             "--local-fallback-review",
         ])
-    if layer in {4, 5, 6, 7, 8} and verb == "review":
+    if layer in {4, 5, 6, 7, 8, 9} and verb == "review":
         command.extend([
             "--evaluation-summary-json",
             f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
@@ -354,7 +365,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
         return [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/execute_layer_eight_option_feature_generation.py",
+            "scripts/tasks/execute_layer_nine_option_feature_generation.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -533,7 +544,18 @@ def _build_layer_workflow(
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/review_layer_eight_option_expression_gate.py",
+            "scripts/tasks/materialize_layer_eight_event_risk_governor_inputs.py",
+            "--start-month",
+            "${START_MONTH}",
+            "--end-month",
+            "${END_MONTH}",
+            "--write",
+        ]
+    elif layer == 9:
+        acquisition_command = [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/review_layer_nine_option_expression_gate.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",

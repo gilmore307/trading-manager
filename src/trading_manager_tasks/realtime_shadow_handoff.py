@@ -28,8 +28,8 @@ MODEL_LAYER_ORDER = (
     "layer_05_alpha_confidence",
     "layer_06_position_projection",
     "layer_07_underlying_action",
-    "layer_08_option_expression",
-    "layer_09_event_risk_governor",
+    "layer_09_option_expression",
+    "layer_08_event_risk_governor",
 )
 
 FORBIDDEN_HANDOFF_ACTIONS = (

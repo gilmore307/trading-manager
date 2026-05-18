@@ -13,8 +13,8 @@ from typing import Any, Iterable, TextIO
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_RUNTIME_ROOT = Path("runtime")
-DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_09_event_risk_required"
-DEFAULT_SOURCE_LAYER = 9
+DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_08_event_risk_required"
+DEFAULT_SOURCE_LAYER = 8
 
 
 @dataclass(frozen=True)

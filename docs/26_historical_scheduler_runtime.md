@@ -10,7 +10,7 @@ The service may supervise:
 - provider-dispatch stages under explicit controls;
 - feature/input preparation;
 - safe offline model/evaluation stages;
-- Layer 9 residual event-risk evidence preparation;
+- Layer 8 residual event-risk evidence preparation;
 - promotion-review packet preparation;
 - status and dashboard payload generation.
 

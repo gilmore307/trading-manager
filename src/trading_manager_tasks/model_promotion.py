@@ -62,8 +62,8 @@ MODEL_PROMOTION_TARGETS: tuple[ModelPromotionTarget, ...] = (
     ModelPromotionTarget("layer_05_alpha_confidence", "alpha_confidence_model", "AlphaConfidenceModel", "alpha_confidence_vector", "alpha_confidence_model"),
     ModelPromotionTarget("layer_06_position_projection", "position_projection_model", "PositionProjectionModel", "position_projection_vector", "position_projection_model"),
     ModelPromotionTarget("layer_07_underlying_action", "underlying_action_model", "UnderlyingActionModel", "underlying_action_plan", "underlying_action_model"),
-    ModelPromotionTarget("layer_08_option_expression", "option_expression_model", "OptionExpressionModel", "option_expression_plan", "option_expression_model"),
-    ModelPromotionTarget("layer_09_event_risk_governor", "event_risk_governor", "EventRiskGovernor", "event_context_vector", "event_risk_governor"),
+    ModelPromotionTarget("layer_09_option_expression", "option_expression_model", "OptionExpressionModel", "option_expression_plan", "option_expression_model"),
+    ModelPromotionTarget("layer_08_event_risk_governor", "event_risk_governor", "EventRiskGovernor", "event_context_vector", "event_risk_governor"),
 )
 
 TARGETS_BY_MODEL_ID = {target.model_id: target for target in MODEL_PROMOTION_TARGETS}

@@ -1,4 +1,4 @@
-"""Safe Layer 9 event-risk input materialization.
+"""Safe Layer 8 event-risk input materialization.
 
 This module builds ``source_09_event_risk_governor`` rows only from already-saved local
 Layer 2 bar artifacts. It may run the trading-data equity abnormal activity
@@ -27,7 +27,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
-DEFAULT_OUTPUT_ROOT = Path("runtime/layer_09_event_risk_governor/input_materialization")
+DEFAULT_OUTPUT_ROOT = Path("runtime/layer_08_event_risk_governor/input_materialization")
 DETECTOR_SOURCE = "source_09_event_risk_governor.equity_abnormal_activity"
 SOURCE = "source_09_event_risk_governor"
 REQUIRED_EVENT_FEED_ARTIFACTS = {
@@ -60,7 +60,7 @@ class DetectorRunRef:
 
 
 @dataclass(frozen=True)
-class LayerNineEventRiskMaterialization:
+class LayerEightEventRiskMaterialization:
     contract_type: str
     start_month: str
     end_month: str
@@ -179,13 +179,13 @@ def _run_detector(
             status="skipped_zero_bar_rows",
         )
     task_key = {
-        "task_id": f"layer_09_event_risk_governor_detector_{symbol}_{ref_month.replace('-', '_')}_{output_dir.name.replace('-', '_')}",
+        "task_id": f"layer_08_event_risk_governor_detector_{symbol}_{ref_month.replace('-', '_')}_{output_dir.name.replace('-', '_')}",
         "source": DETECTOR_SOURCE,
         "params": {
             "bars_csv_path": str(_saved_bar_path(ref)),
         },
         "output_root": str(detector_output_root),
-        "manager_stage_id": "layer_09_event_risk_governor.data_acquisition",
+        "manager_stage_id": "layer_08_event_risk_governor.data_acquisition",
         "source_policy": "local_source_detector_over_reviewed_layer_02_alpaca_bar_artifacts_no_provider_calls",
     }
     task_key_path.parent.mkdir(parents=True, exist_ok=True)
@@ -323,7 +323,7 @@ def _event_feed_row_coverage(event_artifact_paths: Sequence[str], *, start_month
     start = _parse_event_feed_time(start_text)
     end = _parse_event_feed_time(end_text)
     if start is None or end is None:
-        raise TaskSystemError(f"invalid Layer 9 event-feed coverage bounds: {start_text} -> {end_text}")
+        raise TaskSystemError(f"invalid Layer 8 event-feed coverage bounds: {start_text} -> {end_text}")
     coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
     for raw_path in event_artifact_paths:
         source_id = _event_feed_source_from_path(raw_path)
@@ -344,7 +344,7 @@ def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_m
     start, end = _range_bounds(start_month, end_month)
     fold_key = _fold_key(start_month, end_month)
     task_key = {
-        "task_id": f"layer_09_event_risk_governor_{fold_key}",
+        "task_id": f"layer_08_event_risk_governor_{fold_key}",
         "source": SOURCE,
         "params": {
             "start": start,
@@ -352,8 +352,8 @@ def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_m
             "events": list(events),
             "event_artifact_paths": list(event_artifact_paths),
         },
-        "output_root": str(trading_data_root / "storage" / "runtime" / SOURCE / f"layer_09_event_risk_governor_{fold_key}"),
-        "manager_stage_id": "layer_09_event_risk_governor.data_acquisition",
+        "output_root": str(trading_data_root / "storage" / "runtime" / SOURCE / f"layer_08_event_risk_governor_{fold_key}"),
+        "manager_stage_id": "layer_08_event_risk_governor.data_acquisition",
         "source_policy": "local_event_index_over_source_detector_outputs_no_provider_calls",
     }
     path = output_dir / "source_09_task_key.json"
@@ -361,7 +361,7 @@ def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_m
     return path
 
 
-def materialize_layer_nine_event_risk_governor_inputs(
+def materialize_layer_eight_event_risk_governor_inputs(
     *,
     start_month: str,
     end_month: str,
@@ -372,13 +372,13 @@ def materialize_layer_nine_event_risk_governor_inputs(
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     run_id: str | None = None,
     write: bool = False,
-) -> LayerNineEventRiskMaterialization:
+) -> LayerEightEventRiskMaterialization:
     if not manager_storage_root.is_absolute():
         manager_storage_root = Path.cwd() / manager_storage_root
     fold_key = _fold_key(start_month, end_month)
     output_dir = manager_storage_root / output_root / fold_key
     output_dir.mkdir(parents=True, exist_ok=True)
-    run_id = run_id or f"layer_09_event_risk_governor_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_id = run_id or f"layer_08_event_risk_governor_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     refs = tuple(
         ref
         for month in _iter_months(start_month, end_month)
@@ -390,25 +390,25 @@ def materialize_layer_nine_event_risk_governor_inputs(
         )
     )
     if not refs:
-        raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 9 event-risk materialization")
+        raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 8 event-risk materialization")
     event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(trading_data_root=trading_data_root, start_month=start_month, end_month=end_month)
     event_feed_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
     missing_feed_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
     missing_feed_rows = _missing_event_feed_rows(event_feed_row_coverage)
     if write and missing_feed_artifacts:
         raise TaskSystemError(
-            "Layer 9 event-risk coverage is incomplete; missing reviewed feed artifacts for "
+            "Layer 8 event-risk coverage is incomplete; missing reviewed feed artifacts for "
             + ",".join(missing_feed_artifacts)
         )
     if write and missing_feed_rows:
         raise TaskSystemError(
-            "Layer 9 event-risk coverage is incomplete; reviewed feed artifacts have zero in-window rows for "
+            "Layer 8 event-risk coverage is incomplete; reviewed feed artifacts have zero in-window rows for "
             + ",".join(missing_feed_rows)
         )
     detector_runs = tuple(_run_detector(ref, output_dir=output_dir, trading_data_root=trading_data_root, run_id=run_id, write=write) for ref in refs)
     events = [event for detector_run in detector_runs for event in _read_detector_events(detector_run)]
     if not events and not event_artifact_paths and write:
-        raise TaskSystemError("Layer 9 event-risk materialization emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
+        raise TaskSystemError("Layer 8 event-risk materialization emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
     source_task_key_path = _write_source_task_key(output_dir=output_dir, trading_data_root=trading_data_root, start_month=start_month, end_month=end_month, events=events, event_artifact_paths=event_artifact_paths)
     source_receipt_path: str | None = None
     source_event_count = len(events)
@@ -425,8 +425,8 @@ def materialize_layer_nine_event_risk_governor_inputs(
         references = [str(item) for item in payload.get("references") or []]
         source_receipt_path = next((item for item in references if item.endswith("completion_receipt.json")), None)
         source_event_count = int((payload.get("row_counts") or {}).get(SOURCE) or source_event_count)
-    summary = LayerNineEventRiskMaterialization(
-        contract_type="manager_layer_nine_event_risk_governor_input_materialization",
+    summary = LayerEightEventRiskMaterialization(
+        contract_type="manager_layer_eight_event_risk_governor_input_materialization",
         start_month=start_month,
         end_month=end_month,
         detector_run_count=len(detector_runs),
@@ -444,7 +444,7 @@ def materialize_layer_nine_event_risk_governor_inputs(
     return summary
 
 
-def write_summary(summary: LayerNineEventRiskMaterialization, *, output: TextIO) -> None:
+def write_summary(summary: LayerEightEventRiskMaterialization, *, output: TextIO) -> None:
     json.dump(summary.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
 
@@ -461,7 +461,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-id")
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args(argv)
-    summary = materialize_layer_nine_event_risk_governor_inputs(
+    summary = materialize_layer_eight_event_risk_governor_inputs(
         start_month=args.start_month,
         end_month=args.end_month,
         manager_storage_root=args.manager_storage_root,
@@ -476,7 +476,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-__all__ = ["DetectorRunRef", "LayerNineEventRiskMaterialization", "materialize_layer_nine_event_risk_governor_inputs"]
+__all__ = ["DetectorRunRef", "LayerEightEventRiskMaterialization", "materialize_layer_eight_event_risk_governor_inputs"]
 
 
 if __name__ == "__main__":  # pragma: no cover

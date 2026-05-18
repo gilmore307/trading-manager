@@ -26,8 +26,8 @@ PHYSICAL_MODEL_SURFACES_BY_ID = {
     "alpha_confidence_model": "model_05_alpha_confidence",
     "position_projection_model": "model_06_position_projection",
     "underlying_action_model": "model_07_underlying_action",
-    "option_expression_model": "model_08_option_expression",
-    "event_risk_governor": "model_09_event_risk_governor",
+    "option_expression_model": "model_09_option_expression",
+    "event_risk_governor": "model_08_event_risk_governor",
 }
 
 LOCAL_LAYER_INPUTS = (
@@ -38,8 +38,8 @@ LOCAL_LAYER_INPUTS = (
     ("layer_05_alpha_confidence", "alpha_confidence_model", "alpha_confidence_vector"),
     ("layer_06_position_projection", "position_projection_model", "position_projection_vector"),
     ("layer_07_underlying_action", "underlying_action_model", "underlying_action_plan"),
-    ("layer_08_option_expression", "option_expression_model", "option_expression_plan"),
-    ("layer_09_event_risk_governor", "event_risk_governor", "event_context_vector"),
+    ("layer_09_option_expression", "option_expression_model", "option_expression_plan"),
+    ("layer_08_event_risk_governor", "event_risk_governor", "event_context_vector"),
 )
 
 
