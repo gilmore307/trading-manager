@@ -401,6 +401,20 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["DELETION_RECEIPT"]["payload"], "deletion_receipt")
         self.assertEqual(rows["ARTIFACT_TOMBSTONE"]["kind"], "artifact_type")
         self.assertIn("artifact_index", rows["STORAGE_ARTIFACT_INDEX"]["payload"])
+        expected_storage_lifecycle_scripts = {
+            "STORAGE_SQL_ARCHIVE_EXECUTE": "scripts/lifecycle/execute_sql_archive.py",
+            "STORAGE_SQL_ARCHIVE_RESTORE_VERIFY": "scripts/lifecycle/verify_sql_archive_restore.py",
+            "STORAGE_QUARANTINE_DELETE_RESULT_BUILD": "scripts/lifecycle/build_quarantine_delete_result.py",
+        }
+        for key, expected_path in expected_storage_lifecycle_scripts.items():
+            self.assertEqual(rows[key]["kind"], "script")
+            self.assertEqual(rows[key]["payload_format"], "command")
+            self.assertIn(expected_path, rows[key]["path"])
+            self.assertIn("trading-storage", rows[key]["applies_to"])
+            self.assertIn("no ", rows[key]["note"].lower())
+        self.assertIn("--apply-reviewed-archive", rows["STORAGE_SQL_ARCHIVE_EXECUTE"]["note"])
+        self.assertIn("verification-only", rows["STORAGE_SQL_ARCHIVE_RESTORE_VERIFY"]["note"])
+        self.assertIn("planned_not_executed", rows["STORAGE_QUARANTINE_DELETE_RESULT_BUILD"]["note"])
         self.assertIn("manager_unified_request_task_summary_surface", rows["STORAGE_LIFECYCLE_MANAGER_CONTROL_POLICY"]["payload"])
         self.assertIn("trading_storage_protected_set_physical_execution", rows["STORAGE_LIFECYCLE_MANAGER_CONTROL_POLICY"]["payload"])
         self.assertIn("promotion_classifies_artifacts", rows["PROMOTION_STORAGE_LIFECYCLE_BOUNDARY_POLICY"]["payload"])
