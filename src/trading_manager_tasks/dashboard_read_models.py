@@ -32,6 +32,14 @@ from .scheduler_status import (
 HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
 HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/dashboard/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
 DEFAULT_STALE_AFTER_SECONDS = 900
+MONTHLY_TASK_STAGE_TYPES = {"data_acquisition", "feature_generation"}
+FOLD_MODEL_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
+MONTHS_PER_MODEL_FOLD = 6
+MONTHLY_TASKS_PER_FOLD = MONTHS_PER_MODEL_FOLD * 6
+MODEL_TASKS_PER_FOLD = 9 * 4
+TASKS_PER_MODEL_FOLD = MONTHLY_TASKS_PER_FOLD + MODEL_TASKS_PER_FOLD
+BASE_TASK_YEAR = 2016
+BASE_TASK_MONTH = 1
 
 
 def now_utc() -> str:
@@ -367,6 +375,40 @@ def _completed_months(status: HistoricalSchedulerStatus, *, max_month: str) -> l
     return months
 
 
+def _stored_workflow_months(storage_root: Path, *, max_month: str) -> list[str]:
+    """Return month-scoped checkpoints visible to the dashboard.
+
+    The daemon state is a recent-progress summary, not the canonical inventory
+    of every durable month checkpoint.  Tasks must not lose prior months after
+    a restart or after the daemon has advanced its open-lane window.
+    """
+
+    runtime_root = storage_root / "runtime"
+    if not runtime_root.exists():
+        return []
+    months: list[str] = []
+    seen: set[str] = set()
+    for path in sorted(runtime_root.glob("model_training_workflow_state_*.json")):
+        month = path.stem.removeprefix("model_training_workflow_state_")
+        if not _is_month_key(month) or not _month_visible_by_completed_cutoff(month, max_month=max_month):
+            continue
+        try:
+            payload = _load_json_object(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        start_month = str(payload.get("start_month") or month)
+        end_month = str(payload.get("end_month") or start_month)
+        if start_month != end_month or start_month != month:
+            continue
+        stages = payload.get("stages")
+        if not isinstance(stages, list) or not stages:
+            continue
+        if month not in seen:
+            months.append(month)
+            seen.add(month)
+    return months
+
+
 def _workflow_state_payload(storage_root: Path, month: str) -> dict[str, Any] | None:
     path = storage_root / "runtime" / f"model_training_workflow_state_{month}.json"
     try:
@@ -548,6 +590,96 @@ def _worker_info_for_stage(
     return {"worker_id": "scheduler_control_worker", "worker_label": "Scheduler Control Worker", "worker_kind": "scheduler_control"}
 
 
+def _month_offset(month: str | None) -> int | None:
+    if not _is_month_key(month):
+        return None
+    assert month is not None
+    try:
+        year = int(month[:4])
+        month_number = int(month[5:7])
+    except ValueError:
+        return None
+    return (year - BASE_TASK_YEAR) * 12 + (month_number - BASE_TASK_MONTH)
+
+
+def _fold_start_month(period: str | None) -> str | None:
+    text = str(period or "")
+    if ".." not in text:
+        return None
+    start, _end = text.split("..", 1)
+    return start if _is_month_key(start) else None
+
+
+def _monthly_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
+    stage_type = str(raw_stage.get("stage_type") or "")
+    if stage_type not in MONTHLY_TASK_STAGE_TYPES:
+        return None
+    try:
+        layer = int(raw_stage.get("layer"))
+    except (TypeError, ValueError):
+        return None
+    if layer not in MONTHLY_SUBSTRATE_LAYERS:
+        return None
+    type_offset = 1 if stage_type == "data_acquisition" else 2
+    return (layer - 1) * 2 + type_offset
+
+
+def _fold_model_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
+    stage_type = str(raw_stage.get("stage_type") or "")
+    stage_offset = {
+        "model_generation": 1,
+        "model_evaluation": 2,
+        "promotion_review": 3,
+        "maintenance": 4,
+    }.get(stage_type)
+    if stage_offset is None:
+        return None
+    try:
+        layer = int(raw_stage.get("layer"))
+    except (TypeError, ValueError):
+        return None
+    if layer <= 0:
+        return None
+    return (layer - 1) * 4 + stage_offset
+
+
+def _stable_task_number(raw_stage: Mapping[str, Any], *, task_period: str | None) -> int | None:
+    """Return the stable owner-facing task number for a timeline row."""
+
+    fold_start = _fold_start_month(task_period)
+    if fold_start:
+        offset = _month_offset(fold_start)
+        ordinal = _fold_model_task_ordinal(raw_stage)
+        if offset is None or ordinal is None:
+            return None
+        fold_index = max(0, offset // MONTHS_PER_MODEL_FOLD)
+        return fold_index * TASKS_PER_MODEL_FOLD + MONTHLY_TASKS_PER_FOLD + ordinal
+    offset = _month_offset(task_period)
+    ordinal = _monthly_task_ordinal(raw_stage)
+    if offset is None or ordinal is None:
+        return None
+    fold_index = max(0, offset // MONTHS_PER_MODEL_FOLD)
+    month_index_in_fold = offset % MONTHS_PER_MODEL_FOLD
+    return fold_index * TASKS_PER_MODEL_FOLD + month_index_in_fold * 6 + ordinal
+
+
+def _stable_task_uid(raw_stage: Mapping[str, Any], *, task_period: str | None) -> str:
+    stage_id = str(raw_stage.get("stage_id") or "unknown_stage")
+    return f"{task_period or 'unscheduled'}:{stage_id}"
+
+
+def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
+    """Fold states expose only fold-scoped model-worker stages to Tasks."""
+
+    visible: list[Any] = []
+    for raw_stage in raw_stages:
+        if not isinstance(raw_stage, Mapping):
+            continue
+        if str(raw_stage.get("stage_type") or "") in FOLD_MODEL_STAGE_TYPES:
+            visible.append(raw_stage)
+    return visible
+
+
 
 def _is_presentable_task_stage(raw_stage: Mapping[str, Any]) -> bool:
     stage_type = str(raw_stage.get("stage_type") or "")
@@ -580,7 +712,16 @@ def _task_timeline(
     max_dashboard_month = completed_historical_month_cutoff()
     month_stage_sets: list[tuple[str | None, list[Any], bool]] = []
     included_months: set[str] = set()
-    for month in _completed_months(status, max_month=max_dashboard_month):
+    durable_months: list[str] = []
+    seen_durable_months: set[str] = set()
+    for month in [
+        *_stored_workflow_months(storage_root, max_month=max_dashboard_month),
+        *_completed_months(status, max_month=max_dashboard_month),
+    ]:
+        if month not in seen_durable_months:
+            durable_months.append(month)
+            seen_durable_months.add(month)
+    for month in durable_months:
         payload = _workflow_state_payload(storage_root, month)
         if payload is None:
             continue
@@ -617,6 +758,9 @@ def _task_timeline(
             raw_stages = fold_payload.get("stages")
             if not isinstance(raw_stages, list):
                 continue
+            raw_stages = _presentable_fold_stages(raw_stages)
+            if not raw_stages:
+                continue
             fold_start = str(fold_payload.get("start_month") or "")
             fold_end = str(fold_payload.get("end_month") or "")
             fold_key = f"{fold_start}..{fold_end}" if fold_start and fold_end else fold_path.stem
@@ -639,6 +783,9 @@ def _task_timeline(
     coverage_stage_id = str(stage_coverage.get("stage_id") or "") if stage_coverage else ""
     latest_execution = _latest_stage_execution(status) or {}
     latest_failed_stage = latest_execution.get("stage_id") if latest_execution.get("status") == "failed" else None
+    latest_failed_month = None
+    if latest_failed_stage and isinstance(status.latest_decision, Mapping):
+        latest_failed_month = str(status.latest_decision.get("start_month") or "") or None
     current_lane_heads: set[tuple[str | None, str]] = set()
     current_model_heads: set[tuple[str | None, str]] = set()
     seen_ingest_workers: set[str] = set()
@@ -702,7 +849,9 @@ def _task_timeline(
             if not current_lane_heads and is_active_month and not first_open_seen and not is_terminal:
                 is_current = True
                 first_open_seen = True
-            if latest_failed_stage and is_active_month and stage_id == latest_failed_stage:
+            if latest_failed_stage and stage_id == latest_failed_stage and (
+                not latest_failed_month or task_month_for_state == latest_failed_month
+            ):
                 task_state = "failed"
             elif is_terminal:
                 task_state = "completed" if stage_status == "succeeded" else "skipped"
@@ -721,11 +870,14 @@ def _task_timeline(
                 receipt_refs = []
             dataset_unit = raw_stage.get("dataset_unit") if isinstance(raw_stage.get("dataset_unit"), Mapping) else None
             task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
+            task_number = _stable_task_number(raw_stage, task_period=task_month)
             worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
                 raw_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
             )
             task: dict[str, Any] = {
                 "sequence": len(tasks) + 1,
+                "task_number": task_number,
+                "task_uid": _stable_task_uid(raw_stage, task_period=task_month),
                 "month": task_month,
                 "task_id": stage_id,
                 "task_label": _public_stage_name(stage_id, raw_stage.get("stage_type")),
@@ -755,9 +907,16 @@ def _task_timeline(
                     "worker": worker_info,
                 },
             }
-            if is_active_month and coverage_stage_id and stage_id == coverage_stage_id and stage_coverage is not None:
+            if (
+                coverage_stage_id
+                and stage_id == coverage_stage_id
+                and stage_coverage is not None
+                and (not status.current_month or task_month == status.current_month)
+            ):
                 task["detail"]["progress"] = _stage_coverage_chart(stage_coverage)
-            if is_active_month and latest_execution.get("stage_id") == stage_id:
+            if latest_execution.get("stage_id") == stage_id and (
+                not latest_failed_month or task_month == latest_failed_month
+            ):
                 task["detail"]["last_execution"] = {
                     "status": latest_execution.get("status"),
                     "return_code": latest_execution.get("return_code"),
