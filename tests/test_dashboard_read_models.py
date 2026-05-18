@@ -180,6 +180,29 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn(payload["severity"], {"critical", "high", "medium", "low", "info"})
 
 
+    def test_non_owner_operational_items_are_ready_not_action_required(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
+
+        self.assertEqual(payload["status"], "ready")
+        self.assertEqual(payload["severity"], "info")
+        self.assertIn("stopped and ready to start", payload["summary"])
+        self.assertTrue(payload["issue_refs"])
+        self.assertTrue(all(ref["owner_action_required"] is False for ref in payload["issue_refs"]))
+
+
     def test_terminal_task_without_recorded_timing_is_not_backfilled_from_status_update(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

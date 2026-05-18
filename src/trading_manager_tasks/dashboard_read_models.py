@@ -145,6 +145,13 @@ def _owner_status(status: HistoricalSchedulerStatus) -> tuple[str, str, str]:
             f"Historical scheduler is running at {status.current_stage or 'the selected stage'} for {status.current_month or 'the selected month'}.",
         )
     if status.open_operational_items:
+        owner_action_required = any(_operational_item_requires_owner_action(item) for item in status.open_operational_items)
+        if not owner_action_required:
+            return (
+                "ready",
+                "info",
+                f"Historical scheduler is stopped and ready to start; next action is {status.recommended_next_action}.",
+            )
         return (
             "action_required",
             "medium",
@@ -155,6 +162,10 @@ def _owner_status(status: HistoricalSchedulerStatus) -> tuple[str, str, str]:
         "info",
         f"Historical scheduler can continue at {status.current_stage or 'the next selected stage'} for {status.current_month or 'the selected month'}.",
     )
+
+
+def _operational_item_requires_owner_action(item: str) -> bool:
+    return item in {"review_systemd_template_flags", "remove_or_replace_stale_scheduler_lock_before_service_start"}
 
 
 def _issue_refs(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
@@ -176,7 +187,7 @@ def _issue_refs(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
                 "issue_type": "historical_scheduler_operational_item",
                 "issue_id": item,
                 "severity": "medium",
-                "owner_action_required": item in {"review_systemd_template_flags", "remove_or_replace_stale_scheduler_lock_before_service_start"},
+                "owner_action_required": _operational_item_requires_owner_action(item),
             }
         )
     if status.blocked_reason:
