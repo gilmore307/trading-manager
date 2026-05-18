@@ -72,6 +72,15 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertEqual(request["model_layer"], "layer_08_option_expression")
         self.assertEqual(request["evidence_component_id"], "option_expression_model")
 
+    def test_accepts_physical_model_table_ids_from_workflow_commands(self):
+        request = build_model_promotion_review_request(
+            model="model_01_market_regime",
+            candidate_ref="trading-model://promotion-candidates/mpcand_example",
+        )
+
+        self.assertEqual(request["model_id"], "market_regime_model")
+        self.assertEqual(request["model_layer"], "layer_01_market_regime")
+
     def test_rejects_unknown_model_target(self):
         with self.assertRaises(TaskSystemError):
             build_model_promotion_review_request(

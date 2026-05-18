@@ -68,6 +68,10 @@ MODEL_PROMOTION_TARGETS: tuple[ModelPromotionTarget, ...] = (
 
 TARGETS_BY_MODEL_ID = {target.model_id: target for target in MODEL_PROMOTION_TARGETS}
 TARGETS_BY_LAYER_ID = {target.layer_id: target for target in MODEL_PROMOTION_TARGETS}
+TARGETS_BY_PHYSICAL_MODEL_ID = {
+    f"model_{int(target.layer_id.split('_')[1]):02d}_{target.layer_id.split('_', 2)[2]}": target
+    for target in MODEL_PROMOTION_TARGETS
+}
 
 def promotion_target(value: str) -> ModelPromotionTarget:
     """Return the canonical model promotion target for a model or layer id."""
@@ -79,6 +83,10 @@ def promotion_target(value: str) -> ModelPromotionTarget:
         pass
     try:
         return TARGETS_BY_LAYER_ID[normalized]
+    except KeyError:
+        pass
+    try:
+        return TARGETS_BY_PHYSICAL_MODEL_ID[normalized]
     except KeyError:
         pass
     raise TaskSystemError(f"unknown model promotion target: {value}")
