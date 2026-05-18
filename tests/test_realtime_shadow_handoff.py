@@ -24,8 +24,8 @@ def _decision_input_snapshot() -> dict[str, object]:
         ("layer_05_alpha_confidence", "alpha_confidence_model", "alpha_confidence_vector"),
         ("layer_06_position_projection", "position_projection_model", "position_projection_vector"),
         ("layer_07_underlying_action", "underlying_action_model", "underlying_action_plan"),
-        ("layer_09_option_expression", "option_expression_model", "option_expression_plan"),
-        ("layer_08_event_risk_governor", "event_risk_governor", "event_context_vector"),
+        ("layer_08_option_expression", "option_expression_model", "option_expression_plan"),
+        ("layer_09_event_risk_governor", "event_risk_governor", "event_context_vector"),
     ]
     return {
         "contract_type": "execution_model_decision_input_snapshot",

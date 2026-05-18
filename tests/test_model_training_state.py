@@ -300,7 +300,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertEqual(state.provider_calls_observed, 2)
             self.assertEqual(state.summary_row()["provider_calls_observed"], 2)
 
-    def test_layer_nine_option_expression_gate_review_is_ready_after_complete_upstream_base_chain(self):
+    def test_layer_eight_option_expression_gate_review_is_ready_after_complete_upstream_base_chain(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             state_path = tmp / "workflow_state.json"
@@ -313,7 +313,6 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 5: "alpha_confidence",
                 6: "position_projection",
                 7: "underlying_action",
-                8: "event_risk_governor",
             }
             for layer, key in layer_slugs.items():
                 prefix = f"layer_{layer:02d}_{key}"
@@ -329,10 +328,10 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 foundation_catch_up_only=False,
                 write=False,
             )
-            layer_eight_acquisition = {stage.stage_id: stage for stage in state.stages}["layer_09_option_expression.data_acquisition"]
+            layer_eight_acquisition = {stage.stage_id: stage for stage in state.stages}["layer_08_option_expression.data_acquisition"]
             self.assertEqual(layer_eight_acquisition.status, "ready")
             self.assertIsNone(layer_eight_acquisition.approval_gate_required)
-            self.assertTrue(any(token.endswith("review_layer_nine_option_expression_gate.py") for token in layer_eight_acquisition.command))
+            self.assertTrue(any(token.endswith("review_layer_eight_option_expression_gate.py") for token in layer_eight_acquisition.command))
 
     def test_layers_without_input_tasks_can_progress_from_upstream_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

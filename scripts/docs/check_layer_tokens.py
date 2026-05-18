@@ -17,8 +17,8 @@ LAYERS = (
     (5, ("AlphaConfidenceModel",), "layer_05_alpha_confidence", "alpha_confidence_model", "model_05_alpha_confidence", "alpha_confidence_vector"),
     (6, ("PositionProjectionModel",), "layer_06_position_projection", "position_projection_model", "model_06_position_projection", "position_projection_vector"),
     (7, ("UnderlyingActionModel",), "layer_07_underlying_action", "underlying_action_model", "model_07_underlying_action", "underlying_action_plan"),
-    (8, ("EventRiskGovernor", "EventIntelligenceOverlay"), "layer_08_event_risk_governor", "event_risk_governor", "model_08_event_risk_governor", "event_risk_intervention"),
-    (9, ("TradingGuidanceModel", "OptionExpressionModel"), "layer_09_option_expression", "option_expression_model", "model_09_option_expression", "option_expression_plan"),
+    (8, ("TradingGuidanceModel", "OptionExpressionModel"), "layer_08_option_expression", "option_expression_model", "model_08_option_expression", "option_expression_plan"),
+    (9, ("EventRiskGovernor", "EventIntelligenceOverlay"), "layer_09_event_risk_governor", "event_risk_governor", "model_09_event_risk_governor", "event_risk_intervention"),
 )
 
 FILES_TO_CHECK = (

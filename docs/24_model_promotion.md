@@ -22,7 +22,7 @@ Production activation requires an accepted `agent_model_promotion_decision` with
 
 ## Layer 9 / Layer 4 Rule
 
-Layer 8 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, and unknown-overlap activity bridge evidence cannot be promoted directly.
+Layer 9 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, and unknown-overlap activity bridge evidence cannot be promoted directly.
 
 ## Useful Commands
 

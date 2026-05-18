@@ -13,8 +13,8 @@ This file owns shared naming rules for model-layer source, feature, and model su
 | 5 | AlphaConfidenceModel | `alpha_confidence_model` | `model_05_alpha_confidence` |
 | 6 | PositionProjectionModel | `position_projection_model` | `model_06_position_projection` |
 | 7 | UnderlyingActionModel | `underlying_action_model` | `model_07_underlying_action` |
-| 8 | EventRiskGovernor / EventIntelligenceOverlay | `event_risk_governor` | `model_08_event_risk_governor` |
-| 9 | TradingGuidanceModel / OptionExpressionModel | `option_expression_model` | `model_09_option_expression` |
+| 8 | TradingGuidanceModel / OptionExpressionModel | `option_expression_model` | `model_08_option_expression` |
+| 9 | EventRiskGovernor / EventIntelligenceOverlay | `event_risk_governor` | `model_09_event_risk_governor` |
 
 ## Stable Id Rule
 
@@ -74,8 +74,8 @@ Core scalar score tokens that are shared across repositories belong in `state_ve
 - Layer 5 estimates adjusted alpha confidence; it does not size positions or choose instruments.
 - Layer 6 projects abstract holding state; it does not emit broker orders.
 - Layer 7 produces offline direct-underlying thesis; it does not route orders or select option contracts.
-- Layer 8 governs residual event risk; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
-- Layer 9 produces offline guidance/option-expression plans; it does not execute or mutate broker/account state.
+- Layer 8 produces optional offline guidance/option-expression plans; it does not execute or mutate broker/account state.
+- Layer 9 produces event-risk governance/intervention evidence from the Layer 7 direct-underlying thesis, with Layer 8 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
 
 ## Registry Review Checklist
 

@@ -404,10 +404,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "blocked",
                             },
                             {
-                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_id": "layer_08_option_expression.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 8,
-                                "layer_key": "layer_09_option_expression",
+                                "layer_key": "layer_08_option_expression",
                                 "status": "not_applicable",
                                 "last_reason": "no active Layer 7 target chain ready for option-expression expansion",
                             },
@@ -437,7 +437,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             any(task["layer"] == 5 and task["stage_type"] in {"data_acquisition", "feature_generation"} for task in task_timeline)
         )
         self.assertTrue(any(task["layer"] == 5 and task["stage_type"] == "model_generation" for task in task_timeline))
-        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_09_option_expression.data_acquisition")
+        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_08_option_expression.data_acquisition")
         self.assertEqual(real_skip["task_state"], "skipped")
         self.assertIn("no active Layer 7", real_skip["reason"])
 

@@ -1,4 +1,4 @@
-"""Bounded dispatcher for Layer 8 event-feed backfill artifacts.
+"""Bounded dispatcher for Layer 9 event-feed backfill artifacts.
 
 The preparation step writes dry-run-safe task keys. This dispatcher is the
 reviewable boundary that may convert a selected key into an autonomous
@@ -223,7 +223,7 @@ def dispatch_event_feed_backfill(
     max_workers: int = DEFAULT_PROVIDER_STAGE_MAX_WORKERS,
     te_retry_delay_seconds: int = 60,
 ) -> EventFeedDispatchSummary:
-    """Validate or run selected Layer 8 event-feed backfill task keys."""
+    """Validate or run selected Layer 9 event-feed backfill task keys."""
 
     planned = plan_event_feed_requests(start_month=start_month, end_month=end_month, target_symbol=target_symbol)
     selected = _filter_requests(planned, feed_ids=feed_ids, request_ids=request_ids, limit=limit)
@@ -314,8 +314,8 @@ def dispatch_event_feed_backfill(
     dispatch_count = sum(1 for item in items if item.status in {"dispatched_succeeded", "dispatched_failed", "dispatched_failed_browser_ui_fallback_required"})
     provider_call_count = sum(item.attempt_count for item in items if item.attempt_count)
     return EventFeedDispatchSummary(
-        contract_type="manager_layer_eight_event_feed_dispatch_summary",
-        stage_id="layer_08_event_risk_governor.event_feed_backfill",
+        contract_type="manager_layer_nine_event_feed_dispatch_summary",
+        stage_id="layer_09_event_risk_governor.event_feed_backfill",
         start_month=start_month,
         end_month=end_month,
         target_symbol=target_symbol.upper(),
@@ -338,7 +338,7 @@ def write_dispatch_summary(summary: EventFeedDispatchSummary, *, output: TextIO)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate or dispatch bounded Layer 8 event-feed backfill task keys.")
+    parser = argparse.ArgumentParser(description="Validate or dispatch bounded Layer 9 event-feed backfill task keys.")
     parser.add_argument("--start-month", required=True)
     parser.add_argument("--end-month", required=True)
     parser.add_argument("--target-symbol", default="AAPL")

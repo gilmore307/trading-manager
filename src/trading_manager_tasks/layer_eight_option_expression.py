@@ -1,10 +1,10 @@
-"""Layer 9 option-expression gate review helpers.
+"""Layer 8 option-expression gate review helpers.
 
 This module is deliberately no-provider. It reviews completed Layer 7
 underlying-action rows for option-expression-worthy actions before ThetaData
-option-snapshot acquisition is prepared for the Layer 9 trading-guidance
+option-snapshot acquisition is prepared for the Layer 8 trading-guidance
 boundary. If the month has no active underlying action chain, the correct
-``layer_09_option_expression`` acquisition outcome is a reviewed no-provider skip,
+``layer_08_option_expression`` acquisition outcome is a reviewed no-provider skip,
 not an empty provider request.
 """
 
@@ -22,8 +22,8 @@ from typing import Any, Iterable, Mapping, Sequence, TextIO
 from .control_plane import TaskSystemError
 
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
-DEFAULT_OUTPUT_ROOT = Path("storage/runtime/layer_09_option_expression/gate_review")
-STAGE_ID = "layer_09_option_expression.data_acquisition"
+DEFAULT_OUTPUT_ROOT = Path("storage/runtime/layer_08_option_expression/gate_review")
+STAGE_ID = "layer_08_option_expression.data_acquisition"
 ACTIVE_ACTION_TYPES = {
     "increase_long",
     "decrease_long",
@@ -38,7 +38,7 @@ INACTIVE_ACTION_SIDES = {"", "none", "neutral"}
 
 
 @dataclass(frozen=True)
-class LayerNineRequestPreview:
+class LayerEightRequestPreview:
     """A bounded preview of a future option-chain snapshot request."""
 
     request_id: str
@@ -59,8 +59,8 @@ class LayerNineRequestPreview:
 
 
 @dataclass(frozen=True)
-class LayerNineGateReview:
-    """No-provider review of whether Layer 9 needs option-snapshot acquisition."""
+class LayerEightGateReview:
+    """No-provider review of whether Layer 8 needs option-snapshot acquisition."""
 
     contract_type: str
     stage_id: str
@@ -71,7 +71,7 @@ class LayerNineGateReview:
     total_layer_7_rows: int
     active_target_chain_count: int
     active_request_count: int
-    request_previews: tuple[LayerNineRequestPreview, ...]
+    request_previews: tuple[LayerEightRequestPreview, ...]
     evidence_refs: tuple[str, ...]
     reason: str
     recommended_next_action: str
@@ -126,7 +126,7 @@ def _request_id(row: Mapping[str, Any], *, start_month: str) -> str:
     underlying = str(row.get("underlying") or "unknown").lower()
     snapshot = _safe_token(str(row.get("snapshot_time") or row.get("tradeable_time") or row.get("available_time") or "unknown"))
     target = _short_target(str(row.get("target_candidate_id") or "target"))
-    return f"mgrreq_layer9_option_snapshot_{underlying}_{start_month.replace('-', '_')}_{snapshot}_{target}"
+    return f"mgrreq_layer8_option_snapshot_{underlying}_{start_month.replace('-', '_')}_{snapshot}_{target}"
 
 
 def _is_active_layer_7_row(row: Mapping[str, Any]) -> bool:
@@ -139,10 +139,10 @@ def _is_active_layer_7_row(row: Mapping[str, Any]) -> bool:
     return True
 
 
-def request_previews_from_layer_7_rows(rows: Iterable[Mapping[str, Any]], *, start_month: str) -> tuple[LayerNineRequestPreview, ...]:
+def request_previews_from_layer_7_rows(rows: Iterable[Mapping[str, Any]], *, start_month: str) -> tuple[LayerEightRequestPreview, ...]:
     """Build future ThetaData request previews from active Layer 7 rows only."""
 
-    previews: list[LayerNineRequestPreview] = []
+    previews: list[LayerEightRequestPreview] = []
     seen: set[str] = set()
     for row in rows:
         if not _is_active_layer_7_row(row):
@@ -152,7 +152,7 @@ def request_previews_from_layer_7_rows(rows: Iterable[Mapping[str, Any]], *, sta
             continue
         seen.add(request_id)
         previews.append(
-            LayerNineRequestPreview(
+            LayerEightRequestPreview(
                 request_id=request_id,
                 target_candidate_id=str(row.get("target_candidate_id") or ""),
                 underlying=str(row.get("underlying")) if row.get("underlying") else None,
@@ -167,26 +167,26 @@ def request_previews_from_layer_7_rows(rows: Iterable[Mapping[str, Any]], *, sta
     return tuple(previews)
 
 
-def build_layer_nine_gate_review(
+def build_layer_eight_gate_review(
     *,
     start_month: str,
     end_month: str,
     layer_7_rows: Sequence[Mapping[str, Any]],
     evidence_refs: Sequence[str] = (),
-) -> LayerNineGateReview:
+) -> LayerEightGateReview:
     previews = request_previews_from_layer_7_rows(layer_7_rows, start_month=start_month)
     if previews:
         status = "provider_acquisition_ready"
         reviewed_decision = "active_target_chain_ready_for_autonomous_option_acquisition"
-        reason = f"{len(previews)} active Layer 7 target-chain rows are ready for autonomous ThetaData option snapshot acquisition before Layer 9 guidance/option-expression review."
+        reason = f"{len(previews)} active Layer 7 target-chain rows are ready for autonomous ThetaData option snapshot acquisition before Layer 8 guidance/option-expression review."
         recommended_next_action = "prepare_option_expression_acquisition"
     else:
         status = "no_provider_skip_accepted"
         reviewed_decision = "accepted_skip_no_active_target_chain"
-        reason = "Layer 7 produced no active underlying-action chain for Layer 9; all rows are no-trade/maintain/neutral, so no option-chain provider call is warranted for this month."
-        recommended_next_action = "record_layer_09_data_acquisition_no_provider_skip"
-    return LayerNineGateReview(
-        contract_type="manager_layer_09_option_expression_gate_review",
+        reason = "Layer 7 produced no active underlying-action chain for Layer 8 option-expression review; all rows are no-trade/maintain/neutral, so no option-chain provider call is warranted for this month."
+        recommended_next_action = "record_layer_08_data_acquisition_no_provider_skip"
+    return LayerEightGateReview(
+        contract_type="manager_layer_08_option_expression_gate_review",
         stage_id=STAGE_ID,
         start_month=start_month,
         end_month=end_month,
@@ -239,10 +239,10 @@ def fetch_layer_7_rows(*, database_url: str, start_month: str, end_month: str) -
             return [dict(row) for row in cursor.fetchall()]
 
 
-def write_gate_review_artifacts(review: LayerNineGateReview, *, output_root: Path = DEFAULT_OUTPUT_ROOT) -> tuple[Path, Path]:
+def write_gate_review_artifacts(review: LayerEightGateReview, *, output_root: Path = DEFAULT_OUTPUT_ROOT) -> tuple[Path, Path]:
     output_root.mkdir(parents=True, exist_ok=True)
-    review_path = output_root / f"layer_09_option_expression_gate_review_{review.start_month}.json"
-    receipt_path = output_root / f"layer_09_option_expression_gate_review_receipt_{review.start_month}.json"
+    review_path = output_root / f"layer_08_option_expression_gate_review_{review.start_month}.json"
+    receipt_path = output_root / f"layer_08_option_expression_gate_review_receipt_{review.start_month}.json"
     review_payload = review.summary_row()
     review_payload["evidence_refs"] = [*review_payload["evidence_refs"], str(review_path), str(receipt_path)]
     review_path.write_text(json.dumps(review_payload, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
@@ -257,7 +257,7 @@ def write_gate_review_artifacts(review: LayerNineGateReview, *, output_root: Pat
         "completed_at": now,
         "runs": [
             {
-                "run_id": f"layer_09_option_expression_gate_review_{review.start_month}",
+                "run_id": f"layer_08_option_expression_gate_review_{review.start_month}",
                 "status": receipt_status,
                 "output_refs": [str(review_path)],
                 "row_counts": {
@@ -277,13 +277,13 @@ def write_gate_review_artifacts(review: LayerNineGateReview, *, output_root: Pat
     return review_path, receipt_path
 
 
-def write_gate_review(review: LayerNineGateReview, *, output: TextIO) -> None:
+def write_gate_review(review: LayerEightGateReview, *, output: TextIO) -> None:
     json.dump(review.summary_row(), output, indent=2, sort_keys=True, default=str)
     output.write("\n")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Review the Layer 9 option-expression acquisition gate without provider calls.")
+    parser = argparse.ArgumentParser(description="Review the Layer 8 option-expression acquisition gate without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--database-url")
@@ -291,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--write", action="store_true", help="Write review and receipt artifacts under --output-root.")
     args = parser.parse_args(argv)
     rows = fetch_layer_7_rows(database_url=_database_url(args.database_url), start_month=args.start_month, end_month=args.end_month)
-    review = build_layer_nine_gate_review(
+    review = build_layer_eight_gate_review(
         start_month=args.start_month,
         end_month=args.end_month,
         layer_7_rows=rows,
@@ -299,15 +299,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.write:
         review_path, receipt_path = write_gate_review_artifacts(review, output_root=args.output_root)
-        review = LayerNineGateReview(**{**review.summary_row(), "request_previews": review.request_previews, "evidence_refs": (*review.evidence_refs, str(review_path), str(receipt_path))})
+        review = LayerEightGateReview(**{**review.summary_row(), "request_previews": review.request_previews, "evidence_refs": (*review.evidence_refs, str(review_path), str(receipt_path))})
     write_gate_review(review, output=sys.stdout)
     return 0 if review.status == "no_provider_skip_accepted" else 2
 
 
 __all__ = [
-    "LayerNineGateReview",
-    "LayerNineRequestPreview",
-    "build_layer_nine_gate_review",
+    "LayerEightGateReview",
+    "LayerEightRequestPreview",
+    "build_layer_eight_gate_review",
     "fetch_layer_7_rows",
     "request_previews_from_layer_7_rows",
     "write_gate_review_artifacts",

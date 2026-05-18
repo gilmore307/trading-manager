@@ -13,8 +13,8 @@ This file records the active numbering rule for manager-facing docs, scripts, an
 | 5 | AlphaConfidenceModel | `layer_05_alpha_confidence`, `model_05_alpha_confidence` |
 | 6 | PositionProjectionModel | `layer_06_position_projection`, `model_06_position_projection` |
 | 7 | UnderlyingActionModel | `layer_07_underlying_action`, `model_07_underlying_action` |
-| 8 | EventRiskGovernor / EventIntelligenceOverlay | `layer_08_event_risk_governor`, `model_08_event_risk_governor` |
-| 9 | TradingGuidanceModel / OptionExpressionModel | `layer_09_option_expression`, `model_09_option_expression` |
+| 8 | TradingGuidanceModel / OptionExpressionModel | `layer_08_option_expression`, `model_08_option_expression` |
+| 9 | EventRiskGovernor / EventIntelligenceOverlay | `layer_09_event_risk_governor`, `model_09_event_risk_governor` |
 
 ## Rule
 

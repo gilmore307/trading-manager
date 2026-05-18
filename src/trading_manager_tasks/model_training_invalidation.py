@@ -13,8 +13,8 @@ from typing import Any, Iterable, TextIO
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_RUNTIME_ROOT = Path("runtime")
-DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_08_event_risk_required"
-DEFAULT_SOURCE_LAYER = 8
+DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_09_event_risk_required"
+DEFAULT_SOURCE_LAYER = 9
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ def invalidate_layer_downstream_outputs(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     runtime_root: Path | None = None,
     state_paths: Iterable[Path] = (),
-    layer_floor: int = 8,
+    layer_floor: int = 9,
     reason: str = DEFAULT_REASON,
     source_layer: int = DEFAULT_SOURCE_LAYER,
     write: bool = False,

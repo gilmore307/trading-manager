@@ -24,23 +24,23 @@ The historical scheduler may acquire data, prepare features, run safe offline st
 
 ## D006 - The model stack has nine current layers
 
-Manager recognizes the current Layer 1-9 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, PositionProjection, UnderlyingAction, EventRiskGovernor/EventIntelligenceOverlay, and TradingGuidance/OptionExpression.
+Manager recognizes the current Layer 1-9 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, PositionProjection, UnderlyingAction, TradingGuidance/OptionExpression, and EventRiskGovernor/EventIntelligenceOverlay.
 
 ## D007 - Layer 1/2 foundation catch-up is priority
 
 The scheduler should first advance targetless Layer 1 market/cross-asset and Layer 2 sector/industry substrate before ordinary Layer 3+ target work. Valid point-in-time provider data and deterministic features may be reused; dependent model/evaluation/promotion artifacts must be rebuilt when their substrate changed.
 
-## D008 - Layer 8 is residual event-risk governance
+## D008 - Layer 8 is optional trading guidance/expression
 
-Layer 8 may research point-in-time event evidence and residual abnormal activity. It may produce interventions, provenance, review packets, and promotion proposals. It may not auto-promote event families, override base layers as direct alpha, or execute trades.
+Layer 8 may produce optional offline trading-guidance records and option-expression plans from the Layer 7 direct-underlying thesis and point-in-time option context when available. It is not an event-risk governor and does not execute trades or mutate broker/account state.
 
 ## D009 - Layer 4 consumes only accepted event-failure evidence
 
 Layer 4 may condition alpha only with evidence packets that passed source precedence, point-in-time availability, non-overlap, matched controls, leakage review, and agent/manager acceptance. Raw anomalies and unreviewed event text cannot enter Layer 4 scoring.
 
-## D010 - Layer 9 remains final offline guidance/expression
+## D010 - Layer 9 remains residual event-risk governance
 
-Layer 9 produces offline trading guidance and option-expression plans from accepted upstream context and Layer 8 event-risk governance. It is not an event-risk model and must not duplicate Layer 8 residual evidence as alpha.
+Layer 9 governs residual event risk over the Layer 7 direct-underlying/spot thesis. Layer 8 guidance/expression context is optional input context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Promotion activation requires agent decision evidence
 
@@ -85,4 +85,4 @@ microstructure_liquidity_disruption
 option_derivatives_abnormality
 ```
 
-Ordinary bar, volume, spread, liquidity, target-state, option-expression, Layer 8 guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into Layer 9 evidence.
+Ordinary bar, volume, spread, liquidity, target-state, option-expression, Layer 9 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into Layer 9 evidence.

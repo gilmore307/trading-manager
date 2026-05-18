@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.control_plane import TaskSystemError
-from trading_manager_tasks.layer_eight_event_risk_governor import _discover_event_feed_artifacts, materialize_layer_eight_event_risk_governor_inputs
+from trading_manager_tasks.layer_nine_event_risk_governor import _discover_event_feed_artifacts, materialize_layer_nine_event_risk_governor_inputs
 
 
 def _write_layer_two_bar_artifact(storage_root: Path, symbol: str, month: str, row_count: int = 1) -> None:
@@ -42,7 +42,7 @@ def _write_layer_two_bar_artifact(storage_root: Path, symbol: str, month: str, r
     )
 
 
-class LayerEightEventRiskGovernorTests(unittest.TestCase):
+class LayerNineEventRiskGovernorTests(unittest.TestCase):
     def test_dry_run_prepares_detector_and_source_task_keys_without_provider_calls(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -73,7 +73,7 @@ class LayerEightEventRiskGovernorTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            summary = materialize_layer_eight_event_risk_governor_inputs(
+            summary = materialize_layer_nine_event_risk_governor_inputs(
                 start_month="2016-01",
                 end_month="2016-01",
                 manager_storage_root=tmp / "manager-storage",
@@ -83,7 +83,7 @@ class LayerEightEventRiskGovernorTests(unittest.TestCase):
                 write=False,
             )
 
-            self.assertEqual(summary.contract_type, "manager_layer_eight_event_risk_governor_input_materialization")
+            self.assertEqual(summary.contract_type, "manager_layer_nine_event_risk_governor_input_materialization")
             self.assertEqual(summary.detector_run_count, 1)
             self.assertEqual(summary.provider_calls, 0)
             self.assertFalse(summary.model_activation_performed)
@@ -119,7 +119,7 @@ class LayerEightEventRiskGovernorTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            summary = materialize_layer_eight_event_risk_governor_inputs(
+            summary = materialize_layer_nine_event_risk_governor_inputs(
                 start_month="2016-02",
                 end_month="2016-02",
                 manager_storage_root=tmp / "manager-storage",
@@ -165,7 +165,7 @@ class LayerEightEventRiskGovernorTests(unittest.TestCase):
                     encoding="utf-8",
                 )
 
-            summary = materialize_layer_eight_event_risk_governor_inputs(
+            summary = materialize_layer_nine_event_risk_governor_inputs(
                 start_month="2016-01",
                 end_month="2016-02",
                 manager_storage_root=tmp / "manager-storage",
@@ -202,7 +202,7 @@ class LayerEightEventRiskGovernorTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
 
-            summary = materialize_layer_eight_event_risk_governor_inputs(
+            summary = materialize_layer_nine_event_risk_governor_inputs(
                 start_month="2016-01",
                 end_month="2016-01",
                 manager_storage_root=tmp / "manager-storage",
@@ -262,7 +262,7 @@ class LayerEightEventRiskGovernorTests(unittest.TestCase):
                 path.write_text(content, encoding="utf-8")
 
             with self.assertRaisesRegex(TaskSystemError, "zero in-window rows.*gdelt_news"):
-                materialize_layer_eight_event_risk_governor_inputs(
+                materialize_layer_nine_event_risk_governor_inputs(
                     start_month="2016-01",
                     end_month="2016-01",
                     manager_storage_root=tmp / "manager-storage",
@@ -282,7 +282,7 @@ class LayerEightEventRiskGovernorTests(unittest.TestCase):
             _write_layer_two_bar_artifact(storage_root, "XLF", "2016-01")
 
             with self.assertRaisesRegex(TaskSystemError, "event-risk coverage is incomplete"):
-                materialize_layer_eight_event_risk_governor_inputs(
+                materialize_layer_nine_event_risk_governor_inputs(
                     start_month="2016-01",
                     end_month="2016-01",
                     manager_storage_root=tmp / "manager-storage",

@@ -1,9 +1,10 @@
 """Historical base-stack workflow graph.
 
 The manager owns orchestration across the historical-modeling service. This
-module defines the base trading stack progression. Layer 8 EventRiskGovernor
-governs the Layer 7 direct-underlying thesis before Layer 9 trading-guidance
-and option-expression handoff.
+module defines the base trading stack progression. Layer 8 composes optional
+trading-guidance/option-expression context from the Layer 7 direct-underlying
+thesis. Layer 9 EventRiskGovernor governs the Layer 7 thesis directly and may
+attach Layer 8 context when available.
 """
 
 from __future__ import annotations
@@ -241,25 +242,25 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
     },
     {
         "layer": 8,
-        "slug": "event_risk_governor",
-        "model_name": "EventRiskGovernor",
+        "slug": "option_expression",
+        "model_name": "TradingGuidanceModel / OptionExpressionModel",
         "depends_on_layers": (7,),
-        "progression_mode": "event_risk_governance_before_final_guidance",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_risk_context_id",
-        "candidate_progression_policy": "review the active Layer 7 underlying thesis against accepted event-risk evidence before Layer 9 guidance/expression proceeds",
-        "data_surface": "source_09_event_risk_governor plus feature_09_event_risk_governor from reviewed local event/feed evidence; no broker/account mutation",
-        "feature_cli": "trading-data-feature-09-event-risk-governor",
+        "progression_mode": "optional_trading_guidance_after_underlying_action",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
+        "candidate_progression_policy": "finish the active base target chain through optional Layer 8 trading guidance / option expression; crypto/direct-underlying-only routes do not require option refs",
+        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 7 target chains require them plus feature_08_option_expression",
+        "feature_cli": "trading-data-feature-08-option-expression",
     },
     {
         "layer": 9,
-        "slug": "option_expression",
-        "model_name": "TradingGuidanceModel / OptionExpressionModel",
-        "depends_on_layers": (7, 8),
-        "progression_mode": "final_trading_guidance_after_underlying_and_event_risk_review",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
-        "candidate_progression_policy": "finish the active base target chain through Layer 9 trading guidance / option expression after Layer 8 event-risk-governor review",
-        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 7 target chains require them plus feature_08_option_expression",
-        "feature_cli": "trading-data-feature-08-option-expression",
+        "slug": "event_risk_governor",
+        "model_name": "EventRiskGovernor",
+        "depends_on_layers": (7,),
+        "progression_mode": "event_risk_governance_over_underlying_thesis",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_risk_context_id",
+        "candidate_progression_policy": "review the Layer 7 direct-underlying/spot thesis against accepted event-risk evidence; Layer 8 guidance/expression context is optional when available",
+        "data_surface": "source_09_event_risk_governor plus feature_09_event_risk_governor from reviewed local event/feed evidence; no broker/account mutation",
+        "feature_cli": "trading-data-feature-09-event-risk-governor",
     },
 )
 
@@ -275,8 +276,8 @@ REVIEW_SCRIPT_NAMES: dict[int, str] = {
     5: "review_alpha_confidence_promotion.py",
     6: "review_position_projection_promotion.py",
     7: "review_underlying_action_promotion.py",
-    8: "review_event_risk_governor_promotion.py",
-    9: "review_option_expression_promotion.py",
+    8: "review_option_expression_promotion.py",
+    9: "review_event_risk_governor_promotion.py",
 }
 
 
@@ -365,7 +366,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
         return [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/execute_layer_nine_option_feature_generation.py",
+            "scripts/tasks/execute_layer_eight_option_feature_generation.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -544,7 +545,7 @@ def _build_layer_workflow(
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/materialize_layer_eight_event_risk_governor_inputs.py",
+            "scripts/tasks/review_layer_eight_option_expression_gate.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -555,7 +556,7 @@ def _build_layer_workflow(
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/review_layer_nine_option_expression_gate.py",
+            "scripts/tasks/materialize_layer_nine_event_risk_governor_inputs.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
