@@ -124,6 +124,27 @@ class StageRunControllerTests(unittest.TestCase):
         self.assertEqual(receipt.provider_calls, 0)
         dispatch_mock.assert_not_called()
 
+    def test_controller_retries_retryable_provider_policy_failures(self) -> None:
+        after_dashboard = _dashboard("no_action_until_blocker_resolved")
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.stage_run_controller.build_stage_run_dashboard",
+            side_effect=[_dashboard("autonomous_provider_failure_retry_ready"), after_dashboard],
+        ), patch("trading_manager_tasks.stage_run_controller.dispatch_layer_provider_acquisition") as dispatch_mock:
+            dispatch_mock.return_value.provider_calls = 1
+            dispatch_mock.return_value.dispatch_performed = True
+            receipt, _dashboard_row = run_stage_controller_step(
+                stage_id="layer_02_sector_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+                packet_storage_root=Path(raw_tmp) / "storage",
+                dashboard_path=Path(raw_tmp) / "dashboard.json",
+            )
+
+        self.assertEqual(receipt.action_taken, "retry_failed_provider_policy_requests")
+        self.assertEqual(receipt.action_status, "completed")
+        self.assertEqual(receipt.provider_calls, 1)
+        self.assertFalse(dispatch_mock.call_args.kwargs["reject_terminal_coverage"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -23,6 +23,7 @@ from .provider_dispatch import dispatch_layer_provider_acquisition
 from .stage_coverage import StageCoverageReport, collect_stage_coverage
 
 DEFAULT_STAGE_RUN_DASHBOARD_ROOT = Path("storage/runtime/stage_run_dashboard")
+DEFAULT_COMPONENT_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
 SUPPORTED_DASHBOARD_STAGE_IDS = (
     "layer_01_market_regime.data_acquisition",
     "layer_02_sector_context.data_acquisition",
@@ -95,7 +96,14 @@ def default_dashboard_path(*, stage_id: str, start_month: str) -> Path:
     return DEFAULT_STAGE_RUN_DASHBOARD_ROOT / f"{_safe_stage(stage_id)}_{start_month}.json"
 
 
-def _execute_command(*, stage_id: str, start_month: str, end_month: str, request_ids: Sequence[str]) -> tuple[str, ...]:
+def _execute_command(
+    *,
+    stage_id: str,
+    start_month: str,
+    end_month: str,
+    request_ids: Sequence[str],
+    reject_terminal_coverage: bool = True,
+) -> tuple[str, ...]:
     command = [
         "PYTHONPATH=src",
         "python3",
@@ -109,11 +117,56 @@ def _execute_command(*, stage_id: str, start_month: str, end_month: str, request
         "--execute-provider-calls",
         "--continue-on-error",
         "--skip-registered-failures",
-        "--reject-terminal-coverage",
     ]
+    if reject_terminal_coverage:
+        command.append("--reject-terminal-coverage")
     for request_id in request_ids:
         command.extend(["--request-id", request_id])
     return tuple(command)
+
+
+def _symbol_from_alpaca_bars_request_id(request_id: str, *, month: str) -> str | None:
+    suffix = "_" + month.replace("-", "_")
+    prefix = "mgrreq_backfill_alpaca_bars_"
+    if not request_id.startswith(prefix) or not request_id.endswith(suffix):
+        return None
+    symbol = request_id.removeprefix(prefix)[: -len(suffix)]
+    return symbol.upper() if symbol else None
+
+
+def _latest_receipt_run_error(receipt_path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+    runs = payload.get("runs")
+    if not isinstance(runs, list) or not runs:
+        return {}
+    latest = runs[-1]
+    if not isinstance(latest, dict):
+        return {}
+    error = latest.get("error")
+    return error if isinstance(error, dict) else {}
+
+
+def _retryable_provider_policy_failures(
+    *,
+    failed_request_ids: Sequence[str],
+    start_month: str,
+    component_storage_root: Path = DEFAULT_COMPONENT_STORAGE_ROOT,
+) -> tuple[str, ...]:
+    retryable: list[str] = []
+    for request_id in failed_request_ids:
+        symbol = _symbol_from_alpaca_bars_request_id(str(request_id), month=start_month)
+        if symbol is None:
+            continue
+        receipt_path = component_storage_root / "monthly_backfill" / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
+        error = _latest_receipt_run_error(receipt_path)
+        error_type = str(error.get("type") or "")
+        message = str(error.get("message") or "")
+        if error_type == "ProviderPolicyError" and "provider not allowed" in message:
+            retryable.append(str(request_id))
+    return tuple(retryable)
 
 
 def preview_next_provider_dispatch(
@@ -125,20 +178,40 @@ def preview_next_provider_dispatch(
     storage_root: Path,
     coverage: StageCoverageReport,
     database_url: str | None = None,
+    component_storage_root: Path = DEFAULT_COMPONENT_STORAGE_ROOT,
 ) -> StageRunProviderDispatchPreview:
     """Preview the next bounded autonomous provider dispatch without calling providers."""
 
-    pending_ids = tuple(str(item) for item in coverage.pending_request_ids[:limit])
-    if not pending_ids:
+    retry_failed_policy = False
+    if coverage.status == "failed":
+        request_ids = _retryable_provider_policy_failures(
+            failed_request_ids=coverage.failed_request_ids,
+            start_month=start_month,
+            component_storage_root=component_storage_root,
+        )[:limit]
+        retry_failed_policy = bool(request_ids)
+    else:
+        request_ids = tuple(str(item) for item in coverage.pending_request_ids[:limit])
+    if not request_ids:
         return StageRunProviderDispatchPreview(
             available=False,
-            reason="no pending request ids available for provider dispatch",
+            reason=(
+                "failed coverage requires review; no retryable provider-policy failures detected"
+                if coverage.status == "failed"
+                else "no pending request ids available for provider dispatch"
+            ),
             request_count=0,
             request_ids=(),
             skipped_registered_request_ids=(),
             command_preview=(),
             worker_preview=(),
-            execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=()),
+            execute_command_template=_execute_command(
+                stage_id=stage_id,
+                start_month=start_month,
+                end_month=end_month,
+                request_ids=(),
+                reject_terminal_coverage=not retry_failed_policy,
+            ),
         )
     try:
         summary = dispatch_layer_provider_acquisition(
@@ -146,7 +219,7 @@ def preview_next_provider_dispatch(
             start_month=start_month,
             end_month=end_month,
             storage_root=storage_root,
-            request_ids=pending_ids,
+            request_ids=request_ids,
             execute_provider_calls=False,
             skip_registered_failures=True,
             database_url=database_url,
@@ -160,13 +233,25 @@ def preview_next_provider_dispatch(
             skipped_registered_request_ids=(),
             command_preview=(),
             worker_preview=(),
-            execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=pending_ids),
+            execute_command_template=_execute_command(
+                stage_id=stage_id,
+                start_month=start_month,
+                end_month=end_month,
+                request_ids=request_ids,
+                reject_terminal_coverage=not retry_failed_policy,
+            ),
         )
     runnable = tuple(item.request_id for item in summary.items if item.status != "skipped_registered_accepted_failure")
     skipped = tuple(item.request_id for item in summary.items if item.status == "skipped_registered_accepted_failure")
     return StageRunProviderDispatchPreview(
         available=bool(runnable),
-        reason="autonomous provider dispatch preview available" if runnable else "all selected requests are registered accepted failures",
+        reason=(
+            "retryable provider policy failures available for autonomous retry"
+            if retry_failed_policy and runnable
+            else "autonomous provider dispatch preview available"
+            if runnable
+            else "all selected requests are registered accepted failures"
+        ),
         request_count=len(runnable),
         request_ids=runnable,
         skipped_registered_request_ids=skipped,
@@ -181,7 +266,13 @@ def preview_next_provider_dispatch(
             for item in summary.items
             if item.status != "skipped_registered_accepted_failure"
         ),
-        execute_command_template=_execute_command(stage_id=stage_id, start_month=start_month, end_month=end_month, request_ids=runnable),
+        execute_command_template=_execute_command(
+            stage_id=stage_id,
+            start_month=start_month,
+            end_month=end_month,
+            request_ids=runnable,
+            reject_terminal_coverage=not retry_failed_policy,
+        ),
     )
 
 
@@ -207,6 +298,8 @@ def _coverage_payload(report: StageCoverageReport) -> dict[str, Any]:
 
 def _next_action(*, coverage: StageCoverageReport, preview: StageRunProviderDispatchPreview) -> tuple[str, str]:
     if coverage.status == "failed":
+        if preview.available and "retryable provider policy" in preview.reason:
+            return ("autonomous_provider_failure_retry_ready", f"{coverage.reason}; {preview.reason}")
         return ("review_stage_failures", coverage.reason)
     if coverage.can_unlock_downstream:
         return ("advance_downstream_workflow", coverage.reason)
@@ -222,6 +315,7 @@ def build_stage_run_dashboard(
     end_month: str = "2016-01",
     packet_root: Path | None = None,
     packet_storage_root: Path = Path("storage"),
+    component_storage_root: Path = DEFAULT_COMPONENT_STORAGE_ROOT,
     next_limit: int = 5,
     database_url: str | None = None,
 ) -> StageRunDashboard:
@@ -238,6 +332,7 @@ def build_stage_run_dashboard(
         storage_root=packet_storage_root,
         coverage=coverage,
         database_url=database_url,
+        component_storage_root=component_storage_root,
     )
     next_action, blocking_reason = _next_action(coverage=coverage, preview=preview)
     evidence_refs = [f"stage_coverage:{stage_id}:{start_month}:{coverage.status}"]
@@ -269,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--packet-root", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--packet-storage-root", type=Path, default=Path("storage"))
+    parser.add_argument("--component-storage-root", type=Path, default=DEFAULT_COMPONENT_STORAGE_ROOT)
     parser.add_argument("--next-limit", type=int, default=5)
     parser.add_argument("--database-url")
     parser.add_argument("--write", action="store_true")
@@ -280,6 +376,7 @@ def main(argv: list[str] | None = None) -> int:
         end_month=args.end_month,
         packet_root=args.packet_root,
         packet_storage_root=args.packet_storage_root,
+        component_storage_root=args.component_storage_root,
         next_limit=args.next_limit,
         database_url=args.database_url,
     )

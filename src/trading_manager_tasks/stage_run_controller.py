@@ -103,8 +103,12 @@ def run_stage_controller_step(
     provider_calls = 0
     dispatch_performed = False
 
-    if before.next_action == "autonomous_provider_dispatch_ready" and request_ids:
-        action_taken = "execute_autonomous_provider_dispatch"
+    if before.next_action in {"autonomous_provider_dispatch_ready", "autonomous_provider_failure_retry_ready"} and request_ids:
+        action_taken = (
+            "retry_failed_provider_policy_requests"
+            if before.next_action == "autonomous_provider_failure_retry_ready"
+            else "execute_autonomous_provider_dispatch"
+        )
         if auto_execute_provider_calls:
             with ExitStack() as stack:
                 for request_id in sorted(set(request_ids)):
@@ -128,7 +132,7 @@ def run_stage_controller_step(
                     execute_provider_calls=True,
                     continue_on_error=True,
                     skip_registered_failures=True,
-                    reject_terminal_coverage=True,
+                    reject_terminal_coverage=before.next_action != "autonomous_provider_failure_retry_ready",
                     database_url=database_url,
                     dynamic_workers=dynamic_workers,
                     max_workers=max_workers,

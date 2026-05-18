@@ -106,6 +106,31 @@ class StageRunDashboardTests(unittest.TestCase):
         self.assertEqual(dashboard.next_action, "review_stage_failures")
         self.assertIn("downstream remains blocked", dashboard.blocking_reason)
 
+    def test_failed_provider_policy_coverage_can_retry_autonomously(self) -> None:
+        retry_preview = StageRunProviderDispatchPreview(
+            available=True,
+            reason="retryable provider policy failures available for autonomous retry",
+            request_count=1,
+            request_ids=("mgrreq_backfill_alpaca_bars_xop_2016_01",),
+            skipped_registered_request_ids=(),
+            command_preview=(("python3", "-m", "data_feed.01_feed_alpaca_bars", "task_key.json"),),
+            execute_command_template=("PYTHONPATH=src", "python3", "scripts/tasks/dispatch_and_reconcile_provider_stage.py"),
+        )
+        with patch("trading_manager_tasks.stage_run_dashboard.collect_stage_coverage", return_value=_coverage(status="failed")), patch(
+            "trading_manager_tasks.stage_run_dashboard.preview_next_provider_dispatch",
+            return_value=retry_preview,
+        ):
+            dashboard = build_stage_run_dashboard(
+                stage_id="layer_02_sector_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+                packet_storage_root=Path("/tmp/does-not-exist"),
+                next_limit=1,
+            )
+
+        self.assertEqual(dashboard.next_action, "autonomous_provider_failure_retry_ready")
+        self.assertEqual(dashboard.next_provider_dispatch.request_ids, ("mgrreq_backfill_alpaca_bars_xop_2016_01",))
+
     def test_default_dashboard_path_is_stable(self) -> None:
         self.assertEqual(
             default_dashboard_path(stage_id="layer_02_sector_context.data_acquisition", start_month="2016-01"),
