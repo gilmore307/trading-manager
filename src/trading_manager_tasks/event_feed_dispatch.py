@@ -36,6 +36,35 @@ FEED_MODULE_BY_ID = {
     "08_feed_sec_company_financials": "data_feed.08_feed_sec_company_financials",
 }
 
+PROVIDER_CONTROLS_BY_FEED_ID = {
+    "03_feed_alpaca_news": {
+        "allowed_providers": ["alpaca"],
+        "allowed_endpoint_families": ["news"],
+        "max_requests": 10,
+        "max_rows": 500,
+        "max_symbols": 1,
+        "max_time_window": "45d",
+    },
+    "05_feed_gdelt_news": {
+        "allowed_providers": ["gdelt_bigquery"],
+        "allowed_endpoint_families": ["news_query"],
+        "max_requests": 1,
+        "max_rows": 250,
+        "max_time_window": "45d",
+    },
+    "07_feed_trading_economics_calendar_web": {
+        "allowed_providers": ["trading_economics"],
+        "allowed_endpoint_families": ["calendar_web"],
+        "max_requests": 1,
+        "max_time_window": "45d",
+    },
+    "08_feed_sec_company_financials": {
+        "allowed_providers": ["sec_edgar"],
+        "allowed_endpoint_families": ["company_financials"],
+        "max_requests": 1,
+    },
+}
+
 
 @dataclass(frozen=True)
 class EventFeedDispatchItem:
@@ -137,6 +166,7 @@ def _autonomous_event_feed_task_key(task_key: Mapping[str, Any]) -> dict[str, An
     controls = dict(runtime_key.get("manager_controls") or {})
     controls["allow_live_provider_calls"] = True
     controls["autonomous_historical_provider_acquisition"] = True
+    controls.update(PROVIDER_CONTROLS_BY_FEED_ID.get(feed_id, {}))
     runtime_key["manager_controls"] = controls
     params = dict(runtime_key.get("params") or {})
     params["manager_dry_run"] = False

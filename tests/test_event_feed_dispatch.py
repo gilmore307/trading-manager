@@ -72,7 +72,12 @@ class EventFeedDispatchTests(unittest.TestCase):
                 self.assertTrue(payload["manager_controls"]["allow_live_provider_calls"])
                 self.assertTrue(payload["manager_controls"]["autonomous_historical_provider_acquisition"])
             self.assertFalse(by_feed["05_feed_gdelt_news"]["params"]["dry_run"])
+            self.assertEqual(by_feed["05_feed_gdelt_news"]["manager_controls"]["allowed_providers"], ["gdelt_bigquery"])
+            self.assertEqual(by_feed["05_feed_gdelt_news"]["manager_controls"]["allowed_endpoint_families"], ["news_query"])
             self.assertTrue(by_feed["07_feed_trading_economics_calendar_web"]["params"]["allow_live_fetch"])
+            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["allowed_providers"], ["trading_economics"])
+            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["allowed_endpoint_families"], ["calendar_web"])
+            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["max_time_window"], "45d")
 
 
 if __name__ == "__main__":
