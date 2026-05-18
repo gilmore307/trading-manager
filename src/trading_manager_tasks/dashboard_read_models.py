@@ -114,6 +114,11 @@ def _latest_stage_execution(status: HistoricalSchedulerStatus) -> dict[str, Any]
     }
 
 
+def _is_transient_active_scheduler_backoff(status: HistoricalSchedulerStatus) -> bool:
+    reason = str(status.blocked_reason or "").lower()
+    return status.lock.status == "active" and "no executable scheduler-owned workflow stage" in reason
+
+
 def _owner_status(status: HistoricalSchedulerStatus) -> tuple[str, str, str]:
     """Return dashboard status, severity, and short summary."""
 
@@ -134,7 +139,7 @@ def _owner_status(status: HistoricalSchedulerStatus) -> tuple[str, str, str]:
             "high",
             "Historical modeling service is not runtime-ready; service files or lock state need review.",
         )
-    if status.blocked_reason:
+    if status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
         return (
             "blocked",
             "medium",
@@ -198,7 +203,7 @@ def _issue_refs(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
                 "owner_action_required": _operational_item_requires_owner_action(item),
             }
         )
-    if status.blocked_reason:
+    if status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
         refs.append(
             {
                 "issue_type": "historical_workflow_blocked",

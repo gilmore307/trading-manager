@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -201,6 +202,73 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("stopped and ready to start", payload["summary"])
         self.assertTrue(payload["issue_refs"])
         self.assertTrue(all(ref["owner_action_required"] is False for ref in payload["issue_refs"]))
+
+    def test_active_scheduler_no_executable_backoff_is_running_not_error(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2021-10.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2021-10",
+                        "end_month": "2021-10",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
+                                "updated_utc": "2026-05-18T10:46:52Z",
+                                "last_reason": "stage execution started by manager stage executor",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"current_month": "2021-10", "start_month": "2021-10", "end_month": "2021-10"}) + "\n",
+                encoding="utf-8",
+            )
+            lock_path = tmp / "runtime" / "historical_scheduler.lock"
+            lock_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "backoff",
+                        "start_month": "2021-10",
+                        "selected_work": "layer_03_target_state_vector.feature_generation",
+                        "reason": "no executable scheduler-owned workflow stage is currently available",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage",
+                state_path=state_path,
+                lock_path=lock_path,
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T10:47:42Z")
+
+        self.assertEqual(payload["status"], "running")
+        self.assertEqual(payload["severity"], "info")
+        self.assertIn("Historical scheduler is running", payload["summary"])
+        self.assertFalse(any(ref.get("issue_type") == "historical_workflow_blocked" for ref in payload["issue_refs"]))
 
 
     def test_terminal_task_without_recorded_timing_is_not_backfilled_from_status_update(self):
