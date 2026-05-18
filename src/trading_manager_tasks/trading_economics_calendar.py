@@ -272,14 +272,15 @@ def _recent_task_key(*, start: date, end: date, output_root: str) -> dict[str, A
             "realtime_provider_maintenance": True,
             "allowed_providers": ["trading_economics"],
             "allowed_endpoint_families": ["calendar_web"],
-            "max_requests": 2,
+            "max_requests": 4,
             "max_time_window": "45d",
-            "retry_policy_ref": "te_recent_release_fetch_retry_after_10s_once",
-            "release_refresh_policy_ref": "immediate_due_release_refresh_then_10s_failure_retry",
+            "retry_policy_ref": "te_recent_release_fetch_retry_10s_three_attempts_then_websearch",
+            "release_refresh_policy_ref": "immediate_due_release_refresh_then_10s_x3_then_websearch",
+            "fallback_provider_refs": ["websearch_public_macro_release"],
             "model_activation_performed": False,
             "broker_execution_performed": False,
         },
-        "policy_refs": ["logged_out_recent_calendar", "immediate_due_release_refresh", "retry_after_10s_once_on_fetch_failure", "no_api_or_download_export", "no_model_activation", "no_broker_execution"],
+        "policy_refs": ["logged_out_recent_calendar", "immediate_due_release_refresh", "retry_10s_three_attempts_on_fetch_failure", "websearch_public_macro_release_fallback", "delayed_release_reason_lookup", "no_api_or_download_export", "no_model_activation", "no_broker_execution"],
     }
 
 
