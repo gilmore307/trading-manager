@@ -203,6 +203,98 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertTrue(payload["issue_refs"])
         self.assertTrue(all(ref["owner_action_required"] is False for ref in payload["issue_refs"]))
 
+    def test_agent_error_summary_marks_repaired_smoke_closed(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            agent_root = tmp / "storage" / "runtime" / "agent_error_handling"
+            request_root = agent_root / "erragent_smoke"
+            request_root.mkdir(parents=True, exist_ok=True)
+            diagnosis_path = request_root / "agent_error_diagnosis.json"
+            diagnosis_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_error_diagnosis",
+                        "schema_version": "1",
+                        "diagnosis_id": "errdiag_smoke",
+                        "request_ref": "erragent_smoke",
+                        "agent_ref": "trader",
+                        "status": "completed",
+                        "return_code": 0,
+                        "stdout": json.dumps(
+                            {
+                                "result": {
+                                    "payloads": [
+                                        {
+                                            "text": json.dumps(
+                                                {
+                                                    "diagnosis_status": "repaired",
+                                                    "root_cause": "synthetic state was broken",
+                                                    "repair_attempted": True,
+                                                    "files_changed": ["storage/runtime/smoke/state.json"],
+                                                    "verification": {"command": "python3 check_state.py", "exit_code": 0},
+                                                    "retry_recommendation": "retry is safe",
+                                                    "blockers": [],
+                                                }
+                                            )
+                                        }
+                                    ]
+                                }
+                            }
+                        ),
+                        "stderr": "",
+                        "completed_at_utc": "2026-05-18T11:07:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 3,
+                        "error_ref": "ERR-000003",
+                        "error_fingerprint": "errfp_smoke",
+                        "request_id": "erragent_smoke",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_smoke/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_smoke/agent_error_diagnosis.json",
+                        "source_component": "synthetic.agent_error_live_repair_smoke",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.synthetic_repair_smoke",
+                        "error_kind": "synthetic_repair_required",
+                        "severity": "warning",
+                        "summary": "Synthetic auto-repair smoke",
+                        "exit_code": 42,
+                        "occurred_at_utc": "2026-05-18T11:06:37Z",
+                        "created_at_utc": "2026-05-18T11:06:37Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T11:10:00Z")
+
+        agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(len(agent_errors), 1)
+        self.assertEqual(agent_errors[0]["error_ref"], "ERR-000003")
+        self.assertEqual(agent_errors[0]["diagnosis_status"], "completed")
+        self.assertEqual(agent_errors[0]["repair_status"], "repaired")
+        self.assertEqual(agent_errors[0]["handling_status"], "closed")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
+        self.assertEqual(agent_errors[0]["root_cause"], "synthetic state was broken")
+
     def test_active_scheduler_no_executable_backoff_is_running_not_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

@@ -28,6 +28,7 @@ from .scheduler_status import (
     HistoricalSchedulerStatus,
     collect_historical_scheduler_status,
 )
+from .agent_error_handler import DEFAULT_ERROR_CATALOG_NAME
 
 HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
 HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/dashboard/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
@@ -40,6 +41,7 @@ MODEL_TASKS_PER_FOLD = 9 * 4
 TASKS_PER_MODEL_FOLD = MONTHLY_TASKS_PER_FOLD + MODEL_TASKS_PER_FOLD
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
+MAX_AGENT_ERROR_SUMMARY_ROWS = 50
 
 
 def now_utc() -> str:
@@ -80,6 +82,156 @@ def _failure_excerpt(path: object, *, max_chars: int = 800) -> str | None:
     error_lines = [line for line in lines if "Error:" in line or line.endswith("Error") or "Traceback" in line]
     excerpt = error_lines[-1] if error_lines else lines[-1]
     return excerpt[-max_chars:]
+
+
+def _agent_error_catalog_path(storage_root: Path) -> Path:
+    return storage_root / "runtime" / "agent_error_handling" / DEFAULT_ERROR_CATALOG_NAME
+
+
+def _load_jsonl_objects(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for raw_line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            rows.append(payload)
+    return rows
+
+
+def _agent_result_payload(diagnosis: Mapping[str, Any]) -> dict[str, Any]:
+    stdout = diagnosis.get("stdout")
+    if not isinstance(stdout, str) or not stdout.strip():
+        return {}
+    try:
+        outer = json.loads(stdout)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(outer, Mapping):
+        return {}
+    if outer.get("diagnosis_status") or outer.get("repair"):
+        return dict(outer)
+    result = outer.get("result")
+    if not isinstance(result, Mapping):
+        return {}
+    payloads = result.get("payloads")
+    if not isinstance(payloads, list) or not payloads:
+        return {}
+    first = payloads[0]
+    if not isinstance(first, Mapping):
+        return {}
+    text = first.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return {}
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return {"agent_text": text}
+    return parsed if isinstance(parsed, dict) else {"agent_text": text}
+
+
+def _agent_repair_status(diagnosis: Mapping[str, Any], agent_payload: Mapping[str, Any]) -> str:
+    diagnosis_status = str(diagnosis.get("status") or "").lower()
+    if diagnosis_status == "queued":
+        return "queued"
+    if diagnosis_status and diagnosis_status != "completed":
+        return "agent_call_failed"
+    agent_status = str(agent_payload.get("diagnosis_status") or "").lower()
+    repair = agent_payload.get("repair")
+    nested_repair_status = str(repair.get("repair_status") or "").lower() if isinstance(repair, Mapping) else ""
+    verification = agent_payload.get("verification")
+    verification_exit_code = verification.get("exit_code") if isinstance(verification, Mapping) else None
+    if agent_status in {"repaired", "resolved", "fixed", "repair_verified"} or nested_repair_status == "repaired" or verification_exit_code == 0:
+        return "repaired"
+    if nested_repair_status in {"not_supported", "blocked", "failed"}:
+        return nested_repair_status
+    if agent_status in {"no_action_needed", "not_needed", "not_reproducible"}:
+        return "no_action_needed"
+    if agent_payload.get("repair_attempted") is True:
+        return "repair_attempted"
+    if diagnosis_status == "completed":
+        return "diagnosed"
+    return "unknown"
+
+
+def _agent_error_handling_status(catalog_row: Mapping[str, Any], repair_status: str) -> str:
+    if repair_status == "repaired":
+        scope = str(catalog_row.get("error_scope") or "")
+        component = str(catalog_row.get("source_component") or "")
+        if "model_training_stage" in scope or component == "trading-manager.stage_executor":
+            return "awaiting_retry"
+        return "closed"
+    if repair_status == "no_action_needed":
+        return "no_action_required"
+    return "open"
+
+
+def _dashboard_error_severity(catalog_row: Mapping[str, Any], handling_status: str) -> str:
+    if handling_status in {"closed", "no_action_required"}:
+        return "notice"
+    if handling_status == "awaiting_retry":
+        return "warning"
+    severity = str(catalog_row.get("severity") or "error").lower()
+    if severity == "critical":
+        return "critical"
+    if severity == "warning":
+        return "warning"
+    if severity == "info":
+        return "notice"
+    return "error"
+
+
+def _agent_error_summary(storage_root: Path, *, limit: int = MAX_AGENT_ERROR_SUMMARY_ROWS) -> list[dict[str, Any]]:
+    catalog_path = _agent_error_catalog_path(storage_root)
+    rows = _load_jsonl_objects(catalog_path)
+    if not rows:
+        return []
+    summary_rows: list[dict[str, Any]] = []
+    for row in rows[-limit:]:
+        diagnosis_path = _resolve_stage_ref_path(row.get("diagnosis_path"), storage_root=storage_root)
+        diagnosis: dict[str, Any] = {}
+        if diagnosis_path is not None and diagnosis_path.exists():
+            try:
+                diagnosis = _load_json_object(diagnosis_path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                diagnosis = {}
+        agent_payload = _agent_result_payload(diagnosis)
+        repair_status = _agent_repair_status(diagnosis, agent_payload)
+        handling_status = _agent_error_handling_status(row, repair_status)
+        repair_payload = agent_payload.get("repair") if isinstance(agent_payload.get("repair"), Mapping) else {}
+        files_changed = agent_payload.get("files_changed")
+        if not isinstance(files_changed, list):
+            files_changed = repair_payload.get("files_changed") if isinstance(repair_payload.get("files_changed"), list) else []
+        summary_rows.append(
+            {
+                "error_ref": row.get("error_ref"),
+                "error_number": row.get("error_number"),
+                "error_kind": row.get("error_kind"),
+                "error_scope": row.get("error_scope"),
+                "source_component": row.get("source_component"),
+                "source_repo": row.get("source_repo"),
+                "summary": row.get("summary"),
+                "occurred_at_utc": row.get("occurred_at_utc"),
+                "created_at_utc": row.get("created_at_utc"),
+                "severity": row.get("severity"),
+                "dashboard_severity": _dashboard_error_severity(row, handling_status),
+                "diagnosis_status": diagnosis.get("status") or "missing",
+                "repair_status": repair_status,
+                "handling_status": handling_status,
+                "retry_recommendation": agent_payload.get("retry_recommendation"),
+                "root_cause": agent_payload.get("root_cause"),
+                "files_changed": files_changed,
+                "request_path": row.get("request_path"),
+                "diagnosis_path": row.get("diagnosis_path"),
+            }
+        )
+    return summary_rows
 
 
 def _latest_stage_execution(status: HistoricalSchedulerStatus) -> dict[str, Any] | None:
@@ -942,6 +1094,8 @@ def build_historical_task_progress_summary(
     generated_at_utc = generated_at_utc or now_utc()
     stage_counts = _stage_counts(status)
     task_timeline = _task_timeline(status, stage_coverage=stage_coverage)
+    storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    agent_error_summary = _agent_error_summary(storage_root)
     if not stage_counts and task_timeline:
         for task in task_timeline:
             task_status = str(task.get("status") or "unknown")
@@ -962,6 +1116,7 @@ def build_historical_task_progress_summary(
         "next_expected_system_action": status.recommended_next_action,
         "blocker_category": active_blocker,
         "task_timeline": task_timeline,
+        "agent_error_summary": agent_error_summary,
     }
     latest_stage_execution = _latest_stage_execution(status)
     if latest_stage_execution is not None:
