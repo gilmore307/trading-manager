@@ -75,9 +75,52 @@ class EventFeedDispatchTests(unittest.TestCase):
             self.assertEqual(by_feed["05_feed_gdelt_news"]["manager_controls"]["allowed_providers"], ["gdelt_bigquery"])
             self.assertEqual(by_feed["05_feed_gdelt_news"]["manager_controls"]["allowed_endpoint_families"], ["news_query"])
             self.assertTrue(by_feed["07_feed_trading_economics_calendar_web"]["params"]["allow_live_fetch"])
+            self.assertTrue(by_feed["07_feed_trading_economics_calendar_web"]["params"]["persist_failure_diagnostics"])
             self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["allowed_providers"], ["trading_economics"])
             self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["allowed_endpoint_families"], ["calendar_web"])
             self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["max_time_window"], "45d")
+            self.assertEqual(
+                by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["failure_recovery_route"],
+                ["http_cookie_primary", "retry_after_60s", "browser_ui_fallback"],
+            )
+
+    def test_trading_economics_dispatch_retries_once_then_marks_browser_fallback(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            prepare_event_feed_backfill(
+                start_month="2016-01",
+                end_month="2016-01",
+                target_symbol="AAPL",
+                storage_root=root,
+                write_files=True,
+            )
+
+            class Result:
+                returncode = 1
+                stdout = "zero in-window rows"
+                stderr = ""
+
+            with patch("trading_manager_tasks.event_feed_dispatch.time.sleep") as sleep_mock:
+                with patch("trading_manager_tasks.event_feed_dispatch.subprocess.run", return_value=Result()) as run_mock:
+                    summary = dispatch_event_feed_backfill(
+                        start_month="2016-01",
+                        end_month="2016-01",
+                        target_symbol="AAPL",
+                        storage_root=root,
+                        trading_data_root=Path("/tmp/trading-data"),
+                        feed_ids=["07_feed_trading_economics_calendar_web"],
+                        execute_provider_calls=True,
+                        continue_on_error=True,
+                        dynamic_workers=False,
+                        te_retry_delay_seconds=60,
+                    )
+            self.assertEqual(run_mock.call_count, 2)
+            sleep_mock.assert_called_once_with(60)
+            self.assertEqual(summary.provider_calls, 2)
+            self.assertEqual(summary.items[0].attempt_count, 2)
+            self.assertEqual(summary.items[0].status, "dispatched_failed_browser_ui_fallback_required")
+            self.assertTrue(summary.items[0].browser_ui_fallback_required)
+            self.assertIn("browser Custom From/Until/Submit fallback", summary.items[0].error_summary)
 
 
 if __name__ == "__main__":

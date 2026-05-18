@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -78,6 +79,8 @@ class EventFeedDispatchItem:
     status: str
     return_code: int | None = None
     error_summary: str | None = None
+    attempt_count: int = 0
+    browser_ui_fallback_required: bool = False
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -121,9 +124,10 @@ class EventFeedDispatchSummary:
         }
 
 
-def _run_id(request_id: str) -> str:
+def _run_id(request_id: str, *, attempt: int = 1) -> str:
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    return f"{request_id}_event_feed_{stamp}"
+    suffix = "" if attempt == 1 else f"_retry_{attempt}"
+    return f"{request_id}_event_feed_{stamp}{suffix}"
 
 
 def _filter_requests(
@@ -174,6 +178,8 @@ def _autonomous_event_feed_task_key(task_key: Mapping[str, Any]) -> dict[str, An
         params["dry_run"] = False
     elif feed_id == "07_feed_trading_economics_calendar_web":
         params["allow_live_fetch"] = True
+        params["persist_failure_diagnostics"] = True
+        controls["failure_recovery_route"] = ["http_cookie_primary", "retry_after_60s", "browser_ui_fallback"]
     runtime_key["params"] = params
     policy_refs = [str(item) for item in runtime_key.get("policy_refs") or []]
     if "autonomous_historical_provider_acquisition" not in policy_refs:
@@ -182,11 +188,11 @@ def _autonomous_event_feed_task_key(task_key: Mapping[str, Any]) -> dict[str, An
     return runtime_key
 
 
-def _command(feed_id: str, task_key_path: Path, request_id: str) -> list[str]:
+def _command(feed_id: str, task_key_path: Path, request_id: str, *, attempt: int = 1) -> list[str]:
     module = FEED_MODULE_BY_ID.get(feed_id)
     if module is None:
         raise TaskSystemError(f"unsupported event feed dispatch target: {feed_id}")
-    return ["python3", "-m", module, str(task_key_path), "--run-id", _run_id(request_id)]
+    return ["python3", "-m", module, str(task_key_path), "--run-id", _run_id(request_id, attempt=attempt)]
 
 
 def _pythonpath(trading_data_root: Path) -> str:
@@ -215,6 +221,7 @@ def dispatch_event_feed_backfill(
     continue_on_error: bool = False,
     dynamic_workers: bool = True,
     max_workers: int = DEFAULT_PROVIDER_STAGE_MAX_WORKERS,
+    te_retry_delay_seconds: int = 60,
 ) -> EventFeedDispatchSummary:
     """Validate or run selected Layer 9 event-feed backfill task keys."""
 
@@ -254,19 +261,38 @@ def dispatch_event_feed_backfill(
             command_path = runtime_task_key_path
         command = _command(feed_id, command_path, request_id)
         receipt_path = str((trading_data_root / str(task_key.get("output_root") or "storage") / "completion_receipt.json").resolve())
+        attempt_count = 0
+        browser_ui_fallback_required = False
         if execute_provider_calls:
-            result = subprocess.run(
-                command,
-                cwd=trading_data_root,
-                env={**os.environ, "PYTHONPATH": _pythonpath(trading_data_root)},
-                check=False,
-                text=True,
-                capture_output=True,
-            )
-            return_code = result.returncode
-            status = "dispatched_succeeded" if result.returncode == 0 else "dispatched_failed"
-            if result.returncode != 0:
-                error_summary = "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part)
+            max_attempts = 2 if feed_id == "07_feed_trading_economics_calendar_web" else 1
+            last_result = None
+            for attempt in range(1, max_attempts + 1):
+                attempt_count = attempt
+                if attempt > 1:
+                    if te_retry_delay_seconds > 0:
+                        time.sleep(te_retry_delay_seconds)
+                    command = _command(feed_id, command_path, request_id, attempt=attempt)
+                result = subprocess.run(
+                    command,
+                    cwd=trading_data_root,
+                    env={**os.environ, "PYTHONPATH": _pythonpath(trading_data_root)},
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                last_result = result
+                if result.returncode == 0:
+                    break
+            if last_result is None:  # pragma: no cover - execute_provider_calls guards this block.
+                raise TaskSystemError("internal dispatch error: no subprocess result")
+            return_code = last_result.returncode
+            status = "dispatched_succeeded" if last_result.returncode == 0 else "dispatched_failed"
+            if last_result.returncode != 0:
+                error_summary = "\n".join(part for part in (last_result.stdout[-500:], last_result.stderr[-500:]) if part)
+                if feed_id == "07_feed_trading_economics_calendar_web":
+                    browser_ui_fallback_required = True
+                    status = "dispatched_failed_browser_ui_fallback_required"
+                    error_summary = (error_summary + "\n" if error_summary else "") + "Trading Economics HTTP/cookie route failed after one retry; use the reviewed browser Custom From/Until/Submit fallback route."
                 if not continue_on_error:
                     raise TaskSystemError(f"event feed dispatch failed for {request_id}: {error_summary}")
         items.append(
@@ -281,9 +307,12 @@ def dispatch_event_feed_backfill(
                 status=status,
                 return_code=return_code,
                 error_summary=error_summary,
+                attempt_count=attempt_count,
+                browser_ui_fallback_required=browser_ui_fallback_required,
             )
         )
-    dispatch_count = sum(1 for item in items if item.status in {"dispatched_succeeded", "dispatched_failed"})
+    dispatch_count = sum(1 for item in items if item.status in {"dispatched_succeeded", "dispatched_failed", "dispatched_failed_browser_ui_fallback_required"})
+    provider_call_count = sum(item.attempt_count for item in items if item.attempt_count)
     return EventFeedDispatchSummary(
         contract_type="manager_layer_nine_event_feed_dispatch_summary",
         stage_id="layer_09_event_risk_governor.event_feed_backfill",
@@ -293,7 +322,7 @@ def dispatch_event_feed_backfill(
         request_count=len(selected),
         validation_count=len(selected) if not execute_provider_calls else 0,
         dispatch_count=dispatch_count,
-        provider_calls=dispatch_count,
+        provider_calls=provider_call_count,
         dispatch_performed=execute_provider_calls,
         model_activation_performed=False,
         broker_execution_performed=False,
@@ -322,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--continue-on-error", action="store_true")
     parser.add_argument("--dynamic-workers", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--max-workers", type=int, default=DEFAULT_PROVIDER_STAGE_MAX_WORKERS)
+    parser.add_argument("--te-retry-delay-seconds", type=int, default=60)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--output-path", type=Path)
     args = parser.parse_args(argv)
@@ -338,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
         continue_on_error=args.continue_on_error,
         dynamic_workers=args.dynamic_workers,
         max_workers=args.max_workers,
+        te_retry_delay_seconds=args.te_retry_delay_seconds,
     )
     if args.write:
         if args.output_path is None:
