@@ -15,9 +15,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping, TextIO
 
-from .model_training_workflow import MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
+from .model_training_state import advance_workflow_state
+from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, completed_historical_month_cutoff, select_month_ingest_worker_months
+from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, completed_historical_month_cutoff, select_model_worker_fold, select_month_ingest_worker_months
 from .scheduler_status import (
     DEFAULT_DAEMON_WRAPPER_PATH,
     DEFAULT_DECISION_LOG_PATH,
@@ -837,6 +838,52 @@ def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
     return visible
 
 
+def _selected_model_worker_fold_stage_set(
+    status: HistoricalSchedulerStatus,
+    *,
+    storage_root: Path,
+    max_dashboard_month: str,
+    included_months: set[str],
+) -> tuple[str, list[Any], bool] | None:
+    selection = select_model_worker_fold(storage_root=storage_root, max_month=max_dashboard_month)
+    if selection is None:
+        return None
+    fold_key = f"{selection.start_month}..{selection.end_month}"
+    if fold_key in included_months:
+        return None
+    try:
+        plan = build_model_training_workflow_plan(
+            start_month=selection.start_month,
+            end_month=selection.end_month,
+            storage_root=storage_root,
+            selected_target_symbol=_selected_target_symbol_from_service_env(status),
+            foundation_catch_up_only=False,
+        )
+        foundation_stage_ids = [
+            stage.stage_id
+            for layer in plan.layers
+            if layer.layer in MONTHLY_SUBSTRATE_LAYERS
+            for stage in layer.stages
+            if stage.stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES
+        ]
+        state = advance_workflow_state(
+            start_month=selection.start_month,
+            end_month=selection.end_month,
+            storage_root=storage_root,
+            state_path=Path(selection.state_path) if selection.state_path else None,
+            completed_stage_ids=foundation_stage_ids,
+            selected_target_symbol=_selected_target_symbol_from_service_env(status),
+            foundation_catch_up_only=False,
+            write=False,
+        )
+    except Exception:
+        return None
+    rows = _presentable_fold_stages([stage.summary_row() for stage in state.stages])
+    if not rows:
+        return None
+    return fold_key, rows, True
+
+
 
 def _is_presentable_task_stage(raw_stage: Mapping[str, Any]) -> bool:
     stage_type = str(raw_stage.get("stage_type") or "")
@@ -927,6 +974,16 @@ def _task_timeline(
                 continue
             month_stage_sets.append((fold_key, raw_stages, True))
             included_months.add(fold_key)
+    selected_fold = _selected_model_worker_fold_stage_set(
+        status,
+        storage_root=storage_root,
+        max_dashboard_month=max_dashboard_month,
+        included_months=included_months,
+    )
+    if selected_fold is not None:
+        fold_key, raw_stages, is_active_fold = selected_fold
+        month_stage_sets.append((fold_key, raw_stages, is_active_fold))
+        included_months.add(fold_key)
     active_month, active_stages = _active_month_stages(status, storage_root)
     if (
         active_stages
@@ -974,11 +1031,13 @@ def _task_timeline(
             current_lane_heads.add((task_month, stage_id))
             seen_ingest_workers.add(worker_id)
     for timeline_month, raw_stages, _is_active_month in month_stage_sets:
+        if current_model_heads:
+            break
         for raw_stage in raw_stages:
             if not isinstance(raw_stage, Mapping):
                 continue
             stage_id = str(raw_stage.get("stage_id") or "")
-            if not stage_id or str(raw_stage.get("status") or "") in {"succeeded", "not_applicable"}:
+            if not stage_id or str(raw_stage.get("status") or "") != "ready":
                 continue
             stage_type = str(raw_stage.get("stage_type") or "")
             if stage_type not in {"model_generation", "model_evaluation", "promotion_review", "maintenance"}:
@@ -1002,8 +1061,10 @@ def _task_timeline(
             if not is_current:
                 is_current = bool((task_month_for_state, stage_id) in current_model_heads and not is_terminal)
             if not is_current and not current_lane_heads and not current_model_heads:
-                is_current = bool(is_active_month and stage_id and stage_id == status.current_stage and not is_terminal)
-            if not current_lane_heads and is_active_month and not first_open_seen and not is_terminal:
+                is_current = bool(
+                    is_active_month and stage_id and stage_id == status.current_stage and stage_status == "ready" and not is_terminal
+                )
+            if not current_lane_heads and is_active_month and not first_open_seen and stage_status == "ready" and not is_terminal:
                 is_current = True
                 first_open_seen = True
             if latest_failed_stage and stage_id == latest_failed_stage and (

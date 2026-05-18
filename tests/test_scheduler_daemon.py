@@ -375,6 +375,42 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(next_selection.fold_id, "fold_2016-07_2016-12")
         self.assertEqual(next_selection.fold_months, ("2016-07", "2016-08", "2016-09", "2016-10", "2016-11", "2016-12"))
 
+    def test_model_worker_skips_blocked_fold_and_selects_next_ready_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            blocked_state_path = model_worker_fold_state_path("2016-01", "2016-06", root=storage_root / "runtime")
+            blocked_state_path.parent.mkdir(parents=True, exist_ok=True)
+            blocked_state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_09_event_risk_governor.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 9,
+                                "layer_key": "layer_09_event_risk_governor",
+                                "status": "blocked",
+                                "last_reason": "waiting for layer_09_event_risk_governor.feature_or_input_ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-12")
+
+        self.assertIsNotNone(selection)
+        assert selection is not None
+        self.assertEqual(selection.fold_id, "fold_2016-07_2016-12")
+        self.assertEqual(selection.reason_code, "complete_foundation_fold_ready")
+
     def test_auto_work_selection_jumps_past_externally_completed_months(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"

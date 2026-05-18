@@ -955,6 +955,70 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             ["month_ingest_worker_1", "month_ingest_worker_2", "month_ingest_worker_3"],
         )
 
+    def test_task_timeline_marks_ready_model_fold_current_not_blocked_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_2016-07_2016-12.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-07",
+                        "end_month": "2016-12",
+                        "stages": [
+                            {
+                                "stage_id": "layer_09_event_risk_governor.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 9,
+                                "layer_key": "layer_09_event_risk_governor",
+                                "status": "blocked",
+                                "last_reason": "waiting for layer_09_event_risk_governor.feature_or_input_ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_fold_state_2017-01_2017-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2017-01",
+                        "end_month": "2017-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T12:00:00Z")
+
+        current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
+        self.assertIn(("2017-01..2017-06", "layer_01_market_regime.model_generation"), [(task["month"], task["task_id"]) for task in current_tasks])
+        blocked_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-07..2016-12")
+        self.assertEqual(blocked_task["task_state"], "future")
+
     def test_cli_builds_payload(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

@@ -49,6 +49,7 @@ DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-r
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
 DEFAULT_MONTH_INGEST_WORKERS = 3
 COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
+MODEL_WORKER_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
 
 
 def previous_month(month: str) -> str:
@@ -366,9 +367,22 @@ def _fold_payload_has_open_model_worker_stage(payload: dict[str, Any]) -> bool:
     for stage in stages:
         if not isinstance(stage, dict):
             continue
-        if str(stage.get("stage_type") or "") in {"model_generation", "model_evaluation", "promotion_review", "maintenance"} and str(
-            stage.get("status") or ""
-        ) not in {"succeeded", "not_applicable"}:
+        if str(stage.get("stage_type") or "") in MODEL_WORKER_STAGE_TYPES and str(stage.get("status") or "") not in {
+            "succeeded",
+            "not_applicable",
+        }:
+            return True
+    return False
+
+
+def _fold_payload_has_ready_model_worker_stage(payload: dict[str, Any]) -> bool:
+    stages = payload.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return True
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        if str(stage.get("stage_type") or "") in MODEL_WORKER_STAGE_TYPES and str(stage.get("status") or "") == "ready":
             return True
     return False
 
@@ -423,7 +437,11 @@ def select_model_worker_fold(
                     payload = json.loads(state_path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     payload = {}
-                if not _workflow_payload_all_stages_complete(payload) and _fold_payload_has_open_model_worker_stage(payload):
+                if (
+                    not _workflow_payload_all_stages_complete(payload)
+                    and _fold_payload_has_open_model_worker_stage(payload)
+                    and _fold_payload_has_ready_model_worker_stage(payload)
+                ):
                     return ModelWorkerFoldSelection(
                         fold_id=_model_worker_fold_id(candidate, end_month),
                         start_month=candidate,
