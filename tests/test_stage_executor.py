@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.model_training_state import StageProgress
@@ -22,14 +23,15 @@ class StageExecutorTests(unittest.TestCase):
                 command=["python3", "-c", "print('offline ok')"],
                 blockers=(),
             )
-            summary = execute_stage_process(
-                stage,
-                manager_root=tmp,
-                trading_data_root=tmp,
-                trading_model_root=tmp,
-                receipt_root=tmp / "receipts",
-                log_root=tmp / "logs",
-            )
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
             self.assertEqual(summary.contract_type, "manager_stage_execution_summary")
             self.assertEqual(summary.status, "succeeded")
             self.assertEqual(summary.provider_calls, 0)
@@ -71,14 +73,15 @@ class StageExecutorTests(unittest.TestCase):
                 command=["python3", "materialize_layer_three_target_state_inputs.py"],
                 blockers=(),
             )
-            summary = execute_stage_process(
-                stage,
-                manager_root=tmp,
-                trading_data_root=tmp,
-                trading_model_root=tmp,
-                receipt_root=tmp / "receipts",
-                log_root=tmp / "logs",
-            )
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
             self.assertEqual(summary.status, "failed")
             self.assertEqual(summary.provider_calls, 0)
             self.assertTrue(Path(summary.agent_error_request_path or "").exists())

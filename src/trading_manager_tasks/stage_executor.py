@@ -260,6 +260,7 @@ def execute_stage_process(
             evidence_refs=[f"manager_stage:{stage.stage_id}"],
             output_root=log_root.parent / "agent_error_handling",
             call_agent=bool(os.environ.get("MANAGER_AGENT_ERROR_AUTOCALL")),
+            catalog_storage=os.environ.get("MANAGER_AGENT_ERROR_CATALOG_STORAGE", "sql"),
         )
     summary = StageExecutionSummary(
         contract_type="manager_stage_execution_summary",
