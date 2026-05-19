@@ -120,6 +120,9 @@ class RegistryHelperTests(unittest.TestCase):
 
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
         self.assertIn("one_frozen_benchmark_episode_panel", policy["payload"])
+        self.assertIn("single_name_optionable_majority_required", policy["payload"])
+        self.assertIn("etf_backbone_minor_context_only", policy["payload"])
+        self.assertIn("large_same_background_overlap_restrained", policy["payload"])
         self.assertIn("hot_thematic_single_name_coverage_required", policy["payload"])
         self.assertIn("crypto_minority_sleeve_required", policy["payload"])
         self.assertIn("controlled_data_stress_sleeve_allowed", policy["payload"])
@@ -438,7 +441,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("8_resolved_selected_contract_ref", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
         self.assertIn("8_resolved_no_option_reason_codes", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
         self.assertIn("long_call", rows["OPTION_EXPRESSION_TYPES"]["payload"])
+        self.assertIn("underlying_only_expression", rows["OPTION_EXPRESSION_TYPES"]["payload"])
         self.assertIn("option_expression_not_broker_order", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
+        self.assertIn("underlying_only_expression_allowed_when_options_unsuitable", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
         self.assertIn("maintain_or_no_trade_means_no_option_expression", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
         self.assertIn("preferred_delta_range_hard_filter", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
         self.assertIn("target_range_moneyness_guardrail", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
@@ -556,6 +561,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("three_listed_strike_levels_below", rows["LAYER_08_OPTION_BUCKET_STRIKE_POLICY"]["payload"])
         self.assertIn("no_acquisition_time_prefilter_for_model_construction", rows["LAYER_08_OPTION_BUCKET_PREFILTER_POLICY"]["payload"])
         self.assertIn("single_leg_only", rows["LAYER_08_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
+        self.assertIn("underlying_only_expression_non_option_fallback", rows["LAYER_08_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
         self.assertNotIn("live_" + "calls_disabled_by_default", rows["DATA_PRODUCTION_HARDENING_POLICY"]["payload"])
         self.assertEqual(rows["MANAGER_CONTROLLED_INFORMATION_PASS"]["payload"], "manager_controlled_information_pass")
         self.assertIn("plan_controlled_information_pass.py", rows["MANAGER_CONTROLLED_INFORMATION_PASS_PLAN"]["path"])
