@@ -33,7 +33,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py --start-
 
 The scheduler should advance Layer 1/2 foundation coverage before ordinary Layer 3+ target work. Downstream target work requires an explicit selected target symbol once admitted.
 
-Layer 3 input materialization also prepares `source_02_target_candidate_holdings` before `source_03_target_state` so target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
+Layer 2 feature generation also prepares `source_02_target_candidate_holdings` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
 ## Event-Risk Lane
 

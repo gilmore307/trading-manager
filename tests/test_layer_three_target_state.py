@@ -6,7 +6,6 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.layer_three_target_state import (
-    build_target_candidate_holdings_task_key,
     build_source_task_key,
     discover_layer_two_feed_artifacts,
     materialize_layer_three_target_state_inputs,
@@ -74,24 +73,6 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertIn("bar_rows_path", task_key["params"])
             self.assertNotIn("bar_rows", task_key["params"])
 
-    def test_builds_target_candidate_holdings_task_key_for_issuer_fetch(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            tmp = Path(raw_tmp)
-
-            task_key, task_key_path = build_target_candidate_holdings_task_key(
-                start_month="2026-05",
-                end_month="2026-05",
-                output_dir=tmp / "out",
-                trading_data_output_root=tmp / "td-holdings-out",
-            )
-
-            self.assertEqual(task_key["source"], "source_02_target_candidate_holdings")
-            self.assertEqual(task_key["params"]["start"], "2026-05-01T00:00:00-05:00")
-            self.assertEqual(task_key["params"]["end"], "2026-06-01T00:00:00-05:00")
-            self.assertTrue(task_key["params"]["continue_on_error"])
-            self.assertEqual(task_key["source_policy"], "official_issuer_holdings_fetch_with_point_in_time_window_filter")
-            self.assertTrue(task_key_path.exists())
-
     def test_dry_run_writes_task_evidence_but_does_not_call_provider(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -134,8 +115,6 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(summary.feed_artifact_count, 1)
             self.assertEqual(summary.provider_calls, 0)
             self.assertFalse(summary.model_activation_performed)
-            self.assertEqual(summary.target_candidate_holdings_fetch_count, 0)
-            self.assertTrue(Path(summary.target_candidate_holdings_task_key_path).exists())
             self.assertTrue(Path(summary.task_key_path).exists())
 
     def test_fold_materialization_uses_one_candidate_per_symbol_across_months(self) -> None:

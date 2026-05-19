@@ -362,6 +362,15 @@ FEATURE_MODULES: dict[str, str] = {
 def feature_command(feature_cli: str | None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
+    if feature_cli == "trading-data-feature-02-sector-context":
+        return [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/execute_layer_two_feature_generation.py",
+            "--month",
+            "${START_MONTH}",
+            "--write",
+        ]
     if feature_cli == "trading-data-feature-08-option-expression":
         return [
             "PYTHONPATH=src",
@@ -584,8 +593,8 @@ def _build_layer_workflow(
                 dataset_unit=dataset_unit,
                 blockers=acquisition_blockers,
                 approval_gate_required=acquisition_gate,
-                safe_without_provider_calls=not (layer in {1, 2, 3} or acquisition_gate is not None),
-                provider_calls_allowed=layer in {1, 2, 3},
+                safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
+                provider_calls_allowed=layer in {1, 2},
             )
         )
         if meta.get("feature_cli") is not None:
@@ -604,6 +613,8 @@ def _build_layer_workflow(
                         layer=layer,
                         selected_target_symbol=selected_target_symbol,
                     ),
+                    safe_without_provider_calls=layer != 2,
+                    provider_calls_allowed=layer == 2,
                 )
             )
     if foundation_catch_up_only:

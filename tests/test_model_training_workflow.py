@@ -125,8 +125,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", command)
         self.assertIn("--write", command)
         self.assertIsNone(plan.layers[2].stages[0].approval_gate_required)
-        self.assertTrue(plan.layers[2].stages[0].provider_calls_allowed)
-        self.assertFalse(plan.layers[2].stages[0].safe_without_provider_calls)
+        self.assertFalse(plan.layers[2].stages[0].provider_calls_allowed)
+        self.assertTrue(plan.layers[2].stages[0].safe_without_provider_calls)
 
     def test_foundation_catch_up_omits_monthly_post_feature_model_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -216,15 +216,19 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
 
-    def test_layer_two_feature_generation_materializes_feed_artifacts_first(self):
+    def test_layer_two_feature_generation_materializes_features_and_source_two(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
 
+        stage = plan.layers[1].stages[1]
         command = plan.layers[1].feature_command
 
-        self.assertIn("data_feature.feature_02_sector_context.from_feed_artifacts", command)
+        self.assertIn("scripts/tasks/execute_layer_two_feature_generation.py", command)
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
+        self.assertIn("--write", command)
+        self.assertTrue(stage.provider_calls_allowed)
+        self.assertFalse(stage.safe_without_provider_calls)
 
     def test_layer_eight_option_expression_feature_generation_uses_option_adapter_with_no_provider_skip_support(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
