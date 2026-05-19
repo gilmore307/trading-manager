@@ -1,8 +1,8 @@
 # Model Promotion Scheduling
 
-Manager owns scheduling and request preparation for model promotion/evaluation work. Benchmark judgment, promotion eligibility, active model config release, and model activation records belong to `trading-evaluation`.
+Manager owns scheduling and request preparation for model promotion/evaluation work. Benchmark judgment, promotion eligibility, and promotion readiness belong to `trading-evaluation`; runtime active/shadow model selection belongs to `trading-execution`.
 
-When a reviewer agent is used for promotion judgment, the request must require the workspace skill `skills/openclaw/promotion-evaluation-review`. The agent review is advisory evidence only; `trading-evaluation` deterministic checks own eligibility and activation records.
+When a reviewer agent is used for promotion judgment, the request must require the workspace skill `skills/openclaw/promotion-evaluation-review`. The agent review is advisory evidence only; `trading-evaluation` deterministic checks own eligibility and readiness records.
 
 ## Required Evidence
 
@@ -15,12 +15,12 @@ A promotion packet should identify:
 - leakage checks;
 - stability and sample-size evidence;
 - known failure modes;
-- downstream activation scope;
+- downstream shadow/activation scope;
 - evaluation decision evidence.
 
 ## Activation Boundary
 
-Manager must not activate production pointers. Activation requires `trading-evaluation` evidence: accepted benchmark settlement, `promotion_eligibility_decision`, active model config ref, model activation record, and rollback ref. Deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, or route-only artifacts cannot activate production pointers.
+Manager must not activate production pointers. Offline promotion requires `trading-evaluation` evidence: accepted benchmark settlement, `promotion_eligibility_decision`, `promotion_readiness_record`, and rollback/config refs. Runtime activation requires `trading-execution` shadow-cycle evidence: active model live performance, promoted-but-not-active shadow performance, realtime candidate roster, and elimination rationale where applicable. Deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, or route-only artifacts cannot activate production pointers.
 
 ## Layer 9 / Layer 4 Rule
 

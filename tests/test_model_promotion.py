@@ -59,7 +59,8 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertIn("evaluation_promotion_activation_policy", request["policy_refs"])
         self.assertIn("fold_settlement_run", request["expected_outputs"])
         self.assertIn("promotion_eligibility_decision", request["expected_outputs"])
-        self.assertIn("model_activation_record_if_eligible", request["expected_outputs"])
+        self.assertIn("promotion_readiness_record_if_eligible", request["expected_outputs"])
+        self.assertIn("execution_shadow_cycle_selection_after_live_cycle", request["expected_outputs"])
 
 
     def test_accepts_layer_or_stable_model_ids_for_current_surfaces(self):

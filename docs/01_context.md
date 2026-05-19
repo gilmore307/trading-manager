@@ -9,7 +9,8 @@ The trading system is split into focused repositories so each boundary can stay 
 | `trading-manager` | Control plane, registry, contracts, workflow, review gates, shared helpers | Owns global routing and evidence policy. |
 | `trading-data` | Provider feeds, ingestion, source rows, feature rows | Receives manager requests and emits receipts/artifact refs. |
 | `trading-model` | Model design, training, evaluation, diagnostics, promotion candidates | Consumes point-in-time inputs and emits model/evaluation/promotion evidence. |
-| `trading-evaluation` | Frozen benchmarks, fold settlement, promotion eligibility, model activation | Judges completed folds independently and owns active model config release; manager records status but does not own model-quality judgment or activation. |
+| `trading-evaluation` | Frozen benchmarks, fold settlement, promotion eligibility, promotion readiness | Judges completed folds independently and admits candidates to execution shadow review; manager records status but does not own model-quality judgment or activation. |
+| `trading-execution` | Runtime active/shadow model lifecycle | Runs the active model plus promoted shadow candidates and owns post-cycle active/realtime/eliminate roster selection. |
 | `trading-storage` | Durable storage layout, lifecycle, archive/rehydrate, dashboard read models | Stores large payloads and executes lifecycle policy with receipts. |
 | `trading-execution` | Paper/live execution, broker interfaces, orders, fills, account/position reconciliation | Owns all broker/account mutation. Manager can validate handoffs but cannot execute. |
 | `trading-dashboard` | UI and visualization | Reads published status and dashboard payloads. |

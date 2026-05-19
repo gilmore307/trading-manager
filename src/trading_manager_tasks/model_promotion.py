@@ -39,7 +39,8 @@ DEFAULT_POLICY_REFS = (
 DEFAULT_EXPECTED_OUTPUTS = (
     "fold_settlement_run",
     "promotion_eligibility_decision",
-    "model_activation_record_if_eligible",
+    "promotion_readiness_record_if_eligible",
+    "execution_shadow_cycle_selection_after_live_cycle",
     "promotion_review_ready_signal",
 )
 

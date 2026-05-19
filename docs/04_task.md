@@ -31,7 +31,7 @@ The resident historical scheduler is the normal path for no-broker historical mo
 ## Standing Gates
 
 - Provider calls require explicit provider-dispatch scope and controls.
-- Model activation belongs to `trading-evaluation` and requires accepted promotion eligibility plus activation evidence.
+- Offline promotion readiness belongs to `trading-evaluation`; runtime active model selection belongs to `trading-execution` after accepted shadow-cycle evidence.
 - Storage lifecycle mutation requires accepted lifecycle policy, protected-set checks, and receipts.
 - Broker/order/fill/account mutation belongs only to `trading-execution`.
 - Unknown-overlap event/activity evidence is review/provenance only; it cannot score, intervene, or promote.

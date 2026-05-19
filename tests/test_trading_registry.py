@@ -102,12 +102,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("eligible", eligibility["note"])
         self.assertIn("promotion-evaluation-review", eligibility["note"])
 
-        activation = rows["EVALUATION_MODEL_ACTIVATION_RECORD"]
-        self.assertEqual(activation["payload"], "model_activation_record")
-        self.assertIn("trading-evaluation", activation["path"])
+        readiness = rows["EVALUATION_PROMOTION_READINESS_RECORD"]
+        self.assertEqual(readiness["payload"], "promotion_readiness_record")
+        self.assertIn("trading-evaluation", readiness["path"])
 
-        active_config = rows["EVALUATION_ACTIVE_MODEL_CONFIG"]
+        active_config = rows["EXECUTION_ACTIVE_MODEL_CONFIG"]
         self.assertEqual(active_config["payload"], "active_model_config")
+        self.assertIn("trading-execution", active_config["path"])
 
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
         self.assertIn("one_frozen_target_window", policy["payload"])
@@ -123,9 +124,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("incumbent_vector_comparison", vector_policy["payload"])
         self.assertIn("defer_when_not_materially_better", vector_policy["payload"])
 
-        activation_policy = rows["EVALUATION_PROMOTION_ACTIVATION_POLICY"]
-        self.assertIn("evaluation_owns_model_activation", activation_policy["payload"])
-        self.assertIn("manager_schedules_only", activation_policy["payload"])
+        readiness_policy = rows["EVALUATION_PROMOTION_READINESS_POLICY"]
+        self.assertIn("evaluation_owns_offline_promotion_readiness", readiness_policy["payload"])
+        self.assertIn("execution_owns_runtime_activation", readiness_policy["payload"])
+
+        execution_policy = rows["EXECUTION_RUNTIME_MODEL_LIFECYCLE_POLICY"]
+        self.assertIn("promoted_not_active_shadow_during_market_hours", execution_policy["payload"])
+        self.assertIn("ranks_2_to_4_realtime_candidates", execution_policy["payload"])
 
     def test_event_risk_governor_layer_policy_terms_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -398,7 +403,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_PROMOTION_REVIEW"]["payload"], "model_promotion_review")
         self.assertIn("every model layer", rows["MODEL_PROMOTION_REVIEW"]["note"])
         self.assertIn("manager_schedules_only", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
-        self.assertIn("evaluation_owns_benchmark_settlement_eligibility_activation", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("evaluation_owns_benchmark_settlement_eligibility_readiness", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("execution_owns_shadow_cycle_activation", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertEqual(
             rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"],
             "market_regime_model;sector_context_model;target_state_vector_model;event_failure_risk_model;alpha_confidence_model;position_projection_model;underlying_action_model;event_risk_governor;option_expression_model",
@@ -605,8 +611,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("live_trading_capacity_reserved", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("historical_worker_count_capacity_adaptive", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("pre_promotion_full_training_mode", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
-        self.assertIn("market_hours_historical_training_backoff_disabled_until_evaluation_model_activation", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
-        self.assertIn("model_activation_requires_evaluation_activation_record", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
+        self.assertIn("market_hours_historical_training_backoff_disabled_until_execution_runtime_activation", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
+        self.assertIn("runtime_activation_requires_execution_shadow_cycle_selection", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
         self.assertIn("historical_provider_calls_run_autonomously_under_resource_controls", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
         self.assertIn("check_gates", rows["MANAGER_SCHEDULER_WORK_LOOP"]["payload"])
         self.assertIn("run_automation_scheduler.py", rows["MANAGER_AUTOMATION_SCHEDULER_RUN"]["path"])
@@ -651,8 +657,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
         self.assertIn("trading-manager-historical-scheduler.service", rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["path"])
         self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision")
-        self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "model_activation_record")
-        self.assertIn("trading-evaluation", rows["ACTIVATION_RECORD_ARTIFACT"]["path"])
+        self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "execution_shadow_cycle_selection")
+        self.assertIn("trading-execution", rows["ACTIVATION_RECORD_ARTIFACT"]["path"])
         self.assertIn("build_review_decision.py", rows["MANAGER_REVIEW_DECISION_BUILD"]["path"])
         self.assertEqual(rows["COMPONENT_COMPLETION_RECEIPT_PAYLOAD"]["payload"], "component_completion_receipt_payload")
         self.assertIn("store_completion_receipt_payload.py", rows["STORAGE_COMPLETION_RECEIPT_PAYLOAD_STORE"]["path"])
