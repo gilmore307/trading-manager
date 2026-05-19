@@ -89,11 +89,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(benchmark["payload"], "evaluation_benchmark_contract")
         self.assertIn("same-target training-exclusion evidence", benchmark["note"])
         self.assertIn("target-context refs for non-ETF targets", benchmark["note"])
+        self.assertIn("stress-exception refs for controlled data-edge cases", benchmark["note"])
 
         validation = rows["EVALUATION_BENCHMARK_CONTRACT_VALIDATION"]
         self.assertEqual(validation["payload"], "evaluation_benchmark_contract_validation")
         self.assertIn("benchmark target/window overlap", validation["note"])
         self.assertIn("non-ETF target-context refs", validation["note"])
+        self.assertIn("stress-sleeve cap and exception refs", validation["note"])
 
         settlement = rows["FOLD_SETTLEMENT_RUN"]
         self.assertEqual(settlement["payload"], "fold_settlement_run")
@@ -120,6 +122,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("one_frozen_benchmark_episode_panel", policy["payload"])
         self.assertIn("hot_thematic_single_name_coverage_required", policy["payload"])
         self.assertIn("crypto_minority_sleeve_required", policy["payload"])
+        self.assertIn("controlled_data_stress_sleeve_allowed", policy["payload"])
+        self.assertIn("critical_data_stress_tags_require_stress_role", policy["payload"])
+        self.assertIn("quote_only_crypto_component_allowed", policy["payload"])
+        self.assertIn("missing_layer2_stress_component_allowed", policy["payload"])
+        self.assertIn("stress_exception_ref_required", policy["payload"])
+        self.assertIn("stress_sleeve_weight_cap_15_percent", policy["payload"])
         self.assertIn("non_etf_targets_require_target_context_review", policy["payload"])
         self.assertIn("formal_run_once_after_training", policy["payload"])
         self.assertIn("benchmark_data_evaluation_only", policy["payload"])
