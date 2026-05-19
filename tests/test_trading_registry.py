@@ -169,6 +169,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(script["kind"], "script")
         self.assertIn("scripts/tasks/plan_fold_cleanup.py", script["path"])
 
+    def test_storage_maintenance_service_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        summary = rows["STORAGE_SCHEDULED_MAINTENANCE_SUMMARY"]
+        self.assertEqual(summary["kind"], "artifact_type")
+        self.assertEqual(summary["payload"], "storage_scheduled_maintenance_summary")
+        self.assertIn("log archive/delete", summary["note"])
+
+        service = rows["STORAGE_MAINTENANCE_SYSTEMD_SERVICE"]
+        self.assertEqual(service["kind"], "config")
+        self.assertIn("trading-storage-maintenance.service", service["payload"])
+        self.assertIn("trading-storage-maintenance.timer", service["payload"])
+
+        boundary = rows["STORAGE_MAINTENANCE_BACKUP_DELETE_BOUNDARY_POLICY"]
+        self.assertIn("storage_executes_backup_archive_delete", boundary["payload"])
+        self.assertIn("Manager emits plans/requests", boundary["note"])
+
     def test_data_feed_and_data_source_rows_are_separated(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
