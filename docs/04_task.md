@@ -18,9 +18,10 @@ The resident historical scheduler is the normal path for no-broker historical mo
    - Reuse point-in-time-valid provider data, cleaned data, feature-ready manifests, and coverage evidence.
    - Rebuild dependent model/evaluation/promotion artifacts when their substrate changes.
 
-3. **Dataset and promotion readiness**
+3. **Dataset, settlement, and promotion readiness**
    - Expand dataset coverage only through manager evidence and request contracts.
-   - Treat promotion/activation as a separate agent-reviewed gate, not automatic scheduler completion.
+   - Treat fold settlement and promotion eligibility as evaluation-owned evidence, not manager-owned model-quality judgment.
+   - Treat activation as a separate controlled gate, not automatic scheduler completion.
 
 4. **Event-risk governance lane**
    - Keep Layer 9 as residual event-risk governance over the Layer 7 thesis within the historical service boundary; Layer 8 guidance/expression context remains optional.
@@ -30,7 +31,7 @@ The resident historical scheduler is the normal path for no-broker historical mo
 ## Standing Gates
 
 - Provider calls require explicit provider-dispatch scope and controls.
-- Model activation requires accepted `agent_model_promotion_decision` evidence.
+- Model activation requires accepted promotion eligibility and separate activation evidence.
 - Storage lifecycle mutation requires accepted lifecycle policy, protected-set checks, and receipts.
 - Broker/order/fill/account mutation belongs only to `trading-execution`.
 - Unknown-overlap event/activity evidence is review/provenance only; it cannot score, intervene, or promote.

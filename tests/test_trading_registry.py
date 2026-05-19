@@ -64,6 +64,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["TRADING_MANAGER_REPO"]["payload"], "trading-manager")
         self.assertEqual(rows["TRADING_MANAGER_REPO"]["path"], "/root/projects/trading-manager")
         self.assertIn("control-plane", rows["TRADING_MANAGER_REPO"]["note"])
+        self.assertEqual(rows["TRADING_EVALUATION_REPO"]["payload"], "trading-evaluation")
+        self.assertEqual(rows["TRADING_EVALUATION_REPO"]["path"], "/root/projects/trading-evaluation")
+        self.assertIn("independent benchmark", rows["TRADING_EVALUATION_REPO"]["note"])
         self.assertNotIn("TRADING_MAIN_REPO", rows)
         self.assertNotIn("TRADING_SOURCE_REPO", rows)
         self.assertNotIn("TRADING_DERIVED_REPO", rows)
@@ -77,6 +80,30 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn("trading-" + "derived", row["path"])
             self.assertNotIn("trading-" + "strategy", row["payload"])
             self.assertNotIn("trading-" + "strategy", row["path"])
+
+    def test_trading_evaluation_contract_rows_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        benchmark = rows["EVALUATION_BENCHMARK_CONTRACT"]
+        self.assertEqual(benchmark["payload"], "evaluation_benchmark_contract")
+        self.assertIn("training-exclusion evidence", benchmark["note"])
+
+        validation = rows["EVALUATION_BENCHMARK_CONTRACT_VALIDATION"]
+        self.assertEqual(validation["payload"], "evaluation_benchmark_contract_validation")
+        self.assertIn("benchmark target overlap", validation["note"])
+
+        settlement = rows["FOLD_SETTLEMENT_RUN"]
+        self.assertEqual(settlement["payload"], "fold_settlement_run")
+        self.assertIn("completed fold", settlement["note"])
+
+        eligibility = rows["PROMOTION_ELIGIBILITY_DECISION"]
+        self.assertEqual(eligibility["payload"], "promotion_eligibility_decision")
+        self.assertIn("not production activation", eligibility["note"])
+
+        policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
+        self.assertIn("one_frozen_target_window", policy["payload"])
+        self.assertIn("target_not_training_used", policy["payload"])
 
     def test_event_risk_governor_layer_policy_terms_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
