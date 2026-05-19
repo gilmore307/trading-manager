@@ -131,8 +131,11 @@ Lock scopes are `daemon`, `month_stage`, `provider_partition`, `reconcile`, and 
 
 - `manager_dataset_evidence` summarizes snapshot/split/label/eval/control-plane coverage.
 - `model_promotion_review_request` asks for promotion review.
-- `agent_model_promotion_decision` is required for production activation.
+- `agent_model_promotion_decision` is advisory evidence only. Offline promotion readiness belongs to `trading-evaluation`; runtime active selection belongs to `trading-execution`.
 - `agent_storage_lifecycle_decision` is required for storage lifecycle mutation.
+- Agent decisions must cite a fixed workspace skill:
+  `promotion-evaluation-review`, `runtime-model-lifecycle-review`, `target-context-review`, `server-error-diagnosis`, `storage-lifecycle-review`, `failure-register-review`, or `event-strategy-promotion-review`.
+- Any agent comparison between models must use anonymous model labels. The agent must not know which label is new, old, active, incumbent, champion, challenger, or latest.
 
 ## Status Semantics
 

@@ -46,6 +46,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertIn("TaskSystemError", normalized["stderr_excerpt"])
             self.assertTrue(any("do not submit broker orders" in item for item in normalized["forbidden_actions"]))
             self.assertIn("Error request:", normalized["agent_prompt"])
+            self.assertIn("server-error-diagnosis", normalized["agent_prompt"])
 
     def test_rejects_invalid_severity(self) -> None:
         with self.assertRaisesRegex(TaskSystemError, "severity"):

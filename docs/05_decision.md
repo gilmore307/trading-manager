@@ -42,13 +42,27 @@ Layer 4 may condition alpha only with evidence packets that passed source preced
 
 Layer 9 governs residual event risk over the Layer 7 direct-underlying/spot thesis. Layer 8 guidance/expression context is optional input context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
-## D011 - Promotion activation requires agent decision evidence
+## D011 - Agent model review is advisory and blinded
 
-A production activation path must reference an accepted `agent_model_promotion_decision`. Advisory reviews, missing reviews, rejected decisions, deferred decisions, or stale artifacts cannot activate production pointers.
+Agent model reviews may support evaluation and execution decisions, but they do not activate production pointers. Offline promotion readiness belongs to `trading-evaluation`; runtime active selection and active pointer writes belong to `trading-execution`.
+
+Any agent that compares models must receive anonymous labels only. It must not know which model is new, old, active, incumbent, champion, challenger, or latest. If identity blinding fails, the review must defer or return insufficient evidence.
 
 ## D012 - Storage lifecycle mutation is separately gated
 
 Storage lifecycle decisions require policy evidence, protected-set checks, decision artifacts, and receipts. Historical scheduler progress does not imply permission to delete, archive, or mutate durable storage.
+
+## D018 - Agent decision surfaces require fixed skills
+
+Every agent decision surface must cite a fixed workspace skill so the reviewer uses a stable rubric instead of ad hoc judgment:
+
+- `promotion-evaluation-review` for offline benchmark and promotion eligibility review.
+- `runtime-model-lifecycle-review` for execution-owned active/shadow roster review.
+- `event-strategy-promotion-review` for event-family or strategy-failure promotion into model layers.
+- `target-context-review` for target-to-Layer-2 context mapping review.
+- `failure-register-review` for failed request disposition.
+- `server-error-diagnosis` for bounded server error diagnosis and safe repair.
+- `storage-lifecycle-review` for backup, cleanup, archive, restore, and delete review.
 
 ## D013 - Provider calls are explicit gated work
 

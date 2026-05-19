@@ -123,9 +123,10 @@ class RegistryHelperTests(unittest.TestCase):
         review_skill = rows["EVALUATION_PROMOTION_REVIEW_SKILL"]
         self.assertEqual(review_skill["payload"], "promotion-evaluation-review")
         self.assertIn("promotion-evaluation-review/SKILL.md", review_skill["path"])
+        self.assertIn("anonymous model comparison", review_skill["note"])
 
         vector_policy = rows["EVALUATION_PROMOTION_VECTOR_RUBRIC_POLICY"]
-        self.assertIn("incumbent_vector_comparison", vector_policy["payload"])
+        self.assertIn("anonymous_model_vector_comparison", vector_policy["payload"])
         self.assertIn("defer_when_not_materially_better", vector_policy["payload"])
 
         readiness_policy = rows["EVALUATION_PROMOTION_READINESS_POLICY"]
@@ -134,12 +135,40 @@ class RegistryHelperTests(unittest.TestCase):
 
         execution_policy = rows["EXECUTION_RUNTIME_MODEL_LIFECYCLE_POLICY"]
         self.assertIn("promoted_not_active_shadow_during_market_hours", execution_policy["payload"])
+        self.assertIn("anonymous_model_comparison_required", execution_policy["payload"])
         self.assertIn("ranks_2_to_4_realtime_candidates", execution_policy["payload"])
         self.assertIn("active_pointer_write_requires_separate_gate", execution_policy["payload"])
 
         write_policy = rows["EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_POLICY"]
         self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])
         self.assertIn("rollback_ref_required", write_policy["payload"])
+
+    def test_agent_decision_skill_rows_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        fixed_policy = rows["AGENT_DECISION_FIXED_SKILL_POLICY"]
+        self.assertIn("all_agent_decisions_require_fixed_workspace_skill", fixed_policy["payload"])
+        self.assertIn("model_comparisons_require_anonymous_labels", fixed_policy["payload"])
+
+        expected_skills = {
+            "EVALUATION_PROMOTION_REVIEW_SKILL": "promotion-evaluation-review",
+            "RUNTIME_MODEL_LIFECYCLE_REVIEW_SKILL": "runtime-model-lifecycle-review",
+            "TARGET_CONTEXT_REVIEW_SKILL": "target-context-review",
+            "SERVER_ERROR_DIAGNOSIS_SKILL": "server-error-diagnosis",
+            "STORAGE_LIFECYCLE_REVIEW_SKILL": "storage-lifecycle-review",
+            "FAILURE_REGISTER_REVIEW_SKILL": "failure-register-review",
+            "EVENT_STRATEGY_PROMOTION_REVIEW_SKILL": "event-strategy-promotion-review",
+        }
+        for key, skill_name in expected_skills.items():
+            self.assertEqual(rows[key]["payload"], skill_name)
+            self.assertIn(f"{skill_name}/SKILL.md", rows[key]["path"])
+
+        self.assertIn("target-context-review", rows["TARGET_LAYER2_CONTEXT_AGENT_REVIEW"]["note"])
+        self.assertIn("server-error-diagnosis", rows["SERVER_WIDE_AGENT_ERROR_HANDOFF"]["note"])
+        self.assertIn("storage-lifecycle-review", rows["AGENT_STORAGE_LIFECYCLE_DECISION"]["note"])
+        self.assertIn("failure-register-review", rows["MANAGER_FAILED_REQUEST_AGENT_REVIEW_REQUIRED_POLICY"]["note"])
+        self.assertIn("event-strategy-promotion-review", rows["EVENT_FAMILY_TO_LAYER_04_PROMOTION_POLICY"]["note"])
 
     def test_event_risk_governor_layer_policy_terms_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:

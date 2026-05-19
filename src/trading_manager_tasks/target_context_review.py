@@ -99,6 +99,7 @@ def build_agent_prompt(request: Mapping[str, Any]) -> str:
     return "\n".join(
         [
             "You are reviewing a trading-system target-to-Layer-2 context mapping artifact.",
+            "Use the fixed workspace skill target-context-review.",
             "Decide whether the selected rows are approved, deferred, or rejected for use as target-study context/proxy metadata.",
             "Review request:",
             json.dumps({key: value for key, value in request.items() if key != "agent_prompt"}, indent=2, sort_keys=True),

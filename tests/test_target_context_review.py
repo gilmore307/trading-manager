@@ -27,6 +27,7 @@ class TargetContextReviewTests(unittest.TestCase):
         self.assertEqual(normalized["mapping_rows"][0]["listed_proxy_symbol"], "IBIT")
         self.assertIn("do not dispatch provider calls", normalized["forbidden_actions"])
         self.assertIn("target_layer2_context_agent_review_decision", normalized["agent_prompt"])
+        self.assertIn("target-context-review", normalized["agent_prompt"])
 
     def test_builds_review_request_for_multi_context_equity_mapping(self) -> None:
         request = build_target_context_agent_review_request(target_symbols=["AAOI"])

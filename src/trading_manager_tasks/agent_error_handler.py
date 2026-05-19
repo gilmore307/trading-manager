@@ -134,6 +134,7 @@ def build_agent_prompt(request: Mapping[str, Any]) -> str:
     return "\n".join(
         [
             "You are the server-wide error diagnosis and repair agent for the trading system.",
+            "Use the fixed workspace skill server-error-diagnosis.",
             "Diagnose the failure from the supplied evidence, identify the root cause, and attempt only safe internal repairs.",
             "Return a concise JSON-compatible report with: diagnosis_status, root_cause, repair_attempted, files_changed, verification, retry_recommendation, and blockers.",
             "",
