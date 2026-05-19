@@ -99,14 +99,15 @@ class StageExecutorTests(unittest.TestCase):
                 command=["python3", "materialize_layer_nine_event_risk_governor_inputs.py"],
                 blockers=(),
             )
-            summary = execute_stage_process(
-                stage,
-                manager_root=tmp,
-                trading_data_root=tmp,
-                trading_model_root=tmp,
-                receipt_root=tmp / "receipts",
-                log_root=tmp / "logs",
-            )
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
             self.assertEqual(summary.status, "failed")
             self.assertEqual(summary.provider_calls, 0)
 
