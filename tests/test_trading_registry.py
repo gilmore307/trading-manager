@@ -87,11 +87,11 @@ class RegistryHelperTests(unittest.TestCase):
 
         benchmark = rows["EVALUATION_BENCHMARK_CONTRACT"]
         self.assertEqual(benchmark["payload"], "evaluation_benchmark_contract")
-        self.assertIn("training-exclusion evidence", benchmark["note"])
+        self.assertIn("same-target training-exclusion evidence", benchmark["note"])
 
         validation = rows["EVALUATION_BENCHMARK_CONTRACT_VALIDATION"]
         self.assertEqual(validation["payload"], "evaluation_benchmark_contract_validation")
-        self.assertIn("benchmark target overlap", validation["note"])
+        self.assertIn("benchmark target/window overlap", validation["note"])
 
         settlement = rows["FOLD_SETTLEMENT_RUN"]
         self.assertEqual(settlement["payload"], "fold_settlement_run")
@@ -115,10 +115,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("rollback", active_write["note"])
 
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
-        self.assertIn("one_frozen_target_window", policy["payload"])
+        self.assertIn("one_frozen_benchmark_panel", policy["payload"])
         self.assertIn("formal_run_once_after_training", policy["payload"])
         self.assertIn("benchmark_data_evaluation_only", policy["payload"])
-        self.assertIn("target_not_training_used", policy["payload"])
+        self.assertIn("target_window_training_exclusion_required", policy["payload"])
+        self.assertIn("same_target_overlapping_folds_blocked", policy["payload"])
 
         review_skill = rows["EVALUATION_PROMOTION_REVIEW_SKILL"]
         self.assertEqual(review_skill["payload"], "promotion-evaluation-review")
