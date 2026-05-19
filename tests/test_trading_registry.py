@@ -120,6 +120,8 @@ class RegistryHelperTests(unittest.TestCase):
 
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
         self.assertIn("one_frozen_benchmark_episode_panel", policy["payload"])
+        self.assertIn("balanced_time_bucket_panel", policy["payload"])
+        self.assertIn("recent_completed_windows_required", policy["payload"])
         self.assertIn("single_name_optionable_majority_required", policy["payload"])
         self.assertIn("etf_backbone_minor_context_only", policy["payload"])
         self.assertIn("large_same_background_overlap_restrained", policy["payload"])
