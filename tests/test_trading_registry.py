@@ -124,7 +124,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("crypto_minority_sleeve_required", policy["payload"])
         self.assertIn("controlled_data_stress_sleeve_allowed", policy["payload"])
         self.assertIn("critical_data_stress_tags_require_stress_role", policy["payload"])
-        self.assertIn("quote_only_crypto_component_allowed", policy["payload"])
+        self.assertIn("missing_crypto_quote_order_book_context_allowed", policy["payload"])
         self.assertIn("missing_layer2_stress_component_allowed", policy["payload"])
         self.assertIn("stress_exception_ref_required", policy["payload"])
         self.assertIn("stress_sleeve_weight_cap_15_percent", policy["payload"])
