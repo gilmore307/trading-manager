@@ -24,7 +24,7 @@ class SafeErrorRepairTests(unittest.TestCase):
                 summary="historical scheduler daemon failed: scheduler daemon lock is active: storage/runtime/historical_scheduler.lock",
                 working_directory=str(tmp),
             )
-            request, _ = register_error_in_catalog(request, output_root=tmp / "agent_errors")
+            request, _ = register_error_in_catalog(request, output_root=tmp / "agent_errors", catalog_storage="jsonl")
 
             diagnosis = build_diagnosis(request)
             report = json.loads(diagnosis["stdout"])

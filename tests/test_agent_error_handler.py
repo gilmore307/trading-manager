@@ -61,6 +61,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
                 command=["systemctl", "status", "service"],
                 output_root=tmp,
                 call_agent=False,
+                catalog_storage="jsonl",
             )
 
             self.assertEqual(result["contract_type"], "agent_error_handling_result")
@@ -96,6 +97,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
                 output_root=tmp / "out",
                 call_agent=True,
                 runner_command=f"python3 {runner}",
+                catalog_storage="jsonl",
             )
 
             diagnosis = json.loads(Path(result["diagnosis_path"]).read_text(encoding="utf-8"))
@@ -111,6 +113,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
                     summary="failure",
                     output_root=tmp,
                     call_agent=False,
+                    catalog_storage="jsonl",
                 )
 
             diagnosis = json.loads(Path(result["diagnosis_path"]).read_text(encoding="utf-8"))
@@ -121,13 +124,43 @@ class AgentErrorHandlerTests(unittest.TestCase):
     def test_catalog_assigns_monotonic_error_numbers(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
-            first = handle_server_error(source_component="server.one", summary="first", output_root=tmp)
-            second = handle_server_error(source_component="server.two", summary="second", output_root=tmp)
+            first = handle_server_error(source_component="server.one", summary="first", output_root=tmp, catalog_storage="jsonl")
+            second = handle_server_error(source_component="server.two", summary="second", output_root=tmp, catalog_storage="jsonl")
 
             self.assertEqual(first["error_ref"], "ERR-000001")
             self.assertEqual(second["error_ref"], "ERR-000002")
             rows = [json.loads(line) for line in (tmp / "server_error_catalog.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["error_ref"] for row in rows], ["ERR-000001", "ERR-000002"])
+
+    def test_catalog_uses_sql_store_by_default(self) -> None:
+        request = build_server_error_agent_request(
+            source_component="server.sql",
+            summary="sql-backed failure",
+            request_id="erragent_sql",
+        )
+        stored_rows: list[dict[str, object]] = []
+
+        def fake_fetch(**_: object) -> list[dict[str, object]]:
+            return list(stored_rows)
+
+        def fake_persist(rows: list[dict[str, object]], **_: object) -> None:
+            stored_rows.extend(rows)
+
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            with patch("trading_manager_tasks.agent_error_handler.fetch_server_error_catalog_rows", side_effect=fake_fetch), patch(
+                "trading_manager_tasks.agent_error_handler.persist_server_error_catalog_rows",
+                side_effect=fake_persist,
+            ):
+                numbered_request, row = register_error_in_catalog(
+                    request,
+                    output_root=Path(raw_tmp),
+                    database_url="postgresql://example/catalog",
+                )
+
+        self.assertEqual(numbered_request["error_ref"], "ERR-000001")
+        self.assertEqual(numbered_request["error_catalog_path"], "trading_manager.server_error_catalog")
+        self.assertEqual(row["catalog_row_id"], stored_rows[0]["catalog_row_id"])
+        self.assertEqual(stored_rows[0]["contract_type"], "server_error_catalog_entry")
 
     def test_duplicate_errors_reuse_number_and_suppress_notification(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -140,6 +173,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
                 output_root=tmp,
                 notify_discord=False,
                 occurred_at_utc="2026-05-13T13:00:00Z",
+                catalog_storage="jsonl",
             )
             second = handle_server_error(
                 source_component="server.same",
@@ -149,6 +183,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
                 output_root=tmp,
                 notify_discord=True,
                 occurred_at_utc="2026-05-13T13:00:30Z",
+                catalog_storage="jsonl",
             )
 
             self.assertEqual(first["error_ref"], "ERR-000001")
@@ -167,8 +202,8 @@ class AgentErrorHandlerTests(unittest.TestCase):
                 summary="same failure",
                 request_id="erragent_fixed",
             )
-            first_request, first_row = register_error_in_catalog(request, output_root=tmp)
-            second_request, second_row = register_error_in_catalog(request, output_root=tmp)
+            first_request, first_row = register_error_in_catalog(request, output_root=tmp, catalog_storage="jsonl")
+            second_request, second_row = register_error_in_catalog(request, output_root=tmp, catalog_storage="jsonl")
 
             self.assertEqual(first_request["error_ref"], "ERR-000001")
             self.assertEqual(second_request["error_ref"], "ERR-000001")
@@ -194,7 +229,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
         }
 
         with tempfile.TemporaryDirectory() as raw_tmp:
-            request, _ = register_error_in_catalog(request, output_root=Path(raw_tmp))
+            request, _ = register_error_in_catalog(request, output_root=Path(raw_tmp), catalog_storage="jsonl")
 
         with patch("trading_manager_tasks.agent_error_handler.subprocess.run") as run:
             run.return_value.returncode = 0

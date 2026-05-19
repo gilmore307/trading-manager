@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any, Iterable, Mapping, TextIO
 
-from .control_plane import TaskSystemError
+from .control_plane import TaskSystemError, _db_url
 
 SERVER_ERROR_AGENT_REQUEST_CONTRACT = "server_error_agent_request"
 AGENT_ERROR_DIAGNOSIS_CONTRACT = "agent_error_diagnosis"
@@ -32,10 +32,38 @@ DEFAULT_AGENT_REF = "openclaw_agent_under_owner_observation"
 DEFAULT_OUTPUT_ROOT = Path("storage/runtime/agent_error_handling")
 DEFAULT_ERROR_CATALOG_NAME = "server_error_catalog.jsonl"
 DEFAULT_ERROR_CATALOG_LOCK_NAME = ".server_error_catalog.lock"
+SERVER_ERROR_CATALOG_TABLE = "trading_manager.server_error_catalog"
 DEFAULT_DEDUP_WINDOW_SECONDS = 60 * 60
 DEFAULT_DISCORD_TARGET = "channel:1504100135200620665"
 DEFAULT_DISCORD_SERVER_ID = "1480186849241731084"
 ALLOWED_SEVERITIES = {"info", "warning", "error", "critical"}
+CATALOG_STORAGES = {"sql", "jsonl"}
+SERVER_ERROR_CATALOG_COLUMNS = (
+    "catalog_row_id",
+    "contract_type",
+    "schema_version",
+    "error_number",
+    "error_ref",
+    "error_fingerprint",
+    "request_id",
+    "duplicate_of_request_id",
+    "request_path",
+    "diagnosis_path",
+    "source_component",
+    "source_repo",
+    "error_scope",
+    "error_kind",
+    "severity",
+    "summary",
+    "exit_code",
+    "occurred_at_utc",
+    "first_seen_at_utc",
+    "last_seen_at_utc",
+    "created_at_utc",
+    "deduplicated",
+    "dedup_window_seconds",
+    "catalog_payload_json",
+)
 SAFE_ALLOWED_ACTIONS = (
     "inspect referenced logs, receipts, status artifacts, source files, docs, and tests",
     "diagnose root cause and classify whether the failure is code, config, data, environment, provider, or operator-boundary related",
@@ -228,6 +256,80 @@ def _read_catalog_rows(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _catalog_row_id(row: Mapping[str, Any]) -> str:
+    return str(row.get("catalog_row_id") or _stable_id("errcat", row.get("contract_type"), row.get("request_id")))
+
+
+def _json_safe_catalog_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    normalized = dict(row)
+    for key, value in list(normalized.items()):
+        if isinstance(value, datetime):
+            normalized[key] = value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return normalized
+
+
+def _catalog_sql_rows(database_url: str | None = None, *, error_ref: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+    import psycopg
+    from psycopg.rows import dict_row
+
+    predicates = []
+    params: list[Any] = []
+    if error_ref:
+        predicates.append("error_ref = %s")
+        params.append(error_ref.strip().upper())
+    where_sql = " WHERE " + " AND ".join(predicates) if predicates else ""
+    limit_sql = " LIMIT %s" if limit is not None else ""
+    if limit is not None:
+        params.append(max(int(limit), 0))
+    order_sql = (
+        "ORDER BY error_number DESC, created_at_utc DESC, request_id DESC"
+        if limit is not None and not error_ref
+        else "ORDER BY error_number ASC, created_at_utc ASC, request_id ASC"
+    )
+    sql = (
+        f"SELECT {', '.join(SERVER_ERROR_CATALOG_COLUMNS)} "
+        f"FROM {SERVER_ERROR_CATALOG_TABLE}{where_sql} "
+        f"{order_sql}"
+        f"{limit_sql}"
+    )
+    with psycopg.connect(_db_url(database_url), row_factory=dict_row) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            rows = [_json_safe_catalog_row(row) for row in cursor.fetchall()]
+            return list(reversed(rows)) if limit is not None and not error_ref else rows
+
+
+def fetch_server_error_catalog_rows(
+    *,
+    database_url: str | None = None,
+    error_ref: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    return _catalog_sql_rows(database_url, error_ref=error_ref, limit=limit)
+
+
+def persist_server_error_catalog_rows(rows: Iterable[Mapping[str, Any]], *, database_url: str | None = None) -> None:
+    normalized = [validate_server_error_catalog_entry(row) for row in rows]
+    if not normalized:
+        return
+    import psycopg
+    from psycopg.types.json import Jsonb
+
+    columns = SERVER_ERROR_CATALOG_COLUMNS
+    placeholders = ", ".join(["%s"] * len(columns))
+    col_sql = ", ".join(columns)
+    update_sql = ", ".join(f"{column}=EXCLUDED.{column}" for column in columns[1:]) + ", updated_at_utc=NOW()"
+    sql = f"INSERT INTO {SERVER_ERROR_CATALOG_TABLE} ({col_sql}) VALUES ({placeholders}) ON CONFLICT (catalog_row_id) DO UPDATE SET {update_sql}"
+    values = [
+        tuple(Jsonb(row.get(column) or {}) if column == "catalog_payload_json" else row.get(column) for column in columns)
+        for row in normalized
+    ]
+    with psycopg.connect(_db_url(database_url)) as connection:
+        with connection.cursor() as cursor:
+            cursor.executemany(sql, values)
+        connection.commit()
+
+
 def _parse_utc(value: object) -> datetime | None:
     if not value:
         return None
@@ -262,6 +364,8 @@ def register_error_in_catalog(
     *,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     dedup_window_seconds: int | None = None,
+    database_url: str | None = None,
+    catalog_storage: str = "sql",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Assign a durable human-facing error number and append the catalog row.
 
@@ -270,6 +374,8 @@ def register_error_in_catalog(
     instead of allocating a new owner-facing number or sending another alert.
     """
 
+    if catalog_storage not in CATALOG_STORAGES:
+        raise TaskSystemError(f"catalog_storage must be one of: {', '.join(sorted(CATALOG_STORAGES))}")
     root = Path(output_root)
     root.mkdir(parents=True, exist_ok=True)
     catalog_path = _catalog_path(root)
@@ -278,7 +384,7 @@ def register_error_in_catalog(
     with lock_path.open("a+", encoding="utf-8") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         try:
-            rows = _read_catalog_rows(catalog_path)
+            rows = fetch_server_error_catalog_rows(database_url=database_url) if catalog_storage == "sql" else _read_catalog_rows(catalog_path)
             request_id = str(request["request_id"])
             fingerprint = str(request.get("error_fingerprint") or request_id)
             existing = next((row for row in rows if str(row.get("request_id")) == request_id), None)
@@ -286,7 +392,7 @@ def register_error_in_catalog(
                 numbered_request = dict(request)
                 numbered_request["error_number"] = existing["error_number"]
                 numbered_request["error_ref"] = existing["error_ref"]
-                numbered_request["error_catalog_path"] = str(catalog_path)
+                numbered_request["error_catalog_path"] = SERVER_ERROR_CATALOG_TABLE if catalog_storage == "sql" else str(catalog_path)
                 numbered_request["error_deduplicated"] = bool(existing.get("deduplicated"))
                 numbered_request["agent_prompt"] = build_agent_prompt(numbered_request)
                 validate_server_error_agent_request(numbered_request)
@@ -306,7 +412,7 @@ def register_error_in_catalog(
                 numbered_request = dict(request)
                 numbered_request["error_number"] = int(duplicate_base["error_number"])
                 numbered_request["error_ref"] = duplicate_base["error_ref"]
-                numbered_request["error_catalog_path"] = str(catalog_path)
+                numbered_request["error_catalog_path"] = SERVER_ERROR_CATALOG_TABLE if catalog_storage == "sql" else str(catalog_path)
                 numbered_request["error_deduplicated"] = True
                 numbered_request["duplicate_of_request_id"] = duplicate_base.get("request_id") or duplicate_base.get("duplicate_of_request_id")
                 numbered_request["agent_prompt"] = build_agent_prompt(numbered_request)
@@ -331,11 +437,15 @@ def register_error_in_catalog(
                     "created_at_utc": _now_utc(),
                     "deduplicated": True,
                     "dedup_window_seconds": window,
+                    "catalog_payload_json": {},
                 }
-                validate_server_error_catalog_entry(row)
+                row = validate_server_error_catalog_entry(row)
                 validate_server_error_agent_request(numbered_request)
-                with catalog_path.open("a", encoding="utf-8") as catalog_file:
-                    catalog_file.write(json.dumps(row, sort_keys=True) + "\n")
+                if catalog_storage == "sql":
+                    persist_server_error_catalog_rows([row], database_url=database_url)
+                else:
+                    with catalog_path.open("a", encoding="utf-8") as catalog_file:
+                        catalog_file.write(json.dumps(row, sort_keys=True) + "\n")
                 return numbered_request, row
 
             next_number = max([int(row.get("error_number") or 0) for row in rows] or [0]) + 1
@@ -343,7 +453,7 @@ def register_error_in_catalog(
             numbered_request = dict(request)
             numbered_request["error_number"] = next_number
             numbered_request["error_ref"] = error_ref
-            numbered_request["error_catalog_path"] = str(catalog_path)
+            numbered_request["error_catalog_path"] = SERVER_ERROR_CATALOG_TABLE if catalog_storage == "sql" else str(catalog_path)
             numbered_request["error_deduplicated"] = False
             numbered_request["agent_prompt"] = build_agent_prompt(numbered_request)
             row = {
@@ -368,11 +478,15 @@ def register_error_in_catalog(
                 "created_at_utc": _now_utc(),
                 "deduplicated": False,
                 "dedup_window_seconds": window,
+                "catalog_payload_json": {},
             }
-            validate_server_error_catalog_entry(row)
+            row = validate_server_error_catalog_entry(row)
             validate_server_error_agent_request(numbered_request)
-            with catalog_path.open("a", encoding="utf-8") as catalog_file:
-                catalog_file.write(json.dumps(row, sort_keys=True) + "\n")
+            if catalog_storage == "sql":
+                persist_server_error_catalog_rows([row], database_url=database_url)
+            else:
+                with catalog_path.open("a", encoding="utf-8") as catalog_file:
+                    catalog_file.write(json.dumps(row, sort_keys=True) + "\n")
             return numbered_request, row
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
@@ -380,6 +494,8 @@ def register_error_in_catalog(
 
 def validate_server_error_catalog_entry(row: Mapping[str, Any]) -> dict[str, Any]:
     normalized = dict(row)
+    normalized["catalog_row_id"] = _catalog_row_id(normalized)
+    normalized.setdefault("catalog_payload_json", {})
     required = (
         "contract_type",
         "schema_version",
@@ -653,12 +769,19 @@ def handle_server_error(
     discord_target: str | None = None,
     discord_server_id: str | None = None,
     discord_account_id: str | None = None,
+    database_url: str | None = None,
+    catalog_storage: str = "sql",
     **request_kwargs: Any,
 ) -> dict[str, Any]:
     """Create the standard request and optionally call the configured agent runner."""
 
     request = build_server_error_agent_request(source_component=source_component, summary=summary, **request_kwargs)
-    request, catalog_entry = register_error_in_catalog(request, output_root=output_root)
+    request, catalog_entry = register_error_in_catalog(
+        request,
+        output_root=output_root,
+        database_url=database_url,
+        catalog_storage=catalog_storage,
+    )
     request_path = default_request_path(request, output_root)
     write_json_artifact(request, path=request_path)
     configured_runner = runner_command or os.environ.get("MANAGER_AGENT_ERROR_RUNNER_COMMAND", "").strip()
@@ -734,6 +857,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--discord-target", default=None, help="Discord target such as channel:1504100135200620665; defaults to MANAGER_AGENT_ERROR_DISCORD_TARGET.")
     parser.add_argument("--discord-server-id", default=None, help="Optional Discord server/guild id for alert context.")
     parser.add_argument("--discord-account-id", default=None, help="Optional OpenClaw Discord account id; defaults to plugin account resolution.")
+    parser.add_argument("--database-url", help="Database URL for SQL-backed server error catalog; defaults to DATABASE_URL or local secret.")
+    parser.add_argument("--catalog-storage", choices=tuple(sorted(CATALOG_STORAGES)), default="sql")
     args = parser.parse_args(argv)
     result = handle_server_error(
         source_component=args.source_component,
@@ -757,6 +882,8 @@ def main(argv: list[str] | None = None) -> int:
         discord_target=args.discord_target,
         discord_server_id=args.discord_server_id,
         discord_account_id=args.discord_account_id,
+        database_url=args.database_url,
+        catalog_storage=args.catalog_storage,
     )
     write_json_artifact(result, output=sys.stdout)
     return 0
@@ -765,7 +892,9 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "AGENT_ERROR_DIAGNOSIS_CONTRACT",
     "AGENT_ERROR_HANDLING_RESULT_CONTRACT",
+    "CATALOG_STORAGES",
     "DEFAULT_ERROR_CATALOG_NAME",
+    "SERVER_ERROR_CATALOG_TABLE",
     "SERVER_ERROR_AGENT_REQUEST_CONTRACT",
     "SERVER_ERROR_CATALOG_ENTRY_CONTRACT",
     "SERVER_ERROR_CATALOG_OCCURRENCE_CONTRACT",
@@ -773,8 +902,10 @@ __all__ = [
     "build_queued_diagnosis",
     "build_server_error_agent_request",
     "call_agent_runner",
+    "fetch_server_error_catalog_rows",
     "handle_server_error",
     "notify_discord_for_error",
+    "persist_server_error_catalog_rows",
     "register_error_in_catalog",
     "validate_agent_error_diagnosis",
     "validate_server_error_catalog_entry",

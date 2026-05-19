@@ -29,7 +29,7 @@ from .scheduler_status import (
     HistoricalSchedulerStatus,
     collect_historical_scheduler_status,
 )
-from .agent_error_handler import DEFAULT_ERROR_CATALOG_NAME
+from .agent_error_handler import DEFAULT_ERROR_CATALOG_NAME, fetch_server_error_catalog_rows
 
 HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
 HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/dashboard/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
@@ -188,9 +188,17 @@ def _dashboard_error_severity(catalog_row: Mapping[str, Any], handling_status: s
     return "error"
 
 
-def _agent_error_summary(storage_root: Path, *, limit: int = MAX_AGENT_ERROR_SUMMARY_ROWS) -> list[dict[str, Any]]:
-    catalog_path = _agent_error_catalog_path(storage_root)
-    rows = _load_jsonl_objects(catalog_path)
+def _agent_error_summary(
+    storage_root: Path,
+    *,
+    limit: int = MAX_AGENT_ERROR_SUMMARY_ROWS,
+    database_url: str | None = None,
+) -> list[dict[str, Any]]:
+    if database_url:
+        rows = fetch_server_error_catalog_rows(database_url=database_url, limit=limit)
+    else:
+        catalog_path = _agent_error_catalog_path(storage_root)
+        rows = _load_jsonl_objects(catalog_path)
     if not rows:
         return []
     summary_rows: list[dict[str, Any]] = []
@@ -1149,6 +1157,7 @@ def build_historical_task_progress_summary(
     *,
     stage_coverage: Mapping[str, Any] | None = None,
     generated_at_utc: str | None = None,
+    database_url: str | None = None,
 ) -> dict[str, Any]:
     """Build `historical_task_progress_summary` for storage materialization."""
 
@@ -1156,7 +1165,7 @@ def build_historical_task_progress_summary(
     stage_counts = _stage_counts(status)
     task_timeline = _task_timeline(status, stage_coverage=stage_coverage)
     storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
-    agent_error_summary = _agent_error_summary(storage_root)
+    agent_error_summary = _agent_error_summary(storage_root, database_url=database_url)
     if not stage_counts and task_timeline:
         for task in task_timeline:
             task_status = str(task.get("status") or "unknown")
@@ -1237,6 +1246,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--service-env-path", type=Path, default=DEFAULT_SERVICE_ENV_PATH)
     parser.add_argument("--daemon-wrapper-path", type=Path, default=DEFAULT_DAEMON_WRAPPER_PATH)
     parser.add_argument("--stage-coverage-path", type=Path, help="Optional manager_stage_coverage JSON artifact to summarize.")
+    parser.add_argument("--database-url", help="Optional database URL for SQL-backed server error catalog rows.")
     args = parser.parse_args(argv)
 
     status = collect_historical_scheduler_status(
@@ -1249,7 +1259,7 @@ def main(argv: list[str] | None = None) -> int:
         daemon_wrapper_path=args.daemon_wrapper_path,
     )
     stage_coverage = _load_json_object(args.stage_coverage_path) if args.stage_coverage_path else None
-    payload = build_historical_task_progress_summary(status, stage_coverage=stage_coverage)
+    payload = build_historical_task_progress_summary(status, stage_coverage=stage_coverage, database_url=args.database_url)
     write_historical_task_progress_summary(payload, output=sys.stdout)
     return 0
 
