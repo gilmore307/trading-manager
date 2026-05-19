@@ -99,11 +99,22 @@ class RegistryHelperTests(unittest.TestCase):
 
         eligibility = rows["PROMOTION_ELIGIBILITY_DECISION"]
         self.assertEqual(eligibility["payload"], "promotion_eligibility_decision")
-        self.assertIn("not production activation", eligibility["note"])
+        self.assertIn("eligible", eligibility["note"])
+
+        activation = rows["EVALUATION_MODEL_ACTIVATION_RECORD"]
+        self.assertEqual(activation["payload"], "model_activation_record")
+        self.assertIn("trading-evaluation", activation["path"])
+
+        active_config = rows["EVALUATION_ACTIVE_MODEL_CONFIG"]
+        self.assertEqual(active_config["payload"], "active_model_config")
 
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
         self.assertIn("one_frozen_target_window", policy["payload"])
         self.assertIn("target_not_training_used", policy["payload"])
+
+        activation_policy = rows["EVALUATION_PROMOTION_ACTIVATION_POLICY"]
+        self.assertIn("evaluation_owns_model_activation", activation_policy["payload"])
+        self.assertIn("manager_schedules_only", activation_policy["payload"])
 
     def test_event_risk_governor_layer_policy_terms_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -375,7 +386,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_2_deferred", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertEqual(rows["MODEL_PROMOTION_REVIEW"]["payload"], "model_promotion_review")
         self.assertIn("every model layer", rows["MODEL_PROMOTION_REVIEW"]["note"])
-        self.assertIn("activation_requires_approved_review_decision", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("manager_schedules_only", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("evaluation_owns_benchmark_settlement_eligibility_activation", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertEqual(
             rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"],
             "market_regime_model;sector_context_model;target_state_vector_model;event_failure_risk_model;alpha_confidence_model;position_projection_model;underlying_action_model;event_risk_governor;option_expression_model",
@@ -627,7 +639,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
         self.assertIn("trading-manager-historical-scheduler.service", rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["path"])
         self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision")
-        self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "activation_record")
+        self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "model_activation_record")
+        self.assertIn("trading-evaluation", rows["ACTIVATION_RECORD_ARTIFACT"]["path"])
         self.assertIn("build_review_decision.py", rows["MANAGER_REVIEW_DECISION_BUILD"]["path"])
         self.assertEqual(rows["COMPONENT_COMPLETION_RECEIPT_PAYLOAD"]["payload"], "component_completion_receipt_payload")
         self.assertIn("store_completion_receipt_payload.py", rows["STORAGE_COMPLETION_RECEIPT_PAYLOAD_STORE"]["path"])

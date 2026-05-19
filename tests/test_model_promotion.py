@@ -34,8 +34,8 @@ class ModelPromotionRequestTests(unittest.TestCase):
             candidate_ref="trading-model://promotion-candidates/example",
         )
         self.assertEqual({row["request_kind"] for row in requests}, {REQUEST_KIND})
-        self.assertEqual({row["target_repo_id"] for row in requests}, {"trading-manager"})
-        self.assertEqual({row["target_component_id"] for row in requests}, {"manager_model_promotion_review"})
+        self.assertEqual({row["target_repo_id"] for row in requests}, {"trading-evaluation"})
+        self.assertEqual({row["target_component_id"] for row in requests}, {"trading_evaluation_promotion_review"})
 
     def test_builds_valid_manager_request_for_any_model_layer(self):
         request = build_model_promotion_review_request(
@@ -55,11 +55,11 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertEqual(request["output_contract"], "option_expression_plan")
         self.assertEqual(request["candidate_ref"], "trading-model://promotion-candidates/mpcand_example")
         self.assertEqual(request["evaluation_run_refs"], ["trading-model://eval-runs/mdevrun_example"])
-        self.assertIn("model_promotion_unified_review", request["policy_refs"])
-        self.assertIn("model_promotion_script_called_agent_decision", request["policy_refs"])
-        self.assertIn("model_promotion_no_activation_without_agent_decision", request["policy_refs"])
-        self.assertIn("agent_model_promotion_decision", request["expected_outputs"])
-        self.assertIn("activation_record_if_agent_approved", request["expected_outputs"])
+        self.assertIn("evaluation_primary_benchmark_policy", request["policy_refs"])
+        self.assertIn("evaluation_promotion_activation_policy", request["policy_refs"])
+        self.assertIn("fold_settlement_run", request["expected_outputs"])
+        self.assertIn("promotion_eligibility_decision", request["expected_outputs"])
+        self.assertIn("model_activation_record_if_eligible", request["expected_outputs"])
 
 
     def test_accepts_layer_or_stable_model_ids_for_current_surfaces(self):
@@ -99,7 +99,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
 
         payload = json.loads(buffer.getvalue())
         self.assertEqual(payload["request_kind"], "model_promotion_review")
-        self.assertEqual(payload["target_component_kind"], "review_helper")
+        self.assertEqual(payload["target_component_kind"], "evaluation_service")
         self.assertTrue(payload["parameter_ref"].startswith("storage://trading-manager/model_promotion/market_regime_model/"))
 
 

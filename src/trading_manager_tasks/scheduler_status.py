@@ -311,9 +311,9 @@ def _gated_scope_status() -> dict[str, Any]:
             "required_contracts": ["manager_request", "component_completion_receipt", "manager_stage_coverage"],
         },
         "model_activation": {
-            "status": "agent_promotion_decision_required_not_owner_approval",
-            "required_contracts": ["agent_model_promotion_decision", "activation_record"],
-            "decision_actor": "agent",
+            "status": "evaluation_activation_required_not_manager_owned",
+            "required_contracts": ["promotion_eligibility_decision", "model_activation_record", "active_model_config"],
+            "decision_actor": "trading-evaluation",
             "owner_action_required_by_default": False,
             "mutation_performed_by_status_surface": False,
         },

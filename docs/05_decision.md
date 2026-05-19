@@ -66,11 +66,11 @@ Active docs should describe the current system from first principles. Obsolete n
 
 Manager writes model-worker fold progress runtime state: fold id, start/end months, stage statuses, and whether all model-worker work is complete. Storage reads that runtime state directly and owns backup, archive, cleanup planning, lifecycle execution, and receipts. Manager must not emit backup/delete signals, requests, or plans for completed folds.
 
-## D017 - Benchmark Judgment Moves To Trading Evaluation
+## D017 - Benchmark Judgment And Activation Move To Trading Evaluation
 
-Model-quality judgment after a completed fold belongs in `trading-evaluation`, not in manager. Manager records scheduler state and consumes evaluation status, but the benchmark contract, fold settlement, metric semantics, and promotion eligibility decision live in the independent evaluation repository.
+Model-quality judgment and model activation after a completed fold belong in `trading-evaluation`, not in manager. Manager records scheduler state and consumes evaluation status, but the benchmark contract, fold settlement, metric semantics, promotion eligibility decision, active model config, and model activation record live in the independent evaluation repository.
 
-The primary benchmark uses one frozen target/window with training-exclusion proof so fold-to-fold settlement remains comparable. Promotion eligibility is not production activation.
+The primary benchmark uses one frozen target/window with training-exclusion proof so fold-to-fold settlement remains comparable. Activation is a config-release record and must not execute broker/order/account mutation.
 
 ## D210 - Activity bridge non-overlap is mandatory
 

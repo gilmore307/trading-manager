@@ -1,6 +1,6 @@
-# Model Promotion
+# Model Promotion Scheduling
 
-Promotion is the reviewed transition from model evidence to production-eligible configuration. It is not automatic scheduler progress.
+Manager owns scheduling and request preparation for model promotion/evaluation work. Benchmark judgment, promotion eligibility, active model config release, and model activation records belong to `trading-evaluation`.
 
 ## Required Evidence
 
@@ -14,11 +14,11 @@ A promotion packet should identify:
 - stability and sample-size evidence;
 - known failure modes;
 - downstream activation scope;
-- reviewer/agent decision evidence.
+- evaluation decision evidence.
 
-## Activation Rule
+## Activation Boundary
 
-Production activation requires an accepted `agent_model_promotion_decision` with explicit activation scope. Advisory reviews, missing reviews, deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, or route-only artifacts cannot activate production pointers.
+Manager must not activate production pointers. Activation requires `trading-evaluation` evidence: accepted benchmark settlement, `promotion_eligibility_decision`, active model config ref, model activation record, and rollback ref. Deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, or route-only artifacts cannot activate production pointers.
 
 ## Layer 9 / Layer 4 Rule
 
@@ -28,5 +28,5 @@ Layer 9 event-risk research may propose a promotion packet. Layer 4 may consume 
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model option_expression_model --candidate-ref trading-model://promotion-candidates/mpcand_example
-PYTHONPATH=src python3 scripts/tasks/build_agent_model_promotion_decision.py --review-target-ref storage://trading-model/promotion-candidates/mpcand_example.json --decision-status defer --decision-reason "missing production calibration evidence"
+PYTHONPATH=src python3 scripts/tasks/build_agent_model_promotion_decision.py --promotion-request-ref manager_request://model-promotion/example --decision-status defer --decision-reason "missing production calibration evidence"
 ```

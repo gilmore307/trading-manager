@@ -1,11 +1,10 @@
-"""Unified manager-side model promotion review request planning.
+"""Unified manager-side model promotion/evaluation request planning.
 
 This module owns the common control-plane entrypoint for promotion review requests.
 Model repositories still produce model-specific evidence, labels, metrics, and
-candidate artifacts; the manager owns the request shape and review/activation
-boundary. Production promotion/activation decisions are made by a
-script-called agent decision artifact; they are not a routine owner
-approval gate.
+candidate artifacts; the manager owns scheduling/request shape only. Benchmark
+judgment, promotion eligibility, and model activation belong to
+trading-evaluation.
 """
 
 from __future__ import annotations
@@ -29,18 +28,18 @@ from .control_plane import (
 from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, promotion_lock_ref
 
 REQUEST_KIND = "model_promotion_review"
-TARGET_COMPONENT_ID = "manager_model_promotion_review"
-TARGET_COMPONENT_KIND = "review_helper"
-TARGET_REPO_ID = "trading-manager"
+TARGET_COMPONENT_ID = "trading_evaluation_promotion_review"
+TARGET_COMPONENT_KIND = "evaluation_service"
+TARGET_REPO_ID = "trading-evaluation"
 DEFAULT_REQUESTED_BY = "openclaw"
 DEFAULT_POLICY_REFS = (
-    "model_promotion_unified_review",
-    "model_promotion_script_called_agent_decision",
-    "model_promotion_no_activation_without_agent_decision",
+    "evaluation_primary_benchmark_policy",
+    "evaluation_promotion_activation_policy",
 )
 DEFAULT_EXPECTED_OUTPUTS = (
-    "agent_model_promotion_decision",
-    "activation_record_if_agent_approved",
+    "fold_settlement_run",
+    "promotion_eligibility_decision",
+    "model_activation_record_if_eligible",
     "promotion_review_ready_signal",
 )
 

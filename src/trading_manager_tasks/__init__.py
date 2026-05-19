@@ -68,10 +68,8 @@ from .request_handoff import (
     validate_request_handoffs,
 )
 from .review_decision import (
-    build_activation_record,
     build_agent_model_promotion_decision,
     build_review_decision,
-    validate_activation_record,
     validate_agent_model_promotion_decision,
     validate_review_decision,
 )
@@ -133,7 +131,6 @@ __all__ = [
     "collect_historical_scheduler_status",
     "collect_dataset_evidence_from_database",
     "collect_dataset_evidence_from_rows",
-    "build_activation_record",
     "build_agent_model_promotion_decision",
     "build_model_promotion_review_requests",
     "build_rehearsal_receipt",
@@ -167,7 +164,6 @@ __all__ = [
     "SchedulerConfig",
     "SchedulerDecision",
     "run_scheduler_once",
-    "validate_activation_record",
     "validate_agent_model_promotion_decision",
     "is_regular_us_equity_trading_day",
     "market_hours_gate",

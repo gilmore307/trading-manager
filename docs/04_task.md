@@ -20,8 +20,8 @@ The resident historical scheduler is the normal path for no-broker historical mo
 
 3. **Dataset, settlement, and promotion readiness**
    - Expand dataset coverage only through manager evidence and request contracts.
-   - Treat fold settlement and promotion eligibility as evaluation-owned evidence, not manager-owned model-quality judgment.
-   - Treat activation as a separate controlled gate, not automatic scheduler completion.
+   - Treat fold settlement, promotion eligibility, and model activation as evaluation-owned evidence, not manager-owned model-quality judgment.
+   - Treat execution/broker consumption as a separate controlled gate, not automatic scheduler completion.
 
 4. **Event-risk governance lane**
    - Keep Layer 9 as residual event-risk governance over the Layer 7 thesis within the historical service boundary; Layer 8 guidance/expression context remains optional.
@@ -31,7 +31,7 @@ The resident historical scheduler is the normal path for no-broker historical mo
 ## Standing Gates
 
 - Provider calls require explicit provider-dispatch scope and controls.
-- Model activation requires accepted promotion eligibility and separate activation evidence.
+- Model activation belongs to `trading-evaluation` and requires accepted promotion eligibility plus activation evidence.
 - Storage lifecycle mutation requires accepted lifecycle policy, protected-set checks, and receipts.
 - Broker/order/fill/account mutation belongs only to `trading-execution`.
 - Unknown-overlap event/activity evidence is review/provenance only; it cannot score, intervene, or promote.
