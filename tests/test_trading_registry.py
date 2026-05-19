@@ -142,6 +142,33 @@ class RegistryHelperTests(unittest.TestCase):
         ):
             self.assertNotRegex(rows[key]["payload"], numbered_model_pattern)
 
+    def test_fold_cleanup_logical_backup_gate_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        cleanup_plan = rows["MANAGER_FOLD_CLEANUP_PLAN"]
+        self.assertEqual(cleanup_plan["kind"], "artifact_type")
+        self.assertEqual(cleanup_plan["payload"], "manager_fold_cleanup_plan")
+        self.assertIn("fold_all_models_all_tasks_once", cleanup_plan["note"])
+        self.assertIn("trading-manager/src/trading_manager_tasks/fold_cleanup.py", cleanup_plan["path"])
+
+        backup_policy = rows["MANAGER_FOLD_CLEANUP_LOGICAL_BACKUP_POLICY"]
+        self.assertEqual(backup_policy["kind"], "config")
+        self.assertEqual(
+            backup_policy["payload"],
+            "cleanup_after_all_models_all_tasks_complete;one_logical_backup_per_fold;pg_dump_custom;restore_smoke_required;no_model_by_model_cleanup",
+        )
+        self.assertIn("not per model", backup_policy["note"])
+
+        backup_plan = rows["MANAGER_FOLD_SQL_LOGICAL_BACKUP_PLAN"]
+        self.assertEqual(backup_plan["kind"], "artifact_type")
+        self.assertEqual(backup_plan["payload"], "manager_fold_sql_logical_backup_plan")
+        self.assertIn("pg_dump -Fc", backup_plan["note"])
+
+        script = rows["MANAGER_PLAN_FOLD_CLEANUP"]
+        self.assertEqual(script["kind"], "script")
+        self.assertIn("scripts/tasks/plan_fold_cleanup.py", script["path"])
+
     def test_data_feed_and_data_source_rows_are_separated(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}

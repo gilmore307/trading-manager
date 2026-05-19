@@ -62,6 +62,10 @@ Service locks, scheduler state, workflow checkpoints, decision logs, and status 
 
 Active docs should describe the current system from first principles. Obsolete naming, abandoned approaches, and transitional planning notes should be removed from active explanations unless they are necessary to operate current code.
 
+## D016 - Fold cleanup uses one logical backup
+
+Storage cleanup for historical model-worker output is fold-scoped. A fold may enter cleanup only after every model layer and every model-worker task in that fold has completed, then manager must require one logical PostgreSQL backup for the whole fold before storage lifecycle execution. Cleanup must not run once per model.
+
 ## D210 - Activity bridge non-overlap is mandatory
 
 Activity bridge evidence must prove one of these statuses before it can affect scoring or intervention:

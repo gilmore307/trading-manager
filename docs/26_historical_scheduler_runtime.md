@@ -32,6 +32,12 @@ Default runtime files:
 
 Workflow-state writes emit a dashboard refresh event when `TRADING_MANAGER_DASHBOARD_REFRESH_ON_WORKFLOW_STATE_WRITE=true`. The event starts the storage-owned read-model refresh service with `--no-block`, so WebSocket subscribers see newly materialized dashboard snapshots immediately after state transitions while the 5-second storage timer remains a fallback.
 
+## Fold Cleanup Gate
+
+Fold cleanup is one operation per complete model-worker fold. The gate is ready only after all Model Worker layers and all model-worker task types in that fold have completed; it is not evaluated or executed one model at a time.
+
+Before storage lifecycle execution, manager requires a single logical PostgreSQL backup plan for the whole fold using `pg_dump -Fc` plus a globals export. The manager helper emits the backup and cleanup plan only; it does not run `pg_dump`, delete storage files, mutate SQL, or perform lifecycle execution.
+
 ## Lock Contract
 
 Schema: `schemas/scheduler_lock.schema.json`.
@@ -53,6 +59,7 @@ Provider workers must not directly advance terminal workflow state. They write p
 ```bash
 PYTHONPATH=src python3 scripts/tasks/inspect_historical_scheduler_status.py
 PYTHONPATH=src python3 scripts/tasks/build_historical_task_progress_summary.py
+PYTHONPATH=src python3 scripts/tasks/plan_fold_cleanup.py --start-month 2016-01 --end-month 2016-06
 ```
 
 ## Current Priority

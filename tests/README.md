@@ -25,6 +25,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_event_feed_dispatch.py`
 - `test_event_model_regeneration_plan.py`
 - `test_failure_register.py`
+- `test_fold_cleanup.py`
 - `test_governance_checks.py`
 - `test_historical_training.py`
 - `test_information_pass.py`
