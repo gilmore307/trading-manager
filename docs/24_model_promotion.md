@@ -2,6 +2,8 @@
 
 Manager owns scheduling and request preparation for model promotion/evaluation work. Benchmark judgment, promotion eligibility, active model config release, and model activation records belong to `trading-evaluation`.
 
+When a reviewer agent is used for promotion judgment, the request must require the workspace skill `skills/openclaw/promotion-evaluation-review`. The agent review is advisory evidence only; `trading-evaluation` deterministic checks own eligibility and activation records.
+
 ## Required Evidence
 
 A promotion packet should identify:

@@ -100,6 +100,7 @@ class RegistryHelperTests(unittest.TestCase):
         eligibility = rows["PROMOTION_ELIGIBILITY_DECISION"]
         self.assertEqual(eligibility["payload"], "promotion_eligibility_decision")
         self.assertIn("eligible", eligibility["note"])
+        self.assertIn("promotion-evaluation-review", eligibility["note"])
 
         activation = rows["EVALUATION_MODEL_ACTIVATION_RECORD"]
         self.assertEqual(activation["payload"], "model_activation_record")
@@ -110,7 +111,17 @@ class RegistryHelperTests(unittest.TestCase):
 
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
         self.assertIn("one_frozen_target_window", policy["payload"])
+        self.assertIn("formal_run_once_after_training", policy["payload"])
+        self.assertIn("benchmark_data_evaluation_only", policy["payload"])
         self.assertIn("target_not_training_used", policy["payload"])
+
+        review_skill = rows["EVALUATION_PROMOTION_REVIEW_SKILL"]
+        self.assertEqual(review_skill["payload"], "promotion-evaluation-review")
+        self.assertIn("promotion-evaluation-review/SKILL.md", review_skill["path"])
+
+        vector_policy = rows["EVALUATION_PROMOTION_VECTOR_RUBRIC_POLICY"]
+        self.assertIn("incumbent_vector_comparison", vector_policy["payload"])
+        self.assertIn("defer_when_not_materially_better", vector_policy["payload"])
 
         activation_policy = rows["EVALUATION_PROMOTION_ACTIVATION_POLICY"]
         self.assertIn("evaluation_owns_model_activation", activation_policy["payload"])
@@ -594,7 +605,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("live_trading_capacity_reserved", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("historical_worker_count_capacity_adaptive", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("pre_promotion_full_training_mode", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
-        self.assertIn("market_hours_historical_training_backoff_disabled_until_production_model_activation", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
+        self.assertIn("market_hours_historical_training_backoff_disabled_until_evaluation_model_activation", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
+        self.assertIn("model_activation_requires_evaluation_activation_record", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
         self.assertIn("historical_provider_calls_run_autonomously_under_resource_controls", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
         self.assertIn("check_gates", rows["MANAGER_SCHEDULER_WORK_LOOP"]["payload"])
         self.assertIn("run_automation_scheduler.py", rows["MANAGER_AUTOMATION_SCHEDULER_RUN"]["path"])
