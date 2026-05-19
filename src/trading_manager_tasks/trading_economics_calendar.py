@@ -162,7 +162,7 @@ def _write_filtered_month_artifact(*, month: str, month_dir: Path, storage_root:
         writer.writeheader()
         writer.writerows(rows)
     manifest = {
-        "contract_type": "te_calendar_historical_seed_filtered_artifact_v1",
+        "contract_type": "te_calendar_historical_seed_filtered_artifact",
         "month": month,
         "source_artifact_paths": source_paths,
         "filtered_artifact_path": str(target.resolve()),
@@ -234,7 +234,7 @@ def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root:
             task_key_path.parent.mkdir(parents=True, exist_ok=True)
             task_key_path.write_bytes(content)
     return TeHistoricalSeedSummary(
-        contract_type="te_calendar_historical_seed_plan_v1",
+        contract_type="te_calendar_historical_seed_plan",
         start_month=start_month,
         end_month=end_month,
         expected_month_count=len(_month_list(start_month, end_month)),
@@ -298,7 +298,7 @@ def plan_recent_poll(*, as_of_date: date | None = None, lookahead_days: int = DE
         task_key_path.parent.mkdir(parents=True, exist_ok=True)
         task_key_path.write_bytes(content)
     return TeRecentPollSummary(
-        contract_type="te_calendar_recent_poll_plan_v1",
+        contract_type="te_calendar_recent_poll_plan",
         start_date=start.isoformat(),
         end_date_exclusive=end.isoformat(),
         task_key_path=str(task_key_path),

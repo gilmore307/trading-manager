@@ -1034,8 +1034,8 @@ class RegistryHelperTests(unittest.TestCase):
             registry["TARGET_LAYER2_CONTEXT_MAPPING_SHARED_CSV"]["path"],
             "/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv",
         )
-        self.assertEqual(registry["TARGET_LAYER2_CONTEXT_MAPPING_V1"]["payload"], "target_layer2_context_mapping_v1")
-        self.assertIn("target_context_business_mapping", registry["TARGET_LAYER2_CONTEXT_MAPPING_V1"]["applies_to"])
+        self.assertEqual(registry["TARGET_LAYER2_CONTEXT_MAPPING"]["payload"], "target_layer2_context_mapping")
+        self.assertIn("target_context_business_mapping", registry["TARGET_LAYER2_CONTEXT_MAPPING"]["applies_to"])
         self.assertEqual(registry["TARGET_CONTEXT_BUSINESS_MAPPING"]["payload"], "target_context_business_mapping")
         self.assertEqual(registry["TARGET_CONTEXT_MULTI_ROW_BY_TARGET"]["payload"], "target_context_multi_row_by_target")
         self.assertEqual(registry["TARGET_SYMBOL"]["payload"], "target_symbol")

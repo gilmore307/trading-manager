@@ -169,7 +169,7 @@ def build_target_context_agent_review_request(
         "forbidden_actions": list(FORBIDDEN_ACTIONS),
         "expected_outputs": [TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT],
         "policy_refs": [
-            "target_layer2_context_mapping_v1",
+            "target_layer2_context_mapping",
             "target_context_business_mapping",
             "proxy_not_layer_context",
             "script_called_agent_review",

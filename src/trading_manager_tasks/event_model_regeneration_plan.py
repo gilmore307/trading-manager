@@ -97,7 +97,7 @@ def build_event_model_regeneration_plan(
 
     fold_months = _months(start_month, end_month)
     return EventModelRegenerationPlan(
-        contract_type="manager_event_model_regeneration_plan_v1",
+        contract_type="manager_event_model_regeneration_plan",
         start_month=start_month,
         end_month=end_month,
         target_symbol=target_symbol.upper(),
@@ -125,7 +125,7 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="01_build_acceptance_report",
                 owner_repo="trading-model",
-                action="emit event_model_acceptance_report_v1 from accepted final judgment",
+                action="emit event_model_acceptance_report from accepted final judgment",
                 command_ref="python3 scripts/models/model_09_event_risk_governor/build_event_model_acceptance_report.py",
                 status="ready_offline",
                 mutation_class="report_artifact_only",

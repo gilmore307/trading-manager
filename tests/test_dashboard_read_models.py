@@ -467,7 +467,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             state_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "contract_type": "manager_scheduler_daemon_state",
                         "start_month": "2019-06",
                         "end_month": "2019-06",
                         "last_completed_months": ["2019-04", "2019-05"],
@@ -523,7 +523,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             state_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "contract_type": "manager_scheduler_daemon_state",
                         "start_month": "2019-01",
                         "end_month": "2019-01",
                         "current_month": "2019-01",
@@ -588,7 +588,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             state_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "contract_type": "manager_scheduler_daemon_state",
                         "start_month": "2016-07",
                         "end_month": "2016-07",
                         "current_month": "2016-07",
@@ -645,7 +645,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             state_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "contract_type": "manager_scheduler_daemon_state",
                         "start_month": "2026-05",
                         "end_month": "2026-05",
                         "current_month": "2026-05",
@@ -760,7 +760,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             state_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "contract_type": "manager_scheduler_daemon_state",
                         "start_month": "2019-05",
                         "end_month": "2019-05",
                     }
@@ -839,7 +839,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             state_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "contract_type": "manager_scheduler_daemon_state",
                         "start_month": "2017-01",
                         "end_month": "2017-01",
                     }
@@ -927,7 +927,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             state_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_scheduler_daemon_state_v1",
+                        "contract_type": "manager_scheduler_daemon_state",
                         "start_month": "2020-09",
                         "end_month": "2020-09",
                     }

@@ -13,7 +13,7 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         plan = build_event_model_regeneration_plan(start_month="2016-01", end_month="2016-06", target_symbol="aapl")
         row = plan.summary_row()
 
-        self.assertEqual(row["contract_type"], "manager_event_model_regeneration_plan_v1")
+        self.assertEqual(row["contract_type"], "manager_event_model_regeneration_plan")
         self.assertEqual(row["fold_months"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
         self.assertIn("layer_01_market_regime_and_layer_02_sector_context_persistent_foundation_data", row["preserved_surfaces"])
         self.assertIn("event_risk_or_abnormal_activity_only_outputs_without_required_evidence", row["superseded_surfaces"])
@@ -43,7 +43,7 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
             plan = build_event_model_regeneration_plan(start_month="2016-01", end_month="2016-01")
             write_plan_file(plan, path)
             payload = json.loads(path.read_text(encoding="utf-8"))
-            self.assertEqual(payload["contract_type"], "manager_event_model_regeneration_plan_v1")
+            self.assertEqual(payload["contract_type"], "manager_event_model_regeneration_plan")
 
 
 if __name__ == "__main__":
