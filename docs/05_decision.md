@@ -62,9 +62,9 @@ Service locks, scheduler state, workflow checkpoints, decision logs, and status 
 
 Active docs should describe the current system from first principles. Obsolete naming, abandoned approaches, and transitional planning notes should be removed from active explanations unless they are necessary to operate current code.
 
-## D016 - Manager exposes fold completion state only
+## D016 - Manager writes fold completion state only
 
-Manager owns model-worker fold progress state: fold id, start/end months, stage statuses, and whether all model-worker work is complete. Storage monitors that state and owns backup, archive, cleanup planning, lifecycle execution, and receipts. Manager must not emit backup/delete plans for completed folds.
+Manager writes model-worker fold progress runtime state: fold id, start/end months, stage statuses, and whether all model-worker work is complete. Storage reads that runtime state directly and owns backup, archive, cleanup planning, lifecycle execution, and receipts. Manager must not emit backup/delete signals, requests, or plans for completed folds.
 
 ## D210 - Activity bridge non-overlap is mandatory
 

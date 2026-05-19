@@ -154,7 +154,7 @@ class RegistryHelperTests(unittest.TestCase):
         summary = rows["STORAGE_SCHEDULED_MAINTENANCE_SUMMARY"]
         self.assertEqual(summary["kind"], "artifact_type")
         self.assertEqual(summary["payload"], "storage_scheduled_maintenance_summary")
-        self.assertIn("monitors manager fold-state files", summary["note"])
+        self.assertIn("reads manager fold-state files directly", summary["note"])
 
         service = rows["STORAGE_MAINTENANCE_SYSTEMD_SERVICE"]
         self.assertEqual(service["kind"], "config")
@@ -162,8 +162,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("trading-storage-maintenance.timer", service["payload"])
 
         boundary = rows["STORAGE_MAINTENANCE_BACKUP_DELETE_BOUNDARY_POLICY"]
+        self.assertIn("storage_reads_manager_fold_state", boundary["payload"])
         self.assertIn("storage_executes_backup_archive_delete", boundary["payload"])
-        self.assertIn("fold progress state", boundary["note"])
+        self.assertIn("No manager backup/cleanup signal, request, or plan is required", boundary["note"])
 
     def test_data_feed_and_data_source_rows_are_separated(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
