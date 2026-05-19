@@ -29,6 +29,7 @@ DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/sha
 DEFAULT_OUTPUT_ROOT = Path("runtime/layer_03_target_state_vector/input_materialization")
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SOURCE = "source_03_target_state"
+TARGET_CANDIDATE_HOLDINGS_SOURCE = "source_02_target_candidate_holdings"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
 
 
@@ -58,6 +59,10 @@ class LayerThreeTargetStateMaterialization:
     feed_artifact_count: int
     source_row_count: int
     target_candidate_count: int
+    target_candidate_holdings_fetch_count: int
+    target_candidate_holdings_row_count: int
+    target_candidate_holdings_task_key_path: str
+    target_candidate_holdings_receipt_path: str | None
     task_key_path: str
     candidate_rows_path: str
     merged_bar_rows_path: str
@@ -76,6 +81,10 @@ class LayerThreeTargetStateMaterialization:
             "feed_artifact_count": self.feed_artifact_count,
             "source_row_count": self.source_row_count,
             "target_candidate_count": self.target_candidate_count,
+            "target_candidate_holdings_fetch_count": self.target_candidate_holdings_fetch_count,
+            "target_candidate_holdings_row_count": self.target_candidate_holdings_row_count,
+            "target_candidate_holdings_task_key_path": self.target_candidate_holdings_task_key_path,
+            "target_candidate_holdings_receipt_path": self.target_candidate_holdings_receipt_path,
             "task_key_path": self.task_key_path,
             "candidate_rows_path": self.candidate_rows_path,
             "merged_bar_rows_path": self.merged_bar_rows_path,
@@ -296,6 +305,83 @@ def build_source_task_key(
     return task_key, task_key_path, candidate_path, merged_bar_path, bar_count
 
 
+def build_target_candidate_holdings_task_key(
+    *,
+    start_month: str,
+    end_month: str,
+    output_dir: Path,
+    trading_data_output_root: Path,
+) -> tuple[dict[str, Any], Path]:
+    source_start, source_end = _range_bounds(start_month, end_month)
+    fold_key = _fold_key(start_month, end_month)
+    task_key_path = output_dir / "target_candidate_holdings_task_key.json"
+    task_key_path.parent.mkdir(parents=True, exist_ok=True)
+    task_key = {
+        "task_id": f"layer_03_target_candidate_holdings_{fold_key}",
+        "source": TARGET_CANDIDATE_HOLDINGS_SOURCE,
+        "params": {
+            "start": source_start,
+            "end": source_end,
+            "continue_on_error": True,
+        },
+        "output_root": str(trading_data_output_root),
+        "manager_stage_id": "layer_03_target_state_vector.data_acquisition",
+        "source_policy": "official_issuer_holdings_fetch_with_point_in_time_window_filter",
+    }
+    task_key_path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return task_key, task_key_path
+
+
+def _run_trading_data_source(
+    *,
+    trading_data_root: Path,
+    source_module: str,
+    task_key_path: Path,
+    run_id: str,
+    output_dir: Path,
+) -> Mapping[str, Any]:
+    command = ["python3", "-m", source_module, str(task_key_path), "--run-id", run_id]
+    result = subprocess.run(
+        command,
+        cwd=trading_data_root,
+        env={**os.environ, "PYTHONPATH": "src"},
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    log_dir = output_dir / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    safe_module = source_module.replace(".", "_")
+    (log_dir / f"{run_id}.{safe_module}.stdout.log").write_text(result.stdout, encoding="utf-8")
+    (log_dir / f"{run_id}.{safe_module}.stderr.log").write_text(result.stderr, encoding="utf-8")
+    if result.returncode != 0:
+        raise TaskSystemError(f"{source_module} materialization failed: {result.stderr.strip() or result.stdout.strip()}")
+    parsed = json.loads(result.stdout)
+    return parsed if isinstance(parsed, Mapping) else {}
+
+
+def _holdings_fetch_count(receipt_path: str | None) -> int:
+    if not receipt_path:
+        return 0
+    path = Path(receipt_path)
+    if not path.exists():
+        return 0
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return 0
+    runs = [run for run in payload.get("runs") or [] if isinstance(run, Mapping)]
+    if not runs:
+        return 0
+    latest = runs[-1]
+    steps = latest.get("steps") if isinstance(latest.get("steps"), Mapping) else {}
+    fetch_step = steps.get("fetch") if isinstance(steps.get("fetch"), Mapping) else {}
+    details = fetch_step.get("details") if isinstance(fetch_step.get("details"), Mapping) else {}
+    feeds = details.get("holding_feeds") if isinstance(details.get("holding_feeds"), list) else []
+    errors = details.get("holding_feed_errors") if isinstance(details.get("holding_feed_errors"), list) else []
+    return len(feeds) + len(errors)
+
+
 def materialize_layer_three_target_state_inputs(
     *,
     start_month: str,
@@ -325,7 +411,14 @@ def materialize_layer_three_target_state_inputs(
     fold_key = _fold_key(start_month, end_month)
     output_dir = manager_storage_root / output_root / fold_key
     trading_data_output_root = trading_data_root / "storage" / "runtime" / SOURCE / f"layer_03_target_state_vector_{fold_key}"
+    holdings_output_root = trading_data_root / "storage" / "runtime" / TARGET_CANDIDATE_HOLDINGS_SOURCE / f"layer_03_target_state_vector_{fold_key}"
     run_id = run_id or f"layer_03_target_state_vector_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    _holdings_task_key, holdings_task_key_path = build_target_candidate_holdings_task_key(
+        start_month=start_month,
+        end_month=end_month,
+        output_dir=output_dir,
+        trading_data_output_root=holdings_output_root,
+    )
     _task_key, task_key_path, candidate_path, merged_bar_path, _bar_count = build_source_task_key(
         start_month=start_month,
         end_month=end_month,
@@ -333,25 +426,30 @@ def materialize_layer_three_target_state_inputs(
         trading_data_output_root=trading_data_output_root,
         refs=refs,
     )
+    holdings_receipt_path: str | None = None
+    holdings_fetch_count = 0
+    holdings_row_count = 0
     trading_data_receipt_path: str | None = None
     source_row_count = 0
     if write:
-        command = ["python3", "-m", "data_source.source_03_target_state", str(task_key_path), "--run-id", run_id]
-        result = subprocess.run(
-            command,
-            cwd=trading_data_root,
-            env={**os.environ, "PYTHONPATH": "src"},
-            text=True,
-            capture_output=True,
-            check=False,
+        holdings_payload = _run_trading_data_source(
+            trading_data_root=trading_data_root,
+            source_module=f"data_source.{TARGET_CANDIDATE_HOLDINGS_SOURCE}",
+            task_key_path=holdings_task_key_path,
+            run_id=f"{run_id}_holdings",
+            output_dir=output_dir,
         )
-        log_dir = output_dir / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        (log_dir / f"{run_id}.stdout.log").write_text(result.stdout, encoding="utf-8")
-        (log_dir / f"{run_id}.stderr.log").write_text(result.stderr, encoding="utf-8")
-        if result.returncode != 0:
-            raise TaskSystemError(f"source_03_target_state materialization failed: {result.stderr.strip() or result.stdout.strip()}")
-        payload = json.loads(result.stdout)
+        holdings_row_count = int((holdings_payload.get("row_counts") or {}).get(TARGET_CANDIDATE_HOLDINGS_SOURCE) or 0)
+        holdings_refs = [str(item) for item in holdings_payload.get("references") or []]
+        holdings_receipt_path = next((item for item in holdings_refs if item.endswith("completion_receipt.json")), str(holdings_output_root / "completion_receipt.json"))
+        holdings_fetch_count = _holdings_fetch_count(holdings_receipt_path)
+        payload = _run_trading_data_source(
+            trading_data_root=trading_data_root,
+            source_module="data_source.source_03_target_state",
+            task_key_path=task_key_path,
+            run_id=run_id,
+            output_dir=output_dir,
+        )
         source_row_count = int((payload.get("row_counts") or {}).get(SOURCE) or 0)
         refs_out = [str(item) for item in payload.get("references") or []]
         trading_data_receipt_path = next((item for item in refs_out if item.endswith("completion_receipt.json")), str(trading_data_output_root / "completion_receipt.json"))
@@ -363,11 +461,16 @@ def materialize_layer_three_target_state_inputs(
         feed_artifact_count=len(refs),
         source_row_count=source_row_count,
         target_candidate_count=len({ref.symbol for ref in refs}),
+        target_candidate_holdings_fetch_count=holdings_fetch_count,
+        target_candidate_holdings_row_count=holdings_row_count,
+        target_candidate_holdings_task_key_path=str(holdings_task_key_path),
+        target_candidate_holdings_receipt_path=holdings_receipt_path,
         task_key_path=str(task_key_path),
         candidate_rows_path=str(candidate_path),
         merged_bar_rows_path=str(merged_bar_path),
         trading_data_receipt_path=trading_data_receipt_path,
         feed_artifacts=tuple(refs),
+        provider_calls=holdings_fetch_count,
     )
     if write:
         receipt_path = output_dir / "materialization_receipt.json"
@@ -411,6 +514,7 @@ __all__ = [
     "FeedArtifactRef",
     "LayerThreeTargetStateMaterialization",
     "build_source_task_key",
+    "build_target_candidate_holdings_task_key",
     "discover_layer_two_feed_artifacts",
     "materialize_layer_three_target_state_inputs",
 ]

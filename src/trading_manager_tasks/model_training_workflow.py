@@ -584,8 +584,8 @@ def _build_layer_workflow(
                 dataset_unit=dataset_unit,
                 blockers=acquisition_blockers,
                 approval_gate_required=acquisition_gate,
-                safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
-                provider_calls_allowed=layer in {1, 2},
+                safe_without_provider_calls=not (layer in {1, 2, 3} or acquisition_gate is not None),
+                provider_calls_allowed=layer in {1, 2, 3},
             )
         )
         if meta.get("feature_cli") is not None:

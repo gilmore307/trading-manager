@@ -125,7 +125,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", command)
         self.assertIn("--write", command)
         self.assertIsNone(plan.layers[2].stages[0].approval_gate_required)
-        self.assertFalse(plan.layers[2].stages[0].provider_calls_allowed)
+        self.assertTrue(plan.layers[2].stages[0].provider_calls_allowed)
+        self.assertFalse(plan.layers[2].stages[0].safe_without_provider_calls)
 
     def test_foundation_catch_up_omits_monthly_post_feature_model_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
