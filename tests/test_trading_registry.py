@@ -110,6 +110,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(active_config["payload"], "active_model_config")
         self.assertIn("trading-execution", active_config["path"])
 
+        active_write = rows["EXECUTION_ACTIVE_MODEL_CONFIG_WRITE"]
+        self.assertEqual(active_write["payload"], "execution_active_model_config_write")
+        self.assertIn("rollback", active_write["note"])
+
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
         self.assertIn("one_frozen_target_window", policy["payload"])
         self.assertIn("formal_run_once_after_training", policy["payload"])
@@ -131,6 +135,11 @@ class RegistryHelperTests(unittest.TestCase):
         execution_policy = rows["EXECUTION_RUNTIME_MODEL_LIFECYCLE_POLICY"]
         self.assertIn("promoted_not_active_shadow_during_market_hours", execution_policy["payload"])
         self.assertIn("ranks_2_to_4_realtime_candidates", execution_policy["payload"])
+        self.assertIn("active_pointer_write_requires_separate_gate", execution_policy["payload"])
+
+        write_policy = rows["EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_POLICY"]
+        self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])
+        self.assertIn("rollback_ref_required", write_policy["payload"])
 
     def test_event_risk_governor_layer_policy_terms_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
