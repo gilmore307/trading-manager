@@ -119,43 +119,21 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("rollback", active_write["note"])
 
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
-        self.assertIn("one_frozen_benchmark_episode_panel", policy["payload"])
-        self.assertIn("balanced_time_bucket_panel", policy["payload"])
-        self.assertIn("recent_completed_windows_required", policy["payload"])
-        self.assertIn("sector_coverage_required", policy["payload"])
-        self.assertIn("consumer_coverage_required", policy["payload"])
-        self.assertIn("entertainment_media_coverage_required", policy["payload"])
-        self.assertIn("earnings_crossing_coverage_required", policy["payload"])
-        self.assertIn("event_driven_coverage_required", policy["payload"])
-        self.assertIn("single_name_optionable_majority_required", policy["payload"])
-        self.assertIn("etf_backbone_minor_context_only", policy["payload"])
-        self.assertIn("large_same_background_overlap_restrained", policy["payload"])
-        self.assertIn("hot_thematic_single_name_coverage_required", policy["payload"])
-        self.assertIn("crypto_minority_sleeve_required", policy["payload"])
-        self.assertIn("controlled_data_stress_sleeve_allowed", policy["payload"])
-        self.assertIn("critical_data_stress_tags_require_stress_role", policy["payload"])
-        self.assertIn("missing_crypto_quote_order_book_context_allowed", policy["payload"])
-        self.assertIn("missing_layer2_stress_component_allowed", policy["payload"])
-        self.assertIn("stress_exception_ref_required", policy["payload"])
-        self.assertIn("stress_sleeve_weight_cap_15_percent", policy["payload"])
-        self.assertIn("non_etf_targets_require_target_context_review", policy["payload"])
-        self.assertIn("formal_run_once_after_training", policy["payload"])
-        self.assertIn("benchmark_data_evaluation_only", policy["payload"])
-        self.assertIn("target_window_training_exclusion_required", policy["payload"])
-        self.assertIn("same_target_overlapping_folds_blocked", policy["payload"])
-        self.assertIn("one_time_data_construction", policy["payload"])
-        self.assertIn("frozen_reusable_data_snapshot", policy["payload"])
-        self.assertIn("candidate_specific_data_rebuild_forbidden", policy["payload"])
-        self.assertIn("historical_clock_realtime_execution_replay", policy["payload"])
+        self.assertIn("candidate_policy_replay_benchmark", policy["payload"])
+        self.assertIn("two_year_historical_clock_replay", policy["payload"])
+        self.assertIn("model_selects_targets_from_candidate_policy", policy["payload"])
+        self.assertIn("final_tickers_not_preselected", policy["payload"])
+        self.assertIn("fixed_replay_window", policy["payload"])
+        self.assertIn("fixed_selection_metrics", policy["payload"])
         self.assertIn("training_flow_replay_forbidden", policy["payload"])
-        self.assertEqual(
-            rows["EVALUATION_PRIMARY_BENCHMARK_CANDIDATE_SHARED_CSV"]["payload"],
-            "trading-storage/main/shared/evaluation_primary_benchmark_candidate.csv",
-        )
-        self.assertIn("final_candidate_not_frozen", rows["BENCHMARK_CANDIDATE_STATUS"]["note"])
-        self.assertEqual(rows["BENCHMARK_TIME_BUCKET_ID"]["payload"], "time_bucket_id")
-        self.assertEqual(rows["BENCHMARK_SECTOR_COVERAGE_TAGS"]["payload"], "sector_coverage_tags")
-        self.assertEqual(rows["BENCHMARK_EVENT_COVERAGE_TAGS"]["payload"], "event_coverage_tags")
+        self.assertIn("overlapping_training_folds_blocked", policy["payload"])
+        self.assertNotIn("EVALUATION_PRIMARY_BENCHMARK_CANDIDATE_SHARED_CSV", rows)
+        self.assertNotIn("EVALUATION_PRIMARY_BENCHMARK_CANDIDATE_CSV_CONTRACT", rows)
+        self.assertNotIn("BENCHMARK_CANDIDATE_STATUS", rows)
+        self.assertNotIn("BENCHMARK_TIME_BUCKET_ID", rows)
+        self.assertNotIn("BENCHMARK_SECTOR_COVERAGE_TAGS", rows)
+        self.assertNotIn("BENCHMARK_EVENT_COVERAGE_TAGS", rows)
+        self.assertNotIn("BENCHMARK_TRAINING_EXCLUSION_REASON", rows)
         self.assertIn(
             "prepare_benchmark_dataset.py",
             rows["TRADING_EVALUATION_PREPARE_BENCHMARK_DATASET"]["path"],
@@ -178,6 +156,10 @@ class RegistryHelperTests(unittest.TestCase):
             "historical_clock_realtime_execution_replay_not_training_flow",
         )
         self.assertIn("realtime execution decision path", rows["BENCHMARK_REALTIME_REPLAY_ROUTE_POLICY"]["note"])
+        self.assertEqual(
+            rows["PROMOTION_BENCHMARK_TWO_YEAR_REPLAY_WINDOW"]["payload"],
+            "two_year_historical_clock_replay_window",
+        )
         self.assertEqual(rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["payload"], "benchmark_feed_acquisition_plan")
         self.assertIn("event-layer feeds", rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["note"])
         self.assertEqual(
@@ -1490,6 +1472,10 @@ class RegistryHelperTests(unittest.TestCase):
             "TARGET_STATE_TRADABILITY_SCORE_BY_WINDOW": "3_tradability_score_<window>",
             "TARGET_TRANSITION_RISK_SCORE_BY_WINDOW": "3_target_transition_risk_score_<window>",
             "TARGET_TREND_QUALITY_SCORE_BY_WINDOW": "3_target_trend_quality_score_<window>",
+            "TARGET_HANDOFF_STATE": "3_target_handoff_state",
+            "TARGET_HANDOFF_BIAS": "3_target_handoff_bias",
+            "TARGET_HANDOFF_RANK": "3_target_handoff_rank",
+            "TARGET_SELECTION_REASON_CODES": "3_target_selection_reason_codes",
             "EVENT_PRESENCE_SCORE_BY_HORIZON": "9_event_presence_score_<horizon>",
             "EVENT_TIMING_PROXIMITY_SCORE_BY_HORIZON": "9_event_timing_proximity_score_<horizon>",
             "EVENT_INTENSITY_SCORE_BY_HORIZON": "9_event_intensity_score_<horizon>",

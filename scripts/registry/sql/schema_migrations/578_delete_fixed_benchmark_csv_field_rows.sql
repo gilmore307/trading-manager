@@ -1,0 +1,10 @@
+-- Remove registry rows that only described the deleted fixed benchmark CSV.
+
+DELETE FROM trading_registry
+WHERE key IN (
+  'BENCHMARK_CANDIDATE_STATUS',
+  'BENCHMARK_TIME_BUCKET_ID',
+  'BENCHMARK_SECTOR_COVERAGE_TAGS',
+  'BENCHMARK_EVENT_COVERAGE_TAGS',
+  'BENCHMARK_TRAINING_EXCLUSION_REASON'
+);
