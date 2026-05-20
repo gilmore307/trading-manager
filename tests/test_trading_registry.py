@@ -151,6 +151,16 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["BENCHMARK_TIME_BUCKET_ID"]["payload"], "time_bucket_id")
         self.assertEqual(rows["BENCHMARK_SECTOR_COVERAGE_TAGS"]["payload"], "sector_coverage_tags")
         self.assertEqual(rows["BENCHMARK_EVENT_COVERAGE_TAGS"]["payload"], "event_coverage_tags")
+        self.assertIn(
+            "prepare_benchmark_dataset.py",
+            rows["TRADING_EVALUATION_PREPARE_BENCHMARK_DATASET"]["path"],
+        )
+        self.assertEqual(rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["payload"], "benchmark_dataset_preparation_manifest")
+        self.assertEqual(rows["BENCHMARK_FEED_TASK_PLAN"]["payload"], "benchmark_feed_task_plan")
+        self.assertIn(
+            "allow_live_provider_calls=false",
+            rows["BENCHMARK_PROVIDER_TASK_KEYS_FAIL_CLOSED_POLICY"]["note"],
+        )
 
         review_skill = rows["EVALUATION_PROMOTION_REVIEW_SKILL"]
         self.assertEqual(review_skill["payload"], "promotion-evaluation-review")
