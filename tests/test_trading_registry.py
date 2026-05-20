@@ -158,6 +158,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["payload"], "benchmark_dataset_preparation_manifest")
         self.assertIn("manager_request_route_used=false", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
         self.assertEqual(rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["payload"], "benchmark_feed_acquisition_plan")
+        self.assertIn("event-layer feeds", rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["note"])
+        self.assertEqual(
+            rows["BENCHMARK_EVENT_LAYER_ACQUISITION_FEEDS"]["payload"],
+            "03_feed_alpaca_news;05_feed_gdelt_news;07_feed_trading_economics_calendar_web;08_feed_sec_company_financials",
+        )
+        self.assertEqual(rows["BENCHMARK_OPTION_CHAIN_SNAPSHOT_POLICY"]["payload"], "daily_open_midday_close_chain_snapshots")
         self.assertNotIn("BENCHMARK_FEED_TASK_PLAN", rows)
         self.assertEqual(rows["BENCHMARK_FEED_COVERAGE_STATUS_VALUES"]["payload"], "available;deferred;missing")
         self.assertIn("available/deferred/missing", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
