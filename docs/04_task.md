@@ -24,9 +24,9 @@ The resident historical scheduler is the normal path for no-broker historical mo
    - Treat execution/broker consumption as a separate controlled gate, not automatic scheduler completion.
 
 4. **Event-risk governance lane**
-   - Keep Layer 9 as residual event-risk governance over the Layer 7 thesis within the historical service boundary; Layer 8 guidance/expression context remains optional.
+   - Keep Layer 10 as residual event-risk governance over the Layer 8 thesis within the historical service boundary; Layer 9 guidance/expression context remains optional.
    - Admit realtime observation families only after review.
-   - Let Layer 4 consume only accepted evidence packets and Layer 8 compose optional offline guidance/expression context.
+   - Let Layer 4 consume only accepted evidence packets and Layer 9 compose optional offline guidance/expression context.
 
 ## Standing Gates
 

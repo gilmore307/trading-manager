@@ -6,9 +6,9 @@ When a reviewer agent is used for promotion judgment, the request must require t
 
 ## Fold-Stack Gate
 
-Promotion is fold-stack scoped, not single-model scoped. A layer may finish model generation and model evaluation for a fold, but that evidence remains diagnostic until Layer 1 through Layer 9 have all completed model evaluation for the same fold.
+Promotion is fold-stack scoped, not single-model scoped. A layer may finish model generation and model evaluation for a fold, but that evidence remains diagnostic until Layer 1 through Layer 10 have all completed model evaluation for the same fold.
 
-Manager must not schedule promotion review from a single layer's completed fold alone. The promotion review gate opens only after `fold_layers_01_09_model_evaluation_complete`; then evaluation judges one pinned Layer 1-9 version bundle against the frozen benchmark and accepted baselines.
+Manager must not schedule promotion review from a single layer's completed fold alone. The promotion review gate opens only after `fold_layers_01_10_model_evaluation_complete`; then evaluation judges one pinned Layer 1-10 version bundle against the frozen benchmark and accepted baselines.
 
 Promotion acceptance is all-or-nothing for the bundle. Layer-local evidence remains available for diagnostics, regression attribution, and retraining priority, but it must not create independent promotion, shadow, live, or reusable-production acceptance for a single layer or partial substack.
 
@@ -25,16 +25,16 @@ A promotion packet should identify:
 - known failure modes;
 - downstream shadow/activation scope;
 - evaluation decision evidence.
-- evidence that Layer 1 through Layer 9 model evaluation completed for the same fold.
-- pinned version refs for all Layer 1 through Layer 9 models in the candidate bundle.
+- evidence that Layer 1 through Layer 10 model evaluation completed for the same fold.
+- pinned version refs for all Layer 1 through Layer 10 models in the candidate bundle.
 
 ## Activation Boundary
 
 Manager must not activate production pointers. Offline promotion requires `trading-evaluation` evidence: accepted benchmark settlement, `promotion_eligibility_decision`, `promotion_readiness_record`, and rollback/config refs. Runtime activation requires `trading-execution` shadow-cycle evidence: active model live performance, promoted-but-not-active shadow performance, realtime candidate roster, and elimination rationale where applicable. Deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, or route-only artifacts cannot activate production pointers.
 
-## Layer 9 / Layer 4 Rule
+## Layer 10 / Layer 4 Rule
 
-Layer 9 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, and unknown-overlap activity bridge evidence cannot be promoted directly.
+Layer 10 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, and unknown-overlap activity bridge evidence cannot be promoted directly.
 
 ## Useful Commands
 

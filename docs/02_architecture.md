@@ -1,6 +1,6 @@
 # Architecture
 
-This file is the manager-side map of the current Layer 1-9 stack. It is a routing and boundary guide, not the model-design authority.
+This file is the manager-side map of the current Layer 1-10 stack. It is a routing and boundary guide, not the model-design authority.
 
 ## Module Map
 
@@ -19,10 +19,11 @@ This file is the manager-side map of the current Layer 1-9 stack. It is a routin
 | 3 | `TargetStateVectorModel` | `layer_03_target_state_vector`, `model_03_target_state_vector` | Anonymous target context and candidate ranking | `target_context_state`, `target_handoff_rank` | No alpha, exposure, option, position sizing, or final action. |
 | 4 | `EventFailureRiskModel` | `layer_04_event_failure_risk`, `model_04_event_failure_risk` | Reviewed event/strategy-failure conditioning | `event_failure_risk_vector` | Consumes only accepted evidence packets; no action or execution. |
 | 5 | `AlphaConfidenceModel` | `layer_05_alpha_confidence`, `model_05_alpha_confidence` | Calibrated alpha confidence | `alpha_confidence_vector` | No exposure, option contract, or order. |
-| 6 | `PositionProjectionModel` | `layer_06_position_projection`, `model_06_position_projection` | Abstract holding-state projection | `position_projection_vector` | No buy/sell/hold order. |
-| 7 | `UnderlyingActionModel` | `layer_07_underlying_action`, `model_07_underlying_action` | Offline underlying thesis | `underlying_action_plan` | Not broker routing or order construction. |
-| 8 | `TradingGuidanceModel / OptionExpressionModel` | `layer_08_option_expression`, `model_08_option_expression` | Optional offline guidance and option-expression context from the Layer 7 thesis | `trading_guidance_record`, `option_expression_plan` | Not execution and not broker/account mutation. |
-| 9 | `EventRiskGovernor / EventIntelligenceOverlay` | `layer_09_event_risk_governor`, `model_09_event_risk_governor` | Residual event-risk governance over the Layer 7 direct-underlying thesis, with Layer 8 context optional | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
+| 6 | `DynamicRiskPolicyModel` | `layer_06_dynamic_risk_policy`, `model_06_dynamic_risk_policy` | Dynamic risk-budget and premium-policy state from global market regime, systemic event risk, alpha quality, and portfolio context | `dynamic_risk_policy_state` | Not an execution hard-limit gate and not order permission. |
+| 7 | `PositionProjectionModel` | `layer_07_position_projection`, physical `model_06_position_projection` until implementation renumbering | Abstract holding-state projection under Layer 6 risk policy | `position_projection_vector` | No buy/sell/hold order. |
+| 8 | `UnderlyingActionModel` | `layer_08_underlying_action`, physical `model_07_underlying_action` until implementation renumbering | Offline underlying thesis | `underlying_action_plan` | Not broker routing or order construction. |
+| 9 | `TradingGuidanceModel / OptionExpressionModel` | `layer_09_option_expression`, physical `model_08_option_expression` until implementation renumbering | Optional offline guidance and option-expression context from the Layer 8 thesis | `trading_guidance_record`, `option_expression_plan` | Not execution and not broker/account mutation. |
+| 10 | `EventRiskGovernor / EventIntelligenceOverlay` | `layer_10_event_risk_governor`, physical `model_09_event_risk_governor` until implementation renumbering | Residual event-risk governance over the Layer 8 direct-underlying thesis, with Layer 9 context optional | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
 
 ## Physical Surface Rule
 
@@ -30,9 +31,9 @@ Active code, scripts, registry rows, and docs should use the current layer numbe
 
 ## Event Path Rule
 
-Layer 9 may inspect residual event evidence and abnormal activity as governance over the Layer 7 direct-underlying thesis. Layer 4 may consume only Layer 9 evidence packets that passed point-in-time checks, non-overlap checks, matched-control review, leakage review, and agent/manager acceptance.
+Layer 10 may inspect residual event evidence and abnormal activity as governance over the Layer 8 direct-underlying thesis. Layer 4 may consume only Layer 10 evidence packets that passed point-in-time checks, non-overlap checks, matched-control review, leakage review, and agent/manager acceptance.
 
-Layer 8 remains the optional base guidance/expression layer. It should not directly absorb event anomalies as alpha or duplicate Layer 9 residual evidence.
+Layer 9 remains the optional base guidance/expression layer. It should not directly absorb event anomalies as alpha or duplicate Layer 10 residual evidence.
 
 ## Layer 3 Candidate Policy
 

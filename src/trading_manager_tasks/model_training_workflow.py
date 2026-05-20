@@ -1,10 +1,11 @@
 """Historical base-stack workflow graph.
 
 The manager owns orchestration across the historical-modeling service. This
-module defines the base trading stack progression. Layer 8 composes optional
-trading-guidance/option-expression context from the Layer 7 direct-underlying
-thesis. Layer 9 EventRiskGovernor governs the Layer 7 thesis directly and may
-attach Layer 8 context when available.
+module defines the base trading stack progression. Layer 6 calibrates dynamic
+risk policy, Layer 9 composes optional trading-guidance/option-expression
+context from the Layer 8 direct-underlying thesis, and Layer 10
+EventRiskGovernor governs the Layer 8 thesis directly and may attach Layer 9
+context when available.
 """
 
 from __future__ import annotations
@@ -21,8 +22,8 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
-BASE_STACK_LAYER_COUNT = 9
-BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 8, 9)
+BASE_STACK_LAYER_COUNT = 10
+BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 9, 10)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
 DATASET_UNIT_MONTHS = 6
@@ -36,7 +37,7 @@ ROLLING_FOLD_VALIDATION_MONTHS = 1
 ROLLING_FOLD_TEST_MONTHS = 1
 ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_MONTHS + ROLLING_FOLD_TEST_MONTHS
 PROMOTION_STAGE_TYPE = "promotion_review"
-FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_09_model_evaluation_complete"
+FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_10_model_evaluation_complete"
 MULTI_TARGET_SYMBOL_BLOCKER = "multiple_target_symbols_require_separate_workflows"
 
 
@@ -172,7 +173,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (),
         "progression_mode": "background_panel_continuous",
         "candidate_axis": "six_month_window",
-        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each six-month chronological unit; layer-local evaluation may finish before downstream layers, but promotion waits for Layer 1-9 fold-stack evaluation completion",
+        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each six-month chronological unit; layer-local evaluation may finish before downstream layers, but promotion waits for Layer 1-10 fold-stack evaluation completion",
         "data_surface": "autonomous Alpaca ETF bars acquisition plus feature_01_market_regime",
         "feature_cli": "trading-data-feature-01-market-regime",
     },
@@ -183,7 +184,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1,),
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "six_month_window;sector_or_industry_symbol",
-        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists; layer-local evaluation may finish before target-chain layers, but promotion waits for Layer 1-9 fold-stack evaluation completion",
+        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists; layer-local evaluation may finish before target-chain layers, but promotion waits for Layer 1-10 fold-stack evaluation completion",
         "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
@@ -222,47 +223,66 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
     },
     {
         "layer": 6,
-        "slug": "position_projection",
-        "model_name": "PositionProjectionModel",
+        "slug": "dynamic_risk_policy",
+        "model_name": "DynamicRiskPolicyModel",
         "depends_on_layers": (5,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;position_context_id",
-        "candidate_progression_policy": "continue the active target candidate chain after Layer 5 alpha confidence is ready",
-        "data_surface": "alpha confidence plus position/risk/cost context; no dedicated trading-data source",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;risk_policy_context_id",
+        "candidate_progression_policy": "calibrate dynamic premium/risk-budget policy from global market regime, broad event risk, alpha quality, and portfolio context before position projection",
+        "data_surface": "Layer 1 market regime, systemic event-risk context, Layer 5 alpha confidence, and portfolio/account replay state; no dedicated trading-data source and no order hard-limit enforcement",
         "feature_cli": None,
     },
     {
         "layer": 7,
-        "slug": "underlying_action",
-        "model_name": "UnderlyingActionModel",
+        "slug": "position_projection",
+        "model_name": "PositionProjectionModel",
         "depends_on_layers": (6,),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;underlying_action_context_id",
-        "candidate_progression_policy": "continue the active target candidate chain after Layer 6 position projection is ready",
-        "data_surface": "model/control-plane underlying-action context; no dedicated trading-data source",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;position_context_id",
+        "candidate_progression_policy": "project target holding state after Layer 6 dynamic risk policy is ready",
+        "data_surface": "alpha confidence plus dynamic risk policy, position, premium, risk, and cost context; no dedicated trading-data source",
         "feature_cli": None,
+        "physical_layer": 6,
+        "physical_slug": "position_projection",
     },
     {
         "layer": 8,
-        "slug": "option_expression",
-        "model_name": "TradingGuidanceModel / OptionExpressionModel",
+        "slug": "underlying_action",
+        "model_name": "UnderlyingActionModel",
         "depends_on_layers": (7,),
-        "progression_mode": "optional_trading_guidance_after_underlying_action",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
-        "candidate_progression_policy": "finish the active base target chain through optional Layer 8 trading guidance / option expression; crypto/direct-underlying-only routes do not require option refs",
-        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 7 target chains require them plus feature_08_option_expression",
-        "feature_cli": "trading-data-feature-08-option-expression",
+        "progression_mode": "target_major_serial_chain",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;underlying_action_context_id",
+        "candidate_progression_policy": "continue the active target candidate chain after Layer 7 position projection is ready",
+        "data_surface": "model/control-plane underlying-action context; no dedicated trading-data source",
+        "feature_cli": None,
+        "physical_layer": 7,
+        "physical_slug": "underlying_action",
     },
     {
         "layer": 9,
+        "slug": "option_expression",
+        "model_name": "TradingGuidanceModel / OptionExpressionModel",
+        "depends_on_layers": (8,),
+        "progression_mode": "optional_trading_guidance_after_underlying_action",
+        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
+        "candidate_progression_policy": "finish the active base target chain through optional Layer 9 trading guidance / option expression; crypto/direct-underlying-only routes do not require option refs",
+        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 8 target chains require them plus feature_08_option_expression",
+        "feature_cli": "trading-data-feature-08-option-expression",
+        "physical_layer": 8,
+        "physical_slug": "option_expression",
+    },
+    {
+        "layer": 10,
         "slug": "event_risk_governor",
         "model_name": "EventRiskGovernor",
-        "depends_on_layers": (7,),
+        "depends_on_layers": (8,),
         "progression_mode": "event_risk_governance_over_underlying_thesis",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_risk_context_id",
-        "candidate_progression_policy": "review the Layer 7 direct-underlying/spot thesis against accepted event-risk evidence; Layer 8 guidance/expression context is optional when available",
+        "candidate_progression_policy": "review the Layer 8 direct-underlying/spot thesis against accepted event-risk evidence; Layer 9 guidance/expression context is optional when available",
         "data_surface": "source_09_event_risk_governor plus feature_09_event_risk_governor from reviewed local event/feed evidence; no broker/account mutation",
         "feature_cli": "trading-data-feature-09-event-risk-governor",
+        "physical_layer": 9,
+        "physical_slug": "event_risk_governor",
     },
 )
 
@@ -276,17 +296,18 @@ REVIEW_SCRIPT_NAMES: dict[int, str] = {
     3: "review_target_state_vector_promotion.py",
     4: "review_event_failure_risk_promotion.py",
     5: "review_alpha_confidence_promotion.py",
-    6: "review_position_projection_promotion.py",
-    7: "review_underlying_action_promotion.py",
-    8: "review_option_expression_promotion.py",
-    9: "review_event_risk_governor_promotion.py",
+    6: "review_dynamic_risk_policy_promotion.py",
+    7: "review_position_projection_promotion.py",
+    8: "review_underlying_action_promotion.py",
+    9: "review_option_expression_promotion.py",
+    10: "review_event_risk_governor_promotion.py",
 }
 
 
 def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None = None, physical_slug: str | None = None) -> list[str]:
     physical_layer = physical_layer or layer
     physical_slug = physical_slug or slug
-    script_name = REVIEW_SCRIPT_NAMES[physical_layer] if verb == "review" else f"{verb}_model_{physical_layer:02d}_{physical_slug}.py"
+    script_name = REVIEW_SCRIPT_NAMES[layer] if verb == "review" else f"{verb}_model_{physical_layer:02d}_{physical_slug}.py"
     physical_model_key = f"model_{physical_layer:02d}_{physical_slug}"
     command = [
         "PYTHONPATH=/root/projects/trading-model/src",
@@ -300,14 +321,14 @@ def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
         ])
-    if layer in {3, 4, 5, 6, 7, 8, 9} and verb == "generate":
+    if layer in {3, 4, 5, 6, 7, 8, 9, 10} and verb == "generate":
         command.extend([
             "--from-database",
             "--source-start",
             "${START_MONTH_START_ET}",
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
-            "--output-jsonl" if layer in {4, 5, 6, 7, 8, 9} else "--output",
+            "--output-jsonl" if layer in {4, 5, 6, 7, 8, 9, 10} else "--output",
             f"/root/projects/trading-model/storage/runtime/{physical_model_key}/model_rows_${{START_MONTH}}.jsonl",
         ])
     if layer in {1, 2} and verb == "evaluate":
@@ -316,7 +337,7 @@ def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None
             "--output-json",
             f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
         ])
-    if layer in {3, 4, 5, 6, 7, 8, 9} and verb == "evaluate":
+    if layer in {3, 4, 5, 6, 7, 8, 9, 10} and verb == "evaluate":
         command.extend([
             "--from-database",
             "--source-start",
@@ -326,7 +347,7 @@ def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None
             "--output-json",
             f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
         ])
-        if layer in {4, 5, 6, 7, 8, 9}:
+        if layer in {4, 5, 6, 7, 8, 9, 10}:
             command.extend(["--evidence-source", "database_rows_fixture_outcomes"])
     if layer in {1, 2} and verb == "review":
         command.extend([
@@ -342,7 +363,7 @@ def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None
             "real_database_evaluation",
             "--local-fallback-review",
         ])
-    if layer in {4, 5, 6, 7, 8, 9} and verb == "review":
+    if layer in {4, 5, 6, 7, 8, 9, 10} and verb == "review":
         command.extend([
             "--evaluation-summary-json",
             f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
@@ -569,7 +590,7 @@ def _build_layer_workflow(
             "${END_MONTH}",
             "--write",
         ]
-    elif layer == 8:
+    elif layer == 9:
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
@@ -580,7 +601,7 @@ def _build_layer_workflow(
             "${END_MONTH}",
             "--write",
         ]
-    elif layer == 9:
+    elif layer == 10:
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
@@ -675,7 +696,7 @@ def _build_layer_workflow(
         (
             PROMOTION_STAGE_TYPE,
             review,
-            "Run promotion review only after the fold has completed Layer 1-9 model evaluation; evaluation judges one pinned Layer 1-9 bundle, and layer-local artifacts are diagnostic only.",
+            "Run promotion review only after the fold has completed Layer 1-10 model evaluation; evaluation judges one pinned Layer 1-10 bundle, and layer-local artifacts are diagnostic only.",
             (FOLD_STACK_PROMOTION_BLOCKER,),
         ),
         (

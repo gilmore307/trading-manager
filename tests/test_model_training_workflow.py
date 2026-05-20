@@ -38,7 +38,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertEqual(plan.contract_type, "manager_model_training_workflow_plan")
         self.assertEqual(plan.layer_count, BASE_STACK_LAYER_COUNT)
-        self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 10)))
+        self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 11)))
         for layer in plan.layers:
             expected_stage_types = [
                 "data_acquisition",
@@ -48,7 +48,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "promotion_review",
                 "maintenance",
             ]
-            if layer.layer in {4, 5, 6, 7}:
+            if layer.layer in {4, 5, 6, 7, 8}:
                 expected_stage_types = ["model_generation", "model_evaluation", "promotion_review", "maintenance"]
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertIn("model_", " ".join(layer.model_generate_command))
@@ -232,7 +232,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertTrue(stage.provider_calls_allowed)
         self.assertFalse(stage.safe_without_provider_calls)
 
-    def test_layer_eight_option_expression_feature_generation_uses_option_adapter_with_no_provider_skip_support(self):
+    def test_layer_nine_option_expression_feature_generation_uses_option_adapter_with_no_provider_skip_support(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -242,14 +242,14 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        command = plan.layers[7].feature_command
+        command = plan.layers[8].feature_command
 
         self.assertIn("scripts/tasks/execute_layer_eight_option_feature_generation.py", command)
         self.assertIn("--start-month", command)
         self.assertIn("${START_MONTH}", command)
         self.assertIn("--end-month", command)
 
-    def test_layer_eight_option_expression_data_acquisition_runs_gate_review_without_provider_approval(self):
+    def test_layer_nine_option_expression_data_acquisition_runs_gate_review_without_provider_approval(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -259,7 +259,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        stage = plan.layers[7].stages[0]
+        stage = plan.layers[8].stages[0]
 
         self.assertIsNone(stage.approval_gate_required)
         self.assertIn("scripts/tasks/review_layer_eight_option_expression_gate.py", stage.command)
@@ -310,14 +310,15 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
 
-    def test_base_layers_four_to_nine_use_current_physical_model_rows_and_conservative_review(self):
+    def test_base_layers_four_to_ten_use_current_physical_model_rows_and_conservative_review(self):
         expected_scripts = {
             3: "generate_model_04_event_failure_risk.py",
             4: "generate_model_05_alpha_confidence.py",
-            5: "generate_model_06_position_projection.py",
-            6: "generate_model_07_underlying_action.py",
-            7: "generate_model_08_option_expression.py",
-            8: "generate_model_09_event_risk_governor.py",
+            5: "generate_model_06_dynamic_risk_policy.py",
+            6: "generate_model_06_position_projection.py",
+            7: "generate_model_07_underlying_action.py",
+            8: "generate_model_08_option_expression.py",
+            9: "generate_model_09_event_risk_governor.py",
         }
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
@@ -350,15 +351,15 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertEqual(plan.layers[0].progression_mode, "background_panel_continuous")
         self.assertEqual(plan.layers[1].progression_mode, "sector_panel_continuous")
-        self.assertTrue(all(plan.layers[index].progression_mode == "target_major_serial_chain" for index in range(2, 7)))
-        self.assertEqual(plan.layers[7].progression_mode, "optional_trading_guidance_after_underlying_action")
-        self.assertEqual(plan.layers[7].depends_on_layers, (7,))
-        self.assertIn("crypto/direct-underlying-only routes do not require option refs", plan.layers[7].candidate_progression_policy)
-        self.assertIn("upstream_layer_07_model_evaluation_complete", plan.layers[7].stages[0].blockers)
-        self.assertEqual(plan.layers[8].progression_mode, "event_risk_governance_over_underlying_thesis")
-        self.assertEqual(plan.layers[8].depends_on_layers, (7,))
-        self.assertIn("Layer 8 guidance/expression context is optional", plan.layers[8].candidate_progression_policy)
-        self.assertIn("upstream_layer_07_model_evaluation_complete", plan.layers[8].stages[0].blockers)
+        self.assertTrue(all(plan.layers[index].progression_mode == "target_major_serial_chain" for index in range(2, 8)))
+        self.assertEqual(plan.layers[8].progression_mode, "optional_trading_guidance_after_underlying_action")
+        self.assertEqual(plan.layers[8].depends_on_layers, (8,))
+        self.assertIn("crypto/direct-underlying-only routes do not require option refs", plan.layers[8].candidate_progression_policy)
+        self.assertIn("upstream_layer_08_model_evaluation_complete", plan.layers[8].stages[0].blockers)
+        self.assertEqual(plan.layers[9].progression_mode, "event_risk_governance_over_underlying_thesis")
+        self.assertEqual(plan.layers[9].depends_on_layers, (8,))
+        self.assertIn("Layer 9 guidance/expression context is optional", plan.layers[9].candidate_progression_policy)
+        self.assertIn("upstream_layer_08_model_evaluation_complete", plan.layers[9].stages[0].blockers)
 
     def test_promotion_review_waits_for_full_fold_stack_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -373,8 +374,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         for layer in plan.layers:
             promotion_stage = next(stage for stage in layer.stages if stage.stage_type == "promotion_review")
             self.assertEqual(promotion_stage.blockers, (FOLD_STACK_PROMOTION_BLOCKER,))
-            self.assertIn("Layer 1-9 model evaluation", promotion_stage.description)
-            self.assertIn("pinned Layer 1-9 bundle", promotion_stage.description)
+            self.assertIn("Layer 1-10 model evaluation", promotion_stage.description)
+            self.assertIn("pinned Layer 1-10 bundle", promotion_stage.description)
 
     def test_layers_without_dedicated_data_features_do_not_create_nonexistent_tasks(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -385,7 +386,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
-        for layer_number in (4, 5, 6, 7):
+        for layer_number in (4, 5, 6, 7, 8):
             layer = plan.layers[layer_number - 1]
             stage_types = [stage.stage_type for stage in layer.stages]
             self.assertNotIn("data_acquisition", stage_types)

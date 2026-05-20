@@ -13,8 +13,8 @@ Dataset expansion decides which historical dataset role should be broadened next
 
 1. Layer 1/2 foundation coverage.
 2. Layer 3 target-state target windows.
-3. Layers 4-8 downstream context/action/guidance chains once prerequisites exist.
-4. Layer 9 event-risk evidence as a residual lane with reviewed event families and strict non-overlap rules.
+3. Layers 4-9 downstream risk-policy/context/action/guidance chains once prerequisites exist.
+4. Layer 10 event-risk evidence as a residual lane with reviewed event families and strict non-overlap rules.
 
 ## Dataset Unit
 

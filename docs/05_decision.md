@@ -22,25 +22,25 @@ Manager SQL stores concise durable facts and references. Large payloads, logs, s
 
 The historical scheduler may acquire data, prepare features, run safe offline stages, evaluate models, and prepare review evidence. It must not place orders, mutate broker/account state, or activate production models without the accepted promotion path.
 
-## D006 - The model stack has nine current layers
+## D006 - The model stack has ten current layers
 
-Manager recognizes the current Layer 1-9 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, PositionProjection, UnderlyingAction, TradingGuidance/OptionExpression, and EventRiskGovernor/EventIntelligenceOverlay.
+Manager recognizes the current Layer 1-10 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, DynamicRiskPolicy, PositionProjection, UnderlyingAction, TradingGuidance/OptionExpression, and EventRiskGovernor/EventIntelligenceOverlay.
 
 ## D007 - Layer 1/2 foundation catch-up is priority
 
 The scheduler should first advance targetless Layer 1 market/cross-asset and Layer 2 sector/industry substrate before ordinary Layer 3+ target work. Valid point-in-time provider data and deterministic features may be reused; dependent model/evaluation/promotion artifacts must be rebuilt when their substrate changed.
 
-## D008 - Layer 8 is optional trading guidance/expression
+## D008 - Layer 9 is optional trading guidance/expression
 
-Layer 8 may produce optional offline trading-guidance records and option-expression plans from the Layer 7 direct-underlying thesis and point-in-time option context when available. It is not an event-risk governor and does not execute trades or mutate broker/account state.
+Layer 9 may produce optional offline trading-guidance records and option-expression plans from the Layer 8 direct-underlying thesis and point-in-time option context when available. It is not an event-risk governor and does not execute trades or mutate broker/account state.
 
 ## D009 - Layer 4 consumes only accepted event-failure evidence
 
 Layer 4 may condition alpha only with evidence packets that passed source precedence, point-in-time availability, non-overlap, matched controls, leakage review, and agent/manager acceptance. Raw anomalies and unreviewed event text cannot enter Layer 4 scoring.
 
-## D010 - Layer 9 remains residual event-risk governance
+## D010 - Layer 10 remains residual event-risk governance
 
-Layer 9 governs residual event risk over the Layer 7 direct-underlying/spot thesis. Layer 8 guidance/expression context is optional input context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
+Layer 10 governs residual event risk over the Layer 8 direct-underlying/spot thesis. Layer 9 guidance/expression context is optional input context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Agent model review is advisory and blinded
 
@@ -88,9 +88,9 @@ Runtime active model selection belongs in `trading-execution`: the active model 
 
 ## D018 - Promotion Waits For Full Fold Stack
 
-Promotion review is not triggered when one model finishes one fold. Layer-local fold evaluation remains diagnostic until Layer 1 through Layer 9 have all completed model evaluation for the same fold.
+Promotion review is not triggered when one model finishes one fold. Layer-local fold evaluation remains diagnostic until Layer 1 through Layer 10 have all completed model evaluation for the same fold.
 
-Manager may continue running layer-local generation and evaluation stages as each dependency is ready, but the promotion gate opens only after `fold_layers_01_09_model_evaluation_complete`. Evaluation then judges one pinned Layer 1-9 version bundle against the frozen benchmark and accepted baselines. Promotion acceptance is all-or-nothing for that bundle: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently.
+Manager may continue running layer-local generation and evaluation stages as each dependency is ready, but the promotion gate opens only after `fold_layers_01_10_model_evaluation_complete`. Evaluation then judges one pinned Layer 1-10 version bundle against the frozen benchmark and accepted baselines. Promotion acceptance is all-or-nothing for that bundle: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently.
 
 ## D210 - Activity bridge non-overlap is mandatory
 

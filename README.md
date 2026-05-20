@@ -31,7 +31,7 @@ requirements.txt  Shared environment dependency ledger.
 ```text
 docs/00_scope.md                         Repository boundary.
 docs/01_context.md                       Repository map and operating assumptions.
-docs/02_architecture.md                  Current Layer 1-9 control-plane map.
+docs/02_architecture.md                  Current Layer 1-10 control-plane map.
 docs/03_contracts.md                     Manager control-plane contracts.
 docs/04_task.md                          Current active tasks and gates.
 docs/05_decision.md                      Current decision ledger.

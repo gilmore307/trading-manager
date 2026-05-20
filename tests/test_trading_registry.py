@@ -250,8 +250,9 @@ class RegistryHelperTests(unittest.TestCase):
         layer_policy = rows["MODEL_LAYER_CONCEPTUAL_REORDER_POLICY"]
         self.assertIn("layer_04_event_failure_risk", layer_policy["payload"])
         self.assertIn("layer_05_alpha_confidence", layer_policy["payload"])
-        self.assertIn("layer_08_trading_guidance", layer_policy["payload"])
-        self.assertIn("layer_09_event_risk_governor", layer_policy["payload"])
+        self.assertIn("layer_06_dynamic_risk_policy", layer_policy["payload"])
+        self.assertIn("layer_09_option_expression", layer_policy["payload"])
+        self.assertIn("layer_10_event_risk_governor", layer_policy["payload"])
 
         self.assertEqual(rows["TRADING_GUIDANCE_MODEL"]["payload"], "trading_guidance_model")
         self.assertEqual(rows["TRADING_GUIDANCE_RECORD"]["payload"], "trading_guidance_record")
@@ -275,10 +276,11 @@ class RegistryHelperTests(unittest.TestCase):
                 "target_state_vector_model",
                 "event_failure_risk_model",
                 "alpha_confidence_model",
+                "dynamic_risk_policy_model",
                 "position_projection_model",
                 "underlying_action_model",
-                "event_risk_governor",
                 "option_expression_model",
+                "event_risk_governor",
             ],
         )
         expected_receipt_model_sequence = [
@@ -287,17 +289,18 @@ class RegistryHelperTests(unittest.TestCase):
             ("layer_3", "target_state_vector_model"),
             ("layer_4", "event_failure_risk_model"),
             ("layer_5", "alpha_confidence_model"),
-            ("layer_6", "position_projection_model"),
-            ("layer_7", "underlying_action_model"),
-            ("layer_8", "event_risk_governor"),
+            ("layer_6", "dynamic_risk_policy_model"),
+            ("layer_7", "position_projection_model"),
+            ("layer_8", "underlying_action_model"),
             ("layer_9", "option_expression_model"),
+            ("layer_10", "event_risk_governor"),
         ]
         receipt_entries = rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"].split(";")
         self.assertEqual(
             [(entry.split(":", 2)[0], entry.split(":", 2)[1]) for entry in receipt_entries],
             expected_receipt_model_sequence,
         )
-        self.assertEqual(len(receipt_entries), 9)
+        self.assertEqual(len(receipt_entries), 10)
         self.assertIn("no_persisted_decision_receipt", receipt_entries[-1])
 
         for key in (
@@ -520,7 +523,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("execution_owns_shadow_cycle_activation", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertEqual(
             rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"],
-            "market_regime_model;sector_context_model;target_state_vector_model;event_failure_risk_model;alpha_confidence_model;position_projection_model;underlying_action_model;event_risk_governor;option_expression_model",
+            "market_regime_model;sector_context_model;target_state_vector_model;event_failure_risk_model;alpha_confidence_model;dynamic_risk_policy_model;position_projection_model;underlying_action_model;option_expression_model;event_risk_governor",
         )
         self.assertIn("Canonical stable model ids", rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["note"])
         self.assertEqual(rows["MANAGER_MODEL_PROMOTION_REVIEW_PLAN"]["kind"], "script")
@@ -537,9 +540,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_1_deferred_after_real_evaluation", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertIn("layer_3_real_production_eval_substrate_deferred_upstream_dependencies_and_calibration", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertIn("layer_8_agent_reviewed_deferred_no_production_eval_substrate", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
-        self.assertIn("mpdec_d743cb5dbc8159f2", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
-        self.assertIn("mpdec_70fef0f31847cc1c", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
-        self.assertIn("mpdec_e7448aaab1334345", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
+        self.assertIn("layer_6:dynamic_risk_policy_model:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
+        self.assertIn("layer_10:event_risk_governor:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
         self.assertEqual(rows["REVIEW_LAYERS_03_08_PROMOTION_ACCEPTANCE"]["kind"], "script")
         self.assertIn("review_layers_03_08_promotion_acceptance.py", rows["REVIEW_LAYERS_03_08_PROMOTION_ACCEPTANCE"]["path"])
         self.assertEqual(rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["kind"], "script")
@@ -577,7 +579,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("model_03_target_state_vector", rows["SOURCE_02_TARGET_CANDIDATE_HOLDINGS"]["applies_to"])
         self.assertNotIn("sector_context_model", rows["SOURCE_02_TARGET_CANDIDATE_HOLDINGS"]["applies_to"])
         self.assertIn("layer_3_real_eval_deferred_upstream_layer_1_2_not_active_and_calibration_missing", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
-        self.assertIn("layers_4_8_agent_reviewed_missing_production_eval_run_labels_metrics", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
+        self.assertIn("layers_4_10_missing_production_eval_run_labels_metrics", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
+        self.assertIn("layer_6_dynamic_risk_policy_physical_implementation_pending", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
         self.assertIn("data_source_model_input_design_closed", rows["TRADING_DATA_STACK_ACCEPTANCE_STATUS"]["payload"])
         self.assertIn("default_next_regular_us_session_open_after_as_of_date", rows["ETF_HOLDINGS_AVAILABLE_TIME_POLICY"]["payload"])
         self.assertEqual(rows["EQUITY_ABNORMAL_ACTIVITY_MODEL_STANDARD"]["payload"], "equity_abnormal_activity_conservative")
@@ -719,19 +722,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["PROMOTION_STAGE_TYPE"]["payload"], "promotion_review")
         self.assertEqual(
             rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["payload"],
-            "pinned_layer_01_09_bundle_all_or_nothing_after_fold_evaluation_complete",
+            "pinned_layer_01_10_bundle_all_or_nothing_after_fold_evaluation_complete",
         )
         self.assertIn("all-or-nothing", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
-        self.assertIn("pinned Layer 1-9 version bundle", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
-        self.assertIn("fold_layers_01_09_model_evaluation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
-        self.assertIn("pinned_layer_01_09_bundle_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("pinned Layer 1-10 version bundle", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
+        self.assertIn("fold_layers_01_10_model_evaluation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("pinned_layer_01_10_bundle_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertEqual(
+            rows["DYNAMIC_RISK_POLICY_MODEL_LAYER"]["payload"],
+            "layer_06_dynamic_risk_policy_model_global_market_driven_premium_risk_budget_state",
+        )
+        self.assertIn("global market regime", rows["DYNAMIC_RISK_POLICY_MODEL_LAYER"]["note"])
         self.assertEqual(
             rows["LAYER_04_PLUS_SINGLE_TARGET_WORKFLOW_POLICY"]["payload"],
             "layer_04_plus_single_target_interface_multiple_targets_require_separate_workflows",
         )
         self.assertIn("multiple target symbols", rows["LAYER_04_PLUS_SINGLE_TARGET_WORKFLOW_POLICY"]["note"])
         self.assertIn(
-            "promotion_review_waits_for_fold_layers_01_09_model_evaluation_complete",
+            "promotion_review_waits_for_fold_layers_01_10_model_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
         )
         self.assertIn("train_months=4", rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["payload"])
@@ -782,7 +790,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_04_event_failure_risk", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertIn("model_08_option_expression", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertIn("current_physical_names", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
-        self.assertIn("layer_09_event_risk_governor", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertIn("layer_06_dynamic_risk_policy", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertIn("model_09_event_risk_governor", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
         self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
@@ -1968,8 +1977,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("forward_holdout", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
         self.assertIn("ready_signal", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
         self.assertIn("zero_provider_calls", rows["EXECUTION_REALTIME_COVERAGE_GAP_POLICY"]["payload"])
-        self.assertIn("layer_06_broker_account_route_deferred", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
-        self.assertIn("layer_08_thetadata_terminal_required", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
+        self.assertIn("layer_07_broker_account_route_deferred", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
+        self.assertIn("layer_09_thetadata_terminal_required", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
 
 
     def test_execution_realtime_adapter_scaffold_is_registered(self):

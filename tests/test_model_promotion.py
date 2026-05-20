@@ -16,13 +16,14 @@ from trading_manager_tasks.model_promotion import (
 
 class ModelPromotionRequestTests(unittest.TestCase):
     def test_all_model_layers_use_one_request_kind(self):
-        self.assertEqual(len(MODEL_PROMOTION_TARGETS), 9)
+        self.assertEqual(len(MODEL_PROMOTION_TARGETS), 10)
         self.assertEqual({target.model_id for target in MODEL_PROMOTION_TARGETS}, {
             "market_regime_model",
             "sector_context_model",
             "target_state_vector_model",
             "event_failure_risk_model",
             "alpha_confidence_model",
+            "dynamic_risk_policy_model",
             "position_projection_model",
             "underlying_action_model",
             "option_expression_model",
@@ -39,7 +40,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
 
     def test_builds_valid_manager_request_for_any_model_layer(self):
         request = build_model_promotion_review_request(
-            model="layer_08_option_expression",
+            model="layer_09_option_expression",
             candidate_ref="trading-model://promotion-candidates/mpcand_example",
             evaluation_run_refs=["trading-model://eval-runs/mdevrun_example"],
             evidence_refs=["storage://trading-model/evidence/example.json"],
@@ -51,7 +52,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertEqual(normalized["request_kind"], "model_promotion_review")
         self.assertEqual(normalized["priority"], "high")
         self.assertEqual(request["model_id"], "option_expression_model")
-        self.assertEqual(request["model_layer"], "layer_08_option_expression")
+        self.assertEqual(request["model_layer"], "layer_09_option_expression")
         self.assertEqual(request["output_contract"], "option_expression_plan")
         self.assertEqual(request["candidate_ref"], "trading-model://promotion-candidates/mpcand_example")
         self.assertEqual(request["evaluation_run_refs"], ["trading-model://eval-runs/mdevrun_example"])
@@ -70,7 +71,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
         )
 
         self.assertEqual(request["model_id"], "option_expression_model")
-        self.assertEqual(request["model_layer"], "layer_08_option_expression")
+        self.assertEqual(request["model_layer"], "layer_09_option_expression")
         self.assertEqual(request["evidence_component_id"], "option_expression_model")
 
     def test_accepts_physical_model_table_ids_from_workflow_commands(self):
