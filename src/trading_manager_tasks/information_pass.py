@@ -28,7 +28,7 @@ from .dataset_expansion import (
 from .provider_dispatch import ProviderDispatchSummary, dispatch_layer_one_provider_acquisition
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
-DEFAULT_INFORMATION_PASS_PATH = Path("storage/runtime/information_pass/controlled_information_pass_2016-01.json")
+DEFAULT_INFORMATION_PASS_PATH = DEFAULT_STORAGE_ROOT / "runtime" / "information_pass" / "controlled_information_pass_2016-01.json"
 
 
 @dataclass(frozen=True)

@@ -92,6 +92,9 @@ def _pipeline_module_for_component(component_id: str) -> str:
 def _import_pipeline(module_name: str, *, component_src_root: Path):
     root = str(component_src_root)
     inserted = False
+    module_parts = module_name.split(".")
+    module_prefixes = [".".join(module_parts[:idx]) for idx in range(1, len(module_parts) + 1)]
+    previous_modules = {name: sys.modules.pop(name) for name in module_prefixes if name in sys.modules}
     if root not in sys.path:
         sys.path.insert(0, root)
         inserted = True
@@ -99,6 +102,9 @@ def _import_pipeline(module_name: str, *, component_src_root: Path):
         importlib.invalidate_caches()
         return importlib.import_module(module_name)
     finally:
+        for name in module_prefixes:
+            sys.modules.pop(name, None)
+        sys.modules.update(previous_modules)
         if inserted:
             try:
                 sys.path.remove(root)

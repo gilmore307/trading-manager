@@ -22,8 +22,8 @@ from .model_training_workflow import (
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .dashboard_refresh_events import trigger_dashboard_refresh_from_workflow_state_write
 
-DEFAULT_WORKFLOW_STATE_PATH = Path("storage/runtime/model_training_workflow_state.json")
-DEFAULT_WORKFLOW_STATE_ROOT = Path("storage/runtime")
+DEFAULT_WORKFLOW_STATE_PATH = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_workflow_state.json"
+DEFAULT_WORKFLOW_STATE_ROOT = DEFAULT_STORAGE_ROOT / "runtime"
 
 
 def workflow_state_path_for_month(start_month: str, *, root: Path = DEFAULT_WORKFLOW_STATE_ROOT) -> Path:
@@ -759,7 +759,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
-    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to storage/runtime/model_training_workflow_state_YYYY-MM.json.")
+    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/manager/runtime.")
     parser.add_argument("--receipt", action="append", type=Path, default=[], help="Component receipt JSON with manager_stage_id/stage_id to ingest.")
     parser.add_argument("--stage-receipt", action="append", default=[], help="Bind a component receipt to a stage without requiring embedded stage id: STAGE_ID=PATH.")
     parser.add_argument("--expected-receipt-count", action="append", default=[], help="Override expected successful receipt count for a stage: STAGE_ID=COUNT.")

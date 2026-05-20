@@ -8,6 +8,7 @@ from pathlib import Path
 from jsonschema import validate
 
 from trading_manager_tasks.scheduler_locks import (
+    DEFAULT_STORAGE_ROOT,
     acquire_scheduler_lock,
     daemon_lock_ref,
     lock_token,
@@ -38,7 +39,7 @@ class SchedulerLocksTest(unittest.TestCase):
         self.assertEqual(ref.contract_type, "scheduler_lock")
         self.assertEqual(ref.lock_scope, "daemon")
         self.assertEqual(ref.lock_key, "lock:daemon:historical_scheduler")
-        self.assertEqual(ref.lock_path, "storage/runtime/historical_scheduler.lock")
+        self.assertEqual(ref.lock_path, str(DEFAULT_STORAGE_ROOT / "runtime" / "historical_scheduler.lock"))
 
     def test_month_stage_and_reconcile_lock_keys_are_distinct(self) -> None:
         stage = month_stage_lock_ref("2016-01", "layer_01_market_regime.data_acquisition")
@@ -65,7 +66,7 @@ class SchedulerLocksTest(unittest.TestCase):
             "lock:provider:2016-01:layer_01_market_regime.data_acquisition:alpaca:SPY",
         )
         self.assertNotEqual(spy.lock_path, qqq.lock_path)
-        self.assertIn("storage/runtime/locks/provider/2016-01", spy.lock_path)
+        self.assertIn(str(DEFAULT_STORAGE_ROOT / "runtime" / "locks" / "provider" / "2016-01"), spy.lock_path)
 
     def test_promotion_lock_uses_model_and_candidate_identity(self) -> None:
         ref = promotion_lock_ref("model_05_alpha_confidence", "trading-model://promotion-candidates/candidate one")

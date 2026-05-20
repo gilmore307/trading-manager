@@ -590,7 +590,7 @@ def _resolve_stage_ref_path(ref: object, *, storage_root: Path) -> Path | None:
     if candidate.is_absolute():
         return candidate
     # Workflow state usually stores manager-local refs like
-    # storage/runtime/model_training_stage_receipts/.... Resolve those against
+    # runtime/model_training_stage_receipts/.... Resolve those against
     # the repo root inferred from the storage root so dashboard summaries can
     # inspect manager-owned receipt timing metadata without exposing raw files.
     if candidate.parts and candidate.parts[0] == "storage":

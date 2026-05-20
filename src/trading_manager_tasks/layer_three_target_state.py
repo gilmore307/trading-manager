@@ -22,11 +22,12 @@ from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
-DEFAULT_TRADING_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
+DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
-DEFAULT_OUTPUT_ROOT = Path("runtime/layer_03_target_state_vector/input_materialization")
+DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_03_target_state_vector" / "input_materialization"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SOURCE = "source_03_target_state"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
@@ -147,9 +148,14 @@ def _latest_successful_run(receipt: Mapping[str, Any]) -> Mapping[str, Any] | No
     return successful[-1] if successful else None
 
 
-def _resolve_component_path(path: str, *, trading_data_root: Path) -> Path:
+def _resolve_component_path(path: str, *, trading_data_root: Path, trading_storage_root: Path) -> Path:
     resolved = Path(path)
-    return resolved if resolved.is_absolute() else trading_data_root / resolved
+    if resolved.is_absolute():
+        return resolved
+    parts = resolved.parts
+    if parts and parts[0] == "storage":
+        return trading_storage_root.joinpath(*parts[1:])
+    return trading_data_root / resolved
 
 
 def discover_layer_two_feed_artifacts(
@@ -184,7 +190,7 @@ def discover_layer_two_feed_artifacts(
                 cleaned_refs.append(str(Path(output_dir) / "cleaned" / "equity_bar.jsonl"))
         if not cleaned_refs:
             continue
-        cleaned_path = _resolve_component_path(cleaned_refs[-1], trading_data_root=trading_data_root)
+        cleaned_path = _resolve_component_path(cleaned_refs[-1], trading_data_root=trading_data_root, trading_storage_root=trading_storage_root)
         if not cleaned_path.exists():
             continue
         row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
@@ -324,7 +330,7 @@ def materialize_layer_three_target_state_inputs(
         manager_storage_root = Path.cwd() / manager_storage_root
     fold_key = _fold_key(start_month, end_month)
     output_dir = manager_storage_root / output_root / fold_key
-    trading_data_output_root = trading_data_root / "storage" / "runtime" / SOURCE / f"layer_03_target_state_vector_{fold_key}"
+    trading_data_output_root = data_storage_root() / "runtime" / SOURCE / f"layer_03_target_state_vector_{fold_key}"
     run_id = run_id or f"layer_03_target_state_vector_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     _task_key, task_key_path, candidate_path, merged_bar_path, _bar_count = build_source_task_key(
         start_month=start_month,

@@ -20,9 +20,10 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
+from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
-DEFAULT_OUTPUT_ROOT = Path("storage/runtime/layer_09_option_expression/gate_review")
+DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_09_option_expression" / "gate_review"
 STAGE_ID = "layer_09_option_expression.data_acquisition"
 ACTIVE_ACTION_TYPES = {
     "increase_long",

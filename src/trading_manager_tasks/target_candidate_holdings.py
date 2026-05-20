@@ -15,6 +15,7 @@ from typing import Any, Mapping, TextIO
 
 from .control_plane import TaskSystemError
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_OUTPUT_ROOT = Path("runtime/layer_02_sector_context/target_candidate_holdings")
@@ -165,7 +166,7 @@ def materialize_target_candidate_holdings(
         manager_storage_root = Path.cwd() / manager_storage_root
     fold_key = _fold_key(start_month, end_month)
     output_dir = manager_storage_root / output_root / fold_key
-    trading_data_output_root = trading_data_root / "storage" / "runtime" / TARGET_CANDIDATE_HOLDINGS_SOURCE / f"layer_02_sector_context_{fold_key}"
+    trading_data_output_root = data_storage_root() / "runtime" / TARGET_CANDIDATE_HOLDINGS_SOURCE / f"layer_02_sector_context_{fold_key}"
     run_id = run_id or f"layer_02_target_candidate_holdings_{fold_key}"
     _task_key, task_key_path = build_target_candidate_holdings_task_key(
         start_month=start_month,

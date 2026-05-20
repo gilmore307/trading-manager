@@ -18,9 +18,10 @@ from typing import Any, Literal, Mapping, Sequence, TextIO
 from .control_plane import TaskSystemError, fetch_task_summary
 from .failure_register import accepted_failure_request_ids_from_register
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageCoverageStatus = Literal["blocked", "partial_ready", "ready", "failed"]
-DEFAULT_STAGE_COVERAGE_PATH = Path("storage/runtime/stage_coverage/layer_01_market_regime_data_acquisition_2016-01.json")
+DEFAULT_STAGE_COVERAGE_PATH = DEFAULT_STORAGE_ROOT / "runtime" / "stage_coverage" / "layer_01_market_regime_data_acquisition_2016-01.json"
 
 
 @dataclass(frozen=True)

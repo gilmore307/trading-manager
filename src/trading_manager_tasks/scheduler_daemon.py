@@ -26,6 +26,7 @@ from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 from .model_training_state import advance_workflow_state
 from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .storage_paths import manager_storage_root
 from .source_existing_bootstrap import run_source_existing_bootstrap
 from .scheduler import (
     DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
@@ -37,7 +38,7 @@ from .scheduler import (
     run_scheduler_once,
 )
 
-DEFAULT_RUNTIME_DIR = Path("storage/runtime")
+DEFAULT_RUNTIME_DIR = manager_storage_root() / "runtime"
 DEFAULT_STATE_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_state.json"
 DEFAULT_LOCK_PATH = DEFAULT_DAEMON_LOCK_PATH
 DEFAULT_DECISION_LOG_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_decisions.jsonl"

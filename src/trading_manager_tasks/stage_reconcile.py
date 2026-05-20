@@ -22,9 +22,10 @@ from .request_payloads import DEFAULT_STORAGE_ROOT as DEFAULT_MANAGER_STORAGE_RO
 from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, reconcile_lock_ref
 from .stage_coverage import StageCoverageReport, collect_stage_coverage, write_stage_coverage
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+from .storage_paths import data_storage_root
 
-DEFAULT_COMPONENT_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
-DEFAULT_COVERAGE_OUTPUT_ROOT = Path("storage/runtime/stage_coverage")
+DEFAULT_COMPONENT_STORAGE_ROOT = data_storage_root()
+DEFAULT_COVERAGE_OUTPUT_ROOT = DEFAULT_MANAGER_STORAGE_ROOT / "runtime" / "stage_coverage"
 SUPPORTED_PROVIDER_STAGE_IDS = (
     "layer_01_market_regime.data_acquisition",
     "layer_02_sector_context.data_acquisition",
@@ -391,7 +392,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--coverage-report-path", type=Path)
     parser.add_argument("--write-coverage-report", action="store_true")
     parser.add_argument("--advance-workflow", action="store_true", help="Ingest the written coverage report into workflow state.")
-    parser.add_argument("--workflow-state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to storage/runtime/model_training_workflow_state_YYYY-MM.json.")
+    parser.add_argument("--workflow-state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/manager/runtime.")
     parser.add_argument("--write-workflow-state", action="store_true")
     parser.add_argument("--target-symbol", help="Optional target symbol for Layer 3+ workflow-state routing.")
     parser.add_argument("--write-summary", action="store_true", help="Write reconcile summary JSON to --summary-output-path.")

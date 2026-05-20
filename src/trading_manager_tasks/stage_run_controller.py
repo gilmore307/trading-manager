@@ -25,6 +25,7 @@ from .stage_run_dashboard import (
     build_stage_run_dashboard,
     default_dashboard_path,
 )
+from .request_payloads import DEFAULT_STORAGE_ROOT
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,7 @@ def run_stage_controller_step(
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     packet_root: Path | None = None,
-    packet_storage_root: Path = Path("storage"),
+    packet_storage_root: Path = DEFAULT_STORAGE_ROOT,
     next_limit: int = 5,
     max_workers: int = 4,
     dynamic_workers: bool = True,
@@ -191,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--packet-root", type=Path, help=argparse.SUPPRESS)
-    parser.add_argument("--packet-storage-root", type=Path, default=Path("storage"))
+    parser.add_argument("--packet-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--next-limit", type=int, default=5)
     parser.add_argument("--max-workers", type=int, default=4)
     parser.add_argument("--dynamic-workers", action=argparse.BooleanOptionalAction, default=True, help="Select provider workers dynamically from load and memory headroom.")
@@ -217,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         locks_dir=args.locks_dir,
     )
     if args.write:
-        output_path = args.output_path or Path("storage/runtime/stage_run_controller") / f"{args.stage_id.replace('.', '_')}_{args.start_month}.json"
+        output_path = args.output_path or DEFAULT_STORAGE_ROOT / "runtime" / "stage_run_controller" / f"{args.stage_id.replace('.', '_')}_{args.start_month}.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps(receipt.summary_row(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     write_stage_run_controller_receipt(receipt, output=sys.stdout)

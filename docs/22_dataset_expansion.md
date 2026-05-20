@@ -23,7 +23,7 @@ For Layer 3+ target work, the ordinary unit is one target symbol over a bounded 
 ## Commands
 
 ```bash
-PYTHONPATH=src python3 scripts/tasks/collect_dataset_evidence.py --write --output-path storage/runtime/dataset_expansion/evidence.json
+PYTHONPATH=src python3 scripts/tasks/collect_dataset_evidence.py --write --output-path /root/projects/trading-storage/storage/manager/runtime/dataset_expansion/evidence.json
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --start-month 2016-01 --end-month 2016-01
 PYTHONPATH=src python3 scripts/tasks/plan_dataset_expansion.py --collect-evidence-from-db --start-month 2016-01 --end-month 2016-01
 ```

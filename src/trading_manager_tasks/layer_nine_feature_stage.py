@@ -22,8 +22,9 @@ from pathlib import Path
 from typing import Any, Mapping, TextIO
 
 from .control_plane import TaskSystemError
+from .request_payloads import DEFAULT_STORAGE_ROOT
 
-DEFAULT_GATE_REVIEW_ROOT = Path("storage/runtime/layer_09_option_expression/gate_review")
+DEFAULT_GATE_REVIEW_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_09_option_expression" / "gate_review"
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 FEATURE_STAGE_ID = "layer_09_option_expression.feature_generation"
 DATA_ACQUISITION_STAGE_ID = "layer_09_option_expression.data_acquisition"

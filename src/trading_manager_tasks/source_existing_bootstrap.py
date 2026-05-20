@@ -25,9 +25,10 @@ from .dataset_evidence import database_url as resolve_database_url
 from .model_training_state import advance_workflow_state, workflow_state_path_for_month
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, Month, load_market_regime_universe
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .storage_paths import data_storage_root
 
-DEFAULT_COMPONENT_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
-DEFAULT_BOOTSTRAP_REPORT_ROOT = Path("storage/runtime/source_existing_bootstrap")
+DEFAULT_COMPONENT_STORAGE_ROOT = data_storage_root()
+DEFAULT_BOOTSTRAP_REPORT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "source_existing_bootstrap"
 SOURCE_TIMEZONE = "America/New_York"
 
 STAGE_SOURCE_TABLES: Mapping[str, str] = {

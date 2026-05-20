@@ -19,6 +19,7 @@ from typing import Any, Literal, TextIO
 
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .storage_paths import model_runtime_root
 
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
@@ -39,6 +40,7 @@ ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_M
 PROMOTION_STAGE_TYPE = "promotion_review"
 FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_10_model_evaluation_complete"
 MULTI_TARGET_SYMBOL_BLOCKER = "multiple_target_symbols_require_separate_workflows"
+MODEL_RUNTIME_ROOT = model_runtime_root()
 
 
 @dataclass(frozen=True)
@@ -319,13 +321,13 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
             "--output-jsonl" if layer in {4, 5, 6, 7, 8, 9, 10} else "--output",
-            f"/root/projects/trading-model/storage/runtime/{physical_model_key}/model_rows_${{START_MONTH}}.jsonl",
+            f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/model_rows_${{START_MONTH}}.jsonl",
         ])
     if layer in {1, 2} and verb == "evaluate":
         command.extend([
             "--from-database",
             "--output-json",
-            f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
+            f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
         ])
     if layer in {3, 4, 5, 6, 7, 8, 9, 10} and verb == "evaluate":
         command.extend([
@@ -335,20 +337,20 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
             "--output-json",
-            f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
+            f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
         ])
         if layer in {4, 5, 6, 7, 8, 9, 10}:
             command.extend(["--evidence-source", "database_rows_fixture_outcomes"])
     if layer in {1, 2} and verb == "review":
         command.extend([
             "--evaluation-summary-json",
-            f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
+            f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
             "--local-fallback-review",
         ])
     if layer == 3 and verb == "review":
         command.extend([
             "--evaluation-summary-json",
-            f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
+            f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
             "--evidence-source",
             "real_database_evaluation",
             "--local-fallback-review",
@@ -356,9 +358,9 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
     if layer in {4, 5, 6, 7, 8, 9, 10} and verb == "review":
         command.extend([
             "--evaluation-summary-json",
-            f"/root/projects/trading-model/storage/runtime/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
+            f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/evaluation_summary_${{START_MONTH}}.json",
             "--output-json",
-            f"/root/projects/trading-model/storage/runtime/{physical_model_key}/promotion_review_${{START_MONTH}}.json",
+            f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/promotion_review_${{START_MONTH}}.json",
         ])
     return command
 

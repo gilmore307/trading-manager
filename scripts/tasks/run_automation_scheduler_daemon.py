@@ -12,11 +12,12 @@ from pathlib import Path
 
 from trading_manager_tasks.agent_error_handler import handle_server_error
 from trading_manager_tasks.scheduler_daemon import main as scheduler_daemon_main
+from trading_manager_tasks.storage_paths import manager_storage_root
 
 
 def _fatal_stderr_path() -> Path:
     timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%S.%f+0000")
-    return Path("storage/runtime/agent_error_handling/scheduler_daemon_fatal") / f"{timestamp}.stderr.log"
+    return manager_storage_root() / "runtime" / "agent_error_handling" / "scheduler_daemon_fatal" / f"{timestamp}.stderr.log"
 
 
 def main() -> int:

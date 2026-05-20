@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, TextIO
 
 from .control_plane import TaskSystemError, _db_url
+from .storage_paths import manager_storage_root
 
 SERVER_ERROR_AGENT_REQUEST_CONTRACT = "server_error_agent_request"
 AGENT_ERROR_DIAGNOSIS_CONTRACT = "agent_error_diagnosis"
@@ -29,7 +30,7 @@ AGENT_ERROR_HANDLING_RESULT_CONTRACT = "agent_error_handling_result"
 SERVER_ERROR_CATALOG_ENTRY_CONTRACT = "server_error_catalog_entry"
 SERVER_ERROR_CATALOG_OCCURRENCE_CONTRACT = "server_error_catalog_occurrence"
 DEFAULT_AGENT_REF = "openclaw_agent_under_owner_observation"
-DEFAULT_OUTPUT_ROOT = Path("storage/runtime/agent_error_handling")
+DEFAULT_OUTPUT_ROOT = manager_storage_root() / "runtime" / "agent_error_handling"
 DEFAULT_ERROR_CATALOG_NAME = "server_error_catalog.jsonl"
 DEFAULT_ERROR_CATALOG_LOCK_NAME = ".server_error_catalog.lock"
 SERVER_ERROR_CATALOG_TABLE = "trading_manager.server_error_catalog"

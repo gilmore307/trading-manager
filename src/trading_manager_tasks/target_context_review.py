@@ -21,11 +21,12 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, TextIO
 
 from .control_plane import TaskSystemError
+from .request_payloads import DEFAULT_STORAGE_ROOT
 
 TARGET_CONTEXT_AGENT_REVIEW_REQUEST_CONTRACT = "target_layer2_context_agent_review_request"
 TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT = "target_layer2_context_agent_review_decision"
 DEFAULT_MAPPING_CSV = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
-DEFAULT_OUTPUT_ROOT = Path("storage/runtime/target_layer2_context_agent_review")
+DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "target_layer2_context_agent_review"
 DEFAULT_AGENT_REF = "openclaw_agent_under_owner_observation"
 DEFAULT_REVIEW_SCOPE = "target_layer2_context_mapping"
 REQUIRED_COLUMNS = (

@@ -10,6 +10,7 @@ from pathlib import Path
 from trading_manager_tasks.agent_error_handler import (
     CATALOG_STORAGES,
     DEFAULT_ERROR_CATALOG_NAME,
+    DEFAULT_OUTPUT_ROOT,
     fetch_server_error_catalog_rows,
 )
 
@@ -30,7 +31,7 @@ def _load_rows(path: Path) -> list[dict[str, object]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="List server error catalog entries by human-facing error number.")
-    parser.add_argument("--output-root", type=Path, default=Path("storage/runtime/agent_error_handling"))
+    parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--error-ref", help="Filter to one error reference such as ERR-000001.")
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--database-url", help="Database URL for the SQL-backed server error catalog.")

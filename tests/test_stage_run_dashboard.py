@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from trading_manager_tasks.stage_coverage import StageCoverageReport
 from trading_manager_tasks.stage_run_dashboard import (
+    DEFAULT_STAGE_RUN_DASHBOARD_ROOT,
     StageRunProviderDispatchPreview,
     build_stage_run_dashboard,
     default_dashboard_path,
@@ -134,7 +135,7 @@ class StageRunDashboardTests(unittest.TestCase):
     def test_default_dashboard_path_is_stable(self) -> None:
         self.assertEqual(
             default_dashboard_path(stage_id="layer_02_sector_context.data_acquisition", start_month="2016-01"),
-            Path("storage/runtime/stage_run_dashboard/layer_02_sector_context_data_acquisition_2016-01.json"),
+            DEFAULT_STAGE_RUN_DASHBOARD_ROOT / "layer_02_sector_context_data_acquisition_2016-01.json",
         )
 
 

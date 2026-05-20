@@ -21,9 +21,11 @@ from .control_plane import TaskSystemError
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .provider_dispatch import dispatch_layer_provider_acquisition
 from .stage_coverage import StageCoverageReport, collect_stage_coverage
+from .request_payloads import DEFAULT_STORAGE_ROOT
+from .storage_paths import data_storage_root
 
-DEFAULT_STAGE_RUN_DASHBOARD_ROOT = Path("storage/runtime/stage_run_dashboard")
-DEFAULT_COMPONENT_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
+DEFAULT_STAGE_RUN_DASHBOARD_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "stage_run_dashboard"
+DEFAULT_COMPONENT_STORAGE_ROOT = data_storage_root()
 SUPPORTED_DASHBOARD_STAGE_IDS = (
     "layer_01_market_regime.data_acquisition",
     "layer_02_sector_context.data_acquisition",
@@ -314,7 +316,7 @@ def build_stage_run_dashboard(
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     packet_root: Path | None = None,
-    packet_storage_root: Path = Path("storage"),
+    packet_storage_root: Path = DEFAULT_STORAGE_ROOT,
     component_storage_root: Path = DEFAULT_COMPONENT_STORAGE_ROOT,
     next_limit: int = 5,
     database_url: str | None = None,
@@ -363,7 +365,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--packet-root", type=Path, help=argparse.SUPPRESS)
-    parser.add_argument("--packet-storage-root", type=Path, default=Path("storage"))
+    parser.add_argument("--packet-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--component-storage-root", type=Path, default=DEFAULT_COMPONENT_STORAGE_ROOT)
     parser.add_argument("--next-limit", type=int, default=5)
     parser.add_argument("--database-url")

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Mapping, TextIO
 
 from .agent_error_handler import AGENT_ERROR_DIAGNOSIS_CONTRACT, _stable_id
+from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 
 
 def _now_utc() -> str:
@@ -52,7 +53,7 @@ def _extract_lock_path(request: Mapping[str, Any]) -> str | None:
     if match:
         return match.group(1)
     if request.get("source_component") == "trading-manager.historical_scheduler_daemon":
-        return "storage/runtime/historical_scheduler.lock"
+        return str(DEFAULT_DAEMON_LOCK_PATH)
     return None
 
 

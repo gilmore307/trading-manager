@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable, Literal, Mapping, Sequence, TextIO
 
 from .monthly_backfill import load_market_regime_universe
+from .storage_paths import manager_storage_root
 from .control_plane import (
     INPUT_BINDING_COLUMNS,
     TaskSystemError,
@@ -27,7 +28,7 @@ from .control_plane import (
 
 REQUEST_KIND = "data_backfill_month"
 PARAMETER_SCHEMA_REF = "manager_request_parameter_payload"
-DEFAULT_STORAGE_ROOT = Path("storage")
+DEFAULT_STORAGE_ROOT = manager_storage_root()
 ALPACA_BARS_MONTHLY_MAX_PAGES = 30
 
 

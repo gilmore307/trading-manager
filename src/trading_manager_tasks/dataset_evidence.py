@@ -21,9 +21,10 @@ from typing import Any, Mapping, Sequence, TextIO
 from .control_plane import TaskSystemError
 from .dataset_expansion import DatasetRole, ROLE_ORDER
 from .model_training_workflow import LAYER_METADATA, layer_key as workflow_layer_key
+from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_MODEL_SCHEMA = "trading_model"
-DEFAULT_DATASET_EVIDENCE_PATH = Path("storage/runtime/dataset_expansion/evidence.json")
+DEFAULT_DATASET_EVIDENCE_PATH = DEFAULT_STORAGE_ROOT / "runtime" / "dataset_expansion" / "evidence.json"
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 
 MODEL_IDS_BY_LAYER: dict[int, str] = {

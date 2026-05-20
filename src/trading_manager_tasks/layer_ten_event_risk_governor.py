@@ -23,11 +23,12 @@ from typing import Any, Iterable, Mapping, Sequence, TextIO
 from .control_plane import TaskSystemError
 from .layer_three_target_state import FeedArtifactRef, discover_layer_two_feed_artifacts
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
-DEFAULT_TRADING_STORAGE_ROOT = Path("/root/projects/trading-data/storage")
+DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
-DEFAULT_OUTPUT_ROOT = Path("runtime/layer_10_event_risk_governor/input_materialization")
+DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_10_event_risk_governor" / "input_materialization"
 DETECTOR_SOURCE = "source_10_event_risk_governor.equity_abnormal_activity"
 SOURCE = "source_10_event_risk_governor"
 REQUIRED_EVENT_FEED_ARTIFACTS = {
@@ -166,7 +167,7 @@ def _run_detector(
     symbol = ref.symbol
     ref_month = _ref_month(ref)
     task_key_path = output_dir / "detectors" / symbol / ref_month / "task_key.json"
-    detector_output_root = trading_data_root / "storage" / "runtime" / DETECTOR_SOURCE.replace(".", "_") / symbol / ref_month / output_dir.name
+    detector_output_root = data_storage_root() / "runtime" / DETECTOR_SOURCE.replace(".", "_") / symbol / ref_month / output_dir.name
     receipt_path = detector_output_root / "completion_receipt.json"
     if ref.row_count <= 0:
         return DetectorRunRef(
@@ -247,7 +248,13 @@ def _read_detector_events(run: DetectorRunRef) -> Iterable[dict[str, Any]]:
 
 
 
-def _discover_event_feed_artifacts(*, trading_data_root: Path, start_month: str, end_month: str) -> tuple[list[str], dict[str, int]]:
+def _discover_event_feed_artifacts(
+    *,
+    trading_storage_root: Path | None = None,
+    trading_data_root: Path | None = None,
+    start_month: str,
+    end_month: str,
+) -> tuple[list[str], dict[str, int]]:
     """Return reviewed saved feed artifacts available for Layer 10 event extraction.
 
     The bridge is intentionally local-artifact only. It never dispatches feed
@@ -255,7 +262,8 @@ def _discover_event_feed_artifacts(*, trading_data_root: Path, start_month: str,
     advance when required event feeds are absent.
     """
 
-    base = trading_data_root / "storage" / "monthly_backfill"
+    root = trading_storage_root or (trading_data_root / "storage" if trading_data_root is not None else DEFAULT_TRADING_STORAGE_ROOT)
+    base = root / "monthly_backfill"
     paths: list[str] = []
     coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
     for month in _iter_months(start_month, end_month):
@@ -352,7 +360,7 @@ def _write_source_task_key(*, output_dir: Path, trading_data_root: Path, start_m
             "events": list(events),
             "event_artifact_paths": list(event_artifact_paths),
         },
-        "output_root": str(trading_data_root / "storage" / "runtime" / SOURCE / f"layer_10_event_risk_governor_{fold_key}"),
+        "output_root": str(data_storage_root() / "runtime" / SOURCE / f"layer_10_event_risk_governor_{fold_key}"),
         "manager_stage_id": "layer_10_event_risk_governor.data_acquisition",
         "source_policy": "local_event_index_over_source_detector_outputs_no_provider_calls",
     }
@@ -391,7 +399,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
     )
     if not refs:
         raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 10 event-risk materialization")
-    event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(trading_data_root=trading_data_root, start_month=start_month, end_month=end_month)
+    event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
     event_feed_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
     missing_feed_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
     missing_feed_rows = _missing_event_feed_rows(event_feed_row_coverage)

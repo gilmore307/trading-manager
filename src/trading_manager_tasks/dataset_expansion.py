@@ -20,7 +20,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 DatasetRole = Literal["train", "calibration", "validation", "test", "forward_holdout", "shadow_monitoring"]
 ExpansionStatus = Literal["planned", "prepared", "blocked", "not_applicable"]
 
-DEFAULT_DATASET_EXPANSION_PATH = Path("storage/runtime/dataset_expansion/manager_dataset_expansion_plan.json")
+DEFAULT_DATASET_EXPANSION_PATH = DEFAULT_STORAGE_ROOT / "runtime" / "dataset_expansion" / "manager_dataset_expansion_plan.json"
 
 ROLE_ORDER: tuple[DatasetRole, ...] = ("train", "calibration", "validation", "test", "forward_holdout")
 PROMOTION_GAPS_REQUIRING_FORWARD_HOLDOUT = {

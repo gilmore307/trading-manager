@@ -17,7 +17,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterator, Literal
 
-DEFAULT_STORAGE_ROOT = Path("storage")
+from .storage_paths import manager_storage_root
+
+DEFAULT_STORAGE_ROOT = manager_storage_root()
 DEFAULT_RUNTIME_DIR = DEFAULT_STORAGE_ROOT / "runtime"
 DEFAULT_DAEMON_LOCK_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler.lock"
 DEFAULT_LOCKS_DIR = DEFAULT_RUNTIME_DIR / "locks"

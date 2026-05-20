@@ -21,12 +21,26 @@ from .control_plane import TaskSystemError
 from .monthly_backfill import iter_monthly_windows
 from .provider_dispatch import DEFAULT_TRADING_DATA_ROOT
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .storage_paths import data_storage_root
 
 TE_FEED_ID = "07_feed_trading_economics_calendar_web"
 TE_SOURCE_ID = "trading_economics_calendar_web"
 EVENT_SOURCE_ID = "source_10_event_risk_governor"
-DEFAULT_TE_MONTHLY_ROOT = Path("storage/monthly_backfill/trading_economics_calendar_web")
+DEFAULT_TE_MONTHLY_ROOT = data_storage_root() / "monthly_backfill" / "trading_economics_calendar_web"
 DEFAULT_RECENT_LOOKAHEAD_DAYS = 45
+
+
+def _te_monthly_root(trading_data_root: Path) -> Path:
+    root = Path(trading_data_root)
+    if root == DEFAULT_TRADING_DATA_ROOT:
+        return DEFAULT_TE_MONTHLY_ROOT
+    storage_owned = root / "monthly_backfill" / "trading_economics_calendar_web"
+    if storage_owned.exists():
+        return storage_owned
+    legacy_component_local = root / "storage" / "monthly_backfill" / "trading_economics_calendar_web"
+    if legacy_component_local.exists():
+        return legacy_component_local
+    return storage_owned
 
 
 @dataclass(frozen=True)
@@ -182,7 +196,7 @@ def _month_artifact_summary(month_dir: Path, *, storage_root: Path) -> TeCalenda
 
 
 def discover_historical_seed_artifacts(*, start_month: str, end_month: str, trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT, storage_root: Path = DEFAULT_STORAGE_ROOT) -> tuple[list[TeCalendarArtifact], list[str]]:
-    root = trading_data_root / DEFAULT_TE_MONTHLY_ROOT
+    root = _te_monthly_root(trading_data_root)
     selected: list[TeCalendarArtifact] = []
     missing: list[str] = []
     for month in _month_list(start_month, end_month):
@@ -220,12 +234,12 @@ def _historical_seed_task_key(*, start_month: str, end_month: str, artifacts: li
 
 def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT, storage_root: Path = DEFAULT_STORAGE_ROOT, write_files: bool = False) -> TeHistoricalSeedSummary:
     artifacts, missing = discover_historical_seed_artifacts(start_month=start_month, end_month=end_month, trading_data_root=trading_data_root, storage_root=storage_root)
-    monthly_root = trading_data_root / DEFAULT_TE_MONTHLY_ROOT
+    monthly_root = _te_monthly_root(trading_data_root)
     seed_artifacts = [_write_filtered_month_artifact(month=artifact.month, month_dir=monthly_root / artifact.month, storage_root=storage_root) for artifact in artifacts] if write_files else artifacts
     task_key_path: Path | None = None
     task_hash: str | None = None
     if not missing:
-        output_root = f"storage/runtime/source_10_event_risk_governor/te_calendar_historical_seed_{start_month}_{end_month}"
+        output_root = str(data_storage_root() / "runtime" / "source_10_event_risk_governor" / f"te_calendar_historical_seed_{start_month}_{end_month}")
         payload = _historical_seed_task_key(start_month=start_month, end_month=end_month, artifacts=seed_artifacts, output_root=output_root)
         content = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
         task_hash = "sha256:" + hashlib.sha256(content).hexdigest()

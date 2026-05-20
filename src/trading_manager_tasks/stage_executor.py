@@ -30,8 +30,8 @@ from .model_training_state import (
 from .model_training_workflow import build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
-DEFAULT_RECEIPT_ROOT = Path("storage/runtime/model_training_stage_receipts")
-DEFAULT_LOG_ROOT = Path("storage/runtime/model_training_stage_logs")
+DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_receipts"
+DEFAULT_LOG_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_logs"
 SAFE_OFFLINE_STAGE_TYPES = {
     "data_acquisition",
     "feature_generation",
@@ -368,7 +368,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
-    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to storage/runtime/model_training_workflow_state_YYYY-MM.json.")
+    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/manager/runtime.")
     parser.add_argument("--manager-root", type=Path, default=Path("/root/projects/trading-manager"))
     parser.add_argument("--trading-data-root", type=Path, default=Path("/root/projects/trading-data"))
     parser.add_argument("--trading-model-root", type=Path, default=Path("/root/projects/trading-model"))
