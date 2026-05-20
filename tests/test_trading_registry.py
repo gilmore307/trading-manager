@@ -143,6 +143,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("benchmark_data_evaluation_only", policy["payload"])
         self.assertIn("target_window_training_exclusion_required", policy["payload"])
         self.assertIn("same_target_overlapping_folds_blocked", policy["payload"])
+        self.assertEqual(
+            rows["EVALUATION_PRIMARY_BENCHMARK_CANDIDATE_SHARED_CSV"]["payload"],
+            "trading-storage/main/shared/evaluation_primary_benchmark_candidate.csv",
+        )
+        self.assertIn("final_candidate_not_frozen", rows["BENCHMARK_CANDIDATE_STATUS"]["note"])
+        self.assertEqual(rows["BENCHMARK_TIME_BUCKET_ID"]["payload"], "time_bucket_id")
+        self.assertEqual(rows["BENCHMARK_SECTOR_COVERAGE_TAGS"]["payload"], "sector_coverage_tags")
+        self.assertEqual(rows["BENCHMARK_EVENT_COVERAGE_TAGS"]["payload"], "event_coverage_tags")
 
         review_skill = rows["EVALUATION_PROMOTION_REVIEW_SKILL"]
         self.assertEqual(review_skill["payload"], "promotion-evaluation-review")
