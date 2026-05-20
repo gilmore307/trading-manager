@@ -1,4 +1,4 @@
-/root/projects/trading-storage/storage/control_plane/runtime/historical_scheduler_decisions.jsonl {
+/root/projects/trading-storage/storage/02_control_plane/runtime/historical_scheduler_decisions.jsonl {
     weekly
     rotate 8
     compress

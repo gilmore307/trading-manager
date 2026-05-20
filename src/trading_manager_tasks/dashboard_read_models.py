@@ -32,7 +32,7 @@ from .scheduler_status import (
 from .agent_error_handler import DEFAULT_ERROR_CATALOG_NAME, fetch_server_error_catalog_rows
 
 HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
-HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/dashboard_cache/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
+HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/06_dashboard_cache/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
 DEFAULT_STALE_AFTER_SECONDS = 900
 MONTHLY_TASK_STAGE_TYPES = {"data_acquisition", "feature_generation"}
 FOLD_MODEL_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
@@ -593,7 +593,7 @@ def _resolve_stage_ref_path(ref: object, *, storage_root: Path) -> Path | None:
     # trading-storage/storage root. Resolve those against the storage-root
     # parent so dashboard summaries can inspect manager-owned receipt timing
     # metadata without exposing raw files.
-    if candidate.parts and candidate.parts[0] in {"storage", "control_plane"}:
+    if candidate.parts and candidate.parts[0] in {"storage", "02_control_plane"}:
         return storage_root.parent / candidate
     return Path.cwd() / candidate
 

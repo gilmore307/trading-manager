@@ -18,7 +18,7 @@ The service must not perform broker/order/fill/account mutation or production mo
 
 ## Service Shape
 
-Reviewed service templates live under `deploy/`. Runtime state lives under `trading-storage/storage/control_plane/runtime/`.
+Reviewed service templates live under `deploy/`. Runtime state lives under `trading-storage/storage/02_control_plane/runtime/`.
 
 Default runtime files:
 

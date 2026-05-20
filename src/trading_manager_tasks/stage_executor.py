@@ -368,7 +368,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
-    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/control_plane/runtime.")
+    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/02_control_plane/runtime.")
     parser.add_argument("--manager-root", type=Path, default=Path("/root/projects/trading-manager"))
     parser.add_argument("--trading-data-root", type=Path, default=Path("/root/projects/trading-data"))
     parser.add_argument("--trading-model-root", type=Path, default=Path("/root/projects/trading-model"))

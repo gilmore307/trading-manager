@@ -21,7 +21,7 @@ The trading system is split into focused repositories so each boundary can stay 
 - Point-in-time availability is mandatory for historical modeling and promotion evidence.
 - Generated payloads should be referenced by URI/hash/metadata instead of copied into SQL rows.
 - Provider calls, storage lifecycle mutation, benchmark judgment/model activation, and broker/account actions are separate gates.
-- Runtime state lives under `trading-storage/storage/control_plane/runtime/`; component-local `storage/` directories are not part of the active manager shape.
+- Runtime state lives under `trading-storage/storage/02_control_plane/runtime/`; component-local `storage/` directories are not part of the active manager shape.
 
 ## Normal Direction of Work
 

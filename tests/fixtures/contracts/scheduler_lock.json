@@ -2,7 +2,7 @@
   "contract_type": "scheduler_lock",
   "lock_scope": "provider_partition",
   "lock_key": "lock:provider:2016-01:layer_01_market_regime.data_acquisition:alpaca:SPY",
-  "lock_path": "control_plane/runtime/locks/provider/2016-01/layer_01_market_regime.data_acquisition/alpaca/SPY.lock",
+  "lock_path": "02_control_plane/runtime/locks/provider/2016-01/layer_01_market_regime.data_acquisition/alpaca/SPY.lock",
   "month": "2016-01",
   "stage_id": "layer_01_market_regime.data_acquisition",
   "provider_id": "alpaca",

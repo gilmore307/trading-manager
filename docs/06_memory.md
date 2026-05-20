@@ -10,7 +10,7 @@ This file records how durable project memory should be handled for `trading-mana
 - Active decisions: `docs/05_decision.md`.
 - Durable project notes: `docs/06_memory.md`.
 - Registry vocabulary: SQL migrations and generated `scripts/registry/current.csv`.
-- Runtime state: `trading-storage/storage/control_plane/runtime/` files.
+- Runtime state: `trading-storage/storage/02_control_plane/runtime/` files.
 - Historical path: Git history and append-only SQL migrations.
 
 ## Rule

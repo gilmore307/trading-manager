@@ -13,7 +13,7 @@ class SafeErrorRepairTests(unittest.TestCase):
     def test_repairs_scheduler_dead_pid_lock_only(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
-            lock = tmp / "control_plane/runtime/historical_scheduler.lock"
+            lock = tmp / "02_control_plane/runtime/historical_scheduler.lock"
             lock.parent.mkdir(parents=True)
             lock.write_text('{"pid": 999999999, "created_utc": "2026-05-13T00:00:00Z"}\n', encoding="utf-8")
             request = build_server_error_agent_request(
@@ -21,7 +21,7 @@ class SafeErrorRepairTests(unittest.TestCase):
                 source_repo="trading-manager",
                 error_scope="server_service",
                 error_kind="RuntimeError",
-                summary="historical scheduler daemon failed: scheduler daemon lock is active: control_plane/runtime/historical_scheduler.lock",
+                summary="historical scheduler daemon failed: scheduler daemon lock is active: 02_control_plane/runtime/historical_scheduler.lock",
                 working_directory=str(tmp),
             )
             request, _ = register_error_in_catalog(request, output_root=tmp / "agent_errors", catalog_storage="jsonl")
