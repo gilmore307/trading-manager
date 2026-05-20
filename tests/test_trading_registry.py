@@ -163,10 +163,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("available/deferred/missing", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
         self.assertIn("deferred", rows["BENCHMARK_COVERAGE_SUMMARY"]["note"])
         self.assertEqual(
-            rows["BENCHMARK_LIQUIDITY_SAMPLED_ACQUISITION_POLICY"]["payload"],
-            "three_five_minute_regular_session_windows_per_component_month",
+            rows["BENCHMARK_LIQUIDITY_FULL_DAILY_ACQUISITION_POLICY"]["payload"],
+            "full_daily_regular_session_windows_per_component_month",
         )
-        self.assertIn("trade/quote-derived liquidity evidence", rows["BENCHMARK_LIQUIDITY_SAMPLED_ACQUISITION_POLICY"]["note"])
+        self.assertIn("Sampled liquidity receipts are smoke evidence only", rows["BENCHMARK_LIQUIDITY_FULL_DAILY_ACQUISITION_POLICY"]["note"])
+        self.assertNotIn("BENCHMARK_LIQUIDITY_SAMPLED_ACQUISITION_POLICY", rows)
         self.assertNotIn("BENCHMARK_FULL_MONTH_LIQUIDITY_DEFERRED_POLICY", rows)
         self.assertEqual(rows["OKX_HISTORICAL_BENCHMARK_CANDLE_ROUTE"]["payload"], "okx_history_candles_for_benchmark_windows")
         self.assertIn(
