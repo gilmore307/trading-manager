@@ -110,3 +110,11 @@ option_derivatives_abnormality
 ```
 
 Ordinary bar, volume, spread, liquidity, target-state, option-expression, Layer 9 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into Layer 9 evidence.
+
+## D212 - Layer 3 candidate selection is policy-based
+
+Layer 3 candidate selection is part of the model stack, not an externally preselected final ticker list. Manager recognizes Layer 3 as an anonymous target-state model that may rank the current candidate-policy batch for target handoff.
+
+The candidate policy is rule-fixed: current Layer 2 selected/watch sectors, reviewed sector constituents or proxies, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast.
+
+Layer 3 work may remain target-major in task execution because routing symbols only contribute anonymous samples. Promotion evidence must still aggregate by fold and candidate-policy batch; fixed target/window panels are diagnostic or stress surfaces unless wrapped by an accepted candidate-policy replay benchmark.

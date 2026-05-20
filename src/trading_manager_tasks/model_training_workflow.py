@@ -192,8 +192,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1, 2),
         "progression_mode": "target_major_serial_chain",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id",
-        "candidate_progression_policy": "for one selected target symbol and one six-month unit, complete the downstream target chain in order before admitting the next target unless a reviewed coverage exception is recorded",
-        "data_surface": "target candidate/source_03 inputs plus feature_03_target_state_vector",
+        "candidate_progression_policy": "target-major task execution is allowed because routing symbols contribute anonymous target-state samples; evaluation and promotion must aggregate by fold and fixed candidate-universe policy batch",
+        "data_surface": "Layer 3 candidate policy plus target candidate/source_03 inputs, feature_03_target_state_vector, and anonymous target handoff ranking evidence",
         "feature_cli": "trading-data-feature-03-target-state-vector",
     },
     {
