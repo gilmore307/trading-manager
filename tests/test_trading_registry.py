@@ -143,6 +143,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("benchmark_data_evaluation_only", policy["payload"])
         self.assertIn("target_window_training_exclusion_required", policy["payload"])
         self.assertIn("same_target_overlapping_folds_blocked", policy["payload"])
+        self.assertIn("one_time_data_construction", policy["payload"])
+        self.assertIn("frozen_reusable_data_snapshot", policy["payload"])
+        self.assertIn("candidate_specific_data_rebuild_forbidden", policy["payload"])
+        self.assertIn("historical_clock_realtime_execution_replay", policy["payload"])
+        self.assertIn("training_flow_replay_forbidden", policy["payload"])
         self.assertEqual(
             rows["EVALUATION_PRIMARY_BENCHMARK_CANDIDATE_SHARED_CSV"]["payload"],
             "trading-storage/main/shared/evaluation_primary_benchmark_candidate.csv",
@@ -162,6 +167,17 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("--execute", rows["TRADING_EVALUATION_RUN_BENCHMARK_ACQUISITION"]["note"])
         self.assertEqual(rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["payload"], "benchmark_dataset_preparation_manifest")
         self.assertIn("manager_request_route_used=false", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
+        self.assertIn("frozen reusable snapshot", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
+        self.assertEqual(
+            rows["BENCHMARK_REUSABLE_DATA_SNAPSHOT_POLICY"]["payload"],
+            "one_time_acquisition_then_frozen_reuse",
+        )
+        self.assertIn("Candidate-specific benchmark data rebuilds are forbidden", rows["BENCHMARK_REUSABLE_DATA_SNAPSHOT_POLICY"]["note"])
+        self.assertEqual(
+            rows["BENCHMARK_REALTIME_REPLAY_ROUTE_POLICY"]["payload"],
+            "historical_clock_realtime_execution_replay_not_training_flow",
+        )
+        self.assertIn("realtime execution decision path", rows["BENCHMARK_REALTIME_REPLAY_ROUTE_POLICY"]["note"])
         self.assertEqual(rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["payload"], "benchmark_feed_acquisition_plan")
         self.assertIn("event-layer feeds", rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["note"])
         self.assertEqual(
