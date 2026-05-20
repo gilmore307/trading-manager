@@ -90,7 +90,7 @@ Runtime active model selection belongs in `trading-execution`: the active model 
 
 Promotion review is not triggered when one model finishes one fold. Layer-local fold evaluation remains diagnostic until Layer 1 through Layer 9 have all completed model evaluation for the same fold.
 
-Manager may continue running layer-local generation and evaluation stages as each dependency is ready, but the promotion gate opens only after `fold_layers_01_09_model_evaluation_complete`. Evaluation then judges the complete stack against the frozen benchmark and accepted baselines.
+Manager may continue running layer-local generation and evaluation stages as each dependency is ready, but the promotion gate opens only after `fold_layers_01_09_model_evaluation_complete`. Evaluation then judges one pinned Layer 1-9 version bundle against the frozen benchmark and accepted baselines. Promotion acceptance is all-or-nothing for that bundle: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently.
 
 ## D210 - Activity bridge non-overlap is mandatory
 

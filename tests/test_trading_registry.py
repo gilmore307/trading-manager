@@ -719,9 +719,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["PROMOTION_STAGE_TYPE"]["payload"], "promotion_review")
         self.assertEqual(
             rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["payload"],
-            "fold_layers_01_09_model_evaluation_complete_required_before_promotion_review",
+            "pinned_layer_01_09_bundle_all_or_nothing_after_fold_evaluation_complete",
         )
+        self.assertIn("all-or-nothing", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
+        self.assertIn("pinned Layer 1-9 version bundle", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
         self.assertIn("fold_layers_01_09_model_evaluation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("pinned_layer_01_09_bundle_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertIn(
             "promotion_review_waits_for_fold_layers_01_09_model_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],

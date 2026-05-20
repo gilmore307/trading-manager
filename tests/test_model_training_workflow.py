@@ -373,6 +373,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             promotion_stage = next(stage for stage in layer.stages if stage.stage_type == "promotion_review")
             self.assertEqual(promotion_stage.blockers, (FOLD_STACK_PROMOTION_BLOCKER,))
             self.assertIn("Layer 1-9 model evaluation", promotion_stage.description)
+            self.assertIn("pinned Layer 1-9 bundle", promotion_stage.description)
 
     def test_layers_without_dedicated_data_features_do_not_create_nonexistent_tasks(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

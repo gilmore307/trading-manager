@@ -663,7 +663,7 @@ def _build_layer_workflow(
         (
             PROMOTION_STAGE_TYPE,
             review,
-            "Run promotion review only after the fold has completed Layer 1-9 model evaluation; layer-local evaluation artifacts alone are diagnostic, not promotion-ready.",
+            "Run promotion review only after the fold has completed Layer 1-9 model evaluation; evaluation judges one pinned Layer 1-9 bundle, and layer-local artifacts are diagnostic only.",
             (FOLD_STACK_PROMOTION_BLOCKER,),
         ),
         (

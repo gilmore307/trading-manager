@@ -8,7 +8,9 @@ When a reviewer agent is used for promotion judgment, the request must require t
 
 Promotion is fold-stack scoped, not single-model scoped. A layer may finish model generation and model evaluation for a fold, but that evidence remains diagnostic until Layer 1 through Layer 9 have all completed model evaluation for the same fold.
 
-Manager must not schedule promotion review from a single layer's completed fold alone. The promotion review gate opens only after `fold_layers_01_09_model_evaluation_complete`; then evaluation can judge the complete stack against the frozen benchmark and accepted baselines.
+Manager must not schedule promotion review from a single layer's completed fold alone. The promotion review gate opens only after `fold_layers_01_09_model_evaluation_complete`; then evaluation judges one pinned Layer 1-9 version bundle against the frozen benchmark and accepted baselines.
+
+Promotion acceptance is all-or-nothing for the bundle. Layer-local evidence remains available for diagnostics, regression attribution, and retraining priority, but it must not create independent promotion, shadow, live, or reusable-production acceptance for a single layer or partial substack.
 
 ## Required Evidence
 
@@ -24,6 +26,7 @@ A promotion packet should identify:
 - downstream shadow/activation scope;
 - evaluation decision evidence.
 - evidence that Layer 1 through Layer 9 model evaluation completed for the same fold.
+- pinned version refs for all Layer 1 through Layer 9 models in the candidate bundle.
 
 ## Activation Boundary
 
