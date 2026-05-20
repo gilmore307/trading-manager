@@ -120,8 +120,8 @@ class RegistryHelperTests(unittest.TestCase):
 
         policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
         self.assertIn("candidate_policy_replay_benchmark", policy["payload"])
-        self.assertIn("preferred_five_year_historical_clock_replay", policy["payload"])
-        self.assertIn("minimum_two_year_holdout", policy["payload"])
+        self.assertIn("canonical_2021_2025_historical_clock_replay", policy["payload"])
+        self.assertIn("fixed_replay_window_2021_01_01_to_2026_01_01_end_exclusive", policy["payload"])
         self.assertIn("model_selects_targets_from_candidate_policy", policy["payload"])
         self.assertIn("final_tickers_not_preselected", policy["payload"])
         self.assertIn("fixed_replay_window", policy["payload"])
@@ -159,9 +159,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("realtime execution decision path", rows["BENCHMARK_REALTIME_REPLAY_ROUTE_POLICY"]["note"])
         self.assertEqual(
             rows["PROMOTION_BENCHMARK_REPLAY_WINDOW_POLICY"]["payload"],
-            "preferred_five_year_replay_minimum_two_year_holdout",
+            "canonical_2021_01_01_to_2026_01_01_end_exclusive_1255_expected_trading_days",
         )
         self.assertNotIn("PROMOTION_BENCHMARK_TWO_YEAR_REPLAY_WINDOW", rows)
+        self.assertEqual(
+            rows["PROMOTION_BENCHMARK_CANDIDATE_POLICY_REPLAY_CONTRACT"]["payload"],
+            "trading-evaluation/benchmarks/promotion_benchmark_candidate_policy_replay.json",
+        )
         self.assertEqual(rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["payload"], "benchmark_feed_acquisition_plan")
         self.assertIn("event-layer feeds", rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["note"])
         self.assertEqual(

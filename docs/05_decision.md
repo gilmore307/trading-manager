@@ -117,4 +117,4 @@ Layer 3 candidate selection is part of the model stack, not an externally presel
 
 The candidate policy is rule-fixed: current Layer 2 selected/watch sectors, reviewed sector constituents or proxies, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast.
 
-Layer 3 work may remain target-major in task execution because routing symbols only contribute anonymous samples. Promotion evidence must still aggregate by fold and candidate-policy batch. Promotion benchmarks use candidate-policy replay with about five years preferred when coverage is complete and two years as the minimum acceptable holdout; fixed target/window panels are not accepted promotion evidence.
+Layer 3 work may remain target-major in task execution because routing symbols only contribute anonymous samples. Promotion evidence must still aggregate by fold and candidate-policy batch. Ordinary promotion benchmarks use the canonical candidate-policy replay window `2021-01-01` through `2026-01-01` end-exclusive; fixed target/window panels are not accepted promotion evidence.
