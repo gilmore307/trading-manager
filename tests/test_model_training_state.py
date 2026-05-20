@@ -334,7 +334,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             layer_nine_acquisition = {stage.stage_id: stage for stage in state.stages}["layer_09_option_expression.data_acquisition"]
             self.assertEqual(layer_nine_acquisition.status, "ready")
             self.assertIsNone(layer_nine_acquisition.approval_gate_required)
-            self.assertTrue(any(token.endswith("review_layer_eight_option_expression_gate.py") for token in layer_nine_acquisition.command))
+            self.assertTrue(any(token.endswith("review_layer_nine_option_expression_gate.py") for token in layer_nine_acquisition.command))
 
     def test_promotion_review_waits_until_all_layer_evaluations_complete(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -26,10 +26,11 @@ MODEL_LAYER_ORDER = (
     "layer_03_target_state_vector",
     "layer_04_event_failure_risk",
     "layer_05_alpha_confidence",
-    "layer_06_position_projection",
-    "layer_07_underlying_action",
-    "layer_08_option_expression",
-    "layer_09_event_risk_governor",
+    "layer_06_dynamic_risk_policy",
+    "layer_07_position_projection",
+    "layer_08_underlying_action",
+    "layer_09_option_expression",
+    "layer_10_event_risk_governor",
 )
 
 FORBIDDEN_HANDOFF_ACTIONS = (

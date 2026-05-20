@@ -242,8 +242,6 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "candidate_progression_policy": "project target holding state after Layer 6 dynamic risk policy is ready",
         "data_surface": "alpha confidence plus dynamic risk policy, position, premium, risk, and cost context; no dedicated trading-data source",
         "feature_cli": None,
-        "physical_layer": 6,
-        "physical_slug": "position_projection",
     },
     {
         "layer": 8,
@@ -255,8 +253,6 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "candidate_progression_policy": "continue the active target candidate chain after Layer 7 position projection is ready",
         "data_surface": "model/control-plane underlying-action context; no dedicated trading-data source",
         "feature_cli": None,
-        "physical_layer": 7,
-        "physical_slug": "underlying_action",
     },
     {
         "layer": 9,
@@ -266,10 +262,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "optional_trading_guidance_after_underlying_action",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
         "candidate_progression_policy": "finish the active base target chain through optional Layer 9 trading guidance / option expression; crypto/direct-underlying-only routes do not require option refs",
-        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 8 target chains require them plus feature_08_option_expression",
-        "feature_cli": "trading-data-feature-08-option-expression",
-        "physical_layer": 8,
-        "physical_slug": "option_expression",
+        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 8 target chains require them plus feature_09_option_expression",
+        "feature_cli": "trading-data-feature-09-option-expression",
     },
     {
         "layer": 10,
@@ -279,10 +273,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "event_risk_governance_over_underlying_thesis",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_risk_context_id",
         "candidate_progression_policy": "review the Layer 8 direct-underlying/spot thesis against accepted event-risk evidence; Layer 9 guidance/expression context is optional when available",
-        "data_surface": "source_09_event_risk_governor plus feature_09_event_risk_governor from reviewed local event/feed evidence; no broker/account mutation",
-        "feature_cli": "trading-data-feature-09-event-risk-governor",
-        "physical_layer": 9,
-        "physical_slug": "event_risk_governor",
+        "data_surface": "source_10_event_risk_governor plus feature_10_event_risk_governor from reviewed local event/feed evidence; no broker/account mutation",
+        "feature_cli": "trading-data-feature-10-event-risk-governor",
     },
 )
 
@@ -304,11 +296,9 @@ REVIEW_SCRIPT_NAMES: dict[int, str] = {
 }
 
 
-def model_script(layer: int, slug: str, verb: str, *, physical_layer: int | None = None, physical_slug: str | None = None) -> list[str]:
-    physical_layer = physical_layer or layer
-    physical_slug = physical_slug or slug
-    script_name = REVIEW_SCRIPT_NAMES[layer] if verb == "review" else f"{verb}_model_{physical_layer:02d}_{physical_slug}.py"
-    physical_model_key = f"model_{physical_layer:02d}_{physical_slug}"
+def model_script(layer: int, slug: str, verb: str) -> list[str]:
+    script_name = REVIEW_SCRIPT_NAMES[layer] if verb == "review" else f"{verb}_model_{layer:02d}_{slug}.py"
+    physical_model_key = f"model_{layer:02d}_{slug}"
     command = [
         "PYTHONPATH=/root/projects/trading-model/src",
         "python3",
@@ -377,8 +367,8 @@ FEATURE_MODULES: dict[str, str] = {
     "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime.from_feed_artifacts",
     "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context.from_feed_artifacts",
     "trading-data-feature-03-target-state-vector": "data_feature.feature_03_target_state_vector",
-    "trading-data-feature-09-event-risk-governor": "data_feature.feature_09_event_risk_governor",
-    "trading-data-feature-08-option-expression": "data_feature.feature_08_option_expression",
+    "trading-data-feature-10-event-risk-governor": "data_feature.feature_10_event_risk_governor",
+    "trading-data-feature-09-option-expression": "data_feature.feature_09_option_expression",
 }
 
 
@@ -394,11 +384,11 @@ def feature_command(feature_cli: str | None) -> list[str]:
             "${START_MONTH}",
             "--write",
         ]
-    if feature_cli == "trading-data-feature-08-option-expression":
+    if feature_cli == "trading-data-feature-09-option-expression":
         return [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/execute_layer_eight_option_feature_generation.py",
+            "scripts/tasks/execute_layer_nine_option_feature_generation.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -407,7 +397,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-feature-01-market-regime", "trading-data-feature-02-sector-context"}:
         command.extend(["--month", "${START_MONTH}"])
-    if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-09-event-risk-governor"}:
+    if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-10-event-risk-governor"}:
         command.extend([
             "--source-start",
             "${START_MONTH_START_ET}",
@@ -419,10 +409,8 @@ def feature_command(feature_cli: str | None) -> list[str]:
     return command
 
 
-def maintenance_command(layer: int, slug: str, *, physical_layer: int | None = None, physical_slug: str | None = None) -> list[str]:
-    physical_layer = physical_layer or layer
-    physical_slug = physical_slug or slug
-    physical_model_key = f"model_{physical_layer:02d}_{physical_slug}"
+def maintenance_command(layer: int, slug: str) -> list[str]:
+    physical_model_key = f"model_{layer:02d}_{slug}"
     return [
         "PYTHONPATH=src",
         "python3",
@@ -530,13 +518,11 @@ def _build_layer_workflow(
     layer = int(meta["layer"])
     slug = str(meta["slug"])
     key = layer_key(layer, slug)
-    physical_layer = int(meta.get("physical_layer", layer))
-    physical_slug = str(meta.get("physical_slug", slug))
-    generate = model_script(layer, slug, "generate", physical_layer=physical_layer, physical_slug=physical_slug)
-    evaluate = model_script(layer, slug, "evaluate", physical_layer=physical_layer, physical_slug=physical_slug)
-    review = model_script(layer, slug, "review", physical_layer=physical_layer, physical_slug=physical_slug)
+    generate = model_script(layer, slug, "generate")
+    evaluate = model_script(layer, slug, "evaluate")
+    review = model_script(layer, slug, "review")
     feature = feature_command(meta.get("feature_cli"))
-    maintenance = maintenance_command(layer, slug, physical_layer=physical_layer, physical_slug=physical_slug)
+    maintenance = maintenance_command(layer, slug)
     dataset_unit = _dataset_unit_for_layer(
         layer=layer,
         start_month=start_month,
@@ -594,7 +580,7 @@ def _build_layer_workflow(
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/review_layer_eight_option_expression_gate.py",
+            "scripts/tasks/review_layer_nine_option_expression_gate.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -605,7 +591,7 @@ def _build_layer_workflow(
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/materialize_layer_nine_event_risk_governor_inputs.py",
+            "scripts/tasks/materialize_layer_ten_event_risk_governor_inputs.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",

@@ -244,7 +244,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         command = plan.layers[8].feature_command
 
-        self.assertIn("scripts/tasks/execute_layer_eight_option_feature_generation.py", command)
+        self.assertIn("scripts/tasks/execute_layer_nine_option_feature_generation.py", command)
         self.assertIn("--start-month", command)
         self.assertIn("${START_MONTH}", command)
         self.assertIn("--end-month", command)
@@ -262,7 +262,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         stage = plan.layers[8].stages[0]
 
         self.assertIsNone(stage.approval_gate_required)
-        self.assertIn("scripts/tasks/review_layer_eight_option_expression_gate.py", stage.command)
+        self.assertIn("scripts/tasks/review_layer_nine_option_expression_gate.py", stage.command)
         self.assertIn("--write", stage.command)
 
     def test_layer_three_feature_generation_reads_month_scoped_source_rows(self):
@@ -303,7 +303,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         layer = plan.layers[4]
         self.assertEqual(layer.layer_key, "layer_05_alpha_confidence")
         self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation", "model_evaluation", "promotion_review", "maintenance"])
-        self.assertNotIn("materialize_layer_nine_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
+        self.assertNotIn("materialize_layer_ten_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
         self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
         self.assertIn("--from-database", layer.model_generate_command)
         self.assertIn("--output-jsonl", layer.model_generate_command)
@@ -315,10 +315,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             3: "generate_model_04_event_failure_risk.py",
             4: "generate_model_05_alpha_confidence.py",
             5: "generate_model_06_dynamic_risk_policy.py",
-            6: "generate_model_06_position_projection.py",
-            7: "generate_model_07_underlying_action.py",
-            8: "generate_model_08_option_expression.py",
-            9: "generate_model_09_event_risk_governor.py",
+            6: "generate_model_07_position_projection.py",
+            7: "generate_model_08_underlying_action.py",
+            8: "generate_model_09_option_expression.py",
+            9: "generate_model_10_event_risk_governor.py",
         }
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(

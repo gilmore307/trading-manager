@@ -24,7 +24,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 TE_FEED_ID = "07_feed_trading_economics_calendar_web"
 TE_SOURCE_ID = "trading_economics_calendar_web"
-EVENT_SOURCE_ID = "source_09_event_risk_governor"
+EVENT_SOURCE_ID = "source_10_event_risk_governor"
 DEFAULT_TE_MONTHLY_ROOT = Path("storage/monthly_backfill/trading_economics_calendar_web")
 DEFAULT_RECENT_LOOKAHEAD_DAYS = 45
 
@@ -211,7 +211,7 @@ def _historical_seed_task_key(*, start_month: str, end_month: str, artifacts: li
         },
         "manager_controls": {
             "provider_calls": 0,
-            "database_write_target": "trading_data.source_09_event_risk_governor",
+            "database_write_target": "trading_data.source_10_event_risk_governor",
             "model_activation_performed": False,
             "broker_execution_performed": False,
         },
@@ -225,7 +225,7 @@ def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root:
     task_key_path: Path | None = None
     task_hash: str | None = None
     if not missing:
-        output_root = f"storage/runtime/source_09_event_risk_governor/te_calendar_historical_seed_{start_month}_{end_month}"
+        output_root = f"storage/runtime/source_10_event_risk_governor/te_calendar_historical_seed_{start_month}_{end_month}"
         payload = _historical_seed_task_key(start_month=start_month, end_month=end_month, artifacts=seed_artifacts, output_root=output_root)
         content = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
         task_hash = "sha256:" + hashlib.sha256(content).hexdigest()

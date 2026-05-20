@@ -34,7 +34,7 @@ class TradingEconomicsCalendarPlanningTests(unittest.TestCase):
             self.assertEqual(summary.missing_months, ())
             self.assertTrue(summary.task_key_path)
             payload = json.loads(Path(summary.task_key_path).read_text())
-            self.assertEqual(payload["source"], "source_09_event_risk_governor")
+            self.assertEqual(payload["source"], "source_10_event_risk_governor")
             self.assertEqual(payload["params"]["source_materialization_role"], "historical_seed_to_event_risk_governor_source")
             self.assertEqual(len(payload["params"]["feed_artifact_paths"]), 1)
             self.assertIn("/filtered_artifacts/2016-01/", payload["params"]["feed_artifact_paths"][0])

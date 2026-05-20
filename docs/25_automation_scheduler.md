@@ -37,7 +37,7 @@ Layer 2 feature generation also prepares `source_02_target_candidate_holdings` a
 
 ## Event-Risk Lane
 
-Layer 10 is part of the historical-modeling service boundary, but it is not a prerequisite for base-stack progression. It produces residual event-risk evidence, interventions, and promotion-review packets under the same no-broker safety rules. Current physical event-risk source/model surfaces may retain `09` tokens until dedicated renumbering.
+Layer 10 is part of the historical-modeling service boundary, but it is not a prerequisite for base-stack progression. It produces residual event-risk evidence, interventions, and promotion-review packets under the same no-broker safety rules.
 
 ## Dashboard Refresh Events
 

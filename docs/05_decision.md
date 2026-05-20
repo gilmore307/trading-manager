@@ -115,7 +115,7 @@ microstructure_liquidity_disruption
 option_derivatives_abnormality
 ```
 
-Ordinary bar, volume, spread, liquidity, target-state, option-expression, Layer 9 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into Layer 9 evidence.
+Ordinary bar, volume, spread, liquidity, target-state, option-expression, Layer 10 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into Layer 9 evidence.
 
 ## D212 - Layer 3 candidate selection is policy-based
 

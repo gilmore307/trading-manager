@@ -24,10 +24,11 @@ PHYSICAL_MODEL_SURFACES_BY_ID = {
     "target_state_vector_model": "model_03_target_state_vector",
     "event_failure_risk_model": "model_04_event_failure_risk",
     "alpha_confidence_model": "model_05_alpha_confidence",
-    "position_projection_model": "model_06_position_projection",
-    "underlying_action_model": "model_07_underlying_action",
-    "option_expression_model": "model_08_option_expression",
-    "event_risk_governor": "model_09_event_risk_governor",
+    "dynamic_risk_policy_model": "model_06_dynamic_risk_policy",
+    "position_projection_model": "model_07_position_projection",
+    "underlying_action_model": "model_08_underlying_action",
+    "option_expression_model": "model_09_option_expression",
+    "event_risk_governor": "model_10_event_risk_governor",
 }
 
 LOCAL_LAYER_INPUTS = (
@@ -36,10 +37,11 @@ LOCAL_LAYER_INPUTS = (
     ("layer_03_target_state_vector", "target_state_vector_model", "target_context_state"),
     ("layer_04_event_failure_risk", "event_failure_risk_model", "event_failure_risk_vector"),
     ("layer_05_alpha_confidence", "alpha_confidence_model", "alpha_confidence_vector"),
-    ("layer_06_position_projection", "position_projection_model", "position_projection_vector"),
-    ("layer_07_underlying_action", "underlying_action_model", "underlying_action_plan"),
-    ("layer_08_option_expression", "option_expression_model", "option_expression_plan"),
-    ("layer_09_event_risk_governor", "event_risk_governor", "event_context_vector"),
+    ("layer_06_dynamic_risk_policy", "dynamic_risk_policy_model", "dynamic_risk_policy_state"),
+    ("layer_07_position_projection", "position_projection_model", "position_projection_vector"),
+    ("layer_08_underlying_action", "underlying_action_model", "underlying_action_plan"),
+    ("layer_09_option_expression", "option_expression_model", "option_expression_plan"),
+    ("layer_10_event_risk_governor", "event_risk_governor", "event_context_vector"),
 )
 
 

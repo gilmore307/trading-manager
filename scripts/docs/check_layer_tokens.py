@@ -16,10 +16,10 @@ LAYERS = (
     (4, ("EventFailureRiskModel",), "layer_04_event_failure_risk", "event_failure_risk_model", "model_04_event_failure_risk", "event_failure_risk_vector"),
     (5, ("AlphaConfidenceModel",), "layer_05_alpha_confidence", "alpha_confidence_model", "model_05_alpha_confidence", "alpha_confidence_vector"),
     (6, ("DynamicRiskPolicyModel",), "layer_06_dynamic_risk_policy", "dynamic_risk_policy_model", "model_06_dynamic_risk_policy", "dynamic_risk_policy_state"),
-    (7, ("PositionProjectionModel",), "layer_07_position_projection", "position_projection_model", "model_06_position_projection", "position_projection_vector"),
-    (8, ("UnderlyingActionModel",), "layer_08_underlying_action", "underlying_action_model", "model_07_underlying_action", "underlying_action_plan"),
-    (9, ("TradingGuidanceModel", "OptionExpressionModel"), "layer_09_option_expression", "option_expression_model", "model_08_option_expression", "option_expression_plan"),
-    (10, ("EventRiskGovernor", "EventIntelligenceOverlay"), "layer_10_event_risk_governor", "event_risk_governor", "model_09_event_risk_governor", "event_risk_intervention"),
+    (7, ("PositionProjectionModel",), "layer_07_position_projection", "position_projection_model", "model_07_position_projection", "position_projection_vector"),
+    (8, ("UnderlyingActionModel",), "layer_08_underlying_action", "underlying_action_model", "model_08_underlying_action", "underlying_action_plan"),
+    (9, ("TradingGuidanceModel", "OptionExpressionModel"), "layer_09_option_expression", "option_expression_model", "model_09_option_expression", "option_expression_plan"),
+    (10, ("EventRiskGovernor", "EventIntelligenceOverlay"), "layer_10_event_risk_governor", "event_risk_governor", "model_10_event_risk_governor", "event_risk_intervention"),
 )
 
 FILES_TO_CHECK = (

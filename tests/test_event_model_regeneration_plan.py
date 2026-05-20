@@ -34,7 +34,7 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         self.assertEqual(steps["07_state_only_invalidation_if_old_outputs_remain"]["mutation_class"], "workflow_state_only_no_artifact_deletion")
         self.assertTrue(steps["08_revisit_storage_lifecycle_hold"]["requires_review_before_apply"])
         self.assertIn("--model event_risk_governor", steps["06_evaluate_and_review_without_activation"]["command_ref"])
-        self.assertNotIn("--model model_09_event_risk_governor", steps["06_evaluate_and_review_without_activation"]["command_ref"])
+        self.assertNotIn("--model model_10_event_risk_governor", steps["06_evaluate_and_review_without_activation"]["command_ref"])
         self.assertEqual(steps["06_evaluate_and_review_without_activation"]["status"], "blocked_until_event_risk_governor_ready")
 
     def test_writes_plan_file(self) -> None:
