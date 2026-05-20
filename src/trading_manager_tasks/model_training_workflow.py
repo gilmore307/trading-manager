@@ -36,6 +36,7 @@ ROLLING_FOLD_VALIDATION_MONTHS = 1
 ROLLING_FOLD_TEST_MONTHS = 1
 ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_MONTHS + ROLLING_FOLD_TEST_MONTHS
 PROMOTION_STAGE_TYPE = "promotion_review"
+FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_09_model_evaluation_complete"
 
 
 @dataclass(frozen=True)
@@ -170,7 +171,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (),
         "progression_mode": "background_panel_continuous",
         "candidate_axis": "six_month_window",
-        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each six-month chronological unit, then continue to the next six-month unit without waiting for downstream layers",
+        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each six-month chronological unit; layer-local evaluation may finish before downstream layers, but promotion waits for Layer 1-9 fold-stack evaluation completion",
         "data_surface": "autonomous Alpaca ETF bars acquisition plus feature_01_market_regime",
         "feature_cli": "trading-data-feature-01-market-regime",
     },
@@ -181,7 +182,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1,),
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "six_month_window;sector_or_industry_symbol",
-        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists, then continue forward without waiting for target-chain layers",
+        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists; layer-local evaluation may finish before target-chain layers, but promotion waits for Layer 1-9 fold-stack evaluation completion",
         "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
@@ -478,6 +479,11 @@ def _with_target_blocker(blockers: tuple[str, ...], *, layer: int, selected_targ
     return blockers
 
 
+def _upstream_layer_ready_blockers(depends_on_layers: tuple[int, ...], *, foundation_catch_up_only: bool) -> tuple[str, ...]:
+    suffix = "complete" if foundation_catch_up_only else "model_evaluation_complete"
+    return tuple(f"upstream_layer_{dep:02d}_{suffix}" for dep in depends_on_layers)
+
+
 def _build_layer_workflow(
     meta: dict[str, Any],
     *,
@@ -520,8 +526,9 @@ def _build_layer_workflow(
     elif meta.get("feature_cli") is None:
         acquisition_status, acquisition_blockers, acquisition_gate = "not_applicable", (), None
     else:
-        acquisition_status, acquisition_blockers, acquisition_gate = "blocked", tuple(
-            f"upstream_layer_{dep:02d}_complete" for dep in meta["depends_on_layers"]
+        acquisition_status, acquisition_blockers, acquisition_gate = "blocked", _upstream_layer_ready_blockers(
+            tuple(meta["depends_on_layers"]),
+            foundation_catch_up_only=foundation_catch_up_only,
         ), None
 
     acquisition_command = ["manager", "advance-local-input-stage", key]
@@ -641,7 +648,10 @@ def _build_layer_workflow(
             "model_generation",
             generate,
             "Generate offline model/state-vector rows from a complete frozen rolling-fold train manifest, never from one month alone.",
-            tuple(f"upstream_layer_{dep:02d}_complete" for dep in meta["depends_on_layers"])
+            _upstream_layer_ready_blockers(
+                tuple(meta["depends_on_layers"]),
+                foundation_catch_up_only=foundation_catch_up_only,
+            )
             + ((f"{key}.feature_or_input_ready",) if include_input_stage else ()),
         ),
         (
@@ -653,8 +663,8 @@ def _build_layer_workflow(
         (
             PROMOTION_STAGE_TYPE,
             review,
-            "Run the complete Promotion Review task: evidence packet, gates, baseline comparison, split stability, leakage/calibration/test report, agent decision, and durable decision write.",
-            (f"{key}.model_evaluation_complete",),
+            "Run promotion review only after the fold has completed Layer 1-9 model evaluation; layer-local evaluation artifacts alone are diagnostic, not promotion-ready.",
+            (FOLD_STACK_PROMOTION_BLOCKER,),
         ),
         (
             "maintenance",

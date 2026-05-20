@@ -86,6 +86,12 @@ Offline model-quality judgment after a completed fold belongs in `trading-evalua
 
 Runtime active model selection belongs in `trading-execution`: the active model trades, promoted-but-not-active models run shadow during market hours, ranks 2-4 stay realtime candidates, and weak models enter eliminate-candidate review when sufficient reason evidence exists. Active selection is still separate from broker/order/account mutation.
 
+## D018 - Promotion Waits For Full Fold Stack
+
+Promotion review is not triggered when one model finishes one fold. Layer-local fold evaluation remains diagnostic until Layer 1 through Layer 9 have all completed model evaluation for the same fold.
+
+Manager may continue running layer-local generation and evaluation stages as each dependency is ready, but the promotion gate opens only after `fold_layers_01_09_model_evaluation_complete`. Evaluation then judges the complete stack against the frozen benchmark and accepted baselines.
+
 ## D210 - Activity bridge non-overlap is mandatory
 
 Activity bridge evidence must prove one of these statuses before it can affect scoring or intervention:

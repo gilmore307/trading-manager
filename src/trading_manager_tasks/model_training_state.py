@@ -12,6 +12,7 @@ from typing import Any, Iterable, Literal, Mapping, Sequence, TextIO
 
 from .model_training_workflow import (
     FOUNDATION_CATCH_UP_BLOCKER,
+    FOLD_STACK_PROMOTION_BLOCKER,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
     DatasetUnit,
     ModelTrainingWorkflowPlan,
@@ -225,13 +226,23 @@ def _layer_complete(layer_number: int, stages: Mapping[str, StageProgress]) -> b
     return bool(layer_stages) and all(stage.status in {"succeeded", "not_applicable"} for stage in layer_stages)
 
 
+def _layer_model_evaluation_complete(layer_number: int, stages: Mapping[str, StageProgress]) -> bool:
+    layer_stages = [stage for stage in stages.values() if stage.layer == layer_number and stage.stage_type == "model_evaluation"]
+    return bool(layer_stages) and all(stage.status in {"succeeded", "not_applicable"} for stage in layer_stages)
+
+
 def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     if blocker in {"layer_01_task_key_preparation", FOUNDATION_CATCH_UP_BLOCKER, POST_MODEL_GENERATION_REBUILD_BLOCKER}:
         return False
+    if blocker == FOLD_STACK_PROMOTION_BLOCKER:
+        return all(_layer_model_evaluation_complete(layer_number, stages) for layer_number in range(1, 10))
     if blocker == "upstream_layers_01_08_complete":
         return all(_layer_complete(layer_number, stages) for layer_number in range(1, 9))
     if blocker == "active_target_chain_complete":
         return _layer_complete(8, stages)
+    if blocker.startswith("upstream_layer_") and blocker.endswith("_model_evaluation_complete"):
+        layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_model_evaluation_complete"))
+        return _layer_model_evaluation_complete(layer_number, stages)
     if blocker.startswith("upstream_layer_") and blocker.endswith("_complete"):
         layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_complete"))
         return _layer_complete(layer_number, stages)

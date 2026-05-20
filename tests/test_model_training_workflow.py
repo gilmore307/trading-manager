@@ -6,6 +6,7 @@ from pathlib import Path
 
 from trading_manager_tasks.model_training_workflow import (
     BASE_STACK_LAYER_COUNT,
+    FOLD_STACK_PROMOTION_BLOCKER,
     FOUNDATION_CATCH_UP_BLOCKER,
     MONTHLY_SUBSTRATE_LAYERS,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
@@ -352,11 +353,26 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layers[7].progression_mode, "optional_trading_guidance_after_underlying_action")
         self.assertEqual(plan.layers[7].depends_on_layers, (7,))
         self.assertIn("crypto/direct-underlying-only routes do not require option refs", plan.layers[7].candidate_progression_policy)
-        self.assertIn("upstream_layer_07_complete", plan.layers[7].stages[0].blockers)
+        self.assertIn("upstream_layer_07_model_evaluation_complete", plan.layers[7].stages[0].blockers)
         self.assertEqual(plan.layers[8].progression_mode, "event_risk_governance_over_underlying_thesis")
         self.assertEqual(plan.layers[8].depends_on_layers, (7,))
         self.assertIn("Layer 8 guidance/expression context is optional", plan.layers[8].candidate_progression_policy)
-        self.assertIn("upstream_layer_07_complete", plan.layers[8].stages[0].blockers)
+        self.assertIn("upstream_layer_07_model_evaluation_complete", plan.layers[8].stages[0].blockers)
+
+    def test_promotion_review_waits_for_full_fold_stack_evaluation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-06",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        for layer in plan.layers:
+            promotion_stage = next(stage for stage in layer.stages if stage.stage_type == "promotion_review")
+            self.assertEqual(promotion_stage.blockers, (FOLD_STACK_PROMOTION_BLOCKER,))
+            self.assertIn("Layer 1-9 model evaluation", promotion_stage.description)
 
     def test_layers_without_dedicated_data_features_do_not_create_nonexistent_tasks(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

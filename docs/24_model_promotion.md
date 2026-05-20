@@ -4,6 +4,12 @@ Manager owns scheduling and request preparation for model promotion/evaluation w
 
 When a reviewer agent is used for promotion judgment, the request must require the workspace skill `skills/openclaw/promotion-evaluation-review`. The agent review is advisory evidence only; `trading-evaluation` deterministic checks own eligibility and readiness records.
 
+## Fold-Stack Gate
+
+Promotion is fold-stack scoped, not single-model scoped. A layer may finish model generation and model evaluation for a fold, but that evidence remains diagnostic until Layer 1 through Layer 9 have all completed model evaluation for the same fold.
+
+Manager must not schedule promotion review from a single layer's completed fold alone. The promotion review gate opens only after `fold_layers_01_09_model_evaluation_complete`; then evaluation can judge the complete stack against the frozen benchmark and accepted baselines.
+
 ## Required Evidence
 
 A promotion packet should identify:
@@ -17,6 +23,7 @@ A promotion packet should identify:
 - known failure modes;
 - downstream shadow/activation scope;
 - evaluation decision evidence.
+- evidence that Layer 1 through Layer 9 model evaluation completed for the same fold.
 
 ## Activation Boundary
 

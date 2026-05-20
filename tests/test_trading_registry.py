@@ -717,6 +717,15 @@ class RegistryHelperTests(unittest.TestCase):
             "model_generation_evaluation_promotion_artifacts_superseded_until_rebuilt",
         )
         self.assertEqual(rows["PROMOTION_STAGE_TYPE"]["payload"], "promotion_review")
+        self.assertEqual(
+            rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["payload"],
+            "fold_layers_01_09_model_evaluation_complete_required_before_promotion_review",
+        )
+        self.assertIn("fold_layers_01_09_model_evaluation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn(
+            "promotion_review_waits_for_fold_layers_01_09_model_evaluation_complete",
+            rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
+        )
         self.assertIn("train_months=4", rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["payload"])
         self.assertEqual(
             rows["MONTH_SCOPED_INGEST_ONLY_DURING_FOUNDATION_CATCH_UP"]["payload"],

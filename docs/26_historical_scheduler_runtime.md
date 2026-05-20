@@ -57,7 +57,7 @@ PYTHONPATH=src python3 scripts/tasks/build_historical_task_progress_summary.py
 
 ## Current Priority
 
-Layer 1/2 foundation catch-up remains first. A month can advance during this phase after reusable data-acquisition and feature/input-preparation substrate is complete. Model generation, evaluation, review, and promotion artifacts are fold-scoped and should be rebuilt when the substrate changes.
+Layer 1/2 foundation catch-up remains first. A month can advance during this phase after reusable data-acquisition and feature/input-preparation substrate is complete. Model generation and model evaluation are fold-scoped. Promotion review is also fold-scoped, but it must wait until Layer 1 through Layer 9 model evaluation has completed for the same fold; single-layer fold results are diagnostic until the full stack closes.
 
 ## Safety Evidence
 
