@@ -156,7 +156,9 @@ class RegistryHelperTests(unittest.TestCase):
             rows["TRADING_EVALUATION_PREPARE_BENCHMARK_DATASET"]["path"],
         )
         self.assertEqual(rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["payload"], "benchmark_dataset_preparation_manifest")
-        self.assertEqual(rows["BENCHMARK_FEED_TASK_PLAN"]["payload"], "benchmark_feed_task_plan")
+        self.assertIn("manager_request_route_used=false", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
+        self.assertEqual(rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["payload"], "benchmark_feed_acquisition_plan")
+        self.assertNotIn("BENCHMARK_FEED_TASK_PLAN", rows)
         self.assertEqual(rows["BENCHMARK_FEED_COVERAGE_STATUS_VALUES"]["payload"], "available;deferred;missing")
         self.assertIn("available/deferred/missing", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
         self.assertIn("deferred", rows["BENCHMARK_COVERAGE_SUMMARY"]["note"])
@@ -166,9 +168,10 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(rows["OKX_HISTORICAL_BENCHMARK_CANDLE_ROUTE"]["payload"], "okx_history_candles_for_benchmark_windows")
         self.assertIn(
-            "allow_live_provider_calls=false",
-            rows["BENCHMARK_PROVIDER_TASK_KEYS_FAIL_CLOSED_POLICY"]["note"],
+            "sealed one-time action",
+            rows["BENCHMARK_ONE_SHOT_ACQUISITION_GATE_POLICY"]["note"],
         )
+        self.assertNotIn("BENCHMARK_PROVIDER_TASK_KEYS_FAIL_CLOSED_POLICY", rows)
 
         review_skill = rows["EVALUATION_PROMOTION_REVIEW_SKILL"]
         self.assertEqual(review_skill["payload"], "promotion-evaluation-review")
