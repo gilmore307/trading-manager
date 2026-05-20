@@ -8,6 +8,7 @@ from trading_manager_tasks.model_training_workflow import (
     BASE_STACK_LAYER_COUNT,
     FOLD_STACK_PROMOTION_BLOCKER,
     FOUNDATION_CATCH_UP_BLOCKER,
+    MULTI_TARGET_SYMBOL_BLOCKER,
     MONTHLY_SUBSTRATE_LAYERS,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
@@ -414,6 +415,17 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertEqual(layer.dataset_unit.target_symbol, "AAPL")
             self.assertTrue(layer.dataset_unit.target_required)
             self.assertEqual(layer.stages[0].dataset_unit.target_symbol, "AAPL")
+
+    def test_multi_target_symbol_requires_separate_workflows(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            with self.assertRaisesRegex(ValueError, MULTI_TARGET_SYMBOL_BLOCKER):
+                build_model_training_workflow_plan(
+                    storage_root=Path(raw_tmp),
+                    start_month="2016-01",
+                    end_month="2016-06",
+                    selected_target_symbol="AAPL,MSFT",
+                    foundation_catch_up_only=False,
+                )
 
     def test_later_layers_block_when_task_intro_omits_target_symbol(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

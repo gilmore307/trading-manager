@@ -38,7 +38,7 @@ Layer 8 remains the optional base guidance/expression layer. It should not direc
 
 Layer 3 candidate generation is rule-fixed, not final-ticker-fixed. Live routing and promotion replay should build candidates from current Layer 2 selected/watch sectors, reviewed sector constituents or proxies, current hot/liquid market-wide names, and point-in-time liquidity, spread, data-quality, and optional optionability filters. Layer 3 may rank the anonymous candidate-policy batch for target handoff, but downstream layers still own alpha confidence, action, sizing, option expression, and execution.
 
-Manager may schedule Layer 3 work target-major because routing symbols only produce anonymous samples. That scheduling choice does not replace fold-level and candidate-policy-aware evaluation.
+Manager may schedule Layer 3 work target-major because routing symbols only produce anonymous samples. Layer 4 and later keep a single selected target per workflow run. If the candidate policy emits multiple targets, manager schedules one target-scoped workflow per symbol rather than widening the Layer 4+ model interface to multi-target batches. That scheduling choice does not replace fold-level and candidate-policy-aware evaluation.
 
 ## Manager Responsibilities
 

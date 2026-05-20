@@ -37,6 +37,7 @@ ROLLING_FOLD_TEST_MONTHS = 1
 ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_MONTHS + ROLLING_FOLD_TEST_MONTHS
 PROMOTION_STAGE_TYPE = "promotion_review"
 FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_09_model_evaluation_complete"
+MULTI_TARGET_SYMBOL_BLOCKER = "multiple_target_symbols_require_separate_workflows"
 
 
 @dataclass(frozen=True)
@@ -460,7 +461,7 @@ def _dataset_unit_for_layer(
             target_required=False,
             description=f"Layer {layer} dataset unit: fixed panel over one six-month window; no single target symbol applies.",
         )
-    target = selected_target_symbol.strip().upper() if selected_target_symbol else None
+    target = _normalize_selected_target_symbol(selected_target_symbol)
     target_text = target if target else "UNSELECTED_TARGET"
     return DatasetUnit(
         unit_kind="target_symbol_six_month",
@@ -477,6 +478,17 @@ def _with_target_blocker(blockers: tuple[str, ...], *, layer: int, selected_targ
     if layer >= 3 and not (selected_target_symbol and selected_target_symbol.strip()):
         return ("selected_target_symbol_required",) + blockers
     return blockers
+
+
+def _normalize_selected_target_symbol(selected_target_symbol: str | None) -> str | None:
+    if not selected_target_symbol:
+        return None
+    symbol = selected_target_symbol.strip().upper()
+    if not symbol:
+        return None
+    if any(separator in symbol for separator in (",", ";", " ")) or "\t" in symbol or "\n" in symbol:
+        raise ValueError(MULTI_TARGET_SYMBOL_BLOCKER)
+    return symbol
 
 
 def _upstream_layer_ready_blockers(depends_on_layers: tuple[int, ...], *, foundation_catch_up_only: bool) -> tuple[str, ...]:
@@ -721,6 +733,7 @@ def build_model_training_workflow_plan(
 ) -> ModelTrainingWorkflowPlan:
     task_key_count = count_layer_one_task_keys(storage_root, start_month=start_month)
     layer_two_task_key_count = count_layer_two_task_keys(storage_root, start_month=start_month)
+    normalized_target_symbol = _normalize_selected_target_symbol(selected_target_symbol)
     layers = tuple(
         _build_layer_workflow(
             meta,
@@ -728,7 +741,7 @@ def build_model_training_workflow_plan(
             layer_two_task_key_count=layer_two_task_key_count,
             start_month=start_month,
             end_month=end_month,
-            selected_target_symbol=selected_target_symbol,
+            selected_target_symbol=normalized_target_symbol,
             foundation_catch_up_only=foundation_catch_up_only,
         )
         for meta in LAYER_METADATA
@@ -745,7 +758,7 @@ def build_model_training_workflow_plan(
         contract_type="manager_model_training_workflow_plan",
         start_month=start_month,
         end_month=end_month,
-        selected_target_symbol=selected_target_symbol.strip().upper() if selected_target_symbol else None,
+        selected_target_symbol=normalized_target_symbol,
         layer_count=len(layers),
         layer_one_task_key_count=task_key_count,
         layer_two_task_key_count=layer_two_task_key_count,
@@ -772,16 +785,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Allow model generation/evaluation/promotion stages after the Layer 1/2 historical substrate catch-up has been explicitly accepted.",
     )
     args = parser.parse_args(argv)
-    write_workflow_plan(
-        build_model_training_workflow_plan(
+    try:
+        plan = build_model_training_workflow_plan(
             start_month=args.start_month,
             end_month=args.end_month,
             storage_root=args.storage_root,
             selected_target_symbol=args.target_symbol,
             foundation_catch_up_only=not args.allow_post_foundation_model_stages,
-        ),
-        output=sys.stdout,
-    )
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+    write_workflow_plan(plan, output=sys.stdout)
     return 0
 
 
@@ -792,6 +806,8 @@ __all__ = [
     "BASE_STACK_LAYER_COUNT",
     "FOUNDATION_CATCH_UP_BLOCKER",
     "FOUNDATION_CATCH_UP_LAYERS",
+    "FOLD_STACK_PROMOTION_BLOCKER",
+    "MULTI_TARGET_SYMBOL_BLOCKER",
     "MONTHLY_SUBSTRATE_LAYERS",
     "FOUNDATION_CATCH_UP_STAGE_TYPES",
     "LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS",

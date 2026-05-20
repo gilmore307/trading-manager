@@ -725,6 +725,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("pinned Layer 1-9 version bundle", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
         self.assertIn("fold_layers_01_09_model_evaluation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertIn("pinned_layer_01_09_bundle_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertEqual(
+            rows["LAYER_04_PLUS_SINGLE_TARGET_WORKFLOW_POLICY"]["payload"],
+            "layer_04_plus_single_target_interface_multiple_targets_require_separate_workflows",
+        )
+        self.assertIn("multiple target symbols", rows["LAYER_04_PLUS_SINGLE_TARGET_WORKFLOW_POLICY"]["note"])
         self.assertIn(
             "promotion_review_waits_for_fold_layers_01_09_model_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
