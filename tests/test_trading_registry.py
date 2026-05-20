@@ -155,6 +155,11 @@ class RegistryHelperTests(unittest.TestCase):
             "prepare_benchmark_dataset.py",
             rows["TRADING_EVALUATION_PREPARE_BENCHMARK_DATASET"]["path"],
         )
+        self.assertIn(
+            "run_benchmark_acquisition.py",
+            rows["TRADING_EVALUATION_RUN_BENCHMARK_ACQUISITION"]["path"],
+        )
+        self.assertIn("--execute", rows["TRADING_EVALUATION_RUN_BENCHMARK_ACQUISITION"]["note"])
         self.assertEqual(rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["payload"], "benchmark_dataset_preparation_manifest")
         self.assertIn("manager_request_route_used=false", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
         self.assertEqual(rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["payload"], "benchmark_feed_acquisition_plan")
