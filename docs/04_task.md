@@ -18,12 +18,17 @@ The resident historical scheduler is the normal path for no-broker historical mo
    - Reuse point-in-time-valid provider data, cleaned data, feature-ready manifests, and coverage evidence.
    - Rebuild dependent model/evaluation/promotion artifacts when their substrate changes.
 
-3. **Dataset, settlement, and promotion readiness**
+3. **Layer 3+ target rotation**
+   - Keep Layer 3+ model-worker training target-scoped with separate fold checkpoints per target.
+   - When one target is caught up to the latest completed month, select the next queued target and restart its fold chain at `2016-01`.
+   - Treat the queue as scheduler routing only; promotion still depends on evaluation-owned candidate-policy benchmark evidence.
+
+4. **Dataset, settlement, and promotion readiness**
    - Expand dataset coverage only through manager evidence and request contracts.
    - Treat fold settlement, promotion eligibility, and model activation as evaluation-owned evidence, not manager-owned model-quality judgment.
    - Treat execution/broker consumption as a separate controlled gate, not automatic scheduler completion.
 
-4. **Event-risk governance lane**
+5. **Event-risk governance lane**
    - Keep Layer 10 as residual event-risk governance over the Layer 8 thesis within the historical service boundary; Layer 9 guidance/expression context remains optional.
    - Admit realtime observation families only after review.
    - Let Layer 4 consume only accepted evidence packets and Layer 9 compose optional offline guidance/expression context.

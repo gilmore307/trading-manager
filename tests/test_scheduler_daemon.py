@@ -18,6 +18,7 @@ from trading_manager_tasks.scheduler_daemon import (
     acquire_daemon_lock,
     apply_auto_work_selection,
     completed_historical_month_cutoff,
+    load_model_worker_target_queue,
     load_daemon_state,
     model_worker_fold_state_path,
     next_month,
@@ -26,6 +27,7 @@ from trading_manager_tasks.scheduler_daemon import (
     run_daemon_loop,
     seed_model_worker_fold_state,
     select_model_worker_fold,
+    select_model_worker_target,
     select_month_ingest_worker_months,
     select_next_historical_work,
     update_state_from_error,
@@ -320,8 +322,87 @@ class SchedulerDaemonTests(unittest.TestCase):
             payload = json.loads(state_path.read_text(encoding="utf-8"))
             ready = [stage["stage_id"] for stage in payload["stages"] if stage["status"] == "ready"]
 
-        self.assertEqual(state_path.name, "model_training_fold_state_2016-01_2016-06.json")
+        self.assertEqual(state_path.name, "model_training_fold_state_aapl_2016-01_2016-06.json")
         self.assertIn("layer_01_market_regime.model_generation", ready)
+
+    def test_target_scoped_fold_state_path_prevents_cross_target_collision(self):
+        path = model_worker_fold_state_path(
+            "2016-01",
+            "2016-06",
+            root=Path("/tmp/runtime"),
+            selected_target_symbol="BRK.B",
+        )
+
+        self.assertEqual(path.name, "model_training_fold_state_brk_b_2016-01_2016-06.json")
+
+    def test_model_worker_target_queue_skips_completed_target_and_restarts_next_target(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+
+            for start_month in ("2016-01", "2016-07"):
+                end_month = rolling_fold_months(start_month)[-1]
+                selection = select_model_worker_fold(
+                    storage_root=storage_root,
+                    default_start_month="2016-01",
+                    max_month="2016-12",
+                    selected_target_symbol="AAPL",
+                )
+                self.assertIsNotNone(selection)
+                assert selection is not None
+                state_path = seed_model_worker_fold_state(
+                    storage_root=storage_root,
+                    selection=selection,
+                    selected_target_symbol="AAPL",
+                )
+                plan = build_model_training_workflow_plan(
+                    start_month=start_month,
+                    end_month=end_month,
+                    storage_root=storage_root,
+                    selected_target_symbol="AAPL",
+                    foundation_catch_up_only=False,
+                )
+                advance_workflow_state(
+                    start_month=start_month,
+                    end_month=end_month,
+                    storage_root=storage_root,
+                    state_path=state_path,
+                    completed_stage_ids=[stage.stage_id for layer in plan.layers for stage in layer.stages],
+                    selected_target_symbol="AAPL",
+                    foundation_catch_up_only=False,
+                    write=True,
+                )
+
+            queue_path = storage_root / "runtime" / "model_training_target_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_target_queue",
+                        "targets": [{"symbol": "AAPL"}, {"symbol": "MSFT"}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            loaded_queue = load_model_worker_target_queue(queue_path)
+            target_selection = select_model_worker_target(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                target_queue_path=queue_path,
+            )
+
+        self.assertEqual(loaded_queue, ("AAPL", "MSFT"))
+        self.assertIsNotNone(target_selection)
+        assert target_selection is not None
+        self.assertEqual(target_selection.selected_target_symbol, "MSFT")
+        self.assertEqual(target_selection.reason_code, "selected_target_has_open_model_worker_fold")
+        self.assertIsNotNone(target_selection.fold_selection)
+        assert target_selection.fold_selection is not None
+        self.assertEqual(target_selection.fold_selection.start_month, "2016-01")
+        self.assertEqual(Path(target_selection.fold_selection.state_path or "").name, "model_training_fold_state_msft_2016-01_2016-06.json")
 
     def test_model_worker_does_not_select_until_validation_and_test_months_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -339,7 +420,12 @@ class SchedulerDaemonTests(unittest.TestCase):
             for month in rolling_fold_months("2016-01"):
                 self._complete_monthly_substrate(storage_root=storage_root, month=month)
 
-            first_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-12")
+            first_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
             self.assertIsNotNone(first_selection)
             assert first_selection is not None
             first_state_path = seed_model_worker_fold_state(storage_root=storage_root, selection=first_selection, selected_target_symbol="AAPL")
@@ -362,12 +448,22 @@ class SchedulerDaemonTests(unittest.TestCase):
                 write=True,
             )
 
-            overlapping_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-07")
+            overlapping_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-07",
+                selected_target_symbol="AAPL",
+            )
 
             for month in rolling_fold_months("2016-07"):
                 self._complete_monthly_substrate(storage_root=storage_root, month=month)
 
-            next_selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-12")
+            next_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
 
         self.assertIsNone(overlapping_selection)
         self.assertIsNotNone(next_selection)

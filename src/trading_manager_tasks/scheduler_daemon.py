@@ -49,6 +49,7 @@ DEFAULT_DRAIN_MAX_SECONDS = 300.0
 DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-refresh.service"
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
 DEFAULT_MONTH_INGEST_WORKERS = 3
+DEFAULT_TARGET_QUEUE_PATH = DEFAULT_RUNTIME_DIR / "model_training_target_queue.json"
 COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
 MODEL_WORKER_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
 
@@ -343,9 +344,26 @@ def _advance_fold_start_month(start_month: str, *, month_count: int = 6) -> str:
     return month
 
 
-def model_worker_fold_state_path(start_month: str, end_month: str, *, root: Path = DEFAULT_RUNTIME_DIR) -> Path:
+def _safe_target_token(target_symbol: str | None) -> str | None:
+    if not target_symbol:
+        return None
+    token = "".join(char.lower() if char.isalnum() else "_" for char in target_symbol.strip().upper())
+    token = "_".join(part for part in token.split("_") if part)
+    return token or None
+
+
+def model_worker_fold_state_path(
+    start_month: str,
+    end_month: str,
+    *,
+    root: Path = DEFAULT_RUNTIME_DIR,
+    selected_target_symbol: str | None = None,
+) -> Path:
     """Return the fold-scoped Model Worker checkpoint path."""
 
+    target_token = _safe_target_token(selected_target_symbol)
+    if target_token:
+        return root / f"model_training_fold_state_{target_token}_{start_month}_{end_month}.json"
     return root / f"model_training_fold_state_{start_month}_{end_month}.json"
 
 
@@ -409,6 +427,7 @@ def select_model_worker_fold(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     default_start_month: str = "2016-01",
     max_month: str | None = None,
+    selected_target_symbol: str | None = None,
 ) -> ModelWorkerFoldSelection | None:
     """Select the earliest complete non-overlapping six-month fold with open Model Worker work."""
 
@@ -431,7 +450,12 @@ def select_model_worker_fold(
     while candidate <= last_start:
         ready, months = _model_worker_fold_is_ready(storage_root, candidate)
         end_month = months[-1]
-        state_path = model_worker_fold_state_path(candidate, end_month, root=runtime_root)
+        state_path = model_worker_fold_state_path(
+            candidate,
+            end_month,
+            root=runtime_root,
+            selected_target_symbol=selected_target_symbol,
+        )
         if ready:
             if state_path.exists():
                 try:
@@ -464,6 +488,96 @@ def select_model_worker_fold(
     return None
 
 
+@dataclass(frozen=True)
+class ModelWorkerTargetSelection:
+    """Target-scoped model-worker routing decision for autonomous target rotation."""
+
+    contract_type: str = "manager_model_worker_target_selection"
+    selected_target_symbol: str | None = None
+    target_queue: tuple[str, ...] = ()
+    reason_code: str = "no_target_queue_available"
+    fold_selection: ModelWorkerFoldSelection | None = None
+
+    def summary_row(self) -> dict[str, Any]:
+        return {
+            "contract_type": self.contract_type,
+            "selected_target_symbol": self.selected_target_symbol,
+            "target_queue": list(self.target_queue),
+            "reason_code": self.reason_code,
+            "fold_selection": self.fold_selection.summary_row() if self.fold_selection else None,
+        }
+
+
+def load_model_worker_target_queue(path: Path = DEFAULT_TARGET_QUEUE_PATH) -> tuple[str, ...]:
+    """Load the ordered Layer 3+ target-training queue from JSON runtime policy."""
+
+    if not path.exists():
+        return ()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        raw_targets: Any = payload
+    elif isinstance(payload, dict):
+        raw_targets = payload.get("targets") or payload.get("target_symbols") or ()
+    else:
+        raw_targets = ()
+
+    symbols: list[str] = []
+    for item in raw_targets:
+        enabled = True
+        raw_symbol: Any = item
+        if isinstance(item, dict):
+            enabled = bool(item.get("enabled", True))
+            raw_symbol = item.get("symbol") or item.get("target_symbol")
+        if not enabled:
+            continue
+        symbol = str(raw_symbol or "").strip().upper()
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+    return tuple(symbols)
+
+
+def select_model_worker_target(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    default_start_month: str = "2016-01",
+    max_month: str | None = None,
+    selected_target_symbol: str | None = None,
+    target_queue_path: Path = DEFAULT_TARGET_QUEUE_PATH,
+) -> ModelWorkerTargetSelection | None:
+    """Select the next target and fold for Layer 3+ model-worker training.
+
+    A pinned target keeps current behavior. Without a pinned target, manager
+    reads the ordered runtime target queue and skips any target whose
+    target-scoped fold states are complete through the completed-month cutoff.
+    The next target then starts at the earliest ready fold, normally 2016-01.
+    """
+
+    pinned = str(selected_target_symbol or "").strip().upper()
+    target_queue = (pinned,) if pinned else load_model_worker_target_queue(target_queue_path)
+    if not target_queue:
+        return None
+    for symbol in target_queue:
+        fold_selection = select_model_worker_fold(
+            storage_root=storage_root,
+            default_start_month=default_start_month,
+            max_month=max_month,
+            selected_target_symbol=symbol,
+        )
+        if fold_selection is not None:
+            return ModelWorkerTargetSelection(
+                selected_target_symbol=symbol,
+                target_queue=target_queue,
+                reason_code="selected_target_has_open_model_worker_fold",
+                fold_selection=fold_selection,
+            )
+    return ModelWorkerTargetSelection(
+        selected_target_symbol=None,
+        target_queue=target_queue,
+        reason_code="all_targets_complete_through_completed_month_cutoff",
+        fold_selection=None,
+    )
+
+
 def seed_model_worker_fold_state(
     *,
     storage_root: Path = DEFAULT_STORAGE_ROOT,
@@ -472,8 +586,11 @@ def seed_model_worker_fold_state(
 ) -> Path:
     """Create/refresh a fold-scoped state seeded from completed Layer 1/2 substrate months."""
 
-    state_path = Path(selection.state_path) if selection.state_path else model_worker_fold_state_path(
-        selection.start_month, selection.end_month, root=storage_root / "runtime"
+    state_path = model_worker_fold_state_path(
+        selection.start_month,
+        selection.end_month,
+        root=storage_root / "runtime",
+        selected_target_symbol=selected_target_symbol,
     )
     plan = build_model_training_workflow_plan(
         start_month=selection.start_month,
@@ -778,14 +895,21 @@ def _run_model_worker_decision(
     config: SchedulerConfig,
     execute_safe_offline_stages: bool,
     selected_target_symbol: str | None,
-) -> tuple[ModelWorkerFoldSelection, SchedulerDecision] | None:
-    selection = select_model_worker_fold(storage_root=storage_root)
-    if selection is None:
+    target_queue_path: Path,
+) -> tuple[ModelWorkerTargetSelection, SchedulerDecision] | None:
+    target_selection = select_model_worker_target(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+        target_queue_path=target_queue_path,
+    )
+    if target_selection is None or target_selection.fold_selection is None or target_selection.selected_target_symbol is None:
         return None
+    selection = target_selection.fold_selection
+    target_symbol = target_selection.selected_target_symbol
     state_path = seed_model_worker_fold_state(
         storage_root=storage_root,
         selection=selection,
-        selected_target_symbol=selected_target_symbol,
+        selected_target_symbol=target_symbol,
     )
     decision = run_scheduler_once(
         config=config,
@@ -796,11 +920,11 @@ def _run_model_worker_decision(
         execute_safe_preparation=False,
         execute_safe_offline_stages=execute_safe_offline_stages,
         execute_autonomous_provider_stages=False,
-        selected_target_symbol=selected_target_symbol,
+        selected_target_symbol=target_symbol,
         state_path=state_path,
         foundation_catch_up_only=False,
     )
-    return selection, decision
+    return target_selection, decision
 
 def _run_month_ingest_worker_decisions(
     *,
@@ -865,6 +989,7 @@ def run_daemon_loop(
     provider_stage_max_workers: int = 4,
     month_ingest_workers: int = 1,
     selected_target_symbol: str | None = None,
+    target_queue_path: Path = DEFAULT_TARGET_QUEUE_PATH,
     auto_select_next_work: bool = False,
     advance_month_on_complete: bool = False,
     drain_ready_stages: bool = False,
@@ -981,9 +1106,12 @@ def run_daemon_loop(
                             config=config,
                             execute_safe_offline_stages=execute_safe_offline_stages,
                             selected_target_symbol=selected_target_symbol,
+                            target_queue_path=target_queue_path,
                         )
                         if model_worker_result is not None:
-                            model_selection, model_decision = model_worker_result
+                            target_selection, model_decision = model_worker_result
+                            model_selection = target_selection.fold_selection
+                            assert model_selection is not None
                             append_decision_log(decision_log_path, model_decision)
                             completed = utc_now_iso()
                             state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=model_decision)
@@ -992,7 +1120,7 @@ def run_daemon_loop(
                                 start_month=active_start_month,
                                 end_month=active_end_month,
                                 last_next_internal_stage="model_worker_1",
-                                last_work_selection_reason=model_selection.reason_code,
+                                last_work_selection_reason=target_selection.reason_code,
                                 updated_utc=completed,
                             )
                             refresh_needed = refresh_needed or model_decision.decision_status == "executed"
@@ -1001,6 +1129,7 @@ def run_daemon_loop(
                             if output is not None:
                                 row = model_decision.summary_row()
                                 row["worker_id"] = "model_worker_1"
+                                row["selected_target_symbol"] = target_selection.selected_target_symbol
                                 row["fold_id"] = model_selection.fold_id
                                 row["fold_months"] = list(model_selection.fold_months)
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
@@ -1117,6 +1246,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one daemon tick.")
     parser.add_argument("--month-ingest-workers", type=int, default=DEFAULT_MONTH_INGEST_WORKERS, help="Number of month-ingest worker lanes to keep filled for month-scoped acquisition and feature generation.")
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument("--target-queue-path", type=Path, default=DEFAULT_TARGET_QUEUE_PATH, help="Ordered JSON target queue used when --target-symbol is omitted.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")
     parser.add_argument("--drain-ready-stages", action="store_true", help="After a scheduler-owned task completes, immediately continue to the next runnable safe task until no task is ready or drain limits are reached.")
@@ -1156,6 +1286,7 @@ def main(argv: list[str] | None = None) -> int:
         provider_stage_max_workers=args.provider_stage_max_workers,
         month_ingest_workers=args.month_ingest_workers,
         selected_target_symbol=args.target_symbol,
+        target_queue_path=args.target_queue_path,
         auto_select_next_work=args.auto_select_next_work,
         advance_month_on_complete=args.advance_month_on_complete,
         drain_ready_stages=args.drain_ready_stages,
@@ -1181,17 +1312,21 @@ __all__ = [
     "DEFAULT_LOCK_PATH",
     "DEFAULT_RUNTIME_DIR",
     "DEFAULT_STATE_PATH",
+    "DEFAULT_TARGET_QUEUE_PATH",
     "HistoricalWorkSelection",
+    "ModelWorkerTargetSelection",
     "SchedulerDaemonState",
     "acquire_daemon_lock",
     "apply_auto_work_selection",
     "append_decision_log",
     "load_daemon_state",
     "release_daemon_lock",
+    "load_model_worker_target_queue",
     "next_month",
     "refresh_dashboard_read_models",
     "run_daemon_loop",
     "select_next_historical_work",
+    "select_model_worker_target",
     "update_state_from_decision",
     "update_state_from_error",
     "write_daemon_state",

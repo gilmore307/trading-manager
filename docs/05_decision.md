@@ -124,3 +124,11 @@ Layer 3 candidate selection is part of the model stack, not an externally presel
 The candidate policy is rule-fixed: current Layer 2 selected/watch sectors, reviewed sector constituents or proxies, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast.
 
 Layer 3 work may remain target-major in task execution because routing symbols only contribute anonymous samples. Layer 4 and later remain single-target interfaces: if Layer 3 hands off multiple ranked targets, manager schedules separate target-scoped workflow runs instead of passing a multi-target batch into Layer 4+. Promotion evidence must still aggregate by fold and candidate-policy batch. Ordinary promotion benchmarks use the canonical candidate-policy replay window `2021-01-01` through `2026-01-01` end-exclusive; fixed target/window panels are not accepted promotion evidence.
+
+## D213 - Model-worker targets rotate autonomously
+
+Manager may run Layer 3+ historical model-worker training as target-scoped fold chains. Each target owns separate fold checkpoint files, so one completed target does not consume or overwrite another target's `2016-01` onward training state.
+
+When no target is pinned by the service command, the scheduler reads the ordered runtime target queue and selects the first target with an open or unstarted six-month fold. If the current target has completed all eligible folds through the latest completed calendar month, manager skips it and starts the next target from the earliest ready fold, normally `2016-01`.
+
+The target queue is an execution-routing queue, not promotion evidence and not a replacement for Layer 3 candidate-policy replay. Promotion still requires evaluation-owned benchmark evidence over the accepted candidate policy.

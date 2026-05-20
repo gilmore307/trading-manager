@@ -35,6 +35,24 @@ The scheduler should advance Layer 1/2 foundation coverage before ordinary Layer
 
 Layer 2 feature generation also prepares `source_02_target_candidate_holdings` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
+## Target Rotation
+
+Layer 3+ model-worker training uses target-scoped fold checkpoints. When `--target-symbol` is supplied, the daemon remains pinned to that target. When it is omitted, the daemon reads `runtime/model_training_target_queue.json` and selects the first queued target with an open or unstarted six-month model-worker fold.
+
+Accepted queue shape:
+
+```json
+{
+  "contract_type": "manager_model_training_target_queue",
+  "targets": [
+    {"symbol": "AAPL"},
+    {"symbol": "MSFT"}
+  ]
+}
+```
+
+If the first target has completed all eligible folds through the completed-month cutoff, the scheduler skips it and starts the next queued target from the earliest ready fold, usually `2016-01`. The queue controls execution routing only; it does not become fixed-target promotion evidence and does not replace Layer 3 candidate-policy replay.
+
 ## Event-Risk Lane
 
 Layer 10 is part of the historical-modeling service boundary, but it is not a prerequisite for base-stack progression. It produces residual event-risk evidence, interventions, and promotion-review packets under the same no-broker safety rules.
