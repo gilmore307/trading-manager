@@ -20,7 +20,15 @@ def trading_storage_root() -> Path:
 
 
 def component_storage_root(component: str) -> Path:
-    return trading_storage_root() / "storage" / component
+    names = {
+        "data": "source_data",
+        "manager": "control_plane",
+        "model": "model_artifacts",
+        "execution": "execution_artifacts",
+        "benchmark": "benchmark_datasets",
+        "dashboard": "dashboard_cache",
+    }
+    return trading_storage_root() / "storage" / names.get(component, component)
 
 
 def manager_storage_root() -> Path:

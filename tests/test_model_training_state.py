@@ -246,9 +246,9 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertIsNone(stage.status_updated_at_utc)
 
     def test_default_checkpoint_path_is_month_scoped(self):
-        path = workflow_state_path_for_month("2016-02", root=Path("storage/runtime"))
+        path = workflow_state_path_for_month("2016-02", root=Path("control_plane/runtime"))
 
-        self.assertEqual(path, Path("storage/runtime/model_training_workflow_state_2016-02.json"))
+        self.assertEqual(path, Path("control_plane/runtime/model_training_workflow_state_2016-02.json"))
 
     def test_advance_default_checkpoint_path_follows_storage_root(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -416,7 +416,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
     def test_workflow_state_write_triggers_dashboard_refresh_when_enabled(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
-            plan = build_model_training_workflow_plan(storage_root=tmp / "storage", start_month="2016-01", end_month="2016-01")
+            plan = build_model_training_workflow_plan(storage_root=tmp / "storage" / "control_plane", start_month="2016-01", end_month="2016-01")
             state = initial_workflow_state(plan)
             state_path = tmp / "workflow_state.json"
 

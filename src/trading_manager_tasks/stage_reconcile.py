@@ -392,7 +392,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--coverage-report-path", type=Path)
     parser.add_argument("--write-coverage-report", action="store_true")
     parser.add_argument("--advance-workflow", action="store_true", help="Ingest the written coverage report into workflow state.")
-    parser.add_argument("--workflow-state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/manager/runtime.")
+    parser.add_argument("--workflow-state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/control_plane/runtime.")
     parser.add_argument("--write-workflow-state", action="store_true")
     parser.add_argument("--target-symbol", help="Optional target symbol for Layer 3+ workflow-state routing.")
     parser.add_argument("--write-summary", action="store_true", help="Write reconcile summary JSON to --summary-output-path.")

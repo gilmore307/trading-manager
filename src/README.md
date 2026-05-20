@@ -7,7 +7,7 @@
 - `src/` owns reusable implementation modules.
 - `scripts/` owns executable entrypoints and may import `src/`.
 - `src/` must not import `scripts/`.
-- Component-specific data/model/storage/execution/dashboard runtime logic belongs in component repositories.
+- Component-specific runtime logic belongs in the component repositories.
 
 ## Packages
 

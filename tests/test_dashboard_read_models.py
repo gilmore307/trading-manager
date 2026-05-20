@@ -36,9 +36,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
             decision_log.parent.mkdir(parents=True, exist_ok=True)
-            workflow_state = tmp / "storage" / "runtime" / "model_training_workflow_state_2019-05.json"
+            workflow_state = tmp / "storage" / "control_plane" / "runtime" / "model_training_workflow_state_2019-05.json"
             workflow_state.parent.mkdir(parents=True, exist_ok=True)
-            receipt_path = tmp / "storage" / "runtime" / "example_stage_receipt.json"
+            receipt_path = tmp / "storage" / "control_plane" / "runtime" / "example_stage_receipt.json"
             receipt_path.write_text(
                 json.dumps(
                     {
@@ -67,7 +67,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "updated_utc": "2026-05-12T10:00:00Z",
                                 "last_reason": "stage coverage complete",
-                                "receipt_refs": ["storage/runtime/example_stage_receipt.json"],
+                                "receipt_refs": ["control_plane/runtime/example_stage_receipt.json"],
                             },
                             {
                                 "stage_id": "layer_03_target_state_vector.data_acquisition",
@@ -110,9 +110,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "failed",
                                 "reason": "no successful Layer 2 feed artifacts are available for Layer 3 target-state materialization",
                                 "return_code": 1,
-                                "stdout_path": "storage/runtime/model_training_stage_logs/example.stdout.log",
-                                "stderr_path": "storage/runtime/model_training_stage_logs/example.stderr.log",
-                                "receipt_path": "storage/runtime/model_training_stage_receipts/example.receipt.json",
+                                "stdout_path": "control_plane/runtime/model_training_stage_logs/example.stdout.log",
+                                "stderr_path": "control_plane/runtime/model_training_stage_logs/example.stderr.log",
+                                "receipt_path": "control_plane/runtime/model_training_stage_receipts/example.receipt.json",
                                 "provider_calls": 0,
                                 "model_activation_performed": False,
                                 "broker_execution_performed": False,
@@ -124,7 +124,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=decision_log,
@@ -152,7 +152,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["contract_type"], "historical_task_progress_summary")
         self.assertEqual(payload["source_system"], "trading-manager")
         self.assertEqual(payload["generated_at_utc"], "2026-05-12T12:00:00Z")
-        self.assertEqual(payload["schema_ref"], "storage/dashboard/schemas/historical_task_progress_summary.schema.json")
+        self.assertEqual(payload["schema_ref"], "storage/dashboard_cache/schemas/historical_task_progress_summary.schema.json")
         self.assertEqual(payload["status"], "action_required")
         self.assertIn("last execution failed", payload["summary"])
         self.assertEqual(payload["chart_payload"]["stage_coverage"]["expected_count"], 19)
@@ -186,7 +186,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -207,7 +207,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            agent_root = tmp / "storage" / "runtime" / "agent_error_handling"
+            agent_root = tmp / "storage" / "control_plane" / "runtime" / "agent_error_handling"
             request_root = agent_root / "erragent_smoke"
             request_root.mkdir(parents=True, exist_ok=True)
             diagnosis_path = request_root / "agent_error_diagnosis.json"
@@ -231,7 +231,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                                     "diagnosis_status": "repaired",
                                                     "root_cause": "synthetic state was broken",
                                                     "repair_attempted": True,
-                                                    "files_changed": ["storage/runtime/smoke/state.json"],
+                                                    "files_changed": ["control_plane/runtime/smoke/state.json"],
                                                     "verification": {"command": "python3 check_state.py", "exit_code": 0},
                                                     "retry_recommendation": "retry is safe",
                                                     "blockers": [],
@@ -258,8 +258,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_ref": "ERR-000003",
                         "error_fingerprint": "errfp_smoke",
                         "request_id": "erragent_smoke",
-                        "request_path": "storage/runtime/agent_error_handling/erragent_smoke/server_error_agent_request.json",
-                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_smoke/agent_error_diagnosis.json",
+                        "request_path": "control_plane/runtime/agent_error_handling/erragent_smoke/server_error_agent_request.json",
+                        "diagnosis_path": "control_plane/runtime/agent_error_handling/erragent_smoke/agent_error_diagnosis.json",
                         "source_component": "synthetic.agent_error_live_repair_smoke",
                         "source_repo": "trading-manager",
                         "error_scope": "server.synthetic_repair_smoke",
@@ -276,7 +276,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
 
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -299,7 +299,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "model_training_workflow_state_2021-10.json").write_text(
                 json.dumps(
@@ -347,7 +347,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
 
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=lock_path,
                 decision_log_path=decision_log,
@@ -367,7 +367,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "model_training_workflow_state_2019-04.json").write_text(
                 json.dumps(
@@ -383,7 +383,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "layer_01_market_regime",
                                 "status": "succeeded",
                                 "updated_utc": "2026-05-12T10:00:00Z",
-                                "receipt_refs": ["storage/runtime/stage_coverage/example.json"],
+                                "receipt_refs": ["control_plane/runtime/stage_coverage/example.json"],
                             }
                         ],
                     }
@@ -398,7 +398,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -420,7 +420,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "model_training_workflow_state_2019-04.json").write_text(
                 json.dumps(
@@ -477,7 +477,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -496,7 +496,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "model_training_workflow_state_2018-01.json").write_text(
                 json.dumps(
@@ -534,7 +534,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -554,7 +554,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "model_training_fold_state_2016-01_2016-06.json").write_text(
                 json.dumps(
@@ -598,7 +598,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -618,7 +618,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "model_training_workflow_state_2026-05.json").write_text(
                 json.dumps(
@@ -656,7 +656,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -678,7 +678,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "model_training_workflow_state_2019-04.json").write_text(
                 json.dumps(
@@ -726,7 +726,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_text(json.dumps({"current_month": "2019-04", "last_completed_months": ["2019-04"]}) + "\n", encoding="utf-8")
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -769,7 +769,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -790,7 +790,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             for month in ("2017-01", "2017-02", "2017-03", "2017-04"):
                 (runtime / f"model_training_workflow_state_{month}.json").write_text(
@@ -848,7 +848,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -871,7 +871,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             for month in ("2020-09", "2020-10", "2020-11", "2020-12"):
                 (runtime / f"model_training_workflow_state_{month}.json").write_text(
@@ -936,7 +936,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=state_path,
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
@@ -959,7 +959,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            runtime = tmp / "storage" / "runtime"
+            runtime = tmp / "storage" / "control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "model_training_fold_state_2016-07_2016-12.json").write_text(
                 json.dumps(
@@ -1003,7 +1003,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
-                storage_root=tmp / "storage",
+                storage_root=tmp / "storage" / "control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
                 lock_path=tmp / "runtime" / "historical_scheduler.lock",
                 decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
