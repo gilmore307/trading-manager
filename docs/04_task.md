@@ -21,7 +21,7 @@ The resident historical scheduler is the normal path for no-broker historical mo
 3. **Layer 3+ target rotation**
    - Keep Layer 3+ model-worker training target-scoped with separate fold checkpoints per target.
    - When one target is caught up to the latest completed month, select the next queued target and restart its fold chain at `2016-01`.
-   - Treat the queue as scheduler routing only; promotion still depends on evaluation-owned candidate-policy benchmark evidence.
+   - Treat the queue as scheduler routing only; promotion still depends on evaluation-owned candidate-policy replay evidence.
 
 4. **Dataset, settlement, and promotion readiness**
    - Expand dataset coverage only through manager evidence and request contracts.

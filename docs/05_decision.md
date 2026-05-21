@@ -56,7 +56,7 @@ Storage lifecycle decisions require policy evidence, protected-set checks, decis
 
 Every agent decision surface must cite a fixed workspace skill so the reviewer uses a stable rubric instead of ad hoc judgment:
 
-- `promotion-evaluation-review` for offline benchmark and promotion eligibility review.
+- `promotion-evaluation-review` for offline replay and promotion eligibility review.
 - `runtime-model-lifecycle-review` for execution-owned active/shadow roster review.
 - `event-strategy-promotion-review` for event-family or strategy-failure promotion into model layers.
 - `target-context-review` for target-to-Layer-2 context mapping review.
@@ -80,9 +80,9 @@ Active docs should describe the current system from first principles. Obsolete n
 
 Manager writes model-worker fold progress runtime state: fold id, start/end months, stage statuses, and whether all model-worker work is complete. Storage reads that runtime state directly and owns backup, archive, cleanup planning, lifecycle execution, and receipts. Manager must not emit backup/delete signals, requests, or plans for completed folds.
 
-## D017 - Benchmark Judgment Moves To Evaluation; Runtime Activation Moves To Execution
+## D017 - Replay Judgment Moves To Evaluation; Runtime Activation Moves To Execution
 
-Offline model-quality judgment after a completed fold belongs in `trading-evaluation`, not in manager. Manager records scheduler state and consumes evaluation/execution status, but the benchmark contract, fold settlement, metric semantics, promotion eligibility decision, and promotion readiness record live in the independent evaluation repository.
+Offline model-quality judgment after a completed fold belongs in `trading-evaluation`, not in manager. Manager records scheduler state and consumes evaluation/execution status, but the replay contract, fold settlement, metric semantics, promotion eligibility decision, and promotion readiness record live in the independent evaluation repository.
 
 Runtime active model selection belongs in `trading-execution`: the active model trades, promoted-but-not-active models run shadow during market hours, ranks 2-4 stay realtime candidates, and weak models enter eliminate-candidate review when sufficient reason evidence exists. Active selection is still separate from broker/order/account mutation.
 
@@ -90,7 +90,7 @@ Runtime active model selection belongs in `trading-execution`: the active model 
 
 Promotion review is not triggered when one model finishes one fold. Layer-local fold evaluation remains diagnostic until Layer 1 through Layer 10 have all completed model evaluation for the same fold.
 
-Manager may continue running layer-local generation and evaluation stages as each dependency is ready, but the promotion gate opens only after `fold_layers_01_10_model_evaluation_complete`. Evaluation then judges one pinned Layer 1-10 version bundle against the frozen benchmark and accepted baselines. Promotion acceptance is all-or-nothing for that bundle: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently.
+Manager may continue running layer-local generation and evaluation stages as each dependency is ready, but the promotion gate opens only after `fold_layers_01_10_model_evaluation_complete`. Evaluation then replays one pinned Layer 1-10 version bundle through the frozen live-flow component graph, including Layer 10 EventRiskGovernor calls, and compares it against accepted baselines. Promotion acceptance is all-or-nothing for that bundle: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently.
 
 ## D210 - Activity bridge non-overlap is mandatory
 
@@ -123,7 +123,7 @@ Layer 3 candidate selection is part of the model stack, not an externally presel
 
 The candidate policy is rule-fixed: current Layer 2 selected/watch sectors, reviewed sector constituents or proxies, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast.
 
-Layer 3 work may remain target-major in task execution because routing symbols only contribute anonymous samples. Layer 4 and later remain single-target interfaces: if Layer 3 hands off multiple ranked targets, manager schedules separate target-scoped workflow runs instead of passing a multi-target batch into Layer 4+. Promotion evidence must still aggregate by fold and candidate-policy batch. Ordinary promotion benchmarks use the canonical candidate-policy replay window `2021-01-01` through `2026-01-01` end-exclusive; fixed target/window panels are not accepted promotion evidence.
+Layer 3 work may remain target-major in task execution because routing symbols only contribute anonymous samples. Layer 4 and later remain single-target interfaces: if Layer 3 hands off multiple ranked targets, manager schedules separate target-scoped workflow runs instead of passing a multi-target batch into Layer 4+. Promotion evidence must still aggregate by fold and candidate-policy batch. Ordinary promotion replay uses the canonical candidate-policy replay window `2021-01-01` through `2026-01-01` end-exclusive; fixed target/window panels are not accepted promotion evidence.
 
 ## D213 - Model-worker targets rotate autonomously
 
@@ -131,4 +131,4 @@ Manager may run Layer 3+ historical model-worker training as target-scoped fold 
 
 When no target is pinned by the service command, the scheduler reads the ordered runtime target queue and selects the first target with an open or unstarted six-month fold. If the current target has completed all eligible folds through the latest completed calendar month, manager skips it and starts the next target from the earliest ready fold, normally `2016-01`.
 
-The target queue is an execution-routing queue, not promotion evidence and not a replacement for Layer 3 candidate-policy replay. Promotion still requires evaluation-owned benchmark evidence over the accepted candidate policy.
+The target queue is an execution-routing queue, not promotion evidence and not a replacement for Layer 3 candidate-policy replay. Promotion still requires evaluation-owned replay evidence over the accepted candidate policy.

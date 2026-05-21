@@ -2,9 +2,9 @@
 
 This module owns the common control-plane entrypoint for promotion review requests.
 Model repositories still produce model-specific evidence, labels, metrics, and
-candidate artifacts; the manager owns scheduling/request shape only. Benchmark
+candidate artifacts; the manager owns scheduling/request shape only. Replay
 judgment, promotion eligibility, and model activation belong to
-trading-evaluation.
+trading-evaluation. Some registry policy refs keep compatibility names.
 """
 
 from __future__ import annotations

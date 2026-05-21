@@ -1437,7 +1437,8 @@ def _task_timeline(
     return tasks
 
 
-def _benchmark_dataset_root(storage_root: Path, contract_id: str) -> Path:
+def _replay_dataset_root(storage_root: Path, contract_id: str) -> Path:
+    # Compatibility storage path: existing prepared replay artifacts live under this root.
     return storage_root.parent / "05_benchmark_datasets" / contract_id
 
 
@@ -1448,7 +1449,7 @@ def _load_optional_json_object(path: Path) -> dict[str, Any] | None:
         return None
 
 
-def _benchmark_coverage_rows(path: Path) -> list[dict[str, str]]:
+def _replay_coverage_rows(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         return []
     try:
@@ -1466,15 +1467,15 @@ def _int_field(payload: Mapping[str, Any], key: str) -> int:
 
 
 def _unique_csv_values(path: Path, field: str) -> set[str]:
-    rows = _benchmark_coverage_rows(path)
+    rows = _replay_coverage_rows(path)
     return {str(row.get(field) or "").strip() for row in rows if str(row.get(field) or "").strip()}
 
 
-def _benchmark_window_month_count(dataset_root: Path) -> int:
+def _replay_window_month_count(dataset_root: Path) -> int:
     months = _unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month")
     if months:
         return len(months)
-    rows = _benchmark_coverage_rows(dataset_root / "replay_window_manifest.csv")
+    rows = _replay_coverage_rows(dataset_root / "replay_window_manifest.csv")
     if not rows:
         return 60
     try:
@@ -1487,7 +1488,7 @@ def _benchmark_window_month_count(dataset_root: Path) -> int:
     return max(1, (end_dt.year - start_dt.year) * 12 + end_dt.month - start_dt.month)
 
 
-def _benchmark_replay_ready_months(dataset_root: Path) -> set[str]:
+def _replay_ready_months(dataset_root: Path) -> set[str]:
     ready: set[str] = set()
     for path in sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]:
         if not path.exists():
@@ -1500,14 +1501,14 @@ def _benchmark_replay_ready_months(dataset_root: Path) -> set[str]:
     return ready
 
 
-def _benchmark_month_progress(
+def _replay_month_progress(
     *,
     dataset_root: Path,
     stage_id: str,
     status: str,
     ready_months: set[str] | None = None,
 ) -> dict[str, Any]:
-    expected = _benchmark_window_month_count(dataset_root)
+    expected = _replay_window_month_count(dataset_root)
     ready = len(ready_months or set())
     failed = 0
     pending = max(expected - ready - failed, 0)
@@ -1524,7 +1525,7 @@ def _benchmark_month_progress(
     }
 
 
-def _benchmark_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> list[str]:
+def _replay_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> list[str]:
     refs = [
         manifest.get("source_contract_ref"),
         manifest.get("replay_window_manifest_ref") or dataset_root / "replay_window_manifest.csv",
@@ -1538,16 +1539,17 @@ def _evaluation_worker_info() -> dict[str, str]:
     return {"worker_id": "evaluation_worker_1", "worker_label": "Evaluation Worker 1", "worker_kind": "evaluation_worker"}
 
 
-def _evaluation_benchmark_timeline_tasks(
+def _model_group_replay_timeline_tasks(
     *,
     storage_root: Path,
     generated_at_utc: str,
     starting_sequence: int,
 ) -> list[dict[str, Any]]:
-    """Return owner-facing model-group benchmark and promotion-review tasks."""
+    """Return owner-facing model-group replay and promotion-review tasks."""
 
+    # Compatibility contract id: the accepted artifact already uses this id, but the owner-facing concept is Replay.
     contract_id = "promotion_benchmark_candidate_policy_replay"
-    dataset_root = _benchmark_dataset_root(storage_root, contract_id)
+    dataset_root = _replay_dataset_root(storage_root, contract_id)
     manifest_path = dataset_root / "dataset_manifest.json"
     manifest = _load_optional_json_object(manifest_path)
     worker_info = _evaluation_worker_info()
@@ -1576,12 +1578,12 @@ def _evaluation_benchmark_timeline_tasks(
             "model_activation_allowed": False,
             "broker_execution_allowed": False,
             "dataset_unit": {
-                "unit_kind": "model_group_benchmark",
+                "unit_kind": "model_group_replay",
                 "unit_months": 60,
                 "start_month": "2021-01",
                 "end_month": "2026-01",
                 "target_required": False,
-                "description": "Model-group benchmark data, replay evaluation, promotion review, and maintenance.",
+                "description": "Model-group replay data, full live-flow replay, promotion review, and maintenance.",
             },
             "worker": worker_info,
             "progress": progress or _task_status_progress(task_id, status),
@@ -1599,7 +1601,7 @@ def _evaluation_benchmark_timeline_tasks(
                 "stage_type": stage_type,
                 "layer": None,
                 "layer_key": layer_key,
-                "dataset_unit_kind": "model_group_benchmark",
+                "dataset_unit_kind": "model_group_replay",
                 "dataset_unit_months": 60,
                 "target_symbol": None,
                 "target_required": False,
@@ -1622,19 +1624,19 @@ def _evaluation_benchmark_timeline_tasks(
     if manifest is None:
         append_task(
             task_id="model_group.data_acquisition",
-            label="Model Group Data Acquisition",
+            label="Model Group Replay Data Acquisition",
             task_state="current",
             status="ready",
-            reason="Waiting for model-group benchmark data-acquisition preparation manifest.",
+            reason="Waiting for model-group replay data-acquisition preparation manifest.",
             blockers=[],
             stage_type="data_acquisition",
         )
         append_task(
-            task_id="model_group.evaluation",
-            label="Model Group Evaluation",
+            task_id="model_group.replay",
+            label="Model Group Replay",
             task_state="future",
             status="blocked",
-            reason="Waiting for model-group benchmark data acquisition before benchmark evaluation can run.",
+            reason="Waiting for model-group replay data acquisition before replay can run.",
             blockers=["model_group.data_acquisition"],
         )
         append_task(
@@ -1642,8 +1644,8 @@ def _evaluation_benchmark_timeline_tasks(
             label="Model Group Promotion Review",
             task_state="future",
             status="blocked",
-            reason="Waiting for model-group benchmark evaluation evidence and promotion-evaluation-review.",
-            blockers=["model_group.evaluation", "promotion-evaluation-review"],
+            reason="Waiting for model-group replay evidence and promotion-evaluation-review.",
+            blockers=["model_group.replay", "promotion-evaluation-review"],
             stage_type="promotion_review",
         )
         append_task(
@@ -1657,7 +1659,7 @@ def _evaluation_benchmark_timeline_tasks(
         )
         return tasks
 
-    receipt_refs = _benchmark_manifest_refs(manifest, dataset_root)
+    receipt_refs = _replay_manifest_refs(manifest, dataset_root)
     prepared_at = str(manifest.get("prepared_at_utc") or generated_at_utc)
     tasks_updated_at = prepared_at or generated_at_utc
     tasks.clear()
@@ -1667,7 +1669,7 @@ def _evaluation_benchmark_timeline_tasks(
     deferred = _int_field(manifest, "deferred_feed_acquisition_count")
     missing = _int_field(manifest, "missing_feed_acquisition_count")
     if expected == 0:
-        coverage_rows = _benchmark_coverage_rows(dataset_root / "coverage_summary.csv")
+        coverage_rows = _replay_coverage_rows(dataset_root / "coverage_summary.csv")
         expected = sum(int(row.get("required_acquisition_count") or 0) for row in coverage_rows)
         ready = sum(int(row.get("available_acquisition_count") or 0) for row in coverage_rows)
         deferred = sum(int(row.get("deferred_acquisition_count") or 0) for row in coverage_rows)
@@ -1676,13 +1678,13 @@ def _evaluation_benchmark_timeline_tasks(
     coverage_complete = expected > 0 and missing == 0
     append_task(
         task_id="model_group.data_acquisition",
-        label="Model Group Data Acquisition",
+        label="Model Group Replay Data Acquisition",
         task_state="completed" if coverage_complete else "current",
         status="succeeded" if coverage_complete else "blocked",
         reason=(
-            "Model-group benchmark data acquisition is complete."
+            "Model-group replay data acquisition is complete."
             if coverage_complete
-            else f"Model-group benchmark data acquisition is incomplete: {missing}/{expected} feed acquisitions missing."
+            else f"Model-group replay data acquisition is incomplete: {missing}/{expected} feed acquisitions missing."
         ),
         receipt_refs=receipt_refs,
         blockers=[] if coverage_complete else ["one_shot_provider_acquisition_requires_separate_gate"],
@@ -1704,28 +1706,28 @@ def _evaluation_benchmark_timeline_tasks(
 
     freeze_status = str(manifest.get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
-    replay_ready_months = _benchmark_replay_ready_months(dataset_root)
-    replay_progress = _benchmark_month_progress(
+    replay_ready_months = _replay_ready_months(dataset_root)
+    replay_progress = _replay_month_progress(
         dataset_root=dataset_root,
-        stage_id="model_group.evaluation",
-        status="complete" if replay_ready_months and len(replay_ready_months) >= _benchmark_window_month_count(dataset_root) else ("ready" if freeze_ready else "blocked"),
+        stage_id="model_group.replay",
+        status="complete" if replay_ready_months and len(replay_ready_months) >= _replay_window_month_count(dataset_root) else ("ready" if freeze_ready else "blocked"),
         ready_months=replay_ready_months,
     )
     replay_complete = bool(replay_progress["can_unlock_downstream"])
     append_task(
-        task_id="model_group.evaluation",
-        label="Model Group Evaluation",
+        task_id="model_group.replay",
+        label="Model Group Replay",
         task_state="completed" if replay_complete else ("current" if freeze_ready else "future"),
         status="succeeded" if replay_complete else ("ready" if freeze_ready else "blocked"),
         reason=(
-            "Model-group benchmark evaluation is complete across the accepted replay window."
+            "Model-group replay is complete across the accepted replay window."
             if replay_complete
-            else "Model-group benchmark evaluation is ready to run benchmark replay, AUROC, Brier, return, drawdown, cost, hit-rate, payoff, turnover, PCA, PCoA, and guardrail checks."
+            else "Model-group replay is ready to run the frozen Layer 1-10 live-flow component graph, including Layer 10 event-risk calls, AUROC, Brier, return, drawdown, cost, hit-rate, payoff, turnover, PCA, PCoA, and guardrail checks."
             if freeze_ready
-            else f"Waiting for complete model-group benchmark data acquisition and frozen benchmark contract; current freeze_status={freeze_status}."
+            else f"Waiting for complete model-group replay data acquisition and frozen replay contract; current freeze_status={freeze_status}."
         ),
         receipt_refs=[str(manifest_path)],
-        blockers=[] if freeze_ready else ["model_group.data_acquisition", "model_group_benchmark_freeze_review"],
+        blockers=[] if freeze_ready else ["model_group.data_acquisition", "model_group_replay_freeze_review"],
         progress=replay_progress,
     )
     append_task(
@@ -1734,12 +1736,12 @@ def _evaluation_benchmark_timeline_tasks(
         task_state="current" if replay_complete else "future",
         status="ready" if replay_complete else "blocked",
         reason=(
-            "Promotion review integrates benchmark metrics, guardrails, incumbent comparison, and advisory "
+            "Promotion review integrates replay metrics, guardrails, incumbent comparison, and advisory "
             "promotion-evaluation-review evidence into a model-group decision."
         ),
-        blockers=[] if replay_complete else ["model_group.evaluation", "promotion-evaluation-review"],
+        blockers=[] if replay_complete else ["model_group.replay", "promotion-evaluation-review"],
         stage_type="promotion_review",
-        progress=_benchmark_month_progress(
+        progress=_replay_month_progress(
             dataset_root=dataset_root,
             stage_id="model_group.promotion_review",
             status="ready" if replay_complete else "blocked",
@@ -1772,7 +1774,7 @@ def build_historical_task_progress_summary(
     task_timeline = _task_timeline(status, stage_coverage=stage_coverage)
     storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
     task_timeline.extend(
-        _evaluation_benchmark_timeline_tasks(
+        _model_group_replay_timeline_tasks(
             storage_root=storage_root,
             generated_at_utc=generated_at_utc,
             starting_sequence=len(task_timeline),

@@ -252,13 +252,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertTrue(payload["issue_refs"])
         self.assertTrue(all(ref["owner_action_required"] is False for ref in payload["issue_refs"]))
 
-    def test_task_timeline_uses_model_group_lifecycle_for_benchmark_and_promotion(self):
+    def test_task_timeline_uses_model_group_lifecycle_for_replay_and_promotion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            benchmark_root = tmp / "storage" / "05_benchmark_datasets" / "promotion_benchmark_candidate_policy_replay"
-            benchmark_root.mkdir(parents=True, exist_ok=True)
-            (benchmark_root / "dataset_manifest.json").write_text(
+            replay_root = tmp / "storage" / "05_benchmark_datasets" / "promotion_benchmark_candidate_policy_replay"
+            replay_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "benchmark_dataset_preparation_manifest",
@@ -276,7 +276,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (benchmark_root / "coverage_summary.csv").write_text(
+            (replay_root / "coverage_summary.csv").write_text(
                 "contract_id,source_id,required_acquisition_count,available_acquisition_count,deferred_acquisition_count,missing_acquisition_count,coverage_status,notes\n"
                 "promotion_benchmark_candidate_policy_replay,alpaca_bars,60,0,0,60,incomplete,missing\n",
                 encoding="utf-8",
@@ -302,7 +302,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [task["task_id"] for task in evaluation_tasks],
             [
                 "model_group.data_acquisition",
-                "model_group.evaluation",
+                "model_group.replay",
                 "model_group.promotion_review",
                 "model_group.maintenance",
             ],
@@ -313,18 +313,18 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
-        self.assertEqual(evaluation_tasks[0]["task_label"], "Model Group Data Acquisition")
+        self.assertEqual(evaluation_tasks[0]["task_label"], "Model Group Replay Data Acquisition")
         self.assertEqual(evaluation_tasks[0]["task_state"], "current")
         self.assertEqual(evaluation_tasks[0]["status"], "blocked")
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["expected_count"], 360)
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["pending_count"], 360)
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["unit_label"], "source-months")
-        self.assertEqual(evaluation_tasks[1]["task_label"], "Model Group Evaluation")
+        self.assertEqual(evaluation_tasks[1]["task_label"], "Model Group Replay")
         self.assertEqual(evaluation_tasks[1]["task_state"], "future")
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 60)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 60)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "months")
-        self.assertIn("frozen benchmark contract", evaluation_tasks[1]["reason"])
+        self.assertIn("frozen replay contract", evaluation_tasks[1]["reason"])
         self.assertEqual(evaluation_tasks[2]["task_label"], "Model Group Promotion Review")
         self.assertIn("promotion-evaluation-review", evaluation_tasks[2]["detail"]["blockers"])
         self.assertEqual(evaluation_tasks[3]["task_label"], "Model Group Maintenance")
