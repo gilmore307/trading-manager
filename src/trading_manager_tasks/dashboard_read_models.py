@@ -9,6 +9,7 @@ mutate account state.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from datetime import UTC, datetime
@@ -1152,6 +1153,226 @@ def _task_timeline(
     return tasks
 
 
+def _benchmark_dataset_root(storage_root: Path, contract_id: str) -> Path:
+    return storage_root.parent / "05_benchmark_datasets" / contract_id
+
+
+def _load_optional_json_object(path: Path) -> dict[str, Any] | None:
+    try:
+        return _load_json_object(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def _benchmark_coverage_rows(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            return [dict(row) for row in csv.DictReader(handle)]
+    except OSError:
+        return []
+
+
+def _int_field(payload: Mapping[str, Any], key: str) -> int:
+    try:
+        return int(payload.get(key) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _benchmark_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> list[str]:
+    refs = [
+        manifest.get("source_contract_ref"),
+        manifest.get("replay_window_manifest_ref") or dataset_root / "replay_window_manifest.csv",
+        manifest.get("feed_acquisition_plan_ref") or dataset_root / "feed_acquisition_plan.csv",
+        manifest.get("coverage_summary_ref") or dataset_root / "coverage_summary.csv",
+    ]
+    return [str(ref) for ref in refs if ref]
+
+
+def _evaluation_worker_info() -> dict[str, str]:
+    return {"worker_id": "evaluation_worker_1", "worker_label": "Evaluation Worker 1", "worker_kind": "evaluation_worker"}
+
+
+def _evaluation_benchmark_timeline_tasks(
+    *,
+    storage_root: Path,
+    generated_at_utc: str,
+    starting_sequence: int,
+) -> list[dict[str, Any]]:
+    """Return evaluation-owned benchmark tasks under the model-evaluation lane."""
+
+    contract_id = "promotion_benchmark_candidate_policy_replay"
+    dataset_root = _benchmark_dataset_root(storage_root, contract_id)
+    manifest_path = dataset_root / "dataset_manifest.json"
+    manifest = _load_optional_json_object(manifest_path)
+    worker_info = _evaluation_worker_info()
+    period = "2021-01..2026-01"
+    layer_key = "evaluation_benchmark"
+    tasks: list[dict[str, Any]] = []
+
+    def append_task(
+        *,
+        task_id: str,
+        label: str,
+        task_state: str,
+        status: str,
+        reason: str,
+        receipt_refs: list[str] | None = None,
+        blockers: list[str] | None = None,
+        progress: dict[str, Any] | None = None,
+    ) -> None:
+        sequence = starting_sequence + len(tasks) + 1
+        detail: dict[str, Any] = {
+            "blockers": blockers or [],
+            "receipt_refs": receipt_refs or [],
+            "safe_without_provider_calls": True,
+            "provider_calls_allowed": False,
+            "model_activation_allowed": False,
+            "broker_execution_allowed": False,
+            "dataset_unit": {
+                "unit_kind": "evaluation_benchmark",
+                "unit_months": 60,
+                "start_month": "2021-01",
+                "end_month": "2026-01",
+                "target_required": False,
+                "description": "Candidate-policy replay promotion benchmark.",
+            },
+            "worker": worker_info,
+        }
+        if progress is not None:
+            detail["progress"] = progress
+        tasks.append(
+            {
+                "sequence": sequence,
+                "task_number": None,
+                "task_uid": f"{period}:{task_id}",
+                "month": period,
+                "task_id": task_id,
+                "task_label": label,
+                "task_state": task_state,
+                "status": status,
+                "stage_type": "model_evaluation",
+                "layer": None,
+                "layer_key": layer_key,
+                "dataset_unit_kind": "evaluation_benchmark",
+                "dataset_unit_months": 60,
+                "target_symbol": None,
+                "target_required": False,
+                **worker_info,
+                "updated_at_utc": generated_at_utc,
+                "created_at_utc": None,
+                "started_at_utc": None,
+                "ended_at_utc": None,
+                "status_updated_at_utc": generated_at_utc,
+                "reason": reason,
+                "receipt_count": len(receipt_refs or []),
+                "blocker_count": len(blockers or []),
+                "detail": detail,
+            }
+        )
+
+    if manifest is None and not dataset_root.exists():
+        return []
+
+    if manifest is None:
+        append_task(
+            task_id="evaluation_benchmark.dataset_preparation",
+            label="Promotion Benchmark Dataset Preparation",
+            task_state="current",
+            status="ready",
+            reason="Benchmark dataset preparation manifest is not available yet.",
+            blockers=[],
+        )
+        append_task(
+            task_id="evaluation_benchmark.acquisition_coverage",
+            label="Promotion Benchmark Acquisition Coverage",
+            task_state="future",
+            status="blocked",
+            reason="Waiting for benchmark dataset preparation.",
+            blockers=["evaluation_benchmark.dataset_preparation"],
+        )
+        append_task(
+            task_id="evaluation_benchmark.freeze",
+            label="Promotion Benchmark Freeze",
+            task_state="future",
+            status="blocked",
+            reason="Waiting for accepted acquisition coverage and benchmark contract review.",
+            blockers=["evaluation_benchmark.acquisition_coverage"],
+        )
+        return tasks
+
+    receipt_refs = _benchmark_manifest_refs(manifest, dataset_root)
+    prepared_at = str(manifest.get("prepared_at_utc") or generated_at_utc)
+    tasks_updated_at = prepared_at or generated_at_utc
+    tasks.clear()
+
+    append_task(
+        task_id="evaluation_benchmark.dataset_preparation",
+        label="Promotion Benchmark Dataset Preparation",
+        task_state="completed",
+        status="succeeded",
+        reason=str(manifest.get("preparation_status") or "Benchmark dataset preparation bundle is available."),
+        receipt_refs=receipt_refs,
+    )
+    tasks[-1]["updated_at_utc"] = tasks_updated_at
+    tasks[-1]["status_updated_at_utc"] = tasks_updated_at
+
+    expected = _int_field(manifest, "feed_acquisition_count")
+    ready = _int_field(manifest, "available_feed_acquisition_count")
+    deferred = _int_field(manifest, "deferred_feed_acquisition_count")
+    missing = _int_field(manifest, "missing_feed_acquisition_count")
+    if expected == 0:
+        coverage_rows = _benchmark_coverage_rows(dataset_root / "coverage_summary.csv")
+        expected = sum(int(row.get("required_acquisition_count") or 0) for row in coverage_rows)
+        ready = sum(int(row.get("available_acquisition_count") or 0) for row in coverage_rows)
+        deferred = sum(int(row.get("deferred_acquisition_count") or 0) for row in coverage_rows)
+        missing = sum(int(row.get("missing_acquisition_count") or 0) for row in coverage_rows)
+
+    coverage_complete = expected > 0 and missing == 0
+    append_task(
+        task_id="evaluation_benchmark.acquisition_coverage",
+        label="Promotion Benchmark Acquisition Coverage",
+        task_state="completed" if coverage_complete else "current",
+        status="succeeded" if coverage_complete else "blocked",
+        reason=(
+            "Benchmark acquisition coverage is complete."
+            if coverage_complete
+            else f"Benchmark acquisition coverage is incomplete: {missing}/{expected} feed acquisitions missing."
+        ),
+        receipt_refs=[str(dataset_root / "coverage_summary.csv")],
+        blockers=[] if coverage_complete else ["one_shot_provider_acquisition_requires_separate_gate"],
+        progress={
+            "stage_id": "evaluation_benchmark.acquisition_coverage",
+            "status": "complete" if coverage_complete else "partial_ready",
+            "expected_count": expected,
+            "ready_count": ready,
+            "pending_count": missing,
+            "failed_count": 0,
+            "accepted_failed_count": deferred,
+            "can_unlock_downstream": coverage_complete,
+        },
+    )
+
+    freeze_status = str(manifest.get("freeze_status") or "not_frozen")
+    freeze_ready = coverage_complete and freeze_status == "frozen"
+    append_task(
+        task_id="evaluation_benchmark.freeze",
+        label="Promotion Benchmark Freeze",
+        task_state="completed" if freeze_ready else "future",
+        status="succeeded" if freeze_ready else "blocked",
+        reason=(
+            "Promotion benchmark contract and reusable data snapshot are frozen."
+            if freeze_ready
+            else f"Benchmark freeze is waiting on accepted coverage and review; current freeze_status={freeze_status}."
+        ),
+        receipt_refs=[str(manifest_path)],
+        blockers=[] if freeze_ready else ["evaluation_benchmark.acquisition_coverage", "evaluation_benchmark_contract_review"],
+    )
+    return tasks
+
+
 def build_historical_task_progress_summary(
     status: HistoricalSchedulerStatus,
     *,
@@ -1165,6 +1386,13 @@ def build_historical_task_progress_summary(
     stage_counts = _stage_counts(status)
     task_timeline = _task_timeline(status, stage_coverage=stage_coverage)
     storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    task_timeline.extend(
+        _evaluation_benchmark_timeline_tasks(
+            storage_root=storage_root,
+            generated_at_utc=generated_at_utc,
+            starting_sequence=len(task_timeline),
+        )
+    )
     agent_error_summary = _agent_error_summary(storage_root, database_url=database_url)
     if not stage_counts and task_timeline:
         for task in task_timeline:

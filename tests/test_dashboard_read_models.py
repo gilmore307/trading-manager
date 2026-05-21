@@ -203,6 +203,70 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertTrue(payload["issue_refs"])
         self.assertTrue(all(ref["owner_action_required"] is False for ref in payload["issue_refs"]))
 
+    def test_task_timeline_merges_promotion_benchmark_into_model_evaluation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            benchmark_root = tmp / "storage" / "05_benchmark_datasets" / "promotion_benchmark_candidate_policy_replay"
+            benchmark_root.mkdir(parents=True, exist_ok=True)
+            (benchmark_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "benchmark_dataset_preparation_manifest",
+                        "contract_id": "promotion_benchmark_candidate_policy_replay",
+                        "preparation_status": "prepared_candidate_policy_replay_acquisition_bundle",
+                        "prepared_at_utc": "2026-05-21T02:34:48Z",
+                        "freeze_status": "not_frozen",
+                        "feed_acquisition_count": 360,
+                        "available_feed_acquisition_count": 0,
+                        "deferred_feed_acquisition_count": 0,
+                        "missing_feed_acquisition_count": 360,
+                        "source_contract_ref": "trading-evaluation/benchmarks/promotion_benchmark_candidate_policy_replay.json",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (benchmark_root / "coverage_summary.csv").write_text(
+                "contract_id,source_id,required_acquisition_count,available_acquisition_count,deferred_acquisition_count,missing_acquisition_count,coverage_status,notes\n"
+                "promotion_benchmark_candidate_policy_replay,alpaca_bars,60,0,0,60,incomplete,missing\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T09:20:00Z")
+
+        benchmark_tasks = [
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if str(task["task_id"]).startswith("evaluation_benchmark.")
+        ]
+        self.assertEqual(
+            [task["task_id"] for task in benchmark_tasks],
+            [
+                "evaluation_benchmark.dataset_preparation",
+                "evaluation_benchmark.acquisition_coverage",
+                "evaluation_benchmark.freeze",
+            ],
+        )
+        self.assertTrue(all(task["stage_type"] == "model_evaluation" for task in benchmark_tasks))
+        self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in benchmark_tasks))
+        self.assertEqual(benchmark_tasks[0]["task_state"], "completed")
+        self.assertEqual(benchmark_tasks[1]["task_state"], "current")
+        self.assertEqual(benchmark_tasks[1]["status"], "blocked")
+        self.assertEqual(benchmark_tasks[1]["detail"]["progress"]["expected_count"], 360)
+        self.assertEqual(benchmark_tasks[1]["detail"]["progress"]["pending_count"], 360)
+        self.assertEqual(benchmark_tasks[2]["task_state"], "future")
+        self.assertEqual(benchmark_tasks[2]["layer_key"], "evaluation_benchmark")
+
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
