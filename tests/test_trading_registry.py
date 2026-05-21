@@ -199,9 +199,13 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["payload"], "model_buy_point_triggered_chain_snapshots")
         self.assertIn("model buy/expression decisions", rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["note"])
+        duplicate_replay_phrase = " ".join(("replay", "replay"))
+        self.assertNotIn(duplicate_replay_phrase, rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["note"].lower())
         self.assertNotIn("REPLAY_FEED_TASK_PLAN", rows)
         self.assertEqual(rows["REPLAY_FEED_COVERAGE_STATUS_VALUES"]["payload"], "available;deferred;missing")
         self.assertIn("available/deferred/missing", rows["REPLAY_DATASET_PREPARATION_MANIFEST"]["note"])
+        self.assertNotIn(duplicate_replay_phrase, rows["REPLAY_DATASET_PREPARATION_MANIFEST"]["note"].lower())
+        self.assertNotIn(duplicate_replay_phrase, rows["REPLAY_REUSABLE_DATA_SNAPSHOT_POLICY"]["note"].lower())
         self.assertIn("deferred", rows["REPLAY_COVERAGE_SUMMARY"]["note"])
         self.assertEqual(
             rows["REPLAY_LIQUIDITY_FULL_HOURLY_ACQUISITION_POLICY"]["payload"],
@@ -240,6 +244,30 @@ class RegistryHelperTests(unittest.TestCase):
         write_policy = rows["EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_POLICY"]
         self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])
         self.assertIn("rollback_ref_required", write_policy["payload"])
+
+    def test_execution_runtime_component_graph_rows_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(rows["EXECUTION_RUNTIME_COMPONENT"]["payload"], "execution_runtime_component")
+        self.assertIn("trading-execution/docs/50_runtime_components.md", rows["EXECUTION_RUNTIME_COMPONENT"]["path"])
+        self.assertEqual(rows["EXECUTION_RUNTIME_COMPONENT_GRAPH"]["payload"], "execution_runtime_component_graph")
+        self.assertIn("trading-evaluation calls this graph", rows["EXECUTION_RUNTIME_COMPONENT_GRAPH"]["note"])
+        self.assertEqual(rows["TARGET_ALLOCATION_SNAPSHOT"]["payload"], "target_allocation_snapshot")
+        self.assertEqual(rows["ENTRY_DECISION"]["payload"], "entry_decision")
+        self.assertIn("does not call Layer 10", rows["ENTRY_DECISION"]["note"])
+        self.assertEqual(rows["POSITION_LIFECYCLE_DECISION"]["payload"], "position_lifecycle_decision")
+        self.assertEqual(rows["OPTION_REEXPRESSION_DECISION"]["payload"], "option_reexpression_decision")
+        self.assertEqual(rows["FAILURE_EXPLANATION_PACKET"]["payload"], "failure_explanation_packet")
+        self.assertIn("Layer 4 feedback candidates", rows["FAILURE_EXPLANATION_PACKET"]["note"])
+        self.assertEqual(rows["EXECUTION_ORDER_INTENT"]["payload"], "execution_order_intent")
+        self.assertEqual(rows["SIMULATED_FILL_EVENT"]["payload"], "simulated_fill_event")
+
+        policy = rows["EXECUTION_RUNTIME_COMPONENT_GRAPH_POLICY"]
+        self.assertIn("same_components_live_and_replay_different_adapters", policy["payload"])
+        self.assertIn("evaluation_calls_execution_graph", policy["payload"])
+        self.assertIn("layer10_failure_explanation_only", policy["payload"])
+        self.assertIn("not duplicated trading decisions", policy["note"])
 
     def test_agent_decision_skill_rows_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
