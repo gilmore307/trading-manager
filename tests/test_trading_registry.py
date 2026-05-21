@@ -91,7 +91,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("control-plane", rows["TRADING_MANAGER_REPO"]["note"])
         self.assertEqual(rows["TRADING_EVALUATION_REPO"]["payload"], "trading-evaluation")
         self.assertEqual(rows["TRADING_EVALUATION_REPO"]["path"], "/root/projects/trading-evaluation")
-        self.assertIn("independent benchmark", rows["TRADING_EVALUATION_REPO"]["note"])
+        self.assertIn("independent replay", rows["TRADING_EVALUATION_REPO"]["note"])
         self.assertNotIn("TRADING_MAIN_REPO", rows)
         self.assertNotIn("TRADING_SOURCE_REPO", rows)
         self.assertNotIn("TRADING_DERIVED_REPO", rows)
@@ -110,15 +110,15 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        benchmark = rows["EVALUATION_BENCHMARK_CONTRACT"]
-        self.assertEqual(benchmark["payload"], "evaluation_benchmark_contract")
-        self.assertIn("same-target training-exclusion evidence", benchmark["note"])
-        self.assertIn("target-context refs for non-ETF targets", benchmark["note"])
-        self.assertIn("stress-exception refs for controlled data-edge cases", benchmark["note"])
+        replay = rows["EVALUATION_REPLAY_CONTRACT"]
+        self.assertEqual(replay["payload"], "evaluation_replay_contract")
+        self.assertIn("same-target training-exclusion evidence", replay["note"])
+        self.assertIn("target-context refs for non-ETF targets", replay["note"])
+        self.assertIn("stress-exception refs for controlled data-edge cases", replay["note"])
 
-        validation = rows["EVALUATION_BENCHMARK_CONTRACT_VALIDATION"]
-        self.assertEqual(validation["payload"], "evaluation_benchmark_contract_validation")
-        self.assertIn("benchmark target/window overlap", validation["note"])
+        validation = rows["EVALUATION_REPLAY_CONTRACT_VALIDATION"]
+        self.assertEqual(validation["payload"], "evaluation_replay_contract_validation")
+        self.assertIn("replay target/window overlap", validation["note"])
         self.assertIn("non-ETF target-context refs", validation["note"])
         self.assertIn("stress-sleeve cap and exception refs", validation["note"])
 
@@ -143,8 +143,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(active_write["payload"], "execution_active_model_config_write")
         self.assertIn("rollback", active_write["note"])
 
-        policy = rows["EVALUATION_PRIMARY_BENCHMARK_POLICY"]
-        self.assertIn("candidate_policy_replay_benchmark", policy["payload"])
+        policy = rows["EVALUATION_PRIMARY_REPLAY_POLICY"]
+        self.assertIn("candidate_policy_replay", policy["payload"])
         self.assertIn("canonical_2021_2025_historical_clock_replay", policy["payload"])
         self.assertIn("fixed_replay_window_2021_01_01_to_2026_01_01_end_exclusive", policy["payload"])
         self.assertIn("model_selects_targets_from_candidate_policy", policy["payload"])
@@ -153,70 +153,70 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("fixed_selection_metrics", policy["payload"])
         self.assertIn("training_flow_replay_forbidden", policy["payload"])
         self.assertIn("overlapping_training_folds_blocked", policy["payload"])
-        self.assertNotIn("EVALUATION_PRIMARY_BENCHMARK_CANDIDATE_SHARED_CSV", rows)
-        self.assertNotIn("EVALUATION_PRIMARY_BENCHMARK_CANDIDATE_CSV_CONTRACT", rows)
-        self.assertNotIn("BENCHMARK_CANDIDATE_STATUS", rows)
-        self.assertNotIn("BENCHMARK_TIME_BUCKET_ID", rows)
-        self.assertNotIn("BENCHMARK_SECTOR_COVERAGE_TAGS", rows)
-        self.assertNotIn("BENCHMARK_EVENT_COVERAGE_TAGS", rows)
-        self.assertNotIn("BENCHMARK_TRAINING_EXCLUSION_REASON", rows)
+        self.assertNotIn("EVALUATION_PRIMARY_REPLAY_CANDIDATE_SHARED_CSV", rows)
+        self.assertNotIn("EVALUATION_PRIMARY_REPLAY_CANDIDATE_CSV_CONTRACT", rows)
+        self.assertNotIn("REPLAY_CANDIDATE_STATUS", rows)
+        self.assertNotIn("REPLAY_TIME_BUCKET_ID", rows)
+        self.assertNotIn("REPLAY_SECTOR_COVERAGE_TAGS", rows)
+        self.assertNotIn("REPLAY_EVENT_COVERAGE_TAGS", rows)
+        self.assertNotIn("REPLAY_TRAINING_EXCLUSION_REASON", rows)
         self.assertIn(
-            "prepare_benchmark_dataset.py",
-            rows["TRADING_EVALUATION_PREPARE_BENCHMARK_DATASET"]["path"],
+            "prepare_replay_dataset.py",
+            rows["TRADING_EVALUATION_PREPARE_REPLAY_DATASET"]["path"],
         )
         self.assertIn(
-            "run_benchmark_acquisition.py",
-            rows["TRADING_EVALUATION_RUN_BENCHMARK_ACQUISITION"]["path"],
+            "run_replay_acquisition.py",
+            rows["TRADING_EVALUATION_RUN_REPLAY_ACQUISITION"]["path"],
         )
-        self.assertIn("--execute", rows["TRADING_EVALUATION_RUN_BENCHMARK_ACQUISITION"]["note"])
-        self.assertEqual(rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["payload"], "benchmark_dataset_preparation_manifest")
-        self.assertIn("manager_request_route_used=false", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
-        self.assertIn("frozen reusable snapshot", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
+        self.assertIn("--execute", rows["TRADING_EVALUATION_RUN_REPLAY_ACQUISITION"]["note"])
+        self.assertEqual(rows["REPLAY_DATASET_PREPARATION_MANIFEST"]["payload"], "replay_dataset_preparation_manifest")
+        self.assertIn("manager_request_route_used=false", rows["REPLAY_DATASET_PREPARATION_MANIFEST"]["note"])
+        self.assertIn("frozen reusable snapshot", rows["REPLAY_DATASET_PREPARATION_MANIFEST"]["note"])
         self.assertEqual(
-            rows["BENCHMARK_REUSABLE_DATA_SNAPSHOT_POLICY"]["payload"],
+            rows["REPLAY_REUSABLE_DATA_SNAPSHOT_POLICY"]["payload"],
             "one_time_acquisition_then_frozen_reuse",
         )
-        self.assertIn("Candidate-specific benchmark data rebuilds are forbidden", rows["BENCHMARK_REUSABLE_DATA_SNAPSHOT_POLICY"]["note"])
+        self.assertIn("Candidate-specific replay data rebuilds are forbidden", rows["REPLAY_REUSABLE_DATA_SNAPSHOT_POLICY"]["note"])
         self.assertEqual(
-            rows["BENCHMARK_REALTIME_REPLAY_ROUTE_POLICY"]["payload"],
+            rows["REPLAY_REALTIME_REPLAY_ROUTE_POLICY"]["payload"],
             "historical_clock_realtime_execution_replay_not_training_flow",
         )
-        self.assertIn("realtime execution decision path", rows["BENCHMARK_REALTIME_REPLAY_ROUTE_POLICY"]["note"])
+        self.assertIn("realtime execution decision path", rows["REPLAY_REALTIME_REPLAY_ROUTE_POLICY"]["note"])
         self.assertEqual(
-            rows["PROMOTION_BENCHMARK_REPLAY_WINDOW_POLICY"]["payload"],
+            rows["PROMOTION_REPLAY_REPLAY_WINDOW_POLICY"]["payload"],
             "canonical_2021_01_01_to_2026_01_01_end_exclusive_1255_expected_trading_days",
         )
-        self.assertNotIn("PROMOTION_BENCHMARK_TWO_YEAR_REPLAY_WINDOW", rows)
+        self.assertNotIn("PROMOTION_REPLAY_TWO_YEAR_REPLAY_WINDOW", rows)
         self.assertEqual(
-            rows["PROMOTION_BENCHMARK_CANDIDATE_POLICY_REPLAY_CONTRACT"]["payload"],
-            "trading-evaluation/benchmarks/promotion_benchmark_candidate_policy_replay.json",
+            rows["PROMOTION_REPLAY_CANDIDATE_POLICY_REPLAY_CONTRACT"]["payload"],
+            "trading-evaluation/replays/promotion_replay_candidate_policy.json",
         )
-        self.assertEqual(rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["payload"], "benchmark_feed_acquisition_plan")
-        self.assertIn("event-layer feeds", rows["BENCHMARK_FEED_ACQUISITION_PLAN"]["note"])
+        self.assertEqual(rows["REPLAY_FEED_ACQUISITION_PLAN"]["payload"], "replay_feed_acquisition_plan")
+        self.assertIn("event-layer feeds", rows["REPLAY_FEED_ACQUISITION_PLAN"]["note"])
         self.assertEqual(
-            rows["BENCHMARK_EVENT_LAYER_ACQUISITION_FEEDS"]["payload"],
+            rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["payload"],
             "03_feed_alpaca_news;05_feed_gdelt_news;07_feed_trading_economics_calendar_web;08_feed_sec_company_financials",
         )
-        self.assertEqual(rows["BENCHMARK_OPTION_CHAIN_SNAPSHOT_POLICY"]["payload"], "model_buy_point_triggered_chain_snapshots")
-        self.assertIn("model buy/expression decisions", rows["BENCHMARK_OPTION_CHAIN_SNAPSHOT_POLICY"]["note"])
-        self.assertNotIn("BENCHMARK_FEED_TASK_PLAN", rows)
-        self.assertEqual(rows["BENCHMARK_FEED_COVERAGE_STATUS_VALUES"]["payload"], "available;deferred;missing")
-        self.assertIn("available/deferred/missing", rows["BENCHMARK_DATASET_PREPARATION_MANIFEST"]["note"])
-        self.assertIn("deferred", rows["BENCHMARK_COVERAGE_SUMMARY"]["note"])
+        self.assertEqual(rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["payload"], "model_buy_point_triggered_chain_snapshots")
+        self.assertIn("model buy/expression decisions", rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["note"])
+        self.assertNotIn("REPLAY_FEED_TASK_PLAN", rows)
+        self.assertEqual(rows["REPLAY_FEED_COVERAGE_STATUS_VALUES"]["payload"], "available;deferred;missing")
+        self.assertIn("available/deferred/missing", rows["REPLAY_DATASET_PREPARATION_MANIFEST"]["note"])
+        self.assertIn("deferred", rows["REPLAY_COVERAGE_SUMMARY"]["note"])
         self.assertEqual(
-            rows["BENCHMARK_LIQUIDITY_FULL_HOURLY_ACQUISITION_POLICY"]["payload"],
+            rows["REPLAY_LIQUIDITY_FULL_HOURLY_ACQUISITION_POLICY"]["payload"],
             "full_hourly_regular_session_windows_per_component_month",
         )
-        self.assertIn("Sampled liquidity receipts are smoke evidence only", rows["BENCHMARK_LIQUIDITY_FULL_HOURLY_ACQUISITION_POLICY"]["note"])
-        self.assertNotIn("BENCHMARK_LIQUIDITY_SAMPLED_ACQUISITION_POLICY", rows)
-        self.assertNotIn("BENCHMARK_FULL_MONTH_LIQUIDITY_DEFERRED_POLICY", rows)
-        self.assertNotIn("BENCHMARK_LIQUIDITY_FULL_DAILY_ACQUISITION_POLICY", rows)
-        self.assertEqual(rows["OKX_HISTORICAL_BENCHMARK_CANDLE_ROUTE"]["payload"], "okx_history_candles_for_benchmark_windows")
+        self.assertIn("Sampled liquidity receipts are smoke evidence only", rows["REPLAY_LIQUIDITY_FULL_HOURLY_ACQUISITION_POLICY"]["note"])
+        self.assertNotIn("REPLAY_LIQUIDITY_SAMPLED_ACQUISITION_POLICY", rows)
+        self.assertNotIn("REPLAY_FULL_MONTH_LIQUIDITY_DEFERRED_POLICY", rows)
+        self.assertNotIn("REPLAY_LIQUIDITY_FULL_DAILY_ACQUISITION_POLICY", rows)
+        self.assertEqual(rows["OKX_HISTORICAL_REPLAY_CANDLE_ROUTE"]["payload"], "okx_history_candles_for_replay_windows")
         self.assertIn(
             "sealed one-time action",
-            rows["BENCHMARK_ONE_SHOT_ACQUISITION_GATE_POLICY"]["note"],
+            rows["REPLAY_ONE_SHOT_ACQUISITION_GATE_POLICY"]["note"],
         )
-        self.assertNotIn("BENCHMARK_PROVIDER_TASK_KEYS_FAIL_CLOSED_POLICY", rows)
+        self.assertNotIn("REPLAY_PROVIDER_TASK_KEYS_FAIL_CLOSED_POLICY", rows)
 
         review_skill = rows["EVALUATION_PROMOTION_REVIEW_SKILL"]
         self.assertEqual(review_skill["payload"], "promotion-evaluation-review")
@@ -544,7 +544,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_PROMOTION_REVIEW"]["payload"], "model_promotion_review")
         self.assertIn("every model layer", rows["MODEL_PROMOTION_REVIEW"]["note"])
         self.assertIn("manager_schedules_only", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
-        self.assertIn("evaluation_owns_benchmark_settlement_eligibility_readiness", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("evaluation_owns_replay_settlement_eligibility_readiness", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertIn("execution_owns_shadow_cycle_activation", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertEqual(
             rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"],

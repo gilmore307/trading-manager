@@ -1438,8 +1438,7 @@ def _task_timeline(
 
 
 def _replay_dataset_root(storage_root: Path, contract_id: str) -> Path:
-    # Compatibility storage path: existing prepared replay artifacts live under this root.
-    return storage_root.parent / "05_benchmark_datasets" / contract_id
+    return storage_root.parent / "05_replay_datasets" / contract_id
 
 
 def _load_optional_json_object(path: Path) -> dict[str, Any] | None:
@@ -1547,8 +1546,7 @@ def _model_group_replay_timeline_tasks(
 ) -> list[dict[str, Any]]:
     """Return owner-facing model-group replay and promotion-review tasks."""
 
-    # Compatibility contract id: the accepted artifact already uses this id, but the owner-facing concept is Replay.
-    contract_id = "promotion_benchmark_candidate_policy_replay"
+    contract_id = "promotion_replay_candidate_policy"
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     manifest_path = dataset_root / "dataset_manifest.json"
     manifest = _load_optional_json_object(manifest_path)

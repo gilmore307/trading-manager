@@ -256,13 +256,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            replay_root = tmp / "storage" / "05_benchmark_datasets" / "promotion_benchmark_candidate_policy_replay"
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
             replay_root.mkdir(parents=True, exist_ok=True)
             (replay_root / "dataset_manifest.json").write_text(
                 json.dumps(
                     {
-                        "contract_type": "benchmark_dataset_preparation_manifest",
-                        "contract_id": "promotion_benchmark_candidate_policy_replay",
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
                         "preparation_status": "prepared_candidate_policy_replay_acquisition_bundle",
                         "prepared_at_utc": "2026-05-21T02:34:48Z",
                         "freeze_status": "not_frozen",
@@ -270,7 +270,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 0,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 360,
-                        "source_contract_ref": "trading-evaluation/benchmarks/promotion_benchmark_candidate_policy_replay.json",
+                        "source_contract_ref": "trading-evaluation/replays/promotion_replay_candidate_policy.json",
                     }
                 )
                 + "\n",
@@ -278,7 +278,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             (replay_root / "coverage_summary.csv").write_text(
                 "contract_id,source_id,required_acquisition_count,available_acquisition_count,deferred_acquisition_count,missing_acquisition_count,coverage_status,notes\n"
-                "promotion_benchmark_candidate_policy_replay,alpaca_bars,60,0,0,60,incomplete,missing\n",
+                "promotion_replay_candidate_policy,alpaca_bars,60,0,0,60,incomplete,missing\n",
                 encoding="utf-8",
             )
             status = collect_historical_scheduler_status(

@@ -56,7 +56,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertEqual(request["output_contract"], "option_expression_plan")
         self.assertEqual(request["candidate_ref"], "trading-model://promotion-candidates/mpcand_example")
         self.assertEqual(request["evaluation_run_refs"], ["trading-model://eval-runs/mdevrun_example"])
-        self.assertIn("evaluation_primary_benchmark_policy", request["policy_refs"])
+        self.assertIn("evaluation_primary_replay_policy", request["policy_refs"])
         self.assertIn("evaluation_promotion_activation_policy", request["policy_refs"])
         self.assertIn("fold_settlement_run", request["expected_outputs"])
         self.assertIn("promotion_eligibility_decision", request["expected_outputs"])
