@@ -175,6 +175,27 @@ def _agent_repair_status(diagnosis: Mapping[str, Any], agent_payload: Mapping[st
     return "unknown"
 
 
+def _agent_payload_text(value: object, fallback: object = None) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        return text or _agent_payload_text(fallback)
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, Mapping):
+        for key in ("summary", "message", "reason", "detail", "description", "root_cause"):
+            text = _agent_payload_text(value.get(key))
+            if text:
+                return text
+    if isinstance(value, list):
+        parts = [_agent_payload_text(item) for item in value]
+        text_parts = [part for part in parts if part]
+        if text_parts:
+            return " · ".join(text_parts)
+    if fallback is not None:
+        return _agent_payload_text(fallback)
+    return None
+
+
 def _agent_error_handling_status(catalog_row: Mapping[str, Any], repair_status: str) -> str:
     if repair_status == "repaired":
         scope = str(catalog_row.get("error_scope") or "")
@@ -252,8 +273,8 @@ def _agent_error_summary(
                 "diagnosis_status": diagnosis.get("status") or "missing",
                 "repair_status": repair_status,
                 "handling_status": handling_status,
-                "retry_recommendation": agent_payload.get("retry_recommendation"),
-                "root_cause": agent_payload.get("root_cause"),
+                "retry_recommendation": _agent_payload_text(agent_payload.get("retry_recommendation")),
+                "root_cause": _agent_payload_text(agent_payload.get("root_cause"), row.get("summary")),
                 "files_changed": files_changed,
                 "request_path": row.get("request_path"),
                 "diagnosis_path": row.get("diagnosis_path"),

@@ -452,7 +452,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["repair_status"], "repaired")
         self.assertEqual(agent_errors[0]["handling_status"], "awaiting_retry")
         self.assertEqual(agent_errors[0]["dashboard_severity"], "warning")
-        self.assertEqual(agent_errors[0]["root_cause"], {"summary": "type mismatch was repaired"})
+        self.assertEqual(agent_errors[0]["root_cause"], "type mismatch was repaired")
 
     def test_active_scheduler_no_executable_backoff_is_running_not_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
