@@ -166,7 +166,7 @@ def _agent_repair_status(diagnosis: Mapping[str, Any], agent_payload: Mapping[st
         return "repaired"
     if agent_status == "superseded" or nested_repair_status == "superseded":
         return "superseded"
-    if agent_status == "blocked_gate":
+    if agent_status in {"blocked_gate", "blocked_boundary"}:
         return "blocked"
     if nested_repair_status in {"not_supported", "blocked", "failed"}:
         return nested_repair_status

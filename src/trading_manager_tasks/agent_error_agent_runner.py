@@ -39,8 +39,10 @@ def _agent_message(request: Mapping[str, Any]) -> str:
         [
             "Handle this server error request as an internal project repair task.",
             "Use the workspace server-error-repair skill if available.",
-            "Use the supplied safety boundaries. Diagnose the root cause, make safe repository/config fixes when appropriate, run verification, and report what changed.",
-            "Autonomous repair is allowed for bounded internal repository bugs. Provider calls, broker/account mutation, destructive storage changes, model-output writes, runtime stage writes, package/system changes, and live service restarts require a separate gate.",
+            "Your mission is to restore the system to the accepted current contract. Do not stop at diagnosis when a repair is possible.",
+            "Autonomous repair may include code/config patches, provider/source calls, generated data repair, runtime/model-output writes, service restarts, storage maintenance, and system config changes when they are necessary to fix the bug and can be verified.",
+            "Never mutate broker/account/order/fill/position state. Never print, copy, or persist secrets.",
+            "Keep every powerful action narrow, evidence-backed, and recorded in the final repair receipt.",
             "Do not deliver a user-facing chat reply from this run; return strict JSON matching the server-error-repair final output contract to the caller.",
             "",
             str(request.get("agent_prompt") or json.dumps(dict(request), indent=2, sort_keys=True)),

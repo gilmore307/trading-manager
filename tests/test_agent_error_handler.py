@@ -284,6 +284,9 @@ class AgentErrorHandlerTests(unittest.TestCase):
         self.assertIn("server-error-repair", message)
         self.assertIn("server_error_agent_request", message)
         self.assertIn("return strict JSON", message)
+        self.assertIn("provider/source calls", message)
+        self.assertIn("Never mutate broker/account/order/fill/position state", message)
+        self.assertIn("Never print, copy, or persist secrets", message)
 
 
 if __name__ == "__main__":
