@@ -122,6 +122,15 @@ def _agent_result_payload(diagnosis: Mapping[str, Any]) -> dict[str, Any]:
     result = outer.get("result")
     if not isinstance(result, Mapping):
         return {}
+    meta = result.get("meta")
+    if isinstance(meta, Mapping):
+        final_text = meta.get("finalAssistantRawText") or meta.get("finalAssistantVisibleText")
+        if isinstance(final_text, str) and final_text.strip():
+            try:
+                parsed = json.loads(final_text)
+            except json.JSONDecodeError:
+                return {"agent_text": final_text}
+            return parsed if isinstance(parsed, dict) else {"agent_text": final_text}
     payloads = result.get("payloads")
     if not isinstance(payloads, list) or not payloads:
         return {}
@@ -149,7 +158,11 @@ def _agent_repair_status(diagnosis: Mapping[str, Any], agent_payload: Mapping[st
     nested_repair_status = str(repair.get("repair_status") or "").lower() if isinstance(repair, Mapping) else ""
     verification = agent_payload.get("verification")
     verification_exit_code = verification.get("exit_code") if isinstance(verification, Mapping) else None
-    if agent_status in {"repaired", "resolved", "fixed", "repair_verified"} or nested_repair_status == "repaired" or verification_exit_code == 0:
+    if (
+        agent_status in {"repaired", "resolved", "fixed", "repair_verified", "repaired_verified"}
+        or nested_repair_status == "repaired"
+        or verification_exit_code == 0
+    ):
         return "repaired"
     if nested_repair_status in {"not_supported", "blocked", "failed"}:
         return nested_repair_status
@@ -195,11 +208,16 @@ def _agent_error_summary(
     limit: int = MAX_AGENT_ERROR_SUMMARY_ROWS,
     database_url: str | None = None,
 ) -> list[dict[str, Any]]:
-    if database_url:
-        rows = fetch_server_error_catalog_rows(database_url=database_url, limit=limit)
-    else:
-        catalog_path = _agent_error_catalog_path(storage_root)
+    catalog_path = _agent_error_catalog_path(storage_root)
+    if catalog_path.exists() and not database_url:
         rows = _load_jsonl_objects(catalog_path)
+    elif database_url or storage_root == DEFAULT_STORAGE_ROOT:
+        try:
+            rows = fetch_server_error_catalog_rows(database_url=database_url, limit=limit)
+        except Exception:
+            rows = _load_jsonl_objects(catalog_path)
+    else:
+        rows = []
     if not rows:
         return []
     summary_rows: list[dict[str, Any]] = []
@@ -429,6 +447,7 @@ def _stage_coverage_chart(stage_coverage: Mapping[str, Any] | None) -> dict[str,
     return {
         "stage_id": stage_coverage.get("stage_id"),
         "status": stage_coverage.get("status"),
+        "unit_label": stage_coverage.get("unit_label") or "requests",
         "expected_count": int(stage_coverage.get("expected_count") or 0),
         "ready_count": int(stage_coverage.get("ready_count") or 0),
         "pending_count": int(stage_coverage.get("pending_count") or 0),
@@ -444,6 +463,7 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
         return {
             "stage_id": stage_id,
             "status": "complete",
+            "unit_label": "task",
             "expected_count": 1,
             "ready_count": 1,
             "pending_count": 0,
@@ -455,6 +475,7 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
         return {
             "stage_id": stage_id,
             "status": "failed",
+            "unit_label": "task",
             "expected_count": 1,
             "ready_count": 0,
             "pending_count": 0,
@@ -466,6 +487,7 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
         return {
             "stage_id": stage_id,
             "status": "running",
+            "unit_label": "task",
             "expected_count": 2,
             "ready_count": 1,
             "pending_count": 1,
@@ -477,6 +499,7 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
     return {
         "stage_id": stage_id,
         "status": progress_status,
+        "unit_label": "task",
         "expected_count": 1,
         "ready_count": 0,
         "pending_count": 1,
@@ -638,6 +661,8 @@ def _resolve_stage_ref_path(ref: object, *, storage_root: Path) -> Path | None:
     candidate = Path(ref)
     if candidate.is_absolute():
         return candidate
+    if len(candidate.parts) >= 2 and candidate.parts[0] == "storage" and candidate.parts[1] == "runtime":
+        return storage_root / Path(*candidate.parts[1:])
     # Workflow state may store control-plane refs relative to the shared
     # trading-storage/storage root. Resolve those against the storage-root
     # parent so dashboard summaries can inspect manager-owned receipt timing
@@ -1239,6 +1264,65 @@ def _int_field(payload: Mapping[str, Any], key: str) -> int:
         return 0
 
 
+def _unique_csv_values(path: Path, field: str) -> set[str]:
+    rows = _benchmark_coverage_rows(path)
+    return {str(row.get(field) or "").strip() for row in rows if str(row.get(field) or "").strip()}
+
+
+def _benchmark_window_month_count(dataset_root: Path) -> int:
+    months = _unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month")
+    if months:
+        return len(months)
+    rows = _benchmark_coverage_rows(dataset_root / "replay_window_manifest.csv")
+    if not rows:
+        return 60
+    try:
+        start = rows[0].get("start_date")
+        end = rows[0].get("end_date")
+        start_dt = datetime.fromisoformat(str(start)).date()
+        end_dt = datetime.fromisoformat(str(end)).date()
+    except (TypeError, ValueError):
+        return 60
+    return max(1, (end_dt.year - start_dt.year) * 12 + end_dt.month - start_dt.month)
+
+
+def _benchmark_replay_ready_months(dataset_root: Path) -> set[str]:
+    ready: set[str] = set()
+    for path in sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]:
+        if not path.exists():
+            continue
+        for row in _load_jsonl_objects(path):
+            status = str(row.get("status") or row.get("replay_status") or "").lower()
+            month = str(row.get("month") or row.get("replay_month") or "").strip()
+            if month and status in {"succeeded", "completed", "complete"}:
+                ready.add(month)
+    return ready
+
+
+def _benchmark_month_progress(
+    *,
+    dataset_root: Path,
+    stage_id: str,
+    status: str,
+    ready_months: set[str] | None = None,
+) -> dict[str, Any]:
+    expected = _benchmark_window_month_count(dataset_root)
+    ready = len(ready_months or set())
+    failed = 0
+    pending = max(expected - ready - failed, 0)
+    return {
+        "stage_id": stage_id,
+        "status": "complete" if expected > 0 and ready >= expected else status,
+        "unit_label": "months",
+        "expected_count": expected,
+        "ready_count": min(ready, expected),
+        "pending_count": pending,
+        "failed_count": failed,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": expected > 0 and ready >= expected,
+    }
+
+
 def _benchmark_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> list[str]:
     refs = [
         manifest.get("source_contract_ref"),
@@ -1437,6 +1521,7 @@ def _evaluation_benchmark_timeline_tasks(
         progress={
             "stage_id": "evaluation_benchmark.acquisition_coverage",
             "status": "complete" if coverage_complete else "partial_ready",
+            "unit_label": "source-months",
             "expected_count": expected,
             "ready_count": ready,
             "pending_count": missing,
@@ -1460,25 +1545,42 @@ def _evaluation_benchmark_timeline_tasks(
         ),
         receipt_refs=[str(manifest_path)],
         blockers=[] if freeze_ready else ["evaluation_benchmark.acquisition_coverage", "evaluation_benchmark_contract_review"],
+        progress=_benchmark_month_progress(
+            dataset_root=dataset_root,
+            stage_id="evaluation_benchmark.freeze",
+            status="complete" if freeze_ready else "blocked",
+            ready_months=set(_unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month")) if freeze_ready else set(),
+        ),
     )
+    replay_ready_months = _benchmark_replay_ready_months(dataset_root)
+    replay_progress = _benchmark_month_progress(
+        dataset_root=dataset_root,
+        stage_id="evaluation_benchmark.replay_evaluation",
+        status="complete" if replay_ready_months and len(replay_ready_months) >= _benchmark_window_month_count(dataset_root) else ("ready" if freeze_ready else "blocked"),
+        ready_months=replay_ready_months,
+    )
+    replay_complete = bool(replay_progress["can_unlock_downstream"])
     append_task(
         task_id="evaluation_benchmark.replay_evaluation",
         label="Promotion Benchmark Replay Evaluation",
-        task_state="current" if freeze_ready else "future",
-        status="ready" if freeze_ready else "blocked",
+        task_state="completed" if replay_complete else ("current" if freeze_ready else "future"),
+        status="succeeded" if replay_complete else ("ready" if freeze_ready else "blocked"),
         reason=(
-            "Benchmark replay evaluation is ready to run through the historical-clock realtime decision path."
+            "Benchmark replay evaluation is complete across the accepted replay window."
+            if replay_complete
+            else "Benchmark replay evaluation is ready to run through the historical-clock realtime decision path."
             if freeze_ready
             else "Waiting for frozen benchmark contract and complete Layer 1-10 fold-stack model evaluation."
         ),
         receipt_refs=[str(manifest_path)],
         blockers=[] if freeze_ready else ["evaluation_benchmark.freeze", "fold_layers_01_10_model_evaluation_complete"],
+        progress=replay_progress,
     )
     append_task(
         task_id="evaluation_promotion.fold_settlement",
         label="Promotion Fold Settlement Metrics",
-        task_state="future",
-        status="blocked",
+        task_state="current" if replay_complete else "future",
+        status="ready" if replay_complete else "blocked",
         reason=(
             "Waiting for benchmark replay decision rows; settlement owns AUROC, Brier, return, drawdown, cost, "
             "hit-rate, payoff, turnover, PCA, and PCoA diagnostics."
@@ -1486,6 +1588,12 @@ def _evaluation_benchmark_timeline_tasks(
         blockers=["evaluation_benchmark.replay_evaluation"],
         stage_type="promotion_review",
         layer_key_value="evaluation_promotion_review",
+        progress=_benchmark_month_progress(
+            dataset_root=dataset_root,
+            stage_id="evaluation_promotion.fold_settlement",
+            status="ready" if replay_complete else "blocked",
+            ready_months=set(),
+        ),
     )
     append_task(
         task_id="evaluation_promotion.readiness_review",

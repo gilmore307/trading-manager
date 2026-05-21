@@ -273,10 +273,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[1]["status"], "blocked")
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 360)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 360)
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "source-months")
         self.assertEqual(evaluation_tasks[2]["task_state"], "future")
-        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["pending_count"], 1)
+        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["expected_count"], 60)
+        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["pending_count"], 60)
+        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["unit_label"], "months")
         self.assertEqual(evaluation_tasks[2]["layer_key"], "evaluation_benchmark")
         self.assertEqual(evaluation_tasks[3]["task_label"], "Promotion Benchmark Replay Evaluation")
+        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["expected_count"], 60)
         self.assertEqual(evaluation_tasks[4]["layer_key"], "evaluation_promotion_review")
         self.assertIn("AUROC", evaluation_tasks[4]["reason"])
         self.assertIn("promotion-evaluation-review", evaluation_tasks[5]["detail"]["blockers"])
@@ -372,6 +376,83 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["handling_status"], "closed")
         self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
         self.assertEqual(agent_errors[0]["root_cause"], "synthetic state was broken")
+
+    def test_agent_error_summary_parses_openclaw_agent_final_json(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            agent_root = tmp / "storage" / "02_control_plane" / "runtime" / "agent_error_handling"
+            request_root = agent_root / "erragent_openclaw"
+            request_root.mkdir(parents=True, exist_ok=True)
+            final_report = {
+                "diagnosis_status": "repaired_verified",
+                "root_cause": {"summary": "type mismatch was repaired"},
+                "repair_attempted": {"attempted": True},
+                "files_changed": ["/repo/file.py"],
+                "verification": [{"command": "tests", "exit_code": 0}],
+                "retry_recommendation": "retry",
+                "blockers": [],
+            }
+            (request_root / "agent_error_diagnosis.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_error_diagnosis",
+                        "schema_version": "1",
+                        "diagnosis_id": "errdiag_openclaw",
+                        "request_ref": "erragent_openclaw",
+                        "agent_ref": "trader",
+                        "runner_command": "openclaw_agent",
+                        "status": "completed",
+                        "return_code": 0,
+                        "stdout": json.dumps({"result": {"meta": {"finalAssistantRawText": json.dumps(final_report)}}}),
+                        "stderr": "",
+                        "completed_at_utc": "2026-05-18T13:29:52Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 4,
+                        "error_ref": "ERR-000004",
+                        "error_fingerprint": "errfp_openclaw",
+                        "request_id": "erragent_openclaw",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_openclaw/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_openclaw/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.stage_executor",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.model_training_stage",
+                        "error_kind": "stage_command_failed",
+                        "severity": "error",
+                        "summary": "stage failed",
+                        "exit_code": 1,
+                        "occurred_at_utc": "2026-05-18T13:27:32Z",
+                        "created_at_utc": "2026-05-18T13:27:32Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T13:30:00Z")
+
+        agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(agent_errors[0]["repair_status"], "repaired")
+        self.assertEqual(agent_errors[0]["handling_status"], "awaiting_retry")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "warning")
+        self.assertEqual(agent_errors[0]["root_cause"], {"summary": "type mismatch was repaired"})
 
     def test_active_scheduler_no_executable_backoff_is_running_not_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
