@@ -203,7 +203,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertTrue(payload["issue_refs"])
         self.assertTrue(all(ref["owner_action_required"] is False for ref in payload["issue_refs"]))
 
-    def test_task_timeline_merges_promotion_benchmark_into_model_evaluation(self):
+    def test_task_timeline_splits_benchmark_evaluation_and_promotion_review(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -244,28 +244,38 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T09:20:00Z")
 
-        benchmark_tasks = [
+        evaluation_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if str(task["task_id"]).startswith("evaluation_benchmark.")
+            if str(task["task_id"]).startswith(("evaluation_benchmark.", "evaluation_promotion."))
         ]
         self.assertEqual(
-            [task["task_id"] for task in benchmark_tasks],
+            [task["task_id"] for task in evaluation_tasks],
             [
                 "evaluation_benchmark.dataset_preparation",
                 "evaluation_benchmark.acquisition_coverage",
                 "evaluation_benchmark.freeze",
+                "evaluation_benchmark.replay_evaluation",
+                "evaluation_promotion.fold_settlement",
+                "evaluation_promotion.readiness_review",
             ],
         )
-        self.assertTrue(all(task["stage_type"] == "model_evaluation" for task in benchmark_tasks))
-        self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in benchmark_tasks))
-        self.assertEqual(benchmark_tasks[0]["task_state"], "completed")
-        self.assertEqual(benchmark_tasks[1]["task_state"], "current")
-        self.assertEqual(benchmark_tasks[1]["status"], "blocked")
-        self.assertEqual(benchmark_tasks[1]["detail"]["progress"]["expected_count"], 360)
-        self.assertEqual(benchmark_tasks[1]["detail"]["progress"]["pending_count"], 360)
-        self.assertEqual(benchmark_tasks[2]["task_state"], "future")
-        self.assertEqual(benchmark_tasks[2]["layer_key"], "evaluation_benchmark")
+        self.assertEqual(
+            [task["stage_type"] for task in evaluation_tasks],
+            ["data_acquisition", "data_acquisition", "model_evaluation", "model_evaluation", "promotion_review", "promotion_review"],
+        )
+        self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
+        self.assertEqual(evaluation_tasks[0]["task_state"], "completed")
+        self.assertEqual(evaluation_tasks[1]["task_state"], "current")
+        self.assertEqual(evaluation_tasks[1]["status"], "blocked")
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 360)
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 360)
+        self.assertEqual(evaluation_tasks[2]["task_state"], "future")
+        self.assertEqual(evaluation_tasks[2]["layer_key"], "evaluation_benchmark")
+        self.assertEqual(evaluation_tasks[3]["task_label"], "Promotion Benchmark Replay Evaluation")
+        self.assertEqual(evaluation_tasks[4]["layer_key"], "evaluation_promotion_review")
+        self.assertIn("AUROC", evaluation_tasks[4]["reason"])
+        self.assertIn("promotion-evaluation-review", evaluation_tasks[5]["detail"]["blockers"])
 
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

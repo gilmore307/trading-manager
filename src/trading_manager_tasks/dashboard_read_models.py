@@ -1201,7 +1201,7 @@ def _evaluation_benchmark_timeline_tasks(
     generated_at_utc: str,
     starting_sequence: int,
 ) -> list[dict[str, Any]]:
-    """Return evaluation-owned benchmark tasks under the model-evaluation lane."""
+    """Return evaluation-owned benchmark and promotion-review tasks."""
 
     contract_id = "promotion_benchmark_candidate_policy_replay"
     dataset_root = _benchmark_dataset_root(storage_root, contract_id)
@@ -1222,6 +1222,8 @@ def _evaluation_benchmark_timeline_tasks(
         receipt_refs: list[str] | None = None,
         blockers: list[str] | None = None,
         progress: dict[str, Any] | None = None,
+        stage_type: str = "model_evaluation",
+        layer_key_value: str | None = None,
     ) -> None:
         sequence = starting_sequence + len(tasks) + 1
         detail: dict[str, Any] = {
@@ -1253,9 +1255,9 @@ def _evaluation_benchmark_timeline_tasks(
                 "task_label": label,
                 "task_state": task_state,
                 "status": status,
-                "stage_type": "model_evaluation",
+                "stage_type": stage_type,
                 "layer": None,
-                "layer_key": layer_key,
+                "layer_key": layer_key_value or layer_key,
                 "dataset_unit_kind": "evaluation_benchmark",
                 "dataset_unit_months": 60,
                 "target_symbol": None,
@@ -1284,6 +1286,7 @@ def _evaluation_benchmark_timeline_tasks(
             status="ready",
             reason="Benchmark dataset preparation manifest is not available yet.",
             blockers=[],
+            stage_type="data_acquisition",
         )
         append_task(
             task_id="evaluation_benchmark.acquisition_coverage",
@@ -1292,6 +1295,7 @@ def _evaluation_benchmark_timeline_tasks(
             status="blocked",
             reason="Waiting for benchmark dataset preparation.",
             blockers=["evaluation_benchmark.dataset_preparation"],
+            stage_type="data_acquisition",
         )
         append_task(
             task_id="evaluation_benchmark.freeze",
@@ -1300,6 +1304,34 @@ def _evaluation_benchmark_timeline_tasks(
             status="blocked",
             reason="Waiting for accepted acquisition coverage and benchmark contract review.",
             blockers=["evaluation_benchmark.acquisition_coverage"],
+        )
+        append_task(
+            task_id="evaluation_benchmark.replay_evaluation",
+            label="Promotion Benchmark Replay Evaluation",
+            task_state="future",
+            status="blocked",
+            reason="Waiting for frozen benchmark contract and complete Layer 1-10 fold-stack model evaluation.",
+            blockers=["evaluation_benchmark.freeze", "fold_layers_01_10_model_evaluation_complete"],
+        )
+        append_task(
+            task_id="evaluation_promotion.fold_settlement",
+            label="Promotion Fold Settlement Metrics",
+            task_state="future",
+            status="blocked",
+            reason="Waiting for benchmark replay decision rows; settlement owns AUROC, Brier, return, drawdown, cost, hit-rate, payoff, turnover, PCA, and PCoA diagnostics.",
+            blockers=["evaluation_benchmark.replay_evaluation"],
+            stage_type="promotion_review",
+            layer_key_value="evaluation_promotion_review",
+        )
+        append_task(
+            task_id="evaluation_promotion.readiness_review",
+            label="Promotion Eligibility And Readiness Review",
+            task_state="future",
+            status="blocked",
+            reason="Waiting for fold settlement, guardrails, incumbent comparison, and advisory promotion-evaluation-review evidence.",
+            blockers=["evaluation_promotion.fold_settlement", "promotion-evaluation-review"],
+            stage_type="promotion_review",
+            layer_key_value="evaluation_promotion_review",
         )
         return tasks
 
@@ -1315,6 +1347,7 @@ def _evaluation_benchmark_timeline_tasks(
         status="succeeded",
         reason=str(manifest.get("preparation_status") or "Benchmark dataset preparation bundle is available."),
         receipt_refs=receipt_refs,
+        stage_type="data_acquisition",
     )
     tasks[-1]["updated_at_utc"] = tasks_updated_at
     tasks[-1]["status_updated_at_utc"] = tasks_updated_at
@@ -1343,6 +1376,7 @@ def _evaluation_benchmark_timeline_tasks(
         ),
         receipt_refs=[str(dataset_root / "coverage_summary.csv")],
         blockers=[] if coverage_complete else ["one_shot_provider_acquisition_requires_separate_gate"],
+        stage_type="data_acquisition",
         progress={
             "stage_id": "evaluation_benchmark.acquisition_coverage",
             "status": "complete" if coverage_complete else "partial_ready",
@@ -1369,6 +1403,42 @@ def _evaluation_benchmark_timeline_tasks(
         ),
         receipt_refs=[str(manifest_path)],
         blockers=[] if freeze_ready else ["evaluation_benchmark.acquisition_coverage", "evaluation_benchmark_contract_review"],
+    )
+    append_task(
+        task_id="evaluation_benchmark.replay_evaluation",
+        label="Promotion Benchmark Replay Evaluation",
+        task_state="current" if freeze_ready else "future",
+        status="ready" if freeze_ready else "blocked",
+        reason=(
+            "Benchmark replay evaluation is ready to run through the historical-clock realtime decision path."
+            if freeze_ready
+            else "Waiting for frozen benchmark contract and complete Layer 1-10 fold-stack model evaluation."
+        ),
+        receipt_refs=[str(manifest_path)],
+        blockers=[] if freeze_ready else ["evaluation_benchmark.freeze", "fold_layers_01_10_model_evaluation_complete"],
+    )
+    append_task(
+        task_id="evaluation_promotion.fold_settlement",
+        label="Promotion Fold Settlement Metrics",
+        task_state="future",
+        status="blocked",
+        reason=(
+            "Waiting for benchmark replay decision rows; settlement owns AUROC, Brier, return, drawdown, cost, "
+            "hit-rate, payoff, turnover, PCA, and PCoA diagnostics."
+        ),
+        blockers=["evaluation_benchmark.replay_evaluation"],
+        stage_type="promotion_review",
+        layer_key_value="evaluation_promotion_review",
+    )
+    append_task(
+        task_id="evaluation_promotion.readiness_review",
+        label="Promotion Eligibility And Readiness Review",
+        task_state="future",
+        status="blocked",
+        reason="Waiting for fold settlement, guardrails, incumbent comparison, and advisory promotion-evaluation-review evidence.",
+        blockers=["evaluation_promotion.fold_settlement", "promotion-evaluation-review"],
+        stage_type="promotion_review",
+        layer_key_value="evaluation_promotion_review",
     )
     return tasks
 
