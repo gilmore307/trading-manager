@@ -455,6 +455,106 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["dashboard_severity"], "warning")
         self.assertEqual(agent_errors[0]["root_cause"], "type mismatch was repaired")
 
+    def test_supersedes_obsolete_layer_nine_event_risk_error(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2016-01.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_10_event_risk_governor.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 10,
+                                "layer_key": "layer_10_event_risk_governor",
+                                "status": "blocked",
+                                "last_reason": "waiting for upstream_layer_08_model_evaluation_complete",
+                                "updated_utc": "2026-05-21T10:00:00Z",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            agent_root = runtime / "agent_error_handling"
+            request_root = agent_root / "erragent_old_layer_nine"
+            request_root.mkdir(parents=True, exist_ok=True)
+            (request_root / "agent_error_diagnosis.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_error_diagnosis",
+                        "schema_version": "1",
+                        "diagnosis_id": "errdiag_old_layer_nine",
+                        "request_ref": "erragent_old_layer_nine",
+                        "agent_ref": "trader",
+                        "runner_command": "safe_error_repair",
+                        "status": "completed",
+                        "return_code": 0,
+                        "stdout": json.dumps(
+                            {
+                                "diagnosis_status": "completed",
+                                "repair": {"repair_status": "not_supported"},
+                                "root_cause": "model training stage layer_09_event_risk_governor.data_acquisition command returned non-zero status",
+                                "retry_recommendation": "manual review",
+                            }
+                        ),
+                        "stderr": "",
+                        "completed_at_utc": "2026-05-18T10:41:07Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 1,
+                        "error_ref": "ERR-000001",
+                        "error_fingerprint": "errfp_old_layer_nine",
+                        "request_id": "erragent_old_layer_nine",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_old_layer_nine/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_old_layer_nine/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.stage_executor",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.model_training_stage",
+                        "error_kind": "stage_command_failed",
+                        "severity": "error",
+                        "summary": "model training stage layer_09_event_risk_governor.data_acquisition command returned non-zero status",
+                        "exit_code": 1,
+                        "occurred_at_utc": "2026-05-18T10:41:07Z",
+                        "created_at_utc": "2026-05-18T10:41:07Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T10:00:00Z")
+
+        agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(agent_errors[0]["error_ref"], "ERR-000001")
+        self.assertEqual(agent_errors[0]["repair_status"], "superseded")
+        self.assertEqual(agent_errors[0]["handling_status"], "closed")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
+        self.assertIn("layer_10_event_risk_governor", agent_errors[0]["retry_recommendation"])
+
     def test_active_scheduler_no_executable_backoff_is_running_not_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

@@ -285,6 +285,29 @@ def _agent_error_summary(
     return summary_rows
 
 
+def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timeline: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    current_task_ids = {str(task.get("task_id") or "") for task in task_timeline}
+    has_current_layer_ten_event_risk = any(task_id.startswith("layer_10_event_risk_governor.") for task_id in current_task_ids)
+    if not has_current_layer_ten_event_risk:
+        return agent_errors
+    updated_rows: list[dict[str, Any]] = []
+    for row in agent_errors:
+        text = " ".join(str(row.get(field) or "") for field in ("summary", "root_cause", "retry_recommendation"))
+        if "layer_09_event_risk_governor" in text and "layer_09_event_risk_governor.data_acquisition" not in current_task_ids:
+            updated = dict(row)
+            updated["repair_status"] = "superseded"
+            updated["handling_status"] = "closed"
+            updated["dashboard_severity"] = "notice"
+            updated["retry_recommendation"] = (
+                "obsolete route; current workflow uses layer_10_event_risk_governor. "
+                "Prepare current Layer 10 event-feed artifacts before its data_acquisition stage runs."
+            )
+            updated_rows.append(updated)
+        else:
+            updated_rows.append(row)
+    return updated_rows
+
+
 def _latest_stage_execution(status: HistoricalSchedulerStatus) -> dict[str, Any] | None:
     """Return a sanitized latest stage-execution summary for dashboard display."""
 
@@ -1651,7 +1674,10 @@ def build_historical_task_progress_summary(
             starting_sequence=len(task_timeline),
         )
     )
-    agent_error_summary = _agent_error_summary(storage_root, database_url=database_url)
+    agent_error_summary = _mark_superseded_agent_errors(
+        _agent_error_summary(storage_root, database_url=database_url),
+        task_timeline,
+    )
     if not stage_counts and task_timeline:
         for task in task_timeline:
             task_status = str(task.get("status") or "unknown")
