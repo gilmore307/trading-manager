@@ -182,7 +182,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("lineage_refs", payload)
         self.assertIn(payload["severity"], {"critical", "high", "medium", "low", "info"})
 
-    def test_layer_model_evaluation_is_grouped_after_model_generation(self):
+    def test_layer_model_evaluation_is_hidden_from_public_timeline(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -227,10 +227,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task_ids = [task["task_id"] for task in payload["chart_payload"]["task_timeline"]]
         self.assertNotIn("layer_03_target_state_vector.model_evaluation", task_ids)
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.model_evaluation")
-        self.assertEqual(task["task_label"], "Model Group Evaluation")
-        self.assertEqual(task["detail"]["progress"]["unit_label"], "layers")
-        self.assertEqual(task["detail"]["progress"]["expected_count"], 1)
+        self.assertNotIn("model_group.model_evaluation", task_ids)
 
 
     def test_non_owner_operational_items_are_ready_not_action_required(self):
@@ -255,7 +252,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertTrue(payload["issue_refs"])
         self.assertTrue(all(ref["owner_action_required"] is False for ref in payload["issue_refs"]))
 
-    def test_task_timeline_splits_benchmark_evaluation_and_promotion_review(self):
+    def test_task_timeline_uses_model_group_lifecycle_for_benchmark_and_promotion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -299,41 +296,39 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         evaluation_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if str(task["task_id"]).startswith(("evaluation_benchmark.", "evaluation_promotion."))
+            if str(task["task_id"]).startswith("model_group.")
         ]
         self.assertEqual(
             [task["task_id"] for task in evaluation_tasks],
             [
-                "evaluation_benchmark.dataset_preparation",
-                "evaluation_benchmark.acquisition_coverage",
-                "evaluation_benchmark.freeze",
-                "evaluation_benchmark.replay_evaluation",
-                "evaluation_promotion.fold_settlement",
-                "evaluation_promotion.readiness_review",
+                "model_group.data_acquisition",
+                "model_group.evaluation",
+                "model_group.promotion_review",
+                "model_group.maintenance",
             ],
         )
         self.assertEqual(
             [task["stage_type"] for task in evaluation_tasks],
-            ["data_acquisition", "data_acquisition", "model_evaluation", "model_evaluation", "promotion_review", "promotion_review"],
+            ["data_acquisition", "model_evaluation", "promotion_review", "maintenance"],
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
-        self.assertEqual(evaluation_tasks[0]["task_state"], "completed")
-        self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["ready_count"], 1)
-        self.assertEqual(evaluation_tasks[1]["task_state"], "current")
-        self.assertEqual(evaluation_tasks[1]["status"], "blocked")
-        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 360)
-        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 360)
-        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "source-months")
-        self.assertEqual(evaluation_tasks[2]["task_state"], "future")
-        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["expected_count"], 60)
-        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["pending_count"], 60)
-        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["unit_label"], "months")
-        self.assertEqual(evaluation_tasks[2]["layer_key"], "evaluation_benchmark")
-        self.assertEqual(evaluation_tasks[3]["task_label"], "Promotion Benchmark Replay Evaluation")
-        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["expected_count"], 60)
-        self.assertEqual(evaluation_tasks[4]["layer_key"], "evaluation_promotion_review")
-        self.assertIn("AUROC", evaluation_tasks[4]["reason"])
-        self.assertIn("promotion-evaluation-review", evaluation_tasks[5]["detail"]["blockers"])
+        self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
+        self.assertEqual(evaluation_tasks[0]["task_label"], "Model Group Data Acquisition")
+        self.assertEqual(evaluation_tasks[0]["task_state"], "current")
+        self.assertEqual(evaluation_tasks[0]["status"], "blocked")
+        self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["expected_count"], 360)
+        self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["pending_count"], 360)
+        self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["unit_label"], "source-months")
+        self.assertEqual(evaluation_tasks[1]["task_label"], "Model Group Evaluation")
+        self.assertEqual(evaluation_tasks[1]["task_state"], "future")
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 60)
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 60)
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "months")
+        self.assertIn("frozen benchmark contract", evaluation_tasks[1]["reason"])
+        self.assertEqual(evaluation_tasks[2]["task_label"], "Model Group Promotion Review")
+        self.assertIn("promotion-evaluation-review", evaluation_tasks[2]["detail"]["blockers"])
+        self.assertEqual(evaluation_tasks[3]["task_label"], "Model Group Maintenance")
+        self.assertEqual(evaluation_tasks[3]["detail"]["blockers"], ["model_group.promotion_review"])
 
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

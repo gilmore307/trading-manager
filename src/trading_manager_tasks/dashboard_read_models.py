@@ -1054,102 +1054,7 @@ def _is_layer_local_post_generation_stage(raw_stage: Mapping[str, Any]) -> bool:
         return False
 
 
-def _aggregate_status(stages: list[Mapping[str, Any]]) -> str:
-    statuses = [str(stage.get("status") or "unknown") for stage in stages]
-    if any(status == "failed" for status in statuses):
-        return "failed"
-    if statuses and all(status in {"succeeded", "not_applicable"} for status in statuses):
-        return "succeeded"
-    if any(status == "ready" for status in statuses):
-        return "ready"
-    return "blocked"
-
-
-def _aggregate_progress(stage_id: str, status: str, stages: list[Mapping[str, Any]]) -> dict[str, Any]:
-    expected = len(stages)
-    complete = sum(1 for stage in stages if str(stage.get("status") or "") in {"succeeded", "not_applicable"})
-    failed = sum(1 for stage in stages if str(stage.get("status") or "") == "failed")
-    return {
-        "stage_id": stage_id,
-        "status": "complete" if expected > 0 and complete >= expected else status,
-        "unit_label": "layers",
-        "expected_count": expected,
-        "ready_count": min(complete, expected),
-        "pending_count": max(expected - complete - failed, 0),
-        "failed_count": failed,
-        "accepted_failed_count": 0,
-        "can_unlock_downstream": expected > 0 and complete >= expected and failed == 0,
-    }
-
-
-def _first_stage_text(stages: list[Mapping[str, Any]], status: str, field: str) -> str | None:
-    for stage in stages:
-        if str(stage.get("status") or "") == status and stage.get(field):
-            return str(stage.get(field))
-    for stage in stages:
-        if stage.get(field):
-            return str(stage.get(field))
-    return None
-
-
-def _fold_group_stage(raw_stages: list[Any], *, stage_type: str, timeline_month: str | None) -> dict[str, Any] | None:
-    stages = [
-        raw_stage
-        for raw_stage in raw_stages
-        if isinstance(raw_stage, Mapping)
-        and str(raw_stage.get("stage_type") or "") == stage_type
-        and _is_layer_local_post_generation_stage(raw_stage)
-    ]
-    if not stages:
-        return None
-    stage_id = f"model_group.{stage_type}"
-    status = _aggregate_status(stages)
-    label = {
-        "model_evaluation": "Model Group Evaluation",
-        "promotion_review": "Model Group Local Review",
-        "maintenance": "Model Group Maintenance",
-    }[stage_type]
-    reason = {
-        "succeeded": f"All layer-local {label.lower()} steps completed for this model group.",
-        "failed": f"One or more layer-local {label.lower()} steps failed for this model group.",
-        "ready": f"Next internal step ready: {_first_stage_text(stages, 'ready', 'stage_id') or label}.",
-        "blocked": _first_stage_text(stages, "blocked", "last_reason") or f"Waiting for prerequisite layer-local {label.lower()} steps.",
-    }[status]
-    dataset_unit = next((stage.get("dataset_unit") for stage in stages if isinstance(stage.get("dataset_unit"), Mapping)), None)
-    receipt_refs: list[str] = []
-    blockers: list[str] = []
-    for stage in stages:
-        for ref in stage.get("receipt_refs") or []:
-            receipt_refs.append(str(ref))
-        if str(stage.get("status") or "") != "succeeded":
-            blockers.append(str(stage.get("stage_id") or "layer_local_step"))
-    return {
-        "stage_id": stage_id,
-        "task_label": label,
-        "stage_type": stage_type,
-        "layer": None,
-        "layer_key": "model_group",
-        "status": status,
-        "last_reason": reason,
-        "receipt_refs": sorted(dict.fromkeys(receipt_refs)),
-        "blockers": sorted(dict.fromkeys(blockers)),
-        "dataset_unit": dataset_unit
-        or {
-            "unit_kind": "model_group_six_month",
-            "unit_months": MONTHS_PER_MODEL_FOLD,
-            "start_month": str(timeline_month or "").split("..", 1)[0] if timeline_month else None,
-            "end_month": str(timeline_month or "").split("..", 1)[1] if timeline_month and ".." in timeline_month else None,
-            "target_required": True,
-        },
-        "worker_id": "model_worker_1",
-        "worker_label": "Model Worker 1",
-        "worker_kind": "model_worker",
-        "updated_utc": _first_stage_text(stages, status, "updated_utc") or _first_stage_text(stages, "ready", "updated_utc"),
-        "dashboard_progress": _aggregate_progress(stage_id, status, stages),
-    }
-
-
-def _public_task_stages(raw_stages: list[Any], *, timeline_month: str | None) -> list[Any]:
+def _public_task_stages(raw_stages: list[Any]) -> list[Any]:
     rows: list[Any] = []
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
@@ -1157,10 +1062,6 @@ def _public_task_stages(raw_stages: list[Any], *, timeline_month: str | None) ->
         if _is_layer_local_post_generation_stage(raw_stage):
             continue
         rows.append(raw_stage)
-    for stage_type in ("model_evaluation", "promotion_review", "maintenance"):
-        aggregate = _fold_group_stage(raw_stages, stage_type=stage_type, timeline_month=timeline_month)
-        if aggregate is not None:
-            rows.append(aggregate)
     return rows
 
 
@@ -1368,7 +1269,7 @@ def _task_timeline(
     if not month_stage_sets:
         return []
     public_stage_sets = [
-        (timeline_month, _public_task_stages(raw_stages, timeline_month=timeline_month), is_active_month)
+        (timeline_month, _public_task_stages(raw_stages), is_active_month)
         for timeline_month, raw_stages, is_active_month in month_stage_sets
     ]
 
@@ -1643,7 +1544,7 @@ def _evaluation_benchmark_timeline_tasks(
     generated_at_utc: str,
     starting_sequence: int,
 ) -> list[dict[str, Any]]:
-    """Return evaluation-owned benchmark and promotion-review tasks."""
+    """Return owner-facing model-group benchmark and promotion-review tasks."""
 
     contract_id = "promotion_benchmark_candidate_policy_replay"
     dataset_root = _benchmark_dataset_root(storage_root, contract_id)
@@ -1651,7 +1552,7 @@ def _evaluation_benchmark_timeline_tasks(
     manifest = _load_optional_json_object(manifest_path)
     worker_info = _evaluation_worker_info()
     period = "2021-01..2026-01"
-    layer_key = "evaluation_benchmark"
+    layer_key = "model_group"
     tasks: list[dict[str, Any]] = []
 
     def append_task(
@@ -1665,7 +1566,6 @@ def _evaluation_benchmark_timeline_tasks(
         blockers: list[str] | None = None,
         progress: dict[str, Any] | None = None,
         stage_type: str = "model_evaluation",
-        layer_key_value: str | None = None,
     ) -> None:
         sequence = starting_sequence + len(tasks) + 1
         detail: dict[str, Any] = {
@@ -1676,12 +1576,12 @@ def _evaluation_benchmark_timeline_tasks(
             "model_activation_allowed": False,
             "broker_execution_allowed": False,
             "dataset_unit": {
-                "unit_kind": "evaluation_benchmark",
+                "unit_kind": "model_group_benchmark",
                 "unit_months": 60,
                 "start_month": "2021-01",
                 "end_month": "2026-01",
                 "target_required": False,
-                "description": "Candidate-policy replay promotion benchmark.",
+                "description": "Model-group benchmark data, replay evaluation, promotion review, and maintenance.",
             },
             "worker": worker_info,
             "progress": progress or _task_status_progress(task_id, status),
@@ -1698,8 +1598,8 @@ def _evaluation_benchmark_timeline_tasks(
                 "status": status,
                 "stage_type": stage_type,
                 "layer": None,
-                "layer_key": layer_key_value or layer_key,
-                "dataset_unit_kind": "evaluation_benchmark",
+                "layer_key": layer_key,
+                "dataset_unit_kind": "model_group_benchmark",
                 "dataset_unit_months": 60,
                 "target_symbol": None,
                 "target_required": False,
@@ -1721,58 +1621,39 @@ def _evaluation_benchmark_timeline_tasks(
 
     if manifest is None:
         append_task(
-            task_id="evaluation_benchmark.dataset_preparation",
-            label="Promotion Benchmark Dataset Preparation",
+            task_id="model_group.data_acquisition",
+            label="Model Group Data Acquisition",
             task_state="current",
             status="ready",
-            reason="Benchmark dataset preparation manifest is not available yet.",
+            reason="Waiting for model-group benchmark data-acquisition preparation manifest.",
             blockers=[],
             stage_type="data_acquisition",
         )
         append_task(
-            task_id="evaluation_benchmark.acquisition_coverage",
-            label="Promotion Benchmark Acquisition Coverage",
+            task_id="model_group.evaluation",
+            label="Model Group Evaluation",
             task_state="future",
             status="blocked",
-            reason="Waiting for benchmark dataset preparation.",
-            blockers=["evaluation_benchmark.dataset_preparation"],
-            stage_type="data_acquisition",
+            reason="Waiting for model-group benchmark data acquisition before benchmark evaluation can run.",
+            blockers=["model_group.data_acquisition"],
         )
         append_task(
-            task_id="evaluation_benchmark.freeze",
-            label="Promotion Benchmark Freeze",
+            task_id="model_group.promotion_review",
+            label="Model Group Promotion Review",
             task_state="future",
             status="blocked",
-            reason="Waiting for accepted acquisition coverage and benchmark contract review.",
-            blockers=["evaluation_benchmark.acquisition_coverage"],
-        )
-        append_task(
-            task_id="evaluation_benchmark.replay_evaluation",
-            label="Promotion Benchmark Replay Evaluation",
-            task_state="future",
-            status="blocked",
-            reason="Waiting for frozen benchmark contract and complete Layer 1-10 fold-stack model evaluation.",
-            blockers=["evaluation_benchmark.freeze", "fold_layers_01_10_model_evaluation_complete"],
-        )
-        append_task(
-            task_id="evaluation_promotion.fold_settlement",
-            label="Promotion Fold Settlement Metrics",
-            task_state="future",
-            status="blocked",
-            reason="Waiting for benchmark replay decision rows; settlement owns AUROC, Brier, return, drawdown, cost, hit-rate, payoff, turnover, PCA, and PCoA diagnostics.",
-            blockers=["evaluation_benchmark.replay_evaluation"],
+            reason="Waiting for model-group benchmark evaluation evidence and promotion-evaluation-review.",
+            blockers=["model_group.evaluation", "promotion-evaluation-review"],
             stage_type="promotion_review",
-            layer_key_value="evaluation_promotion_review",
         )
         append_task(
-            task_id="evaluation_promotion.readiness_review",
-            label="Promotion Eligibility And Readiness Review",
+            task_id="model_group.maintenance",
+            label="Model Group Maintenance",
             task_state="future",
             status="blocked",
-            reason="Waiting for fold settlement, guardrails, incumbent comparison, and advisory promotion-evaluation-review evidence.",
-            blockers=["evaluation_promotion.fold_settlement", "promotion-evaluation-review"],
-            stage_type="promotion_review",
-            layer_key_value="evaluation_promotion_review",
+            reason="Waiting for model-group promotion review before maintenance can run.",
+            blockers=["model_group.promotion_review"],
+            stage_type="maintenance",
         )
         return tasks
 
@@ -1780,18 +1661,6 @@ def _evaluation_benchmark_timeline_tasks(
     prepared_at = str(manifest.get("prepared_at_utc") or generated_at_utc)
     tasks_updated_at = prepared_at or generated_at_utc
     tasks.clear()
-
-    append_task(
-        task_id="evaluation_benchmark.dataset_preparation",
-        label="Promotion Benchmark Dataset Preparation",
-        task_state="completed",
-        status="succeeded",
-        reason=str(manifest.get("preparation_status") or "Benchmark dataset preparation bundle is available."),
-        receipt_refs=receipt_refs,
-        stage_type="data_acquisition",
-    )
-    tasks[-1]["updated_at_utc"] = tasks_updated_at
-    tasks[-1]["status_updated_at_utc"] = tasks_updated_at
 
     expected = _int_field(manifest, "feed_acquisition_count")
     ready = _int_field(manifest, "available_feed_acquisition_count")
@@ -1806,20 +1675,20 @@ def _evaluation_benchmark_timeline_tasks(
 
     coverage_complete = expected > 0 and missing == 0
     append_task(
-        task_id="evaluation_benchmark.acquisition_coverage",
-        label="Promotion Benchmark Acquisition Coverage",
+        task_id="model_group.data_acquisition",
+        label="Model Group Data Acquisition",
         task_state="completed" if coverage_complete else "current",
         status="succeeded" if coverage_complete else "blocked",
         reason=(
-            "Benchmark acquisition coverage is complete."
+            "Model-group benchmark data acquisition is complete."
             if coverage_complete
-            else f"Benchmark acquisition coverage is incomplete: {missing}/{expected} feed acquisitions missing."
+            else f"Model-group benchmark data acquisition is incomplete: {missing}/{expected} feed acquisitions missing."
         ),
-        receipt_refs=[str(dataset_root / "coverage_summary.csv")],
+        receipt_refs=receipt_refs,
         blockers=[] if coverage_complete else ["one_shot_provider_acquisition_requires_separate_gate"],
         stage_type="data_acquisition",
         progress={
-            "stage_id": "evaluation_benchmark.acquisition_coverage",
+            "stage_id": "model_group.data_acquisition",
             "status": "complete" if coverage_complete else "partial_ready",
             "unit_label": "source-months",
             "expected_count": expected,
@@ -1830,80 +1699,61 @@ def _evaluation_benchmark_timeline_tasks(
             "can_unlock_downstream": coverage_complete,
         },
     )
+    tasks[-1]["updated_at_utc"] = tasks_updated_at
+    tasks[-1]["status_updated_at_utc"] = tasks_updated_at
 
     freeze_status = str(manifest.get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
-    append_task(
-        task_id="evaluation_benchmark.freeze",
-        label="Promotion Benchmark Freeze",
-        task_state="completed" if freeze_ready else "future",
-        status="succeeded" if freeze_ready else "blocked",
-        reason=(
-            "Promotion benchmark contract and reusable data snapshot are frozen."
-            if freeze_ready
-            else f"Benchmark freeze is waiting on accepted coverage and review; current freeze_status={freeze_status}."
-        ),
-        receipt_refs=[str(manifest_path)],
-        blockers=[] if freeze_ready else ["evaluation_benchmark.acquisition_coverage", "evaluation_benchmark_contract_review"],
-        progress=_benchmark_month_progress(
-            dataset_root=dataset_root,
-            stage_id="evaluation_benchmark.freeze",
-            status="complete" if freeze_ready else "blocked",
-            ready_months=set(_unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month")) if freeze_ready else set(),
-        ),
-    )
     replay_ready_months = _benchmark_replay_ready_months(dataset_root)
     replay_progress = _benchmark_month_progress(
         dataset_root=dataset_root,
-        stage_id="evaluation_benchmark.replay_evaluation",
+        stage_id="model_group.evaluation",
         status="complete" if replay_ready_months and len(replay_ready_months) >= _benchmark_window_month_count(dataset_root) else ("ready" if freeze_ready else "blocked"),
         ready_months=replay_ready_months,
     )
     replay_complete = bool(replay_progress["can_unlock_downstream"])
     append_task(
-        task_id="evaluation_benchmark.replay_evaluation",
-        label="Promotion Benchmark Replay Evaluation",
+        task_id="model_group.evaluation",
+        label="Model Group Evaluation",
         task_state="completed" if replay_complete else ("current" if freeze_ready else "future"),
         status="succeeded" if replay_complete else ("ready" if freeze_ready else "blocked"),
         reason=(
-            "Benchmark replay evaluation is complete across the accepted replay window."
+            "Model-group benchmark evaluation is complete across the accepted replay window."
             if replay_complete
-            else "Benchmark replay evaluation is ready to run through the historical-clock realtime decision path."
+            else "Model-group benchmark evaluation is ready to run benchmark replay, AUROC, Brier, return, drawdown, cost, hit-rate, payoff, turnover, PCA, PCoA, and guardrail checks."
             if freeze_ready
-            else "Waiting for frozen benchmark contract and complete Layer 1-10 fold-stack model evaluation."
+            else f"Waiting for complete model-group benchmark data acquisition and frozen benchmark contract; current freeze_status={freeze_status}."
         ),
         receipt_refs=[str(manifest_path)],
-        blockers=[] if freeze_ready else ["evaluation_benchmark.freeze", "fold_layers_01_10_model_evaluation_complete"],
+        blockers=[] if freeze_ready else ["model_group.data_acquisition", "model_group_benchmark_freeze_review"],
         progress=replay_progress,
     )
     append_task(
-        task_id="evaluation_promotion.fold_settlement",
-        label="Promotion Fold Settlement Metrics",
+        task_id="model_group.promotion_review",
+        label="Model Group Promotion Review",
         task_state="current" if replay_complete else "future",
         status="ready" if replay_complete else "blocked",
         reason=(
-            "Waiting for benchmark replay decision rows; settlement owns AUROC, Brier, return, drawdown, cost, "
-            "hit-rate, payoff, turnover, PCA, and PCoA diagnostics."
+            "Promotion review integrates benchmark metrics, guardrails, incumbent comparison, and advisory "
+            "promotion-evaluation-review evidence into a model-group decision."
         ),
-        blockers=["evaluation_benchmark.replay_evaluation"],
+        blockers=[] if replay_complete else ["model_group.evaluation", "promotion-evaluation-review"],
         stage_type="promotion_review",
-        layer_key_value="evaluation_promotion_review",
         progress=_benchmark_month_progress(
             dataset_root=dataset_root,
-            stage_id="evaluation_promotion.fold_settlement",
+            stage_id="model_group.promotion_review",
             status="ready" if replay_complete else "blocked",
             ready_months=set(),
         ),
     )
     append_task(
-        task_id="evaluation_promotion.readiness_review",
-        label="Promotion Eligibility And Readiness Review",
+        task_id="model_group.maintenance",
+        label="Model Group Maintenance",
         task_state="future",
         status="blocked",
-        reason="Waiting for fold settlement, guardrails, incumbent comparison, and advisory promotion-evaluation-review evidence.",
-        blockers=["evaluation_promotion.fold_settlement", "promotion-evaluation-review"],
-        stage_type="promotion_review",
-        layer_key_value="evaluation_promotion_review",
+        reason="Waiting for model-group promotion review before maintenance can run.",
+        blockers=["model_group.promotion_review"],
+        stage_type="maintenance",
     )
     return tasks
 
