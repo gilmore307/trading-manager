@@ -37,7 +37,7 @@ Layer 2 feature generation also prepares `source_02_target_candidate_holdings` a
 
 ## Target Rotation
 
-Layer 3+ model-worker training uses target-scoped fold checkpoints. When `--target-symbol` is supplied, the daemon remains pinned to that target. When it is omitted, the daemon reads `runtime/model_training_target_queue.json` and selects the first queued target with an open or unstarted six-month model-worker fold.
+Layer 3+ model-worker training uses target-scoped fold checkpoints. The checked-in systemd template intentionally omits `--target-symbol`, so the daemon reads `runtime/model_training_target_queue.json` and selects the first queued target with an open or unstarted six-month model-worker fold. Supplying `--target-symbol` is a reviewed repair override that pins the daemon to one target and disables queue rotation for that run.
 
 Accepted queue shape:
 
@@ -52,6 +52,12 @@ Accepted queue shape:
 ```
 
 If the first target has completed all eligible folds through the completed-month cutoff, the scheduler skips it and starts the next queued target from the earliest ready fold, usually `2016-01`. The queue controls execution routing only; it does not become fixed-target promotion evidence and does not replace Layer 3 candidate-policy replay.
+
+The runtime queue can be prepared from reviewed target context mappings:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --write
+```
 
 ## Event-Risk Lane
 

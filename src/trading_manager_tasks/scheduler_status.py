@@ -17,7 +17,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, TextIO
 
-from .scheduler_daemon import DEFAULT_DECISION_LOG_PATH, DEFAULT_LOCK_PATH, DEFAULT_STATE_PATH, _process_exists, select_next_historical_work
+from .scheduler_daemon import (
+    DEFAULT_DECISION_LOG_PATH,
+    DEFAULT_LOCK_PATH,
+    DEFAULT_STATE_PATH,
+    _process_exists,
+    load_model_worker_target_queue,
+    select_next_historical_work,
+)
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_locks import scheduler_lock_plan
 
@@ -73,6 +80,7 @@ class WorkflowCheckpointStatus:
     next_stage_id: str | None
     next_stage_status: str | None
     next_stage_type: str | None
+    next_stage_blockers: tuple[str, ...]
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -196,6 +204,7 @@ def _workflow_checkpoint_status(path: Path) -> WorkflowCheckpointStatus:
             next_stage_id=None,
             next_stage_status=None,
             next_stage_type=None,
+            next_stage_blockers=(),
         )
     stages = [stage for stage in payload.get("stages") or [] if isinstance(stage, Mapping)]
     next_stage = None
@@ -203,6 +212,9 @@ def _workflow_checkpoint_status(path: Path) -> WorkflowCheckpointStatus:
         if stage.get("status") not in TERMINAL_STAGE_STATUSES:
             next_stage = stage
             break
+    next_stage_blockers: tuple[str, ...] = ()
+    if next_stage:
+        next_stage_blockers = tuple(str(value) for value in next_stage.get("blockers") or () if str(value))
     return WorkflowCheckpointStatus(
         path=str(path),
         exists=True,
@@ -213,6 +225,7 @@ def _workflow_checkpoint_status(path: Path) -> WorkflowCheckpointStatus:
         next_stage_id=str(next_stage.get("stage_id") or "") or None if next_stage else None,
         next_stage_status=str(next_stage.get("status") or "") or None if next_stage else None,
         next_stage_type=str(next_stage.get("stage_type") or "") or None if next_stage else None,
+        next_stage_blockers=next_stage_blockers,
     )
 
 
@@ -338,6 +351,7 @@ def _open_operational_items(
     lock: LockStatus,
     recommended_flags_present: bool,
     workflow: WorkflowCheckpointStatus,
+    target_queue_ready: bool,
 ) -> tuple[str, ...]:
     items: list[str] = []
     if not recommended_flags_present:
@@ -348,7 +362,12 @@ def _open_operational_items(
         items.append("start_service_or_run_one_shot_smoke_to_create_decision_log")
     if lock.status == "stale":
         items.append("remove_or_replace_stale_scheduler_lock_before_service_start")
-    if workflow.exists and not workflow.terminal_complete and workflow.next_stage_status == "blocked":
+    target_boundary_block = (
+        target_queue_ready
+        and workflow.next_stage_status == "blocked"
+        and "selected_target_symbol_required" in workflow.next_stage_blockers
+    )
+    if workflow.exists and not workflow.terminal_complete and workflow.next_stage_status == "blocked" and not target_boundary_block:
         items.append("resolve_current_workflow_blocked_stage")
     return tuple(items)
 
@@ -393,9 +412,17 @@ def collect_historical_scheduler_status(
     flags_present, missing_flags = _service_flags(service_template_path)
     current_daemon_state = None if stale_completed_state else daemon_state
     provider_status = _provider_status(current_decision, current_daemon_state)
+    target_queue_ready = bool(load_model_worker_target_queue(storage_root / "runtime" / "model_training_target_queue.json"))
     blocked_reason = None
     if current_decision and current_decision.get("decision_status") == "backoff":
         blocked_reason = str(current_decision.get("reason") or current_decision.get("reason_code") or "") or None
+    if (
+        blocked_reason
+        and target_queue_ready
+        and workflow.next_stage_status == "blocked"
+        and "selected_target_symbol_required" in workflow.next_stage_blockers
+    ):
+        blocked_reason = None
     current_stage = workflow.next_stage_id or str((current_decision or {}).get("selected_work") or "") or None
     if current_stage is None and current_month:
         current_stage = "prepare_layer_one_historical_training_batch" if not workflow.exists else "historical_work_selected"
@@ -420,6 +447,7 @@ def collect_historical_scheduler_status(
         lock=lock,
         recommended_flags_present=flags_present,
         workflow=workflow,
+        target_queue_ready=target_queue_ready,
     )
     if not service_runtime_ready:
         recommended_next_action = "fix_service_template_or_runtime_files_before_host_activation"

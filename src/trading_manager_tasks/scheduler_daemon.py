@@ -573,7 +573,7 @@ def select_model_worker_target(
     return ModelWorkerTargetSelection(
         selected_target_symbol=None,
         target_queue=target_queue,
-        reason_code="all_targets_complete_through_completed_month_cutoff",
+        reason_code="no_complete_foundation_fold_available",
         fold_selection=None,
     )
 

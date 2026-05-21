@@ -10,7 +10,6 @@ WorkingDirectory=/root/projects/trading-manager
 Environment=PYTHONPATH=/root/projects/trading-manager/src
 Environment=TRADING_MANAGER_HISTORICAL_START_MONTH=2016-01
 Environment=TRADING_MANAGER_HISTORICAL_END_MONTH=2016-06
-Environment=TRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL
 Environment=TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=5
 Environment=TRADING_MANAGER_PROVIDER_STAGE_NEXT_LIMIT=12
 Environment=TRADING_MANAGER_PROVIDER_STAGE_MAX_WORKERS=4
@@ -26,7 +25,6 @@ EnvironmentFile=-/etc/default/trading-manager-historical-scheduler
 ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py \
   --start-month ${TRADING_MANAGER_HISTORICAL_START_MONTH} \
   --end-month ${TRADING_MANAGER_HISTORICAL_END_MONTH} \
-  --target-symbol ${TRADING_MANAGER_SELECTED_TARGET_SYMBOL} \
   --interval-seconds ${TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS} \
   --execute-safe-preparation \
   --execute-safe-offline-stages \

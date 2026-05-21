@@ -129,6 +129,80 @@ class SchedulerStatusTests(unittest.TestCase):
             ["daemon", "month_stage", "reconcile", "provider_partition"],
         )
 
+    def test_status_treats_target_boundary_block_as_model_worker_queue_wait(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            service, env, wrapper = self._write_service_files(tmp)
+            plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage_root,
+                selected_target_symbol=None,
+            )
+            foundation_stage_ids = [
+                stage.stage_id
+                for layer in plan.layers
+                if layer.layer in {1, 2}
+                for stage in layer.stages
+            ]
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2016-01", root=storage_root / "runtime"),
+                completed_stage_ids=foundation_stage_ids,
+                write=True,
+            )
+            (storage_root / "runtime").mkdir(parents=True, exist_ok=True)
+            (storage_root / "runtime" / "model_training_target_queue.json").write_text(
+                json.dumps({"contract_type": "manager_model_training_target_queue", "targets": [{"symbol": "AAPL"}]}) + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({
+                    "contract_type": "manager_scheduler_daemon_state",
+                    "start_month": "2016-01",
+                    "end_month": "2016-01",
+                    "last_decision_status": "backoff",
+                    "last_reason_code": "workflow_stage_blocked",
+                    "last_next_internal_stage": "month_ingest_worker_lanes",
+                }) + "\n",
+                encoding="utf-8",
+            )
+            decision_log.write_text(
+                json.dumps({
+                    "contract_type": "manager_scheduler_decision",
+                    "decision_status": "backoff",
+                    "reason_code": "workflow_stage_blocked",
+                    "reason": "no executable scheduler-owned workflow stage is currently available",
+                    "selected_work": "model_training_workflow",
+                    "next_internal_stage": "historical_training_work_loop",
+                    "provider_calls": 0,
+                    "dispatch_performed": False,
+                }) + "\n",
+                encoding="utf-8",
+            )
+
+            status = collect_historical_scheduler_status(
+                storage_root=storage_root,
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+        row = status.summary_row()
+        self.assertEqual(row["workflow_checkpoint"]["next_stage_id"], "layer_03_target_state_vector.data_acquisition")
+        self.assertIn("selected_target_symbol_required", row["workflow_checkpoint"]["next_stage_blockers"])
+        self.assertIsNone(row["blocked_reason"])
+        self.assertNotIn("resolve_current_workflow_blocked_stage", row["open_operational_items"])
+
     def test_status_ignores_stale_completed_previous_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
