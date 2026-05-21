@@ -438,6 +438,54 @@ def _stage_coverage_chart(stage_coverage: Mapping[str, Any] | None) -> dict[str,
     }
 
 
+def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
+    status = str(stage_status or "unknown").lower()
+    if status in {"succeeded", "not_applicable"}:
+        return {
+            "stage_id": stage_id,
+            "status": "complete",
+            "expected_count": 1,
+            "ready_count": 1,
+            "pending_count": 0,
+            "failed_count": 0,
+            "accepted_failed_count": 0,
+            "can_unlock_downstream": True,
+        }
+    if status == "failed":
+        return {
+            "stage_id": stage_id,
+            "status": "failed",
+            "expected_count": 1,
+            "ready_count": 0,
+            "pending_count": 0,
+            "failed_count": 1,
+            "accepted_failed_count": 0,
+            "can_unlock_downstream": False,
+        }
+    if status == "running":
+        return {
+            "stage_id": stage_id,
+            "status": "running",
+            "expected_count": 2,
+            "ready_count": 1,
+            "pending_count": 1,
+            "failed_count": 0,
+            "accepted_failed_count": 0,
+            "can_unlock_downstream": False,
+        }
+    progress_status = status if status in {"ready", "blocked", "pending"} else "unknown"
+    return {
+        "stage_id": stage_id,
+        "status": progress_status,
+        "expected_count": 1,
+        "ready_count": 0,
+        "pending_count": 1,
+        "failed_count": 0,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": False,
+    }
+
+
 def _public_stage_name(stage_id: object, stage_type: object) -> str:
     phase = str(stage_type or "").replace("_", " ").strip()
     if phase:
@@ -835,6 +883,15 @@ def _stable_task_uid(raw_stage: Mapping[str, Any], *, task_period: str | None) -
     return f"{task_period or 'unscheduled'}:{stage_id}"
 
 
+def _is_fold_worker_stage(raw_stage: Mapping[str, Any]) -> bool:
+    stage_type = str(raw_stage.get("stage_type") or "")
+    try:
+        layer = int(raw_stage.get("layer"))
+    except (TypeError, ValueError):
+        layer = 0
+    return stage_type in FOLD_MODEL_STAGE_TYPES or (stage_type in MONTHLY_TASK_STAGE_TYPES and layer not in MONTHLY_SUBSTRATE_LAYERS)
+
+
 def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
     """Expose fold-scoped model-worker stages to Tasks."""
 
@@ -842,12 +899,7 @@ def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
             continue
-        stage_type = str(raw_stage.get("stage_type") or "")
-        try:
-            layer = int(raw_stage.get("layer"))
-        except (TypeError, ValueError):
-            layer = 0
-        if stage_type in FOLD_MODEL_STAGE_TYPES or (stage_type in MONTHLY_TASK_STAGE_TYPES and layer not in MONTHLY_SUBSTRATE_LAYERS):
+        if _is_fold_worker_stage(raw_stage):
             visible.append(raw_stage)
     return visible
 
@@ -1054,7 +1106,7 @@ def _task_timeline(
             if not stage_id or str(raw_stage.get("status") or "") != "ready":
                 continue
             stage_type = str(raw_stage.get("stage_type") or "")
-            if stage_type not in {"model_generation", "model_evaluation", "promotion_review", "maintenance"}:
+            if stage_type not in FOLD_MODEL_STAGE_TYPES:
                 continue
             task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
             current_model_heads.add((task_month, stage_id))
@@ -1131,6 +1183,7 @@ def _task_timeline(
                 "detail": {
                     "blockers": [str(blocker) for blocker in blockers],
                     "receipt_refs": [str(ref) for ref in receipt_refs],
+                    "progress": _task_status_progress(stage_id, "failed" if task_state == "failed" else stage_status),
                     "safe_without_provider_calls": raw_stage.get("safe_without_provider_calls"),
                     "provider_calls_allowed": raw_stage.get("provider_calls_allowed"),
                     "model_activation_allowed": raw_stage.get("model_activation_allowed"),
@@ -1247,9 +1300,8 @@ def _evaluation_benchmark_timeline_tasks(
                 "description": "Candidate-policy replay promotion benchmark.",
             },
             "worker": worker_info,
+            "progress": progress or _task_status_progress(task_id, status),
         }
-        if progress is not None:
-            detail["progress"] = progress
         tasks.append(
             {
                 "sequence": sequence,
