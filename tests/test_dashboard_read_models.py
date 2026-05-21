@@ -182,6 +182,52 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("lineage_refs", payload)
         self.assertIn(payload["severity"], {"critical", "high", "medium", "low", "info"})
 
+    def test_layer_model_evaluation_label_is_local_not_promotion_benchmark_evaluation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            workflow_state = tmp / "storage" / "02_control_plane" / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            workflow_state.parent.mkdir(parents=True, exist_ok=True)
+            workflow_state.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_evaluation",
+                                "stage_type": "model_evaluation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
+                                "dataset_unit": {
+                                    "target_symbol": "AAPL",
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T12:00:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector.model_evaluation")
+        self.assertEqual(task["task_label"], "Local Layer Evaluation")
+
 
     def test_non_owner_operational_items_are_ready_not_action_required(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -604,10 +604,13 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
 
 
 def _public_stage_name(stage_id: object, stage_type: object) -> str:
+    stage_id_text = str(stage_id or "")
+    if stage_id_text.startswith("layer_") and stage_type == "model_evaluation":
+        return "Local Layer Evaluation"
     phase = str(stage_type or "").replace("_", " ").strip()
     if phase:
         return phase.title()
-    return str(stage_id or "unknown task").replace("_", " ").replace(".", " / ").title()
+    return stage_id_text.replace("_", " ").replace(".", " / ").title() or "Unknown Task"
 
 
 def _storage_root_from_checkpoint_path(path: object) -> Path:
