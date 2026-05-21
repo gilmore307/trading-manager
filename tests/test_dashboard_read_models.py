@@ -1370,6 +1370,254 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         blocked_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-07..2016-12")
         self.assertEqual(blocked_task["task_state"], "future")
 
+    def test_task_timeline_uses_latest_model_worker_fold_for_current_task(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.model_evaluation",
+                                "stage_type": "model_evaluation",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "ready",
+                                "dataset_unit": {
+                                    "target_symbol": "AAPL",
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_fold_state_aaoi_2016-07_2016-12.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-07",
+                        "end_month": "2016-12",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
+                                "dataset_unit": {
+                                    "target_symbol": "AAOI",
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_fold_state_aapl_2016-07_2016-12.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-07",
+                        "end_month": "2016-12",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "target_symbol": "AAPL",
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                },
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
+                                "dataset_unit": {
+                                    "target_symbol": "AAPL",
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                },
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            decision_log.parent.mkdir(parents=True, exist_ok=True)
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "executed",
+                        "selected_work": "layer_03_target_state_vector.data_acquisition",
+                        "execution_summary": {
+                            "workflow_plan": {
+                                "start_month": "2016-07",
+                                "end_month": "2016-12",
+                                "selected_target_symbol": "AAPL",
+                            },
+                            "stage_execution": {
+                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "status": "succeeded",
+                                "return_code": 0,
+                            }
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T11:34:00Z")
+
+        current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
+        self.assertIn(
+            ("2016-07..2016-12", "layer_03_target_state_vector.feature_generation", "AAPL"),
+            [(task["month"], task["task_id"], task["target_symbol"]) for task in current_tasks],
+        )
+        self.assertNotIn(
+            ("2016-01..2016-06", "layer_01_market_regime.model_evaluation"),
+            [(task["month"], task["task_id"]) for task in current_tasks],
+        )
+
+    def test_task_timeline_does_not_fallback_to_older_fold_when_latest_fold_has_no_ready_head(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_09_option_expression.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 9,
+                                "layer_key": "layer_09_option_expression",
+                                "status": "ready",
+                                "dataset_unit": {
+                                    "target_symbol": "AAPL",
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_fold_state_aapl_2016-07_2016-12.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-07",
+                        "end_month": "2016-12",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "blocked",
+                                "last_reason": "stage command is currently running outside checkpoint state",
+                                "dataset_unit": {
+                                    "target_symbol": "AAPL",
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            decision_log.parent.mkdir(parents=True, exist_ok=True)
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "executed",
+                        "selected_work": "layer_03_target_state_vector.feature_generation",
+                        "execution_summary": {
+                            "workflow_plan": {
+                                "start_month": "2016-07",
+                                "end_month": "2016-12",
+                                "selected_target_symbol": "AAPL",
+                            },
+                            "stage_execution": {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "status": "succeeded",
+                                "return_code": 0,
+                            },
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T11:45:00Z")
+
+        current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
+        self.assertNotIn(
+            ("2016-01..2016-06", "layer_09_option_expression.feature_generation"),
+            [(task["month"], task["task_id"]) for task in current_tasks],
+        )
+
     def test_cli_builds_payload(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

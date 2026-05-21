@@ -642,6 +642,24 @@ def _selected_target_symbol_from_service_env(status: HistoricalSchedulerStatus) 
     return None
 
 
+def _selected_target_symbol_from_latest_decision(status: HistoricalSchedulerStatus) -> str | None:
+    latest_decision = status.latest_decision or {}
+    if not isinstance(latest_decision, Mapping):
+        return None
+    symbol = str(latest_decision.get("selected_target_symbol") or "").strip().upper()
+    if symbol:
+        return symbol
+    execution_summary = latest_decision.get("execution_summary")
+    workflow_plan = execution_summary.get("workflow_plan") if isinstance(execution_summary, Mapping) else None
+    if isinstance(workflow_plan, Mapping):
+        symbol = str(workflow_plan.get("selected_target_symbol") or "").strip().upper()
+    return symbol or None
+
+
+def _selected_target_symbol(status: HistoricalSchedulerStatus) -> str | None:
+    return _selected_target_symbol_from_latest_decision(status) or _selected_target_symbol_from_service_env(status)
+
+
 def _planned_stage_rows(status: HistoricalSchedulerStatus, *, month: str | None = None) -> list[dict[str, Any]]:
     selected_month = month or status.current_month
     if not selected_month:
@@ -651,7 +669,7 @@ def _planned_stage_rows(status: HistoricalSchedulerStatus, *, month: str | None 
             start_month=selected_month,
             end_month=selected_month,
             storage_root=_storage_root_from_checkpoint_path(status.workflow_checkpoint.path),
-            selected_target_symbol=_selected_target_symbol_from_service_env(status),
+            selected_target_symbol=_selected_target_symbol(status),
         )
     except Exception:
         return []
@@ -1023,6 +1041,50 @@ def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
     return visible
 
 
+def _target_symbol_from_fold_stages(raw_stages: list[Any]) -> str | None:
+    for raw_stage in raw_stages:
+        if not isinstance(raw_stage, Mapping):
+            continue
+        dataset_unit = raw_stage.get("dataset_unit")
+        if not isinstance(dataset_unit, Mapping):
+            continue
+        symbol = str(dataset_unit.get("target_symbol") or "").strip().upper()
+        if symbol:
+            return symbol
+    return None
+
+
+def _active_model_worker_fold_key(status: HistoricalSchedulerStatus) -> str | None:
+    latest_decision = status.latest_decision or {}
+    if not isinstance(latest_decision, Mapping):
+        return None
+    selected_work = str(latest_decision.get("selected_work") or "")
+    if selected_work:
+        try:
+            layer = int(selected_work.split("_", 2)[1])
+        except (IndexError, ValueError):
+            layer = 0
+        if layer in MONTHLY_SUBSTRATE_LAYERS:
+            return None
+    fold_months = latest_decision.get("fold_months")
+    if isinstance(fold_months, list) and len(fold_months) >= MONTHS_PER_MODEL_FOLD:
+        start = str(fold_months[0] or "")
+        end = str(fold_months[MONTHS_PER_MODEL_FOLD - 1] or "")
+        if start and end:
+            return f"{start}..{end}"
+    start_month = str(latest_decision.get("start_month") or "")
+    end_month = str(latest_decision.get("end_month") or "")
+    if not start_month or not end_month:
+        execution_summary = latest_decision.get("execution_summary")
+        workflow_plan = execution_summary.get("workflow_plan") if isinstance(execution_summary, Mapping) else None
+        if isinstance(workflow_plan, Mapping):
+            start_month = str(workflow_plan.get("start_month") or "")
+            end_month = str(workflow_plan.get("end_month") or "")
+    if start_month and end_month and start_month != end_month:
+        return f"{start_month}..{end_month}"
+    return None
+
+
 def _selected_model_worker_fold_stage_set(
     status: HistoricalSchedulerStatus,
     *,
@@ -1041,7 +1103,7 @@ def _selected_model_worker_fold_stage_set(
             start_month=selection.start_month,
             end_month=selection.end_month,
             storage_root=storage_root,
-            selected_target_symbol=_selected_target_symbol_from_service_env(status),
+            selected_target_symbol=_selected_target_symbol(status),
             foundation_catch_up_only=False,
         )
         foundation_stage_ids = [
@@ -1057,7 +1119,7 @@ def _selected_model_worker_fold_stage_set(
             storage_root=storage_root,
             state_path=Path(selection.state_path) if selection.state_path else None,
             completed_stage_ids=foundation_stage_ids,
-            selected_target_symbol=_selected_target_symbol_from_service_env(status),
+            selected_target_symbol=_selected_target_symbol(status),
             foundation_catch_up_only=False,
             write=False,
         )
@@ -1138,6 +1200,7 @@ def _task_timeline(
             month_stage_sets.append((month_key, raw_stages, True))
             included_months.add(month_key)
     runtime_root = storage_root / "runtime"
+    selected_target_symbol = _selected_target_symbol(status)
     if runtime_root.exists():
         for fold_path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
             try:
@@ -1149,6 +1212,9 @@ def _task_timeline(
                 continue
             raw_stages = _presentable_fold_stages(raw_stages)
             if not raw_stages:
+                continue
+            fold_target_symbol = _target_symbol_from_fold_stages(raw_stages)
+            if selected_target_symbol and fold_target_symbol and fold_target_symbol != selected_target_symbol:
                 continue
             fold_start = str(fold_payload.get("start_month") or "")
             fold_end = str(fold_payload.get("end_month") or "")
@@ -1187,6 +1253,7 @@ def _task_timeline(
         latest_failed_month = str(status.latest_decision.get("start_month") or "") or None
     current_lane_heads: set[tuple[str | None, str]] = set()
     current_model_heads: set[tuple[str | None, str]] = set()
+    active_model_fold_key = _active_model_worker_fold_key(status)
     seen_ingest_workers: set[str] = set()
     for timeline_month, raw_stages, _is_active_month in month_stage_sets:
         for raw_stage in raw_stages:
@@ -1215,7 +1282,12 @@ def _task_timeline(
                 continue
             current_lane_heads.add((task_month, stage_id))
             seen_ingest_workers.add(worker_id)
-    for timeline_month, raw_stages, _is_active_month in month_stage_sets:
+    model_stage_sets = [
+        stage_set for stage_set in month_stage_sets if not active_model_fold_key or stage_set[0] == active_model_fold_key
+    ]
+    if active_model_fold_key and not model_stage_sets:
+        model_stage_sets = month_stage_sets
+    for timeline_month, raw_stages, _is_active_month in model_stage_sets:
         if current_model_heads:
             break
         for raw_stage in raw_stages:
@@ -1224,8 +1296,10 @@ def _task_timeline(
             stage_id = str(raw_stage.get("stage_id") or "")
             if not stage_id or str(raw_stage.get("status") or "") != "ready":
                 continue
-            stage_type = str(raw_stage.get("stage_type") or "")
-            if stage_type not in FOLD_MODEL_STAGE_TYPES:
+            if active_model_fold_key:
+                if not _is_fold_worker_stage(raw_stage):
+                    continue
+            elif str(raw_stage.get("stage_type") or "") not in FOLD_MODEL_STAGE_TYPES:
                 continue
             task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
             current_model_heads.add((task_month, stage_id))
@@ -1249,7 +1323,10 @@ def _task_timeline(
                 is_current = bool(
                     is_active_month and stage_id and stage_id == status.current_stage and stage_status == "ready" and not is_terminal
                 )
-            if not current_lane_heads and is_active_month and not first_open_seen and stage_status == "ready" and not is_terminal:
+            active_fallback_allowed = is_active_month and (
+                not active_model_fold_key or timeline_month == active_model_fold_key or _is_month_key(timeline_month)
+            )
+            if not current_lane_heads and active_fallback_allowed and not first_open_seen and stage_status == "ready" and not is_terminal:
                 is_current = True
                 first_open_seen = True
             if latest_failed_stage and stage_id == latest_failed_stage and (
