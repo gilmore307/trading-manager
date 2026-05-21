@@ -38,8 +38,10 @@ def _agent_message(request: Mapping[str, Any]) -> str:
     return "\n".join(
         [
             "Handle this server error request as an internal project repair task.",
+            "Use the workspace server-error-repair skill if available.",
             "Use the supplied safety boundaries. Diagnose the root cause, make safe repository/config fixes when appropriate, run verification, and report what changed.",
-            "Do not deliver a user-facing chat reply from this run; return the repair result to the caller.",
+            "Autonomous repair is allowed for bounded internal repository bugs. Provider calls, broker/account mutation, destructive storage changes, model-output writes, runtime stage writes, package/system changes, and live service restarts require a separate gate.",
+            "Do not deliver a user-facing chat reply from this run; return strict JSON matching the server-error-repair final output contract to the caller.",
             "",
             str(request.get("agent_prompt") or json.dumps(dict(request), indent=2, sort_keys=True)),
         ]

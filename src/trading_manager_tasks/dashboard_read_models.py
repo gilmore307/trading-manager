@@ -159,11 +159,15 @@ def _agent_repair_status(diagnosis: Mapping[str, Any], agent_payload: Mapping[st
     verification = agent_payload.get("verification")
     verification_exit_code = verification.get("exit_code") if isinstance(verification, Mapping) else None
     if (
-        agent_status in {"repaired", "resolved", "fixed", "repair_verified", "repaired_verified"}
+        agent_status in {"repaired", "resolved", "fixed", "repair_verified", "repaired_verified", "repaired_awaiting_retry"}
         or nested_repair_status == "repaired"
         or verification_exit_code == 0
     ):
         return "repaired"
+    if agent_status == "superseded" or nested_repair_status == "superseded":
+        return "superseded"
+    if agent_status == "blocked_gate":
+        return "blocked"
     if nested_repair_status in {"not_supported", "blocked", "failed"}:
         return nested_repair_status
     if agent_status in {"no_action_needed", "not_needed", "not_reproducible"}:
@@ -197,6 +201,8 @@ def _agent_payload_text(value: object, fallback: object = None) -> str | None:
 
 
 def _agent_error_handling_status(catalog_row: Mapping[str, Any], repair_status: str) -> str:
+    if repair_status == "superseded":
+        return "closed"
     if repair_status == "repaired":
         scope = str(catalog_row.get("error_scope") or "")
         component = str(catalog_row.get("source_component") or "")

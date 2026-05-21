@@ -280,7 +280,10 @@ class AgentErrorHandlerTests(unittest.TestCase):
         self.assertEqual(cmd[:4], ["openclaw", "agent", "--agent", "trader"])
         self.assertIn("--json", cmd)
         self.assertIn("--thinking", cmd)
-        self.assertIn("server_error_agent_request", cmd[cmd.index("--message") + 1])
+        message = cmd[cmd.index("--message") + 1]
+        self.assertIn("server-error-repair", message)
+        self.assertIn("server_error_agent_request", message)
+        self.assertIn("return strict JSON", message)
 
 
 if __name__ == "__main__":
