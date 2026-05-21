@@ -11,10 +11,11 @@ This file owns shared naming rules for model-layer source, feature, and model su
 | 3 | TargetStateVectorModel | `target_state_vector_model` | `model_03_target_state_vector` |
 | 4 | EventFailureRiskModel | `event_failure_risk_model` | `model_04_event_failure_risk` |
 | 5 | AlphaConfidenceModel | `alpha_confidence_model` | `model_05_alpha_confidence` |
-| 6 | PositionProjectionModel | `position_projection_model` | `model_07_position_projection` |
-| 7 | UnderlyingActionModel | `underlying_action_model` | `model_08_underlying_action` |
-| 8 | TradingGuidanceModel / OptionExpressionModel | `option_expression_model` | `model_09_option_expression` |
-| 9 | EventRiskGovernor / EventIntelligenceOverlay | `event_risk_governor` | `model_10_event_risk_governor` |
+| 6 | DynamicRiskPolicyModel | `dynamic_risk_policy_model` | `model_06_dynamic_risk_policy` |
+| 7 | PositionProjectionModel | `position_projection_model` | `model_07_position_projection` |
+| 8 | UnderlyingActionModel | `underlying_action_model` | `model_08_underlying_action` |
+| 9 | TradingGuidanceModel / OptionExpressionModel | `option_expression_model` | `model_09_option_expression` |
+| 10 | EventRiskGovernor / EventIntelligenceOverlay | `event_risk_governor` | `model_10_event_risk_governor` |
 
 ## Stable Id Rule
 
@@ -58,7 +59,7 @@ Source-family numbers are not automatic proof of model-layer ownership. The regi
 Layer-owned model score tokens use compact numeric prefixes only when the token is part of a reviewed layer contract:
 
 ```text
-1_* 2_* 3_* 4_* 5_* 6_* 7_* 8_* 9_*
+1_* 2_* 3_* 4_* 5_* 6_* 7_* 8_* 9_* 10_*
 ```
 
 Generic ids, refs, timestamps, run metadata, receipt metadata, and registry fields stay generic.
@@ -72,10 +73,11 @@ Core scalar score tokens that are shared across repositories belong in `state_ve
 - Layer 3 builds target context; it does not emit alpha, exposure, option choice, or action.
 - Layer 4 consumes only accepted event/strategy-failure evidence; it does not discover raw event families or trade.
 - Layer 5 estimates adjusted alpha confidence; it does not size positions or choose instruments.
-- Layer 6 projects abstract holding state; it does not emit broker orders.
+- Layer 6 produces dynamic risk policy state; it does not size positions, choose instruments, or emit broker orders.
+- Layer 7 projects abstract holding state; it does not emit broker orders.
 - Layer 8 produces offline direct-underlying thesis; it does not route orders or select option contracts.
-- Layer 8 produces optional offline guidance/option-expression plans; it does not execute or mutate broker/account state.
-- Layer 9 produces event-risk governance/intervention evidence from the Layer 8 direct-underlying thesis, with Layer 8 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
+- Layer 9 produces optional offline guidance/option-expression plans; it does not execute or mutate broker/account state.
+- Layer 10 produces event-risk governance/intervention evidence from the Layer 8 direct-underlying thesis, with Layer 9 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
 
 ## Registry Review Checklist
 

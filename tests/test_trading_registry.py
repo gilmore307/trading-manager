@@ -54,6 +54,31 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
+    def test_local_registry_paths_exist(self):
+        repo_root = Path.cwd()
+        missing = []
+
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            for row in csv.DictReader(csv_file):
+                for raw_path in filter(None, (part.strip() for part in row["path"].split(";"))):
+                    path_without_anchor = raw_path.split("#", 1)[0]
+                    if not path_without_anchor:
+                        continue
+
+                    if path_without_anchor.startswith("/root/projects/trading-manager/"):
+                        candidate = Path(path_without_anchor)
+                    elif path_without_anchor.startswith("trading-manager/"):
+                        candidate = repo_root / path_without_anchor.removeprefix("trading-manager/")
+                    elif path_without_anchor.startswith(("scripts/", "src/", "tests/", "docs/", "deploy/", "schemas/")):
+                        candidate = repo_root / path_without_anchor
+                    else:
+                        continue
+
+                    if not candidate.exists():
+                        missing.append(f"{row['key']} -> {raw_path}")
+
+        self.assertEqual([], missing)
+
     def test_component_repository_rows_use_trading_data_and_manager_boundaries(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
