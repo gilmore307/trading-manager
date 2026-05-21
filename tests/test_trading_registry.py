@@ -567,8 +567,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_8_agent_reviewed_deferred_no_production_eval_substrate", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertIn("layer_6:dynamic_risk_policy_model:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
         self.assertIn("layer_10:event_risk_governor:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
-        self.assertEqual(rows["REVIEW_LAYERS_03_08_PROMOTION_ACCEPTANCE"]["kind"], "script")
-        self.assertIn("review_layers_03_08_promotion_acceptance.py", rows["REVIEW_LAYERS_03_08_PROMOTION_ACCEPTANCE"]["path"])
+        self.assertEqual(rows["REVIEW_LAYERS_03_10_PROMOTION_ACCEPTANCE"]["kind"], "script")
+        self.assertIn("review_layers_03_10_promotion_acceptance.py", rows["REVIEW_LAYERS_03_10_PROMOTION_ACCEPTANCE"]["path"])
         self.assertEqual(rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["kind"], "script")
         self.assertIn("review_target_state_vector_production_substrate.py", rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["path"])
         expected_layer_script_paths = {
