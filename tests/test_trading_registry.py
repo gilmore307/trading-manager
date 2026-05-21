@@ -435,8 +435,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("price_action", rows["EVENT_CATEGORY_TYPE_VALUES"]["payload"])
         self.assertIn("false_breakout", rows["PRICE_ACTION_EVENT_TYPES"]["payload"])
         self.assertIn("layer_10_event_risk_governor_event_not_new_model_layer", rows["PRICE_ACTION_EVENT_LAYER_POLICY"]["payload"])
-        self.assertIn("9_event_presence_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
-        self.assertIn("9_event_target_relevance_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("10_event_presence_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("10_event_target_relevance_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertEqual(rows["ALPHA_CONFIDENCE_MODEL"]["payload"], "alpha_confidence_model")
         self.assertEqual(rows["MODEL_05_ALPHA_CONFIDENCE"]["payload"], "model_05_alpha_confidence")
         self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR"]["payload"], "alpha_confidence_vector")
@@ -493,7 +493,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_09_OPTION_EXPRESSION"]["payload"], "model_09_option_expression")
         self.assertEqual(rows["OPTION_EXPRESSION_PLAN"]["payload"], "option_expression_plan")
         self.assertEqual(rows["EXPRESSION_VECTOR"]["payload"], "expression_vector")
-        self.assertIn("layer_08_after_underlying_action", rows["OPTION_EXPRESSION_MODEL_LAYER_POLICY"]["payload"])
+        self.assertIn("layer_09_after_underlying_action", rows["OPTION_EXPRESSION_MODEL_LAYER_POLICY"]["payload"])
         self.assertIn("9_option_expression_eligibility_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("9_option_theta_risk_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("9_resolved_expression_type", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
@@ -616,11 +616,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("trading_storage_protected_set_physical_execution", rows["STORAGE_LIFECYCLE_MANAGER_CONTROL_POLICY"]["payload"])
         self.assertIn("promotion_classifies_artifacts", rows["PROMOTION_STORAGE_LIFECYCLE_BOUNDARY_POLICY"]["payload"])
         self.assertIn("manager_schedules_lifecycle", rows["PROMOTION_STORAGE_LIFECYCLE_BOUNDARY_POLICY"]["payload"])
-        self.assertIn("near_to_far_listed_expirations", rows["LAYER_08_OPTION_BUCKET_EXPIRATION_POLICY"]["payload"])
-        self.assertIn("three_listed_strike_levels_below", rows["LAYER_08_OPTION_BUCKET_STRIKE_POLICY"]["payload"])
-        self.assertIn("no_acquisition_time_prefilter_for_model_construction", rows["LAYER_08_OPTION_BUCKET_PREFILTER_POLICY"]["payload"])
-        self.assertIn("single_leg_only", rows["LAYER_08_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
-        self.assertIn("underlying_only_expression_non_option_fallback", rows["LAYER_08_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
+        self.assertIn("near_to_far_listed_expirations", rows["LAYER_09_OPTION_BUCKET_EXPIRATION_POLICY"]["payload"])
+        self.assertIn("three_listed_strike_levels_below", rows["LAYER_09_OPTION_BUCKET_STRIKE_POLICY"]["payload"])
+        self.assertIn("no_acquisition_time_prefilter_for_model_construction", rows["LAYER_09_OPTION_BUCKET_PREFILTER_POLICY"]["payload"])
+        self.assertIn("single_leg_only", rows["LAYER_09_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
+        self.assertIn("underlying_only_expression_non_option_fallback", rows["LAYER_09_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
         self.assertNotIn("live_" + "calls_disabled_by_default", rows["DATA_PRODUCTION_HARDENING_POLICY"]["payload"])
         self.assertEqual(rows["MANAGER_CONTROLLED_INFORMATION_PASS"]["payload"], "manager_controlled_information_pass")
         self.assertIn("plan_controlled_information_pass.py", rows["MANAGER_CONTROLLED_INFORMATION_PASS_PLAN"]["path"])
@@ -1507,27 +1507,27 @@ class RegistryHelperTests(unittest.TestCase):
             "TARGET_HANDOFF_BIAS": "3_target_handoff_bias",
             "TARGET_HANDOFF_RANK": "3_target_handoff_rank",
             "TARGET_SELECTION_REASON_CODES": "3_target_selection_reason_codes",
-            "EVENT_PRESENCE_SCORE_BY_HORIZON": "9_event_presence_score_<horizon>",
-            "EVENT_TIMING_PROXIMITY_SCORE_BY_HORIZON": "9_event_timing_proximity_score_<horizon>",
-            "EVENT_INTENSITY_SCORE_BY_HORIZON": "9_event_intensity_score_<horizon>",
-            "EVENT_DIRECTION_BIAS_SCORE_BY_HORIZON": "9_event_direction_bias_score_<horizon>",
-            "EVENT_CONTEXT_ALIGNMENT_SCORE_BY_HORIZON": "9_event_context_alignment_score_<horizon>",
-            "EVENT_UNCERTAINTY_SCORE_BY_HORIZON": "9_event_uncertainty_score_<horizon>",
-            "EVENT_GAP_RISK_SCORE_BY_HORIZON": "9_event_gap_risk_score_<horizon>",
-            "EVENT_REVERSAL_RISK_SCORE_BY_HORIZON": "9_event_reversal_risk_score_<horizon>",
-            "EVENT_LIQUIDITY_DISRUPTION_SCORE_BY_HORIZON": "9_event_liquidity_disruption_score_<horizon>",
-            "EVENT_CONTAGION_RISK_SCORE_BY_HORIZON": "9_event_contagion_risk_score_<horizon>",
-            "EVENT_CONTEXT_QUALITY_SCORE_BY_HORIZON": "9_event_context_quality_score_<horizon>",
-            "EVENT_MARKET_IMPACT_SCORE_BY_HORIZON": "9_event_market_impact_score_<horizon>",
-            "EVENT_SECTOR_IMPACT_SCORE_BY_HORIZON": "9_event_sector_impact_score_<horizon>",
-            "EVENT_INDUSTRY_IMPACT_SCORE_BY_HORIZON": "9_event_industry_impact_score_<horizon>",
-            "EVENT_THEME_FACTOR_IMPACT_SCORE_BY_HORIZON": "9_event_theme_factor_impact_score_<horizon>",
-            "EVENT_PEER_GROUP_IMPACT_SCORE_BY_HORIZON": "9_event_peer_group_impact_score_<horizon>",
-            "EVENT_SYMBOL_IMPACT_SCORE_BY_HORIZON": "9_event_symbol_impact_score_<horizon>",
-            "EVENT_MICROSTRUCTURE_IMPACT_SCORE_BY_HORIZON": "9_event_microstructure_impact_score_<horizon>",
-            "EVENT_SCOPE_CONFIDENCE_SCORE_BY_HORIZON": "9_event_scope_confidence_score_<horizon>",
-            "EVENT_SCOPE_ESCALATION_RISK_SCORE_BY_HORIZON": "9_event_scope_escalation_risk_score_<horizon>",
-            "EVENT_TARGET_RELEVANCE_SCORE_BY_HORIZON": "9_event_target_relevance_score_<horizon>",
+            "EVENT_PRESENCE_SCORE_BY_HORIZON": "10_event_presence_score_<horizon>",
+            "EVENT_TIMING_PROXIMITY_SCORE_BY_HORIZON": "10_event_timing_proximity_score_<horizon>",
+            "EVENT_INTENSITY_SCORE_BY_HORIZON": "10_event_intensity_score_<horizon>",
+            "EVENT_DIRECTION_BIAS_SCORE_BY_HORIZON": "10_event_direction_bias_score_<horizon>",
+            "EVENT_CONTEXT_ALIGNMENT_SCORE_BY_HORIZON": "10_event_context_alignment_score_<horizon>",
+            "EVENT_UNCERTAINTY_SCORE_BY_HORIZON": "10_event_uncertainty_score_<horizon>",
+            "EVENT_GAP_RISK_SCORE_BY_HORIZON": "10_event_gap_risk_score_<horizon>",
+            "EVENT_REVERSAL_RISK_SCORE_BY_HORIZON": "10_event_reversal_risk_score_<horizon>",
+            "EVENT_LIQUIDITY_DISRUPTION_SCORE_BY_HORIZON": "10_event_liquidity_disruption_score_<horizon>",
+            "EVENT_CONTAGION_RISK_SCORE_BY_HORIZON": "10_event_contagion_risk_score_<horizon>",
+            "EVENT_CONTEXT_QUALITY_SCORE_BY_HORIZON": "10_event_context_quality_score_<horizon>",
+            "EVENT_MARKET_IMPACT_SCORE_BY_HORIZON": "10_event_market_impact_score_<horizon>",
+            "EVENT_SECTOR_IMPACT_SCORE_BY_HORIZON": "10_event_sector_impact_score_<horizon>",
+            "EVENT_INDUSTRY_IMPACT_SCORE_BY_HORIZON": "10_event_industry_impact_score_<horizon>",
+            "EVENT_THEME_FACTOR_IMPACT_SCORE_BY_HORIZON": "10_event_theme_factor_impact_score_<horizon>",
+            "EVENT_PEER_GROUP_IMPACT_SCORE_BY_HORIZON": "10_event_peer_group_impact_score_<horizon>",
+            "EVENT_SYMBOL_IMPACT_SCORE_BY_HORIZON": "10_event_symbol_impact_score_<horizon>",
+            "EVENT_MICROSTRUCTURE_IMPACT_SCORE_BY_HORIZON": "10_event_microstructure_impact_score_<horizon>",
+            "EVENT_SCOPE_CONFIDENCE_SCORE_BY_HORIZON": "10_event_scope_confidence_score_<horizon>",
+            "EVENT_SCOPE_ESCALATION_RISK_SCORE_BY_HORIZON": "10_event_scope_escalation_risk_score_<horizon>",
+            "EVENT_TARGET_RELEVANCE_SCORE_BY_HORIZON": "10_event_target_relevance_score_<horizon>",
             "ALPHA_DIRECTION_SCORE_BY_HORIZON": "5_alpha_direction_score_<horizon>",
             "ALPHA_STRENGTH_SCORE_BY_HORIZON": "5_alpha_strength_score_<horizon>",
             "ALPHA_EXPECTED_RETURN_SCORE_BY_HORIZON": "5_expected_return_score_<horizon>",
