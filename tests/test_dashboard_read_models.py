@@ -780,11 +780,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
-        layer_three_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["layer"] == 3)
-        self.assertEqual(layer_three_task["dataset_unit_kind"], "target_symbol_six_month")
-        self.assertEqual(layer_three_task["target_symbol"], "AAPL")
-        self.assertTrue(layer_three_task["target_required"])
-        self.assertEqual(layer_three_task["detail"]["dataset_unit"]["target_symbol"], "AAPL")
+        self.assertFalse(any(task["layer"] == 3 for task in payload["chart_payload"]["task_timeline"]))
 
     def test_task_timeline_marks_three_month_ingest_lane_heads_current(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -867,7 +863,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertTrue(all(task["task_id"] == "layer_02_sector_context.data_acquisition" for task in current_tasks))
 
-    def test_task_timeline_marks_later_layer_month_substrate_lane_heads_current(self):
+    def test_task_timeline_advances_after_completed_foundation_months(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -948,12 +944,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-14T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertEqual([task["month"] for task in current_tasks], ["2020-09", "2020-10", "2020-11"])
-        self.assertTrue(all(task["task_id"] == "layer_03_target_state_vector.data_acquisition" for task in current_tasks))
-        self.assertEqual(
-            [task["worker_id"] for task in current_tasks],
-            ["month_ingest_worker_1", "month_ingest_worker_2", "month_ingest_worker_3"],
-        )
+        self.assertEqual([task["month"] for task in current_tasks], ["2021-01"])
+        self.assertTrue(all(task["task_id"] == "layer_01_market_regime.data_acquisition" for task in current_tasks))
+        self.assertEqual([task["worker_id"] for task in current_tasks], ["month_ingest_worker_1"])
 
     def test_task_timeline_marks_ready_model_fold_current_not_blocked_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

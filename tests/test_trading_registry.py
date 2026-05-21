@@ -285,7 +285,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EVENT_RISK_INTERVENTION"]["payload"], "event_risk_intervention")
         self.assertIn("flatten_candidate", rows["EVENT_RISK_INTERVENTION_STATUS_VALUES"]["payload"])
         self.assertIn("broker order", rows["EVENT_RISK_INTERVENTION"]["note"])
-        self.assertIn("current_physical_surfaces_aligned_with_nine_layer_order", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
+        self.assertIn("current_physical_surfaces_aligned_with_ten_layer_order", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
 
     def test_active_model_control_plane_registry_rows_use_stable_model_ids(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -1996,7 +1996,20 @@ class RegistryHelperTests(unittest.TestCase):
             rows["EXECUTION_REALTIME_INPUT_COVERAGE_MATRIX"]["payload"],
             "execution_realtime_input_coverage",
         )
-        self.assertIn("model_09_option_expression", rows["EXECUTION_REALTIME_INPUT_COVERAGE_MATRIX"]["applies_to"])
+        realtime_coverage = rows["EXECUTION_REALTIME_INPUT_COVERAGE_MATRIX"]["applies_to"]
+        for model_id in (
+            "model_01_market_regime",
+            "model_02_sector_context",
+            "model_03_target_state_vector",
+            "model_04_event_failure_risk",
+            "model_05_alpha_confidence",
+            "model_06_dynamic_risk_policy",
+            "model_07_position_projection",
+            "model_08_underlying_action",
+            "model_09_option_expression",
+            "model_10_event_risk_governor",
+        ):
+            self.assertIn(model_id, realtime_coverage)
         self.assertEqual(rows["REALTIME_CAPTURE_CONTRACT"]["payload"], "realtime_capture_contract")
         self.assertIn("forward_holdout", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
         self.assertIn("ready_signal", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])

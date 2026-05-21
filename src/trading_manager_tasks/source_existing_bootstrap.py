@@ -197,9 +197,9 @@ def _source_stage_coverage(
 def _event_source_coverage(*, month: str, row_count: int) -> EventSourceCoverage:
     status = "ready" if row_count > 0 else "missing"
     reason = (
-        f"existing source_10_event_risk_governor rows found for {month}; Layer 9 overlay lane can reuse source evidence"
+        f"existing source_10_event_risk_governor rows found for {month}; Layer 10 event-risk lane can reuse source evidence"
         if row_count > 0
-        else f"no source_10_event_risk_governor rows found for {month}; Layer 9 overlay lane has no existing source evidence"
+        else f"no source_10_event_risk_governor rows found for {month}; Layer 10 event-risk lane has no existing source evidence"
     )
     return EventSourceCoverage(
         contract_type="manager_source_existing_event_coverage",
@@ -216,7 +216,7 @@ def build_source_coverages_from_counts(
     months: Sequence[str],
     source_01_counts: Mapping[str, Mapping[str, int]],
     source_03_counts: Mapping[str, Mapping[str, int]],
-    source_09_counts: Mapping[str, int],
+    source_10_counts: Mapping[str, int],
     selected_target_symbol: str | None,
     source_01_first_seen_month_by_symbol: Mapping[str, str] | None = None,
 ) -> tuple[tuple[SourceStageCoverage, ...], tuple[EventSourceCoverage, ...], tuple[str, ...]]:
@@ -263,7 +263,7 @@ def build_source_coverages_from_counts(
             )
         else:
             warnings.append("selected_target_symbol missing; source_03_target_state bootstrap was skipped")
-        event_coverages.append(_event_source_coverage(month=month, row_count=int(source_09_counts.get(month, 0))))
+        event_coverages.append(_event_source_coverage(month=month, row_count=int(source_10_counts.get(month, 0))))
     return tuple(stage_coverages), tuple(event_coverages), tuple(dict.fromkeys(warnings))
 
 
@@ -284,7 +284,7 @@ def _fetch_source_counts_from_database(
     end_date = _month_end_date(end_month)
     source_01: dict[str, dict[str, int]] = {}
     source_03: dict[str, dict[str, int]] = {}
-    source_09: dict[str, int] = {}
+    source_10: dict[str, int] = {}
     source_01_first_seen: dict[str, str] = {}
     target = selected_target_symbol.strip().upper() if selected_target_symbol else None
 
@@ -361,10 +361,10 @@ def _fetch_source_counts_from_database(
                     [SOURCE_TIMEZONE, start_date, SOURCE_TIMEZONE, end_date, SOURCE_TIMEZONE],
                 )
                 for row in cursor.fetchall():
-                    source_09[str(row["month"])] = int(row["row_count"])
+                    source_10[str(row["month"])] = int(row["row_count"])
             else:
                 warnings.append("missing table trading_data.source_10_event_risk_governor")
-    return source_01, source_03, source_09, source_01_first_seen, tuple(warnings)
+    return source_01, source_03, source_10, source_01_first_seen, tuple(warnings)
 
 
 def _coverage_report_path(*, report_root: Path, month: str, stage_id: str) -> Path:
@@ -423,7 +423,7 @@ def run_source_existing_bootstrap(
     write: bool = False,
     source_01_counts: Mapping[str, Mapping[str, int]] | None = None,
     source_03_counts: Mapping[str, Mapping[str, int]] | None = None,
-    source_09_counts: Mapping[str, int] | None = None,
+    source_10_counts: Mapping[str, int] | None = None,
     source_01_first_seen_month_by_symbol: Mapping[str, str] | None = None,
 ) -> SourceExistingBootstrapSummary:
     """Inspect existing source data and optionally seed workflow states.
@@ -435,10 +435,10 @@ def run_source_existing_bootstrap(
     started = utc_now_iso()
     months = iter_months(start_month, end_month)
     warnings: list[str] = []
-    if source_01_counts is None or source_03_counts is None or source_09_counts is None:
+    if source_01_counts is None or source_03_counts is None or source_10_counts is None:
         try:
             db_url = resolve_database_url(database_url)
-            fetched_01, fetched_03, fetched_09, fetched_01_first_seen, fetch_warnings = _fetch_source_counts_from_database(
+            fetched_01, fetched_03, fetched_10, fetched_01_first_seen, fetch_warnings = _fetch_source_counts_from_database(
                 database_url=db_url,
                 start_month=start_month,
                 end_month=end_month,
@@ -446,20 +446,20 @@ def run_source_existing_bootstrap(
             )
             source_01_counts = fetched_01
             source_03_counts = fetched_03
-            source_09_counts = fetched_09
+            source_10_counts = fetched_10
             source_01_first_seen_month_by_symbol = fetched_01_first_seen
             warnings.extend(fetch_warnings)
         except Exception as exc:
             warnings.append(f"source-existing bootstrap skipped database scan: {type(exc).__name__}: {exc}")
             source_01_counts = {}
             source_03_counts = {}
-            source_09_counts = {}
+            source_10_counts = {}
 
     stage_coverages, event_coverages, coverage_warnings = build_source_coverages_from_counts(
         months=months,
         source_01_counts=source_01_counts,
         source_03_counts=source_03_counts,
-        source_09_counts=source_09_counts,
+        source_10_counts=source_10_counts,
         selected_target_symbol=selected_target_symbol,
         source_01_first_seen_month_by_symbol=source_01_first_seen_month_by_symbol,
     )
@@ -475,7 +475,11 @@ def run_source_existing_bootstrap(
     coverage_report_paths: list[str] = []
     bootstrapped_months: list[str] = []
     for month in months:
-        ready_coverages = coverages_by_month.get(month, [])
+        ready_coverages = [
+            coverage
+            for coverage in coverages_by_month.get(month, [])
+            if coverage.stage_id.startswith(("layer_01_", "layer_02_"))
+        ]
         if not ready_coverages:
             continue
         report_paths: list[Path] = []

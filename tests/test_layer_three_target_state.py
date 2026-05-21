@@ -116,6 +116,9 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(summary.provider_calls, 0)
             self.assertFalse(summary.model_activation_performed)
             self.assertTrue(Path(summary.task_key_path).exists())
+            self.assertTrue(Path(summary.task_key_path).is_relative_to(tmp / "manager-storage"))
+            task_key = json.loads(Path(summary.task_key_path).read_text(encoding="utf-8"))
+            self.assertTrue(Path(task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
 
     def test_fold_materialization_uses_one_candidate_per_symbol_across_months(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

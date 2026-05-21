@@ -243,7 +243,7 @@ def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root:
         payload = _historical_seed_task_key(start_month=start_month, end_month=end_month, artifacts=seed_artifacts, output_root=output_root)
         content = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
         task_hash = "sha256:" + hashlib.sha256(content).hexdigest()
-        task_key_path = (storage_root / "runtime" / "te_calendar" / "historical_seed" / f"{start_month}_{end_month}_source_09_task_key.json").resolve()
+        task_key_path = (storage_root / "runtime" / "te_calendar" / "historical_seed" / f"{start_month}_{end_month}_source_10_task_key.json").resolve()
         if write_files:
             task_key_path.parent.mkdir(parents=True, exist_ok=True)
             task_key_path.write_bytes(content)

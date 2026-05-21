@@ -163,11 +163,11 @@ def build_event_model_regeneration_plan(
                 requires_review_before_apply=False,
             ),
             RegenerationStep(
-                step_id="05_generate_feature_09_and_model_09",
+                step_id="05_generate_feature_10_and_model_10",
                 owner_repo="trading-data;trading-model",
                 action="generate feature_10_event_risk_governor then model_10_event_risk_governor/event_context_vector outputs",
                 command_ref="trading-data-feature-10-event-risk-governor; python3 scripts/models/model_10_event_risk_governor/generate_model_10_event_risk_governor.py",
-                status="blocked_until_source_09_ready",
+                status="blocked_until_source_10_ready",
                 mutation_class="offline_model_artifact_generation",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,

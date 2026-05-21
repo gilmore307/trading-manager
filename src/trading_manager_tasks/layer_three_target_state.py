@@ -27,7 +27,7 @@ from .storage_paths import data_storage_root
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
-DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_03_target_state_vector" / "input_materialization"
+DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_03_target_state_vector" / "input_materialization"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SOURCE = "source_03_target_state"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
@@ -329,8 +329,9 @@ def materialize_layer_three_target_state_inputs(
     if not manager_storage_root.is_absolute():
         manager_storage_root = Path.cwd() / manager_storage_root
     fold_key = _fold_key(start_month, end_month)
-    output_dir = manager_storage_root / output_root / fold_key
-    trading_data_output_root = data_storage_root() / "runtime" / SOURCE / f"layer_03_target_state_vector_{fold_key}"
+    output_base = output_root if output_root.is_absolute() else manager_storage_root / output_root
+    output_dir = output_base / fold_key
+    trading_data_output_root = output_dir / "trading_data_outputs" / SOURCE
     run_id = run_id or f"layer_03_target_state_vector_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     _task_key, task_key_path, candidate_path, merged_bar_path, _bar_count = build_source_task_key(
         start_month=start_month,

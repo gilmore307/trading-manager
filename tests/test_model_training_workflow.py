@@ -26,7 +26,7 @@ def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") ->
 
 
 class ModelTrainingWorkflowTests(unittest.TestCase):
-    def test_base_stack_plan_covers_all_nine_layers_and_stage_types_after_foundation_catch_up(self):
+    def test_base_stack_plan_covers_all_ten_layers_and_stage_types_after_foundation_catch_up(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -121,7 +121,13 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
     def test_layer_three_data_acquisition_uses_local_materializer_without_provider_dispatch(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
 
         command = plan.layers[2].stages[0].command
         self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", command)
@@ -148,8 +154,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 [stage.stage_type for stage in layer.stages],
                 expected_stage_types,
             )
-        layer_three_acquisition = plan.layers[2].stages[0]
-        self.assertNotIn(FOUNDATION_CATCH_UP_BLOCKER, layer_three_acquisition.blockers)
+        self.assertEqual(plan.layers[2].stages, ())
 
     def test_monthly_substrate_stages_stay_month_scoped_while_model_stages_are_fold_scoped(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -158,6 +163,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 start_month="2016-07",
                 end_month="2016-07",
                 selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
             )
             fold_plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -430,7 +436,12 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
     def test_later_layers_block_when_task_intro_omits_target_symbol(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-06")
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-06",
+                foundation_catch_up_only=False,
+            )
 
         self.assertIsNone(plan.selected_target_symbol)
         layer_three_acquisition = plan.layers[2].stages[0]

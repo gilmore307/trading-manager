@@ -88,6 +88,11 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             self.assertEqual(summary.provider_calls, 0)
             self.assertFalse(summary.model_activation_performed)
             self.assertTrue(Path(summary.source_task_key_path).exists())
+            self.assertTrue(Path(summary.source_task_key_path).is_relative_to(tmp / "manager-storage"))
+            source_task_key = json.loads(Path(summary.source_task_key_path).read_text(encoding="utf-8"))
+            self.assertTrue(Path(source_task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
+            detector_task_key = json.loads(Path(summary.detector_runs[0].task_key_path).read_text(encoding="utf-8"))
+            self.assertTrue(Path(detector_task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
 
     def test_zero_row_feed_artifacts_are_skipped_before_detector_execution(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -178,6 +183,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
 
             self.assertEqual(summary.detector_run_count, 2)
             self.assertEqual({run.month for run in summary.detector_runs}, {"2016-01", "2016-02"})
+            self.assertEqual(Path(summary.source_task_key_path).name, "source_10_task_key.json")
             self.assertEqual(task_key["params"]["start"], "2016-01-01T00:00:00-05:00")
             self.assertEqual(task_key["params"]["end"], "2016-03-01T00:00:00-05:00")
             self.assertTrue(all(Path(run.task_key_path).exists() for run in summary.detector_runs))

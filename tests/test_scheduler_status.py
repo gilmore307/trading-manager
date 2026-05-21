@@ -129,7 +129,7 @@ class SchedulerStatusTests(unittest.TestCase):
             ["daemon", "month_stage", "reconcile", "provider_partition"],
         )
 
-    def test_status_treats_target_boundary_block_as_model_worker_queue_wait(self):
+    def test_status_treats_foundation_complete_with_target_queue_as_model_worker_wait(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
@@ -198,8 +198,8 @@ class SchedulerStatusTests(unittest.TestCase):
             )
 
         row = status.summary_row()
-        self.assertEqual(row["workflow_checkpoint"]["next_stage_id"], "layer_03_target_state_vector.data_acquisition")
-        self.assertIn("selected_target_symbol_required", row["workflow_checkpoint"]["next_stage_blockers"])
+        self.assertIsNone(row["workflow_checkpoint"]["next_stage_id"])
+        self.assertEqual(row["workflow_checkpoint"]["next_stage_blockers"], ())
         self.assertIsNone(row["blocked_reason"])
         self.assertNotIn("resolve_current_workflow_blocked_stage", row["open_operational_items"])
 

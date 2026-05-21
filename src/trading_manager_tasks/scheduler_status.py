@@ -398,6 +398,7 @@ def collect_historical_scheduler_status(
     )
     if stale_completed_state:
         state_month = ""
+        current_decision = None
     current_month = str(
         state_month
         or (current_decision or {}).get("start_month")
@@ -419,8 +420,13 @@ def collect_historical_scheduler_status(
     if (
         blocked_reason
         and target_queue_ready
-        and workflow.next_stage_status == "blocked"
-        and "selected_target_symbol_required" in workflow.next_stage_blockers
+        and (
+            workflow.terminal_complete
+            or (
+                workflow.next_stage_status == "blocked"
+                and "selected_target_symbol_required" in workflow.next_stage_blockers
+            )
+        )
     ):
         blocked_reason = None
     current_stage = workflow.next_stage_id or str((current_decision or {}).get("selected_work") or "") or None

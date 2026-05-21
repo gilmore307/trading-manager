@@ -13,8 +13,8 @@ from typing import Any, Iterable, TextIO
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_RUNTIME_ROOT = Path("runtime")
-DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_09_event_risk_required"
-DEFAULT_SOURCE_LAYER = 9
+DEFAULT_REASON = "stale_provisional_invalidated_event_sources_incomplete_rebuild_from_layer_10_event_risk_required"
+DEFAULT_SOURCE_LAYER = 10
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ def invalidate_layer_downstream_outputs(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     runtime_root: Path | None = None,
     state_paths: Iterable[Path] = (),
-    layer_floor: int = 9,
+    layer_floor: int = 10,
     reason: str = DEFAULT_REASON,
     source_layer: int = DEFAULT_SOURCE_LAYER,
     write: bool = False,
@@ -135,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--runtime-root", type=Path)
     parser.add_argument("--state-path", action="append", type=Path, default=[])
-    parser.add_argument("--layer-floor", type=int, default=8)
+    parser.add_argument("--layer-floor", type=int, default=10)
     parser.add_argument("--source-layer", type=int, default=DEFAULT_SOURCE_LAYER)
     parser.add_argument("--reason", default=DEFAULT_REASON)
     parser.add_argument("--write", action="store_true")

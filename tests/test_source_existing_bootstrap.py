@@ -20,13 +20,13 @@ class SourceExistingBootstrapTests(unittest.TestCase):
         layer_two = _symbols(LAYER_TWO_MODEL_LAYER)
         source_01 = {"2016-01": {symbol: 10 for symbol in (*layer_one, *layer_two)}}
         source_03 = {"2016-01": {"AAPL": 20}}
-        source_09 = {"2016-01": 3}
+        source_10 = {"2016-01": 3}
 
         stage_coverages, event_coverages, warnings = build_source_coverages_from_counts(
             months=("2016-01",),
             source_01_counts=source_01,
             source_03_counts=source_03,
-            source_09_counts=source_09,
+            source_10_counts=source_10,
             selected_target_symbol="AAPL",
         )
 
@@ -54,7 +54,7 @@ class SourceExistingBootstrapTests(unittest.TestCase):
                 storage_root=storage_root,
                 source_01_counts=source_01,
                 source_03_counts=source_03,
-                source_09_counts={"2016-01": 0},
+                source_10_counts={"2016-01": 0},
                 write=True,
             )
             state_path = workflow_state_path_for_month("2016-01", root=storage_root / "runtime")
@@ -65,7 +65,7 @@ class SourceExistingBootstrapTests(unittest.TestCase):
         self.assertEqual(summary.bootstrapped_months, ("2016-01",))
         self.assertEqual(by_stage["layer_01_market_regime.data_acquisition"]["status"], "succeeded")
         self.assertEqual(by_stage["layer_02_sector_context.data_acquisition"]["status"], "succeeded")
-        self.assertEqual(by_stage["layer_03_target_state_vector.data_acquisition"]["status"], "succeeded")
+        self.assertNotIn("layer_03_target_state_vector.data_acquisition", by_stage)
         self.assertEqual(by_stage["layer_01_market_regime.feature_generation"]["status"], "ready")
         self.assertFalse(payload["model_activation_performed"])
         self.assertFalse(payload["broker_execution_performed"])
@@ -81,7 +81,7 @@ class SourceExistingBootstrapTests(unittest.TestCase):
                 storage_root=storage_root,
                 source_01_counts=source_01,
                 source_03_counts={},
-                source_09_counts={},
+                source_10_counts={},
                 write=True,
             )
             state_path = workflow_state_path_for_month("2016-01", root=storage_root / "runtime")

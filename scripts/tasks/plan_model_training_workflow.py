@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan the manager-owned base Layer 1-7 historical model-training workflow."""
+"""Plan the manager-owned base Layer 1-10 historical model-training workflow."""
 
 from __future__ import annotations
 
