@@ -11,6 +11,7 @@ from trading_manager_tasks.model_training_workflow import (
     MULTI_TARGET_SYMBOL_BLOCKER,
     MONTHLY_SUBSTRATE_LAYERS,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
+    LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER,
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
     LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
     build_model_training_workflow_plan,
@@ -23,6 +24,19 @@ def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") ->
         path = root / "monthly_backfill" / "alpaca_bars" / member.symbol / month / "task_key.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{}\n", encoding="utf-8")
+
+
+def _write_event_feed_artifacts(root: Path, *, month: str = "2016-01") -> None:
+    artifacts = {
+        "alpaca_news": ("equity_news.csv", f"id,timeline_headline,created_at,updated_at,symbols,summary,event_link_url\nn1,Headline,{month}-04T10:00:00-05:00,{month}-04T10:01:00-05:00,AAPL,Summary,https://example.com/news\n"),
+        "gdelt_news": ("gdelt_article.csv", f"article_id,seen_at,source_domain,event_link_url,title,source_theme_tags,organizations,tone,impact_scope\ng1,{month}-04T09:00:00-05:00,reuters.com,https://example.com/gdelt,Fed news,ECON,Federal Reserve,-1,market\n"),
+        "sec_company_financials": ("sec_company_fact.csv", f"cik,entity_name,taxonomy,tag,label,description,unit,fy,fp,form,filed,frame,end,value,accession_number,symbol\n1,Test Inc,us-gaap,Revenues,Revenue,,USD,2016,Q1,10-Q,{month}-05,,{month}-05,1,a1,AAPL\n"),
+        "trading_economics_calendar_web": ("trading_economics_calendar_event.csv", f"event_time,country,event,source_event_type,reference,actual,previous,consensus,te_forecast,revised,importance,symbol,source_url\n{month}-08T08:30:00-05:00,United States,Payrolls,Labour,Dec,200K,180K,190K,,,3,,https://tradingeconomics.com/united-states/calendar\n"),
+    }
+    for source_id, (filename, content) in artifacts.items():
+        path = root / "monthly_backfill" / source_id / month / "runs" / "run_001" / "saved" / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
 
 
 class ModelTrainingWorkflowTests(unittest.TestCase):
@@ -366,6 +380,34 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layers[9].depends_on_layers, (8,))
         self.assertIn("Layer 9 guidance/expression context is optional", plan.layers[9].candidate_progression_policy)
         self.assertIn("upstream_layer_08_model_evaluation_complete", plan.layers[9].stages[0].blockers)
+
+    def test_layer_ten_data_acquisition_blocks_until_required_event_feeds_have_coverage(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            plan = build_model_training_workflow_plan(
+                storage_root=root,
+                trading_storage_root=root,
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            blocked_stage = plan.layers[9].stages[0]
+
+            _write_event_feed_artifacts(root, month="2016-01")
+            ready_plan = build_model_training_workflow_plan(
+                storage_root=root,
+                trading_storage_root=root,
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            coverage_ready_stage = ready_plan.layers[9].stages[0]
+
+        self.assertIn(LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER, blocked_stage.blockers)
+        self.assertNotIn(LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER, coverage_ready_stage.blockers)
+        self.assertIn("upstream_layer_08_model_evaluation_complete", coverage_ready_stage.blockers)
 
     def test_promotion_review_waits_for_full_fold_stack_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

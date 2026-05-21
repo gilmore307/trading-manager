@@ -19,7 +19,7 @@ from typing import Any, Literal, TextIO
 
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .storage_paths import model_runtime_root
+from .storage_paths import data_storage_root, model_runtime_root
 
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
@@ -41,6 +41,7 @@ PROMOTION_STAGE_TYPE = "promotion_review"
 FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_10_model_evaluation_complete"
 MULTI_TARGET_SYMBOL_BLOCKER = "multiple_target_symbols_require_separate_workflows"
 MODEL_RUNTIME_ROOT = model_runtime_root()
+LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER = "layer_10_event_feed_coverage_ready"
 
 
 @dataclass(frozen=True)
@@ -507,6 +508,33 @@ def _upstream_layer_ready_blockers(depends_on_layers: tuple[int, ...], *, founda
     return tuple(f"upstream_layer_{dep:02d}_{suffix}" for dep in depends_on_layers)
 
 
+def _event_feed_coverage_blockers(*, start_month: str, end_month: str, trading_storage_root: Path) -> tuple[str, ...]:
+    from .layer_ten_event_risk_governor import (
+        _discover_event_feed_artifacts,
+        _event_feed_row_coverage,
+        _missing_event_feed_artifacts,
+        _missing_event_feed_rows,
+    )
+
+    event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(
+        trading_storage_root=trading_storage_root,
+        start_month=start_month,
+        end_month=end_month,
+    )
+    event_feed_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
+    if _missing_event_feed_artifacts(event_feed_coverage) or _missing_event_feed_rows(event_feed_row_coverage):
+        return (LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER,)
+    return ()
+
+
+def _resolve_event_feed_storage_root(storage_root: Path, trading_storage_root: Path | None) -> Path:
+    if trading_storage_root is not None:
+        return trading_storage_root
+    if storage_root == DEFAULT_STORAGE_ROOT:
+        return data_storage_root()
+    return storage_root
+
+
 def _build_layer_workflow(
     meta: dict[str, Any],
     *,
@@ -516,6 +544,7 @@ def _build_layer_workflow(
     end_month: str,
     selected_target_symbol: str | None,
     foundation_catch_up_only: bool,
+    layer_ten_event_feed_blockers: tuple[str, ...],
 ) -> LayerWorkflow:
     layer = int(meta["layer"])
     slug = str(meta["slug"])
@@ -551,6 +580,8 @@ def _build_layer_workflow(
             tuple(meta["depends_on_layers"]),
             foundation_catch_up_only=foundation_catch_up_only,
         ), None
+        if layer == 10:
+            acquisition_blockers = acquisition_blockers + layer_ten_event_feed_blockers
 
     acquisition_command = ["manager", "advance-local-input-stage", key]
     if layer in {1, 2}:
@@ -737,12 +768,19 @@ def build_model_training_workflow_plan(
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     storage_root: Path = DEFAULT_STORAGE_ROOT,
+    trading_storage_root: Path | None = None,
     selected_target_symbol: str | None = None,
     foundation_catch_up_only: bool = True,
 ) -> ModelTrainingWorkflowPlan:
     task_key_count = count_layer_one_task_keys(storage_root, start_month=start_month)
     layer_two_task_key_count = count_layer_two_task_keys(storage_root, start_month=start_month)
     normalized_target_symbol = _normalize_selected_target_symbol(selected_target_symbol)
+    resolved_trading_storage_root = _resolve_event_feed_storage_root(storage_root, trading_storage_root)
+    layer_ten_event_feed_blockers = _event_feed_coverage_blockers(
+        start_month=start_month,
+        end_month=end_month,
+        trading_storage_root=resolved_trading_storage_root,
+    )
     layers = tuple(
         _build_layer_workflow(
             meta,
@@ -752,6 +790,7 @@ def build_model_training_workflow_plan(
             end_month=end_month,
             selected_target_symbol=normalized_target_symbol,
             foundation_catch_up_only=foundation_catch_up_only,
+            layer_ten_event_feed_blockers=layer_ten_event_feed_blockers,
         )
         for meta in LAYER_METADATA
     )
@@ -787,6 +826,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
+    parser.add_argument("--trading-storage-root", type=Path)
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument(
         "--allow-post-foundation-model-stages",
@@ -799,6 +839,7 @@ def main(argv: list[str] | None = None) -> int:
             start_month=args.start_month,
             end_month=args.end_month,
             storage_root=args.storage_root,
+            trading_storage_root=args.trading_storage_root,
             selected_target_symbol=args.target_symbol,
             foundation_catch_up_only=not args.allow_post_foundation_model_stages,
         )
@@ -821,6 +862,7 @@ __all__ = [
     "FOUNDATION_CATCH_UP_STAGE_TYPES",
     "LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS",
     "LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS",
+    "LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER",
     "POST_MODEL_GENERATION_REBUILD_BLOCKER",
     "LayerWorkflow",
     "ModelTrainingWorkflowPlan",
