@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -44,6 +45,7 @@ TASKS_PER_MODEL_FOLD = MONTHLY_TASKS_PER_FOLD + MODEL_TASKS_PER_FOLD
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
 MAX_AGENT_ERROR_SUMMARY_ROWS = 50
+STAGE_FAILURE_RE = re.compile(r"stage\s+([A-Za-z0-9_.-]+)\s+command", re.IGNORECASE)
 
 
 def now_utc() -> str:
@@ -214,6 +216,35 @@ def _agent_error_handling_status(catalog_row: Mapping[str, Any], repair_status: 
     return "open"
 
 
+def _stage_id_from_error_row(row: Mapping[str, Any]) -> str | None:
+    for field in ("summary", "error_scope"):
+        text = str(row.get(field) or "")
+        match = STAGE_FAILURE_RE.search(text)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _successful_retry_receipt(storage_root: Path, stage_id: str) -> dict[str, Any] | None:
+    receipt_dir = storage_root / "runtime" / "model_training_stage_receipts" / stage_id.replace(".", "__")
+    if not receipt_dir.exists():
+        return None
+    for path in sorted(receipt_dir.glob("*.json"), reverse=True):
+        try:
+            receipt = _load_json_object(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if str(receipt.get("status") or "").lower() != "succeeded":
+            continue
+        runs = receipt.get("runs")
+        if isinstance(runs, list) and runs:
+            if not any(isinstance(run, Mapping) and str(run.get("status") or "").lower() == "succeeded" for run in runs):
+                continue
+        completed_at = receipt.get("completed_at") or receipt.get("completed_at_utc") or receipt.get("updated_utc")
+        return {"path": str(path), "completed_at_utc": completed_at}
+    return None
+
+
 def _dashboard_error_severity(catalog_row: Mapping[str, Any], handling_status: str) -> str:
     if handling_status in {"closed", "no_action_required"}:
         return "notice"
@@ -259,6 +290,12 @@ def _agent_error_summary(
         agent_payload = _agent_result_payload(diagnosis)
         repair_status = _agent_repair_status(diagnosis, agent_payload)
         handling_status = _agent_error_handling_status(row, repair_status)
+        retry_receipt = None
+        if repair_status == "repaired" and handling_status == "awaiting_retry":
+            stage_id = _stage_id_from_error_row(row)
+            retry_receipt = _successful_retry_receipt(storage_root, stage_id) if stage_id else None
+            if retry_receipt:
+                handling_status = "closed"
         repair_payload = agent_payload.get("repair") if isinstance(agent_payload.get("repair"), Mapping) else {}
         files_changed = agent_payload.get("files_changed")
         if not isinstance(files_changed, list):
@@ -281,9 +318,14 @@ def _agent_error_summary(
                 "discord_notification": diagnosis.get("discord_notification"),
                 "repair_status": repair_status,
                 "handling_status": handling_status,
-                "retry_recommendation": _agent_payload_text(agent_payload.get("retry_recommendation")),
+                "retry_recommendation": (
+                    f"retry completed successfully at {retry_receipt.get('completed_at_utc') or 'recorded receipt'}"
+                    if retry_receipt
+                    else _agent_payload_text(agent_payload.get("retry_recommendation"))
+                ),
                 "root_cause": _agent_payload_text(agent_payload.get("root_cause"), row.get("summary")),
                 "files_changed": files_changed,
+                "retry_receipt": retry_receipt,
                 "request_path": row.get("request_path"),
                 "diagnosis_path": row.get("diagnosis_path"),
             }

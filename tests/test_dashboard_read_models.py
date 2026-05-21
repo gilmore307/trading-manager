@@ -455,6 +455,96 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["dashboard_severity"], "warning")
         self.assertEqual(agent_errors[0]["root_cause"], "type mismatch was repaired")
 
+    def test_agent_error_summary_closes_repaired_stage_after_successful_retry_receipt(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            agent_root = runtime / "agent_error_handling"
+            request_root = agent_root / "erragent_retry_closed"
+            request_root.mkdir(parents=True, exist_ok=True)
+            final_report = {
+                "diagnosis_status": "repaired_awaiting_retry",
+                "root_cause": "stage bug was repaired",
+                "repair": {"repair_status": "repaired", "files_changed": ["/repo/file.py"]},
+                "retry_recommendation": "wait for scheduler",
+            }
+            (request_root / "agent_error_diagnosis.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_error_diagnosis",
+                        "schema_version": "1",
+                        "diagnosis_id": "errdiag_retry_closed",
+                        "request_ref": "erragent_retry_closed",
+                        "agent_ref": "trader",
+                        "runner_command": "openclaw_agent",
+                        "status": "completed",
+                        "return_code": 0,
+                        "stdout": json.dumps({"result": {"meta": {"finalAssistantRawText": json.dumps(final_report)}}}),
+                        "stderr": "",
+                        "completed_at_utc": "2026-05-18T13:29:52Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            receipt_dir = runtime / "model_training_stage_receipts" / "layer_04_event_failure_risk__model_generation"
+            receipt_dir.mkdir(parents=True, exist_ok=True)
+            (receipt_dir / "2026-05-21T112022.000000+0000.receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "component_completion_receipt",
+                        "manager_stage_id": "layer_04_event_failure_risk.model_generation",
+                        "status": "succeeded",
+                        "completed_at": "2026-05-21T11:20:22Z",
+                        "runs": [{"status": "succeeded", "return_code": 0}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 4,
+                        "error_ref": "ERR-000004",
+                        "error_fingerprint": "errfp_retry_closed",
+                        "request_id": "erragent_retry_closed",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_retry_closed/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_retry_closed/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.stage_executor",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.model_training_stage",
+                        "error_kind": "stage_command_failed",
+                        "severity": "error",
+                        "summary": "model training stage layer_04_event_failure_risk.model_generation command returned non-zero status",
+                        "exit_code": 1,
+                        "occurred_at_utc": "2026-05-18T13:27:32Z",
+                        "created_at_utc": "2026-05-18T13:27:32Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T11:21:00Z")
+
+        agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(agent_errors[0]["repair_status"], "repaired")
+        self.assertEqual(agent_errors[0]["handling_status"], "closed")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
+        self.assertIn("retry completed successfully", agent_errors[0]["retry_recommendation"])
+
     def test_supersedes_obsolete_layer_nine_event_risk_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
