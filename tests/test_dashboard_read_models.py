@@ -449,6 +449,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T13:30:00Z")
 
         agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(agent_errors[0]["runner_command"], "openclaw_agent")
         self.assertEqual(agent_errors[0]["repair_status"], "repaired")
         self.assertEqual(agent_errors[0]["handling_status"], "awaiting_retry")
         self.assertEqual(agent_errors[0]["dashboard_severity"], "warning")

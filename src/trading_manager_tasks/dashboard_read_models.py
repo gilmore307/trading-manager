@@ -271,6 +271,8 @@ def _agent_error_summary(
                 "severity": row.get("severity"),
                 "dashboard_severity": _dashboard_error_severity(row, handling_status),
                 "diagnosis_status": diagnosis.get("status") or "missing",
+                "runner_command": diagnosis.get("runner_command"),
+                "discord_notification": diagnosis.get("discord_notification"),
                 "repair_status": repair_status,
                 "handling_status": handling_status,
                 "retry_recommendation": _agent_payload_text(agent_payload.get("retry_recommendation")),

@@ -792,8 +792,6 @@ def handle_server_error(
         diagnosis = call_agent_runner(request, runner_command=configured_runner)
     else:
         diagnosis = build_queued_diagnosis(request, reason="agent runner not configured" if effective_call_agent else "agent call not requested")
-    diagnosis_path = default_diagnosis_path(request, output_root)
-    write_json_artifact(diagnosis, path=diagnosis_path)
     should_notify_discord = (
         bool(notify_discord)
         if notify_discord is not None
@@ -818,6 +816,10 @@ def handle_server_error(
             if should_notify_discord
             else {"status": "skipped", "reason": "discord notification not requested"}
         )
+    diagnosis = dict(diagnosis)
+    diagnosis["discord_notification"] = discord_notification
+    diagnosis_path = default_diagnosis_path(request, output_root)
+    write_json_artifact(diagnosis, path=diagnosis_path)
     result = {
         "contract_type": AGENT_ERROR_HANDLING_RESULT_CONTRACT,
         "schema_version": "1",

@@ -72,6 +72,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertTrue(diagnosis_path.exists())
             diagnosis = json.loads(diagnosis_path.read_text(encoding="utf-8"))
             self.assertEqual(validate_agent_error_diagnosis(diagnosis)["status"], "queued")
+            self.assertEqual(diagnosis["discord_notification"]["status"], "skipped")
             self.assertEqual(result["error_ref"], "ERR-000001")
             catalog_path = tmp / "server_error_catalog.jsonl"
             rows = [json.loads(line) for line in catalog_path.read_text(encoding="utf-8").splitlines()]
@@ -104,6 +105,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
             diagnosis = json.loads(Path(result["diagnosis_path"]).read_text(encoding="utf-8"))
             self.assertEqual(diagnosis["status"], "completed")
             self.assertIn("diagnosis_status", diagnosis["stdout"])
+            self.assertEqual(diagnosis["discord_notification"]["status"], "skipped")
 
     def test_false_autocall_env_does_not_call_runner(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
