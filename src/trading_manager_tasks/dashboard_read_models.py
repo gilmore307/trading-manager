@@ -836,13 +836,18 @@ def _stable_task_uid(raw_stage: Mapping[str, Any], *, task_period: str | None) -
 
 
 def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
-    """Fold states expose only fold-scoped model-worker stages to Tasks."""
+    """Expose fold-scoped model-worker stages to Tasks."""
 
     visible: list[Any] = []
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
             continue
-        if str(raw_stage.get("stage_type") or "") in FOLD_MODEL_STAGE_TYPES:
+        stage_type = str(raw_stage.get("stage_type") or "")
+        try:
+            layer = int(raw_stage.get("layer"))
+        except (TypeError, ValueError):
+            layer = 0
+        if stage_type in FOLD_MODEL_STAGE_TYPES or (stage_type in MONTHLY_TASK_STAGE_TYPES and layer not in MONTHLY_SUBSTRATE_LAYERS):
             visible.append(raw_stage)
     return visible
 

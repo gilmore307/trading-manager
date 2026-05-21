@@ -624,7 +624,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(durable_task["task_number"], 289)
         self.assertEqual(durable_task["task_uid"], "2018-01:layer_01_market_regime.data_acquisition")
 
-    def test_task_timeline_keeps_fold_rows_model_scoped(self):
+    def test_task_timeline_shows_fold_target_chain_prep_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -650,6 +650,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer": 1,
                                 "layer_key": "layer_01_market_regime",
                                 "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
                             },
                         ],
                     }
@@ -684,9 +691,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2016-06"]
-        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation"])
+        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation", "data_acquisition"])
         self.assertEqual(fold_tasks[0]["task_number"], 37)
         self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime.model_generation")
+        self.assertEqual(fold_tasks[1]["task_uid"], "2016-01..2016-06:layer_03_target_state_vector.data_acquisition")
 
     def test_current_incomplete_calendar_month_is_not_exposed_as_ready_task(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

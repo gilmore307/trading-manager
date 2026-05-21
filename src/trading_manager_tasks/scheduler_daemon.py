@@ -52,6 +52,7 @@ DEFAULT_MONTH_INGEST_WORKERS = 3
 DEFAULT_TARGET_QUEUE_PATH = DEFAULT_RUNTIME_DIR / "model_training_target_queue.json"
 COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
 MODEL_WORKER_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
+MODEL_WORKER_PREP_STAGE_TYPES = {"data_acquisition", "feature_generation"}
 
 
 def previous_month(month: str) -> str:
@@ -379,6 +380,19 @@ def _workflow_payload_all_stages_complete(payload: dict[str, Any]) -> bool:
     return bool(statuses) and all(status in {"succeeded", "not_applicable"} for status in statuses)
 
 
+def _is_model_worker_routable_stage(stage: dict[str, Any]) -> bool:
+    stage_type = str(stage.get("stage_type") or "")
+    if stage_type in MODEL_WORKER_STAGE_TYPES:
+        return True
+    if stage_type not in MODEL_WORKER_PREP_STAGE_TYPES:
+        return False
+    try:
+        layer = int(stage.get("layer"))
+    except (TypeError, ValueError):
+        return False
+    return layer not in MONTHLY_SUBSTRATE_LAYERS
+
+
 def _fold_payload_has_open_model_worker_stage(payload: dict[str, Any]) -> bool:
     stages = payload.get("stages")
     if not isinstance(stages, list) or not stages:
@@ -386,7 +400,7 @@ def _fold_payload_has_open_model_worker_stage(payload: dict[str, Any]) -> bool:
     for stage in stages:
         if not isinstance(stage, dict):
             continue
-        if str(stage.get("stage_type") or "") in MODEL_WORKER_STAGE_TYPES and str(stage.get("status") or "") not in {
+        if _is_model_worker_routable_stage(stage) and str(stage.get("status") or "") not in {
             "succeeded",
             "not_applicable",
         }:
@@ -401,7 +415,7 @@ def _fold_payload_has_ready_model_worker_stage(payload: dict[str, Any]) -> bool:
     for stage in stages:
         if not isinstance(stage, dict):
             continue
-        if str(stage.get("stage_type") or "") in MODEL_WORKER_STAGE_TYPES and str(stage.get("status") or "") == "ready":
+        if _is_model_worker_routable_stage(stage) and str(stage.get("status") or "") == "ready":
             return True
     return False
 
