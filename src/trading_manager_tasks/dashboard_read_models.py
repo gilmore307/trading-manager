@@ -983,9 +983,9 @@ def _fold_model_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
     stage_type = str(raw_stage.get("stage_type") or "")
     stage_offset = {
         "model_generation": 1,
-        "model_evaluation": 2,
-        "promotion_review": 3,
-        "maintenance": 4,
+        "model_evaluation": 91,
+        "promotion_review": 92,
+        "maintenance": 93,
     }.get(stage_type)
     if stage_offset is None:
         return None
@@ -994,7 +994,7 @@ def _fold_model_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
     except (TypeError, ValueError):
         return None
     if layer <= 0:
-        return None
+        return stage_offset
     return (layer - 1) * 4 + stage_offset
 
 
@@ -1042,6 +1042,126 @@ def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
         if _is_fold_worker_stage(raw_stage):
             visible.append(raw_stage)
     return visible
+
+
+def _is_layer_local_post_generation_stage(raw_stage: Mapping[str, Any]) -> bool:
+    stage_type = str(raw_stage.get("stage_type") or "")
+    if stage_type not in {"model_evaluation", "promotion_review", "maintenance"}:
+        return False
+    try:
+        return int(raw_stage.get("layer")) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _aggregate_status(stages: list[Mapping[str, Any]]) -> str:
+    statuses = [str(stage.get("status") or "unknown") for stage in stages]
+    if any(status == "failed" for status in statuses):
+        return "failed"
+    if statuses and all(status in {"succeeded", "not_applicable"} for status in statuses):
+        return "succeeded"
+    if any(status == "ready" for status in statuses):
+        return "ready"
+    return "blocked"
+
+
+def _aggregate_progress(stage_id: str, status: str, stages: list[Mapping[str, Any]]) -> dict[str, Any]:
+    expected = len(stages)
+    complete = sum(1 for stage in stages if str(stage.get("status") or "") in {"succeeded", "not_applicable"})
+    failed = sum(1 for stage in stages if str(stage.get("status") or "") == "failed")
+    return {
+        "stage_id": stage_id,
+        "status": "complete" if expected > 0 and complete >= expected else status,
+        "unit_label": "layers",
+        "expected_count": expected,
+        "ready_count": min(complete, expected),
+        "pending_count": max(expected - complete - failed, 0),
+        "failed_count": failed,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": expected > 0 and complete >= expected and failed == 0,
+    }
+
+
+def _first_stage_text(stages: list[Mapping[str, Any]], status: str, field: str) -> str | None:
+    for stage in stages:
+        if str(stage.get("status") or "") == status and stage.get(field):
+            return str(stage.get(field))
+    for stage in stages:
+        if stage.get(field):
+            return str(stage.get(field))
+    return None
+
+
+def _fold_group_stage(raw_stages: list[Any], *, stage_type: str, timeline_month: str | None) -> dict[str, Any] | None:
+    stages = [
+        raw_stage
+        for raw_stage in raw_stages
+        if isinstance(raw_stage, Mapping)
+        and str(raw_stage.get("stage_type") or "") == stage_type
+        and _is_layer_local_post_generation_stage(raw_stage)
+    ]
+    if not stages:
+        return None
+    stage_id = f"model_group.{stage_type}"
+    status = _aggregate_status(stages)
+    label = {
+        "model_evaluation": "Model Group Evaluation",
+        "promotion_review": "Model Group Local Review",
+        "maintenance": "Model Group Maintenance",
+    }[stage_type]
+    reason = {
+        "succeeded": f"All layer-local {label.lower()} steps completed for this model group.",
+        "failed": f"One or more layer-local {label.lower()} steps failed for this model group.",
+        "ready": f"Next internal step ready: {_first_stage_text(stages, 'ready', 'stage_id') or label}.",
+        "blocked": _first_stage_text(stages, "blocked", "last_reason") or f"Waiting for prerequisite layer-local {label.lower()} steps.",
+    }[status]
+    dataset_unit = next((stage.get("dataset_unit") for stage in stages if isinstance(stage.get("dataset_unit"), Mapping)), None)
+    receipt_refs: list[str] = []
+    blockers: list[str] = []
+    for stage in stages:
+        for ref in stage.get("receipt_refs") or []:
+            receipt_refs.append(str(ref))
+        if str(stage.get("status") or "") != "succeeded":
+            blockers.append(str(stage.get("stage_id") or "layer_local_step"))
+    return {
+        "stage_id": stage_id,
+        "task_label": label,
+        "stage_type": stage_type,
+        "layer": None,
+        "layer_key": "model_group",
+        "status": status,
+        "last_reason": reason,
+        "receipt_refs": sorted(dict.fromkeys(receipt_refs)),
+        "blockers": sorted(dict.fromkeys(blockers)),
+        "dataset_unit": dataset_unit
+        or {
+            "unit_kind": "model_group_six_month",
+            "unit_months": MONTHS_PER_MODEL_FOLD,
+            "start_month": str(timeline_month or "").split("..", 1)[0] if timeline_month else None,
+            "end_month": str(timeline_month or "").split("..", 1)[1] if timeline_month and ".." in timeline_month else None,
+            "target_required": True,
+        },
+        "worker_id": "model_worker_1",
+        "worker_label": "Model Worker 1",
+        "worker_kind": "model_worker",
+        "updated_utc": _first_stage_text(stages, status, "updated_utc") or _first_stage_text(stages, "ready", "updated_utc"),
+        "dashboard_progress": _aggregate_progress(stage_id, status, stages),
+    }
+
+
+def _public_task_stages(raw_stages: list[Any], *, timeline_month: str | None) -> list[Any]:
+    rows: list[Any] = []
+    for raw_stage in raw_stages:
+        if not isinstance(raw_stage, Mapping):
+            continue
+        if _is_layer_local_post_generation_stage(raw_stage):
+            continue
+        rows.append(raw_stage)
+    for stage_type in ("model_evaluation", "promotion_review", "maintenance"):
+        aggregate = _fold_group_stage(raw_stages, stage_type=stage_type, timeline_month=timeline_month)
+        if aggregate is not None:
+            rows.append(aggregate)
+    return rows
 
 
 def _target_symbol_from_fold_stages(raw_stages: list[Any]) -> str | None:
@@ -1247,6 +1367,10 @@ def _task_timeline(
         month_stage_sets.append((active_month, active_stages, True))
     if not month_stage_sets:
         return []
+    public_stage_sets = [
+        (timeline_month, _public_task_stages(raw_stages, timeline_month=timeline_month), is_active_month)
+        for timeline_month, raw_stages, is_active_month in month_stage_sets
+    ]
 
     coverage_stage_id = str(stage_coverage.get("stage_id") or "") if stage_coverage else ""
     latest_execution = _latest_stage_execution(status) or {}
@@ -1258,7 +1382,7 @@ def _task_timeline(
     current_model_heads: set[tuple[str | None, str]] = set()
     active_model_fold_key = _active_model_worker_fold_key(status)
     seen_ingest_workers: set[str] = set()
-    for timeline_month, raw_stages, _is_active_month in month_stage_sets:
+    for timeline_month, raw_stages, _is_active_month in public_stage_sets:
         for raw_stage in raw_stages:
             if not isinstance(raw_stage, Mapping):
                 continue
@@ -1286,10 +1410,10 @@ def _task_timeline(
             current_lane_heads.add((task_month, stage_id))
             seen_ingest_workers.add(worker_id)
     model_stage_sets = [
-        stage_set for stage_set in month_stage_sets if not active_model_fold_key or stage_set[0] == active_model_fold_key
+        stage_set for stage_set in public_stage_sets if not active_model_fold_key or stage_set[0] == active_model_fold_key
     ]
     if active_model_fold_key and not model_stage_sets:
-        model_stage_sets = month_stage_sets
+        model_stage_sets = public_stage_sets
     for timeline_month, raw_stages, _is_active_month in model_stage_sets:
         if current_model_heads:
             break
@@ -1309,7 +1433,7 @@ def _task_timeline(
             break
     tasks: list[dict[str, Any]] = []
     first_open_seen = False
-    for timeline_month, raw_stages, is_active_month in month_stage_sets:
+    for timeline_month, raw_stages, is_active_month in public_stage_sets:
         for raw_stage in raw_stages:
             if not isinstance(raw_stage, Mapping):
                 continue
@@ -1363,7 +1487,7 @@ def _task_timeline(
                 "task_uid": _stable_task_uid(raw_stage, task_period=task_month),
                 "month": task_month,
                 "task_id": stage_id,
-                "task_label": _public_stage_name(stage_id, raw_stage.get("stage_type")),
+                "task_label": str(raw_stage.get("task_label") or _public_stage_name(stage_id, raw_stage.get("stage_type"))),
                 "task_state": task_state,
                 "status": stage_status,
                 "stage_type": raw_stage.get("stage_type"),
@@ -1382,7 +1506,9 @@ def _task_timeline(
                 "detail": {
                     "blockers": [str(blocker) for blocker in blockers],
                     "receipt_refs": [str(ref) for ref in receipt_refs],
-                    "progress": _task_status_progress(stage_id, "failed" if task_state == "failed" else stage_status),
+                    "progress": raw_stage.get("dashboard_progress")
+                    if isinstance(raw_stage.get("dashboard_progress"), Mapping)
+                    else _task_status_progress(stage_id, "failed" if task_state == "failed" else stage_status),
                     "safe_without_provider_calls": raw_stage.get("safe_without_provider_calls"),
                     "provider_calls_allowed": raw_stage.get("provider_calls_allowed"),
                     "model_activation_allowed": raw_stage.get("model_activation_allowed"),
