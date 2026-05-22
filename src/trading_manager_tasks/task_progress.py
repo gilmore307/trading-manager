@@ -130,6 +130,19 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
             "accepted_failed_count": 0,
             "can_unlock_downstream": elapsed_whole >= expected_whole,
         }
+    nodes = row.get("nodes")
+    if isinstance(nodes, list) and nodes:
+        return {
+            "stage_id": row.get("stage_id"),
+            "status": row.get("status") or "running",
+            "unit_label": str(unit_label or "nodes"),
+            "expected_count": None,
+            "ready_count": None,
+            "pending_count": None,
+            "failed_count": 0,
+            "accepted_failed_count": 0,
+            "can_unlock_downstream": False,
+        }
     return None
 
 

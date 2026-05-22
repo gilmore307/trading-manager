@@ -212,6 +212,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            write_task_progress_node(
+                progress_root=runtime / "task_progress",
+                worker_id="month_ingest_worker_1",
+                task_uid="2020-07:layer_09_option_expression.data_acquisition",
+                stage_id="layer_09_option_expression.data_acquisition",
+                node_id="stage_started",
+                node_label="Stage process started",
+            )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
@@ -229,6 +237,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["blocker_count"], 0)
         self.assertEqual(task["detail"]["blockers"], [])
+        self.assertEqual(task["detail"]["progress"]["status"], "running")
+        self.assertEqual(task["detail"]["progress"]["nodes"][0]["node_id"], "stage_started")
 
     def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
