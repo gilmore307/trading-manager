@@ -580,6 +580,87 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(maintenance_task["status"], "blocked")
         self.assertEqual(maintenance_task["detail"]["blockers"], ["model_group.promotion_review"])
 
+    def test_model_group_maintenance_completes_from_readiness_record(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            review_root = replay_root / "promotion_review_runs" / "model_group_replay_fixture"
+            readiness_root = replay_root / "promotion_readiness_runs" / "model_group_replay_fixture"
+            review_root.mkdir(parents=True, exist_ok=True)
+            readiness_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 2,
+                        "available_feed_acquisition_count": 2,
+                        "missing_feed_acquisition_count": 0,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
+            (replay_root / "replay_progress.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"stage_id": "model_group.replay", "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "month": "2021-02", "status": "completed"}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (review_root / "promotion_evaluation_review.json").write_text(
+                json.dumps({"recommendation": "eligible_for_shadow", "created_at_utc": "2026-05-22T12:50:00Z"}) + "\n",
+                encoding="utf-8",
+            )
+            (review_root / "promotion_eligibility_decision.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "promotion_eligibility_decision",
+                        "decision_status": "eligible",
+                        "decision_reason": "first model bootstrap",
+                        "created_at_utc": "2026-05-22T12:50:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (readiness_root / "promotion_readiness_record.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "promotion_readiness_record",
+                        "promotion_readiness_record_id": "promready_fixture",
+                        "created_at_utc": "2026-05-22T12:55:00Z",
+                        "model_activation_performed": False,
+                        "active_model_config_written": False,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:56:00Z")
+
+        maintenance_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.maintenance")
+        self.assertEqual(maintenance_task["status"], "succeeded")
+        self.assertEqual(maintenance_task["task_state"], "completed")
+        self.assertEqual(maintenance_task["receipt_count"], 1)
+        self.assertEqual(maintenance_task["detail"]["progress"]["ready_count"], 1)
+        self.assertEqual(maintenance_task["detail"]["progress"]["pending_count"], 0)
+        self.assertTrue(maintenance_task["detail"]["progress"]["can_unlock_downstream"])
+
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

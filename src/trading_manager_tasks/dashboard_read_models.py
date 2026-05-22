@@ -1907,6 +1907,23 @@ def _latest_promotion_review_artifacts(dataset_root: Path) -> dict[str, Any] | N
     return {"decision": dict(decision), "review": dict(review or {}), "receipt_refs": refs}
 
 
+def _latest_promotion_readiness_artifacts(dataset_root: Path) -> dict[str, Any] | None:
+    readiness_root = dataset_root / "promotion_readiness_runs"
+    if not readiness_root.exists():
+        return None
+    candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
+    for readiness_path in sorted(readiness_root.glob("*/promotion_readiness_record.json")):
+        readiness = _load_optional_json_object(readiness_path)
+        if readiness is None:
+            continue
+        created = str(readiness.get("created_at_utc") or readiness_path.parent.name)
+        candidates.append((created, readiness_path, readiness))
+    if not candidates:
+        return None
+    _created, readiness_path, readiness = sorted(candidates, key=lambda item: item[0])[-1]
+    return {"readiness": dict(readiness), "receipt_refs": [str(readiness_path)]}
+
+
 def _evaluation_worker_info() -> dict[str, str]:
     return {"worker_id": "evaluation_worker_1", "worker_label": "Evaluation Worker 1", "worker_kind": "evaluation_worker"}
 
@@ -2108,6 +2125,15 @@ def _model_group_replay_timeline_tasks(
     promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")
     promotion_complete = promotion_decision is not None
     promotion_eligible = promotion_decision_status == "eligible"
+    readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root)
+    readiness_record = readiness_artifacts["readiness"] if readiness_artifacts else None
+    readiness_complete = (
+        promotion_eligible
+        and readiness_record is not None
+        and str(readiness_record.get("contract_type") or "") == "promotion_readiness_record"
+        and readiness_record.get("model_activation_performed") is False
+        and readiness_record.get("active_model_config_written") is False
+    )
     promotion_blockers = [
         str(item)
         for item in (
@@ -2159,20 +2185,25 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.maintenance",
         label="Maintenance",
-        task_state="current" if promotion_eligible else "future",
-        status="ready" if promotion_eligible else "blocked",
+        task_state="completed" if readiness_complete else ("current" if promotion_eligible else "future"),
+        status="succeeded" if readiness_complete else ("ready" if promotion_eligible else "blocked"),
         reason=(
+            "Promotion readiness handoff is complete; execution can admit the promoted model group to market-hours shadow review."
+            if readiness_complete
+            else
             "Model-group candidate is eligible for maintenance handoff after promotion review."
             if promotion_eligible
             else "Waiting for eligible model-group promotion review before maintenance can run."
         ),
+        receipt_refs=list(readiness_artifacts["receipt_refs"]) if readiness_artifacts else None,
         blockers=[] if promotion_eligible else ["model_group.promotion_review"],
         stage_type="maintenance",
         progress=_single_step_progress(
             stage_id="model_group.maintenance",
-            status="ready" if promotion_eligible else "blocked",
-            complete=False,
+            status="succeeded" if readiness_complete else ("ready" if promotion_eligible else "blocked"),
+            complete=readiness_complete,
             unit_label="maintenance-step",
+            can_unlock_downstream=readiness_complete,
         ),
     )
     return tasks
