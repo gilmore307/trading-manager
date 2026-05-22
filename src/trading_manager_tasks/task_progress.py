@@ -133,6 +133,19 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
     nodes = row.get("nodes")
     if isinstance(nodes, list) and nodes:
         node_rows = [node for node in nodes if isinstance(node, Mapping)]
+        meaningful_nodes = [
+            node
+            for node in node_rows
+            if str(node.get("node_id") or "") != "stage_started"
+            or node.get("processed_count") is not None
+            or node.get("expected_count") is not None
+            or node.get("elapsed_seconds") is not None
+            or node.get("expected_seconds") is not None
+            or str(node.get("status") or "").lower() in {"succeeded", "success", "completed", "complete", "ready", "failed", "error"}
+        ]
+        if not meaningful_nodes:
+            return None
+        node_rows = meaningful_nodes
         completed_nodes = [
             node
             for node in node_rows

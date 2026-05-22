@@ -237,11 +237,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["blocker_count"], 0)
         self.assertEqual(task["detail"]["blockers"], [])
-        self.assertEqual(task["detail"]["progress"]["status"], "running")
-        self.assertEqual(task["detail"]["progress"]["ready_count"], 0)
-        self.assertEqual(task["detail"]["progress"]["expected_count"], 1)
-        self.assertEqual(task["detail"]["progress"]["pending_count"], 1)
-        self.assertEqual(task["detail"]["progress"]["nodes"][0]["node_id"], "stage_started")
+        self.assertIsNone(task["detail"]["progress"])
 
     def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
