@@ -1058,6 +1058,19 @@ def _model_worker_info() -> dict[str, str]:
     return {"worker_id": "model_worker_1", "worker_label": "Model Worker 1", "worker_kind": "model_worker"}
 
 
+def _stage_layer(raw_stage: Mapping[str, Any]) -> int | None:
+    try:
+        return int(raw_stage.get("layer"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_monthly_substrate_stage(raw_stage: Mapping[str, Any]) -> bool:
+    stage_type = str(raw_stage.get("stage_type") or "")
+    layer = _stage_layer(raw_stage)
+    return stage_type in MONTHLY_TASK_STAGE_TYPES and layer in MONTHLY_SUBSTRATE_LAYERS
+
+
 def _worker_info_for_stage(
     raw_stage: Mapping[str, Any],
     *,
@@ -1084,6 +1097,8 @@ def _worker_info_for_stage(
 
     stage_type = str(raw_stage.get("stage_type") or "unknown")
     if stage_type in {"data_acquisition", "feature_generation"}:
+        if not _is_monthly_substrate_stage(raw_stage):
+            return _model_worker_info()
         return _month_ingest_worker_info(month, worker_count=month_ingest_worker_count)
     if stage_type in {"model_generation", "model_evaluation", "promotion_review", "maintenance"}:
         return _model_worker_info()
@@ -1184,6 +1199,8 @@ def _monthly_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
 def _fold_model_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
     stage_type = str(raw_stage.get("stage_type") or "")
     stage_offset = {
+        "data_acquisition": -1,
+        "feature_generation": 0,
         "model_generation": 1,
         "model_evaluation": 91,
         "promotion_review": 92,
@@ -1228,10 +1245,7 @@ def _stable_task_uid(raw_stage: Mapping[str, Any], *, task_period: str | None) -
 
 def _is_fold_dashboard_stage(raw_stage: Mapping[str, Any]) -> bool:
     stage_type = str(raw_stage.get("stage_type") or "")
-    try:
-        layer = int(raw_stage.get("layer"))
-    except (TypeError, ValueError):
-        layer = 0
+    layer = _stage_layer(raw_stage) or 0
     return stage_type in FOLD_MODEL_STAGE_TYPES or (stage_type in MONTHLY_TASK_STAGE_TYPES and layer not in MONTHLY_SUBSTRATE_LAYERS)
 
 
@@ -1277,6 +1291,8 @@ def _monthly_dashboard_stage_rows(raw_stage: Mapping[str, Any], *, timeline_mont
 
     stage_type = str(raw_stage.get("stage_type") or "")
     if stage_type not in MONTHLY_TASK_STAGE_TYPES:
+        return [dict(raw_stage)]
+    if not _is_monthly_substrate_stage(raw_stage):
         return [dict(raw_stage)]
     months = _timeline_period_months(timeline_month)
     if len(months) <= 1:
@@ -1570,7 +1586,7 @@ def _task_timeline(
                     continue
             elif str(raw_stage.get("stage_type") or "") not in FOLD_MODEL_STAGE_TYPES:
                 continue
-            if active_model_fold_key and str(raw_stage.get("stage_type") or "") in MONTHLY_TASK_STAGE_TYPES:
+            if active_model_fold_key and _is_monthly_substrate_stage(raw_stage):
                 period_months = _timeline_period_months(timeline_month)
                 task_month = period_months[0] if period_months else str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
             else:

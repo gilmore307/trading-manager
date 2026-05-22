@@ -1505,6 +1505,26 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            (runtime / "model_training_workflow_state_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-06",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "succeeded",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             state_path = tmp / "runtime" / "historical_scheduler_state.json"
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_text(
@@ -1521,8 +1541,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             write_task_progress_node(
                 progress_root=runtime / "task_progress",
-                worker_id="month_ingest_worker_1",
-                task_uid="2016-01:layer_03_target_state_vector.data_acquisition",
+                worker_id="model_worker_1",
+                task_uid="2016-01..2016-06:layer_03_target_state_vector.data_acquisition",
                 stage_id="layer_03_target_state_vector.data_acquisition",
                 unit_label="rows",
                 processed_count=40,
@@ -1543,24 +1563,24 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
-        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation", "model_generation"])
+        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation", "model_generation", "data_acquisition"])
         self.assertEqual(fold_tasks[0]["task_number"], 37)
         self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime.model_generation")
         self.assertIsNone(fold_tasks[0]["detail"]["progress"])
         self.assertIsNone(fold_tasks[1]["detail"]["progress"])
-        monthly_prep_tasks = [
+        fold_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
             if task["task_id"] == "layer_03_target_state_vector.data_acquisition"
         ]
-        self.assertEqual([task["month"] for task in monthly_prep_tasks], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
+        self.assertEqual([task["month"] for task in fold_prep_tasks], ["2016-fold1"])
         timeline_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
         self.assertGreater(timeline_months.index("2016-fold1"), max(index for index, month in enumerate(timeline_months) if month == "2016-06"))
-        self.assertEqual(monthly_prep_tasks[0]["dataset_unit_months"], None)
-        self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["ready_count"], 40)
-        self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["expected_count"], 100)
-        self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["unit_label"], "rows")
-        self.assertIsNone(monthly_prep_tasks[1]["detail"]["progress"])
+        self.assertEqual(fold_prep_tasks[0]["worker_label"], "Model Worker 1")
+        self.assertEqual(fold_prep_tasks[0]["dataset_unit_months"], None)
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["ready_count"], 40)
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["expected_count"], 100)
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["unit_label"], "rows")
 
     def test_task_timeline_places_fold_after_ending_month(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2175,8 +2195,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertIn(
-            ("2016-07", "layer_03_target_state_vector.feature_generation", "AAPL"),
-            [(task["month"], task["task_id"], task["target_symbol"]) for task in current_tasks],
+            ("2016-fold2", "layer_03_target_state_vector.feature_generation", "AAPL", "Model Worker 1"),
+            [(task["month"], task["task_id"], task["target_symbol"], task["worker_label"]) for task in current_tasks],
         )
         self.assertNotIn(
             ("2016-fold1", "layer_01_market_regime.model_evaluation"),
