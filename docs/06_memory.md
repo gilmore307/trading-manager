@@ -11,11 +11,11 @@ This file records how durable project memory should be handled for `trading-mana
 - Durable project notes: `docs/06_memory.md`.
 - Registry vocabulary: SQL migrations and generated `scripts/registry/current.csv`.
 - Runtime state: `trading-storage/storage/02_control_plane/runtime/` files.
-- Historical path: Git history and append-only SQL migrations.
+- Audit history: Git history and append-only SQL migrations.
 
 ## Rule
 
-Do not keep route-change narrative in active docs once the current contract is clear. If a fact matters operationally, write the current rule. If only history matters, rely on Git or migration history.
+Active docs state current operational rules. Audit-only details stay in Git history or append-only SQL migrations.
 
 ## Not Stored Here
 

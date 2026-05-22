@@ -323,7 +323,7 @@ def build_stage_run_dashboard(
 ) -> StageRunDashboard:
     """Build a single stage dashboard/receipt without mutating providers or storage."""
 
-    _ = packet_root  # compatibility argument retained for CLI/API stability.
+    _ = packet_root  # Accepted but unused; dashboard reads from packet_storage_root.
     model_layer = _model_layer_for_stage(stage_id)
     coverage = collect_stage_coverage(stage_id=stage_id, start_month=start_month, end_month=end_month, database_url=database_url)
     preview = preview_next_provider_dispatch(

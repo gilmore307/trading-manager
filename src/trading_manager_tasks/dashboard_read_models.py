@@ -390,8 +390,8 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
             updated["handling_status"] = "closed"
             updated["dashboard_severity"] = "notice"
             updated["retry_recommendation"] = (
-                "obsolete route; current workflow uses layer_10_event_risk_governor. "
-                "Prepare current Layer 10 event-feed artifacts before its data_acquisition stage runs."
+                "Superseded by layer_10_event_risk_governor. "
+                "Prepare Layer 10 event-feed artifacts before its data_acquisition stage runs."
             )
             updated_rows.append(updated)
         else:

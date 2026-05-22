@@ -1,6 +1,6 @@
 # Decisions
 
-This is the current decision ledger for `trading-manager`. It records durable active rules, not every route taken to reach them. Earlier wording remains available in Git history and immutable registry migrations.
+This is the current decision ledger for `trading-manager`. It records durable active rules.
 
 ## D001 - Manager is the control plane
 
@@ -74,7 +74,7 @@ Service locks, scheduler state, workflow checkpoints, decision logs, and status 
 
 ## D015 - Documentation favors current contracts
 
-Active docs should describe the current system from first principles. Obsolete naming, abandoned approaches, and transitional planning notes should be removed from active explanations unless they are necessary to operate current code.
+Active docs describe current contracts, responsibilities, and operating rules directly. Audit-only details remain in Git history or append-only SQL migrations.
 
 ## D016 - Manager writes fold completion state only
 

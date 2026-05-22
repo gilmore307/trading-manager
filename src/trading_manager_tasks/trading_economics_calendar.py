@@ -37,9 +37,9 @@ def _te_monthly_root(trading_data_root: Path) -> Path:
     storage_owned = root / "monthly_backfill" / "trading_economics_calendar_web"
     if storage_owned.exists():
         return storage_owned
-    legacy_component_local = root / "storage" / "monthly_backfill" / "trading_economics_calendar_web"
-    if legacy_component_local.exists():
-        return legacy_component_local
+    component_local = root / "storage" / "monthly_backfill" / "trading_economics_calendar_web"
+    if component_local.exists():
+        return component_local
     return storage_owned
 
 

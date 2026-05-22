@@ -670,7 +670,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
         self.assertIn("retry completed successfully", agent_errors[0]["retry_recommendation"])
 
-    def test_supersedes_obsolete_layer_nine_event_risk_error(self):
+    def test_supersedes_layer_nine_event_risk_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)

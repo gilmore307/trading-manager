@@ -406,7 +406,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", required=True, help="Inclusive YYYY-MM end month.")
     parser.add_argument("--exclude-crypto", action="store_true", help="Skip OKX crypto; by default it joins at its later 2018-01 start.")
     parser.add_argument("--requested-by", default=DEFAULT_REQUESTED_BY)
-    parser.add_argument("--model-layer", action="append", choices=SUPPORTED_MARKET_REGIME_MODEL_LAYERS, default=[], help="Universe model_layer to plan for Alpaca bars. Defaults to Layer 1 for backward compatibility; repeat for multiple layers.")
+    parser.add_argument("--model-layer", action="append", choices=SUPPORTED_MARKET_REGIME_MODEL_LAYERS, default=[], help="Universe model_layer to plan for Alpaca bars. Omit for Layer 1; repeat for multiple layers.")
     parser.add_argument("--format", choices=("jsonl", "json", "csv"), default="jsonl")
     parser.add_argument("--inventory", action="store_true", help="Print source availability inventory instead of requests.")
     args = parser.parse_args(argv)

@@ -1,6 +1,6 @@
 # Tasks
 
-This is the current manager task ledger. It should stay short and operational. Historical route narrative belongs in Git history and append-only SQL migrations.
+This is the current manager task ledger. It stays short, operational, and tied to active gates.
 
 ## Current Operating Priority
 

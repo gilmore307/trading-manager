@@ -437,7 +437,7 @@ def dispatch_layer_provider_acquisition(
 
 
 def dispatch_layer_one_provider_acquisition(**kwargs: Any) -> ProviderDispatchSummary:
-    """Backward-compatible wrapper for Layer 1 provider dispatch."""
+    """Layer 1 provider dispatch wrapper."""
 
     return dispatch_layer_provider_acquisition(model_layer=LAYER_ONE_MODEL_LAYER, **kwargs)
 
