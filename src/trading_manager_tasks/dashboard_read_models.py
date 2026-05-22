@@ -1752,6 +1752,40 @@ def _timeline_period_months(timeline_month: str | None) -> list[str]:
     return _months_in_span(start_month, end_month)
 
 
+def _task_timeline_sort_key(task: Mapping[str, Any]) -> tuple[int, int, int, int, int]:
+    month = str(task.get("month") or "")
+    months = _timeline_period_months(month)
+    if months:
+        end_offset = _month_offset(months[-1])
+        start_offset = _month_offset(months[0])
+    else:
+        end_offset = _month_offset(month)
+        start_offset = end_offset
+    period_after_month = 1 if len(months) > 1 or FOLD_LABEL_RE.fullmatch(month) else 0
+    try:
+        task_number = int(task.get("task_number"))
+    except (TypeError, ValueError):
+        task_number = 1_000_000
+    try:
+        sequence = int(task.get("sequence"))
+    except (TypeError, ValueError):
+        sequence = 1_000_000
+    return (
+        end_offset if end_offset is not None else 1_000_000,
+        period_after_month,
+        start_offset if start_offset is not None else 1_000_000,
+        task_number,
+        sequence,
+    )
+
+
+def _sort_task_timeline(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sorted_tasks = sorted(tasks, key=_task_timeline_sort_key)
+    for index, task in enumerate(sorted_tasks, start=1):
+        task["sequence"] = index
+    return sorted_tasks
+
+
 def _replay_window_months(dataset_root: Path) -> tuple[str, str]:
     rows = _replay_coverage_rows(dataset_root / "replay_window_manifest.csv")
     if not rows:
@@ -2230,6 +2264,7 @@ def build_historical_task_progress_summary(
             selected_target_symbol=_selected_target_symbol(status),
         )
     )
+    task_timeline = _sort_task_timeline(task_timeline)
     public_active_task = _public_active_task(status, task_timeline)
     agent_error_summary = _mark_superseded_agent_errors(
         _agent_error_summary(storage_root, database_url=database_url),

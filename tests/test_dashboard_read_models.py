@@ -1452,11 +1452,92 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             if task["task_id"] == "layer_03_target_state_vector.data_acquisition"
         ]
         self.assertEqual([task["month"] for task in monthly_prep_tasks], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
+        timeline_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
+        self.assertGreater(timeline_months.index("2016-fold1"), max(index for index, month in enumerate(timeline_months) if month == "2016-06"))
         self.assertEqual(monthly_prep_tasks[0]["dataset_unit_months"], None)
         self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["ready_count"], 40)
         self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["expected_count"], 100)
         self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["unit_label"], "rows")
         self.assertIsNone(monthly_prep_tasks[1]["detail"]["progress"])
+
+    def test_task_timeline_places_fold_after_ending_month(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            for month in ("2016-06", "2016-12"):
+                (runtime / f"model_training_workflow_state_{month}.json").write_text(
+                    json.dumps(
+                        {
+                            "contract_type": "manager_model_training_workflow_state",
+                            "start_month": month,
+                            "end_month": month,
+                            "stages": [
+                                {
+                                    "stage_id": "layer_01_market_regime.data_acquisition",
+                                    "stage_type": "data_acquisition",
+                                    "layer": 1,
+                                    "layer_key": "layer_01_market_regime",
+                                    "status": "succeeded",
+                                }
+                            ],
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            for start, end in (("2016-01", "2016-06"), ("2016-07", "2016-12")):
+                (runtime / f"model_training_fold_state_{start}_{end}.json").write_text(
+                    json.dumps(
+                        {
+                            "contract_type": "manager_model_training_workflow_state",
+                            "start_month": start,
+                            "end_month": end,
+                            "stages": [
+                                {
+                                    "stage_id": "layer_01_market_regime.model_generation",
+                                    "stage_type": "model_generation",
+                                    "layer": 1,
+                                    "layer_key": "layer_01_market_regime",
+                                    "status": "succeeded",
+                                }
+                            ],
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_daemon_state",
+                        "start_month": "2017-01",
+                        "end_month": "2017-01",
+                        "current_month": "2017-01",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
+
+        ordered_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
+        self.assertLess(ordered_months.index("2016-06"), ordered_months.index("2016-fold1"))
+        self.assertLess(ordered_months.index("2016-fold1"), ordered_months.index("2016-12"))
+        self.assertLess(ordered_months.index("2016-12"), ordered_months.index("2016-fold2"))
 
     def test_current_incomplete_calendar_month_is_not_exposed_as_ready_task(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
