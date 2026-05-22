@@ -351,7 +351,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
-        self.assertTrue(all(task["month"] == "2016-01..2016-06" for task in evaluation_tasks))
+        self.assertTrue(all(task["month"] == "2016-fold1" for task in evaluation_tasks))
         self.assertTrue(all(task["dataset_unit_kind"] == "model_group_training_fold" for task in evaluation_tasks))
         self.assertTrue(all(task["dataset_unit_months"] == 6 for task in evaluation_tasks))
         self.assertEqual(evaluation_tasks[1]["detail"]["dataset_unit"]["start_month"], "2016-01")
@@ -378,7 +378,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[3]["detail"]["blockers"], ["model_group.promotion_review"])
         self.assertEqual(payload["status"], "blocked")
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.data_acquisition")
-        self.assertEqual(payload["chart_payload"]["current_month"], "2016-01..2016-06")
+        self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
         self.assertEqual(payload["chart_payload"]["active_task"]["worker_id"], "evaluation_worker_1")
         self.assertNotEqual(payload["chart_payload"]["internal_active_stage"], payload["chart_payload"]["active_stage"])
 
@@ -1161,7 +1161,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
-        fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2016-06"]
+        fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
         self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation", "model_generation"])
         self.assertEqual(fold_tasks[0]["task_number"], 37)
         self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime.model_generation")
@@ -1573,8 +1573,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertIn(("2017-01..2017-06", "layer_01_market_regime.model_generation"), [(task["month"], task["task_id"]) for task in current_tasks])
-        blocked_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-07..2016-12")
+        self.assertIn(("2017-fold1", "layer_01_market_regime.model_generation"), [(task["month"], task["task_id"]) for task in current_tasks])
+        blocked_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2")
         self.assertEqual(blocked_task["task_state"], "future")
 
     def test_task_timeline_uses_latest_model_worker_fold_for_current_task(self):
@@ -1717,7 +1717,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [(task["month"], task["task_id"], task["target_symbol"]) for task in current_tasks],
         )
         self.assertNotIn(
-            ("2016-01..2016-06", "layer_01_market_regime.model_evaluation"),
+            ("2016-fold1", "layer_01_market_regime.model_evaluation"),
             [(task["month"], task["task_id"]) for task in current_tasks],
         )
 
@@ -1821,7 +1821,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertNotIn(
-            ("2016-01..2016-06", "layer_09_option_expression.feature_generation"),
+            ("2016-fold1", "layer_09_option_expression.feature_generation"),
             [(task["month"], task["task_id"]) for task in current_tasks],
         )
 

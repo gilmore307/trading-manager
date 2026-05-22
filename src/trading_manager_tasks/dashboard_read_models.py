@@ -47,6 +47,7 @@ BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
 MAX_AGENT_ERROR_SUMMARY_ROWS = 50
 STAGE_FAILURE_RE = re.compile(r"stage\s+([A-Za-z0-9_.-]+)\s+command", re.IGNORECASE)
+FOLD_LABEL_RE = re.compile(r"^(\d{4})-fold([1-9]\d*)$")
 
 
 def now_utc() -> str:
@@ -1063,10 +1064,67 @@ def _month_offset(month: str | None) -> int | None:
 
 def _fold_start_month(period: str | None) -> str | None:
     text = str(period or "")
+    fold_label = FOLD_LABEL_RE.fullmatch(text)
+    if fold_label:
+        year = int(fold_label.group(1))
+        fold_number = int(fold_label.group(2))
+        month_number = (fold_number - 1) * MONTHS_PER_MODEL_FOLD + 1
+        if month_number <= 12:
+            return f"{year:04d}-{month_number:02d}"
+        return None
     if ".." not in text:
         return None
     start, _end = text.split("..", 1)
     return start if _is_month_key(start) else None
+
+
+def _fold_period_range(start_month: str, end_month: str) -> str:
+    return f"{start_month}..{end_month}"
+
+
+def _fold_period_label(start_month: str, end_month: str) -> str:
+    if not _is_month_key(start_month) or not _is_month_key(end_month):
+        return _fold_period_range(start_month, end_month)
+    try:
+        start_year = int(start_month[:4])
+        start_month_number = int(start_month[5:7])
+        end_year = int(end_month[:4])
+    except ValueError:
+        return _fold_period_range(start_month, end_month)
+    if start_year != end_year:
+        return _fold_period_range(start_month, end_month)
+    if _month_span_count(start_month, end_month) != MONTHS_PER_MODEL_FOLD:
+        return _fold_period_range(start_month, end_month)
+    if (start_month_number - 1) % MONTHS_PER_MODEL_FOLD != 0:
+        return _fold_period_range(start_month, end_month)
+    fold_number = ((start_month_number - 1) // MONTHS_PER_MODEL_FOLD) + 1
+    return f"{start_year:04d}-fold{fold_number}"
+
+
+def _add_months(month: str, offset: int) -> str | None:
+    if not _is_month_key(month):
+        return None
+    try:
+        year = int(month[:4])
+        month_number = int(month[5:7])
+    except ValueError:
+        return None
+    month_index = year * 12 + month_number - 1 + offset
+    return f"{month_index // 12:04d}-{month_index % 12 + 1:02d}"
+
+
+def _fold_label_range(period: str | None) -> str | None:
+    text = str(period or "")
+    fold_start = _fold_start_month(text)
+    if fold_start is None or not FOLD_LABEL_RE.fullmatch(text):
+        return None
+    fold_end = _add_months(fold_start, MONTHS_PER_MODEL_FOLD - 1)
+    if fold_end is None:
+        return None
+    months = _months_in_span(fold_start, fold_end)
+    if len(months) != MONTHS_PER_MODEL_FOLD:
+        return None
+    return _fold_period_range(months[0], months[-1])
 
 
 def _monthly_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
@@ -1124,7 +1182,8 @@ def _stable_task_number(raw_stage: Mapping[str, Any], *, task_period: str | None
 
 def _stable_task_uid(raw_stage: Mapping[str, Any], *, task_period: str | None) -> str:
     stage_id = str(raw_stage.get("stage_id") or "unknown_stage")
-    return f"{task_period or 'unscheduled'}:{stage_id}"
+    period = _fold_label_range(task_period) or task_period or "unscheduled"
+    return f"{period}:{stage_id}"
 
 
 def _is_fold_dashboard_stage(raw_stage: Mapping[str, Any]) -> bool:
@@ -1236,7 +1295,7 @@ def _active_model_worker_fold_key(status: HistoricalSchedulerStatus) -> str | No
         start = str(fold_months[0] or "")
         end = str(fold_months[MONTHS_PER_MODEL_FOLD - 1] or "")
         if start and end:
-            return f"{start}..{end}"
+            return _fold_period_label(start, end)
     start_month = str(latest_decision.get("start_month") or "")
     end_month = str(latest_decision.get("end_month") or "")
     if not start_month or not end_month:
@@ -1246,7 +1305,7 @@ def _active_model_worker_fold_key(status: HistoricalSchedulerStatus) -> str | No
             start_month = str(workflow_plan.get("start_month") or "")
             end_month = str(workflow_plan.get("end_month") or "")
     if start_month and end_month and start_month != end_month:
-        return f"{start_month}..{end_month}"
+        return _fold_period_label(start_month, end_month)
     return None
 
 
@@ -1260,7 +1319,7 @@ def _selected_model_worker_fold_stage_set(
     selection = select_model_worker_fold(storage_root=storage_root, max_month=max_dashboard_month)
     if selection is None:
         return None
-    fold_key = f"{selection.start_month}..{selection.end_month}"
+    fold_key = _fold_period_label(selection.start_month, selection.end_month)
     if fold_key in included_months:
         return None
     try:
@@ -1384,7 +1443,7 @@ def _task_timeline(
                 continue
             fold_start = str(fold_payload.get("start_month") or "")
             fold_end = str(fold_payload.get("end_month") or "")
-            fold_key = f"{fold_start}..{fold_end}" if fold_start and fold_end else fold_path.stem
+            fold_key = _fold_period_label(fold_start, fold_end) if fold_start and fold_end else fold_path.stem
             if fold_end and not _month_visible_by_completed_cutoff(fold_end, max_month=max_dashboard_month):
                 continue
             if fold_key in included_months:
@@ -1670,6 +1729,11 @@ def _timeline_period_months(timeline_month: str | None) -> list[str]:
     if _is_month_key(text):
         return [text]
     if ".." not in text:
+        range_label = _fold_label_range(text)
+        if range_label is None:
+            return []
+        text = range_label
+    if ".." not in text:
         return []
     start_month, end_month = text.split("..", 1)
     return _months_in_span(start_month, end_month)
@@ -1807,7 +1871,7 @@ def _model_group_replay_timeline_tasks(
         storage_root=storage_root,
         selected_target_symbol=selected_target_symbol,
     )
-    period = f"{training_start_month}..{training_end_month}"
+    period = _fold_period_label(training_start_month, training_end_month)
     replay_start_month, replay_end_month = _replay_window_months(dataset_root)
     replay_unit_months = _replay_window_month_count(dataset_root)
     layer_key = "model_group"
