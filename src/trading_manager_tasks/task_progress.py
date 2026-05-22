@@ -132,16 +132,25 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
         }
     nodes = row.get("nodes")
     if isinstance(nodes, list) and nodes:
+        node_rows = [node for node in nodes if isinstance(node, Mapping)]
+        completed_nodes = [
+            node
+            for node in node_rows
+            if str(node.get("status") or "").lower() in {"succeeded", "success", "completed", "complete", "ready"}
+        ]
+        failed_nodes = [node for node in node_rows if str(node.get("status") or "").lower() in {"failed", "error"}]
+        expected_nodes = max(1, len(node_rows))
+        ready_nodes = min(len(completed_nodes), expected_nodes)
         return {
             "stage_id": row.get("stage_id"),
             "status": row.get("status") or "running",
             "unit_label": str(unit_label or "nodes"),
-            "expected_count": None,
-            "ready_count": None,
-            "pending_count": None,
-            "failed_count": 0,
+            "expected_count": expected_nodes,
+            "ready_count": ready_nodes,
+            "pending_count": max(expected_nodes - ready_nodes - len(failed_nodes), 0),
+            "failed_count": len(failed_nodes),
             "accepted_failed_count": 0,
-            "can_unlock_downstream": False,
+            "can_unlock_downstream": ready_nodes >= expected_nodes,
         }
     return None
 
