@@ -178,8 +178,9 @@ def _autonomous_event_feed_task_key(task_key: Mapping[str, Any]) -> dict[str, An
         params["dry_run"] = False
     elif feed_id == "07_feed_trading_economics_calendar_web":
         params["allow_live_fetch"] = True
+        params["use_authenticated_cookies"] = False
         params["persist_failure_diagnostics"] = True
-        controls["failure_recovery_route"] = ["http_cookie_primary", "retry_after_60s", "browser_ui_fallback"]
+        controls["failure_recovery_route"] = ["logged_out_visible_page_primary", "retry_after_60s", "browser_ui_fallback"]
     runtime_key["params"] = params
     policy_refs = [str(item) for item in runtime_key.get("policy_refs") or []]
     if "autonomous_historical_provider_acquisition" not in policy_refs:

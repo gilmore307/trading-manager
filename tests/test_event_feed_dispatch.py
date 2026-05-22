@@ -75,13 +75,14 @@ class EventFeedDispatchTests(unittest.TestCase):
             self.assertEqual(by_feed["05_feed_gdelt_news"]["manager_controls"]["allowed_providers"], ["gdelt_bigquery"])
             self.assertEqual(by_feed["05_feed_gdelt_news"]["manager_controls"]["allowed_endpoint_families"], ["news_query"])
             self.assertTrue(by_feed["07_feed_trading_economics_calendar_web"]["params"]["allow_live_fetch"])
+            self.assertFalse(by_feed["07_feed_trading_economics_calendar_web"]["params"]["use_authenticated_cookies"])
             self.assertTrue(by_feed["07_feed_trading_economics_calendar_web"]["params"]["persist_failure_diagnostics"])
             self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["allowed_providers"], ["trading_economics"])
             self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["allowed_endpoint_families"], ["calendar_web"])
             self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["max_time_window"], "45d")
             self.assertEqual(
                 by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["failure_recovery_route"],
-                ["http_cookie_primary", "retry_after_60s", "browser_ui_fallback"],
+                ["logged_out_visible_page_primary", "retry_after_60s", "browser_ui_fallback"],
             )
 
     def test_trading_economics_dispatch_retries_once_then_marks_browser_fallback(self):

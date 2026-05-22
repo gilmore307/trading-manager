@@ -52,7 +52,7 @@ Trading Economics calendar handling is split into two manager-owned routes:
 2. Recent poll: an ongoing realtime-maintenance task key for the logged-out visible recent calendar page. It uses `date_range_mode=recent`, `use_authenticated_cookies=false`, and no API/download/export route. The realtime system owns scheduling this poll and upserting planned/released macro events into SQL.
 3. Due-release refresh: when a scheduled event reaches its release time, the realtime system should fetch immediately. If TE fetch fails or returns no released `actual`/`revised` value, retry every 10 seconds for 6 additional attempts, roughly 1 minute total retry time, under `te_recent_release_fetch_retry_10s_six_attempts_then_websearch`. If all attempts fail or the release still appears missing, fall back to `websearch_public_macro_release` to find either the released value or a documented delay/cancellation/no-release reason. Fallback rows must preserve provenance and must not be silently merged into TE-origin rows.
 
-Training should read TE macro events from SQL first. If gaps remain, the manager may fill them with reviewed authenticated TE historical fetches or public macro web-search provenance rows; fallback provenance must remain explicit.
+Training should read TE macro events from SQL first. If narrow gaps remain, the manager may fill them with reviewed logged-out visible-page custom-date fetches or public macro web-search provenance rows; fallback provenance must remain explicit. Ongoing TE maintenance does not depend on an active TE subscription.
 
 ## Useful Commands
 
