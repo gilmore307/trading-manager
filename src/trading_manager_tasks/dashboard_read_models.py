@@ -437,7 +437,46 @@ def _is_transient_active_scheduler_backoff(status: HistoricalSchedulerStatus) ->
     return status.lock.status == "active" and "no executable scheduler-owned workflow stage" in reason
 
 
-def _owner_status(status: HistoricalSchedulerStatus) -> tuple[str, str, str]:
+def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[dict[str, Any]]) -> dict[str, Any] | None:
+    current_or_ready: list[dict[str, Any]] = []
+    for task in task_timeline:
+        if str(task.get("task_state") or "") == "current":
+            current_or_ready.append(task)
+    for task in task_timeline:
+        if str(task.get("status") or "") == "ready":
+            current_or_ready.append(task)
+    for task in current_or_ready:
+        if str(task.get("layer_key") or "") == "model_group":
+            return task
+    if status.lock.status == "active" and current_or_ready:
+        return current_or_ready[0]
+    return None
+
+
+def _public_active_task_summary(task: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if task is None:
+        return None
+    return {
+        "task_id": task.get("task_id"),
+        "task_label": task.get("task_label"),
+        "month": task.get("month"),
+        "status": task.get("status"),
+        "task_state": task.get("task_state"),
+        "stage_type": task.get("stage_type"),
+        "layer": task.get("layer"),
+        "layer_key": task.get("layer_key"),
+        "worker_id": task.get("worker_id"),
+        "worker_label": task.get("worker_label"),
+        "worker_kind": task.get("worker_kind"),
+        "target_symbol": task.get("target_symbol"),
+    }
+
+
+def _owner_status(
+    status: HistoricalSchedulerStatus,
+    *,
+    public_active_task: Mapping[str, Any] | None = None,
+) -> tuple[str, str, str]:
     """Return dashboard status, severity, and short summary."""
 
     workflow = status.workflow_checkpoint
@@ -462,6 +501,27 @@ def _owner_status(status: HistoricalSchedulerStatus) -> tuple[str, str, str]:
             "blocked",
             "medium",
             f"Historical modeling is blocked at {status.current_stage or 'unknown stage'}: {status.blocked_reason}.",
+        )
+    if public_active_task is not None:
+        label = str(public_active_task.get("task_label") or public_active_task.get("task_id") or "the current task")
+        period = str(public_active_task.get("month") or "the selected period")
+        task_status = str(public_active_task.get("status") or "").lower()
+        if task_status == "blocked":
+            return (
+                "blocked",
+                "medium",
+                f"Historical workflow is blocked at {label} for {period}.",
+            )
+        if status.lock.status == "active":
+            return (
+                "running",
+                "info",
+                f"Historical scheduler is running; current public task is {label} for {period}.",
+            )
+        return (
+            "ready",
+            "info",
+            f"Historical workflow is ready at {label} for {period}.",
         )
     if workflow.terminal_complete:
         return (
@@ -1986,6 +2046,7 @@ def build_historical_task_progress_summary(
             selected_target_symbol=_selected_target_symbol(status),
         )
     )
+    public_active_task = _public_active_task(status, task_timeline)
     agent_error_summary = _mark_superseded_agent_errors(
         _agent_error_summary(storage_root, database_url=database_url),
         task_timeline,
@@ -1996,11 +2057,14 @@ def build_historical_task_progress_summary(
             stage_counts[task_status] = stage_counts.get(task_status, 0) + 1
         stage_counts = dict(sorted(stage_counts.items()))
     progress_percent = _progress_percent(stage_counts)
-    dashboard_status, severity, summary = _owner_status(status)
+    dashboard_status, severity, summary = _owner_status(status, public_active_task=public_active_task)
     active_blocker = status.blocked_reason or (status.open_operational_items[0] if status.open_operational_items else None)
     chart_payload: dict[str, Any] = {
-        "current_month": status.current_month,
-        "active_stage": status.current_stage,
+        "current_month": public_active_task.get("month") if public_active_task else status.current_month,
+        "active_stage": public_active_task.get("task_id") if public_active_task else None,
+        "active_task": _public_active_task_summary(public_active_task),
+        "internal_current_month": status.current_month,
+        "internal_active_stage": status.current_stage,
         "progress_percent": progress_percent,
         "stage_counts": stage_counts,
         "terminal_complete": status.workflow_checkpoint.terminal_complete,

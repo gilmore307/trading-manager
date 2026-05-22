@@ -229,6 +229,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task_ids = [task["task_id"] for task in payload["chart_payload"]["task_timeline"]]
         self.assertNotIn("layer_03_target_state_vector.model_evaluation", task_ids)
         self.assertNotIn("model_group.model_evaluation", task_ids)
+        self.assertIsNone(payload["chart_payload"]["active_stage"])
+        self.assertIn("internal_active_stage", payload["chart_payload"])
 
 
     def test_non_owner_operational_items_are_ready_not_action_required(self):
@@ -374,6 +376,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("promotion-evaluation-review", evaluation_tasks[2]["detail"]["blockers"])
         self.assertEqual(evaluation_tasks[3]["task_label"], "Maintenance")
         self.assertEqual(evaluation_tasks[3]["detail"]["blockers"], ["model_group.promotion_review"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.data_acquisition")
+        self.assertEqual(payload["chart_payload"]["current_month"], "2016-01..2016-06")
+        self.assertEqual(payload["chart_payload"]["active_task"]["worker_id"], "evaluation_worker_1")
+        self.assertNotEqual(payload["chart_payload"]["internal_active_stage"], payload["chart_payload"]["active_stage"])
 
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
