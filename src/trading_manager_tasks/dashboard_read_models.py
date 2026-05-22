@@ -1852,6 +1852,21 @@ def _replay_month_progress(
     }
 
 
+def _single_step_progress(*, stage_id: str, status: str, complete: bool, unit_label: str) -> dict[str, Any]:
+    ready = 1 if complete else 0
+    return {
+        "stage_id": stage_id,
+        "status": "complete" if complete else status,
+        "unit_label": unit_label,
+        "expected_count": 1,
+        "ready_count": ready,
+        "pending_count": 0 if complete else 1,
+        "failed_count": 0,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": complete,
+    }
+
+
 def _replay_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> list[str]:
     refs = [
         manifest.get("source_contract_ref"),
@@ -2086,11 +2101,11 @@ def _model_group_replay_timeline_tasks(
         ),
         blockers=[] if replay_complete else ["model_group.replay", "promotion-evaluation-review"],
         stage_type="promotion_review",
-        progress=_replay_month_progress(
-            dataset_root=dataset_root,
+        progress=_single_step_progress(
             stage_id="model_group.promotion_review",
             status="ready" if replay_complete else "blocked",
-            ready_months=set(),
+            complete=False,
+            unit_label="review-decision",
         ),
     )
     append_task(
@@ -2101,6 +2116,12 @@ def _model_group_replay_timeline_tasks(
         reason="Waiting for model-group promotion review before maintenance can run.",
         blockers=["model_group.promotion_review"],
         stage_type="maintenance",
+        progress=_single_step_progress(
+            stage_id="model_group.maintenance",
+            status="blocked",
+            complete=False,
+            unit_label="maintenance-step",
+        ),
     )
     return tasks
 
