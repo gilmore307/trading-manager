@@ -281,6 +281,41 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "promotion_replay_candidate_policy,alpaca_bars,60,0,0,60,incomplete,missing\n",
                 encoding="utf-8",
             )
+            (replay_root / "replay_window_manifest.csv").write_text(
+                "contract_id,replay_mode,start_date,end_date,min_trading_days,candidate_policy_ref,replay_route_ref,market_condition_tags,selection_metric_refs\n"
+                "promotion_replay_candidate_policy,candidate_policy_replay,2021-01-01,2026-01-01,1255,candidate,route,tags,metrics\n",
+                encoding="utf-8",
+            )
+            fold_state = tmp / "storage" / "02_control_plane" / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            fold_state.parent.mkdir(parents=True, exist_ok=True)
+            fold_state.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "six_month_target_fold",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": True,
+                                    "target_symbol": "AAPL",
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
@@ -313,6 +348,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
+        self.assertTrue(all(task["month"] == "2016-01..2016-06" for task in evaluation_tasks))
+        self.assertTrue(all(task["dataset_unit_kind"] == "model_group_training_fold" for task in evaluation_tasks))
+        self.assertTrue(all(task["dataset_unit_months"] == 6 for task in evaluation_tasks))
+        self.assertEqual(evaluation_tasks[1]["detail"]["dataset_unit"]["start_month"], "2016-01")
+        self.assertEqual(evaluation_tasks[1]["detail"]["dataset_unit"]["end_month"], "2016-06")
+        self.assertEqual(evaluation_tasks[1]["detail"]["dataset_unit"]["unit_months"], 6)
+        self.assertEqual(evaluation_tasks[1]["detail"]["replay_window"]["start_month"], "2021-01")
+        self.assertEqual(evaluation_tasks[1]["detail"]["replay_window"]["end_month"], "2026-01")
+        self.assertEqual(evaluation_tasks[1]["detail"]["replay_window"]["unit_months"], 60)
         self.assertEqual(evaluation_tasks[0]["task_label"], "Model Group Replay Data Acquisition")
         self.assertEqual(evaluation_tasks[0]["task_state"], "current")
         self.assertEqual(evaluation_tasks[0]["status"], "blocked")

@@ -1530,6 +1530,78 @@ def _replay_window_month_count(dataset_root: Path) -> int:
     return max(1, (end_dt.year - start_dt.year) * 12 + end_dt.month - start_dt.month)
 
 
+def _month_span_count(start_month: str, end_month: str) -> int:
+    try:
+        start_year, start_month_number = (int(part) for part in start_month.split("-", 1))
+        end_year, end_month_number = (int(part) for part in end_month.split("-", 1))
+    except ValueError:
+        return MONTHS_PER_MODEL_FOLD
+    return max(1, (end_year - start_year) * 12 + end_month_number - start_month_number + 1)
+
+
+def _replay_window_months(dataset_root: Path) -> tuple[str, str]:
+    rows = _replay_coverage_rows(dataset_root / "replay_window_manifest.csv")
+    if not rows:
+        return "2021-01", "2026-01"
+    start_date = str(rows[0].get("start_date") or "")
+    end_date = str(rows[0].get("end_date") or "")
+    start_month = start_date[:7] if _is_month_key(start_date[:7]) else "2021-01"
+    end_month = end_date[:7] if _is_month_key(end_date[:7]) else "2026-01"
+    return start_month, end_month
+
+
+def _fold_state_target_symbol(payload: Mapping[str, Any]) -> str | None:
+    raw_stages = payload.get("stages")
+    if not isinstance(raw_stages, list):
+        return None
+    return _target_symbol_from_fold_stages(raw_stages)
+
+
+def _is_completed_training_fold_state(payload: Mapping[str, Any]) -> bool:
+    raw_stages = payload.get("stages")
+    if not isinstance(raw_stages, list) or not raw_stages:
+        return False
+    presentable_stages = _presentable_fold_stages(raw_stages)
+    if not presentable_stages:
+        return False
+    terminal_statuses = {"succeeded", "not_applicable"}
+    return all(str(stage.get("status") or "").lower() in terminal_statuses for stage in presentable_stages if isinstance(stage, Mapping))
+
+
+def _model_group_training_fold_window(
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+) -> tuple[str, str, int]:
+    runtime_root = storage_root / "runtime"
+    fallback = ("2016-01", "2016-06", MONTHS_PER_MODEL_FOLD)
+    if not runtime_root.exists():
+        return fallback
+    candidates: list[tuple[str, str, str | None]] = []
+    for fold_path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
+        try:
+            payload = _load_json_object(fold_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if not _is_completed_training_fold_state(payload):
+            continue
+        start_month = str(payload.get("start_month") or "")
+        end_month = str(payload.get("end_month") or "")
+        if not _is_month_key(start_month) or not _is_month_key(end_month):
+            continue
+        candidates.append((start_month, end_month, _fold_state_target_symbol(payload)))
+    if not candidates:
+        return fallback
+    selected_symbol = str(selected_target_symbol or "").strip().upper()
+    if selected_symbol:
+        symbol_candidates = [candidate for candidate in candidates if (candidate[2] or "").upper() == selected_symbol]
+        if symbol_candidates:
+            start_month, end_month, _ = sorted(symbol_candidates)[0]
+            return start_month, end_month, _month_span_count(start_month, end_month)
+    start_month, end_month, _ = sorted(candidates)[0]
+    return start_month, end_month, _month_span_count(start_month, end_month)
+
+
 def _replay_ready_months(dataset_root: Path) -> set[str]:
     ready: set[str] = set()
     for path in sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]:
@@ -1586,6 +1658,7 @@ def _model_group_replay_timeline_tasks(
     storage_root: Path,
     generated_at_utc: str,
     starting_sequence: int,
+    selected_target_symbol: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return owner-facing model-group replay and promotion-review tasks."""
 
@@ -1594,7 +1667,13 @@ def _model_group_replay_timeline_tasks(
     manifest_path = dataset_root / "dataset_manifest.json"
     manifest = _load_optional_json_object(manifest_path)
     worker_info = _evaluation_worker_info()
-    period = "2021-01..2026-01"
+    training_start_month, training_end_month, training_unit_months = _model_group_training_fold_window(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
+    period = f"{training_start_month}..{training_end_month}"
+    replay_start_month, replay_end_month = _replay_window_months(dataset_root)
+    replay_unit_months = _replay_window_month_count(dataset_root)
     layer_key = "model_group"
     tasks: list[dict[str, Any]] = []
 
@@ -1619,12 +1698,21 @@ def _model_group_replay_timeline_tasks(
             "model_activation_allowed": False,
             "broker_execution_allowed": False,
             "dataset_unit": {
-                "unit_kind": "model_group_replay",
-                "unit_months": 60,
-                "start_month": "2021-01",
-                "end_month": "2026-01",
+                "unit_kind": "model_group_training_fold",
+                "unit_months": training_unit_months,
+                "start_month": training_start_month,
+                "end_month": training_end_month,
                 "target_required": False,
-                "description": "Model-group replay data, full live-flow replay, promotion review, and maintenance.",
+                "description": "Model-group candidate training fold used for replay, promotion review, and maintenance.",
+            },
+            "replay_window": {
+                "unit_kind": "model_group_replay_window",
+                "unit_months": replay_unit_months,
+                "start_month": replay_start_month,
+                "end_month": replay_end_month,
+                "contract_id": contract_id,
+                "target_required": False,
+                "description": "Fixed out-of-sample market window used to test the candidate model group.",
             },
             "worker": worker_info,
             "progress": progress or _task_status_progress(task_id, status),
@@ -1642,8 +1730,8 @@ def _model_group_replay_timeline_tasks(
                 "stage_type": stage_type,
                 "layer": None,
                 "layer_key": layer_key,
-                "dataset_unit_kind": "model_group_replay",
-                "dataset_unit_months": 60,
+                "dataset_unit_kind": "model_group_training_fold",
+                "dataset_unit_months": training_unit_months,
                 "target_symbol": None,
                 "target_required": False,
                 **worker_info,
@@ -1819,6 +1907,7 @@ def build_historical_task_progress_summary(
             storage_root=storage_root,
             generated_at_utc=generated_at_utc,
             starting_sequence=len(task_timeline),
+            selected_target_symbol=_selected_target_symbol(status),
         )
     )
     agent_error_summary = _mark_superseded_agent_errors(
