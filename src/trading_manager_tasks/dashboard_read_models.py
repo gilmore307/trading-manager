@@ -439,18 +439,31 @@ def _is_transient_active_scheduler_backoff(status: HistoricalSchedulerStatus) ->
 
 
 def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[dict[str, Any]]) -> dict[str, Any] | None:
-    current_or_ready: list[dict[str, Any]] = []
+    current_tasks: list[dict[str, Any]] = []
     for task in task_timeline:
         if str(task.get("task_state") or "") == "current":
-            current_or_ready.append(task)
-    for task in task_timeline:
-        if str(task.get("status") or "") == "ready":
-            current_or_ready.append(task)
-    for task in current_or_ready:
+            current_tasks.append(task)
+    internal_stage = str(status.current_stage or "")
+    if status.lock.status == "active" and internal_stage:
+        for task in current_tasks:
+            if str(task.get("task_id") or "") == internal_stage:
+                return task
+    if status.lock.status == "active":
+        for task in current_tasks:
+            if str(task.get("layer_key") or "") != "model_group":
+                return task
+    for task in current_tasks:
         if str(task.get("layer_key") or "") == "model_group":
             return task
-    if status.lock.status == "active" and current_or_ready:
-        return current_or_ready[0]
+    ready_tasks: list[dict[str, Any]] = []
+    for task in task_timeline:
+        if str(task.get("status") or "") == "ready":
+            ready_tasks.append(task)
+    if status.lock.status == "active" and ready_tasks:
+        for task in ready_tasks:
+            if str(task.get("layer_key") or "") != "model_group":
+                return task
+        return ready_tasks[0]
     return None
 
 
@@ -2042,15 +2055,18 @@ def _model_group_replay_timeline_tasks(
         status="complete" if replay_ready_months and len(replay_ready_months) >= _replay_window_month_count(dataset_root) else ("ready" if freeze_ready else "blocked"),
         ready_months=replay_ready_months,
     )
+    replay_started = bool(replay_ready_months)
     replay_complete = bool(replay_progress["can_unlock_downstream"])
     append_task(
         task_id="model_group.replay",
         label="Model Evaluation",
-        task_state="completed" if replay_complete else ("current" if freeze_ready else "future"),
+        task_state="completed" if replay_complete else ("current" if replay_started else "future"),
         status="succeeded" if replay_complete else ("ready" if freeze_ready else "blocked"),
         reason=(
             "Model-group replay is complete across the accepted replay window."
             if replay_complete
+            else f"Model-group replay has started and completed {len(replay_ready_months)}/{_replay_window_month_count(dataset_root)} replay months."
+            if replay_started
             else "Model-group replay is ready to run the frozen Layer 1-10 live-flow component graph, including Layer 10 event-risk calls, AUROC, Brier, return, drawdown, cost, hit-rate, payoff, turnover, PCA, PCoA, and guardrail checks."
             if freeze_ready
             else f"Waiting for complete model-group replay data acquisition and frozen replay contract; current freeze_status={freeze_status}."

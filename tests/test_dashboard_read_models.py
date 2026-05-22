@@ -382,6 +382,107 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["chart_payload"]["active_task"]["worker_id"], "evaluation_worker_1")
         self.assertNotEqual(payload["chart_payload"]["internal_active_stage"], payload["chart_payload"]["active_stage"])
 
+    def test_ready_model_group_replay_does_not_override_active_scheduler_work(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            replay_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "preparation_status": "prepared_candidate_policy_replay_acquisition_bundle",
+                        "prepared_at_utc": "2026-05-21T02:34:48Z",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 60,
+                        "available_feed_acquisition_count": 60,
+                        "deferred_feed_acquisition_count": 0,
+                        "missing_feed_acquisition_count": 0,
+                        "source_contract_ref": "trading-evaluation/replays/promotion_replay_candidate_policy.json",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "replay_window_manifest.csv").write_text(
+                "contract_id,replay_mode,start_date,end_date,min_trading_days,candidate_policy_ref,replay_route_ref,market_condition_tags,selection_metric_refs\n"
+                "promotion_replay_candidate_policy,candidate_policy_replay,2021-01-01,2026-01-01,1255,candidate,route,tags,metrics\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "six_month_target_fold",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_symbol": "AAPL",
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_workflow_state_2020-07.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2020-07",
+                        "end_month": "2020-07",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
+                                "updated_utc": "2026-05-22T12:20:59Z",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps({"current_month": "2020-07", "start_month": "2020-07"}) + "\n", encoding="utf-8")
+            lock_path = tmp / "runtime" / "historical_scheduler.lock"
+            lock_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=state_path,
+                lock_path=lock_path,
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:21:00Z")
+
+        replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
+        self.assertEqual(replay_task["status"], "ready")
+        self.assertEqual(replay_task["task_state"], "future")
+        self.assertEqual(payload["chart_payload"]["active_stage"], "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(payload["chart_payload"]["current_month"], "2020-07")
+
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
