@@ -32,6 +32,7 @@ from .scheduler_status import (
     collect_historical_scheduler_status,
 )
 from .agent_error_handler import DEFAULT_ERROR_CATALOG_NAME, fetch_server_error_catalog_rows
+from .task_progress import load_active_task_progress
 
 HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
 HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/06_dashboard_cache/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
@@ -1145,62 +1146,6 @@ def _dashboard_stage_rows(raw_stage: Mapping[str, Any], *, timeline_month: str |
     return _monthly_dashboard_stage_rows(raw_stage, timeline_month=timeline_month)
 
 
-def _model_generation_step_progress(tasks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    grouped_tasks: dict[str | None, list[dict[str, Any]]] = {}
-    for task in tasks:
-        if task.get("stage_type") != "model_generation" or task.get("layer") is None:
-            continue
-        grouped_tasks.setdefault(task.get("month"), []).append(task)
-    progress_by_uid: dict[str, dict[str, Any]] = {}
-    for period, period_tasks in grouped_tasks.items():
-        ordered_tasks = sorted(period_tasks, key=lambda item: int(item.get("layer") or 0))
-        expected = len(ordered_tasks)
-        completed_before_or_at = 0
-        for index, task in enumerate(ordered_tasks, start=1):
-            state = str(task.get("task_state") or task.get("status") or "unknown")
-            terminal = state in {"succeeded", "not_applicable", "completed", "skipped"}
-            if terminal:
-                completed_before_or_at = index
-            failed = 1 if state == "failed" else 0
-            ready = completed_before_or_at
-            if not terminal:
-                ready = sum(
-                    1
-                    for previous_task in ordered_tasks[: index - 1]
-                    if str(previous_task.get("task_state") or previous_task.get("status") or "unknown")
-                    in {"succeeded", "not_applicable", "completed", "skipped"}
-                )
-            pending = max(expected - ready - failed, 0)
-            progress_by_uid[str(task.get("task_uid") or "")] = {
-                "stage_id": f"{period or 'unknown'}:model_generation",
-                "status": "failed" if failed else "complete" if ready >= expected else "ready" if state == "current" else "pending",
-                "unit_label": "model steps",
-                "expected_count": expected,
-                "ready_count": ready,
-                "pending_count": pending,
-                "failed_count": failed,
-                "accepted_failed_count": 0,
-                "can_unlock_downstream": expected > 0 and ready >= expected and failed == 0,
-            }
-    return progress_by_uid
-
-
-def _apply_model_generation_step_progress(tasks: list[dict[str, Any]]) -> None:
-    progress_by_uid = _model_generation_step_progress(tasks)
-    for task in tasks:
-        if task.get("stage_type") != "model_generation" or task.get("layer") is None:
-            continue
-        detail = task.get("detail")
-        if not isinstance(detail, dict):
-            continue
-        progress = detail.get("progress")
-        if not isinstance(progress, Mapping) or progress.get("unit_label") != "task":
-            continue
-        replacement = progress_by_uid.get(str(task.get("task_uid") or ""))
-        if replacement is not None:
-            detail["progress"] = dict(replacement)
-
-
 def _target_symbol_from_fold_stages(raw_stages: list[Any]) -> str | None:
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
@@ -1319,6 +1264,7 @@ def _task_timeline(
     """
 
     storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    active_task_progress = load_active_task_progress(storage_root / "runtime" / "task_progress")
     month_ingest_worker_count = DEFAULT_MONTH_INGEST_WORKERS
     max_dashboard_month = completed_historical_month_cutoff()
     month_stage_sets: list[tuple[str | None, list[Any], bool]] = []
@@ -1525,10 +1471,14 @@ def _task_timeline(
                 worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
                     dashboard_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
                 )
+                task_uid = _stable_task_uid(dashboard_stage, task_period=task_month)
+                progress = active_task_progress.get(task_uid)
+                if progress is None and isinstance(dashboard_stage.get("dashboard_progress"), Mapping):
+                    progress = dict(dashboard_stage["dashboard_progress"])
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
                     "task_number": task_number,
-                    "task_uid": _stable_task_uid(dashboard_stage, task_period=task_month),
+                    "task_uid": task_uid,
                     "month": task_month,
                     "task_id": stage_id,
                     "task_label": str(dashboard_stage.get("task_label") or _public_stage_name(stage_id, dashboard_stage.get("stage_type"))),
@@ -1550,9 +1500,7 @@ def _task_timeline(
                     "detail": {
                         "blockers": [str(blocker) for blocker in blockers],
                         "receipt_refs": [str(ref) for ref in receipt_refs],
-                        "progress": dashboard_stage.get("dashboard_progress")
-                        if isinstance(dashboard_stage.get("dashboard_progress"), Mapping)
-                        else _task_status_progress(stage_id, "failed" if task_state == "failed" else stage_status),
+                        "progress": progress,
                         "safe_without_provider_calls": dashboard_stage.get("safe_without_provider_calls"),
                         "provider_calls_allowed": dashboard_stage.get("provider_calls_allowed"),
                         "model_activation_allowed": dashboard_stage.get("model_activation_allowed"),
@@ -1578,7 +1526,6 @@ def _task_timeline(
                     }
                 tasks.append(task)
             continue
-    _apply_model_generation_step_progress(tasks)
     return tasks
 
 
@@ -1844,7 +1791,7 @@ def _model_group_replay_timeline_tasks(
                 "description": "Fixed out-of-sample market window used to test the candidate model group.",
             },
             "worker": worker_info,
-            "progress": progress or _task_status_progress(task_id, status),
+            "progress": progress,
         }
         tasks.append(
             {

@@ -20,9 +20,14 @@ class StageExecutorTests(unittest.TestCase):
                 layer_key="layer_01_market_regime",
                 stage_type="feature_generation",
                 status="ready",
-                command=["python3", "-c", "print('offline ok')"],
+                command=[
+                    "python3",
+                    "-c",
+                    "import os, pathlib; p=pathlib.Path(os.environ['TRADING_MANAGER_TASK_PROGRESS_PATH']); print('offline ok', p.exists(), os.environ['TRADING_MANAGER_TASK_PROGRESS_TASK_UID'])",
+                ],
                 blockers=(),
             )
+            progress_root = tmp / "progress"
             with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
                 summary = execute_stage_process(
                     stage,
@@ -31,6 +36,9 @@ class StageExecutorTests(unittest.TestCase):
                     trading_model_root=tmp,
                     receipt_root=tmp / "receipts",
                     log_root=tmp / "logs",
+                    progress_root=progress_root,
+                    task_uid="2016-01:layer_01_market_regime.feature_generation",
+                    worker_id="month_ingest_worker_1",
                 )
             self.assertEqual(summary.contract_type, "manager_stage_execution_summary")
             self.assertEqual(summary.status, "succeeded")
@@ -38,7 +46,9 @@ class StageExecutorTests(unittest.TestCase):
             self.assertFalse(summary.model_activation_performed)
             self.assertFalse(summary.broker_execution_performed)
             self.assertTrue(Path(summary.receipt_path or "").exists())
-            self.assertIn("offline ok", Path(summary.stdout_path or "").read_text(encoding="utf-8"))
+            stdout = Path(summary.stdout_path or "").read_text(encoding="utf-8")
+            self.assertIn("offline ok True 2016-01:layer_01_market_regime.feature_generation", stdout)
+            self.assertFalse(list(progress_root.glob("*.json")))
 
 
     def test_resolves_runtime_month_placeholders_before_execution(self):

@@ -29,6 +29,7 @@ from .model_training_state import (
 )
 from .model_training_workflow import build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .task_progress import DEFAULT_TASK_PROGRESS_ROOT, clear_worker_task_progress, worker_progress_path, write_task_progress_node
 
 DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_receipts"
 DEFAULT_LOG_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_logs"
@@ -213,6 +214,9 @@ def execute_stage_process(
     trading_model_root: Path = Path("/root/projects/trading-model"),
     receipt_root: Path = DEFAULT_RECEIPT_ROOT,
     log_root: Path = DEFAULT_LOG_ROOT,
+    progress_root: Path | None = None,
+    task_uid: str | None = None,
+    worker_id: str = "stage_executor",
 ) -> StageExecutionSummary:
     """Execute one already-ready safe offline stage and write a receipt."""
 
@@ -221,6 +225,8 @@ def execute_stage_process(
     if not argv:
         raise TaskSystemError(f"stage command has no argv after env parsing: {stage.stage_id}")
     cwd = _cwd_for_stage(stage, manager_root=manager_root, trading_data_root=trading_data_root, trading_model_root=trading_model_root)
+    progress_root = progress_root or DEFAULT_TASK_PROGRESS_ROOT
+    task_uid = task_uid or f"{stage.dataset_unit.start_month if stage.dataset_unit else 'unscheduled'}:{stage.stage_id}"
     stage_log_root = log_root / stage.stage_id.replace(".", "__")
     stage_receipt_root = receipt_root / stage.stage_id.replace(".", "__")
     stage_log_root.mkdir(parents=True, exist_ok=True)
@@ -229,10 +235,28 @@ def execute_stage_process(
     stamp = started.replace(":", "").replace("+00:00", "Z")
     stdout_path = stage_log_root / f"{stamp}.stdout.log"
     stderr_path = stage_log_root / f"{stamp}.stderr.log"
+    progress_path = worker_progress_path(progress_root, worker_id)
+    write_task_progress_node(
+        progress_root=progress_root,
+        worker_id=worker_id,
+        task_uid=task_uid,
+        stage_id=stage.stage_id,
+        status="running",
+        node_id="stage_started",
+        node_label="Stage process started",
+    )
     result = subprocess.run(
         argv,
         cwd=cwd,
-        env={**os.environ, **env_assignments},
+        env={
+            **os.environ,
+            **env_assignments,
+            "TRADING_MANAGER_TASK_PROGRESS_ROOT": str(progress_root),
+            "TRADING_MANAGER_TASK_PROGRESS_PATH": str(progress_path),
+            "TRADING_MANAGER_TASK_PROGRESS_WORKER_ID": worker_id,
+            "TRADING_MANAGER_TASK_PROGRESS_TASK_UID": task_uid,
+            "TRADING_MANAGER_TASK_PROGRESS_STAGE_ID": stage.stage_id,
+        },
         text=True,
         capture_output=True,
         check=False,
@@ -283,6 +307,7 @@ def execute_stage_process(
         + "\n",
         encoding="utf-8",
     )
+    clear_worker_task_progress(progress_root=progress_root, worker_id=worker_id)
     return summary
 
 
@@ -297,6 +322,7 @@ def execute_next_ready_stage(
     trading_model_root: Path = Path("/root/projects/trading-model"),
     receipt_root: Path = DEFAULT_RECEIPT_ROOT,
     log_root: Path = DEFAULT_LOG_ROOT,
+    progress_root: Path | None = None,
     selected_target_symbol: str | None = None,
     foundation_catch_up_only: bool = True,
     write: bool = False,
@@ -322,6 +348,7 @@ def execute_next_ready_stage(
         write_workflow_state(state_path, state)
     stage = next(updated_stage for updated_stage in state.stages if updated_stage.stage_id == stage_id)
     stage = replace(stage, command=_resolve_command_placeholders(stage.command, start_month=start_month, end_month=end_month))
+    task_uid = f"{start_month if start_month == end_month else f'{start_month}..{end_month}'}:{stage.stage_id}"
     summary = execute_stage_process(
         stage,
         manager_root=manager_root,
@@ -329,6 +356,9 @@ def execute_next_ready_stage(
         trading_model_root=trading_model_root,
         receipt_root=receipt_root,
         log_root=log_root,
+        progress_root=progress_root or storage_root / "runtime" / "task_progress",
+        task_uid=task_uid,
+        worker_id="model_worker_1" if start_month != end_month else "month_ingest_worker_stage_executor",
     )
     updated = state
     if summary.status == "succeeded" and summary.receipt_path:
@@ -374,6 +404,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trading-model-root", type=Path, default=Path("/root/projects/trading-model"))
     parser.add_argument("--receipt-root", type=Path, default=DEFAULT_RECEIPT_ROOT)
     parser.add_argument("--log-root", type=Path, default=DEFAULT_LOG_ROOT)
+    parser.add_argument("--progress-root", type=Path, default=None)
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument(
         "--allow-post-foundation-model-stages",
@@ -392,6 +423,7 @@ def main(argv: list[str] | None = None) -> int:
         trading_model_root=args.trading_model_root,
         receipt_root=args.receipt_root,
         log_root=args.log_root,
+        progress_root=args.progress_root,
         selected_target_symbol=args.target_symbol,
         foundation_catch_up_only=not args.allow_post_foundation_model_stages,
         write=args.write,

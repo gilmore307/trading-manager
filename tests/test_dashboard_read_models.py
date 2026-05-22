@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from trading_manager_tasks.dashboard_read_models import build_historical_task_progress_summary
 from trading_manager_tasks.scheduler_status import collect_historical_scheduler_status
+from trading_manager_tasks.task_progress import write_task_progress_node
 
 
 class DashboardReadModelProducerTests(unittest.TestCase):
@@ -173,8 +174,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task_timeline[0]["ended_at_utc"], "2026-05-12T09:30:00Z")
         self.assertEqual(task_timeline[0]["status_updated_at_utc"], "2026-05-12T10:00:00Z")
         self.assertEqual(task_timeline[0]["detail"]["progress"]["ready_count"], 3)
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["failed_count"], 1)
-        self.assertEqual(task_timeline[2]["detail"]["progress"]["pending_count"], 1)
+        self.assertIsNone(task_timeline[1]["detail"]["progress"])
+        self.assertIsNone(task_timeline[2]["detail"]["progress"])
         self.assertIn("Layer 2 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
         self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))
@@ -1130,6 +1131,17 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            write_task_progress_node(
+                progress_root=runtime / "task_progress",
+                worker_id="month_ingest_worker_1",
+                task_uid="2016-01:layer_03_target_state_vector.data_acquisition",
+                stage_id="layer_03_target_state_vector.data_acquisition",
+                unit_label="rows",
+                processed_count=40,
+                expected_count=100,
+                node_id="materialize_rows",
+                node_label="Materializing source rows",
+            )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
                 state_path=state_path,
@@ -1146,10 +1158,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation", "model_generation"])
         self.assertEqual(fold_tasks[0]["task_number"], 37)
         self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime.model_generation")
-        self.assertEqual(fold_tasks[0]["detail"]["progress"]["ready_count"], 1)
-        self.assertEqual(fold_tasks[0]["detail"]["progress"]["expected_count"], 2)
-        self.assertEqual(fold_tasks[1]["detail"]["progress"]["ready_count"], 2)
-        self.assertEqual(fold_tasks[1]["detail"]["progress"]["expected_count"], 2)
+        self.assertIsNone(fold_tasks[0]["detail"]["progress"])
+        self.assertIsNone(fold_tasks[1]["detail"]["progress"])
         monthly_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
@@ -1157,6 +1167,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         ]
         self.assertEqual([task["month"] for task in monthly_prep_tasks], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
         self.assertEqual(monthly_prep_tasks[0]["dataset_unit_months"], None)
+        self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["ready_count"], 40)
+        self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["expected_count"], 100)
+        self.assertEqual(monthly_prep_tasks[0]["detail"]["progress"]["unit_label"], "rows")
+        self.assertIsNone(monthly_prep_tasks[1]["detail"]["progress"])
 
     def test_current_incomplete_calendar_month_is_not_exposed_as_ready_task(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
