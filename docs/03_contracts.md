@@ -127,6 +127,17 @@ month / stage_id / provider_id / partition_id / model_id / candidate_ref as appl
 
 Lock scopes are `daemon`, `month_stage`, `provider_partition`, `reconcile`, and `promotion`. Provider partition locks permit concurrent partition work only; reconcile locks own stage-state transitions. Dry-run decisions and status snapshots expose `scheduler_lock_plan` with the lock refs/templates required for the selected work; execution paths acquire local file-backed locks for the corresponding stage, provider partition, reconcile, and persisted promotion-request lanes.
 
+## Workflow Stage Semantics
+
+Historical workflow stages must keep source data, derived features, and model-dependent state separate.
+
+- `data_acquisition` downloads or snapshots source evidence from an external or already-reviewed source surface. It may normalize storage paths, coverage receipts, and point-in-time source refs, but it must not derive model-informed values.
+- `feature_generation` derives deterministic data features only from the acquired/source data for the same stage scope. It must be reproducible without reading another model's output, score, decision, or hidden runtime state.
+- If a derived table requires any upstream model output, it is not a `feature_generation` output for that source stage. It needs a separate model/input table, an explicit model-generation stage, or a newly named intermediate task with its own contract and blockers.
+- Model outputs, replay state, promotion review evidence, and maintenance surfaces must not be stored under source/feature contracts just because they are convenient downstream inputs.
+
+For example, `trading_data.feature_01_market_regime` is a valid feature surface when it is deterministically derived from acquired market bars. A target/event table that requires TargetStateVectorModel output, EventFailureRiskModel output, or replay portfolio state is not a feature surface under this definition.
+
 ## Review and Promotion Contracts
 
 - `manager_dataset_evidence` summarizes snapshot/split/label/eval/control-plane coverage.
