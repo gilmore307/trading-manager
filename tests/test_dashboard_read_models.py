@@ -183,6 +183,98 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("lineage_refs", payload)
         self.assertIn(payload["severity"], {"critical", "high", "medium", "low", "info"})
 
+    def test_task_timeline_shows_started_ready_stage_as_running_without_static_blockers(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2020-07.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2020-07",
+                        "end_month": "2020-07",
+                        "stages": [
+                            {
+                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 9,
+                                "layer_key": "layer_09_option_expression",
+                                "status": "ready",
+                                "blockers": ["upstream_layer_08_model_evaluation_complete"],
+                                "last_reason": "stage execution started by manager stage executor",
+                                "started_at_utc": "2026-05-22T12:48:38Z",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T13:00:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression.data_acquisition")
+        self.assertEqual(task["status"], "running")
+        self.assertEqual(task["task_state"], "current")
+        self.assertEqual(task["blocker_count"], 0)
+        self.assertEqual(task["detail"]["blockers"], [])
+
+    def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2020-07.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2020-07",
+                        "end_month": "2020-07",
+                        "stages": [
+                            {
+                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 9,
+                                "layer_key": "layer_09_option_expression",
+                                "status": "blocked",
+                                "blockers": ["upstream_layer_08_model_evaluation_complete", "other_static_dependency"],
+                                "last_reason": "waiting for upstream_layer_08_model_evaluation_complete",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T13:00:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression.data_acquisition")
+        self.assertEqual(task["status"], "blocked")
+        self.assertEqual(task["blocker_count"], 1)
+        self.assertEqual(task["detail"]["blockers"], ["upstream_layer_08_model_evaluation_complete"])
+
     def test_layer_model_evaluation_is_hidden_from_public_timeline(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

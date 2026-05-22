@@ -50,6 +50,39 @@ class StageExecutorTests(unittest.TestCase):
             self.assertIn("offline ok True 2016-01:layer_01_market_regime.feature_generation", stdout)
             self.assertFalse(list(progress_root.glob("*.json")))
 
+    def test_stage_process_timeout_fails_and_writes_diagnostics(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            stage = StageProgress(
+                stage_id="layer_01_market_regime.feature_generation",
+                layer=1,
+                layer_key="layer_01_market_regime",
+                stage_type="feature_generation",
+                status="ready",
+                command=["python3", "-c", "import time; time.sleep(2)"],
+                blockers=(),
+            )
+            with patch.dict(
+                "os.environ",
+                {
+                    "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl",
+                    "TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "1",
+                },
+                clear=False,
+            ):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
+
+            self.assertEqual(summary.status, "failed")
+            self.assertIsNone(summary.return_code)
+            self.assertIn("timeout_seconds=1", summary.reason or "")
+            self.assertIn("timeout_seconds=1", Path(summary.stderr_path or "").read_text(encoding="utf-8"))
 
     def test_resolves_runtime_month_placeholders_before_execution(self):
         command = _resolve_command_placeholders(["runner", "--month", "${START_MONTH}", "--path", "summary_${END_MONTH}.json"], start_month="2016-01", end_month="2016-02")

@@ -210,32 +210,47 @@ def fetch_layer_8_rows(*, database_url: str, start_month: str, end_month: str) -
     start = _month_start(start_month)
     end = _exclusive_month_start(end_month)
     query = """
-        WITH target_symbols AS (
+        WITH l8_rows AS MATERIALIZED (
+          SELECT
+            l8.available_time,
+            l8.tradeable_time,
+            l8.target_candidate_id,
+            COALESCE(l8.tradeable_time, l8.available_time) AS snapshot_time,
+            l8.underlying_action_plan_ref,
+            l8."8_resolved_underlying_action_type" AS action_type,
+            l8."8_resolved_action_side" AS action_side,
+            l8."8_resolved_dominant_horizon" AS dominant_horizon,
+            l8."8_resolved_action_confidence_score" AS action_confidence_score
+          FROM trading_model.model_08_underlying_action l8
+          WHERE l8.available_time::timestamptz >= %s::timestamptz
+            AND l8.available_time::timestamptz < %s::timestamptz
+        ),
+        target_symbols AS (
           SELECT DISTINCT ON (target_candidate_id)
-                 target_candidate_id,
-                 symbol AS underlying
-          FROM trading_data.source_03_target_state
-          ORDER BY target_candidate_id, available_time ASC
+            source.target_candidate_id,
+            source.symbol AS underlying
+          FROM trading_data.source_03_target_state source
+          JOIN (SELECT DISTINCT target_candidate_id FROM l8_rows) ids USING (target_candidate_id)
+          ORDER BY source.target_candidate_id, source.available_time ASC
         )
         SELECT
-          l8.available_time,
-          l8.tradeable_time,
-          l8.target_candidate_id,
+          l8_rows.available_time,
+          l8_rows.tradeable_time,
+          l8_rows.target_candidate_id,
           ts.underlying,
-          COALESCE(l8.tradeable_time, l8.available_time) AS snapshot_time,
-          l8.underlying_action_plan_ref,
-          l8."8_resolved_underlying_action_type" AS action_type,
-          l8."8_resolved_action_side" AS action_side,
-          l8."8_resolved_dominant_horizon" AS dominant_horizon,
-          l8."8_resolved_action_confidence_score" AS action_confidence_score
-        FROM trading_model.model_08_underlying_action l8
+          l8_rows.snapshot_time,
+          l8_rows.underlying_action_plan_ref,
+          l8_rows.action_type,
+          l8_rows.action_side,
+          l8_rows.dominant_horizon,
+          l8_rows.action_confidence_score
+        FROM l8_rows
         LEFT JOIN target_symbols ts USING (target_candidate_id)
-        WHERE l8.available_time::timestamptz >= %s::timestamptz
-          AND l8.available_time::timestamptz < %s::timestamptz
-        ORDER BY l8.available_time::timestamptz ASC, l8.target_candidate_id ASC
+        ORDER BY l8_rows.available_time::timestamptz ASC, l8_rows.target_candidate_id ASC
     """
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
         with conn.cursor() as cursor:
+            cursor.execute("SET LOCAL statement_timeout = '5min'")
             cursor.execute(query, (start, end))
             return [dict(row) for row in cursor.fetchall()]
 

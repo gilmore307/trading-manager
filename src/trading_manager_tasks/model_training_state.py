@@ -134,8 +134,6 @@ def _stage_with_update(stage: StageProgress, *, now: str, **changes: Any) -> Sta
     next_status = changes.get("status", stage.status)
     if next_status != stage.status and "status_updated_at_utc" not in changes:
         changes["status_updated_at_utc"] = now
-    if next_status == "ready" and not stage.started_at_utc and "started_at_utc" not in changes:
-        changes["started_at_utc"] = now
     if "updated_utc" not in changes:
         changes["updated_utc"] = now
     return replace(stage, **changes)
@@ -270,6 +268,15 @@ def _ready_last_reason(stage: StageProgress) -> str | None:
     return stage.last_reason
 
 
+def _ready_started_at(stage: StageProgress, ready_reason: str | None) -> str | None:
+    if not ready_reason:
+        return None
+    normalized = ready_reason.lower()
+    if "stage execution started" in normalized or "stage started" in normalized:
+        return stage.started_at_utc
+    return None
+
+
 def _blocker_reason(stage: StageProgress, stages: Mapping[str, StageProgress]) -> str | None:
     missing = []
     for blocker in stage.blockers:
@@ -306,7 +313,14 @@ def refresh_workflow_state(state: WorkflowState, *, plan: ModelTrainingWorkflowP
             if stage.approval_gate_required and approval_status != "approved":
                 status = "blocked"
                 reason = f"waiting for {stage.approval_gate_required}"
-            stage = _stage_with_update(stage, status=status, last_reason=reason if status == "blocked" else _ready_last_reason(stage), now=now)
+            ready_reason = None if status == "blocked" else _ready_last_reason(stage)
+            stage = _stage_with_update(
+                stage,
+                status=status,
+                last_reason=reason if status == "blocked" else ready_reason,
+                started_at_utc=stage.started_at_utc if status == "blocked" else _ready_started_at(stage, ready_reason),
+                now=now,
+            )
         else:
             stage = _stage_with_update(stage, status="blocked", last_reason=reason, now=now)
         refreshed.append(stage)

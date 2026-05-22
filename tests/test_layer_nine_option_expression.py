@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import inspect
 from pathlib import Path
 
 from trading_manager_tasks.layer_nine_option_expression import (
     STAGE_ID,
     build_layer_nine_gate_review,
+    fetch_layer_8_rows,
     request_previews_from_layer_8_rows,
     write_gate_review_artifacts,
 )
@@ -82,6 +84,13 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
             self.assertIn('"provider_calls": 0', receipt_text)
             self.assertIn('"broker_execution_performed": false', receipt_text)
             self.assertIn('"model_activation_performed": false', receipt_text)
+
+    def test_layer_8_fetch_limits_symbol_lookup_to_fold_targets(self) -> None:
+        source = inspect.getsource(fetch_layer_8_rows)
+
+        self.assertIn("WITH l8_rows AS MATERIALIZED", source)
+        self.assertIn("JOIN (SELECT DISTINCT target_candidate_id FROM l8_rows)", source)
+        self.assertIn("statement_timeout", source)
 
 
 if __name__ == "__main__":

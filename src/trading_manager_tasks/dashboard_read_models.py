@@ -968,6 +968,33 @@ def _task_timestamp_fields(raw_stage: Mapping[str, Any], *, storage_root: Path) 
     }
 
 
+def _stage_started_reason(raw_stage: Mapping[str, Any]) -> bool:
+    reason = str(raw_stage.get("last_reason") or "").lower()
+    return "stage execution started" in reason or "stage started" in reason
+
+
+def _effective_dashboard_stage_status(raw_stage: Mapping[str, Any], timestamps: Mapping[str, str | None]) -> str:
+    status = str(raw_stage.get("status") or "unknown")
+    if status == "ready" and _stage_started_reason(raw_stage) and timestamps.get("started_at_utc") and not timestamps.get("ended_at_utc"):
+        return "running"
+    return status
+
+
+def _unresolved_dashboard_blockers(raw_stage: Mapping[str, Any], *, stage_status: str) -> list[str]:
+    """Return operator-facing blockers, not the static dependency list."""
+
+    if stage_status in {"ready", "running", "succeeded", "not_applicable"}:
+        return []
+    reason = str(raw_stage.get("last_reason") or "")
+    prefix = "waiting for "
+    if reason.startswith(prefix):
+        return [item.strip() for item in reason.removeprefix(prefix).split(",") if item.strip()]
+    blockers = raw_stage.get("blockers") or []
+    if not isinstance(blockers, list):
+        return []
+    return [str(blocker) for blocker in blockers]
+
+
 def _active_month_stages(status: HistoricalSchedulerStatus, storage_root: Path) -> tuple[str | None, list[Any]]:
     checkpoint_path = _resolve_local_path(status.workflow_checkpoint.path)
     timeline_month = status.current_month
@@ -1562,7 +1589,8 @@ def _task_timeline(
                 stage_id = str(dashboard_stage.get("stage_id") or "")
                 if not stage_id or not _is_presentable_task_stage(dashboard_stage):
                     continue
-                stage_status = str(dashboard_stage.get("status") or "unknown")
+                timestamp_fields = _task_timestamp_fields(dashboard_stage, storage_root=storage_root)
+                stage_status = _effective_dashboard_stage_status(dashboard_stage, timestamp_fields)
                 is_terminal = stage_status in {"succeeded", "not_applicable"}
                 task_month_for_state = str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "") or None
                 is_current = bool((task_month_for_state, stage_id) in current_lane_heads and not is_terminal)
@@ -1572,6 +1600,8 @@ def _task_timeline(
                     is_current = bool(
                         is_active_month and stage_id and stage_id == status.current_stage and stage_status == "ready" and not is_terminal
                     )
+                if stage_status == "running":
+                    is_current = True
                 active_fallback_allowed = is_active_month and (
                     not active_model_fold_key or timeline_month == active_model_fold_key or _is_month_key(timeline_month)
                 )
@@ -1591,9 +1621,7 @@ def _task_timeline(
                 reason = str(dashboard_stage.get("last_reason") or "")
                 if len(reason) > max_reason_chars:
                     reason = reason[: max_reason_chars - 1] + "…"
-                blockers = dashboard_stage.get("blockers") or []
-                if not isinstance(blockers, list):
-                    blockers = []
+                blockers = _unresolved_dashboard_blockers(dashboard_stage, stage_status=stage_status)
                 receipt_refs = dashboard_stage.get("receipt_refs") or []
                 if not isinstance(receipt_refs, list):
                     receipt_refs = []
@@ -1625,7 +1653,7 @@ def _task_timeline(
                     "target_required": dataset_unit.get("target_required") if dataset_unit else None,
                     **worker_info,
                     "updated_at_utc": dashboard_stage.get("updated_utc"),
-                    **_task_timestamp_fields(dashboard_stage, storage_root=storage_root),
+                    **timestamp_fields,
                     "reason": reason or None,
                     "receipt_count": len(receipt_refs),
                     "blocker_count": len(blockers),

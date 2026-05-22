@@ -33,6 +33,7 @@ from .task_progress import DEFAULT_TASK_PROGRESS_ROOT, clear_worker_task_progres
 
 DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_receipts"
 DEFAULT_LOG_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_logs"
+DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 30
 SAFE_OFFLINE_STAGE_TYPES = {
     "data_acquisition",
     "feature_generation",
@@ -245,30 +246,44 @@ def execute_stage_process(
         node_id="stage_started",
         node_label="Stage process started",
     )
-    result = subprocess.run(
-        argv,
-        cwd=cwd,
-        env={
-            **os.environ,
-            **env_assignments,
-            "TRADING_MANAGER_TASK_PROGRESS_ROOT": str(progress_root),
-            "TRADING_MANAGER_TASK_PROGRESS_PATH": str(progress_path),
-            "TRADING_MANAGER_TASK_PROGRESS_WORKER_ID": worker_id,
-            "TRADING_MANAGER_TASK_PROGRESS_TASK_UID": task_uid,
-            "TRADING_MANAGER_TASK_PROGRESS_STAGE_ID": stage.stage_id,
-        },
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    timeout_seconds = int(os.environ.get("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS") or DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS)
+    run_env = {
+        **os.environ,
+        **env_assignments,
+        "TRADING_MANAGER_TASK_PROGRESS_ROOT": str(progress_root),
+        "TRADING_MANAGER_TASK_PROGRESS_PATH": str(progress_path),
+        "TRADING_MANAGER_TASK_PROGRESS_WORKER_ID": worker_id,
+        "TRADING_MANAGER_TASK_PROGRESS_TASK_UID": task_uid,
+        "TRADING_MANAGER_TASK_PROGRESS_STAGE_ID": stage.stage_id,
+    }
+    try:
+        result = subprocess.run(
+            argv,
+            cwd=cwd,
+            env=run_env,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout_seconds if timeout_seconds > 0 else None,
+        )
+        return_code: int | None = result.returncode
+        stdout = result.stdout
+        stderr = result.stderr
+        failure_reason = "stage command returned non-zero status"
+    except subprocess.TimeoutExpired as exc:
+        return_code = None
+        stdout = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace")
+        stderr = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode(errors="replace")
+        stderr = f"{stderr}\nstage command exceeded timeout_seconds={timeout_seconds}\n"
+        failure_reason = f"stage command exceeded timeout_seconds={timeout_seconds}"
     completed = datetime.now(UTC).isoformat()
-    stdout_path.write_text(result.stdout, encoding="utf-8")
-    stderr_path.write_text(result.stderr, encoding="utf-8")
-    status = "succeeded" if result.returncode == 0 else "failed"
+    stdout_path.write_text(stdout, encoding="utf-8")
+    stderr_path.write_text(stderr, encoding="utf-8")
+    status = "succeeded" if return_code == 0 else "failed"
     receipt_path = stage_receipt_root / f"{stamp}.receipt.json"
-    provider_calls = _provider_call_count_from_stdout(result.stdout) if result.returncode == 0 else 0
+    provider_calls = _provider_call_count_from_stdout(stdout) if return_code == 0 else 0
     agent_error_result: Mapping[str, Any] | None = None
-    if result.returncode != 0:
+    if return_code != 0:
         agent_error_result = handle_server_error(
             source_component="trading-manager.stage_executor",
             source_repo="trading-manager",
@@ -277,7 +292,7 @@ def execute_stage_process(
             severity="error",
             summary=f"model training stage {stage.stage_id} command returned non-zero status",
             command=stage.command,
-            exit_code=result.returncode,
+            exit_code=return_code,
             stdout_path=str(stdout_path),
             stderr_path=str(stderr_path),
             working_directory=str(cwd),
@@ -291,12 +306,12 @@ def execute_stage_process(
         stage_id=stage.stage_id,
         status=status,
         command=stage.command,
-        return_code=result.returncode,
+        return_code=return_code,
         receipt_path=str(receipt_path),
         stdout_path=str(stdout_path),
         stderr_path=str(stderr_path),
         provider_calls=provider_calls,
-        reason=None if result.returncode == 0 else "stage command returned non-zero status",
+        reason=None if return_code == 0 else failure_reason,
         agent_error_request_path=str(agent_error_result.get("request_path")) if agent_error_result else None,
         agent_error_diagnosis_path=str(agent_error_result.get("diagnosis_path")) if agent_error_result else None,
         agent_error_number=int(agent_error_result["error_number"]) if agent_error_result and agent_error_result.get("error_number") else None,

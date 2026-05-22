@@ -194,16 +194,62 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             stage = {stage.stage_id: stage for stage in state.stages}[stage_id]
             self.assertIsNotNone(stage.created_at_utc)
             self.assertIsNotNone(stage.status_updated_at_utc)
-            self.assertIsNotNone(stage.started_at_utc)
+            self.assertIsNone(stage.started_at_utc)
             self.assertIsNone(stage.ended_at_utc)
-            started_when_current = stage.started_at_utc
 
             state = mark_stage_started(state, stage_id=stage_id, started_at="2026-05-13T10:00:00+00:00")
             state = mark_stage_succeeded(state, stage_id=stage_id, ended_at="2026-05-13T10:05:00+00:00")
             stage = {stage.stage_id: stage for stage in state.stages}[stage_id]
-            self.assertEqual(stage.started_at_utc, started_when_current)
+            self.assertEqual(stage.started_at_utc, "2026-05-13T10:00:00+00:00")
             self.assertEqual(stage.ended_at_utc, "2026-05-13T10:05:00+00:00")
             self.assertEqual(stage.status_updated_at_utc, "2026-05-13T10:05:00+00:00")
+
+    def test_ready_refresh_clears_legacy_started_timestamp_unless_stage_is_running(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage = tmp / "storage"
+            _write_task_keys(storage, model_layer=LAYER_ONE_MODEL_LAYER)
+            state_path = tmp / "workflow_state.json"
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage,
+                state_path=state_path,
+                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                write=False,
+            )
+            stage = {stage.stage_id: stage for stage in state.stages}["layer_01_market_regime.data_acquisition"]
+            legacy_payload = state.summary_row()
+            legacy_payload["stages"][0]["started_at_utc"] = "2026-05-13T10:00:00+00:00"
+            state_path.write_text(json.dumps(legacy_payload) + "\n", encoding="utf-8")
+
+            refreshed = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage,
+                state_path=state_path,
+                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                write=False,
+            )
+
+            refreshed_stage = {item.stage_id: item for item in refreshed.stages}[stage.stage_id]
+            self.assertEqual(refreshed_stage.status, "ready")
+            self.assertIsNone(refreshed_stage.started_at_utc)
+
+            running_payload = refreshed.summary_row()
+            running_payload["stages"][0]["started_at_utc"] = "2026-05-13T10:00:00+00:00"
+            running_payload["stages"][0]["last_reason"] = "stage execution started by manager stage executor"
+            state_path.write_text(json.dumps(running_payload) + "\n", encoding="utf-8")
+
+            running = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=storage,
+                state_path=state_path,
+                write=False,
+            )
+            running_stage = {item.stage_id: item for item in running.stages}[stage.stage_id]
+            self.assertEqual(running_stage.started_at_utc, "2026-05-13T10:00:00+00:00")
 
     def test_terminal_stage_without_lifecycle_is_not_backfilled_when_reobserved(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
