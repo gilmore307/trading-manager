@@ -267,7 +267,18 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("same_components_live_and_replay_different_adapters", policy["payload"])
         self.assertIn("evaluation_calls_execution_graph", policy["payload"])
         self.assertIn("layer10_failure_explanation_only", policy["payload"])
+        self.assertIn("separate_crypto_and_equity_options_accounts", policy["payload"])
+        self.assertIn("no_cross_account_netting", policy["payload"])
         self.assertIn("not duplicated trading decisions", policy["note"])
+
+        self.assertEqual(rows["EXECUTION_ACCOUNT_SLEEVE"]["payload"], "execution_account_sleeve")
+        self.assertIn("exactly one sleeve", rows["EXECUTION_ACCOUNT_SLEEVE"]["note"])
+        self.assertEqual(rows["CRYPTO_SPOT_ACCOUNT_SLEEVE"]["payload"], "crypto_spot_account")
+        self.assertIn("fixed BTC, ETH, and SOL candidate pool", rows["CRYPTO_SPOT_ACCOUNT_SLEEVE"]["note"])
+        self.assertEqual(rows["EQUITY_OPTIONS_ACCOUNT_SLEEVE"]["payload"], "equity_options_account")
+        self.assertIn("option re-expression", rows["EQUITY_OPTIONS_ACCOUNT_SLEEVE"]["note"])
+        self.assertIn("symbols=BTC,ETH,SOL", rows["CRYPTO_SPOT_CANDIDATE_POOL_POLICY"]["payload"])
+        self.assertIn("BTC-USDT,ETH-USDT,SOL-USDT", rows["CRYPTO_SPOT_CANDIDATE_POOL_POLICY"]["payload"])
 
     def test_agent_decision_skill_rows_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
