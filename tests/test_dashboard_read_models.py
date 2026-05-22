@@ -1097,6 +1097,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                             },
                             {
+                                "stage_id": "layer_02_sector_context.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 2,
+                                "layer_key": "layer_02_sector_context",
+                                "status": "succeeded",
+                            },
+                            {
                                 "stage_id": "layer_03_target_state_vector.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
@@ -1136,9 +1143,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2016-06"]
-        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation"])
+        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation", "model_generation"])
         self.assertEqual(fold_tasks[0]["task_number"], 37)
         self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime.model_generation")
+        self.assertEqual(fold_tasks[0]["detail"]["progress"]["ready_count"], 1)
+        self.assertEqual(fold_tasks[0]["detail"]["progress"]["expected_count"], 2)
+        self.assertEqual(fold_tasks[1]["detail"]["progress"]["ready_count"], 2)
+        self.assertEqual(fold_tasks[1]["detail"]["progress"]["expected_count"], 2)
         monthly_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]

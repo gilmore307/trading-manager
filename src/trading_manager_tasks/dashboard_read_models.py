@@ -1145,51 +1145,50 @@ def _dashboard_stage_rows(raw_stage: Mapping[str, Any], *, timeline_month: str |
     return _monthly_dashboard_stage_rows(raw_stage, timeline_month=timeline_month)
 
 
-def _aggregate_status(states: list[str]) -> str:
-    if any(state == "failed" for state in states):
-        return "failed"
-    if states and all(state in {"succeeded", "not_applicable", "completed", "skipped"} for state in states):
-        return "complete"
-    if any(state in {"ready", "current"} for state in states):
-        return "ready"
-    if any(state == "running" for state in states):
-        return "running"
-    if any(state in {"blocked", "future"} for state in states):
-        return "blocked"
-    return "pending"
-
-
-def _phase_progress(tasks: list[dict[str, Any]]) -> dict[tuple[str | None, str | None], dict[str, Any]]:
-    grouped_states: dict[tuple[str | None, str | None], list[str]] = {}
+def _model_generation_step_progress(tasks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    grouped_tasks: dict[str | None, list[dict[str, Any]]] = {}
     for task in tasks:
-        if task.get("layer") is None:
+        if task.get("stage_type") != "model_generation" or task.get("layer") is None:
             continue
-        key = (task.get("month"), task.get("stage_type"))
-        grouped_states.setdefault(key, []).append(str(task.get("task_state") or task.get("status") or "unknown"))
-    progress_by_key: dict[tuple[str | None, str | None], dict[str, Any]] = {}
-    for key, states in grouped_states.items():
-        expected = len(states)
-        ready = sum(1 for state in states if state in {"succeeded", "not_applicable", "completed", "skipped"})
-        failed = sum(1 for state in states if state == "failed")
-        pending = max(expected - ready - failed, 0)
-        progress_by_key[key] = {
-            "stage_id": f"{key[0] or 'unknown'}:{key[1] or 'unknown'}",
-            "status": _aggregate_status(states),
-            "unit_label": "tasks",
-            "expected_count": expected,
-            "ready_count": ready,
-            "pending_count": pending,
-            "failed_count": failed,
-            "accepted_failed_count": 0,
-            "can_unlock_downstream": expected > 0 and ready >= expected and failed == 0,
-        }
-    return progress_by_key
+        grouped_tasks.setdefault(task.get("month"), []).append(task)
+    progress_by_uid: dict[str, dict[str, Any]] = {}
+    for period, period_tasks in grouped_tasks.items():
+        ordered_tasks = sorted(period_tasks, key=lambda item: int(item.get("layer") or 0))
+        expected = len(ordered_tasks)
+        completed_before_or_at = 0
+        for index, task in enumerate(ordered_tasks, start=1):
+            state = str(task.get("task_state") or task.get("status") or "unknown")
+            terminal = state in {"succeeded", "not_applicable", "completed", "skipped"}
+            if terminal:
+                completed_before_or_at = index
+            failed = 1 if state == "failed" else 0
+            ready = completed_before_or_at
+            if not terminal:
+                ready = sum(
+                    1
+                    for previous_task in ordered_tasks[: index - 1]
+                    if str(previous_task.get("task_state") or previous_task.get("status") or "unknown")
+                    in {"succeeded", "not_applicable", "completed", "skipped"}
+                )
+            pending = max(expected - ready - failed, 0)
+            progress_by_uid[str(task.get("task_uid") or "")] = {
+                "stage_id": f"{period or 'unknown'}:model_generation",
+                "status": "failed" if failed else "complete" if ready >= expected else "ready" if state == "current" else "pending",
+                "unit_label": "model steps",
+                "expected_count": expected,
+                "ready_count": ready,
+                "pending_count": pending,
+                "failed_count": failed,
+                "accepted_failed_count": 0,
+                "can_unlock_downstream": expected > 0 and ready >= expected and failed == 0,
+            }
+    return progress_by_uid
 
 
-def _apply_phase_progress(tasks: list[dict[str, Any]]) -> None:
-    progress_by_key = _phase_progress(tasks)
+def _apply_model_generation_step_progress(tasks: list[dict[str, Any]]) -> None:
+    progress_by_uid = _model_generation_step_progress(tasks)
     for task in tasks:
-        if task.get("layer") is None:
+        if task.get("stage_type") != "model_generation" or task.get("layer") is None:
             continue
         detail = task.get("detail")
         if not isinstance(detail, dict):
@@ -1197,7 +1196,7 @@ def _apply_phase_progress(tasks: list[dict[str, Any]]) -> None:
         progress = detail.get("progress")
         if not isinstance(progress, Mapping) or progress.get("unit_label") != "task":
             continue
-        replacement = progress_by_key.get((task.get("month"), task.get("stage_type")))
+        replacement = progress_by_uid.get(str(task.get("task_uid") or ""))
         if replacement is not None:
             detail["progress"] = dict(replacement)
 
@@ -1579,7 +1578,7 @@ def _task_timeline(
                     }
                 tasks.append(task)
             continue
-    _apply_phase_progress(tasks)
+    _apply_model_generation_step_progress(tasks)
     return tasks
 
 
