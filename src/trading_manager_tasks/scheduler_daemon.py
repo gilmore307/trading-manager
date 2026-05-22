@@ -257,6 +257,7 @@ def select_month_ingest_worker_months(
     default_start_month: str = "2016-01",
     worker_count: int = DEFAULT_MONTH_INGEST_WORKERS,
     max_month: str | None = None,
+    selected_target_symbol: str | None = None,
 ) -> tuple[str, ...]:
     """Return up to `worker_count` month-scoped ingest lanes to work now.
 
@@ -267,6 +268,9 @@ def select_month_ingest_worker_months(
     blocked behind foundation catch-up. New months are appended after the latest
     known month so all three ingest lanes can stay filled by default.
     """
+
+    if target_has_open_model_worker_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
+        return ()
 
     worker_count = max(1, int(worker_count))
     max_month = max_month or completed_historical_month_cutoff()
@@ -421,6 +425,86 @@ def _fold_payload_has_ready_model_worker_stage(payload: dict[str, Any]) -> bool:
     return False
 
 
+def _open_model_worker_fold_for_target(
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+) -> ModelWorkerFoldSelection | None:
+    """Return the earliest non-terminal target fold, even when it is blocked.
+
+    A blocked fold is still open work. Layer 10 may update the event-focus
+    library that later folds depend on, so the scheduler must not skip ahead
+    just because the earliest fold has no immediately executable stage.
+    """
+
+    runtime_root = storage_root / "runtime"
+    if not runtime_root.exists():
+        return None
+    pattern = "model_training_fold_state_*.json"
+    candidates: list[ModelWorkerFoldSelection] = []
+    for path in sorted(runtime_root.glob(pattern)):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        start_month = str(payload.get("start_month") or "")
+        end_month = str(payload.get("end_month") or "")
+        if not start_month or not end_month:
+            continue
+        expected_path = model_worker_fold_state_path(
+            start_month,
+            end_month,
+            root=runtime_root,
+            selected_target_symbol=selected_target_symbol,
+        )
+        if path != expected_path:
+            continue
+        if _workflow_payload_all_stages_complete(payload):
+            continue
+        if not _fold_payload_has_open_model_worker_stage(payload):
+            continue
+        candidates.append(
+            ModelWorkerFoldSelection(
+                fold_id=_model_worker_fold_id(start_month, end_month),
+                start_month=start_month,
+                end_month=end_month,
+                fold_months=rolling_fold_months(start_month),
+                reason_code=(
+                    "resume_open_model_worker_fold"
+                    if _fold_payload_has_ready_model_worker_stage(payload)
+                    else "blocked_model_worker_fold_holds_target_lane"
+                ),
+                state_path=str(path),
+            )
+        )
+    return sorted(candidates, key=lambda selection: (selection.start_month, selection.end_month, selection.state_path or ""))[0] if candidates else None
+
+
+def target_has_open_model_worker_fold(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    selected_target_symbol: str | None = None,
+) -> bool:
+    """Return whether a target already has a non-terminal Model Worker fold."""
+
+    if selected_target_symbol:
+        return _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=selected_target_symbol) is not None
+    for symbol in load_model_worker_target_queue():
+        if _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=symbol) is not None:
+            return True
+    runtime_root = storage_root / "runtime"
+    if not runtime_root.exists():
+        return False
+    for path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not _workflow_payload_all_stages_complete(payload) and _fold_payload_has_open_model_worker_stage(payload):
+            return True
+    return False
+
+
 def _month_foundation_ready(storage_root: Path, month: str) -> bool:
     path = storage_root / "runtime" / f"model_training_workflow_state_{month}.json"
     if not path.exists():
@@ -448,6 +532,10 @@ def select_model_worker_fold(
 
     max_month = max_month or completed_historical_month_cutoff()
     runtime_root = storage_root / "runtime"
+    open_selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
+    if open_selection is not None:
+        return open_selection
+
     known_months: set[str] = set()
     if runtime_root.exists():
         for path in sorted(runtime_root.glob(WORKFLOW_STATE_GLOB)):
@@ -1063,13 +1151,23 @@ def run_daemon_loop(
                 try:
                     use_month_ingest_lanes = auto_select_next_work and month_ingest_workers > 1
                     if use_month_ingest_lanes:
+                        replay_probe = run_model_group_replay_if_ready(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                            execute=False,
+                        )
+                        replay_holds_target_lane = replay_probe is not None
                         remaining_iterations = None if max_iterations is None else max_iterations - iterations
                         lane_limit = month_ingest_workers if remaining_iterations is None else min(month_ingest_workers, max(1, remaining_iterations))
-                        months = select_month_ingest_worker_months(
-                            storage_root=storage_root,
-                            default_start_month=active_start_month,
-                            worker_count=lane_limit,
-                        )
+                        if replay_holds_target_lane:
+                            months = ()
+                        else:
+                            months = select_month_ingest_worker_months(
+                                storage_root=storage_root,
+                                default_start_month=active_start_month,
+                                worker_count=lane_limit,
+                                selected_target_symbol=selected_target_symbol,
+                            )
                         decisions = _run_month_ingest_worker_decisions(
                             months=months,
                             config=config,
@@ -1116,14 +1214,16 @@ def run_daemon_loop(
                                 row["worker_month"] = month
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                        model_worker_result = _run_model_worker_decision(
-                            storage_root=storage_root,
-                            component_src_root=component_src_root,
-                            config=config,
-                            execute_safe_offline_stages=execute_safe_offline_stages,
-                            selected_target_symbol=selected_target_symbol,
-                            target_queue_path=target_queue_path,
-                        )
+                        model_worker_result = None
+                        if not replay_holds_target_lane:
+                            model_worker_result = _run_model_worker_decision(
+                                storage_root=storage_root,
+                                component_src_root=component_src_root,
+                                config=config,
+                                execute_safe_offline_stages=execute_safe_offline_stages,
+                                selected_target_symbol=selected_target_symbol,
+                                target_queue_path=target_queue_path,
+                            )
                         if model_worker_result is not None:
                             target_selection, model_decision = model_worker_result
                             model_selection = target_selection.fold_selection

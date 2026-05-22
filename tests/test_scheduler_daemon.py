@@ -471,7 +471,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(next_selection.fold_id, "fold_2016-07_2016-12")
         self.assertEqual(next_selection.fold_months, ("2016-07", "2016-08", "2016-09", "2016-10", "2016-11", "2016-12"))
 
-    def test_model_worker_skips_blocked_fold_and_selects_next_ready_fold(self):
+    def test_model_worker_holds_blocked_fold_instead_of_selecting_next_ready_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
@@ -504,8 +504,33 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNotNone(selection)
         assert selection is not None
-        self.assertEqual(selection.fold_id, "fold_2016-07_2016-12")
-        self.assertEqual(selection.reason_code, "complete_foundation_fold_ready")
+        self.assertEqual(selection.fold_id, "fold_2016-01_2016-06")
+        self.assertEqual(selection.reason_code, "blocked_model_worker_fold_holds_target_lane")
+
+    def test_month_ingest_workers_pause_when_target_has_open_model_worker_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-06",
+                selected_target_symbol="AAPL",
+            )
+            self.assertIsNotNone(selection)
+            assert selection is not None
+            seed_model_worker_fold_state(storage_root=storage_root, selection=selection, selected_target_symbol="AAPL")
+
+            months = select_month_ingest_worker_months(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                worker_count=3,
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertEqual(months, ())
 
     def test_model_worker_selects_fold_with_ready_target_chain_preparation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
