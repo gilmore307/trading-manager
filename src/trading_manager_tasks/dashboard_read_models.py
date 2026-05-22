@@ -1066,13 +1066,17 @@ def _stable_task_uid(raw_stage: Mapping[str, Any], *, task_period: str | None) -
     return f"{task_period or 'unscheduled'}:{stage_id}"
 
 
-def _is_fold_worker_stage(raw_stage: Mapping[str, Any]) -> bool:
+def _is_fold_dashboard_stage(raw_stage: Mapping[str, Any]) -> bool:
     stage_type = str(raw_stage.get("stage_type") or "")
     try:
         layer = int(raw_stage.get("layer"))
     except (TypeError, ValueError):
         layer = 0
     return stage_type in FOLD_MODEL_STAGE_TYPES or (stage_type in MONTHLY_TASK_STAGE_TYPES and layer not in MONTHLY_SUBSTRATE_LAYERS)
+
+
+def _is_fold_worker_stage(raw_stage: Mapping[str, Any]) -> bool:
+    return str(raw_stage.get("stage_type") or "") in FOLD_MODEL_STAGE_TYPES
 
 
 def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
@@ -1082,7 +1086,7 @@ def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
             continue
-        if _is_fold_worker_stage(raw_stage):
+        if _is_fold_dashboard_stage(raw_stage):
             visible.append(raw_stage)
     return visible
 
@@ -1106,6 +1110,96 @@ def _public_task_stages(raw_stages: list[Any]) -> list[Any]:
             continue
         rows.append(raw_stage)
     return rows
+
+
+def _monthly_dashboard_stage_rows(raw_stage: Mapping[str, Any], *, timeline_month: str | None) -> list[dict[str, Any]]:
+    """Return dashboard rows for a source/feature stage scoped to a month span."""
+
+    stage_type = str(raw_stage.get("stage_type") or "")
+    if stage_type not in MONTHLY_TASK_STAGE_TYPES:
+        return [dict(raw_stage)]
+    months = _timeline_period_months(timeline_month)
+    if len(months) <= 1:
+        return [dict(raw_stage)]
+    rows: list[dict[str, Any]] = []
+    dataset_unit = raw_stage.get("dataset_unit") if isinstance(raw_stage.get("dataset_unit"), Mapping) else None
+    for month in months:
+        row = dict(raw_stage)
+        row["month"] = month
+        if dataset_unit is not None:
+            monthly_unit = dict(dataset_unit)
+            monthly_unit["start_month"] = month
+            monthly_unit["end_month"] = month
+            monthly_unit["unit_months"] = 1
+            unit_kind = str(monthly_unit.get("unit_kind") or "")
+            if unit_kind.endswith("_six_month"):
+                monthly_unit["unit_kind"] = unit_kind[: -len("_six_month")] + "_month"
+            elif unit_kind == "six_month_panel":
+                monthly_unit["unit_kind"] = "monthly_panel"
+            row["dataset_unit"] = monthly_unit
+        rows.append(row)
+    return rows
+
+
+def _dashboard_stage_rows(raw_stage: Mapping[str, Any], *, timeline_month: str | None) -> list[dict[str, Any]]:
+    return _monthly_dashboard_stage_rows(raw_stage, timeline_month=timeline_month)
+
+
+def _aggregate_status(states: list[str]) -> str:
+    if any(state == "failed" for state in states):
+        return "failed"
+    if states and all(state in {"succeeded", "not_applicable", "completed", "skipped"} for state in states):
+        return "complete"
+    if any(state in {"ready", "current"} for state in states):
+        return "ready"
+    if any(state == "running" for state in states):
+        return "running"
+    if any(state in {"blocked", "future"} for state in states):
+        return "blocked"
+    return "pending"
+
+
+def _phase_progress(tasks: list[dict[str, Any]]) -> dict[tuple[str | None, str | None], dict[str, Any]]:
+    grouped_states: dict[tuple[str | None, str | None], list[str]] = {}
+    for task in tasks:
+        if task.get("layer") is None:
+            continue
+        key = (task.get("month"), task.get("stage_type"))
+        grouped_states.setdefault(key, []).append(str(task.get("task_state") or task.get("status") or "unknown"))
+    progress_by_key: dict[tuple[str | None, str | None], dict[str, Any]] = {}
+    for key, states in grouped_states.items():
+        expected = len(states)
+        ready = sum(1 for state in states if state in {"succeeded", "not_applicable", "completed", "skipped"})
+        failed = sum(1 for state in states if state == "failed")
+        pending = max(expected - ready - failed, 0)
+        progress_by_key[key] = {
+            "stage_id": f"{key[0] or 'unknown'}:{key[1] or 'unknown'}",
+            "status": _aggregate_status(states),
+            "unit_label": "tasks",
+            "expected_count": expected,
+            "ready_count": ready,
+            "pending_count": pending,
+            "failed_count": failed,
+            "accepted_failed_count": 0,
+            "can_unlock_downstream": expected > 0 and ready >= expected and failed == 0,
+        }
+    return progress_by_key
+
+
+def _apply_phase_progress(tasks: list[dict[str, Any]]) -> None:
+    progress_by_key = _phase_progress(tasks)
+    for task in tasks:
+        if task.get("layer") is None:
+            continue
+        detail = task.get("detail")
+        if not isinstance(detail, dict):
+            continue
+        progress = detail.get("progress")
+        if not isinstance(progress, Mapping) or progress.get("unit_label") != "task":
+            continue
+        replacement = progress_by_key.get((task.get("month"), task.get("stage_type")))
+        if replacement is not None:
+            detail["progress"] = dict(replacement)
 
 
 def _target_symbol_from_fold_stages(raw_stages: list[Any]) -> str | None:
@@ -1368,11 +1462,15 @@ def _task_timeline(
             if not stage_id or str(raw_stage.get("status") or "") != "ready":
                 continue
             if active_model_fold_key:
-                if not _is_fold_worker_stage(raw_stage):
+                if not _is_fold_dashboard_stage(raw_stage):
                     continue
             elif str(raw_stage.get("stage_type") or "") not in FOLD_MODEL_STAGE_TYPES:
                 continue
-            task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
+            if active_model_fold_key and str(raw_stage.get("stage_type") or "") in MONTHLY_TASK_STAGE_TYPES:
+                period_months = _timeline_period_months(timeline_month)
+                task_month = period_months[0] if period_months else str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
+            else:
+                task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
             current_model_heads.add((task_month, stage_id))
             break
     tasks: list[dict[str, Any]] = []
@@ -1381,102 +1479,107 @@ def _task_timeline(
         for raw_stage in raw_stages:
             if not isinstance(raw_stage, Mapping):
                 continue
-            stage_id = str(raw_stage.get("stage_id") or "")
-            if not stage_id or not _is_presentable_task_stage(raw_stage):
-                continue
-            stage_status = str(raw_stage.get("status") or "unknown")
-            is_terminal = stage_status in {"succeeded", "not_applicable"}
-            task_month_for_state = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
-            is_current = bool((task_month_for_state, stage_id) in current_lane_heads and not is_terminal)
-            if not is_current:
-                is_current = bool((task_month_for_state, stage_id) in current_model_heads and not is_terminal)
-            if not is_current and not current_lane_heads and not current_model_heads:
-                is_current = bool(
-                    is_active_month and stage_id and stage_id == status.current_stage and stage_status == "ready" and not is_terminal
+            for dashboard_stage in _dashboard_stage_rows(raw_stage, timeline_month=timeline_month):
+                if not isinstance(dashboard_stage, Mapping):
+                    continue
+                stage_id = str(dashboard_stage.get("stage_id") or "")
+                if not stage_id or not _is_presentable_task_stage(dashboard_stage):
+                    continue
+                stage_status = str(dashboard_stage.get("status") or "unknown")
+                is_terminal = stage_status in {"succeeded", "not_applicable"}
+                task_month_for_state = str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "") or None
+                is_current = bool((task_month_for_state, stage_id) in current_lane_heads and not is_terminal)
+                if not is_current:
+                    is_current = bool((task_month_for_state, stage_id) in current_model_heads and not is_terminal)
+                if not is_current and not current_lane_heads and not current_model_heads:
+                    is_current = bool(
+                        is_active_month and stage_id and stage_id == status.current_stage and stage_status == "ready" and not is_terminal
+                    )
+                active_fallback_allowed = is_active_month and (
+                    not active_model_fold_key or timeline_month == active_model_fold_key or _is_month_key(timeline_month)
                 )
-            active_fallback_allowed = is_active_month and (
-                not active_model_fold_key or timeline_month == active_model_fold_key or _is_month_key(timeline_month)
-            )
-            if not current_lane_heads and active_fallback_allowed and not first_open_seen and stage_status == "ready" and not is_terminal:
-                is_current = True
-                first_open_seen = True
-            if latest_failed_stage and stage_id == latest_failed_stage and (
-                not latest_failed_month or task_month_for_state == latest_failed_month
-            ):
-                task_state = "failed"
-            elif is_terminal:
-                task_state = "completed" if stage_status == "succeeded" else "skipped"
-            elif is_current:
-                task_state = "current"
-            else:
-                task_state = "future"
-            reason = str(raw_stage.get("last_reason") or "")
-            if len(reason) > max_reason_chars:
-                reason = reason[: max_reason_chars - 1] + "…"
-            blockers = raw_stage.get("blockers") or []
-            if not isinstance(blockers, list):
-                blockers = []
-            receipt_refs = raw_stage.get("receipt_refs") or []
-            if not isinstance(receipt_refs, list):
-                receipt_refs = []
-            dataset_unit = raw_stage.get("dataset_unit") if isinstance(raw_stage.get("dataset_unit"), Mapping) else None
-            task_month = str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "") or None
-            task_number = _stable_task_number(raw_stage, task_period=task_month)
-            worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
-                raw_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
-            )
-            task: dict[str, Any] = {
-                "sequence": len(tasks) + 1,
-                "task_number": task_number,
-                "task_uid": _stable_task_uid(raw_stage, task_period=task_month),
-                "month": task_month,
-                "task_id": stage_id,
-                "task_label": str(raw_stage.get("task_label") or _public_stage_name(stage_id, raw_stage.get("stage_type"))),
-                "task_state": task_state,
-                "status": stage_status,
-                "stage_type": raw_stage.get("stage_type"),
-                "layer": raw_stage.get("layer"),
-                "layer_key": raw_stage.get("layer_key"),
-                "dataset_unit_kind": dataset_unit.get("unit_kind") if dataset_unit else None,
-                "dataset_unit_months": dataset_unit.get("unit_months") if dataset_unit else None,
-                "target_symbol": dataset_unit.get("target_symbol") if dataset_unit else None,
-                "target_required": dataset_unit.get("target_required") if dataset_unit else None,
-                **worker_info,
-                "updated_at_utc": raw_stage.get("updated_utc"),
-                **_task_timestamp_fields(raw_stage, storage_root=storage_root),
-                "reason": reason or None,
-                "receipt_count": len(receipt_refs),
-                "blocker_count": len(blockers),
-                "detail": {
-                    "blockers": [str(blocker) for blocker in blockers],
-                    "receipt_refs": [str(ref) for ref in receipt_refs],
-                    "progress": raw_stage.get("dashboard_progress")
-                    if isinstance(raw_stage.get("dashboard_progress"), Mapping)
-                    else _task_status_progress(stage_id, "failed" if task_state == "failed" else stage_status),
-                    "safe_without_provider_calls": raw_stage.get("safe_without_provider_calls"),
-                    "provider_calls_allowed": raw_stage.get("provider_calls_allowed"),
-                    "model_activation_allowed": raw_stage.get("model_activation_allowed"),
-                    "broker_execution_allowed": raw_stage.get("broker_execution_allowed"),
-                    "dataset_unit": dataset_unit,
-                    "worker": worker_info,
-                },
-            }
-            if (
-                coverage_stage_id
-                and stage_id == coverage_stage_id
-                and stage_coverage is not None
-                and (not status.current_month or task_month == status.current_month)
-            ):
-                task["detail"]["progress"] = _stage_coverage_chart(stage_coverage)
-            if latest_execution.get("stage_id") == stage_id and (
-                not latest_failed_month or task_month == latest_failed_month
-            ):
-                task["detail"]["last_execution"] = {
-                    "status": latest_execution.get("status"),
-                    "return_code": latest_execution.get("return_code"),
-                    "reason": latest_execution.get("failure_detail") or latest_execution.get("reason"),
+                if not current_lane_heads and active_fallback_allowed and not first_open_seen and stage_status == "ready" and not is_terminal:
+                    is_current = True
+                    first_open_seen = True
+                if latest_failed_stage and stage_id == latest_failed_stage and (
+                    not latest_failed_month or task_month_for_state == latest_failed_month
+                ):
+                    task_state = "failed"
+                elif is_terminal:
+                    task_state = "completed" if stage_status == "succeeded" else "skipped"
+                elif is_current:
+                    task_state = "current"
+                else:
+                    task_state = "future"
+                reason = str(dashboard_stage.get("last_reason") or "")
+                if len(reason) > max_reason_chars:
+                    reason = reason[: max_reason_chars - 1] + "…"
+                blockers = dashboard_stage.get("blockers") or []
+                if not isinstance(blockers, list):
+                    blockers = []
+                receipt_refs = dashboard_stage.get("receipt_refs") or []
+                if not isinstance(receipt_refs, list):
+                    receipt_refs = []
+                dataset_unit = dashboard_stage.get("dataset_unit") if isinstance(dashboard_stage.get("dataset_unit"), Mapping) else None
+                task_month = str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "") or None
+                task_number = _stable_task_number(dashboard_stage, task_period=task_month)
+                worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
+                    dashboard_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
+                )
+                task: dict[str, Any] = {
+                    "sequence": len(tasks) + 1,
+                    "task_number": task_number,
+                    "task_uid": _stable_task_uid(dashboard_stage, task_period=task_month),
+                    "month": task_month,
+                    "task_id": stage_id,
+                    "task_label": str(dashboard_stage.get("task_label") or _public_stage_name(stage_id, dashboard_stage.get("stage_type"))),
+                    "task_state": task_state,
+                    "status": stage_status,
+                    "stage_type": dashboard_stage.get("stage_type"),
+                    "layer": dashboard_stage.get("layer"),
+                    "layer_key": dashboard_stage.get("layer_key"),
+                    "dataset_unit_kind": dataset_unit.get("unit_kind") if dataset_unit else None,
+                    "dataset_unit_months": dataset_unit.get("unit_months") if dataset_unit else None,
+                    "target_symbol": dataset_unit.get("target_symbol") if dataset_unit else None,
+                    "target_required": dataset_unit.get("target_required") if dataset_unit else None,
+                    **worker_info,
+                    "updated_at_utc": dashboard_stage.get("updated_utc"),
+                    **_task_timestamp_fields(dashboard_stage, storage_root=storage_root),
+                    "reason": reason or None,
+                    "receipt_count": len(receipt_refs),
+                    "blocker_count": len(blockers),
+                    "detail": {
+                        "blockers": [str(blocker) for blocker in blockers],
+                        "receipt_refs": [str(ref) for ref in receipt_refs],
+                        "progress": dashboard_stage.get("dashboard_progress")
+                        if isinstance(dashboard_stage.get("dashboard_progress"), Mapping)
+                        else _task_status_progress(stage_id, "failed" if task_state == "failed" else stage_status),
+                        "safe_without_provider_calls": dashboard_stage.get("safe_without_provider_calls"),
+                        "provider_calls_allowed": dashboard_stage.get("provider_calls_allowed"),
+                        "model_activation_allowed": dashboard_stage.get("model_activation_allowed"),
+                        "broker_execution_allowed": dashboard_stage.get("broker_execution_allowed"),
+                        "dataset_unit": dataset_unit,
+                        "worker": worker_info,
+                    },
                 }
-            tasks.append(task)
+                if (
+                    coverage_stage_id
+                    and stage_id == coverage_stage_id
+                    and stage_coverage is not None
+                    and (not status.current_month or task_month == status.current_month)
+                ):
+                    task["detail"]["progress"] = _stage_coverage_chart(stage_coverage)
+                if latest_execution.get("stage_id") == stage_id and (
+                    not latest_failed_month or task_month == latest_failed_month
+                ):
+                    task["detail"]["last_execution"] = {
+                        "status": latest_execution.get("status"),
+                        "return_code": latest_execution.get("return_code"),
+                        "reason": latest_execution.get("failure_detail") or latest_execution.get("reason"),
+                    }
+                tasks.append(task)
+            continue
+    _apply_phase_progress(tasks)
     return tasks
 
 
@@ -1537,6 +1640,33 @@ def _month_span_count(start_month: str, end_month: str) -> int:
     except ValueError:
         return MONTHS_PER_MODEL_FOLD
     return max(1, (end_year - start_year) * 12 + end_month_number - start_month_number + 1)
+
+
+def _months_in_span(start_month: str, end_month: str) -> list[str]:
+    if not _is_month_key(start_month) or not _is_month_key(end_month):
+        return []
+    start_year, start_month_number = (int(part) for part in start_month.split("-", 1))
+    end_year, end_month_number = (int(part) for part in end_month.split("-", 1))
+    start_index = start_year * 12 + start_month_number - 1
+    end_index = end_year * 12 + end_month_number - 1
+    if end_index < start_index:
+        return []
+    months: list[str] = []
+    for index in range(start_index, end_index + 1):
+        year = index // 12
+        month = index % 12 + 1
+        months.append(f"{year:04d}-{month:02d}")
+    return months
+
+
+def _timeline_period_months(timeline_month: str | None) -> list[str]:
+    text = str(timeline_month or "")
+    if _is_month_key(text):
+        return [text]
+    if ".." not in text:
+        return []
+    start_month, end_month = text.split("..", 1)
+    return _months_in_span(start_month, end_month)
 
 
 def _replay_window_months(dataset_root: Path) -> tuple[str, str]:
@@ -1753,7 +1883,7 @@ def _model_group_replay_timeline_tasks(
     if manifest is None:
         append_task(
             task_id="model_group.data_acquisition",
-            label="Model Group Replay Data Acquisition",
+            label="Data Acquisition",
             task_state="current",
             status="ready",
             reason="Waiting for model-group replay data-acquisition preparation manifest.",
@@ -1762,7 +1892,7 @@ def _model_group_replay_timeline_tasks(
         )
         append_task(
             task_id="model_group.replay",
-            label="Model Group Replay",
+            label="Model Evaluation",
             task_state="future",
             status="blocked",
             reason="Waiting for model-group replay data acquisition before replay can run.",
@@ -1770,7 +1900,7 @@ def _model_group_replay_timeline_tasks(
         )
         append_task(
             task_id="model_group.promotion_review",
-            label="Model Group Promotion Review",
+            label="Promotion Review",
             task_state="future",
             status="blocked",
             reason="Waiting for model-group replay evidence and promotion-evaluation-review.",
@@ -1779,7 +1909,7 @@ def _model_group_replay_timeline_tasks(
         )
         append_task(
             task_id="model_group.maintenance",
-            label="Model Group Maintenance",
+            label="Maintenance",
             task_state="future",
             status="blocked",
             reason="Waiting for model-group promotion review before maintenance can run.",
@@ -1807,7 +1937,7 @@ def _model_group_replay_timeline_tasks(
     coverage_complete = expected > 0 and missing == 0
     append_task(
         task_id="model_group.data_acquisition",
-        label="Model Group Replay Data Acquisition",
+        label="Data Acquisition",
         task_state="completed" if coverage_complete else "current",
         status="succeeded" if coverage_complete else "blocked",
         reason=(
@@ -1845,7 +1975,7 @@ def _model_group_replay_timeline_tasks(
     replay_complete = bool(replay_progress["can_unlock_downstream"])
     append_task(
         task_id="model_group.replay",
-        label="Model Group Replay",
+        label="Model Evaluation",
         task_state="completed" if replay_complete else ("current" if freeze_ready else "future"),
         status="succeeded" if replay_complete else ("ready" if freeze_ready else "blocked"),
         reason=(
@@ -1861,7 +1991,7 @@ def _model_group_replay_timeline_tasks(
     )
     append_task(
         task_id="model_group.promotion_review",
-        label="Model Group Promotion Review",
+        label="Promotion Review",
         task_state="current" if replay_complete else "future",
         status="ready" if replay_complete else "blocked",
         reason=(
@@ -1879,7 +2009,7 @@ def _model_group_replay_timeline_tasks(
     )
     append_task(
         task_id="model_group.maintenance",
-        label="Model Group Maintenance",
+        label="Maintenance",
         task_state="future",
         status="blocked",
         reason="Waiting for model-group promotion review before maintenance can run.",

@@ -357,21 +357,21 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[1]["detail"]["replay_window"]["start_month"], "2021-01")
         self.assertEqual(evaluation_tasks[1]["detail"]["replay_window"]["end_month"], "2026-01")
         self.assertEqual(evaluation_tasks[1]["detail"]["replay_window"]["unit_months"], 60)
-        self.assertEqual(evaluation_tasks[0]["task_label"], "Model Group Replay Data Acquisition")
+        self.assertEqual(evaluation_tasks[0]["task_label"], "Data Acquisition")
         self.assertEqual(evaluation_tasks[0]["task_state"], "current")
         self.assertEqual(evaluation_tasks[0]["status"], "blocked")
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["expected_count"], 360)
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["pending_count"], 360)
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["unit_label"], "source-months")
-        self.assertEqual(evaluation_tasks[1]["task_label"], "Model Group Replay")
+        self.assertEqual(evaluation_tasks[1]["task_label"], "Model Evaluation")
         self.assertEqual(evaluation_tasks[1]["task_state"], "future")
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 60)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 60)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "months")
         self.assertIn("frozen replay contract", evaluation_tasks[1]["reason"])
-        self.assertEqual(evaluation_tasks[2]["task_label"], "Model Group Promotion Review")
+        self.assertEqual(evaluation_tasks[2]["task_label"], "Promotion Review")
         self.assertIn("promotion-evaluation-review", evaluation_tasks[2]["detail"]["blockers"])
-        self.assertEqual(evaluation_tasks[3]["task_label"], "Model Group Maintenance")
+        self.assertEqual(evaluation_tasks[3]["task_label"], "Maintenance")
         self.assertEqual(evaluation_tasks[3]["detail"]["blockers"], ["model_group.promotion_review"])
 
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
@@ -1136,10 +1136,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2016-06"]
-        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation", "data_acquisition"])
+        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_generation"])
         self.assertEqual(fold_tasks[0]["task_number"], 37)
         self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime.model_generation")
-        self.assertEqual(fold_tasks[1]["task_uid"], "2016-01..2016-06:layer_03_target_state_vector.data_acquisition")
+        monthly_prep_tasks = [
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if task["task_id"] == "layer_03_target_state_vector.data_acquisition"
+        ]
+        self.assertEqual([task["month"] for task in monthly_prep_tasks], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
+        self.assertEqual(monthly_prep_tasks[0]["dataset_unit_months"], None)
 
     def test_current_incomplete_calendar_month_is_not_exposed_as_ready_task(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -1675,7 +1681,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertIn(
-            ("2016-07..2016-12", "layer_03_target_state_vector.feature_generation", "AAPL"),
+            ("2016-07", "layer_03_target_state_vector.feature_generation", "AAPL"),
             [(task["month"], task["task_id"], task["target_symbol"]) for task in current_tasks],
         )
         self.assertNotIn(
