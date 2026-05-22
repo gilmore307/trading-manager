@@ -488,6 +488,98 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["chart_payload"]["active_stage"], "layer_03_target_state_vector.data_acquisition")
         self.assertEqual(payload["chart_payload"]["current_month"], "2020-07")
 
+    def test_model_group_promotion_review_uses_review_artifact(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            review_root = replay_root / "promotion_review_runs" / "model_group_replay_fixture"
+            review_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 2,
+                        "available_feed_acquisition_count": 2,
+                        "missing_feed_acquisition_count": 0,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "feed_acquisition_plan.csv").write_text(
+                "month\n2021-01\n2021-02\n",
+                encoding="utf-8",
+            )
+            (replay_root / "replay_progress.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"stage_id": "model_group.replay", "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "month": "2021-02", "status": "completed"}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (review_root / "promotion_evaluation_review.json").write_text(
+                json.dumps(
+                    {
+                        "recommendation": "insufficient_evidence",
+                        "blocking_issues": ["missing anonymous comparison", "auroc_below_minimum"],
+                        "created_at_utc": "2026-05-22T12:50:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (review_root / "promotion_eligibility_decision.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "promotion_eligibility_decision",
+                        "decision_status": "review_required",
+                        "decision_reason": "AUROC below minimum; missing comparison evidence",
+                        "created_at_utc": "2026-05-22T12:50:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            fold_state = tmp / "storage" / "02_control_plane" / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            fold_state.parent.mkdir(parents=True, exist_ok=True)
+            fold_state.write_text(
+                json.dumps(
+                    {
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [{"stage_id": "layer_03_target_state_vector.model_generation", "stage_type": "model_generation", "status": "succeeded"}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:51:00Z")
+
+        promotion_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.promotion_review")
+        maintenance_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.maintenance")
+        self.assertEqual(promotion_task["status"], "review_required")
+        self.assertEqual(promotion_task["task_state"], "current")
+        self.assertEqual(promotion_task["detail"]["progress"]["ready_count"], 1)
+        self.assertEqual(promotion_task["detail"]["progress"]["pending_count"], 0)
+        self.assertFalse(promotion_task["detail"]["progress"]["can_unlock_downstream"])
+        self.assertEqual(promotion_task["detail"]["blockers"], ["missing anonymous comparison", "auroc_below_minimum"])
+        self.assertEqual(maintenance_task["status"], "blocked")
+        self.assertEqual(maintenance_task["detail"]["blockers"], ["model_group.promotion_review"])
+
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

@@ -1852,7 +1852,14 @@ def _replay_month_progress(
     }
 
 
-def _single_step_progress(*, stage_id: str, status: str, complete: bool, unit_label: str) -> dict[str, Any]:
+def _single_step_progress(
+    *,
+    stage_id: str,
+    status: str,
+    complete: bool,
+    unit_label: str,
+    can_unlock_downstream: bool | None = None,
+) -> dict[str, Any]:
     ready = 1 if complete else 0
     return {
         "stage_id": stage_id,
@@ -1863,7 +1870,7 @@ def _single_step_progress(*, stage_id: str, status: str, complete: bool, unit_la
         "pending_count": 0 if complete else 1,
         "failed_count": 0,
         "accepted_failed_count": 0,
-        "can_unlock_downstream": complete,
+        "can_unlock_downstream": complete if can_unlock_downstream is None else can_unlock_downstream,
     }
 
 
@@ -1875,6 +1882,29 @@ def _replay_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> li
         manifest.get("coverage_summary_ref") or dataset_root / "coverage_summary.csv",
     ]
     return [str(ref) for ref in refs if ref]
+
+
+def _latest_promotion_review_artifacts(dataset_root: Path) -> dict[str, Any] | None:
+    review_root = dataset_root / "promotion_review_runs"
+    if not review_root.exists():
+        return None
+    candidates: list[tuple[str, Path, Mapping[str, Any], Mapping[str, Any] | None]] = []
+    for decision_path in sorted(review_root.glob("*/promotion_eligibility_decision.json")):
+        decision = _load_optional_json_object(decision_path)
+        if decision is None:
+            continue
+        review_path = decision_path.parent / "promotion_evaluation_review.json"
+        review = _load_optional_json_object(review_path)
+        created = str(decision.get("created_at_utc") or (review or {}).get("created_at_utc") or decision_path.parent.name)
+        candidates.append((created, decision_path, decision, review))
+    if not candidates:
+        return None
+    _created, decision_path, decision, review = sorted(candidates, key=lambda item: item[0])[-1]
+    refs = [str(decision_path)]
+    review_path = decision_path.parent / "promotion_evaluation_review.json"
+    if review_path.exists():
+        refs.append(str(review_path))
+    return {"decision": dict(decision), "review": dict(review or {}), "receipt_refs": refs}
 
 
 def _evaluation_worker_info() -> dict[str, str]:
@@ -2072,6 +2102,21 @@ def _model_group_replay_timeline_tasks(
     )
     replay_started = bool(replay_ready_months)
     replay_complete = bool(replay_progress["can_unlock_downstream"])
+    promotion_artifacts = _latest_promotion_review_artifacts(dataset_root)
+    promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
+    promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
+    promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")
+    promotion_complete = promotion_decision is not None
+    promotion_eligible = promotion_decision_status == "eligible"
+    promotion_blockers = [
+        str(item)
+        for item in (
+            promotion_review.get("blocking_issues")
+            if isinstance(promotion_review, Mapping) and isinstance(promotion_review.get("blocking_issues"), list)
+            else []
+        )
+        if str(item)
+    ]
     append_task(
         task_id="model_group.replay",
         label="Model Evaluation",
@@ -2093,32 +2138,39 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.promotion_review",
         label="Promotion Review",
-        task_state="current" if replay_complete else "future",
-        status="ready" if replay_complete else "blocked",
+        task_state="completed" if promotion_eligible else ("current" if replay_complete else "future"),
+        status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if replay_complete else "blocked",
         reason=(
+            str(promotion_decision.get("decision_reason") or "Promotion review completed.") if promotion_decision else
             "Promotion review integrates replay metrics, guardrails, incumbent comparison, and advisory "
             "promotion-evaluation-review evidence into a model-group decision."
         ),
-        blockers=[] if replay_complete else ["model_group.replay", "promotion-evaluation-review"],
+        receipt_refs=list(promotion_artifacts["receipt_refs"]) if promotion_artifacts else None,
+        blockers=promotion_blockers if promotion_complete and not promotion_eligible else ([] if replay_complete else ["model_group.replay", "promotion-evaluation-review"]),
         stage_type="promotion_review",
         progress=_single_step_progress(
             stage_id="model_group.promotion_review",
-            status="ready" if replay_complete else "blocked",
-            complete=False,
+            status=(promotion_decision_status or "ready") if replay_complete else "blocked",
+            complete=promotion_complete,
             unit_label="review-decision",
+            can_unlock_downstream=promotion_eligible,
         ),
     )
     append_task(
         task_id="model_group.maintenance",
         label="Maintenance",
-        task_state="future",
-        status="blocked",
-        reason="Waiting for model-group promotion review before maintenance can run.",
-        blockers=["model_group.promotion_review"],
+        task_state="current" if promotion_eligible else "future",
+        status="ready" if promotion_eligible else "blocked",
+        reason=(
+            "Model-group candidate is eligible for maintenance handoff after promotion review."
+            if promotion_eligible
+            else "Waiting for eligible model-group promotion review before maintenance can run."
+        ),
+        blockers=[] if promotion_eligible else ["model_group.promotion_review"],
         stage_type="maintenance",
         progress=_single_step_progress(
             stage_id="model_group.maintenance",
-            status="blocked",
+            status="ready" if promotion_eligible else "blocked",
             complete=False,
             unit_label="maintenance-step",
         ),
