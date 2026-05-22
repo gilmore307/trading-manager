@@ -32,6 +32,8 @@ A promotion packet should identify:
 
 Manager must not activate production pointers. Offline promotion requires `trading-evaluation` evidence: accepted replay settlement, `promotion_eligibility_decision`, `promotion_readiness_record`, and rollback/config refs. Runtime activation requires `trading-execution` shadow-cycle evidence: active model live performance, promoted-but-not-active shadow performance, realtime candidate roster, and elimination rationale where applicable. Deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, or route-only artifacts cannot activate production pointers.
 
+For the first accepted model bundle, evaluation may set `first_model_bootstrap = true`. That bundle's own frozen settlement run becomes the bootstrap baseline for later anonymous incumbent comparisons. This is a promotion/readiness exception only; it still cannot activate a production pointer without execution-owned shadow-cycle evidence.
+
 ## Layer 10 / Layer 4 Rule
 
 Layer 10 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, and unknown-overlap activity bridge evidence cannot be promoted directly.
