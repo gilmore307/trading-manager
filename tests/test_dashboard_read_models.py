@@ -500,6 +500,86 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["dashboard_severity"], "warning")
         self.assertEqual(agent_errors[0]["root_cause"], "type mismatch was repaired")
 
+    def test_agent_error_summary_recovers_truncated_openclaw_stdout_and_closes_manual_review_repair(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            agent_root = runtime / "agent_error_handling"
+            request_root = agent_root / "erragent_truncated"
+            request_root.mkdir(parents=True, exist_ok=True)
+            final_report = {
+                "review_type": "server_error_repair",
+                "error_ref": "ERR-000006",
+                "diagnosis_status": "repaired_verified",
+                "root_cause": "planner exposed layer_10_event_risk_governor.data_acquisition before event-feed coverage",
+                "repair": {"repair_status": "repaired", "files_changed": ["/repo/planner.py"]},
+                "retry_recommendation": "manual_review",
+                "blockers": ["reviewed event-feed artifacts are still missing"],
+            }
+            truncated_stdout = 'truncated prefix "finalAssistantRawText": ' + json.dumps(json.dumps(final_report)) + ', "tail": true}'
+            (request_root / "agent_error_diagnosis.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_error_diagnosis",
+                        "schema_version": "1",
+                        "diagnosis_id": "errdiag_truncated",
+                        "request_ref": "erragent_truncated",
+                        "agent_ref": "trader",
+                        "runner_command": "openclaw_agent",
+                        "status": "completed",
+                        "return_code": 0,
+                        "stdout": truncated_stdout,
+                        "stderr": "",
+                        "completed_at_utc": "2026-05-21T12:30:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 6,
+                        "error_ref": "ERR-000006",
+                        "error_fingerprint": "errfp_truncated",
+                        "request_id": "erragent_truncated",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_truncated/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_truncated/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.stage_executor",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.model_training_stage",
+                        "error_kind": "stage_command_failed",
+                        "severity": "error",
+                        "summary": "model training stage layer_10_event_risk_governor.data_acquisition command returned non-zero status",
+                        "exit_code": 1,
+                        "occurred_at_utc": "2026-05-21T12:01:49Z",
+                        "created_at_utc": "2026-05-21T12:01:49Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T12:31:00Z")
+
+        agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(agent_errors[0]["error_ref"], "ERR-000006")
+        self.assertEqual(agent_errors[0]["repair_status"], "repaired")
+        self.assertEqual(agent_errors[0]["handling_status"], "closed")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
+        self.assertIn("event-feed coverage", agent_errors[0]["root_cause"])
+
     def test_agent_error_summary_closes_repaired_stage_after_successful_retry_receipt(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

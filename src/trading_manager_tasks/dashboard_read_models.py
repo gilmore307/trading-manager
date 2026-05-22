@@ -116,7 +116,7 @@ def _agent_result_payload(diagnosis: Mapping[str, Any]) -> dict[str, Any]:
     try:
         outer = json.loads(stdout)
     except json.JSONDecodeError:
-        return {}
+        return _agent_result_payload_from_text(stdout)
     if not isinstance(outer, Mapping):
         return {}
     if outer.get("diagnosis_status") or outer.get("repair"):
@@ -147,6 +147,40 @@ def _agent_result_payload(diagnosis: Mapping[str, Any]) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {"agent_text": text}
     return parsed if isinstance(parsed, dict) else {"agent_text": text}
+
+
+def _agent_result_payload_from_text(text: str) -> dict[str, Any]:
+    """Best-effort parse for truncated OpenClaw stdout envelopes.
+
+    Some runner receipts cap stdout and can drop the opening bytes of the JSON
+    envelope while preserving the embedded finalAssistantRawText string. The
+    embedded report is still the durable diagnosis content, so recover it when
+    the string literal is intact.
+    """
+
+    for key in ("finalAssistantRawText", "finalAssistantVisibleText"):
+        marker = f'"{key}"'
+        marker_index = text.find(marker)
+        if marker_index < 0:
+            continue
+        colon_index = text.find(":", marker_index + len(marker))
+        if colon_index < 0:
+            continue
+        quote_index = text.find('"', colon_index + 1)
+        if quote_index < 0:
+            continue
+        try:
+            decoded_text, _ = json.JSONDecoder().raw_decode(text[quote_index:])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(decoded_text, str) or not decoded_text.strip():
+            continue
+        try:
+            parsed = json.loads(decoded_text)
+        except json.JSONDecodeError:
+            return {"agent_text": decoded_text}
+        return parsed if isinstance(parsed, dict) else {"agent_text": decoded_text}
+    return {}
 
 
 def _agent_repair_status(diagnosis: Mapping[str, Any], agent_payload: Mapping[str, Any]) -> str:
@@ -202,10 +236,19 @@ def _agent_payload_text(value: object, fallback: object = None) -> str | None:
     return None
 
 
-def _agent_error_handling_status(catalog_row: Mapping[str, Any], repair_status: str) -> str:
+def _agent_error_handling_status(
+    catalog_row: Mapping[str, Any],
+    repair_status: str,
+    agent_payload: Mapping[str, Any] | None = None,
+) -> str:
     if repair_status == "superseded":
         return "closed"
     if repair_status == "repaired":
+        payload = agent_payload or {}
+        retry_recommendation = str(payload.get("retry_recommendation") or "").lower()
+        blockers = payload.get("blockers")
+        if retry_recommendation == "manual_review" and isinstance(blockers, list) and blockers:
+            return "closed"
         scope = str(catalog_row.get("error_scope") or "")
         component = str(catalog_row.get("source_component") or "")
         if "model_training_stage" in scope or component == "trading-manager.stage_executor":
@@ -289,7 +332,7 @@ def _agent_error_summary(
                 diagnosis = {}
         agent_payload = _agent_result_payload(diagnosis)
         repair_status = _agent_repair_status(diagnosis, agent_payload)
-        handling_status = _agent_error_handling_status(row, repair_status)
+        handling_status = _agent_error_handling_status(row, repair_status, agent_payload)
         retry_receipt = None
         if repair_status == "repaired" and handling_status == "awaiting_retry":
             stage_id = _stage_id_from_error_row(row)
