@@ -468,7 +468,7 @@ class RegistryHelperTests(unittest.TestCase):
             "05_OPTION_EXPRESSION_MODEL_INPUTS_BUNDLE_CONFIG",
         }:
             self.assertNotIn(obsolete_config, rows)
-        self.assertEqual(rows["TARGET_STATE_VECTOR_SYNCHRONIZED_STATE_WINDOWS"]["payload"], "5min;15min;60min;390min")
+        self.assertEqual(rows["TARGET_STATE_VECTOR_SYNCHRONIZED_STATE_WINDOWS"]["payload"], "10min;1h;1D;1W")
         self.assertEqual(rows["TARGET_CONTEXT_STATE_VERSION_DEFAULT"]["payload"], "target_context_state")
         self.assertEqual(
             rows["TARGET_STATE_VECTOR_WINDOW_SYNC_POLICY"]["payload"],
@@ -495,7 +495,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EVENT_RISK_GOVERNOR"]["payload"], "event_risk_governor")
         self.assertEqual(rows["MODEL_10_EVENT_RISK_GOVERNOR"]["payload"], "model_10_event_risk_governor")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR"]["payload"], "event_context_vector")
-        self.assertEqual(rows["EVENT_CONTEXT_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
+        self.assertEqual(rows["EVENT_CONTEXT_VECTOR_HORIZONS"]["payload"], "10min;1h;1D;1W")
         self.assertIn("price_action", rows["EVENT_CATEGORY_TYPE_VALUES"]["payload"])
         self.assertIn("false_breakout", rows["PRICE_ACTION_EVENT_TYPES"]["payload"])
         self.assertIn("layer_10_event_risk_governor_event_not_new_model_layer", rows["PRICE_ACTION_EVENT_LAYER_POLICY"]["payload"])
@@ -505,7 +505,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_05_ALPHA_CONFIDENCE"]["payload"], "model_05_alpha_confidence")
         self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR"]["payload"], "alpha_confidence_vector")
         self.assertEqual(rows["BASE_ALPHA_VECTOR"]["payload"], "base_alpha_vector")
-        self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
+        self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR_HORIZONS"]["payload"], "10min;1h;1D;1W")
         self.assertIn("5_alpha_direction_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("5_alpha_tradability_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("5_base_alpha_direction_score_<horizon>", rows["ALPHA_CONFIDENCE_BASE_DIAGNOSTIC_SCORE_FAMILIES"]["payload"])
@@ -524,7 +524,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["POSITION_PROJECTION_MODEL"]["payload"], "position_projection_model")
         self.assertEqual(rows["MODEL_07_POSITION_PROJECTION"]["payload"], "model_07_position_projection")
         self.assertEqual(rows["POSITION_PROJECTION_VECTOR"]["payload"], "position_projection_vector")
-        self.assertEqual(rows["POSITION_PROJECTION_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
+        self.assertEqual(rows["POSITION_PROJECTION_VECTOR_HORIZONS"]["payload"], "10min;1h;1D;1W")
         self.assertIn("7_target_exposure_score_<horizon>", rows["POSITION_PROJECTION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("7_projection_confidence_score_<horizon>", rows["POSITION_PROJECTION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("7_resolved_target_exposure_score", rows["POSITION_PROJECTION_HANDOFF_SUMMARY_FIELD_FAMILIES"]["payload"])
@@ -537,7 +537,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_08_UNDERLYING_ACTION"]["payload"], "model_08_underlying_action")
         self.assertEqual(rows["UNDERLYING_ACTION_PLAN"]["payload"], "underlying_action_plan")
         self.assertEqual(rows["UNDERLYING_ACTION_VECTOR"]["payload"], "underlying_action_vector")
-        self.assertEqual(rows["UNDERLYING_ACTION_VECTOR_HORIZONS"]["payload"], "5min;15min;60min;390min")
+        self.assertEqual(rows["UNDERLYING_ACTION_VECTOR_HORIZONS"]["payload"], "10min;1h;1D;1W")
         self.assertIn(
             "8_underlying_trade_eligibility_score_<horizon>",
             rows["UNDERLYING_ACTION_VECTOR_SCORE_FAMILIES"]["payload"],

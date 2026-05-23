@@ -56,7 +56,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
                 "underlying_action_plan_ref": "uap_001",
                 "action_type": "increase_long",
                 "action_side": "long",
-                "dominant_horizon": "390min",
+                "dominant_horizon": "1W",
                 "action_confidence_score": 0.72,
             }
         ]
