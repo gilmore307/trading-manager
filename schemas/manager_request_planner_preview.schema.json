@@ -4,7 +4,6 @@
   "additionalProperties": true,
   "properties": {
     "availability_note": {"type": "string"},
-    "bar_grain": {"type": "string"},
     "candidate_ref": {"type": "string"},
     "contract_type": {"const": "manager_request"},
     "deadline_at_utc": {"type": ["string", "null"]},
@@ -15,6 +14,7 @@
     "evidence_refs": {"items": {"type": "string"}, "type": "array"},
     "expected_outputs": {"items": {"type": "string"}, "type": "array", "uniqueItems": true},
     "exposure_type": {"type": "string"},
+    "feature_grain": {"type": "string"},
     "model_id": {"type": "string"},
     "model_layer": {"type": "string"},
     "model_name": {"type": "string"},

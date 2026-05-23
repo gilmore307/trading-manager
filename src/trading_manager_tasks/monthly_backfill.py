@@ -29,7 +29,7 @@ DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
 LAYER_ONE_MODEL_LAYER = "layer_01_market_regime"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SUPPORTED_MARKET_REGIME_MODEL_LAYERS = (LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER)
-BAR_GRAIN_TO_ALPACA_TIMEFRAME = {"1m": "1Min", "30m": "30Min", "1d": "1Day"}
+SUPPORTED_FEATURE_GRAINS = {"1m", "30m", "1d"}
 MARKET_CONTEXT_SOURCE_TIMEFRAME = "1Min"
 
 
@@ -83,7 +83,7 @@ class MarketRegimeUniverseMember:
 
     symbol: str
     model_layer: str
-    bar_grain: str
+    feature_grain: str
     timeframe: str
     exposure_type: str
     universe_type: str
@@ -250,14 +250,14 @@ def load_market_regime_universe(
             if model_layer not in layer_filter:
                 continue
             symbol = str(row.get("symbol") or "").upper()
-            bar_grain = str(row.get("bar_grain") or "")
-            if not symbol or bar_grain not in BAR_GRAIN_TO_ALPACA_TIMEFRAME:
+            feature_grain = str(row.get("feature_grain") or "")
+            if not symbol or feature_grain not in SUPPORTED_FEATURE_GRAINS:
                 raise ValueError(f"unsupported universe row: {row}")
             rows.append(
                 MarketRegimeUniverseMember(
                     symbol=symbol,
                     model_layer=model_layer,
-                    bar_grain=bar_grain,
+                    feature_grain=feature_grain,
                     timeframe=MARKET_CONTEXT_SOURCE_TIMEFRAME,
                     exposure_type=str(row.get("exposure_type") or ""),
                     universe_type=str(row.get("universe_type") or ""),
@@ -298,7 +298,7 @@ def _plan_source_window(
             {
                 "symbol": universe_member.symbol,
                 "timeframe": universe_member.timeframe,
-                "bar_grain": universe_member.bar_grain,
+                "feature_grain": universe_member.feature_grain,
                 "model_layer": universe_member.model_layer,
                 "universe_ref": "trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv",
                 "universe_type": universe_member.universe_type,

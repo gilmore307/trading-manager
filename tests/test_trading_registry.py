@@ -1163,7 +1163,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(len(rows), 44)
         self.assertEqual(
             list(rows[0].keys()),
-            ["symbol", "universe_type", "model_layer", "exposure_type", "bar_grain", "fund_name", "issuer_name", "interpretation"],
+            ["symbol", "universe_type", "model_layer", "exposure_type", "feature_grain", "fund_name", "issuer_name", "interpretation"],
         )
         self.assertEqual(rows[0]["symbol"], "AIQ")
         self.assertEqual(rows[0]["model_layer"], "layer_02_sector_context")
@@ -1185,7 +1185,7 @@ class RegistryHelperTests(unittest.TestCase):
             "UNIVERSE_TYPE": "universe_type",
             "MODEL_LAYER": "model_layer",
             "EXPOSURE_TYPE": "exposure_type",
-            "BAR_GRAIN": "bar_grain",
+            "FEATURE_GRAIN": "feature_grain",
             "FUND_NAME": "fund_name",
             "ISSUER_NAME": "issuer_name",
             "INTERPRETATION": "interpretation",

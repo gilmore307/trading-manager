@@ -1,6 +1,5 @@
 {
   "availability_note": "Alpaca equities bars available from accepted common start.",
-  "bar_grain": "30Min",
   "contract_type": "manager_request",
   "dry_run": true,
   "end_date_exclusive": "2016-02-01",
@@ -8,6 +7,7 @@
     "storage://trading-data/monthly_backfill/alpaca_bars/SPY/2016-01/"
   ],
   "exposure_type": "broad_market",
+  "feature_grain": "30m",
   "model_layer": "layer_01_market_regime",
   "month": "2016-01",
   "parameter_ref": "storage://trading-manager/monthly_backfill/alpaca_bars/SPY/2016-01/task_key.json",
@@ -25,7 +25,7 @@
   "target_component_id": "01_feed_alpaca_bars",
   "target_component_kind": "data_feed",
   "target_repo_id": "trading-data",
-  "timeframe": "30Min",
+  "timeframe": "1Min",
   "universe_ref": "trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv",
   "universe_type": "market_context"
 }
