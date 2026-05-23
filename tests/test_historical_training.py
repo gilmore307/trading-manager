@@ -60,6 +60,7 @@ class HistoricalTrainingPreparationTests(unittest.TestCase):
         self.assertEqual(summary.handoff_validation_count, 19)
         self.assertIn("SPY", summary.symbols)
         self.assertTrue(all(row["target_component_id"] == "01_feed_alpaca_bars" for row in requests))
+        self.assertTrue(all(row["timeframe"] == "1Min" for row in requests))
         self.assertTrue(all("/alpaca_bars/" in row["parameter_ref"] for row in requests))
         self.assertTrue(all(row["schema_ref"] == "manager_request_parameter_payload" for row in payloads))
         self.assertTrue(all(row["provider_calls"] == 0 for row in validations))
@@ -86,8 +87,9 @@ class HistoricalTrainingPreparationTests(unittest.TestCase):
         self.assertIn("XLK", summary.symbols)
         self.assertNotIn("SPY", summary.symbols)
         self.assertTrue(all(row["model_layer"] == "layer_02_sector_context" for row in requests))
-        self.assertTrue(any(row["symbol"] == "XLB" and row["timeframe"] == "30Min" for row in requests))
-        self.assertTrue(any(row["symbol"] == "AIQ" and row["timeframe"] == "1Day" for row in requests))
+        self.assertTrue(all(row["timeframe"] == "1Min" for row in requests))
+        self.assertTrue(any(row["symbol"] == "XLB" and row["timeframe"] == "1Min" for row in requests))
+        self.assertTrue(any(row["symbol"] == "AIQ" and row["timeframe"] == "1Min" for row in requests))
         self.assertTrue(all(row["provider_calls"] == 0 for row in validations))
 
     def test_default_preview_does_not_write_or_validate_handoff(self):

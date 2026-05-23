@@ -45,6 +45,7 @@ class RequestPayloadMaterializationTests(unittest.TestCase):
         self.assertEqual(payload["window"], {"start_date": "2016-01-01", "end_date_exclusive": "2016-02-01"})
         self.assertEqual(payload["params"]["symbol"], "SPY")
         self.assertEqual(payload["params"]["timeframe"], request["timeframe"])
+        self.assertEqual(payload["params"]["timeframe"], "1Min")
         self.assertEqual(payload["params"]["start"], "2016-01-01")
         self.assertEqual(payload["params"]["end"], "2016-02-01")
         self.assertEqual(payload["params"]["max_pages"], ALPACA_BARS_MONTHLY_MAX_PAGES)

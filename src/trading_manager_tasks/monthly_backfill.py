@@ -30,6 +30,7 @@ LAYER_ONE_MODEL_LAYER = "layer_01_market_regime"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SUPPORTED_MARKET_REGIME_MODEL_LAYERS = (LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER)
 BAR_GRAIN_TO_ALPACA_TIMEFRAME = {"1m": "1Min", "30m": "30Min", "1d": "1Day"}
+MARKET_CONTEXT_SOURCE_TIMEFRAME = "1Min"
 
 
 @dataclass(frozen=True, order=True)
@@ -250,15 +251,14 @@ def load_market_regime_universe(
                 continue
             symbol = str(row.get("symbol") or "").upper()
             bar_grain = str(row.get("bar_grain") or "")
-            timeframe = BAR_GRAIN_TO_ALPACA_TIMEFRAME.get(bar_grain)
-            if not symbol or timeframe is None:
+            if not symbol or bar_grain not in BAR_GRAIN_TO_ALPACA_TIMEFRAME:
                 raise ValueError(f"unsupported universe row: {row}")
             rows.append(
                 MarketRegimeUniverseMember(
                     symbol=symbol,
                     model_layer=model_layer,
                     bar_grain=bar_grain,
-                    timeframe=timeframe,
+                    timeframe=MARKET_CONTEXT_SOURCE_TIMEFRAME,
                     exposure_type=str(row.get("exposure_type") or ""),
                     universe_type=str(row.get("universe_type") or ""),
                 )

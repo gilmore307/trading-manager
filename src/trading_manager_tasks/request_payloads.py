@@ -47,7 +47,7 @@ FEED_TASK_DEFAULTS: dict[str, FeedTaskDefaults] = {
         feed_id="01_feed_alpaca_bars",
         params={
             "symbol": "SPY",
-            "timeframe": "1Day",
+            "timeframe": "1Min",
             "adjustment": "raw",
             "limit": 1000,
             "max_pages": ALPACA_BARS_MONTHLY_MAX_PAGES,
