@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the OpenClaw agent runner for server error requests."""
+"""Run the Codex CLI agent runner for server error requests."""
 
 from __future__ import annotations
 

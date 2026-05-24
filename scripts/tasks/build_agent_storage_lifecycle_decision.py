@@ -21,7 +21,7 @@ def _stable_id(*parts: object) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build agent_storage_lifecycle_decision artifacts without storage mutation side effects.")
     parser.add_argument("--storage-lifecycle-request-ref", required=True)
-    parser.add_argument("--agent-ref", default="openclaw_agent_under_owner_observation")
+    parser.add_argument("--agent-ref", default="codex_cli_gpt_5_5")
     parser.add_argument("--decision-status", required=True, choices=ALLOWED_DECISIONS)
     parser.add_argument("--decision-reason", required=True)
     parser.add_argument("--evidence-ref", action="append", default=[])

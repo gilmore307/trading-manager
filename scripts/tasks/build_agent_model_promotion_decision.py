@@ -13,7 +13,7 @@ from trading_manager_tasks.review_decision import build_agent_model_promotion_de
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build agent_model_promotion_decision artifacts without activation side effects.")
     parser.add_argument("--promotion-request-ref", required=True)
-    parser.add_argument("--agent-ref", default="openclaw_agent_under_owner_observation")
+    parser.add_argument("--agent-ref", default="codex_cli_gpt_5_5")
     parser.add_argument("--decision-status", required=True, choices=("approve", "defer", "reject", "revoke", "supersede"))
     parser.add_argument("--decision-reason", required=True)
     parser.add_argument("--evidence-ref", action="append", default=[])

@@ -15,7 +15,7 @@ from trading_manager_tasks.agent_error_handler import (
     validate_server_error_catalog_entry,
     validate_server_error_agent_request,
 )
-from trading_manager_tasks.agent_error_agent_runner import run_openclaw_agent_for_error
+from trading_manager_tasks.agent_error_agent_runner import run_codex_cli_for_error
 from trading_manager_tasks.control_plane import TaskSystemError
 
 
@@ -251,7 +251,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
         self.assertIn("Recorded:", cmd[cmd.index("--message") + 1])
         self.assertIn("Deduplicated: no", cmd[cmd.index("--message") + 1])
 
-    def test_openclaw_agent_runner_calls_project_agent(self) -> None:
+    def test_codex_cli_runner_calls_repair_skill(self) -> None:
         request = build_server_error_agent_request(
             source_component="server.test",
             source_repo="trading-manager",
@@ -262,28 +262,29 @@ class AgentErrorHandlerTests(unittest.TestCase):
         with patch.dict(
             "os.environ",
             {
-                "MANAGER_AGENT_ERROR_AGENT_ID": "trader",
-                "MANAGER_AGENT_ERROR_AGENT_TIMEOUT_SECONDS": "60",
-                "MANAGER_AGENT_ERROR_AGENT_THINKING": "high",
+                "MANAGER_AGENT_ERROR_CODEX_MODEL": "gpt-5.5",
+                "MANAGER_AGENT_ERROR_CODEX_TIMEOUT_SECONDS": "60",
             },
             clear=False,
         ), patch("trading_manager_tasks.agent_error_agent_runner.subprocess.run") as run:
             run.return_value.returncode = 0
-            run.return_value.stdout = '{"reply":"fixed"}'
+            run.return_value.stdout = '{"diagnosis_status":"repaired_verified","root_cause":"fixed"}'
             run.return_value.stderr = ""
-            diagnosis = run_openclaw_agent_for_error(request)
+            diagnosis = run_codex_cli_for_error(request)
 
         self.assertEqual(diagnosis["contract_type"], "agent_error_diagnosis")
         self.assertEqual(diagnosis["status"], "completed")
-        self.assertEqual(diagnosis["runner_command"], "openclaw_agent")
+        self.assertEqual(diagnosis["runner_command"], "codex_cli")
         cmd = run.call_args.args[0]
-        self.assertEqual(cmd[:4], ["openclaw", "agent", "--agent", "trader"])
-        self.assertIn("--json", cmd)
-        self.assertIn("--thinking", cmd)
-        message = cmd[cmd.index("--message") + 1]
+        self.assertEqual(cmd[:4], ["codex", "exec", "--ephemeral", "--ignore-rules"])
+        self.assertIn("-m", cmd)
+        self.assertEqual(cmd[cmd.index("-m") + 1], "gpt-5.5")
+        self.assertIn("--output-last-message", cmd)
+        self.assertIn("--add-dir", cmd)
+        message = cmd[-1]
         self.assertIn("server-error-repair", message)
         self.assertIn("server_error_agent_request", message)
-        self.assertIn("return strict JSON", message)
+        self.assertIn("Return ONLY strict JSON", message)
         self.assertIn("provider/source calls", message)
         self.assertIn("Never mutate broker/account/order/fill/position state", message)
         self.assertIn("Never print, copy, or persist secrets", message)

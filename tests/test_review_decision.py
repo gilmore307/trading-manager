@@ -30,7 +30,7 @@ class ReviewDecisionArtifactTests(unittest.TestCase):
     def test_builds_agent_model_promotion_decision_artifact(self):
         decision = build_agent_model_promotion_decision(
             promotion_request_ref="manager_request://model_01_market_regime",
-            agent_ref="openclaw_agent_under_owner_observation",
+            agent_ref="codex_cli_gpt_5_5",
             decision_status="defer",
             decision_reason="missing production calibration evidence",
             evidence_refs=["storage://trading-model/evidence/eval.json"],

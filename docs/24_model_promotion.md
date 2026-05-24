@@ -2,7 +2,7 @@
 
 Manager owns scheduling and request preparation for model promotion/evaluation work. Replay judgment, promotion eligibility, and promotion readiness belong to `trading-evaluation`; runtime active/shadow model selection belongs to `trading-execution`.
 
-When a reviewer agent is used for promotion judgment, the request must require the workspace skill `skills/openclaw/promotion-evaluation-review`. The agent review is advisory evidence only; `trading-evaluation` deterministic checks own eligibility and readiness records.
+When Codex CLI is used for promotion judgment, the request must require the workspace skill `skills/codex/promotion-evaluation-review`. The review is advisory evidence only; `trading-evaluation` deterministic checks own eligibility and readiness records.
 
 ## Fold-Stack Gate
 
