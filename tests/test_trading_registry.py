@@ -256,7 +256,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EXECUTION_INTAKE_SNAPSHOT"]["payload"], "execution_intake_snapshot")
         self.assertIn("does not allocate risk budget", rows["EXECUTION_INTAKE_SNAPSHOT"]["note"])
         self.assertEqual(rows["ENTRY_DECISION"]["payload"], "entry_decision")
-        self.assertIn("does not call Layer 10", rows["ENTRY_DECISION"]["note"])
+        self.assertIn("does not call Layer 9 or Layer 10", rows["ENTRY_DECISION"]["note"])
         self.assertEqual(rows["POSITION_LIFECYCLE_DECISION"]["payload"], "position_lifecycle_decision")
         self.assertEqual(rows["OPTION_REEXPRESSION_DECISION"]["payload"], "option_reexpression_decision")
         self.assertEqual(rows["FAILURE_EXPLANATION_PACKET"]["payload"], "failure_explanation_packet")
