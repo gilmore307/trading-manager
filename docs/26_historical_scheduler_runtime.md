@@ -66,7 +66,7 @@ Target-specific substrate work is the second phase. It prepares target state, ta
 
 Replay is run-cycle scoped. It simulates the frozen live component graph against the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. Replay does not start from a preselected symbol except in explicit diagnostic repair scenarios.
 
-Failure attribution is a separate task between replay and evaluation. It may inspect target selection misses, portfolio combinations, event/co-event explanations, alpha residuals, position-management choices, option-expression drag, and overblock/underblock behavior. This boundary must also exist in live operation after decisions settle, normally as an execution-owned after-close or off-hours attribution cycle.
+Failure attribution is a separate task between replay and evaluation. It may inspect target selection misses, portfolio combinations, event/co-event explanations, alpha residuals, position-management choices, option-expression drag, and overblock/underblock behavior. This boundary must also exist in live operation as an execution-owned C07 path: realtime watch may run during market hours for early failure/deviation evidence, and settlement attribution may run after close or in an accepted off-hours window.
 
 Evaluation consumes replay and attribution evidence. Promotion review must wait for the candidate bundle's replay, attribution, and evaluation evidence; single-layer checks and target-substrate runs remain diagnostic until the full run cycle closes.
 
