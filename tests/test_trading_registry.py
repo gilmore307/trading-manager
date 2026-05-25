@@ -238,8 +238,12 @@ class RegistryHelperTests(unittest.TestCase):
         execution_policy = rows["EXECUTION_RUNTIME_MODEL_LIFECYCLE_POLICY"]
         self.assertIn("promoted_not_active_shadow_during_market_hours", execution_policy["payload"])
         self.assertIn("anonymous_model_comparison_required", execution_policy["payload"])
-        self.assertIn("ranks_2_to_4_realtime_candidates", execution_policy["payload"])
+        self.assertIn("weekly_rerank", execution_policy["payload"])
+        self.assertIn("one_active_three_stable_wingmen_two_rotating_challengers", execution_policy["payload"])
+        self.assertIn("probation_uses_one_stable_wingman_slot", execution_policy["payload"])
+        self.assertIn("probation_failed_expedited_elimination_review", execution_policy["payload"])
         self.assertIn("active_pointer_write_requires_separate_gate", execution_policy["payload"])
+        self.assertIn("runtime promoted eligibility", execution_policy["note"])
         self.assertIn("distinct from promotion Replay", execution_policy["note"])
 
         replay_shadow_policy = rows["REPLAY_SHADOW_SEPARATION_POLICY"]
@@ -265,6 +269,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("c08_model_group_shadow_comparison_intraday_component", shadow_policy["payload"])
         self.assertIn("not_replay", shadow_policy["payload"])
         self.assertIn("active_model_only_trading_authority", shadow_policy["payload"])
+        self.assertIn("one_active_three_stable_wingmen_two_rotating_challengers", shadow_policy["payload"])
+        self.assertIn("probation_uses_one_stable_wingman_slot", shadow_policy["payload"])
         self.assertIn("C08 Model Group Shadow Comparison", shadow_policy["note"])
         self.assertIn("capacity-gated", shadow_policy["note"])
 
