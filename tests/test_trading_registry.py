@@ -247,6 +247,21 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("shadow_realtime_promoted_model_selection", replay_shadow_policy["payload"])
         self.assertIn("must not call execution_shadow_cycle_selection", replay_shadow_policy["note"])
 
+        shadow_component = rows["EXECUTION_SHADOW_RUNTIME_COMPONENT"]
+        self.assertEqual(shadow_component["payload"], "execution_shadow_runtime_component")
+        self.assertIn("not used by promotion Replay", shadow_component["note"])
+        self.assertIn("no broker/order/account or active-pointer mutation authority", shadow_component["note"])
+
+        shadow_evidence = rows["EXECUTION_SHADOW_MODEL_RUNTIME_EVIDENCE"]
+        self.assertEqual(shadow_evidence["payload"], "execution_shadow_model_runtime_evidence")
+        self.assertIn("cannot authorize orders", shadow_evidence["note"])
+
+        shadow_policy = rows["SHADOW_RUNTIME_COMPONENT_POLICY"]
+        self.assertIn("s01_shadow_model_comparison_intraday_component", shadow_policy["payload"])
+        self.assertIn("not_replay", shadow_policy["payload"])
+        self.assertIn("active_model_only_trading_authority", shadow_policy["payload"])
+        self.assertIn("outside the C01-C07 trading decision graph", shadow_policy["note"])
+
         write_policy = rows["EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_POLICY"]
         self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])
         self.assertIn("rollback_ref_required", write_policy["payload"])
