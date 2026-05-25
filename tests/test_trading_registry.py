@@ -240,6 +240,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("anonymous_model_comparison_required", execution_policy["payload"])
         self.assertIn("ranks_2_to_4_realtime_candidates", execution_policy["payload"])
         self.assertIn("active_pointer_write_requires_separate_gate", execution_policy["payload"])
+        self.assertIn("distinct from promotion Replay", execution_policy["note"])
+
+        replay_shadow_policy = rows["REPLAY_SHADOW_SEPARATION_POLICY"]
+        self.assertIn("replay_fixed_historical_evaluation_not_shadow_selection", replay_shadow_policy["payload"])
+        self.assertIn("shadow_realtime_promoted_model_selection", replay_shadow_policy["payload"])
+        self.assertIn("must not call execution_shadow_cycle_selection", replay_shadow_policy["note"])
 
         write_policy = rows["EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_POLICY"]
         self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])
@@ -270,7 +276,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer10_failure_explanation_only", policy["payload"])
         self.assertIn("separate_crypto_and_equity_options_accounts", policy["payload"])
         self.assertIn("no_cross_account_netting", policy["payload"])
-        self.assertIn("not duplicated trading decisions", policy["note"])
+        self.assertIn("Replay is a fixed historical evaluation mechanism", policy["note"])
+        self.assertIn("shadow is a realtime execution-owned selection mechanism", policy["note"])
 
         self.assertEqual(rows["EXECUTION_ACCOUNT_SLEEVE"]["payload"], "execution_account_sleeve")
         self.assertIn("exactly one sleeve", rows["EXECUTION_ACCOUNT_SLEEVE"]["note"])
