@@ -22,6 +22,11 @@ Manager SQL stores concise durable facts and references. Large payloads, logs, s
 
 The historical scheduler may acquire data, prepare features, run safe offline stages, prepare replay and attribution requests, and prepare review evidence. It must not place orders, mutate broker/account state, activate production models, or choose the active promoted-model roster.
 
+When future live runtime is enabled, historical model tasks are paused. The
+scheduler should select no historical work while realtime trading, market-data
+ingestion, broker gates, account freshness, and C08 model-group comparison are
+competing for host capacity.
+
 ## D006 - The model stack has ten current layers
 
 Manager recognizes the current Layer 1-10 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, DynamicRiskPolicy, PositionProjection, UnderlyingAction, TradingGuidance/OptionExpression, and EventRiskGovernor/EventIntelligenceOverlay.

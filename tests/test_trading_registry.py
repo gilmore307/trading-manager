@@ -256,12 +256,22 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(shadow_evidence["payload"], "execution_shadow_model_runtime_evidence")
         self.assertIn("cannot authorize orders", shadow_evidence["note"])
 
+        c08_capacity = rows["EXECUTION_C08_CAPACITY_SIMULATION"]
+        self.assertEqual(c08_capacity["payload"], "execution_c08_capacity_simulation")
+        self.assertIn("Side-effect-free estimate", c08_capacity["note"])
+        self.assertIn("no provider calls", c08_capacity["note"])
+
         shadow_policy = rows["SHADOW_RUNTIME_COMPONENT_POLICY"]
         self.assertIn("c08_model_group_shadow_comparison_intraday_component", shadow_policy["payload"])
         self.assertIn("not_replay", shadow_policy["payload"])
         self.assertIn("active_model_only_trading_authority", shadow_policy["payload"])
         self.assertIn("C08 Model Group Shadow Comparison", shadow_policy["note"])
         self.assertIn("capacity-gated", shadow_policy["note"])
+
+        live_pause = rows["LIVE_RUNTIME_HISTORICAL_MODEL_TASK_PAUSE_POLICY"]
+        self.assertIn("live_runtime_pauses_historical_model_tasks", live_pause["payload"])
+        self.assertIn("c08_capacity_measured_without_historical_training_load", live_pause["payload"])
+        self.assertIn("live_runtime_historical_model_tasks_paused", live_pause["note"])
 
         write_policy = rows["EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_POLICY"]
         self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])

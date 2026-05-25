@@ -13,6 +13,7 @@ from trading_manager_tasks.scheduler import (
     ResourceSnapshot,
     SchedulerConfig,
     is_regular_us_equity_trading_day,
+    live_runtime_historical_task_gate,
     market_hours_gate,
     resource_gate,
     run_scheduler_once,
@@ -92,6 +93,21 @@ class SchedulerTests(unittest.TestCase):
         self.assertIn("load_per_cpu", result.reason)
         self.assertIn("available_memory_mb", result.reason)
         self.assertIn("free_disk_gb", result.reason)
+
+    def test_live_runtime_gate_pauses_historical_model_tasks(self):
+        result = live_runtime_historical_task_gate(SchedulerConfig(live_runtime_mode_enabled=True))
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.reason_code, "live_runtime_historical_model_tasks_paused")
+
+    def test_scheduler_backs_off_historical_tasks_when_live_runtime_enabled(self):
+        decision = run_scheduler_once(
+            now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
+            config=SchedulerConfig(live_runtime_mode_enabled=True, market_hours_protection_enabled=False),
+            resource_snapshot=self._healthy_resource_snapshot(),
+        )
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "live_runtime_historical_model_tasks_paused")
+        self.assertIsNone(decision.selected_work)
 
     def test_scheduler_reports_ready_safe_work_without_side_effects(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

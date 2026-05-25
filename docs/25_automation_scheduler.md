@@ -6,9 +6,25 @@ The scheduler selects safe historical-modeling work and advances it through expl
 
 - Choose the next chronological and capacity-safe unit of work.
 - Respect market-day/time and resource gates.
+- Pause historical model tasks while future live runtime is enabled.
 - Run safe offline preparation when allowed.
 - Dispatch bounded provider stages only through explicit provider controls.
 - Record decisions and checkpoints for resume.
+
+## Live Runtime Pause
+
+When future live runtime is enabled, historical model tasks are paused. This is
+stronger than ordinary market-hours protection: the scheduler returns
+`live_runtime_historical_model_tasks_paused` and selects no historical work so
+realtime trading, market-data ingestion, broker gates, account freshness, and
+C08 model-group comparison keep priority.
+
+The gate is controlled by `TRADING_MANAGER_LIVE_RUNTIME_MODE_ENABLED=1` or the
+one-shot scheduler flag:
+
+```bash
+PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py --live-runtime-mode
+```
 
 ## Work Classes
 

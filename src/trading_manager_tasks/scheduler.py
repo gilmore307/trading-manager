@@ -46,12 +46,14 @@ def _env_bool(name: str, *, default: bool) -> bool:
 
 
 DEFAULT_MARKET_HOURS_PROTECTION_ENABLED = _env_bool("TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED", default=True)
+DEFAULT_LIVE_RUNTIME_MODE_ENABLED = _env_bool("TRADING_MANAGER_LIVE_RUNTIME_MODE_ENABLED", default=False)
 
 
 @dataclass(frozen=True)
 class SchedulerConfig:
     """Runtime gates for one scheduler tick."""
 
+    live_runtime_mode_enabled: bool = DEFAULT_LIVE_RUNTIME_MODE_ENABLED
     market_hours_protection_enabled: bool = DEFAULT_MARKET_HOURS_PROTECTION_ENABLED
     protected_start_et: str = "09:20"
     protected_end_et: str = "16:10"
@@ -259,6 +261,18 @@ def resource_gate(snapshot: ResourceSnapshot, config: SchedulerConfig = Schedule
     return GateResult(True, "resource_budget_available", "resource budget is available after reserving live-system headroom")
 
 
+def live_runtime_historical_task_gate(config: SchedulerConfig = SchedulerConfig()) -> GateResult:
+    """Block historical model work while the future live runtime is enabled."""
+
+    if config.live_runtime_mode_enabled:
+        return GateResult(
+            False,
+            "live_runtime_historical_model_tasks_paused",
+            "future live runtime is enabled; historical model tasks are paused so realtime trading and C08 model-group comparison keep priority",
+        )
+    return GateResult(True, "live_runtime_not_enabled", "historical model tasks may be considered because live runtime mode is not enabled")
+
+
 PROVIDER_STAGE_MODEL_LAYERS = {
     "layer_01_market_regime.data_acquisition": LAYER_ONE_MODEL_LAYER,
     "layer_02_sector_context.data_acquisition": LAYER_TWO_MODEL_LAYER,
@@ -425,11 +439,27 @@ def run_scheduler_once(
     """
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
+    live_runtime_gate = live_runtime_historical_task_gate(config)
     market_gate = market_hours_gate(now, config)
     snapshot = resource_snapshot or collect_resource_snapshot(storage_root)
     res_gate = resource_gate(snapshot, config)
     now_et = now.astimezone(NEW_YORK)
 
+    if not live_runtime_gate.allowed:
+        return SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc=now.isoformat(),
+            now_et=now_et.isoformat(),
+            decision_status="backoff",
+            reason_code=live_runtime_gate.reason_code,
+            reason=live_runtime_gate.reason,
+            market_protection_active=True,
+            resource_pressure_active=not res_gate.allowed,
+            selected_work=None,
+            command=[],
+            next_internal_stage="historical_training_work_loop",
+            lock_plan=scheduler_lock_plan(month=start_month, selected_work=None, next_internal_stage="historical_training_work_loop"),
+        )
     if not market_gate.allowed:
         return SchedulerDecision(
             contract_type="manager_scheduler_decision",
@@ -734,6 +764,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one scheduler tick.")
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
+    parser.add_argument("--live-runtime-mode", action="store_true", help="Pause historical model tasks because live runtime and C08 realtime model comparison have priority.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
     parser.add_argument("--max-load-per-cpu", type=float, default=DEFAULT_MAX_LOAD_PER_CPU)
@@ -746,6 +777,7 @@ def main(argv: list[str] | None = None) -> int:
             text = text[:-1] + "+00:00"
         now = datetime.fromisoformat(text).astimezone(UTC)
     config = SchedulerConfig(
+        live_runtime_mode_enabled=args.live_runtime_mode or DEFAULT_LIVE_RUNTIME_MODE_ENABLED,
         market_hours_protection_enabled=not args.disable_market_hours_protection and DEFAULT_MARKET_HOURS_PROTECTION_ENABLED,
         min_available_memory_mb=args.min_available_memory_mb,
         min_free_disk_gb=args.min_free_disk_gb,
@@ -772,11 +804,13 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "GateResult",
     "DEFAULT_MARKET_HOURS_PROTECTION_ENABLED",
+    "DEFAULT_LIVE_RUNTIME_MODE_ENABLED",
     "ResourceSnapshot",
     "SchedulerConfig",
     "SchedulerDecision",
     "collect_resource_snapshot",
     "is_regular_us_equity_trading_day",
+    "live_runtime_historical_task_gate",
     "market_hours_gate",
     "resource_gate",
     "run_scheduler_once",
