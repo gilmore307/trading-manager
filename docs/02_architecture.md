@@ -31,7 +31,11 @@ Active code, scripts, registry rows, and docs should use the current layer numbe
 
 ## Event Path Rule
 
-Layer 10 may inspect residual event evidence and abnormal activity as governance over the Layer 8 direct-underlying thesis. Layer 4 may consume only Layer 10 evidence packets that passed point-in-time checks, non-overlap checks, matched-control review, leakage review, and agent/manager acceptance.
+Layer 10 may inspect residual event evidence and abnormal activity only after
+concentrated live-flow replay has exposed failures, residuals, misses, or path
+deviations. It is not a pre-replay input stage. Layer 4 may consume only Layer
+10 evidence packets that passed point-in-time checks, non-overlap checks,
+matched-control review, leakage review, and agent/manager acceptance.
 
 Layer 9 remains the optional base guidance/expression layer. It should not directly absorb event anomalies as alpha or duplicate Layer 10 residual evidence.
 
@@ -41,7 +45,12 @@ Layer 3 candidate generation is rule-fixed, not final-ticker-fixed. Live routing
 
 Manager may schedule target-major substrate work because routing symbols only prepare data samples. That scheduling choice does not select the replay target. Live-flow replay must run the component graph against the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. A fixed-symbol run is a diagnostic repair scenario, not ordinary promotion evidence.
 
-Layer 4 event evidence has both reusable global/sector substrate and target-local slices. Global/sector event substrate belongs with reusable foundation work; target-local event evidence belongs with target substrate only when a downstream replay or diagnostic run needs it.
+Layer 4 event evidence has both reusable global/sector substrate and
+target-local slices. Global/sector event-observation substrate belongs with
+reusable foundation work, but it is still collected per fold because the
+accepted observation pool can change across folds. Target-local event evidence
+belongs with target substrate only when a downstream replay or diagnostic run
+needs it.
 
 ## Manager Responsibilities
 

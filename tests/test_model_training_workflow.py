@@ -8,10 +8,12 @@ from trading_manager_tasks.model_training_workflow import (
     BASE_STACK_LAYER_COUNT,
     FOLD_STACK_PROMOTION_BLOCKER,
     FOUNDATION_CATCH_UP_BLOCKER,
+    FOUNDATION_CATCH_UP_LAYERS,
+    LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER,
+    MODEL_GROUP_REPLAY_COMPLETE_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
     MONTHLY_SUBSTRATE_LAYERS,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
-    LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER,
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
     LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
     build_model_training_workflow_plan,
@@ -62,7 +64,9 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "promotion_review",
                 "maintenance",
             ]
-            if layer.layer in {4, 5, 6, 7, 8}:
+            if layer.layer == 4:
+                expected_stage_types = ["data_acquisition", "model_generation", "model_evaluation", "promotion_review", "maintenance"]
+            elif layer.layer in {5, 6, 7, 8, 10}:
                 expected_stage_types = ["model_generation", "model_evaluation", "promotion_review", "maintenance"]
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertIn("model_", " ".join(layer.model_generate_command))
@@ -82,7 +86,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertTrue(plan.foundation_catch_up_only)
         for layer in plan.layers:
-            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in MONTHLY_SUBSTRATE_LAYERS else []
+            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in {1, 2} else (["data_acquisition"] if layer.layer == 4 else [])
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertNotIn("model_generation", {stage.stage_type for stage in layer.stages})
             self.assertNotIn("model_evaluation", {stage.stage_type for stage in layer.stages})
@@ -160,10 +164,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
 
         self.assertTrue(plan.foundation_catch_up_only)
-        self.assertEqual(plan.foundation_catch_up_layers, MONTHLY_SUBSTRATE_LAYERS)
+        self.assertEqual(plan.foundation_catch_up_layers, FOUNDATION_CATCH_UP_LAYERS)
         self.assertEqual(plan.reusable_substrate_stage_types, ("data_acquisition", "feature_generation"))
         for layer in plan.layers:
-            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in MONTHLY_SUBSTRATE_LAYERS else []
+            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in {1, 2} else (["data_acquisition"] if layer.layer == 4 else [])
             self.assertEqual(
                 [stage.stage_type for stage in layer.stages],
                 expected_stage_types,
@@ -376,12 +380,12 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layers[8].depends_on_layers, (8,))
         self.assertIn("crypto/direct-underlying-only routes do not require option refs", plan.layers[8].candidate_progression_policy)
         self.assertIn("upstream_layer_08_model_evaluation_complete", plan.layers[8].stages[0].blockers)
-        self.assertEqual(plan.layers[9].progression_mode, "event_risk_governance_over_underlying_thesis")
-        self.assertEqual(plan.layers[9].depends_on_layers, (8,))
-        self.assertIn("Layer 9 guidance/expression context is optional", plan.layers[9].candidate_progression_policy)
-        self.assertIn("upstream_layer_08_model_evaluation_complete", plan.layers[9].stages[0].blockers)
+        self.assertEqual(plan.layers[9].progression_mode, "post_replay_event_failure_attribution")
+        self.assertEqual(plan.layers[9].depends_on_layers, ())
+        self.assertIn("after concentrated live-flow replay", plan.layers[9].candidate_progression_policy)
+        self.assertIn(MODEL_GROUP_REPLAY_COMPLETE_BLOCKER, plan.layers[9].stages[0].blockers)
 
-    def test_layer_ten_data_acquisition_blocks_until_required_event_feeds_have_coverage(self):
+    def test_layer_four_event_observation_data_acquisition_blocks_until_required_event_feeds_have_coverage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
             plan = build_model_training_workflow_plan(
@@ -392,7 +396,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
-            blocked_stage = plan.layers[9].stages[0]
+            blocked_stage = plan.layers[3].stages[0]
 
             _write_event_feed_artifacts(root, month="2016-01")
             ready_plan = build_model_training_workflow_plan(
@@ -403,11 +407,14 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
-            coverage_ready_stage = ready_plan.layers[9].stages[0]
+            coverage_ready_stage = ready_plan.layers[3].stages[0]
 
-        self.assertIn(LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER, blocked_stage.blockers)
-        self.assertNotIn(LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER, coverage_ready_stage.blockers)
-        self.assertIn("upstream_layer_08_model_evaluation_complete", coverage_ready_stage.blockers)
+        self.assertIn(LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER, blocked_stage.blockers)
+        self.assertNotIn(LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER, coverage_ready_stage.blockers)
+        self.assertEqual(coverage_ready_stage.status, "ready")
+        self.assertIn("materialize_layer_four_event_observation_inputs.py", " ".join(coverage_ready_stage.command))
+        self.assertEqual([stage.stage_type for stage in ready_plan.layers[9].stages[:1]], ["model_generation"])
+        self.assertIn(MODEL_GROUP_REPLAY_COMPLETE_BLOCKER, ready_plan.layers[9].stages[0].blockers)
 
     def test_promotion_review_waits_for_full_fold_stack_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -434,7 +441,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
-        for layer_number in (4, 5, 6, 7, 8):
+        layer_four_stage_types = [stage.stage_type for stage in plan.layers[3].stages]
+        self.assertEqual(layer_four_stage_types, ["data_acquisition", "model_generation", "model_evaluation", "promotion_review", "maintenance"])
+        self.assertNotIn("feature_generation", layer_four_stage_types)
+        for layer_number in (5, 6, 7, 8):
             layer = plan.layers[layer_number - 1]
             stage_types = [stage.stage_type for stage in layer.stages]
             self.assertNotIn("data_acquisition", stage_types)
@@ -463,7 +473,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertEqual(layer.dataset_unit.unit_months, 6)
             self.assertEqual(layer.dataset_unit.target_symbol, "AAPL")
             self.assertTrue(layer.dataset_unit.target_required)
-            self.assertEqual(layer.stages[0].dataset_unit.target_symbol, "AAPL")
+            if layer.layer == 4 and layer.stages[0].stage_type == "data_acquisition":
+                self.assertEqual(layer.stages[0].dataset_unit.unit_kind, "event_observation_fold_panel")
+                self.assertIsNone(layer.stages[0].dataset_unit.target_symbol)
+            else:
+                self.assertEqual(layer.stages[0].dataset_unit.target_symbol, "AAPL")
 
     def test_multi_target_symbol_requires_separate_workflows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

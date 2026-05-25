@@ -1,11 +1,10 @@
-"""Historical base-stack workflow graph.
+"""Historical model research workflow graph.
 
 The manager owns orchestration across the historical-modeling service. This
-module defines the base trading stack progression. Layer 6 calibrates dynamic
-risk policy, Layer 9 composes optional trading-guidance/option-expression
-context from the Layer 8 direct-underlying thesis, and Layer 10
-EventRiskGovernor governs the Layer 8 thesis directly and may attach Layer 9
-context when available.
+module defines reusable foundation substrate, target substrate, concentrated
+Replay, post-replay Layer 10 attribution, evaluation, promotion, and maintenance
+boundaries. Layer 10 is not a pre-replay input stage; it starts after Replay
+settles failures, residuals, misses, or path deviations.
 """
 
 from __future__ import annotations
@@ -24,12 +23,12 @@ from .storage_paths import data_storage_root, model_runtime_root
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
 BASE_STACK_LAYER_COUNT = 10
-BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 9, 10)
+BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 4, 9)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
 DATASET_UNIT_MONTHS = 6
-FOUNDATION_CATCH_UP_LAYERS = (1, 2)
-MONTHLY_SUBSTRATE_LAYERS = FOUNDATION_CATCH_UP_LAYERS
+FOUNDATION_CATCH_UP_LAYERS = (1, 2, 4)
+MONTHLY_SUBSTRATE_LAYERS = (1, 2)
 FOUNDATION_CATCH_UP_STAGE_TYPES = ("data_acquisition", "feature_generation")
 FOUNDATION_CATCH_UP_BLOCKER = "layer_01_02_historical_catch_up_to_current_required"
 POST_MODEL_GENERATION_REBUILD_BLOCKER = "post_model_generation_rebuild_required_after_layer_01_02_catch_up"
@@ -39,8 +38,10 @@ ROLLING_FOLD_TEST_MONTHS = 1
 ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_MONTHS + ROLLING_FOLD_TEST_MONTHS
 PROMOTION_STAGE_TYPE = "promotion_review"
 FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_10_model_evaluation_complete"
+MODEL_GROUP_REPLAY_COMPLETE_BLOCKER = "model_group_replay_complete"
 MULTI_TARGET_SYMBOL_BLOCKER = "multiple_target_symbols_require_separate_workflows"
 MODEL_RUNTIME_ROOT = model_runtime_root()
+LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER = "layer_04_event_observation_pool_ready"
 LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER = "layer_10_event_feed_coverage_ready"
 
 
@@ -143,7 +144,7 @@ class ModelTrainingWorkflowPlan:
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
     foundation_catch_up_only: bool = True
-    foundation_catch_up_layers: tuple[int, ...] = MONTHLY_SUBSTRATE_LAYERS
+    foundation_catch_up_layers: tuple[int, ...] = FOUNDATION_CATCH_UP_LAYERS
     reusable_substrate_stage_types: tuple[str, ...] = FOUNDATION_CATCH_UP_STAGE_TYPES
     post_model_generation_artifacts_policy: str = "supersede_and_rebuild_after_layer_01_02_historical_catch_up"
 
@@ -209,8 +210,9 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (3,),
         "progression_mode": "target_major_serial_chain",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_failure_context_id",
-        "candidate_progression_policy": "continue the active target candidate chain after Layer 3 target state is ready; only reviewed event/strategy-failure evidence can condition this layer",
-        "data_surface": "agent-reviewed event/strategy-failure evidence plus target state; no dedicated trading-data source and no raw event alpha requirement",
+        "candidate_progression_policy": "collect fold-scoped global/sector event observations before replay; target-local Layer 4 scoring later consumes only reviewed event/strategy-failure evidence",
+        "data_surface": "fold-scoped accepted global/sector event-observation substrate plus reviewed event/strategy-failure evidence; no raw event alpha requirement",
+        "input_stage": True,
         "feature_cli": None,
     },
     {
@@ -272,12 +274,12 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "layer": 10,
         "slug": "event_risk_governor",
         "model_name": "EventRiskGovernor",
-        "depends_on_layers": (8,),
-        "progression_mode": "event_risk_governance_over_underlying_thesis",
+        "depends_on_layers": (),
+        "progression_mode": "post_replay_event_failure_attribution",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_risk_context_id",
-        "candidate_progression_policy": "review the Layer 8 direct-underlying/spot thesis against accepted event-risk evidence; Layer 9 guidance/expression context is optional when available",
-        "data_surface": "source_10_event_risk_governor plus feature_10_event_risk_governor from reviewed local event/feed evidence; no broker/account mutation",
-        "feature_cli": "trading-data-feature-10-event-risk-governor",
+        "candidate_progression_policy": "start only after concentrated live-flow replay exposes failures, residuals, missed opportunities, or path deviations; produce attribution/promotion evidence, not pre-replay inputs",
+        "data_surface": "post-replay failure/residual attribution over replay traces and PIT event observations; no pre-replay data-acquisition or feature-generation stage",
+        "feature_cli": None,
     },
 )
 
@@ -486,8 +488,47 @@ def _dataset_unit_for_layer(
     )
 
 
-def _with_target_blocker(blockers: tuple[str, ...], *, layer: int, selected_target_symbol: str | None) -> tuple[str, ...]:
-    if layer >= 3 and not (selected_target_symbol and selected_target_symbol.strip()):
+def _input_dataset_unit_for_layer(
+    *,
+    layer: int,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> DatasetUnit:
+    if layer == 4:
+        return DatasetUnit(
+            unit_kind="event_observation_fold_panel",
+            unit_months=DATASET_UNIT_MONTHS,
+            start_month=start_month,
+            end_month=end_month,
+            target_symbol=None,
+            target_required=False,
+            description="Layer 4 input unit: fold-scoped global/sector event-observation substrate; no single target symbol applies.",
+        )
+    return _dataset_unit_for_layer(
+        layer=layer,
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
+
+
+def _stage_requires_target(*, layer: int, stage_type: str) -> bool:
+    if layer < 3:
+        return False
+    if layer == 4 and stage_type in {"data_acquisition", "feature_generation"}:
+        return False
+    return True
+
+
+def _with_target_blocker(
+    blockers: tuple[str, ...],
+    *,
+    layer: int,
+    selected_target_symbol: str | None,
+    stage_type: str,
+) -> tuple[str, ...]:
+    if _stage_requires_target(layer=layer, stage_type=stage_type) and not (selected_target_symbol and selected_target_symbol.strip()):
         return ("selected_target_symbol_required",) + blockers
     return blockers
 
@@ -527,6 +568,17 @@ def _event_feed_coverage_blockers(*, start_month: str, end_month: str, trading_s
     return ()
 
 
+def _layer_four_event_observation_blockers(*, start_month: str, end_month: str, trading_storage_root: Path) -> tuple[str, ...]:
+    blockers = _event_feed_coverage_blockers(
+        start_month=start_month,
+        end_month=end_month,
+        trading_storage_root=trading_storage_root,
+    )
+    if blockers:
+        return (LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER,)
+    return ()
+
+
 def _resolve_event_feed_storage_root(storage_root: Path, trading_storage_root: Path | None) -> Path:
     if trading_storage_root is not None:
         return trading_storage_root
@@ -544,7 +596,7 @@ def _build_layer_workflow(
     end_month: str,
     selected_target_symbol: str | None,
     foundation_catch_up_only: bool,
-    layer_ten_event_feed_blockers: tuple[str, ...],
+    layer_four_event_observation_blockers: tuple[str, ...],
 ) -> LayerWorkflow:
     layer = int(meta["layer"])
     slug = str(meta["slug"])
@@ -555,6 +607,12 @@ def _build_layer_workflow(
     feature = feature_command(meta.get("feature_cli"))
     maintenance = maintenance_command(layer, slug)
     dataset_unit = _dataset_unit_for_layer(
+        layer=layer,
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
+    input_dataset_unit = _input_dataset_unit_for_layer(
         layer=layer,
         start_month=start_month,
         end_month=end_month,
@@ -573,15 +631,16 @@ def _build_layer_workflow(
             required_count=LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
             preparation_blocker="layer_02_task_key_preparation",
         )
-    elif meta.get("feature_cli") is None:
+    elif not meta.get("input_stage") and meta.get("feature_cli") is None:
         acquisition_status, acquisition_blockers, acquisition_gate = "not_applicable", (), None
+    elif layer == 4:
+        acquisition_status = "blocked" if layer_four_event_observation_blockers else "ready"
+        acquisition_blockers, acquisition_gate = layer_four_event_observation_blockers, None
     else:
         acquisition_status, acquisition_blockers, acquisition_gate = "blocked", _upstream_layer_ready_blockers(
             tuple(meta["depends_on_layers"]),
             foundation_catch_up_only=foundation_catch_up_only,
         ), None
-        if layer == 10:
-            acquisition_blockers = acquisition_blockers + layer_ten_event_feed_blockers
 
     acquisition_command = ["manager", "advance-local-input-stage", key]
     if layer in {1, 2}:
@@ -609,6 +668,17 @@ def _build_layer_workflow(
             "${END_MONTH}",
             "--write",
         ]
+    elif layer == 4:
+        acquisition_command = [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/materialize_layer_four_event_observation_inputs.py",
+            "--start-month",
+            "${START_MONTH}",
+            "--end-month",
+            "${END_MONTH}",
+            "--write",
+        ]
     elif layer == 9:
         acquisition_command = [
             "PYTHONPATH=src",
@@ -620,25 +690,19 @@ def _build_layer_workflow(
             "${END_MONTH}",
             "--write",
         ]
-    elif layer == 10:
-        acquisition_command = [
-            "PYTHONPATH=src",
-            "python3",
-            "scripts/tasks/materialize_layer_ten_event_risk_governor_inputs.py",
-            "--start-month",
-            "${START_MONTH}",
-            "--end-month",
-            "${END_MONTH}",
-            "--write",
-        ]
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
 
-    acquisition_blockers = _with_target_blocker(acquisition_blockers, layer=layer, selected_target_symbol=selected_target_symbol)
+    acquisition_blockers = _with_target_blocker(
+        acquisition_blockers,
+        layer=layer,
+        selected_target_symbol=selected_target_symbol,
+        stage_type="data_acquisition",
+    )
 
     stages: list[WorkflowStage] = []
     has_monthly_input_stage = layer in BASE_INPUT_STAGE_LAYERS
-    include_input_stage = has_monthly_input_stage and (not foundation_catch_up_only or layer in MONTHLY_SUBSTRATE_LAYERS)
+    include_input_stage = has_monthly_input_stage and (not foundation_catch_up_only or layer in FOUNDATION_CATCH_UP_LAYERS)
     if include_input_stage:
         stages.append(
             WorkflowStage(
@@ -649,7 +713,7 @@ def _build_layer_workflow(
                 description=str(meta["data_surface"]),
                 status=acquisition_status,
                 command=acquisition_command,
-                dataset_unit=dataset_unit,
+                dataset_unit=input_dataset_unit,
                 blockers=acquisition_blockers,
                 approval_gate_required=acquisition_gate,
                 safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
@@ -671,6 +735,7 @@ def _build_layer_workflow(
                         (f"{key}.data_acquisition_complete",),
                         layer=layer,
                         selected_target_symbol=selected_target_symbol,
+                        stage_type="feature_generation",
                     ),
                     safe_without_provider_calls=layer != 2,
                     provider_calls_allowed=layer == 2,
@@ -695,16 +760,21 @@ def _build_layer_workflow(
             stages=tuple(stages),
         )
 
+    model_generation_blockers = _upstream_layer_ready_blockers(
+        tuple(meta["depends_on_layers"]),
+        foundation_catch_up_only=foundation_catch_up_only,
+    ) + ((f"{key}.feature_or_input_ready",) if include_input_stage else ())
+    model_generation_description = "Generate offline model/state-vector rows from a complete frozen rolling-fold train manifest, never from one month alone."
+    if layer == 10:
+        model_generation_blockers = (MODEL_GROUP_REPLAY_COMPLETE_BLOCKER,)
+        model_generation_description = "Run post-replay event failure/residual attribution after concentrated live-flow replay has settled."
+
     for stage_type, command, description, blockers in (
         (
             "model_generation",
             generate,
-            "Generate offline model/state-vector rows from a complete frozen rolling-fold train manifest, never from one month alone.",
-            _upstream_layer_ready_blockers(
-                tuple(meta["depends_on_layers"]),
-                foundation_catch_up_only=foundation_catch_up_only,
-            )
-            + ((f"{key}.feature_or_input_ready",) if include_input_stage else ()),
+            model_generation_description,
+            model_generation_blockers,
         ),
         (
             "model_evaluation",
@@ -741,7 +811,12 @@ def _build_layer_workflow(
                 status="blocked",
                 command=command,
                 dataset_unit=dataset_unit,
-                blockers=_with_target_blocker(stage_blockers, layer=layer, selected_target_symbol=selected_target_symbol),
+                blockers=_with_target_blocker(
+                    stage_blockers,
+                    layer=layer,
+                    selected_target_symbol=selected_target_symbol,
+                    stage_type=stage_type,
+                ),
             )
         )
     return LayerWorkflow(
@@ -776,7 +851,7 @@ def build_model_training_workflow_plan(
     layer_two_task_key_count = count_layer_two_task_keys(storage_root, start_month=start_month)
     normalized_target_symbol = _normalize_selected_target_symbol(selected_target_symbol)
     resolved_trading_storage_root = _resolve_event_feed_storage_root(storage_root, trading_storage_root)
-    layer_ten_event_feed_blockers = _event_feed_coverage_blockers(
+    layer_four_event_observation_blockers = _layer_four_event_observation_blockers(
         start_month=start_month,
         end_month=end_month,
         trading_storage_root=resolved_trading_storage_root,
@@ -790,7 +865,7 @@ def build_model_training_workflow_plan(
             end_month=end_month,
             selected_target_symbol=normalized_target_symbol,
             foundation_catch_up_only=foundation_catch_up_only,
-            layer_ten_event_feed_blockers=layer_ten_event_feed_blockers,
+            layer_four_event_observation_blockers=layer_four_event_observation_blockers,
         )
         for meta in LAYER_METADATA
     )
@@ -857,11 +932,13 @@ __all__ = [
     "FOUNDATION_CATCH_UP_BLOCKER",
     "FOUNDATION_CATCH_UP_LAYERS",
     "FOLD_STACK_PROMOTION_BLOCKER",
+    "MODEL_GROUP_REPLAY_COMPLETE_BLOCKER",
     "MULTI_TARGET_SYMBOL_BLOCKER",
     "MONTHLY_SUBSTRATE_LAYERS",
     "FOUNDATION_CATCH_UP_STAGE_TYPES",
     "LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS",
     "LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS",
+    "LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER",
     "LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER",
     "POST_MODEL_GENERATION_REBUILD_BLOCKER",
     "LayerWorkflow",

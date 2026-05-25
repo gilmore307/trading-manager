@@ -253,7 +253,7 @@ def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
         feature = stages.get(f"{layer_key}.feature_generation")
         acquisition = stages.get(f"{layer_key}.data_acquisition")
         return (feature is not None and feature.status in {"succeeded", "not_applicable"}) or (
-            acquisition is not None and acquisition.status == "not_applicable"
+            acquisition is not None and acquisition.status in {"succeeded", "not_applicable"}
         )
     return False
 

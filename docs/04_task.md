@@ -13,8 +13,8 @@ The resident historical scheduler is the normal path for no-broker historical mo
    - Verify provider, model-activation, storage-lifecycle, and broker gates from status evidence.
    - Use runtime status scripts instead of chat/session memory.
 
-2. **Layer 1/2 foundation catch-up**
-   - Advance targetless Layer 1 market/cross-asset and Layer 2 sector/industry substrate before ordinary Layer 3+ target work.
+2. **Foundation catch-up**
+   - Advance targetless Layer 1 market/cross-asset, Layer 2 sector/industry, and fold-scoped global/sector Layer 4 event-observation substrate before ordinary target work.
    - Reuse point-in-time-valid provider data, cleaned data, feature-ready manifests, and coverage evidence.
    - Rebuild dependent model/evaluation/promotion artifacts when their substrate changes.
 
@@ -29,7 +29,7 @@ The resident historical scheduler is the normal path for no-broker historical mo
    - Treat execution/broker consumption as a separate controlled gate, not automatic scheduler completion.
 
 5. **Event-risk governance lane**
-   - Keep Layer 10 as residual event-risk governance over the Layer 8 thesis within the historical service boundary; Layer 9 guidance/expression context remains optional.
+   - Keep Layer 10 as post-replay residual event-risk attribution within the historical service boundary; it starts after concentrated replay exposes failures, residuals, misses, or deviations.
    - Admit realtime observation families only after review.
    - Let Layer 4 consume only accepted evidence packets and Layer 9 compose optional offline guidance/expression context.
 

@@ -11,14 +11,15 @@ Dataset expansion decides which historical dataset role should be broadened next
 
 ## Expansion Order
 
-1. Layer 1/2 foundation coverage.
+1. Layer 1/2 foundation coverage plus fold-scoped global/sector Layer 4 event-observation substrate.
 2. Layer 3 target-state target windows.
 3. Layers 4-9 downstream risk-policy/context/action/guidance chains once prerequisites exist.
-4. Layer 10 event-risk evidence as a residual lane with reviewed event families and strict non-overlap rules.
+4. Concentrated replay.
+5. Layer 10 post-replay event-risk attribution with reviewed event families and strict non-overlap rules.
 
 ## Dataset Unit
 
-For Layer 3+ target work, the ordinary unit is one target symbol over a bounded historical window. Layer 1/2 foundation work is targetless panel work.
+For Layer 3+ target work, the ordinary substrate unit is one target symbol over a bounded historical window. Layer 1/2 foundation work is targetless panel work. Global/sector Layer 4 event-observation substrate is targetless but fold-scoped because the accepted observation pool can change by fold.
 
 ## Commands
 

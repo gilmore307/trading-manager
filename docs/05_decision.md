@@ -28,7 +28,7 @@ Manager recognizes the current Layer 1-10 stack: MarketRegime, SectorContext, Ta
 
 ## D007 - Reusable foundation catch-up is priority
 
-The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes Layer 1 market/cross-asset context, Layer 2 sector/industry context, and global or sector-scoped Layer 4 event context. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
+The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes Layer 1 market/cross-asset context, Layer 2 sector/industry context, and fold-scoped global or sector-scoped Layer 4 event-observation context. Layer 4 event-observation substrate must be collected for each fold because the accepted event observation pool can change across folds. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
 
 ## D008 - Layer 9 is optional trading guidance/expression
 
@@ -43,9 +43,9 @@ support live trading-review decisions and later Layer 10/Layer 4 promotion
 research, but they cannot be treated as trained event-failure evidence until the
 normal review and acceptance route completes.
 
-## D010 - Layer 10 remains residual event-risk governance
+## D010 - Layer 10 remains post-replay residual event-risk governance
 
-Layer 10 governs residual event risk over the Layer 8 direct-underlying/spot thesis. Layer 9 guidance/expression context is optional input context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
+Layer 10 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It must not run as a pre-replay data-acquisition or feature-generation stage. Layer 9 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Agent model review is advisory and blinded
 

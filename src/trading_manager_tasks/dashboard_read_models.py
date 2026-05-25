@@ -393,7 +393,7 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
             updated["dashboard_severity"] = "notice"
             updated["retry_recommendation"] = (
                 "Superseded by layer_10_event_risk_governor. "
-                "Prepare Layer 10 event-feed artifacts before its data_acquisition stage runs."
+                "Prepare fold-scoped Layer 4 event-observation artifacts before replay; Layer 10 starts after replay for attribution."
             )
             updated_rows.append(updated)
         else:
@@ -2231,7 +2231,7 @@ def _model_group_replay_timeline_tasks(
             if replay_complete
             else f"Model-group replay has started and completed {len(replay_ready_months)}/{_replay_window_month_count(dataset_root)} replay months."
             if replay_started
-            else "Model-group replay is ready to run the frozen Layer 1-10 live-flow component graph, including Layer 10 event-risk calls, AUROC, Brier, return, drawdown, cost, hit-rate, payoff, turnover, PCA, PCoA, and guardrail checks."
+            else "Model-group replay is ready to run the frozen pre-attribution live-flow component graph; Layer 10 starts after replay for failure/residual attribution before evaluation."
             if freeze_ready
             else f"Waiting for complete model-group replay data acquisition and frozen replay contract; current freeze_status={freeze_status}."
         ),

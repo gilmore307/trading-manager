@@ -141,7 +141,7 @@ def _validate_safe_stage(stage: StageProgress) -> None:
         raise TaskSystemError(f"provider-dispatch stage requires the autonomous provider-stage controller: {stage.stage_id}")
     if stage.stage_type == "data_acquisition" and not any(
         token.endswith("materialize_layer_three_target_state_inputs.py")
-        or token.endswith("materialize_layer_ten_event_risk_governor_inputs.py")
+        or token.endswith("materialize_layer_four_event_observation_inputs.py")
         or token.endswith("review_layer_nine_option_expression_gate.py")
         for token in stage.command
     ):

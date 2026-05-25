@@ -130,16 +130,16 @@ class StageExecutorTests(unittest.TestCase):
             self.assertTrue(Path(summary.agent_error_request_path or "").exists())
             self.assertTrue(Path(summary.agent_error_diagnosis_path or "").exists())
 
-    def test_executes_approved_layer_ten_event_risk_local_data_acquisition_command(self):
+    def test_executes_approved_layer_four_event_observation_local_data_acquisition_command(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_10_event_risk_governor.data_acquisition",
-                layer=8,
-                layer_key="layer_10_event_risk_governor",
+                stage_id="layer_04_event_failure_risk.data_acquisition",
+                layer=4,
+                layer_key="layer_04_event_failure_risk",
                 stage_type="data_acquisition",
                 status="ready",
-                command=["python3", "materialize_layer_ten_event_risk_governor_inputs.py"],
+                command=["python3", "materialize_layer_four_event_observation_inputs.py"],
                 blockers=(),
             )
             with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):

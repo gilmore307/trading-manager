@@ -372,7 +372,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             state = advance_workflow_state(
                 storage_root=tmp,
                 state_path=state_path,
-                completed_stage_ids=completions,
+                completed_stage_ids=completions + ["layer_04_event_failure_risk.data_acquisition"],
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
                 write=False,
@@ -449,7 +449,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             state = advance_workflow_state(
                 storage_root=tmp,
                 state_path=state_path,
-                completed_stage_ids=completions,
+                completed_stage_ids=completions + ["layer_04_event_failure_risk.data_acquisition"],
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
                 write=False,

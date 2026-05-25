@@ -31,7 +31,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py --start-
 
 ## Research-Cycle Priority
 
-The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes Layer 1 market context, Layer 2 sector context, and global or sector-scoped Layer 4 event substrate. These rows are shared across historical research runs and must not be redownloaded merely because a new target is being studied.
+The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes Layer 1 market context, Layer 2 sector context, and fold-scoped global or sector-scoped Layer 4 event-observation substrate. Layer 4 event-observation collection repeats per fold because the accepted observation pool may change between folds. These rows are shared across target research runs and must not be redownloaded merely because a new target is being studied.
 
 Layer 2 feature generation also prepares `source_02_target_candidate_holdings` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
@@ -63,7 +63,7 @@ PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --writ
 
 ## Event-Risk Lane
 
-Layer 10 is part of the historical-modeling service boundary, but post-replay failure attribution is broader than Layer 10 alone. Attribution may inspect target selection misses, portfolio combinations, Layer 4 event-risk behavior, Layer 5 alpha errors, Layer 6/7/8 position-management choices, Layer 9 option-expression drag, and Layer 10 event/co-event explanations. It produces attribution packets for evaluation and, where appropriate, event-family promotion-review packets under the same no-broker safety rules.
+Layer 10 is part of the historical-modeling service boundary, but it starts after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or deviations. It must not appear as a pre-replay data-acquisition or feature-generation stage. Post-replay attribution may inspect target selection misses, portfolio combinations, Layer 4 event-risk behavior, Layer 5 alpha errors, Layer 6/7/8 position-management choices, Layer 9 option-expression drag, and Layer 10 event/co-event explanations. It produces attribution packets for evaluation and, where appropriate, event-family promotion-review packets under the same no-broker safety rules.
 
 ## Dashboard Refresh Events
 

@@ -16,8 +16,8 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         self.assertEqual(row["contract_type"], "manager_event_model_regeneration_plan")
         self.assertEqual(row["fold_months"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
         self.assertIn("layer_01_market_regime_and_layer_02_sector_context_persistent_foundation_data", row["preserved_surfaces"])
-        self.assertIn("event_risk_or_abnormal_activity_only_outputs_without_required_evidence", row["superseded_surfaces"])
-        self.assertIn("base-stack outputs remain reusable", row["invalidation_scope"])
+        self.assertIn("pre_replay_layer_10_data_or_feature_outputs", row["superseded_surfaces"])
+        self.assertIn("base-stack and replay outputs remain reusable", row["invalidation_scope"])
         self.assertFalse(row["write_performed"])
         self.assertFalse(row["model_activation_performed"])
         self.assertFalse(row["broker_execution_performed"])
@@ -31,11 +31,14 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         provider_steps = [step_id for step_id, item in steps.items() if item["provider_calls_allowed"]]
         self.assertEqual(provider_steps, ["03_dispatch_or_verify_event_feed_artifacts"])
         self.assertTrue(steps["03_dispatch_or_verify_event_feed_artifacts"]["requires_review_before_apply"])
-        self.assertEqual(steps["07_state_only_invalidation_if_old_outputs_remain"]["mutation_class"], "workflow_state_only_no_artifact_deletion")
-        self.assertTrue(steps["08_revisit_storage_lifecycle_hold"]["requires_review_before_apply"])
-        self.assertIn("--model event_risk_governor", steps["06_evaluate_and_review_without_activation"]["command_ref"])
-        self.assertNotIn("--model model_10_event_risk_governor", steps["06_evaluate_and_review_without_activation"]["command_ref"])
-        self.assertEqual(steps["06_evaluate_and_review_without_activation"]["status"], "blocked_until_event_risk_governor_ready")
+        self.assertEqual(steps["08_state_only_invalidation_if_old_outputs_remain"]["mutation_class"], "workflow_state_only_no_artifact_deletion")
+        self.assertTrue(steps["09_revisit_storage_lifecycle_hold"]["requires_review_before_apply"])
+        self.assertIn("materialize_layer_four_event_observation_inputs.py", steps["04_materialize_layer_4_event_observation_fold_pool"]["command_ref"])
+        self.assertEqual(steps["05_run_concentrated_live_flow_replay"]["status"], "blocked_until_layer_4_event_observation_pool_ready")
+        self.assertEqual(steps["06_generate_post_replay_layer_10_attribution"]["status"], "blocked_until_model_group_replay_complete")
+        self.assertIn("--model event_risk_governor", steps["07_evaluate_and_review_without_activation"]["command_ref"])
+        self.assertNotIn("--model model_10_event_risk_governor", steps["07_evaluate_and_review_without_activation"]["command_ref"])
+        self.assertEqual(steps["07_evaluate_and_review_without_activation"]["status"], "blocked_until_post_replay_event_attribution_ready")
 
     def test_writes_plan_file(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

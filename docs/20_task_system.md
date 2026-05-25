@@ -50,11 +50,13 @@ Failures should become durable evidence, not chat-only notes. The failure regist
 Model research tasks are grouped by data reuse and decision-cycle ownership, not by a
 linear Layer 1 through Layer 10 loop.
 
-1. Foundation substrate. Build reusable market, sector, and global/sector event
-   inputs once per historical window. This covers Layer 1, Layer 2, and the
-   global or sector-scoped Layer 4 event substrate. It is reusable across target
-   research runs; researching AAPL must not require redownloading the same
-   reusable market, sector, macro, or global event evidence for NVDA.
+1. Foundation substrate. Build reusable market, sector, and fold-scoped
+   global/sector event inputs for each historical window. This covers Layer 1,
+   Layer 2, and the global or sector-scoped Layer 4 event-observation substrate.
+   The Layer 4 event substrate is still collected per fold because the accepted
+   event observation pool can change across folds; researching AAPL must not
+   require redownloading the same reusable market, sector, macro, or global
+   event evidence for NVDA.
 2. Target substrate. Materialize target-specific source and feature evidence
    only when a downstream run needs it. This includes target state, target-local
    event slices, option-expression inputs, and other target-scoped source or
@@ -65,10 +67,12 @@ linear Layer 1 through Layer 10 loop.
    choose no target, choose one target, or choose a target combination. Replay
    must not be framed as "run this already selected symbol through the stack"
    unless the request is an explicit diagnostic repair scenario.
-4. Failure attribution. After replay settlement and before evaluation judgment,
-   a separate attribution task investigates misses, residuals, overblocks,
-   underblocks, bad expressions, and event/co-event explanations. The same
-   component boundary is needed in live operation after real decisions settle.
+4. Failure attribution and Layer 10. After replay settlement and before
+   evaluation judgment, a separate attribution task investigates misses,
+   residuals, overblocks, underblocks, bad expressions, and event/co-event
+   explanations. Layer 10 starts here; it must not run as a pre-replay
+   data-acquisition or feature-generation stage. The same component boundary is
+   needed in live operation after real decisions settle.
 5. Evaluation. Evaluation consumes replay traces and attribution packets to
    score the candidate component bundle against baselines, calibration,
    stability, leakage, portfolio behavior, and failure explanations.

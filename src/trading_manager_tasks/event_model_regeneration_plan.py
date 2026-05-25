@@ -1,4 +1,4 @@
-"""Safe EventRiskGovernor regeneration plan.
+"""Safe post-replay event-attribution regeneration plan.
 
 The plan is intentionally non-mutating. It defines what to preserve, what to
 rebuild, and which manager/model/data/storage gates are required before any
@@ -107,19 +107,19 @@ def build_event_model_regeneration_plan(
         preserved_surfaces=(
             "reviewed_provider_data_and_monthly_cleaned_data_when_point_in_time_valid",
             "layer_01_market_regime_and_layer_02_sector_context_persistent_foundation_data",
-            "base_target_chain_outputs_without_event_risk_or_abnormal_activity_only_inputs",
+            "base_target_chain_outputs_before_concentrated_replay_when_point_in_time_valid",
             "event_risk_diagnostic_evidence_artifacts_for_comparison_debug_and_audit",
             "storage_artifacts_and_dashboard_snapshots_until_regeneration_review_completes",
         ),
         superseded_surfaces=(
-            "event_risk_or_abnormal_activity_only_outputs_without_required_evidence",
-            "event_risk_governor_outputs_built_before_required_event_feed_coverage",
-            "promotion_review_artifacts_claiming_event_alpha_without_acceptance_gate_evidence",
-            "model_run_metadata_that_depends_on_non_current_event_risk_inputs_after_reviewed_rebuild_exists",
+            "pre_replay_layer_10_data_or_feature_outputs",
+            "event_risk_governor_outputs_built_before_concentrated_replay_failure_attribution",
+            "promotion_review_artifacts_claiming_event_alpha_without_layer_4_acceptance_and_replay_attribution_evidence",
+            "model_run_metadata_that_depends_on_non_current_event_observation_or_replay_attribution_after_reviewed_rebuild_exists",
         ),
         invalidation_scope=(
-            "state_only_layer_10_event_risk_governor_and_event_adjusted_outputs; base-stack outputs remain reusable "
-            "unless a specific artifact consumed non-current event-risk/source rows or violates the rolling-fold policy"
+            "state_only_post_replay_layer_10_attribution_and_event_adjusted_outputs; base-stack and replay outputs remain reusable "
+            "unless a specific artifact consumed non-current event observations, non-current replay traces, or violates the rolling-fold policy"
         ),
         regeneration_steps=(
             RegenerationStep(
@@ -153,39 +153,49 @@ def build_event_model_regeneration_plan(
                 requires_review_before_apply=True,
             ),
             RegenerationStep(
-                step_id="04_materialize_source_10_event_risk_governor",
+                step_id="04_materialize_layer_4_event_observation_fold_pool",
                 owner_repo="trading-manager",
-                action="materialize source_10_event_risk_governor rows from reviewed local event feeds and detector evidence",
-                command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_layer_ten_event_risk_governor_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
+                action="materialize the fold-scoped Layer 4 global/sector event-observation substrate from reviewed local event feeds",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_observation_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
                 status="blocked_until_event_feed_coverage_ready",
-                mutation_class="local_source_materialization_receipt",
+                mutation_class="local_event_observation_substrate_receipt",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,
             ),
             RegenerationStep(
-                step_id="05_generate_feature_10_and_model_10",
-                owner_repo="trading-data;trading-model",
-                action="generate feature_10_event_risk_governor then model_10_event_risk_governor/event_context_vector outputs",
-                command_ref="trading-data-feature-10-event-risk-governor; python3 scripts/models/model_10_event_risk_governor/generate_model_10_event_risk_governor.py",
-                status="blocked_until_source_10_ready",
-                mutation_class="offline_model_artifact_generation",
+                step_id="05_run_concentrated_live_flow_replay",
+                owner_repo="trading-manager;trading-model",
+                action="run concentrated live-flow replay so components can choose no target, one target, or target combinations under historical point-in-time conditions",
+                command_ref="manager concentrated-replay --start-month ${START_MONTH} --end-month ${END_MONTH}",
+                status="blocked_until_layer_4_event_observation_pool_ready",
+                mutation_class="offline_replay_trace_generation",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,
             ),
             RegenerationStep(
-                step_id="06_evaluate_and_review_without_activation",
+                step_id="06_generate_post_replay_layer_10_attribution",
+                owner_repo="trading-model",
+                action="generate Layer 10 attribution from replay failures, residuals, misses, path deviations, overblocks, underblocks, and option-expression drag",
+                command_ref="python3 scripts/models/model_10_event_risk_governor/generate_post_replay_event_attribution.py",
+                status="blocked_until_model_group_replay_complete",
+                mutation_class="offline_post_replay_attribution_generation",
+                provider_calls_allowed=False,
+                requires_review_before_apply=False,
+            ),
+            RegenerationStep(
+                step_id="07_evaluate_and_review_without_activation",
                 owner_repo="trading-model;trading-manager",
-                action="evaluate EventRiskGovernor with direction-neutral risk labels first, then submit conservative manager promotion review",
+                action="evaluate post-replay EventRiskGovernor attribution quality, then submit conservative manager promotion review",
                 command_ref="python3 scripts/models/model_10_event_risk_governor/evaluate_model_10_event_risk_governor.py; PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model event_risk_governor",
-                status="blocked_until_event_risk_governor_ready",
+                status="blocked_until_post_replay_event_attribution_ready",
                 mutation_class="promotion_evidence_and_review_request_only",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,
             ),
             RegenerationStep(
-                step_id="07_state_only_invalidation_if_old_outputs_remain",
+                step_id="08_state_only_invalidation_if_old_outputs_remain",
                 owner_repo="trading-manager",
-                action="mark stale event-risk-dependent workflow stages rebuild-required without deleting artifacts",
+                action="mark stale pre-replay Layer 10 or event-adjusted workflow stages rebuild-required without deleting artifacts",
                 command_ref="PYTHONPATH=src python3 scripts/tasks/invalidate_layer_ten_event_downstream_outputs.py --write",
                 status="review_before_write",
                 mutation_class="workflow_state_only_no_artifact_deletion",
@@ -193,7 +203,7 @@ def build_event_model_regeneration_plan(
                 requires_review_before_apply=True,
             ),
             RegenerationStep(
-                step_id="08_revisit_storage_lifecycle_hold",
+                step_id="09_revisit_storage_lifecycle_hold",
                 owner_repo="trading-storage;trading-manager",
                 action="after reviewed rebuild, rerun lifecycle/dashboard-prune dry-runs and decide whether any deletion is safe",
                 command_ref="PYTHONPATH=src python3 scripts/dashboard/prune_dashboard_snapshots.py --dry-run",
@@ -209,7 +219,8 @@ def build_event_model_regeneration_plan(
         ),
         notes=(
             "Layer 1 and Layer 2 data are persistent foundations: compress/archive only, never auto-delete.",
-            "The event-risk lane is risk governance, not signed alpha or option-flow promotion.",
+            "Layer 4 event observations are collected for each fold before replay, even for global/sector events, because the accepted observation pool can change by fold.",
+            "Layer 10 starts after concentrated replay and learns attribution from replay failures/residuals; it is not a pre-replay data-acquisition lane.",
             "Current earnings/guidance route remains blocked for signed claims by missing comparable current guidance and PIT expectation baselines.",
             "This plan is non-mutating; executable steps remain separate reviewed tools.",
         ),

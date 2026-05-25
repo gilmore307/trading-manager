@@ -799,10 +799,27 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("global market regime", rows["DYNAMIC_RISK_POLICY_MODEL_LAYER"]["note"])
         self.assertEqual(
-            rows["LAYER_04_PLUS_SINGLE_TARGET_WORKFLOW_POLICY"]["payload"],
-            "layer_04_plus_single_target_interface_multiple_targets_require_separate_workflows",
+            rows["MODEL_REPLAY_CANDIDATE_SELECTION_POLICY"]["payload"],
+            "target_substrate_does_not_select_replay_targets_components_choose_candidates_or_combinations",
         )
-        self.assertIn("multiple target symbols", rows["LAYER_04_PLUS_SINGLE_TARGET_WORKFLOW_POLICY"]["note"])
+        self.assertIn("components to choose no target", rows["MODEL_REPLAY_CANDIDATE_SELECTION_POLICY"]["note"])
+        self.assertEqual(
+            rows["LAYER_10_POST_REPLAY_ATTRIBUTION_POLICY"]["payload"],
+            "layer_10_starts_after_concentrated_replay_not_before_replay_input_stage",
+        )
+        self.assertIn("pre-replay data-acquisition", rows["LAYER_10_POST_REPLAY_ATTRIBUTION_POLICY"]["note"])
+        self.assertEqual(
+            rows["LAYER_4_FOLD_EVENT_OBSERVATION_POLICY"]["payload"],
+            "layer_4_global_sector_event_observation_substrate_collected_each_fold",
+        )
+        self.assertIn("collected for each fold", rows["LAYER_4_FOLD_EVENT_OBSERVATION_POLICY"]["note"])
+        self.assertIn(
+            "materialize_layer_four_event_observation_inputs.py",
+            rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["payload"],
+        )
+        self.assertIn("model_training_workflow", rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["applies_to"])
+        self.assertNotIn("model_training_workflow", rows["MANAGER_MATERIALIZE_LAYER_TEN_EVENT_RISK_INPUTS"]["applies_to"])
+        self.assertIn("Legacy diagnostic", rows["MANAGER_MATERIALIZE_LAYER_TEN_EVENT_RISK_INPUTS"]["note"])
         self.assertIn(
             "promotion_review_waits_for_fold_layers_01_10_model_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
