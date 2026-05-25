@@ -25,7 +25,32 @@ Use `model_NN_*` only for physical implementation surfaces: import/package paths
 
 ## SQL Table Surface Patterns
 
-Layer-owned SQL tables must put the zero-padded layer number directly after the surface stem:
+SQL physical identifiers use lowercase snake_case. A dot separates only SQL namespace levels, normally `schema.table`. Do not use hyphens in SQL table, column, schema, registry, or task identifiers; reserve hyphenated slugs for filesystem or URL surfaces that already require them.
+
+New model/data table surfaces must use the current owner-domain-stage pattern:
+
+```text
+<schema>.<owner_prefix>_<domain_slug>_<task_stage>[_<artifact_role>]
+```
+
+Where:
+
+- `owner_prefix` is `mNN` for model-owned layer surfaces and `cNN` for execution/component-owned surfaces.
+- `domain_slug` is the reviewed model, component, or domain slug, for example `market_regime`.
+- `task_stage` is the task that generates the table, for example `data_acquisition`, `feature_generation`, or `model_generation`.
+- `artifact_role` is optional and names a support artifact such as `explainability` or `diagnostics`.
+
+Examples:
+
+```text
+trading_data.m01_market_regime_data_acquisition
+trading_data.m01_market_regime_feature_generation
+trading_model.m01_market_regime_model_generation
+trading_model.m01_market_regime_model_generation_explainability
+trading_model.m01_market_regime_model_generation_diagnostics
+```
+
+Previously accepted layer-owned SQL tables used the older surface-stem pattern:
 
 ```text
 source_NN_<surface_slug>
@@ -35,7 +60,9 @@ model_NN_<layer_slug>_explainability
 model_NN_<layer_slug>_diagnostics
 ```
 
-For `model_NN_*`, `NN` is the accepted model-layer number. For `source_NN_*` and `feature_NN_*`, `NN` follows the registered data-source or feature-surface contract and must be checked against the row meaning. Layer-neutral governance, control-plane, registry, receipt, and audit tables must not invent a fake layer number; they should carry layer refs in row fields when needed.
+Existing implemented `source_NN_*`, `feature_NN_*`, and `model_NN_*` tables remain explicit compatibility surfaces until a reviewed migration replaces them. Do not use the older pattern for newly planned tables.
+
+For older `model_NN_*`, `NN` is the accepted model-layer number. For older `source_NN_*` and `feature_NN_*`, `NN` follows the registered data-source or feature-surface contract and must be checked against the row meaning. Layer-neutral governance, control-plane, registry, receipt, and audit tables must not invent a fake layer number; they should carry layer refs in row fields when needed.
 
 ## Current Shared Source/Feature Examples
 
