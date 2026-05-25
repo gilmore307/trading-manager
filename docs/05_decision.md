@@ -38,6 +38,11 @@ Layer 9 may produce optional offline trading-guidance records and option-express
 
 Layer 4 may condition alpha only with evidence packets that passed source precedence, point-in-time availability, non-overlap, matched controls, leakage review, and agent/manager acceptance. Raw anomalies and unreviewed event text cannot enter Layer 4 scoring.
 
+C07 provisional untrained-event risk estimates are not Layer 4 inputs. They may
+support live trading-review decisions and later Layer 10/Layer 4 promotion
+research, but they cannot be treated as trained event-failure evidence until the
+normal review and acceptance route completes.
+
 ## D010 - Layer 10 remains residual event-risk governance
 
 Layer 10 governs residual event risk over the Layer 8 direct-underlying/spot thesis. Layer 9 guidance/expression context is optional input context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
@@ -123,7 +128,7 @@ Layer 3 candidate selection is part of the model stack, not an externally presel
 
 The candidate policy is rule-fixed: current Layer 2 selected/watch sectors, reviewed sector constituents or proxies, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast.
 
-Layer 3 work may remain target-major in task execution because routing symbols only contribute anonymous samples. Layer 4 and later remain single-target interfaces: if Layer 3 hands off multiple ranked targets, manager schedules separate target-scoped workflow runs instead of passing a multi-target batch into Layer 4+. Promotion evidence must still aggregate by fold and candidate-policy batch. Ordinary promotion replay uses the canonical candidate-policy replay window `2021-01-01` through `2026-01-01` end-exclusive; fixed target/window panels are not accepted promotion evidence.
+Layer 3 and later substrate work may remain target-major in task execution because routing symbols prepare data samples. That scheduling choice does not select the replay target. Promotion replay runs the live-flow component graph over the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. Fixed target/window panels remain diagnostic repair evidence only and are not accepted promotion evidence.
 
 ## D213 - Model-worker targets rotate autonomously
 

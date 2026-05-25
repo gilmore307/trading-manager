@@ -55,12 +55,17 @@ realtime failure/deviation watch during market hours, then run settlement
 attribution after the regular session closes or in another explicitly accepted
 off-hours window. Realtime watch may produce warning evidence for C03/C05/C06
 review paths, but it must not mutate intraday entry, lifecycle, sizing, or
-execution decisions by itself. Evaluation may use attribution evidence, but
-evaluation must not silently invent attribution labels inside promotion scoring.
+execution decisions by itself. If C07 identifies an event or anomaly that has not
+been trained and accepted through Layer 10/Layer 4, it may only emit a
+provisional untrained-event risk estimate from model-failure severity and
+supporting evidence. That estimate must be routed to the trading-review agent
+before it can affect a live block, reduce, exit, or human-review path.
+Evaluation may use attribution evidence, but evaluation must not silently invent
+attribution labels inside promotion scoring.
 
 ## Layer 10 / Layer 4 Rule
 
-Layer 10 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, and unknown-overlap activity bridge evidence cannot be promoted directly.
+Layer 10 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
 
 ## Useful Commands
 
