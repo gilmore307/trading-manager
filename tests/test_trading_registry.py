@@ -257,10 +257,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("cannot authorize orders", shadow_evidence["note"])
 
         shadow_policy = rows["SHADOW_RUNTIME_COMPONENT_POLICY"]
-        self.assertIn("s01_shadow_model_comparison_intraday_component", shadow_policy["payload"])
+        self.assertIn("c08_model_group_shadow_comparison_intraday_component", shadow_policy["payload"])
         self.assertIn("not_replay", shadow_policy["payload"])
         self.assertIn("active_model_only_trading_authority", shadow_policy["payload"])
-        self.assertIn("outside the C01-C07 trading decision graph", shadow_policy["note"])
+        self.assertIn("C08 Model Group Shadow Comparison", shadow_policy["note"])
+        self.assertIn("capacity-gated", shadow_policy["note"])
 
         write_policy = rows["EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_POLICY"]
         self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])
