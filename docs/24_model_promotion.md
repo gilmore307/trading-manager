@@ -1,16 +1,22 @@
-# Model Promotion Scheduling
+# Model Promotion And Lifecycle Scheduling
 
 Manager owns scheduling and request preparation for model promotion/evaluation work. Replay judgment, promotion eligibility, and promotion readiness belong to `trading-evaluation`; runtime active/shadow model selection belongs to `trading-execution`.
 
 When Codex CLI is used for promotion judgment, the request must require the workspace skill `skills/codex/promotion-evaluation-review`. The review is advisory evidence only; `trading-evaluation` deterministic checks own eligibility and readiness records.
 
-## Fold-Stack Gate
+## Research-Cycle Gate
 
-Promotion is fold-stack scoped, not single-model scoped. A layer may finish model generation and model evaluation for a fold, but that evidence remains diagnostic until Layer 1 through Layer 10 have all completed model evaluation for the same fold.
+Promotion is run-cycle scoped, not single-model or fixed-target scoped. A layer may finish local model generation checks, but that evidence remains diagnostic until the candidate bundle has passed the full historical live-flow cycle:
 
-Manager must not schedule promotion review from a single layer's completed fold alone. The promotion review gate opens only after `fold_layers_01_10_model_evaluation_complete`; then evaluation replays one pinned Layer 1-10 version bundle through the frozen live-flow component graph, including Layer 10 EventRiskGovernor calls, and compares it against accepted baselines.
+- reusable foundation substrate;
+- target-specific substrate where needed;
+- live-flow replay where components freely select no target, one target, or a target combination from the eligible historical pool;
+- post-replay failure attribution;
+- evaluation against accepted baselines and lifecycle thresholds.
 
-Promotion acceptance is all-or-nothing for the bundle. Layer-local evidence remains available for diagnostics, regression attribution, and retraining priority, but it must not create independent promotion, shadow, live, or reusable-production acceptance for a single layer or partial substack.
+Manager must not schedule promotion review from a single layer's completed fold alone, and it must not convert a target-substrate task into evidence that the system was forced to trade that target. Replay judgment belongs to the frozen live-flow component graph under point-in-time historical evidence.
+
+Promotion acceptance is bundle-scoped. Layer-local evidence remains available for diagnostics, regression attribution, and retraining priority, but it must not create independent promotion, shadow, live, or reusable-production acceptance for a single layer or partial substack unless an accepted lifecycle contract explicitly defines that component-local role.
 
 ## Required Evidence
 
@@ -18,21 +24,33 @@ A promotion packet should identify:
 
 - model/layer/candidate refs;
 - dataset snapshot and split refs;
+- replay candidate-pool and component-selection refs;
 - labels and evaluation refs;
+- post-replay failure-attribution refs;
 - baseline comparisons;
 - leakage checks;
 - stability and sample-size evidence;
 - known failure modes;
 - downstream shadow/activation scope;
 - evaluation decision evidence.
-- evidence that Layer 1 through Layer 10 model evaluation completed for the same fold.
-- pinned version refs for all Layer 1 through Layer 10 models in the candidate bundle.
+- evidence that the candidate component bundle completed the same replay/evaluation cycle.
+- pinned version refs for all component models in the candidate bundle.
 
 ## Activation Boundary
 
-Manager must not activate production pointers. Offline promotion requires `trading-evaluation` evidence: accepted replay settlement, `promotion_eligibility_decision`, `promotion_readiness_record`, and rollback/config refs. Runtime activation requires `trading-execution` shadow-cycle evidence: active model live performance, promoted-but-not-active shadow performance, realtime candidate roster, and elimination rationale where applicable. Deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, or route-only artifacts cannot activate production pointers.
+Manager must not activate production pointers or manage the active promoted-model roster directly. Offline promotion requires `trading-evaluation` evidence: accepted replay settlement, post-replay failure attribution, `promotion_eligibility_decision`, `promotion_readiness_record`, and rollback/config refs.
+
+Runtime management of already promoted models belongs to the runtime component lifecycle owner. That component compares active, shadow, realtime-candidate, demotion-candidate, and eliminated model roles from live/shadow evidence. Manager may schedule the request and persist the receipt, but it must not independently choose the active production pointer.
+
+Deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, target-only substrate runs, or route-only artifacts cannot activate production pointers.
 
 For the first accepted model bundle, evaluation may set `first_model_bootstrap = true`. That bundle's own frozen settlement run becomes the bootstrap baseline for later anonymous incumbent comparisons. This is a promotion/readiness exception only; it still cannot activate a production pointer without execution-owned shadow-cycle evidence.
+
+## Failure Attribution Boundary
+
+Failure attribution is a first-class task between replay and evaluation. It is not the same as evaluation and it is not limited to Layer 10 event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, and event/co-event explanations.
+
+The same boundary is required in live operation after decisions settle. Evaluation may use attribution evidence, but evaluation must not silently invent attribution labels inside promotion scoring.
 
 ## Layer 10 / Layer 4 Rule
 

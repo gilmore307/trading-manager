@@ -20,15 +20,15 @@ Manager SQL stores concise durable facts and references. Large payloads, logs, s
 
 ## D005 - Historical modeling is not trading execution
 
-The historical scheduler may acquire data, prepare features, run safe offline stages, evaluate models, and prepare review evidence. It must not place orders, mutate broker/account state, or activate production models without the accepted promotion path.
+The historical scheduler may acquire data, prepare features, run safe offline stages, prepare replay and attribution requests, and prepare review evidence. It must not place orders, mutate broker/account state, activate production models, or choose the active promoted-model roster.
 
 ## D006 - The model stack has ten current layers
 
 Manager recognizes the current Layer 1-10 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, DynamicRiskPolicy, PositionProjection, UnderlyingAction, TradingGuidance/OptionExpression, and EventRiskGovernor/EventIntelligenceOverlay.
 
-## D007 - Layer 1/2 foundation catch-up is priority
+## D007 - Reusable foundation catch-up is priority
 
-The scheduler should first advance targetless Layer 1 market/cross-asset and Layer 2 sector/industry substrate before ordinary Layer 3+ target work. Valid point-in-time provider data and deterministic features may be reused; dependent model/evaluation/promotion artifacts must be rebuilt when their substrate changed.
+The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes Layer 1 market/cross-asset context, Layer 2 sector/industry context, and global or sector-scoped Layer 4 event context. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
 
 ## D008 - Layer 9 is optional trading guidance/expression
 
@@ -80,17 +80,17 @@ Active docs describe current contracts, responsibilities, and operating rules di
 
 Manager writes model-worker fold progress runtime state: fold id, start/end months, stage statuses, and whether all model-worker work is complete. Storage reads that runtime state directly and owns backup, archive, cleanup planning, lifecycle execution, and receipts. Manager must not emit backup/delete signals, requests, or plans for completed folds.
 
-## D017 - Replay Judgment Moves To Evaluation; Runtime Activation Moves To Execution
+## D017 - Replay Judgment Moves To Evaluation; Runtime Lifecycle Moves To Execution
 
-Offline model-quality judgment after a completed fold belongs in `trading-evaluation`, not in manager. Manager records scheduler state and consumes evaluation/execution status, but the replay contract, fold settlement, metric semantics, promotion eligibility decision, and promotion readiness record live in the independent evaluation repository.
+Offline model-quality judgment after a completed run cycle belongs in `trading-evaluation`, not in manager. Manager records scheduler state and consumes evaluation/execution status, but the replay contract, run settlement, metric semantics, promotion eligibility decision, and promotion readiness record live in the independent evaluation repository.
 
-Runtime active model selection belongs in `trading-execution`: the active model trades, promoted-but-not-active models run shadow during market hours, ranks 2-4 stay realtime candidates, and weak models enter eliminate-candidate review when sufficient reason evidence exists. Active selection is still separate from broker/order/account mutation.
+Runtime promoted-model lifecycle management belongs in `trading-execution`: the active model trades, promoted-but-not-active models run shadow during market hours, ranks 2-4 stay realtime candidates, and weak models enter eliminate-candidate review when sufficient reason evidence exists. Active selection is still separate from broker/order/account mutation.
 
-## D018 - Promotion Waits For Full Fold Stack
+## D018 - Promotion Waits For Full Run Cycle
 
-Promotion review is not triggered when one model finishes one fold. Layer-local fold evaluation remains diagnostic until Layer 1 through Layer 10 have all completed model evaluation for the same fold.
+Promotion review is not triggered when one model finishes a local check or one target substrate lane completes. Layer-local checks and target-substrate runs remain diagnostic until the candidate bundle has completed the same run cycle.
 
-Manager may continue running layer-local generation and evaluation stages as each dependency is ready, but the promotion gate opens only after `fold_layers_01_10_model_evaluation_complete`. Evaluation then replays one pinned Layer 1-10 version bundle through the frozen live-flow component graph, including Layer 10 EventRiskGovernor calls, and compares it against accepted baselines. Promotion acceptance is all-or-nothing for that bundle: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently.
+The current run cycle is reusable foundation substrate, target substrate where needed, live-flow replay, post-replay failure attribution, evaluation, and promotion/lifecycle handoff. Replay must simulate the frozen live component graph over the historical candidate pool; components may choose no target, one target, or a target combination. Evaluation compares the pinned candidate bundle against accepted baselines after attribution evidence exists. Promotion acceptance is bundle-scoped: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently without an accepted component-local lifecycle contract.
 
 ## D210 - Activity bridge non-overlap is mandatory
 

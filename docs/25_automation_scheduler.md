@@ -17,7 +17,7 @@ The scheduler selects safe historical-modeling work and advances it through expl
 | Safe planning | Build request previews, coverage reports, handoff payloads | Allowed. |
 | Safe offline stage | Feature/materialization/model-local command with no broker mutation; provider access is allowed only when the stage explicitly declares it | Allowed only through reviewed executor path. |
 | Provider dispatch | Alpaca/ThetaData/news/calendar backfill | Requires explicit dispatch gate. |
-| Model activation | Promote production config | Requires accepted agent promotion decision. |
+| Runtime model lifecycle request | Ask runtime lifecycle owner to classify active/shadow/candidate roles | Requires accepted promotion or shadow-cycle evidence; manager does not activate pointers. |
 | Storage lifecycle mutation | Archive/delete/rehydrate | Requires accepted lifecycle decision. |
 | Broker/account mutation | Orders, fills, positions, account state | Not allowed in manager. |
 
@@ -29,15 +29,17 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py --start-month 2
 PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py --start-month 2016-01 --end-month 2016-01 --execute-safe-preparation --execute-safe-offline-stages --execute-autonomous-provider-stages --auto-select-next-work --advance-month-on-complete --once
 ```
 
-## Foundation Priority
+## Research-Cycle Priority
 
-The scheduler should advance Layer 1/2 foundation coverage before ordinary Layer 3+ target work. Downstream target work requires an explicit selected target symbol once admitted.
+The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes Layer 1 market context, Layer 2 sector context, and global or sector-scoped Layer 4 event substrate. These rows are shared across historical research runs and must not be redownloaded merely because a new target is being studied.
 
 Layer 2 feature generation also prepares `source_02_target_candidate_holdings` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
 ## Target Rotation
 
-Layer 3+ model-worker training uses target-scoped fold checkpoints. The checked-in systemd template intentionally omits `--target-symbol`, so the daemon reads `runtime/model_training_target_queue.json` and selects the first queued target with an open or unstarted six-month model-worker fold. Supplying `--target-symbol` is a reviewed repair override that pins the daemon to one target and disables queue rotation for that run. A fold is selectable when any fold-scoped model-worker stage is ready, including target-chain data-acquisition or feature-generation prep needed before later model-generation stages.
+Target substrate work uses target-scoped checkpoints only for data preparation and diagnostics. It does not mean replay is forced to trade that target. Live-flow replay must simulate the real component graph over the eligible historical candidate pool, where components may select no target, one target, or a target combination.
+
+The checked-in systemd template may omit `--target-symbol` so the daemon can advance a reviewed substrate queue. Supplying `--target-symbol` is a reviewed repair override for preparing or repairing one target's data lane; it must not be treated as promotion evidence for a fixed-target strategy.
 
 Accepted queue shape:
 
@@ -51,7 +53,7 @@ Accepted queue shape:
 }
 ```
 
-If the first target has completed all eligible folds through the completed-month cutoff, the scheduler skips it and starts the next queued target from the earliest ready fold, usually `2016-01`. The queue controls execution routing only; it does not become fixed-target promotion evidence and does not replace Layer 3 candidate-policy replay.
+If the first target has completed all eligible substrate windows through the completed-month cutoff, the scheduler skips it and starts the next queued target from the earliest ready window, usually `2016-01`. The queue controls data-preparation routing only; it does not become fixed-target promotion evidence and does not replace component-led candidate selection replay.
 
 The runtime queue can be prepared from reviewed target context mappings:
 
@@ -61,7 +63,7 @@ PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --writ
 
 ## Event-Risk Lane
 
-Layer 10 is part of the historical-modeling service boundary, but it is not a prerequisite for base-stack progression. It produces residual event-risk evidence, interventions, and promotion-review packets under the same no-broker safety rules.
+Layer 10 is part of the historical-modeling service boundary, but post-replay failure attribution is broader than Layer 10 alone. Attribution may inspect target selection misses, portfolio combinations, Layer 4 event-risk behavior, Layer 5 alpha errors, Layer 6/7/8 position-management choices, Layer 9 option-expression drag, and Layer 10 event/co-event explanations. It produces attribution packets for evaluation and, where appropriate, event-family promotion-review packets under the same no-broker safety rules.
 
 ## Dashboard Refresh Events
 

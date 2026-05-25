@@ -10,11 +10,14 @@ The service may supervise:
 - provider-dispatch stages under explicit controls;
 - feature/input preparation;
 - safe offline model/evaluation stages;
-- Layer 9 residual event-risk evidence preparation;
+- reusable foundation substrate preparation;
+- target-specific substrate preparation;
+- live-flow replay request preparation;
+- post-replay failure-attribution request preparation;
 - promotion-review packet preparation;
 - status and dashboard payload generation.
 
-The service must not perform broker/order/fill/account mutation or production model activation.
+The service must not perform broker/order/fill/account mutation, production model activation, or active promoted-model roster selection.
 
 ## Service Shape
 
@@ -57,9 +60,15 @@ PYTHONPATH=src python3 scripts/tasks/build_historical_task_progress_summary.py
 
 ## Current Priority
 
-Layer 1/2 foundation catch-up remains first. A month can advance during this phase after reusable data-acquisition and feature-generation substrate is complete. After the target and fold are fixed, the scheduler may run a second acquisition/feature phase for independent target/fold evidence, such as event-library-driven Layer 4 event evidence, but those stages must obey the contract in `docs/03_contracts.md`: `data_acquisition` downloads or snapshots source evidence, and `feature_generation` derives deterministic features from that source evidence without reading model outputs. Anything that requires an upstream model output must be a separate model-dependent task/table with explicit blockers, not a source feature.
+Reusable foundation catch-up remains first. A month can advance during this phase after reusable data-acquisition and feature-generation substrate is complete for market context, sector context, and global/sector event context. Researching another target later must reuse that foundation evidence instead of redownloading it.
 
-Model generation is fold-scoped. Once a target-scoped Model Worker fold is opened, that fold owns the target lane until it reaches a terminal state; a blocked open fold must not be skipped and later folds must not receive prefetch/substrate work. This preserves Layer 10 event-governor causality: each fold may update event-focus evidence that should shape subsequent fold acquisition and interpretation. Layer-local `model_evaluation` stages are internal artifact checks and failure-attribution evidence only; the owner-facing Evaluation task is the model-group replay over the accepted out-of-sample window. Promotion review is fold-scoped, but it must wait until the full Layer 1 through Layer 10 stack has completed internal checks and model-group replay evidence exists; single-layer fold results are diagnostic until the full stack closes.
+Target-specific substrate work is the second phase. It prepares target state, target-local event evidence, option-expression inputs, and other target-scoped source/feature rows only when a downstream run needs them. Target-substrate checkpoints are data-preparation lanes; they do not force replay to trade that target.
+
+Replay is run-cycle scoped. It simulates the frozen live component graph against the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. Replay does not start from a preselected symbol except in explicit diagnostic repair scenarios.
+
+Failure attribution is a separate task between replay and evaluation. It may inspect target selection misses, portfolio combinations, event/co-event explanations, alpha residuals, position-management choices, option-expression drag, and overblock/underblock behavior. This boundary must also exist in live operation after decisions settle.
+
+Evaluation consumes replay and attribution evidence. Promotion review must wait for the candidate bundle's replay, attribution, and evaluation evidence; single-layer checks and target-substrate runs remain diagnostic until the full run cycle closes.
 
 ## Safety Evidence
 

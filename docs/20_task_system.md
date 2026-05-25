@@ -40,9 +40,45 @@ Failures should become durable evidence, not chat-only notes. The failure regist
 
 - Planning and materialization are safe by default.
 - Provider calls require explicit provider dispatch.
-- Model activation requires accepted agent promotion decision.
+- Runtime model lifecycle requests require accepted promotion or shadow-cycle evidence.
+- Manager must not activate production pointers directly.
 - Storage lifecycle mutation requires accepted lifecycle decision.
 - Broker/account mutation is not allowed in manager.
+
+## Model Research Run Cycle
+
+Model research tasks are grouped by data reuse and decision-cycle ownership, not by a
+linear Layer 1 through Layer 10 loop.
+
+1. Foundation substrate. Build reusable market, sector, and global/sector event
+   inputs once per historical window. This covers Layer 1, Layer 2, and the
+   global or sector-scoped Layer 4 event substrate. It is reusable across target
+   research runs; researching AAPL must not require redownloading the same
+   reusable market, sector, macro, or global event evidence for NVDA.
+2. Target substrate. Materialize target-specific source and feature evidence
+   only when a downstream run needs it. This includes target state, target-local
+   event slices, option-expression inputs, and other target-scoped source or
+   feature rows. These tasks prepare what the live components would have been
+   able to inspect, but they do not select a fixed trade target for replay.
+3. Live-flow replay. Replay simulates the real system under a historical
+   point-in-time background. Components may scan the eligible candidate pool,
+   choose no target, choose one target, or choose a target combination. Replay
+   must not be framed as "run this already selected symbol through the stack"
+   unless the request is an explicit diagnostic repair scenario.
+4. Failure attribution. After replay settlement and before evaluation judgment,
+   a separate attribution task investigates misses, residuals, overblocks,
+   underblocks, bad expressions, and event/co-event explanations. The same
+   component boundary is needed in live operation after real decisions settle.
+5. Evaluation. Evaluation consumes replay traces and attribution packets to
+   score the candidate component bundle against baselines, calibration,
+   stability, leakage, portfolio behavior, and failure explanations.
+6. Promotion and lifecycle handoff. Promotion produces accepted/rejected/deferred
+   evidence for a model bundle. Management of already promoted models belongs to
+   the runtime component lifecycle owner, not to manager activation.
+
+The manager schedules and records these tasks. It does not turn a historical
+target-substrate request into a fixed-target strategy claim, and it does not
+activate promoted models directly.
 
 ## Trading Economics calendar maintenance
 
