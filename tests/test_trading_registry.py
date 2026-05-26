@@ -547,8 +547,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(summary["payload"], "storage_scheduled_maintenance_summary")
         self.assertIn("reads manager fold-state files directly", summary["note"])
 
-        service = rows["STORAGE_MAINTENANCE_SYSTEMD_SERVICE"]
-        self.assertEqual(service["kind"], "config")
+        service = rows["STORAGE_MAINTENANCE_SYSTEMD_UNITS"]
+        self.assertEqual(service["kind"], "systemd_unit")
         self.assertIn("trading-storage-maintenance.service", service["payload"])
         self.assertIn("trading-storage-maintenance.timer", service["payload"])
 
@@ -1071,12 +1071,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
         self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
-        self.assertEqual(rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["kind"], "template")
+        self.assertEqual(rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE"]["kind"], "systemd_unit")
         self.assertEqual(
-            rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["payload"],
+            rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE"]["payload"],
             "trading-manager-historical-scheduler.service",
         )
-        self.assertIn("trading-manager-historical-scheduler.service", rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["path"])
+        self.assertIn("trading-manager-historical-scheduler.service", rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE"]["path"])
         self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision")
         self.assertNotIn("ACTIVATION_RECORD_ARTIFACT", rows)
         self.assertEqual(rows["EXECUTION_SHADOW_CYCLE_SELECTION"]["payload"], "execution_shadow_cycle_selection")
@@ -1098,6 +1098,32 @@ class RegistryHelperTests(unittest.TestCase):
                 if "event_database" in (row["applies_to"] or "")
             ]
         self.assertEqual(offenders, [])
+
+    def test_systemd_units_use_narrow_kind(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+
+        self.assertFalse([row["key"] for row in rows if row["kind"] == "template"])
+
+        unit_rows = [row for row in rows if row["kind"] == "systemd_unit"]
+        self.assertTrue(unit_rows)
+        for row in unit_rows:
+            payload_units = [part.strip() for part in row["payload"].split(";") if part.strip()]
+            path_units = [part.strip() for part in row["path"].split(";") if part.strip()]
+            self.assertTrue(payload_units)
+            self.assertTrue(path_units)
+            self.assertTrue(all(unit.endswith((".service", ".timer", ".path")) for unit in payload_units))
+            self.assertTrue(all(path.endswith((".service", ".timer", ".path")) for path in path_units))
+            self.assertIn("systemd", row["applies_to"])
+
+        config_unit_artifact_keys = {
+            row["key"]
+            for row in rows
+            if row["kind"] == "config"
+            and (row["path"].endswith((".service", ".timer", ".path")) or "/systemd/" in row["path"])
+            and "checked-in systemd" in row["note"].lower()
+        }
+        self.assertEqual(set(), config_unit_artifact_keys)
 
     def test_applies_to_uses_type_first_source_scopes(self):
         pattern = re.compile(r"(?:^|;)[0-9]{2}_source_")

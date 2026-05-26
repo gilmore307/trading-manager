@@ -2,6 +2,8 @@
 
 Templates are reviewed reusable shapes for requests, payloads, contracts, reports, or storage-facing examples. They are not generated runtime outputs.
 
+`template` is not a registry kind. Register the concrete thing instead: checked-in systemd unit files use `systemd_unit`; request, artifact, manifest, and ready-signal categories use their narrow type kinds; reusable shared files use `shared_artifact`.
+
 ## Boundary
 
 - Manager owns template rules and registry vocabulary.

@@ -32,7 +32,7 @@ Allowed values for a status slot are `status_value`; the slot carrying them is `
 | Row role | Kind |
 |---|---|
 | stable callable command/export | `script` |
-| reusable checked-in template | `template` |
+| checked-in systemd service/timer/path unit file | `systemd_unit` |
 | durable checked-in shared data/config file | `shared_artifact` |
 | repository identity | `repo` |
 | non-secret config or secret alias | `config` |

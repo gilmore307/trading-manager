@@ -21,6 +21,34 @@ SCHEMA_SQL = REGISTRY_ROOT / "sql" / "trading_registry.sql"
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_CSV_PATH = REGISTRY_ROOT / "current.csv"
 
+BASE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS trading_registry (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  key TEXT NOT NULL UNIQUE,
+  payload_format TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  path TEXT,
+  applies_to TEXT,
+  artifact_sync_policy TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE IF EXISTS trading_registry
+DROP CONSTRAINT IF EXISTS trading_registry_kind_check;
+
+ALTER TABLE IF EXISTS trading_registry
+DROP CONSTRAINT IF EXISTS trading_registry_payload_format_check;
+
+ALTER TABLE IF EXISTS trading_registry
+DROP CONSTRAINT IF EXISTS trading_registry_artifact_sync_policy_check;
+
+ALTER TABLE IF EXISTS trading_registry
+DROP CONSTRAINT IF EXISTS trading_registry_field_applies_to_check;
+"""
+
 REGISTRY_COLUMNS = (
     "id",
     "kind",
@@ -136,6 +164,10 @@ def apply_schema(db_url: str) -> None:
     run_psql(db_url, file=SCHEMA_SQL, quiet=True)
 
 
+def prepare_table_for_sync(db_url: str) -> None:
+    run_psql(db_url, stdin_sql=BASE_TABLE_SQL, quiet=True)
+
+
 def sync_registry(db_url: str, csv_path: Path) -> int:
     rows = read_registry_rows(csv_path)
     column_sql = ", ".join(REGISTRY_COLUMNS)
@@ -215,8 +247,9 @@ def main() -> int:
         print(f"would sync {len(rows)} registry rows from {args.csv_path}")
         return 0
 
-    apply_schema(db_url)
+    prepare_table_for_sync(db_url)
     row_count = sync_registry(db_url, args.csv_path)
+    apply_schema(db_url)
     print(f"synced {row_count} registry rows from {args.csv_path}")
 
     if not args.no_export:

@@ -43,7 +43,7 @@ CHECK (kind IN (
   'shared_artifact',
   'state_vector_value',
   'status_value',
-  'template',
+  'systemd_unit',
   'temporal_field',
   'term',
   'text_field'
