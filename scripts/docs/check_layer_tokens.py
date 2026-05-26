@@ -34,10 +34,6 @@ FILES_TO_CHECK = (
     "src/trading_manager_tasks/model_promotion.py",
 )
 
-APPEND_ONLY_PREFIXES = (
-    "scripts/registry/sql/schema_migrations/",
-)
-
 STALE_LAYER_DOC_RE = re.compile(r"docs/(?:8\d|1\d\d)_")
 
 
@@ -109,8 +105,6 @@ def main() -> int:
             if not path.is_file():
                 continue
             rel = str(path.relative_to(REPO_ROOT))
-            if any(rel.startswith(prefix) for prefix in APPEND_ONLY_PREFIXES):
-                continue
             if rel == "scripts/registry/current.csv":
                 continue
             try:

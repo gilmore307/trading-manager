@@ -6,9 +6,9 @@ This is the current decision ledger for `trading-manager`. It records durable ac
 
 `trading-manager` owns architecture, registry, contracts, request routing, scheduler policy, review gates, promotion gates, shared helpers, and status surfaces. It does not own data production, model implementation, storage execution, dashboard UI, broker execution, generated artifacts, or secrets.
 
-## D002 - Registry rows are SQL-backed
+## D002 - Registry rows are current-table synced
 
-Active registry entries are created or changed by SQL migrations under `scripts/registry/sql/schema_migrations/`. `scripts/registry/current.csv` is generated evidence and must not be edited by hand. Registry `id` is the stable automation reference; `key` is display/search text.
+Active registry entries live in `scripts/registry/current.csv` and sync into the SQL-backed `trading_registry` table through `scripts/registry/sync_registry.py`. The current table definition is `scripts/registry/sql/trading_registry.sql`; the registry no longer uses stacked `schema_migrations`. Registry `id` is the stable automation reference; `key` is display/search text.
 
 ## D003 - Component work is contract-routed
 

@@ -1,34 +1,31 @@
 # Registry SQL
 
-This directory owns the SQL-backed concrete registry entries for `trading-manager`.
+This directory owns the current SQL table shape for `trading-manager` registry.
 
-Markdown files in `../kinds/` define kind boundaries. SQL migrations define the actual active entries and schema.
+Markdown files in `../kinds/` define kind boundaries. `../current.csv` defines the actual active entries.
 
 ## Layout
 
 ```text
 scripts/registry/sql/
   README.md
-  schema_migrations/
-    001_create_trading_registry.sql
-    002_bootstrap_trading_registry.sql
-    ...
+  trading_registry.sql
 ```
 
 ## Rules
 
-- Treat migrations as append-only after commit.
+- Keep this file as the current table definition, not a migration ledger.
 - Do not list concrete row inventories in kind Markdown files.
-- Do not store secrets in SQL payloads. Use secret aliases for `config` entries.
+- Do not store secrets in SQL or CSV payloads. Use secret aliases for `config` entries.
 - If a new `kind` is introduced, update both the SQL kind check and the corresponding `scripts/registry/kinds/<kind>.md` boundary file. The SQL kind check must stay aligned with `scripts/registry/kinds/*.md`; tests enforce this.
 
 ## CSV Snapshot
 
-`scripts/registry/apply_registry_migrations.py` exports the active `trading_registry` table to `../current.csv` after every non-dry-run migration pass.
+`scripts/registry/sync_registry.py` syncs `../current.csv` into the active `trading_registry` table.
 
-Use `--export-only` to refresh the CSV without applying migrations.
+Use `--export-only` to refresh the CSV from the live DB after an operator-side inspection or repair.
 
-Use `--no-export` only for exceptional debugging; normal registry updates should leave GitHub with a current CSV snapshot.
+Use `--no-export` only for exceptional debugging; normal registry updates should leave GitHub with current CSV rows.
 
 ## Path Column
 

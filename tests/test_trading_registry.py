@@ -34,13 +34,13 @@ def create_row(**overrides):
 
 class RegistryHelperTests(unittest.TestCase):
     def test_registry_kind_files_match_sql_constraint_and_current_rows(self):
-        constraint_blocks = []
-        for migration in sorted(Path("scripts/registry/sql/schema_migrations").glob("*.sql")):
-            text = migration.read_text()
-            if "CHECK (kind IN (" in text:
-                constraint_blocks.append(text.split("CHECK (kind IN (", 1)[1].split("));", 1)[0])
-        self.assertTrue(constraint_blocks)
-        constrained_kinds = sorted(re.findall(r"'([^']+)'", constraint_blocks[-1]))
+        schema = Path("scripts/registry/sql/trading_registry.sql").read_text()
+        constraint = re.search(
+            r"CONSTRAINT trading_registry_kind_check\s+CHECK \(kind IN \((.*?)\)\);",
+            schema,
+            re.S,
+        ).group(1)
+        constrained_kinds = sorted(re.findall(r"'([^']+)'", constraint))
 
         kind_files = sorted(
             path.stem
@@ -54,6 +54,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(kind_files, constrained_kinds)
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
+
+    def test_registry_uses_current_table_sync_not_schema_migrations(self):
+        self.assertTrue(Path("scripts/registry/sql/trading_registry.sql").is_file())
+        self.assertTrue(Path("scripts/registry/sync_registry.py").is_file())
+        self.assertFalse(Path("scripts/registry/sql/schema_migrations").exists())
+        self.assertFalse(Path("scripts/registry/apply_registry_migrations.py").exists())
 
     def test_term_payloads_are_tokens_not_inline_prose_or_lists(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -1084,40 +1090,6 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("requested", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
         self.assertIn("deleted", {row["payload"] for row in rows.values() if row["kind"] == "status_value"})
 
-        migration = Path("scripts/registry/sql/schema_migrations/249_create_manager_control_plane_contract_tables.sql").read_text()
-        for table_name in {
-            "manager_request",
-            "input_binding",
-            "run_manifest",
-            "run_step",
-            "artifact_ref",
-            "ready_signal",
-        }:
-            self.assertIn(f"trading_manager.{table_name}", migration)
-
-        summary_migration = Path("scripts/registry/sql/schema_migrations/253_create_global_task_summary.sql").read_text()
-        self.assertIn("CREATE OR REPLACE VIEW trading_manager.task_summary", summary_migration)
-        self.assertIn("priority_rank", summary_migration)
-
-        payload_migration = Path("scripts/registry/sql/schema_migrations/258_register_request_payload_materialization.sql").read_text()
-        self.assertIn("MANAGER_REQUEST_PARAMETER_PAYLOAD", payload_migration)
-        self.assertIn("MANAGER_REQUEST_PAYLOAD_MATERIALIZE", payload_migration)
-
-        handoff_migration = Path("scripts/registry/sql/schema_migrations/260_register_request_handoff_validation.sql").read_text()
-        self.assertIn("MANAGER_REQUEST_HANDOFF_VALIDATE", handoff_migration)
-
-        decision_migration = Path("scripts/registry/sql/schema_migrations/261_register_review_decision_artifacts.sql").read_text()
-        self.assertIn("REVIEW_DECISION_ARTIFACT", decision_migration)
-        self.assertIn("MANAGER_REVIEW_DECISION_BUILD", decision_migration)
-
-        integration_migration = Path("scripts/registry/sql/schema_migrations/262_register_storage_receipt_and_risk_cap_entrypoints.sql").read_text()
-        self.assertIn("STORAGE_COMPLETION_RECEIPT_PAYLOAD_STORE", integration_migration)
-        self.assertIn("TRADE_RISK_CAP_VALIDATE", integration_migration)
-
-        provider_migration = Path("scripts/registry/sql/schema_migrations/339_clean_retired_provider_approval_references.sql").read_text()
-        self.assertIn("autonomous_historical_provider_acquisition_enabled", provider_migration)
-        self.assertIn("cfg_MCO001", provider_migration)
-
     def test_event_database_scope_is_not_active(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             offenders = [
@@ -1580,13 +1552,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("no_provider_calls", registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW_SAFETY_BOUNDARY"]["payload"])
 
     def test_registered_payload_formats_match_sql_constraint(self):
-        constraint_blocks = []
-        for migration in sorted(Path("scripts/registry/sql/schema_migrations").glob("*.sql")):
-            text = migration.read_text()
-            if "CHECK (payload_format IN (" in text:
-                constraint_blocks.append(text.split("CHECK (payload_format IN (", 1)[1].split("));", 1)[0])
-        self.assertTrue(constraint_blocks)
-        constrained_formats = tuple(re.findall(r"'([^']+)'", constraint_blocks[-1]))
+        schema = Path("scripts/registry/sql/trading_registry.sql").read_text()
+        constraint = re.search(
+            r"CONSTRAINT trading_registry_payload_format_check\s+CHECK \(payload_format IN \((.*?)\)\);",
+            schema,
+            re.S,
+        ).group(1)
+        constrained_formats = tuple(re.findall(r"'([^']+)'", constraint))
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registered_formats = tuple(
@@ -2022,15 +1994,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("DATA_TASK_PARAMS", rows)
 
     def test_registered_artifact_sync_policies_match_sql_constraint(self):
-        constraint_blocks = []
-        for migration in sorted(Path("scripts/registry/sql/schema_migrations").glob("*.sql")):
-            text = migration.read_text()
-            if "CHECK (artifact_sync_policy IN (" in text:
-                constraint_blocks.append(
-                    text.split("CHECK (artifact_sync_policy IN (", 1)[1].split("));", 1)[0]
-                )
-        self.assertTrue(constraint_blocks)
-        constrained_policies = tuple(re.findall(r"'([^']+)'", constraint_blocks[-1]))
+        schema = Path("scripts/registry/sql/trading_registry.sql").read_text()
+        constraint = re.search(
+            r"CONSTRAINT trading_registry_artifact_sync_policy_check\s+CHECK \(.*?OR artifact_sync_policy IN \((.*?)\)\s+\);",
+            schema,
+            re.S,
+        ).group(1)
+        constrained_policies = tuple(re.findall(r"'([^']+)'", constraint))
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registered_policies = tuple(

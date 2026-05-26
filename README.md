@@ -54,11 +54,11 @@ docs/30_helpers.md                       Shared helper package policy.
 
 Concrete registry entries live in the SQL-backed `trading_registry` table.
 
-- SQL migrations under `scripts/registry/sql/schema_migrations/` are the source of truth for active rows.
-- `scripts/registry/current.csv` is generated and must not be edited by hand.
+- `scripts/registry/sql/trading_registry.sql` is the current table definition.
+- `scripts/registry/current.csv` is the reviewed current row inventory and DB sync source.
 - `scripts/registry/kinds/*.md` define registry-kind boundaries, not row lists.
 - `scripts/registry/rules/*.md` define cross-kind rules.
-- Registry `id` values are stable automation references. Registry `key` values are human-readable and may change through reviewed migrations.
+- Registry `id` values are stable automation references. Registry `key` values are human-readable and may change through reviewed registry updates.
 
 ## Normal Verification
 
@@ -69,7 +69,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 python3 scripts/docs/check_docs_spine.py
 python3 scripts/docs/check_layer_tokens.py
 python3 scripts/contracts/validate_contract_examples.py
-python3 scripts/registry/check_registry_current_matches_migrations.py --allow-missing-db
+python3 scripts/registry/check_registry_current_matches_db.py --allow-missing-db
 python3 -m compileall -q src scripts
 git diff --check
 ```
@@ -77,8 +77,8 @@ git diff --check
 Operator/server environments with registry DB access should additionally run the strict DB-backed registry gate:
 
 ```bash
-python3 scripts/registry/apply_registry_migrations.py --dry-run
-python3 scripts/registry/check_registry_current_matches_migrations.py
+python3 scripts/registry/sync_registry.py --dry-run
+python3 scripts/registry/check_registry_current_matches_db.py
 ```
 
 ## Shared Environment

@@ -5,8 +5,8 @@ The registry is the reviewed shared vocabulary and locator table for the trading
 ## Source of Truth
 
 ```text
-scripts/registry/sql/schema_migrations/  Append-only schema/data changes.
-scripts/registry/current.csv             Generated active snapshot; do not edit by hand.
+scripts/registry/sql/trading_registry.sql Current table definition.
+scripts/registry/current.csv              Reviewed current row inventory and DB sync source.
 scripts/registry/kinds/*.md              Kind boundaries and rejection rules.
 scripts/registry/rules/*.md              Cross-kind naming/routing rules.
 ```
@@ -26,27 +26,27 @@ A registry row has a stable `id`, a `kind`, a human-readable `key`, a typed `pay
 Clean local/CI verification without DB credentials:
 
 ```bash
-python3 scripts/registry/check_registry_current_matches_migrations.py --allow-missing-db
+python3 scripts/registry/check_registry_current_matches_db.py --allow-missing-db
 ```
 
 Operator/server verification with DB access:
 
 ```bash
-python3 scripts/registry/apply_registry_migrations.py --dry-run
-python3 scripts/registry/check_registry_current_matches_migrations.py
+python3 scripts/registry/sync_registry.py --dry-run
+python3 scripts/registry/check_registry_current_matches_db.py
 ```
 
 Registry mutation/export on the operator server:
 
 ```bash
-python3 scripts/registry/apply_registry_migrations.py
-python3 scripts/registry/apply_registry_migrations.py --export-only
+python3 scripts/registry/sync_registry.py
+python3 scripts/registry/sync_registry.py --export-only
 ```
 
 A registry-changing commit normally includes:
 
-1. SQL migration.
-2. Regenerated `scripts/registry/current.csv`.
+1. Updated `scripts/registry/current.csv`.
+2. Updated `scripts/registry/sql/trading_registry.sql` if the table shape changes.
 3. Any affected kind/rule docs.
 4. Tests or dry-run evidence.
 

@@ -7,23 +7,23 @@
 - Scripts may import `src/` packages.
 - `src/` must not import scripts.
 - Stable automation-facing commands should be registered as `kind=script` when needed.
-- Registry SQL and generated snapshots live under `scripts/registry/`.
+- Registry SQL and current row inventory live under `scripts/registry/`.
 
 ## Registry Commands
 
 Clean local/CI verification without DB credentials:
 
 ```bash
-python3 scripts/registry/check_registry_current_matches_migrations.py --allow-missing-db
+python3 scripts/registry/check_registry_current_matches_db.py --allow-missing-db
 ```
 
 Operator/server verification and mutation with DB access:
 
 ```bash
-python3 scripts/registry/apply_registry_migrations.py --dry-run
-python3 scripts/registry/check_registry_current_matches_migrations.py
-python3 scripts/registry/apply_registry_migrations.py
-python3 scripts/registry/apply_registry_migrations.py --export-only
+python3 scripts/registry/sync_registry.py --dry-run
+python3 scripts/registry/check_registry_current_matches_db.py
+python3 scripts/registry/sync_registry.py
+python3 scripts/registry/sync_registry.py --export-only
 ```
 
 ## Task Command Groups
