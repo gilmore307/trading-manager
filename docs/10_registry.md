@@ -21,6 +21,12 @@ A registry row has a stable `id`, a `kind`, a human-readable `key`, a typed `pay
 - Use the narrowest valid `kind`.
 - Do not register ordinary implementation files as scripts.
 
+## Dictionary Boundary
+
+`term` is the system dictionary for shared nouns and concepts. A term row explains meaning in `note` and uses `payload` as the stable dictionary token.
+
+Do not put concrete implementation values in `term`: SQL table names use `sql_table`; enum/reason/status values use `status_value`; policies and constants use `config`; artifact, receipt, report, manifest, request, and contract categories use their narrow type kinds.
+
 ## Workflow
 
 Clean local/CI verification without DB credentials:

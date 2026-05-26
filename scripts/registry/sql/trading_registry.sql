@@ -41,6 +41,7 @@ CHECK (kind IN (
   'request_type',
   'script',
   'shared_artifact',
+  'sql_table',
   'state_vector_value',
   'status_value',
   'systemd_unit',

@@ -33,6 +33,7 @@ Allowed values for a status slot are `status_value`; the slot carrying them is `
 |---|---|
 | stable callable command/export | `script` |
 | checked-in systemd service/timer/path unit file | `systemd_unit` |
+| canonical SQL table name | `sql_table` |
 | durable checked-in shared data/config file | `shared_artifact` |
 | repository identity | `repo` |
 | non-secret config or secret alias | `config` |
@@ -41,7 +42,7 @@ Allowed values for a status slot are `status_value`; the slot carrying them is `
 | manifest category | `manifest_type` |
 | ready-signal category | `ready_signal_type` |
 | registry payload-format token | `payload_format` |
-| glossary concept | `term` |
+| system dictionary concept / shared noun definition | `term` |
 
 ## Rejection Defaults
 

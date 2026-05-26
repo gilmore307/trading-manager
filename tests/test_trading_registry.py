@@ -85,6 +85,66 @@ class RegistryHelperTests(unittest.TestCase):
         ]
         self.assertEqual([], bad_terms)
 
+    def test_term_rows_are_dictionary_entries_not_concrete_surfaces(self):
+        artifact_suffixes = (
+            "_CONTRACT",
+            "_RECEIPT",
+            "_MANIFEST",
+            "_PACKET",
+            "_RECORD",
+            "_PLAN",
+            "_SUMMARY",
+            "_ARTIFACT",
+            "_RESULT",
+        )
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            term_rows = [
+                row
+                for row in csv.DictReader(csv_file)
+                if row["kind"] == "term"
+            ]
+
+        offenders = []
+        for row in term_rows:
+            if row["key"].endswith("_TABLE"):
+                offenders.append((row["key"], "sql_table"))
+            if row["key"].endswith(artifact_suffixes):
+                offenders.append((row["key"], "artifact_type"))
+            if row["key"].startswith((
+                "CANDIDATE_ANONYMITY_",
+                "CANDIDATE_ELIGIBILITY_",
+                "CANDIDATE_REASON_",
+            )):
+                offenders.append((row["key"], "status_value"))
+            if row["key"].endswith("_POLICY") and row["payload"] not in {
+                "model_06_dynamic_risk_policy",
+                "layer_06_dynamic_risk_policy",
+            }:
+                offenders.append((row["key"], "config"))
+            if not row["note"].strip():
+                offenders.append((row["key"], "missing_definition"))
+
+        self.assertEqual([], offenders)
+
+    def test_sql_table_rows_use_sql_table_kind(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+
+        sql_rows = [row for row in rows if row["kind"] == "sql_table"]
+        self.assertTrue(sql_rows)
+        self.assertFalse([
+            row["key"]
+            for row in rows
+            if row["kind"] == "term" and row["key"].endswith("_TABLE")
+        ])
+        for row in sql_rows:
+            self.assertIn("sql_table", row["applies_to"])
+            self.assertTrue(row["key"].endswith("_TABLE"))
+            self.assertTrue(
+                "." in row["payload"]
+                or row["payload"].startswith("model_")
+            )
+
     def test_local_registry_paths_exist(self):
         repo_root = Path.cwd()
         missing = []
@@ -377,7 +437,7 @@ class RegistryHelperTests(unittest.TestCase):
             "TRADE_RECONCILIATION_RESULT_TABLE": "trading_execution.trade_reconciliation_result",
         }
         for key, payload in expected_tables.items():
-            self.assertEqual(rows[key]["kind"], "term")
+            self.assertEqual(rows[key]["kind"], "sql_table")
             self.assertEqual(rows[key]["payload"], payload)
             self.assertIn("sql_table", rows[key]["applies_to"])
 
@@ -1619,6 +1679,7 @@ class RegistryHelperTests(unittest.TestCase):
         expected_domains = {
             "agent_model_promotion_decision",
             "artifact_sync_policy_type",
+            "anonymous_target_candidate_builder",
             "manager_contract_lifecycle_status",
             "manager_request",
             "promotion_result",
@@ -1626,7 +1687,16 @@ class RegistryHelperTests(unittest.TestCase):
             "run_manifest",
             "run_step",
             "artifact_ref",
+            "candidate_anonymity_check_state",
+            "candidate_eligibility_state",
+            "candidate_generation_reason_codes",
+            "fold_scoped_source_data",
             "ready_signal",
+            "quarantine_candidate",
+            "retention_class",
+            "storage_lifecycle",
+            "target_state_vector_model",
+            "trading-storage",
         }
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -1643,8 +1713,11 @@ class RegistryHelperTests(unittest.TestCase):
         }
         self.assertEqual(domains, expected_domains)
         self.assertFalse(domains & retired_unaccepted_slot_status_domains)
-        payloads = [row["payload"] for row in status_rows]
-        self.assertEqual(len(payloads), len(set(payloads)))
+        scoped_payloads = [
+            (row["applies_to"], row["payload"])
+            for row in status_rows
+        ]
+        self.assertEqual(len(scoped_payloads), len(set(scoped_payloads)))
         self.assertEqual(
             next(row for row in status_rows if row["payload"] == "registry_only")["key"],
             "ARTIFACT_SYNC_POLICY_TYPE_REGISTRY_ONLY",
