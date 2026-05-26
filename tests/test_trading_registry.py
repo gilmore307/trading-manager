@@ -283,6 +283,78 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])
         self.assertIn("rollback_ref_required", write_policy["payload"])
 
+    def test_sql_output_table_inventory_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        expected_tables = {
+            "M01_MARKET_REGIME_DATA_ACQUISITION_TABLE": "trading_data.m01_market_regime_data_acquisition",
+            "M01_MARKET_REGIME_FEATURE_GENERATION_TABLE": "trading_data.m01_market_regime_feature_generation",
+            "M01_MARKET_REGIME_MODEL_GENERATION_TABLE": "trading_model.m01_market_regime_model_generation",
+            "M01_MARKET_REGIME_EXPLAINABILITY_TABLE": "trading_model.m01_market_regime_explainability",
+            "M01_MARKET_REGIME_DIAGNOSTICS_TABLE": "trading_model.m01_market_regime_diagnostics",
+            "M02_SECTOR_CONTEXT_DATA_ACQUISITION_TABLE": "trading_data.m02_sector_context_data_acquisition",
+            "M09_OPTION_EXPRESSION_CONTRACT_PATH_TABLE": "trading_data.m09_option_expression_data_acquisition_contract_path",
+            "EVALUATION_REPLAY_CONTRACT_TABLE": "trading_evaluation.replay_contract",
+            "EVALUATION_REPLAY_DATASET_PREPARATION_TABLE": "trading_evaluation.replay_dataset_preparation",
+            "EVALUATION_REPLAY_DATASET_FREEZE_TABLE": "trading_evaluation.replay_dataset_freeze",
+            "EVALUATION_REPLAY_SOURCE_COVERAGE_TABLE": "trading_evaluation.replay_source_coverage",
+            "EVALUATION_REPLAY_EXECUTION_RUN_TABLE": "trading_evaluation.replay_execution_run",
+            "EVALUATION_REPLAY_DECISION_TABLE": "trading_evaluation.replay_decision",
+            "EVALUATION_REPLAY_PROGRESS_TABLE": "trading_evaluation.replay_progress",
+            "EVALUATION_FOLD_SETTLEMENT_RUN_TABLE": "trading_evaluation.fold_settlement_run",
+            "EVALUATION_FOLD_SETTLEMENT_METRIC_TABLE": "trading_evaluation.fold_settlement_metric",
+            "EVALUATION_PROMOTION_ELIGIBILITY_DECISION_TABLE": "trading_evaluation.promotion_eligibility_decision",
+            "EVALUATION_PROMOTION_READINESS_RECORD_TABLE": "trading_evaluation.promotion_readiness_record",
+            "EVALUATION_PROMOTED_MODEL_PARAMETER_TABLE": "trading_evaluation.promoted_model_parameter",
+            "EXECUTION_REALTIME_TRADING_RUNTIME_STATUS_TABLE": "trading_execution.execution_realtime_trading_runtime_status",
+            "EXECUTION_CAPABILITY_CATALOG_TABLE": "trading_execution.execution_capability_catalog",
+            "EXECUTION_REALTIME_DATA_INTERFACE_TABLE": "trading_execution.execution_realtime_data_interface",
+            "EXECUTION_BROKER_INTERFACE_TABLE": "trading_execution.execution_broker_interface",
+            "EXECUTION_REALTIME_CAPTURE_CONTRACT_TABLE": "trading_execution.realtime_capture_contract",
+            "EXECUTION_REALTIME_FEATURE_SNAPSHOT_TABLE": "trading_execution.realtime_feature_snapshot",
+            "EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT_TABLE": "trading_execution.execution_model_decision_input_snapshot",
+            "EXECUTION_REALTIME_INPUT_COVERAGE_TABLE": "trading_execution.execution_realtime_input_coverage",
+            "EXECUTION_REALTIME_SUBSCRIPTION_PLAN_TABLE": "trading_execution.execution_realtime_subscription_plan",
+            "EXECUTION_REALTIME_LIVE_OBSERVE_RESULT_TABLE": "trading_execution.execution_realtime_live_observe_result",
+            "C01_INTAKE_SNAPSHOT_TABLE": "trading_execution.c01_intake_snapshot",
+            "C02_ENTRY_DECISION_TABLE": "trading_execution.c02_entry_decision",
+            "C03_POSITION_LIFECYCLE_DECISION_TABLE": "trading_execution.c03_position_lifecycle_decision",
+            "C04_OPTION_REEXPRESSION_DECISION_TABLE": "trading_execution.c04_option_reexpression_decision",
+            "C05_ORDER_INTENT_TABLE": "trading_execution.c05_order_intent",
+            "C06_EXECUTION_GATE_RESULT_TABLE": "trading_execution.c06_execution_gate_result",
+            "C07_FAILURE_EXPLANATION_PACKET_TABLE": "trading_execution.c07_failure_explanation_packet",
+            "C08_SHADOW_MODEL_RUNTIME_EVIDENCE_TABLE": "trading_execution.c08_shadow_model_runtime_evidence",
+            "C08_SHADOW_CYCLE_SELECTION_TABLE": "trading_execution.c08_shadow_cycle_selection",
+            "C08_CAPACITY_SIMULATION_TABLE": "trading_execution.c08_capacity_simulation",
+            "EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_TABLE": "trading_execution.execution_active_model_config_write",
+            "EXECUTION_ORDER_CONSTRUCTION_APPROVAL_TABLE": "trading_execution.execution_order_construction_approval",
+            "EXECUTION_BROKER_ORDER_INTENT_TABLE": "trading_execution.execution_broker_order_intent",
+            "EXECUTION_BROKER_ORDER_INTENT_RESULT_TABLE": "trading_execution.execution_broker_order_intent_result",
+            "TRADE_RISK_CAP_TABLE": "trading_execution.trade_risk_cap",
+            "REALTIME_MODEL_DECISION_EFFECTIVENESS_TABLE": "trading_execution.realtime_model_decision_effectiveness",
+            "REALTIME_MODEL_DECISION_EFFECTIVENESS_ROW_TABLE": "trading_execution.realtime_model_decision_effectiveness_row",
+            "C07_FAILURE_ATTRIBUTION_TABLE": "trading_execution.c07_failure_attribution",
+            "RUNTIME_MODEL_LIFECYCLE_REVIEW_RESULT_TABLE": "trading_execution.runtime_model_lifecycle_review_result",
+            "BROKER_ORDER_SUBMISSION_TABLE": "trading_execution.broker_order_submission",
+            "BROKER_ORDER_STATE_TABLE": "trading_execution.broker_order_state",
+            "BROKER_FILL_TABLE": "trading_execution.broker_fill",
+            "ACCOUNT_STATE_SNAPSHOT_TABLE": "trading_execution.account_state_snapshot",
+            "POSITION_STATE_SNAPSHOT_TABLE": "trading_execution.position_state_snapshot",
+            "EXECUTION_RECONCILIATION_RESULT_TABLE": "trading_execution.execution_reconciliation_result",
+        }
+        for key, payload in expected_tables.items():
+            self.assertEqual(rows[key]["kind"], "term")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("sql_table", rows[key]["applies_to"])
+
+        policy = rows["SQL_OUTPUT_TABLE_INVENTORY_POLICY"]
+        self.assertIn("schema_qualified_table_names_required", policy["payload"])
+        self.assertIn("future_broker_account_tables_reserved_not_active", policy["payload"])
+        self.assertIn("does not authorize live broker submission", policy["note"])
+        self.assertIn("future_gated_broker_mutation", rows["BROKER_ORDER_SUBMISSION_TABLE"]["applies_to"])
+        self.assertIn("outside the active current loop", rows["BROKER_ORDER_SUBMISSION_TABLE"]["note"])
+
     def test_execution_runtime_component_graph_rows_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
