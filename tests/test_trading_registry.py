@@ -121,10 +121,54 @@ class RegistryHelperTests(unittest.TestCase):
                 "layer_06_dynamic_risk_policy",
             }:
                 offenders.append((row["key"], "config"))
+            if (
+                "/" in row["payload"]
+                or row["payload"].endswith((".json", ".md"))
+                or row["payload"].startswith("/root/")
+            ):
+                offenders.append((row["key"], "path_or_file_pattern"))
+            if re.search(r"(20\d{6}|Q[1-4]_20\d{2})", row["key"]):
+                offenders.append((row["key"], "dated_artifact"))
             if not row["note"].strip():
                 offenders.append((row["key"], "missing_definition"))
 
         self.assertEqual([], offenders)
+
+    def test_docs_decision_concepts_are_registered_as_terms(self):
+        expected_payloads = {
+            "accepted_event_failure_evidence",
+            "activity_bridge_non_overlap",
+            "blinded_agent_model_review",
+            "contract_routed_component_work",
+            "current_table_synced_registry",
+            "evaluation_owned_replay_judgment",
+            "execution_owned_runtime_lifecycle",
+            "failure_attribution_boundary",
+            "fold_completion_state",
+            "full_run_cycle_promotion_gate",
+            "gated_provider_call",
+            "historical_modeling_boundary",
+            "layer_3_candidate_selection_policy",
+            "local_resumable_runtime_state",
+            "manager_control_plane",
+            "manager_scheduler_decision_loop",
+            "model_worker_target_rotation",
+            "optional_trading_guidance_expression",
+            "post_replay_event_risk_governance",
+            "reusable_foundation_catch_up",
+            "script_called_agent_decision_surface",
+            "startup_abnormality_scope",
+            "target_substrate_lane",
+            "ten_layer_model_stack",
+        }
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            term_payloads = {
+                row["payload"]
+                for row in csv.DictReader(csv_file)
+                if row["kind"] == "term"
+            }
+
+        self.assertLessEqual(expected_payloads, term_payloads)
 
     def test_sql_table_rows_use_sql_table_kind(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -712,7 +756,7 @@ class RegistryHelperTests(unittest.TestCase):
             "3_tradability_score_<window>",
         }:
             self.assertIn(expected_target_state_vector_payload, {row["payload"] for row in rows.values()})
-        self.assertEqual(rows["MODEL_VECTOR_TAXONOMY"]["payload"], "trading-model/docs/21_vector_taxonomy.md")
+        self.assertEqual(rows["MODEL_VECTOR_TAXONOMY"]["payload"], "model_vector_taxonomy")
         self.assertEqual(rows["EVENT_RISK_GOVERNOR"]["payload"], "event_risk_governor")
         self.assertEqual(rows["MODEL_10_EVENT_RISK_GOVERNOR"]["payload"], "model_10_event_risk_governor")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR"]["payload"], "event_context_vector")
@@ -1082,7 +1126,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("market_hours_historical_training_backoff_disabled_until_execution_runtime_activation", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
         self.assertIn("runtime_activation_requires_execution_shadow_cycle_selection", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
         self.assertIn("historical_provider_calls_run_autonomously_under_resource_controls", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
-        self.assertIn("check_gates", rows["MANAGER_SCHEDULER_WORK_LOOP"]["payload"])
+        self.assertEqual(rows["MANAGER_SCHEDULER_DECISION_LOOP"]["payload"], "manager_scheduler_decision_loop")
+        self.assertIn("check approval/resource/market-hour gates", rows["MANAGER_SCHEDULER_DECISION_LOOP"]["note"])
         self.assertIn("run_automation_scheduler.py", rows["MANAGER_AUTOMATION_SCHEDULER_RUN"]["path"])
         self.assertIn("run_automation_scheduler_daemon.py", rows["MANAGER_AUTOMATION_SCHEDULER_DAEMON_RUN"]["path"])
         self.assertIn("plan_model_training_workflow.py", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN"]["path"])
@@ -1690,9 +1735,14 @@ class RegistryHelperTests(unittest.TestCase):
             "candidate_anonymity_check_state",
             "candidate_eligibility_state",
             "candidate_generation_reason_codes",
+            "earnings_guidance_event_family",
+            "event_family_scouting_packet",
             "fold_scoped_source_data",
             "ready_signal",
+            "one_shot_replay_acquisition",
             "quarantine_candidate",
+            "replay_dataset_preparation",
+            "replay_freeze_gate",
             "retention_class",
             "storage_lifecycle",
             "target_state_vector_model",
