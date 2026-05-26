@@ -10,7 +10,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from trading_manager_tasks.registry_values import registry_payload
+
 ALLOWED_DECISIONS = ("approve", "defer", "reject", "revoke", "supersede")
+AGENT_STORAGE_LIFECYCLE_DECISION = registry_payload("term_STORLIFEAGENT001")
+CREATED_AT_UTC = registry_payload("fld_DASHTASK006")
 
 
 def _stable_id(*parts: object) -> str:
@@ -29,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     decision = {
-        "contract_type": "agent_storage_lifecycle_decision",
+        "contract_type": AGENT_STORAGE_LIFECYCLE_DECISION,
         "agent_storage_lifecycle_decision_id": _stable_id(
             args.storage_lifecycle_request_ref,
             args.agent_ref,
@@ -45,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         "evidence_refs": [str(item) for item in args.evidence_ref],
         "conditions": [str(item) for item in args.condition],
         "owner_observed_automation": True,
-        "created_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        CREATED_AT_UTC: datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     }
     content = json.dumps(decision, indent=2, sort_keys=True) + "\n"
     if args.output:

@@ -13,8 +13,13 @@ from trading_manager_tasks.layer_ten_event_risk_governor import (
     _missing_event_feed_artifacts,
     _missing_event_feed_rows,
 )
+from trading_manager_tasks.registry_values import registry_payload
 from trading_manager_tasks.request_payloads import DEFAULT_STORAGE_ROOT
 from trading_manager_tasks.storage_paths import data_storage_root
+
+BLOCKED = registry_payload("sts_MSH005")
+EVENT_FEED_ROW_COVERAGE = registry_payload("fld_L4EVTCOV002")
+SUCCEEDED = registry_payload("sts_MSH003")
 
 
 def main() -> int:
@@ -38,7 +43,7 @@ def main() -> int:
     )
     missing_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
     missing_rows = _missing_event_feed_rows(event_feed_row_coverage)
-    status = "blocked" if missing_artifacts or missing_rows else "succeeded"
+    status = BLOCKED if missing_artifacts or missing_rows else SUCCEEDED
     payload = {
         "contract_type": "manager_layer_04_event_observation_materialization",
         "manager_stage_id": "layer_04_event_failure_risk.data_acquisition",
@@ -48,7 +53,7 @@ def main() -> int:
         "end_month": args.end_month,
         "event_observation_scope": "global_sector_fold_substrate",
         "event_feed_coverage": event_feed_coverage,
-        "event_feed_row_coverage": event_feed_row_coverage,
+        EVENT_FEED_ROW_COVERAGE: event_feed_row_coverage,
         "missing_event_feed_artifacts": missing_artifacts,
         "missing_event_feed_rows": missing_rows,
         "provider_calls": 0,
@@ -64,7 +69,7 @@ def main() -> int:
         payload["artifact_ref"] = str(output_path)
 
     print(json.dumps(payload, sort_keys=True))
-    return 1 if status == "blocked" else 0
+    return 1 if status == BLOCKED else 0
 
 
 if __name__ == "__main__":

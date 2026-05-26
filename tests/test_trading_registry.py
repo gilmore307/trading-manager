@@ -11,6 +11,7 @@ from trading_registry import (
     map_registry_item_row,
     parse_registry,
 )
+from trading_manager_tasks.registry_values import registry_payload, registry_value
 
 
 def create_row(**overrides):
@@ -2057,6 +2058,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIsNone(reader.get_payload_by_id("missing"))
         self.assertIsNone(reader.get_path_by_id("missing"))
         self.assertTrue(all("WHERE id = %s" in sql for sql, _ in calls))
+
+    def test_manager_registry_value_helpers_resolve_by_stable_id(self):
+        self.assertEqual(registry_payload("trm_MRM001"), "market_regime_model")
+        self.assertEqual(registry_payload("trm_M6DRP01"), "model_06_dynamic_risk_policy")
+        self.assertEqual(registry_payload("mlv_L10ERG001"), "layer_10_event_risk_governor")
+        self.assertTrue(registry_value("out_TL2CTX001", "path").endswith("layer_02_target_context_mapping.csv"))
 
     def test_require_item_by_id_throws_for_missing_item(self):
         reader = RegistryReader(lambda _sql, _params: {"rows": []})

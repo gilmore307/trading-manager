@@ -16,33 +16,53 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
+from trading_manager_tasks.registry_values import registry_payload
 
 
-PHYSICAL_MODEL_SURFACES_BY_ID = {
-    "market_regime_model": "model_01_market_regime",
-    "sector_context_model": "model_02_sector_context",
-    "target_state_vector_model": "model_03_target_state_vector",
-    "event_failure_risk_model": "model_04_event_failure_risk",
-    "alpha_confidence_model": "model_05_alpha_confidence",
-    "dynamic_risk_policy_model": "model_06_dynamic_risk_policy",
-    "position_projection_model": "model_07_position_projection",
-    "underlying_action_model": "model_08_underlying_action",
-    "option_expression_model": "model_09_option_expression",
-    "event_risk_governor": "model_10_event_risk_governor",
+PHYSICAL_MODEL_SURFACE_IDS_BY_MODEL_ID = {
+    "trm_MRM001": "dki_MRMV001",
+    "trm_SCM001": "trm_M2S001",
+    "trm_TSVMI01": "trm_M3TSV01",
+    "trm_EFRM001": "trm_MEFR001",
+    "trm_ACM001": "trm_MAC001",
+    "trm_DRPM001": "trm_M6DRP01",
+    "trm_TPM001": "trm_MTP001",
+    "trm_UAM001": "trm_M7UAM01",
+    "trm_OEM001": "trm_M7OEM01",
+    "trm_ERG001": "trm_M9ERG01",
 }
-
-LOCAL_LAYER_INPUTS = (
-    ("layer_01_market_regime", "market_regime_model", "market_context_state"),
-    ("layer_02_sector_context", "sector_context_model", "sector_context_state"),
-    ("layer_03_target_state_vector", "target_state_vector_model", "target_context_state"),
-    ("layer_04_event_failure_risk", "event_failure_risk_model", "event_failure_risk_vector"),
-    ("layer_05_alpha_confidence", "alpha_confidence_model", "alpha_confidence_vector"),
-    ("layer_06_dynamic_risk_policy", "dynamic_risk_policy_model", "dynamic_risk_policy_state"),
-    ("layer_07_position_projection", "position_projection_model", "position_projection_vector"),
-    ("layer_08_underlying_action", "underlying_action_model", "underlying_action_plan"),
-    ("layer_09_option_expression", "option_expression_model", "option_expression_plan"),
-    ("layer_10_event_risk_governor", "event_risk_governor", "event_context_vector"),
+LOCAL_LAYER_INPUT_IDS = (
+    ("mlv_L1MR001", "trm_MRM001", "trm_MCS001"),
+    ("mlv_L2SC001", "trm_SCM001", "trm_SCS001"),
+    ("mlv_L3TSV01", "trm_TSVMI01", "trm_TSV001"),
+    ("mlv_L4EFR001", "trm_EFRM001", "trm_EFRV001"),
+    ("mlv_L5AC001", "trm_ACM001", "trm_ASV001"),
+    ("mlv_L6DRP001", "trm_DRPM001", "trm_DRPS001"),
+    ("mlv_L7PP001", "trm_TPM001", "trm_TSVEC01"),
+    ("mlv_L8UA001", "trm_UAM001", "trm_UAP001"),
+    ("mlv_L9OE001", "trm_OEM001", "trm_OEP001"),
+    ("mlv_L10ERG001", "trm_ERG001", "trm_ECV001"),
 )
+PHYSICAL_MODEL_SURFACES_BY_ID = {
+    registry_payload(model_id): registry_payload(surface_id)
+    for model_id, surface_id in PHYSICAL_MODEL_SURFACE_IDS_BY_MODEL_ID.items()
+}
+LOCAL_LAYER_INPUTS = tuple(
+    (registry_payload(layer_id), registry_payload(model_id), registry_payload(output_id))
+    for layer_id, model_id, output_id in LOCAL_LAYER_INPUT_IDS
+)
+
+AVAILABLE_TIME = registry_payload("fld_STKEX011")
+EVENT_FAILURE_RISK_MODEL = registry_payload("trm_EFRM001")
+EVENT_FAILURE_RISK_VECTOR = registry_payload("trm_EFRV001")
+EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT = registry_payload("trm_EXEC_RT008")
+EXECUTION_REALTIME_SHADOW_FIXTURE_BUNDLE = registry_payload("trm_RTLV003")
+LAYER_04_EVENT_FAILURE_RISK = registry_payload("mlv_L4EFR001")
+MANAGER_REALTIME_SHADOW_HANDOFF_REHEARSAL = registry_payload("trm_RTLV004")
+MODEL_LAYER = registry_payload("fld_MODLAY001")
+MODEL_REALTIME_DECISION_ROUTE_PLAN = registry_payload("trm_MODEL_RTD002")
+SUCCEEDED = registry_payload("sts_MSH003")
+TRADEABLE_TIME = registry_payload("fld_TSV001")
 
 
 def _add_repo_src(path: Path) -> None:
@@ -64,7 +84,7 @@ def _local_execution_fixture(args: argparse.Namespace) -> dict[str, Any]:
             {
                 "contract_type": "execution_model_decision_layer_input",
                 "decision_input_snapshot_id": snapshot_id,
-                "model_layer": layer,
+                MODEL_LAYER: layer,
                 "model_id": model_id,
                 "expected_model_output": expected_output,
                 "feature_ref": f"realtime-feature://{snapshot_id}/{layer}",
@@ -76,11 +96,11 @@ def _local_execution_fixture(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
     decision_input = {
-        "contract_type": "execution_model_decision_input_snapshot",
+        "contract_type": EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT,
         "decision_input_snapshot_id": snapshot_id,
         "decision_time": args.decision_time,
-        "available_time": args.available_time,
-        "tradeable_time": args.tradeable_time,
+        AVAILABLE_TIME: args.available_time,
+        TRADEABLE_TIME: args.tradeable_time,
         "instrument_ref": instrument_ref,
         "instrument_refs": list(args.instrument_refs or []),
         "source_refs": list(args.sources or []),
@@ -96,7 +116,7 @@ def _local_execution_fixture(args: argparse.Namespace) -> dict[str, Any]:
         "account_mutation_performed": False,
     }
     return {
-        "contract_type": "execution_realtime_shadow_fixture_bundle",
+        "contract_type": EXECUTION_REALTIME_SHADOW_FIXTURE_BUNDLE,
         "request_id": args.request_id,
         "mode": args.mode,
         "decision_input_snapshot": decision_input,
@@ -120,7 +140,7 @@ def _local_route_plan(decision_input: Mapping[str, Any], *, mode: str) -> dict[s
             {
                 "contract_type": "model_realtime_decision_layer_route",
                 "route_plan_id": f"rtdroute_{decision_input.get('decision_input_snapshot_id')}",
-                "model_layer": row.get("model_layer"),
+                MODEL_LAYER: row.get(MODEL_LAYER),
                 "model_id": model_id,
                 "expected_model_output": row.get("expected_model_output"),
                 "feature_ref": row.get("feature_ref"),
@@ -133,7 +153,7 @@ def _local_route_plan(decision_input: Mapping[str, Any], *, mode: str) -> dict[s
             }
         )
     return {
-        "contract_type": "model_realtime_decision_route_plan",
+        "contract_type": MODEL_REALTIME_DECISION_ROUTE_PLAN,
         "route_plan_id": f"rtdroute_{decision_input.get('decision_input_snapshot_id')}",
         "decision_input_snapshot_id": decision_input.get("decision_input_snapshot_id"),
         "decision_time": decision_input.get("decision_time"),
@@ -190,8 +210,8 @@ def main() -> int:
                 "model_layers": args.model_layers,
                 "instrument_refs": args.instrument_refs,
                 "decision_time": args.decision_time,
-                "available_time": args.available_time,
-                "tradeable_time": args.tradeable_time,
+                AVAILABLE_TIME: args.available_time,
+                TRADEABLE_TIME: args.tradeable_time,
                 "historical_dataset_snapshot_ref": args.historical_dataset_snapshot_ref,
                 "frozen_model_config_ref": args.frozen_model_config_ref,
             }
@@ -199,16 +219,16 @@ def main() -> int:
     decision_input = execution_fixture["decision_input_snapshot"]
     if args.model_layers is None:
         rows = decision_input.setdefault("layer_input_refs", [])
-        present_layers = {row.get("model_layer") for row in rows if isinstance(row, dict)}
-        if "layer_04_event_failure_risk" not in present_layers:
+        present_layers = {row.get(MODEL_LAYER) for row in rows if isinstance(row, dict)}
+        if LAYER_04_EVENT_FAILURE_RISK not in present_layers:
             rows.append(
                 {
                     "contract_type": "execution_model_decision_layer_input",
                     "decision_input_snapshot_id": decision_input.get("decision_input_snapshot_id"),
-                    "model_layer": "layer_04_event_failure_risk",
-                    "model_id": "event_failure_risk_model",
-                    "expected_model_output": "event_failure_risk_vector",
-                    "feature_ref": f"realtime-feature://{decision_input.get('decision_input_snapshot_id')}/layer_04_event_failure_risk",
+                    MODEL_LAYER: LAYER_04_EVENT_FAILURE_RISK,
+                    "model_id": EVENT_FAILURE_RISK_MODEL,
+                    "expected_model_output": EVENT_FAILURE_RISK_VECTOR,
+                    "feature_ref": f"realtime-feature://{decision_input.get('decision_input_snapshot_id')}/{LAYER_04_EVENT_FAILURE_RISK}",
                     "upstream_context_refs": [],
                     "frozen_model_config_ref": args.frozen_model_config_ref,
                     "historical_dataset_snapshot_ref": args.historical_dataset_snapshot_ref,
@@ -236,7 +256,7 @@ def main() -> int:
         receipt_uri=args.receipt_uri,
     )
     bundle = {
-        "contract_type": "manager_realtime_shadow_handoff_rehearsal",
+        "contract_type": MANAGER_REALTIME_SHADOW_HANDOFF_REHEARSAL,
         "request_id": args.request_id,
         "execution_fixture": execution_fixture,
         "route_plan": route_plan,
@@ -247,7 +267,7 @@ def main() -> int:
         "broker_calls_performed": 0,
         "broker_order_construction_performed": False,
         "account_mutation_performed": False,
-        "rehearsal_status": "ready" if manager_handoff["receipt"]["status"] == "succeeded" and route_validation["valid"] else "blocked",
+        "rehearsal_status": "ready" if manager_handoff["receipt"]["status"] == SUCCEEDED and route_validation["valid"] else "blocked",
     }
     payload = bundle if args.output == "bundle" else bundle[args.output]
     json.dump(payload, sys.stdout, indent=2, sort_keys=True)

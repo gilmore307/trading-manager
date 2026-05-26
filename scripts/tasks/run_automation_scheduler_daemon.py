@@ -11,8 +11,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from trading_manager_tasks.agent_error_handler import handle_server_error
+from trading_manager_tasks.registry_values import registry_payload
 from trading_manager_tasks.scheduler_daemon import main as scheduler_daemon_main
 from trading_manager_tasks.storage_paths import manager_storage_root
+
+TRADING_MANAGER_REPO = registry_payload("rep_H6S3V8LA")
 
 
 def _fatal_stderr_path() -> Path:
@@ -30,7 +33,7 @@ def main() -> int:
         try:
             result = handle_server_error(
                 source_component="trading-manager.historical_scheduler_daemon",
-                source_repo="trading-manager",
+                source_repo=TRADING_MANAGER_REPO,
                 error_scope="server_service",
                 error_kind=exc.__class__.__name__,
                 severity="error",

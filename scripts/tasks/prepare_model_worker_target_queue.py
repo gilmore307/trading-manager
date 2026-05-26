@@ -9,9 +9,13 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from trading_manager_tasks.registry_values import registry_payload, registry_value
 from trading_manager_tasks.scheduler_daemon import DEFAULT_TARGET_QUEUE_PATH
 
-DEFAULT_MAPPING_CSV = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
+DEFAULT_MAPPING_CSV = Path(registry_value("out_TL2CTX001", "path"))
+MANAGER_MODEL_TRAINING_TARGET_QUEUE = registry_payload("art_MGRTRGROT002")
+REVIEW_STATUS = registry_payload("fld_TL2CTX011")
+TARGET_SYMBOL = registry_payload("fld_DU004")
 
 
 def _now() -> str:
@@ -29,9 +33,9 @@ def _mapping_targets(mapping_csv: Path) -> list[str]:
     targets: list[str] = []
     with mapping_csv.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
-            if str(row.get("review_status") or "").strip().lower() != "accepted":
+            if str(row.get(REVIEW_STATUS) or "").strip().lower() != "accepted":
                 continue
-            symbol = _normal_symbol(row.get("target_symbol"))
+            symbol = _normal_symbol(row.get(TARGET_SYMBOL))
             if symbol and symbol not in targets:
                 targets.append(symbol)
     return targets
@@ -44,7 +48,7 @@ def build_target_queue(*, bootstrap_targets: list[str], mapping_csv: Path, gener
         if normal and normal not in targets:
             targets.append(normal)
     return {
-        "contract_type": "manager_model_training_target_queue",
+        "contract_type": MANAGER_MODEL_TRAINING_TARGET_QUEUE,
         "generated_at_utc": generated_at_utc or _now(),
         "queue_policy": "ordered_first_open_fold",
         "rotation_boundary": "layer_03_plus_model_worker",

@@ -5,21 +5,27 @@ from __future__ import annotations
 
 import csv
 import re
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-LAYERS = (
-    (1, ("MarketRegimeModel",), "layer_01_market_regime", "market_regime_model", "model_01_market_regime", "market_context_state"),
-    (2, ("SectorContextModel",), "layer_02_sector_context", "sector_context_model", "model_02_sector_context", "sector_context_state"),
-    (3, ("TargetStateVectorModel",), "layer_03_target_state_vector", "target_state_vector_model", "model_03_target_state_vector", "target_context_state"),
-    (4, ("EventFailureRiskModel",), "layer_04_event_failure_risk", "event_failure_risk_model", "model_04_event_failure_risk", "event_failure_risk_vector"),
-    (5, ("AlphaConfidenceModel",), "layer_05_alpha_confidence", "alpha_confidence_model", "model_05_alpha_confidence", "alpha_confidence_vector"),
-    (6, ("DynamicRiskPolicyModel",), "layer_06_dynamic_risk_policy", "dynamic_risk_policy_model", "model_06_dynamic_risk_policy", "dynamic_risk_policy_state"),
-    (7, ("PositionProjectionModel",), "layer_07_position_projection", "position_projection_model", "model_07_position_projection", "position_projection_vector"),
-    (8, ("UnderlyingActionModel",), "layer_08_underlying_action", "underlying_action_model", "model_08_underlying_action", "underlying_action_plan"),
-    (9, ("TradingGuidanceModel", "OptionExpressionModel"), "layer_09_option_expression", "option_expression_model", "model_09_option_expression", "option_expression_plan"),
-    (10, ("EventRiskGovernor", "EventIntelligenceOverlay"), "layer_10_event_risk_governor", "event_risk_governor", "model_10_event_risk_governor", "event_risk_intervention"),
+from trading_manager_tasks.registry_values import registry_payload
+
+LAYER_REGISTRY_IDS = (
+    (1, ("MarketRegimeModel",), "mlv_L1MR001", "trm_MRM001", "dki_MRMV001", "trm_MCS001"),
+    (2, ("SectorContextModel",), "mlv_L2SC001", "trm_SCM001", "trm_M2S001", "trm_SCS001"),
+    (3, ("TargetStateVectorModel",), "mlv_L3TSV01", "trm_TSVMI01", "trm_M3TSV01", "trm_TSV001"),
+    (4, ("EventFailureRiskModel",), "mlv_L4EFR001", "trm_EFRM001", "trm_MEFR001", "trm_EFRV001"),
+    (5, ("AlphaConfidenceModel",), "mlv_L5AC001", "trm_ACM001", "trm_MAC001", "trm_ASV001"),
+    (6, ("DynamicRiskPolicyModel",), "mlv_L6DRP001", "trm_DRPM001", "trm_M6DRP01", "trm_DRPS001"),
+    (7, ("PositionProjectionModel",), "mlv_L7PP001", "trm_TPM001", "trm_MTP001", "trm_TSVEC01"),
+    (8, ("UnderlyingActionModel",), "mlv_L8UA001", "trm_UAM001", "trm_M7UAM01", "trm_UAP001"),
+    (9, ("TradingGuidanceModel", "OptionExpressionModel"), "mlv_L9OE001", "trm_OEM001", "trm_M7OEM01", "trm_OEP001"),
+    (10, ("EventRiskGovernor", "EventIntelligenceOverlay"), "mlv_L10ERG001", "trm_ERG001", "trm_M9ERG01", "trm_ERI001"),
 )
 
 FILES_TO_CHECK = (
@@ -55,11 +61,26 @@ def current_registry_text() -> str:
     )
 
 
+def layers() -> tuple[tuple[int, tuple[str, ...], str, str, str, str], ...]:
+    return tuple(
+        (
+            number,
+            boundaries,
+            registry_payload(layer_id),
+            registry_payload(stable_model_id),
+            registry_payload(model_token_id),
+            registry_payload(handoff_id),
+        )
+        for number, boundaries, layer_id, stable_model_id, model_token_id, handoff_id in LAYER_REGISTRY_IDS
+    )
+
+
 def main() -> int:
     texts = {rel: read(rel) for rel in FILES_TO_CHECK}
     registry = current_registry_text()
 
-    for number, boundaries, layer_token, stable_model_id, model_token, handoff in LAYERS:
+    layer_rows = layers()
+    for number, boundaries, layer_token, stable_model_id, model_token, handoff in layer_rows:
         architecture = texts["docs/02_architecture.md"]
         numbering = texts["docs/28_numbering_physical_contract.md"]
         promotion = texts["src/trading_manager_tasks/model_promotion.py"]
@@ -101,7 +122,7 @@ def main() -> int:
     if stale_refs:
         fail(f"active surfaces reference stale 80+/100+ docs numbering: {sorted(set(stale_refs))}")
 
-    print(f"layer tokens OK ({len(LAYERS)} layers)")
+    print(f"layer tokens OK ({len(layer_rows)} layers)")
     return 0
 
 
