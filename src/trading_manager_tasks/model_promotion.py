@@ -3,8 +3,8 @@
 This module owns the common control-plane entrypoint for promotion review requests.
 Model repositories still produce model-specific evidence, labels, metrics, and
 candidate artifacts; the manager owns scheduling/request shape only. Replay
-judgment, promotion eligibility, and model activation belong to
-trading-evaluation.
+judgment and promotion readiness belong to trading-evaluation; runtime model
+lifecycle and active-pointer writes belong to trading-execution.
 """
 
 from __future__ import annotations
@@ -34,7 +34,8 @@ TARGET_REPO_ID = "trading-evaluation"
 DEFAULT_REQUESTED_BY = "openclaw"
 DEFAULT_POLICY_REFS = (
     "evaluation_primary_replay_policy",
-    "evaluation_promotion_activation_policy",
+    "evaluation_promotion_readiness_policy",
+    "execution_runtime_model_lifecycle_policy",
 )
 DEFAULT_EXPECTED_OUTPUTS = (
     "fold_settlement_run",

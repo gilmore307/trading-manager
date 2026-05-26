@@ -44,7 +44,7 @@ def build_review_decision(
     """Build an advisory review_decision artifact.
 
     This artifact may support evaluation evidence, but it is not sufficient for
-    model activation. Activation belongs to `trading-evaluation`.
+    model activation. Runtime activation belongs to `trading-execution`.
     """
 
     if decision_status not in ALLOWED_DECISION_STATUSES:
