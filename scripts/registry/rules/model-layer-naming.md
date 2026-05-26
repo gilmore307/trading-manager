@@ -1,6 +1,6 @@
 # Model Layer Naming Rules
 
-This file owns shared naming rules for model-layer source, feature, and model surfaces that cross repository boundaries.
+This file owns shared naming rules for model-layer source, feature, and model surfaces that cross repository boundaries. General physical SQL table naming and SQL-versus-artifact storage boundaries live in `sql-table-surface-naming.md`.
 
 ## Current Layer Stack
 
@@ -25,20 +25,17 @@ Use `mNN_<domain_slug>_<task_stage>` SQL names for physical table surfaces. Impl
 
 ## SQL Table Surface Patterns
 
-SQL physical identifiers use lowercase snake_case. A dot separates only SQL namespace levels, normally `schema.table`. Do not use hyphens in SQL table, column, schema, registry, or task identifiers; reserve hyphenated slugs for filesystem or URL surfaces that already require them.
-
-Model/data table surfaces must use the current owner-domain-stage pattern:
+Model/data table surfaces apply the shared pattern from
+`sql-table-surface-naming.md`:
 
 ```text
 <schema>.<owner_prefix>_<domain_slug>_<task_stage>[_<artifact_role>]
 ```
 
-Where:
-
-- `owner_prefix` is `mNN` for model-owned layer surfaces and `cNN` for execution/component-owned surfaces.
-- `domain_slug` is the reviewed model, component, or domain slug, for example `market_regime`.
-- `task_stage` is the task that generates the table, for example `data_acquisition`, `feature_generation`, or `model_generation`.
-- `artifact_role` is optional and names a support artifact such as `explainability` or `diagnostics`.
+For model-layer tables, `owner_prefix` is `mNN`, `domain_slug` is the reviewed
+model/domain slug, `task_stage` is the task that generates the table, and
+`artifact_role` is optional support evidence such as `explainability` or
+`diagnostics`.
 
 Examples:
 
