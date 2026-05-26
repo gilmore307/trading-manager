@@ -32,7 +32,8 @@ Execution table names use business-family prefixes under `trading_execution`:
 - `realtime_*` for realtime capture, feature snapshots, model-input snapshots,
   subscriptions, live-observe rows, and monitor receipts.
 - `cNN_*` only for actual component-owned decision outputs.
-- `trade_*` for risk, order-construction, and broker-shaped intent rows.
+- `trade_*` for risk, order-construction, broker-shaped intent rows, and
+  future broker/account/position/fill/reconciliation rows.
 - `performance_*` for live/shadow model performance, effectiveness,
   attribution, and lifecycle review evidence.
 
@@ -120,9 +121,13 @@ Execution trade and performance surfaces:
 ```text
 trading_execution.trade_risk_cap
 trading_execution.trade_broker_order_intent
+trading_execution.trade_broker_order_submission
+trading_execution.trade_broker_fill
+trading_execution.trade_account_state_snapshot
+trading_execution.trade_position_state_snapshot
+trading_execution.trade_reconciliation_result
 trading_execution.performance_model_runtime_evidence
 trading_execution.performance_model_decision_effectiveness
-trading_execution.performance_c07_failure_attribution
 trading_execution.performance_runtime_model_lifecycle_review
 ```
 
