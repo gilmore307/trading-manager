@@ -183,7 +183,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("realtime execution decision path", rows["REPLAY_REALTIME_REPLAY_ROUTE_POLICY"]["note"])
         self.assertEqual(
-            rows["PROMOTION_REPLAY_REPLAY_WINDOW_POLICY"]["payload"],
+            rows["PROMOTION_REPLAY_WINDOW_POLICY"]["payload"],
             "canonical_2021_01_01_to_2026_01_01_end_exclusive_1255_expected_trading_days",
         )
         self.assertNotIn("PROMOTION_REPLAY_TWO_YEAR_REPLAY_WINDOW", rows)
@@ -291,8 +291,8 @@ class RegistryHelperTests(unittest.TestCase):
             "M01_MARKET_REGIME_DATA_ACQUISITION_TABLE": "trading_data.m01_market_regime_data_acquisition",
             "M01_MARKET_REGIME_FEATURE_GENERATION_TABLE": "trading_data.m01_market_regime_feature_generation",
             "M01_MARKET_REGIME_MODEL_GENERATION_TABLE": "trading_model.m01_market_regime_model_generation",
-            "M01_MARKET_REGIME_EXPLAINABILITY_TABLE": "trading_model.m01_market_regime_explainability",
-            "M01_MARKET_REGIME_DIAGNOSTICS_TABLE": "trading_model.m01_market_regime_diagnostics",
+            "M01_MARKET_REGIME_MODEL_GENERATION_EXPLAINABILITY_TABLE": "trading_model.m01_market_regime_model_generation_explainability",
+            "M01_MARKET_REGIME_MODEL_GENERATION_DIAGNOSTICS_TABLE": "trading_model.m01_market_regime_model_generation_diagnostics",
             "M02_SECTOR_CONTEXT_DATA_ACQUISITION_TABLE": "trading_data.m02_sector_context_data_acquisition",
             "M09_OPTION_EXPRESSION_CONTRACT_PATH_TABLE": "trading_data.m09_option_expression_data_acquisition_contract_path",
             "EVALUATION_REPLAY_CONTRACT_TABLE": "trading_evaluation.replay_contract",
@@ -307,16 +307,16 @@ class RegistryHelperTests(unittest.TestCase):
             "EVALUATION_PROMOTION_ELIGIBILITY_DECISION_TABLE": "trading_evaluation.promotion_eligibility_decision",
             "EVALUATION_PROMOTION_READINESS_RECORD_TABLE": "trading_evaluation.promotion_readiness_record",
             "EVALUATION_PROMOTED_MODEL_PARAMETER_TABLE": "trading_evaluation.promoted_model_parameter",
-            "EXECUTION_REALTIME_TRADING_RUNTIME_STATUS_TABLE": "trading_execution.execution_realtime_trading_runtime_status",
-            "EXECUTION_CAPABILITY_CATALOG_TABLE": "trading_execution.execution_capability_catalog",
-            "EXECUTION_REALTIME_DATA_INTERFACE_TABLE": "trading_execution.execution_realtime_data_interface",
-            "EXECUTION_BROKER_INTERFACE_TABLE": "trading_execution.execution_broker_interface",
-            "EXECUTION_REALTIME_CAPTURE_CONTRACT_TABLE": "trading_execution.realtime_capture_contract",
-            "EXECUTION_REALTIME_FEATURE_SNAPSHOT_TABLE": "trading_execution.realtime_feature_snapshot",
-            "EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT_TABLE": "trading_execution.execution_model_decision_input_snapshot",
-            "EXECUTION_REALTIME_INPUT_COVERAGE_TABLE": "trading_execution.execution_realtime_input_coverage",
-            "EXECUTION_REALTIME_SUBSCRIPTION_PLAN_TABLE": "trading_execution.execution_realtime_subscription_plan",
-            "EXECUTION_REALTIME_LIVE_OBSERVE_RESULT_TABLE": "trading_execution.execution_realtime_live_observe_result",
+            "STATUS_REALTIME_TRADING_RUNTIME_TABLE": "trading_execution.status_realtime_trading_runtime",
+            "STATUS_CAPABILITY_CATALOG_TABLE": "trading_execution.status_capability_catalog",
+            "STATUS_REALTIME_DATA_INTERFACE_TABLE": "trading_execution.status_realtime_data_interface",
+            "STATUS_BROKER_INTERFACE_TABLE": "trading_execution.status_broker_interface",
+            "REALTIME_CAPTURE_CONTRACT_TABLE": "trading_execution.realtime_capture_contract",
+            "REALTIME_FEATURE_SNAPSHOT_TABLE": "trading_execution.realtime_feature_snapshot",
+            "REALTIME_MODEL_DECISION_INPUT_SNAPSHOT_TABLE": "trading_execution.realtime_model_decision_input_snapshot",
+            "REALTIME_INPUT_COVERAGE_TABLE": "trading_execution.realtime_input_coverage",
+            "REALTIME_SUBSCRIPTION_PLAN_TABLE": "trading_execution.realtime_subscription_plan",
+            "REALTIME_LIVE_OBSERVE_RESULT_TABLE": "trading_execution.realtime_live_observe_result",
             "C01_INTAKE_SNAPSHOT_TABLE": "trading_execution.c01_intake_snapshot",
             "C02_ENTRY_DECISION_TABLE": "trading_execution.c02_entry_decision",
             "C03_POSITION_LIFECYCLE_DECISION_TABLE": "trading_execution.c03_position_lifecycle_decision",
@@ -324,24 +324,24 @@ class RegistryHelperTests(unittest.TestCase):
             "C05_ORDER_INTENT_TABLE": "trading_execution.c05_order_intent",
             "C06_EXECUTION_GATE_RESULT_TABLE": "trading_execution.c06_execution_gate_result",
             "C07_FAILURE_EXPLANATION_PACKET_TABLE": "trading_execution.c07_failure_explanation_packet",
-            "C08_SHADOW_MODEL_RUNTIME_EVIDENCE_TABLE": "trading_execution.c08_shadow_model_runtime_evidence",
+            "PERFORMANCE_MODEL_RUNTIME_EVIDENCE_TABLE": "trading_execution.performance_model_runtime_evidence",
             "C08_SHADOW_CYCLE_SELECTION_TABLE": "trading_execution.c08_shadow_cycle_selection",
-            "C08_CAPACITY_SIMULATION_TABLE": "trading_execution.c08_capacity_simulation",
-            "EXECUTION_ACTIVE_MODEL_CONFIG_WRITE_TABLE": "trading_execution.execution_active_model_config_write",
-            "EXECUTION_ORDER_CONSTRUCTION_APPROVAL_TABLE": "trading_execution.execution_order_construction_approval",
-            "EXECUTION_BROKER_ORDER_INTENT_TABLE": "trading_execution.execution_broker_order_intent",
-            "EXECUTION_BROKER_ORDER_INTENT_RESULT_TABLE": "trading_execution.execution_broker_order_intent_result",
+            "PERFORMANCE_RUNTIME_CAPACITY_SIMULATION_TABLE": "trading_execution.performance_runtime_capacity_simulation",
+            "STATUS_ACTIVE_MODEL_CONFIG_WRITE_TABLE": "trading_execution.status_active_model_config_write",
+            "TRADE_ORDER_CONSTRUCTION_APPROVAL_TABLE": "trading_execution.trade_order_construction_approval",
+            "TRADE_BROKER_ORDER_INTENT_TABLE": "trading_execution.trade_broker_order_intent",
+            "TRADE_BROKER_ORDER_INTENT_RESULT_TABLE": "trading_execution.trade_broker_order_intent_result",
             "TRADE_RISK_CAP_TABLE": "trading_execution.trade_risk_cap",
-            "REALTIME_MODEL_DECISION_EFFECTIVENESS_TABLE": "trading_execution.realtime_model_decision_effectiveness",
-            "REALTIME_MODEL_DECISION_EFFECTIVENESS_ROW_TABLE": "trading_execution.realtime_model_decision_effectiveness_row",
+            "PERFORMANCE_MODEL_DECISION_EFFECTIVENESS_TABLE": "trading_execution.performance_model_decision_effectiveness",
+            "PERFORMANCE_MODEL_DECISION_EFFECTIVENESS_ROW_TABLE": "trading_execution.performance_model_decision_effectiveness_row",
             "C07_FAILURE_ATTRIBUTION_TABLE": "trading_execution.c07_failure_attribution",
-            "RUNTIME_MODEL_LIFECYCLE_REVIEW_RESULT_TABLE": "trading_execution.runtime_model_lifecycle_review_result",
-            "BROKER_ORDER_SUBMISSION_TABLE": "trading_execution.broker_order_submission",
-            "BROKER_ORDER_STATE_TABLE": "trading_execution.broker_order_state",
-            "BROKER_FILL_TABLE": "trading_execution.broker_fill",
-            "ACCOUNT_STATE_SNAPSHOT_TABLE": "trading_execution.account_state_snapshot",
-            "POSITION_STATE_SNAPSHOT_TABLE": "trading_execution.position_state_snapshot",
-            "EXECUTION_RECONCILIATION_RESULT_TABLE": "trading_execution.execution_reconciliation_result",
+            "PERFORMANCE_RUNTIME_MODEL_LIFECYCLE_REVIEW_TABLE": "trading_execution.performance_runtime_model_lifecycle_review",
+            "TRADE_BROKER_ORDER_SUBMISSION_TABLE": "trading_execution.trade_broker_order_submission",
+            "TRADE_BROKER_ORDER_STATE_TABLE": "trading_execution.trade_broker_order_state",
+            "TRADE_BROKER_FILL_TABLE": "trading_execution.trade_broker_fill",
+            "TRADE_ACCOUNT_STATE_SNAPSHOT_TABLE": "trading_execution.trade_account_state_snapshot",
+            "TRADE_POSITION_STATE_SNAPSHOT_TABLE": "trading_execution.trade_position_state_snapshot",
+            "TRADE_RECONCILIATION_RESULT_TABLE": "trading_execution.trade_reconciliation_result",
         }
         for key, payload in expected_tables.items():
             self.assertEqual(rows[key]["kind"], "term")
@@ -352,8 +352,22 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("schema_qualified_table_names_required", policy["payload"])
         self.assertIn("future_broker_account_tables_reserved_not_active", policy["payload"])
         self.assertIn("does not authorize live broker submission", policy["note"])
-        self.assertIn("future_gated_broker_mutation", rows["BROKER_ORDER_SUBMISSION_TABLE"]["applies_to"])
-        self.assertIn("outside the active current loop", rows["BROKER_ORDER_SUBMISSION_TABLE"]["note"])
+        self.assertIn("future_gated_broker_mutation", rows["TRADE_BROKER_ORDER_SUBMISSION_TABLE"]["applies_to"])
+        self.assertIn("outside the active current loop", rows["TRADE_BROKER_ORDER_SUBMISSION_TABLE"]["note"])
+
+        layer_policy = rows["SQL_LAYER_TABLE_NAMING_POLICY"]
+        self.assertIn("use_mNN_domain_task_stage_sql_names", layer_policy["payload"])
+        self.assertIn("old_source_feature_model_prefixes_are_migration_debt", layer_policy["payload"])
+        self.assertNotIn("use_source_NN_feature_NN_model_NN_prefixes", layer_policy["payload"])
+
+        for stale_key in {
+            "ACTIVATION_RECORD_ARTIFACT",
+            "DATA_SOURCES_GLOBAL_CONFIG_DEPRECATED",
+            "EXECUTION_REALTIME_RUNTIME_CHECK_TIMER",
+            "EARNINGS_GUIDANCE_ARTIFACT_COVERAGE_SCOUT_Q4_2025",
+            "EARNINGS_GUIDANCE_ARTIFACT_COVERAGE_WITH_DOCUMENTS_Q4_2025",
+        }:
+            self.assertNotIn(stale_key, rows)
 
     def test_execution_runtime_component_graph_rows_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -580,7 +594,9 @@ class RegistryHelperTests(unittest.TestCase):
             "05_OPTION_EXPRESSION_MODEL_INPUTS_BUNDLE_CONFIG",
         }:
             self.assertNotIn(obsolete_config, rows)
-        self.assertEqual(rows["TARGET_STATE_VECTOR_SYNCHRONIZED_STATE_WINDOWS"]["payload"], "10min;1h;1D;1W")
+        self.assertEqual(rows["MODEL_DECISION_HORIZON_GRID"]["payload"], "10min;1h;1D;1W")
+        self.assertIn("rolling 24-hour", rows["MODEL_DECISION_HORIZON_GRID"]["note"])
+        self.assertEqual(rows["TARGET_STATE_VECTOR_SYNCHRONIZED_STATE_WINDOWS"]["payload"], "model_decision_horizon_grid")
         self.assertEqual(rows["TARGET_CONTEXT_STATE_VERSION_DEFAULT"]["payload"], "target_context_state")
         self.assertEqual(
             rows["TARGET_STATE_VECTOR_WINDOW_SYNC_POLICY"]["payload"],
@@ -607,7 +623,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EVENT_RISK_GOVERNOR"]["payload"], "event_risk_governor")
         self.assertEqual(rows["MODEL_10_EVENT_RISK_GOVERNOR"]["payload"], "model_10_event_risk_governor")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR"]["payload"], "event_context_vector")
-        self.assertEqual(rows["EVENT_CONTEXT_VECTOR_HORIZONS"]["payload"], "10min;1h;1D;1W")
+        self.assertEqual(rows["EVENT_CONTEXT_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn("price_action", rows["EVENT_CATEGORY_TYPE_VALUES"]["payload"])
         self.assertIn("false_breakout", rows["PRICE_ACTION_EVENT_TYPES"]["payload"])
         self.assertIn("layer_10_event_risk_governor_event_not_new_model_layer", rows["PRICE_ACTION_EVENT_LAYER_POLICY"]["payload"])
@@ -617,7 +633,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_05_ALPHA_CONFIDENCE"]["payload"], "model_05_alpha_confidence")
         self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR"]["payload"], "alpha_confidence_vector")
         self.assertEqual(rows["BASE_ALPHA_VECTOR"]["payload"], "base_alpha_vector")
-        self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR_HORIZONS"]["payload"], "10min;1h;1D;1W")
+        self.assertEqual(rows["EVENT_FAILURE_RISK_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
+        self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn("5_alpha_direction_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("5_alpha_tradability_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("5_base_alpha_direction_score_<horizon>", rows["ALPHA_CONFIDENCE_BASE_DIAGNOSTIC_SCORE_FAMILIES"]["payload"])
@@ -636,7 +653,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["POSITION_PROJECTION_MODEL"]["payload"], "position_projection_model")
         self.assertEqual(rows["MODEL_07_POSITION_PROJECTION"]["payload"], "model_07_position_projection")
         self.assertEqual(rows["POSITION_PROJECTION_VECTOR"]["payload"], "position_projection_vector")
-        self.assertEqual(rows["POSITION_PROJECTION_VECTOR_HORIZONS"]["payload"], "10min;1h;1D;1W")
+        self.assertEqual(rows["POSITION_PROJECTION_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn("7_target_exposure_score_<horizon>", rows["POSITION_PROJECTION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("7_projection_confidence_score_<horizon>", rows["POSITION_PROJECTION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("7_resolved_target_exposure_score", rows["POSITION_PROJECTION_HANDOFF_SUMMARY_FIELD_FAMILIES"]["payload"])
@@ -649,7 +666,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_08_UNDERLYING_ACTION"]["payload"], "model_08_underlying_action")
         self.assertEqual(rows["UNDERLYING_ACTION_PLAN"]["payload"], "underlying_action_plan")
         self.assertEqual(rows["UNDERLYING_ACTION_VECTOR"]["payload"], "underlying_action_vector")
-        self.assertEqual(rows["UNDERLYING_ACTION_VECTOR_HORIZONS"]["payload"], "10min;1h;1D;1W")
+        self.assertEqual(rows["UNDERLYING_ACTION_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn(
             "8_underlying_trade_eligibility_score_<horizon>",
             rows["UNDERLYING_ACTION_VECTOR_SCORE_FAMILIES"]["payload"],
@@ -669,6 +686,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MODEL_09_OPTION_EXPRESSION"]["payload"], "model_09_option_expression")
         self.assertEqual(rows["OPTION_EXPRESSION_PLAN"]["payload"], "option_expression_plan")
         self.assertEqual(rows["EXPRESSION_VECTOR"]["payload"], "expression_vector")
+        self.assertEqual(rows["OPTION_EXPRESSION_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn("layer_09_after_underlying_action", rows["OPTION_EXPRESSION_MODEL_LAYER_POLICY"]["payload"])
         self.assertIn("9_option_expression_eligibility_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("9_option_theta_risk_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
@@ -760,6 +778,30 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("data_source_model_input_design_closed", rows["TRADING_DATA_STACK_ACCEPTANCE_STATUS"]["payload"])
         self.assertIn("default_next_regular_us_session_open_after_as_of_date", rows["ETF_HOLDINGS_AVAILABLE_TIME_POLICY"]["payload"])
         self.assertEqual(rows["EQUITY_ABNORMAL_ACTIVITY_MODEL_STANDARD"]["payload"], "equity_abnormal_activity_conservative")
+        self.assertEqual(
+            rows["ABNORMAL_ACTIVITY_EVIDENCE_FAMILY_SET"]["payload"],
+            "price_action_pattern;residual_market_structure_disturbance;microstructure_liquidity_disruption;option_derivatives_abnormality",
+        )
+        self.assertEqual(
+            rows["EVENT_ABNORMAL_ACTIVITY_EVIDENCE_CATEGORIES"]["payload"],
+            "abnormal_activity_evidence_family_set",
+        )
+        self.assertEqual(
+            rows["ABNORMALITY_COVERAGE_COMPLETE_REQUIRED_FAMILIES"]["payload"],
+            "abnormal_activity_evidence_family_set",
+        )
+        self.assertEqual(
+            rows["ACTIVITY_PRICE_RELATIONSHIP_PROOF_GATE_REQUIREMENT"]["payload"],
+            "required_before_event_activity_bridge_model_promotion",
+        )
+        self.assertEqual(
+            rows["ACTIVITY_PRICE_RELATIONSHIP_PROOF_GATE"]["payload"],
+            "activity_price_relationship_proof_gate_requirement",
+        )
+        self.assertEqual(
+            rows["ACTIVITY_PRICE_CROSS_SECTION_STUDY_REQUIRED"]["payload"],
+            "activity_price_relationship_proof_gate_requirement",
+        )
         self.assertIn("historical_calibration_required", rows["EQUITY_ABNORMAL_ACTIVITY_CALIBRATION_STATUS"]["payload"])
         self.assertIn("manager_request", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
         self.assertIn("run_manifest", rows["MANAGER_STORAGE_HANDOFF_CONTRACTS"]["payload"])
@@ -929,8 +971,8 @@ class RegistryHelperTests(unittest.TestCase):
             rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["payload"],
         )
         self.assertIn("model_training_workflow", rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["applies_to"])
-        self.assertNotIn("model_training_workflow", rows["MANAGER_MATERIALIZE_LAYER_TEN_EVENT_RISK_INPUTS"]["applies_to"])
-        self.assertIn("Legacy diagnostic", rows["MANAGER_MATERIALIZE_LAYER_TEN_EVENT_RISK_INPUTS"]["note"])
+        self.assertNotIn("MANAGER_MATERIALIZE_LAYER_TEN_EVENT_RISK_INPUTS", rows)
+        self.assertNotIn("MANAGER_LAYER_TEN_EVENT_RISK_INPUT_MATERIALIZATION", rows)
         self.assertIn(
             "promotion_review_waits_for_fold_layers_01_10_model_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
@@ -989,8 +1031,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
         self.assertIn("trading-manager-historical-scheduler.service", rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["path"])
         self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision")
-        self.assertEqual(rows["ACTIVATION_RECORD_ARTIFACT"]["payload"], "execution_shadow_cycle_selection")
-        self.assertIn("trading-execution", rows["ACTIVATION_RECORD_ARTIFACT"]["path"])
+        self.assertNotIn("ACTIVATION_RECORD_ARTIFACT", rows)
+        self.assertEqual(rows["EXECUTION_SHADOW_CYCLE_SELECTION"]["payload"], "execution_shadow_cycle_selection")
+        self.assertIn("trading-execution", rows["EXECUTION_SHADOW_CYCLE_SELECTION"]["path"])
         self.assertIn("build_review_decision.py", rows["MANAGER_REVIEW_DECISION_BUILD"]["path"])
         self.assertEqual(rows["COMPONENT_COMPLETION_RECEIPT_PAYLOAD"]["payload"], "component_completion_receipt_payload")
         self.assertIn("store_completion_receipt_payload.py", rows["STORAGE_COMPLETION_RECEIPT_PAYLOAD_STORE"]["path"])
