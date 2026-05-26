@@ -1,7 +1,7 @@
 """Trading Economics calendar seed and realtime maintenance planning.
 
-This module separates the one-time historical seed from the ongoing realtime
-recent-calendar maintenance route. It only prepares task keys and summaries; it
+This module separates historical SQL seeding from the ongoing recent-calendar
+maintenance route. It only prepares task keys and summaries; it
 never starts services, activates models, submits broker orders, or mutates
 accounts.
 """
@@ -279,6 +279,8 @@ def _recent_task_key(*, start: date, end: date, output_root: str) -> dict[str, A
             "date_range_mode": "recent",
             "use_authenticated_cookies": False,
             "persist_failure_diagnostics": True,
+            "monthly_backfill_bucketed_output": True,
+            "source_materialization_role": "append_to_trading_economics_monthly_backfill",
         },
         "manager_controls": {
             "allow_live_provider_calls": True,
@@ -303,7 +305,7 @@ def plan_recent_poll(*, as_of_date: date | None = None, lookahead_days: int = DE
         raise TaskSystemError("lookahead_days must be between 1 and 45")
     start = as_of_date or datetime.now(UTC).date()
     end = start + timedelta(days=lookahead_days)
-    output_root = f"storage/realtime/trading_economics_calendar_web/recent/{start.isoformat()}"
+    output_root = "storage/monthly_backfill/trading_economics_calendar_web"
     payload = _recent_task_key(start=start, end=end, output_root=output_root)
     content = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     task_hash = "sha256:" + hashlib.sha256(content).hexdigest()
