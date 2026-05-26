@@ -221,7 +221,7 @@ def _historical_seed_task_key(*, start_month: str, end_month: str, artifacts: li
             "end": end_date,
             "feed_artifact_paths": [artifact.path for artifact in artifacts],
             "source_materialization_role": "historical_seed_to_event_risk_governor_source",
-            "raw_artifact_retention": "deletable_after_successful_sql_ingest_and_manifest_review",
+            "raw_artifact_retention": "keep_forever_append_only_source_evidence",
         },
         "manager_controls": {
             "provider_calls": 0,
