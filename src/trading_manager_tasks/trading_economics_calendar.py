@@ -1,15 +1,13 @@
-"""Trading Economics calendar seed and realtime maintenance planning.
+"""Trading Economics calendar storage-source planning.
 
-This module separates historical SQL seeding from the ongoing recent-calendar
-maintenance route. It only prepares task keys and summaries; it
-never starts services, activates models, submits broker orders, or mutates
-accounts.
+This module prepares source-key plans from canonical storage artifacts. The
+Trading Economics website subscription is expired, so recent website polling is
+retired and returns a no-provider no-task receipt.
 """
 from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import sys
 from dataclasses import asdict, dataclass
@@ -23,9 +21,6 @@ from .provider_dispatch import DEFAULT_TRADING_DATA_ROOT
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root
 
-TE_FEED_ID = "07_feed_trading_economics_calendar_web"
-TE_SOURCE_ID = "trading_economics_calendar_web"
-EVENT_SOURCE_ID = "source_10_event_risk_governor"
 DEFAULT_TE_MONTHLY_ROOT = data_storage_root() / "monthly_backfill" / "trading_economics_calendar_web"
 DEFAULT_RECENT_LOOKAHEAD_DAYS = 45
 
@@ -66,6 +61,7 @@ class TeHistoricalSeedSummary:
     task_key_path: str | None
     task_key_hash: str | None
     write_performed: bool
+    retired_reason: str | None
     provider_calls: int
     database_writes_performed: bool
     model_activation_performed: bool
@@ -87,6 +83,7 @@ class TeRecentPollSummary:
     write_performed: bool
     date_range_mode: str
     use_authenticated_cookies: bool
+    retired_reason: str | None
     provider_calls: int
     database_writes_performed: bool
     model_activation_performed: bool
@@ -167,27 +164,6 @@ def _filtered_artifact_path(*, month: str, storage_root: Path) -> Path:
     return storage_root / "runtime" / "te_calendar" / "historical_seed" / "filtered_artifacts" / month / "trading_economics_calendar_event.csv"
 
 
-def _write_filtered_month_artifact(*, month: str, month_dir: Path, storage_root: Path) -> TeCalendarArtifact:
-    fieldnames, rows, source_paths = _merge_month_rows(month=month, paths=_month_artifact_paths(month_dir))
-    target = _filtered_artifact_path(month=month, storage_root=storage_root)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-    manifest = {
-        "contract_type": "te_calendar_historical_seed_filtered_artifact",
-        "month": month,
-        "source_artifact_paths": source_paths,
-        "filtered_artifact_path": str(target.resolve()),
-        "row_count": len(rows),
-        "filter": "event_time month equals containing historical backfill month; exact duplicate rows removed across runs",
-        "raw_original_deleted": False,
-    }
-    (target.parent / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return TeCalendarArtifact(month=month, path=str(target.resolve()), row_count=len(rows), selected=True)
-
-
 def _month_artifact_summary(month_dir: Path, *, storage_root: Path) -> TeCalendarArtifact | None:
     _, rows, _ = _merge_month_rows(month=month_dir.name, paths=_month_artifact_paths(month_dir))
     if not rows:
@@ -208,56 +184,20 @@ def discover_historical_seed_artifacts(*, start_month: str, end_month: str, trad
     return selected, missing
 
 
-def _historical_seed_task_key(*, start_month: str, end_month: str, artifacts: list[TeCalendarArtifact], output_root: str) -> dict[str, Any]:
-    start_date = f"{start_month}-01T00:00:00-05:00"
-    end_window = list(iter_monthly_windows(end_month, end_month))[0]
-    end_date = f"{end_window.end_date_exclusive}T00:00:00-05:00"
-    return {
-        "source": EVENT_SOURCE_ID,
-        "task_id": f"te_calendar_historical_seed_{start_month.replace('-', '_')}_{end_month.replace('-', '_')}",
-        "output_root": output_root,
-        "params": {
-            "start": start_date,
-            "end": end_date,
-            "feed_artifact_paths": [artifact.path for artifact in artifacts],
-            "source_materialization_role": "historical_seed_to_event_risk_governor_source",
-            "raw_artifact_retention": "keep_forever_append_only_source_evidence",
-        },
-        "manager_controls": {
-            "provider_calls": 0,
-            "database_write_target": "trading_data.source_10_event_risk_governor",
-            "model_activation_performed": False,
-            "broker_execution_performed": False,
-        },
-    }
-
-
 def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT, storage_root: Path = DEFAULT_STORAGE_ROOT, write_files: bool = False) -> TeHistoricalSeedSummary:
     artifacts, missing = discover_historical_seed_artifacts(start_month=start_month, end_month=end_month, trading_data_root=trading_data_root, storage_root=storage_root)
-    monthly_root = _te_monthly_root(trading_data_root)
-    seed_artifacts = [_write_filtered_month_artifact(month=artifact.month, month_dir=monthly_root / artifact.month, storage_root=storage_root) for artifact in artifacts] if write_files else artifacts
-    task_key_path: Path | None = None
-    task_hash: str | None = None
-    if not missing:
-        output_root = str(data_storage_root() / "runtime" / "source_10_event_risk_governor" / f"te_calendar_historical_seed_{start_month}_{end_month}")
-        payload = _historical_seed_task_key(start_month=start_month, end_month=end_month, artifacts=seed_artifacts, output_root=output_root)
-        content = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
-        task_hash = "sha256:" + hashlib.sha256(content).hexdigest()
-        task_key_path = (storage_root / "runtime" / "te_calendar" / "historical_seed" / f"{start_month}_{end_month}_source_10_task_key.json").resolve()
-        if write_files:
-            task_key_path.parent.mkdir(parents=True, exist_ok=True)
-            task_key_path.write_bytes(content)
     return TeHistoricalSeedSummary(
-        contract_type="te_calendar_historical_seed_plan",
+        contract_type="te_calendar_historical_seed_retired",
         start_month=start_month,
         end_month=end_month,
         expected_month_count=len(_month_list(start_month, end_month)),
         covered_month_count=len(artifacts),
         missing_months=tuple(missing),
-        selected_artifacts=tuple(seed_artifacts),
-        task_key_path=str(task_key_path) if task_key_path is not None else None,
-        task_key_hash=task_hash,
-        write_performed=write_files,
+        selected_artifacts=tuple(artifacts),
+        task_key_path=None,
+        task_key_hash=None,
+        write_performed=False,
+        retired_reason="TE macro rows stay in canonical storage and are not materialized into source_10_event_risk_governor until a later accepted Layer 10 route promotes them.",
         provider_calls=0,
         database_writes_performed=False,
         model_activation_performed=False,
@@ -265,63 +205,21 @@ def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root:
     )
 
 
-def _recent_task_key(*, start: date, end: date, output_root: str) -> dict[str, Any]:
-    return {
-        "feed": TE_FEED_ID,
-        "task_id": f"te_calendar_recent_{start.isoformat()}_{end.isoformat()}",
-        "output_root": output_root,
-        "params": {
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat(),
-            "country": "United States",
-            "importance": "3",
-            "allow_live_fetch": True,
-            "date_range_mode": "recent",
-            "use_authenticated_cookies": False,
-            "persist_failure_diagnostics": True,
-            "monthly_backfill_bucketed_output": True,
-            "source_materialization_role": "append_to_trading_economics_monthly_backfill",
-        },
-        "manager_controls": {
-            "allow_live_provider_calls": True,
-            "autonomous_historical_provider_acquisition": False,
-            "realtime_provider_maintenance": True,
-            "allowed_providers": ["trading_economics"],
-            "allowed_endpoint_families": ["calendar_web"],
-            "max_requests": 7,
-            "max_time_window": "45d",
-            "retry_policy_ref": "te_recent_release_fetch_retry_10s_six_attempts_then_websearch",
-            "release_refresh_policy_ref": "immediate_due_release_refresh_then_10s_x6_then_websearch",
-            "fallback_provider_refs": ["websearch_public_macro_release"],
-            "model_activation_performed": False,
-            "broker_execution_performed": False,
-        },
-        "policy_refs": ["logged_out_recent_calendar", "immediate_due_release_refresh", "retry_10s_six_attempts_on_fetch_failure", "websearch_public_macro_release_fallback", "delayed_release_reason_lookup", "no_api_or_download_export", "no_model_activation", "no_broker_execution"],
-    }
-
-
 def plan_recent_poll(*, as_of_date: date | None = None, lookahead_days: int = DEFAULT_RECENT_LOOKAHEAD_DAYS, storage_root: Path = DEFAULT_STORAGE_ROOT, write_files: bool = False) -> TeRecentPollSummary:
     if lookahead_days <= 0 or lookahead_days > 45:
         raise TaskSystemError("lookahead_days must be between 1 and 45")
     start = as_of_date or datetime.now(UTC).date()
     end = start + timedelta(days=lookahead_days)
-    output_root = "storage/monthly_backfill/trading_economics_calendar_web"
-    payload = _recent_task_key(start=start, end=end, output_root=output_root)
-    content = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
-    task_hash = "sha256:" + hashlib.sha256(content).hexdigest()
-    task_key_path = (storage_root / "runtime" / "te_calendar" / "recent" / f"{start.isoformat()}_task_key.json").resolve()
-    if write_files:
-        task_key_path.parent.mkdir(parents=True, exist_ok=True)
-        task_key_path.write_bytes(content)
     return TeRecentPollSummary(
-        contract_type="te_calendar_recent_poll_plan",
+        contract_type="te_calendar_recent_poll_retired",
         start_date=start.isoformat(),
         end_date_exclusive=end.isoformat(),
-        task_key_path=str(task_key_path),
-        task_key_hash=task_hash,
-        write_performed=write_files,
-        date_range_mode="recent",
+        task_key_path=None,
+        task_key_hash=None,
+        write_performed=False,
+        date_range_mode="retired",
         use_authenticated_cookies=False,
+        retired_reason="Trading Economics website subscription is expired; use canonical storage snapshot only.",
         provider_calls=0,
         database_writes_performed=False,
         model_activation_performed=False,
@@ -335,7 +233,7 @@ def write_summary(summary: TeHistoricalSeedSummary | TeRecentPollSummary, *, out
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Plan Trading Economics calendar historical seed or recent poll task keys.")
+    parser = argparse.ArgumentParser(description="Plan Trading Economics calendar storage-source task keys.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     seed = subparsers.add_parser("historical-seed")
     seed.add_argument("--start-month", required=True)

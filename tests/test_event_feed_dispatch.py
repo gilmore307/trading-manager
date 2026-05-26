@@ -25,14 +25,14 @@ class EventFeedDispatchTests(unittest.TestCase):
                 target_symbol="AAPL",
                 storage_root=root,
                 trading_data_root=Path("/tmp/trading-data"),
-                feed_ids=["07_feed_trading_economics_calendar_web"],
+                feed_ids=["05_feed_gdelt_news"],
                 execute_provider_calls=False,
             )
             self.assertFalse(summary.dispatch_performed)
             self.assertEqual(summary.provider_calls, 0)
             self.assertEqual(summary.validation_count, 1)
             self.assertEqual(summary.items[0].status, "validated_not_dispatched")
-            self.assertIn("data_feed.07_feed_trading_economics_calendar_web", summary.items[0].command)
+            self.assertIn("data_feed.05_feed_gdelt_news", summary.items[0].command)
 
     def test_runtime_key_enables_only_selected_live_feed_controls(self):
         with tempfile.TemporaryDirectory() as td:
@@ -57,7 +57,7 @@ class EventFeedDispatchTests(unittest.TestCase):
                     target_symbol="AAPL",
                     storage_root=root,
                     trading_data_root=Path("/tmp/trading-data"),
-                    feed_ids=["05_feed_gdelt_news", "07_feed_trading_economics_calendar_web"],
+                    feed_ids=["05_feed_gdelt_news", "08_feed_sec_company_financials"],
                     execute_provider_calls=True,
                     dynamic_workers=False,
                 )
@@ -74,18 +74,10 @@ class EventFeedDispatchTests(unittest.TestCase):
             self.assertFalse(by_feed["05_feed_gdelt_news"]["params"]["dry_run"])
             self.assertEqual(by_feed["05_feed_gdelt_news"]["manager_controls"]["allowed_providers"], ["gdelt_bigquery"])
             self.assertEqual(by_feed["05_feed_gdelt_news"]["manager_controls"]["allowed_endpoint_families"], ["news_query"])
-            self.assertTrue(by_feed["07_feed_trading_economics_calendar_web"]["params"]["allow_live_fetch"])
-            self.assertFalse(by_feed["07_feed_trading_economics_calendar_web"]["params"]["use_authenticated_cookies"])
-            self.assertTrue(by_feed["07_feed_trading_economics_calendar_web"]["params"]["persist_failure_diagnostics"])
-            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["allowed_providers"], ["trading_economics"])
-            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["allowed_endpoint_families"], ["calendar_web"])
-            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["max_time_window"], "45d")
-            self.assertEqual(
-                by_feed["07_feed_trading_economics_calendar_web"]["manager_controls"]["failure_recovery_route"],
-                ["logged_out_visible_page_primary", "retry_after_60s", "browser_ui_fallback"],
-            )
+            self.assertEqual(by_feed["08_feed_sec_company_financials"]["manager_controls"]["allowed_providers"], ["sec_edgar"])
+            self.assertEqual(by_feed["08_feed_sec_company_financials"]["manager_controls"]["allowed_endpoint_families"], ["company_financials"])
 
-    def test_trading_economics_dispatch_retries_once_then_marks_browser_fallback(self):
+    def test_trading_economics_feed_is_not_dispatchable(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             prepare_event_feed_backfill(
@@ -96,32 +88,16 @@ class EventFeedDispatchTests(unittest.TestCase):
                 write_files=True,
             )
 
-            class Result:
-                returncode = 1
-                stdout = "zero in-window rows"
-                stderr = ""
-
-            with patch("trading_manager_tasks.event_feed_dispatch.time.sleep") as sleep_mock:
-                with patch("trading_manager_tasks.event_feed_dispatch.subprocess.run", return_value=Result()) as run_mock:
-                    summary = dispatch_event_feed_backfill(
-                        start_month="2016-01",
-                        end_month="2016-01",
-                        target_symbol="AAPL",
-                        storage_root=root,
-                        trading_data_root=Path("/tmp/trading-data"),
-                        feed_ids=["07_feed_trading_economics_calendar_web"],
-                        execute_provider_calls=True,
-                        continue_on_error=True,
-                        dynamic_workers=False,
-                        te_retry_delay_seconds=60,
-                    )
-            self.assertEqual(run_mock.call_count, 2)
-            sleep_mock.assert_called_once_with(60)
-            self.assertEqual(summary.provider_calls, 2)
-            self.assertEqual(summary.items[0].attempt_count, 2)
-            self.assertEqual(summary.items[0].status, "dispatched_failed_browser_ui_fallback_required")
-            self.assertTrue(summary.items[0].browser_ui_fallback_required)
-            self.assertIn("browser Custom From/Until/Submit fallback", summary.items[0].error_summary)
+            with self.assertRaisesRegex(Exception, "unsupported event feed ids"):
+                dispatch_event_feed_backfill(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    target_symbol="AAPL",
+                    storage_root=root,
+                    trading_data_root=Path("/tmp/trading-data"),
+                    feed_ids=["07_feed_trading_economics_calendar_web"],
+                    execute_provider_calls=True,
+                )
 
 
 if __name__ == "__main__":

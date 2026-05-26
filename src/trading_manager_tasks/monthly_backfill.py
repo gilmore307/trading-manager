@@ -182,7 +182,7 @@ DEFAULT_SOURCES: tuple[SourceAvailability, ...] = (
         None,
         include_by_default=False,
         historical_backfill_supported=False,
-        note="Accepted visible-page route is current/window oriented, not a bulk historical API route.",
+        note="Website route is retired because the subscription is expired; macro source data is the canonical storage snapshot.",
     ),
     SourceAvailability(
         "thetadata_option_selection_snapshot",

@@ -33,7 +33,7 @@ def _write_event_feed_artifacts(root: Path, *, month: str = "2016-01") -> None:
         "alpaca_news": ("equity_news.csv", f"id,timeline_headline,created_at,updated_at,symbols,summary,event_link_url\nn1,Headline,{month}-04T10:00:00-05:00,{month}-04T10:01:00-05:00,AAPL,Summary,https://example.com/news\n"),
         "gdelt_news": ("gdelt_article.csv", f"article_id,seen_at,source_domain,event_link_url,title,source_theme_tags,organizations,tone,impact_scope\ng1,{month}-04T09:00:00-05:00,reuters.com,https://example.com/gdelt,Fed news,ECON,Federal Reserve,-1,market\n"),
         "sec_company_financials": ("sec_company_fact.csv", f"cik,entity_name,taxonomy,tag,label,description,unit,fy,fp,form,filed,frame,end,value,accession_number,symbol\n1,Test Inc,us-gaap,Revenues,Revenue,,USD,2016,Q1,10-Q,{month}-05,,{month}-05,1,a1,AAPL\n"),
-        "trading_economics_calendar_web": ("trading_economics_calendar_event.csv", f"event_time,country,event,source_event_type,reference,actual,previous,consensus,te_forecast,revised,importance,symbol,source_url\n{month}-08T08:30:00-05:00,United States,Payrolls,Labour,Dec,200K,180K,190K,,,3,,https://tradingeconomics.com/united-states/calendar\n"),
+        "trading_economics_calendar_web": ("trading_economics_calendar_event.csv", f"event_time,country,event,source_event_type,reference,actual,previous,consensus,te_forecast,revised,importance,symbol\n{month}-08T08:30:00-05:00,United States,Payrolls,Labour,Dec,200K,180K,190K,,,3,\n"),
     }
     for source_id, (filename, content) in artifacts.items():
         path = root / "monthly_backfill" / source_id / month / "runs" / "run_001" / "saved" / filename

@@ -33,7 +33,6 @@ from .request_payloads import DEFAULT_STORAGE_ROOT, storage_uri_to_local_path
 FEED_MODULE_BY_ID = {
     "03_feed_alpaca_news": "data_feed.03_feed_alpaca_news",
     "05_feed_gdelt_news": "data_feed.05_feed_gdelt_news",
-    "07_feed_trading_economics_calendar_web": "data_feed.07_feed_trading_economics_calendar_web",
     "08_feed_sec_company_financials": "data_feed.08_feed_sec_company_financials",
 }
 
@@ -51,12 +50,6 @@ PROVIDER_CONTROLS_BY_FEED_ID = {
         "allowed_endpoint_families": ["news_query"],
         "max_requests": 1,
         "max_rows": 250,
-        "max_time_window": "45d",
-    },
-    "07_feed_trading_economics_calendar_web": {
-        "allowed_providers": ["trading_economics"],
-        "allowed_endpoint_families": ["calendar_web"],
-        "max_requests": 1,
         "max_time_window": "45d",
     },
     "08_feed_sec_company_financials": {
@@ -176,11 +169,6 @@ def _autonomous_event_feed_task_key(task_key: Mapping[str, Any]) -> dict[str, An
     params["manager_dry_run"] = False
     if feed_id == "05_feed_gdelt_news":
         params["dry_run"] = False
-    elif feed_id == "07_feed_trading_economics_calendar_web":
-        params["allow_live_fetch"] = True
-        params["use_authenticated_cookies"] = False
-        params["persist_failure_diagnostics"] = True
-        controls["failure_recovery_route"] = ["logged_out_visible_page_primary", "retry_after_60s", "browser_ui_fallback"]
     runtime_key["params"] = params
     policy_refs = [str(item) for item in runtime_key.get("policy_refs") or []]
     if "autonomous_historical_provider_acquisition" not in policy_refs:
@@ -265,7 +253,7 @@ def dispatch_event_feed_backfill(
         attempt_count = 0
         browser_ui_fallback_required = False
         if execute_provider_calls:
-            max_attempts = 2 if feed_id == "07_feed_trading_economics_calendar_web" else 1
+            max_attempts = 1
             last_result = None
             for attempt in range(1, max_attempts + 1):
                 attempt_count = attempt
@@ -290,10 +278,6 @@ def dispatch_event_feed_backfill(
             status = "dispatched_succeeded" if last_result.returncode == 0 else "dispatched_failed"
             if last_result.returncode != 0:
                 error_summary = "\n".join(part for part in (last_result.stdout[-500:], last_result.stderr[-500:]) if part)
-                if feed_id == "07_feed_trading_economics_calendar_web":
-                    browser_ui_fallback_required = True
-                    status = "dispatched_failed_browser_ui_fallback_required"
-                    error_summary = (error_summary + "\n" if error_summary else "") + "Trading Economics HTTP/cookie route failed after one retry; use the reviewed browser Custom From/Until/Submit fallback route."
                 if not continue_on_error:
                     raise TaskSystemError(f"event feed dispatch failed for {request_id}: {error_summary}")
         items.append(

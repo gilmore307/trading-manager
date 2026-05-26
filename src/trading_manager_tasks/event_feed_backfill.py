@@ -25,13 +25,11 @@ DEFAULT_REQUESTED_BY = "trading-manager.layer_ten_event_feed_backfill"
 REQUIRED_EVENT_FEED_IDS = (
     "03_feed_alpaca_news",
     "05_feed_gdelt_news",
-    "07_feed_trading_economics_calendar_web",
     "08_feed_sec_company_financials",
 )
 SOURCE_BY_FEED_ID = {
     "03_feed_alpaca_news": "alpaca_news",
     "05_feed_gdelt_news": "gdelt_news",
-    "07_feed_trading_economics_calendar_web": "trading_economics_calendar_web",
     "08_feed_sec_company_financials": "sec_company_financials",
 }
 
@@ -134,8 +132,6 @@ def _enrich_payload(payload: dict[str, Any], *, target_symbol: str, target_cik: 
                 ],
             }
         )
-    elif feed_id == "07_feed_trading_economics_calendar_web":
-        params.update({"country": "United States", "importance": "3", "allow_live_fetch": False})
     elif feed_id == "08_feed_sec_company_financials":
         params.update({"data_kind": "sec_company_fact", "cik": str(target_cik).zfill(10), "taxonomy": "us-gaap"})
         params.pop("tag", None)

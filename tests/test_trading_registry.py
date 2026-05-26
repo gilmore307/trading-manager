@@ -331,7 +331,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["kind"], "config")
         self.assertEqual(
             rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["payload"],
-            "03_feed_alpaca_news;05_feed_gdelt_news;07_feed_trading_economics_calendar_web;08_feed_sec_company_financials",
+            "03_feed_alpaca_news;05_feed_gdelt_news;08_feed_sec_company_financials",
         )
         self.assertEqual(rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["payload"], "model_buy_point_triggered_chain_snapshots")
         self.assertIn("model buy/expression decisions", rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["note"])
@@ -1424,7 +1424,7 @@ class RegistryHelperTests(unittest.TestCase):
             "OPTION_NBBO",
             "SEC_COMPANY_FACT",
             "SEC_FILING_DOCUMENT",
-            "TRADING_ECONOMICS_CALENDAR_PAGE",
+            "TRADING_ECONOMICS_CALENDAR_STORAGE_SOURCE",
         }
         for key in expected_feed_capabilities:
             self.assertEqual(by_key[key]["kind"], "feed_capability")
@@ -1433,7 +1433,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("02_feed_alpaca_liquidity", by_key["ALPACA_EQUITY_LATEST_SNAPSHOT"]["applies_to"])
         self.assertIn("05_feed_gdelt_news", by_key["GDELT_GKG_RECORD"]["applies_to"])
         self.assertIn("06_feed_etf_holdings", by_key["ETF_ISSUER_HOLDINGS"]["applies_to"])
-        self.assertIn("07_feed_trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_PAGE"]["applies_to"])
+        self.assertIn("07_feed_trading_economics_calendar_web", by_key["TRADING_ECONOMICS_CALENDAR_STORAGE_SOURCE"]["applies_to"])
         for obsolete_calendar_or_macro_key in {
             "CALENDAR_DISCOVERY",
             "ECONOMIC_RELEASE_CALENDAR",

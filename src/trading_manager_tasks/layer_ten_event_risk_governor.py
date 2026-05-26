@@ -35,13 +35,11 @@ REQUIRED_EVENT_FEED_ARTIFACTS = {
     "alpaca_news": "equity_news.csv",
     "gdelt_news": "gdelt_article.csv",
     "sec_company_financials": "sec_company_fact.csv",
-    "trading_economics_calendar_web": "trading_economics_calendar_event.csv",
 }
 EVENT_FEED_TIME_FIELDS = {
     "alpaca_news": ("created_at", "updated_at"),
     "gdelt_news": ("seen_at", "gdelt_date"),
     "sec_company_financials": ("filing_date", "filed", "end", "report_date"),
-    "trading_economics_calendar_web": ("event_time",),
 }
 ET = ZoneInfo("America/New_York")
 

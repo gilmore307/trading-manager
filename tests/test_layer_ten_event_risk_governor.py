@@ -188,7 +188,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             self.assertEqual(task_key["params"]["end"], "2016-03-01T00:00:00-05:00")
             self.assertTrue(all(Path(run.task_key_path).exists() for run in summary.detector_runs))
 
-    def test_dry_run_includes_reviewed_news_sec_macro_artifacts_in_source_task_key(self) -> None:
+    def test_dry_run_includes_reviewed_news_and_sec_artifacts_in_source_task_key(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             trading_data_root = tmp / "trading-data"
@@ -201,7 +201,6 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
                 "alpaca_news": ("equity_news.csv", "id,timeline_headline,created_at,updated_at,symbols,summary,event_link_url\nn1,Headline,2016-01-04T10:00:00-05:00,2016-01-04T10:01:00-05:00,XLF,Summary,https://example.com/news\n"),
                 "gdelt_news": ("gdelt_article.csv", "article_id,seen_at,source_domain,event_link_url,title,source_theme_tags,organizations,tone,impact_scope\ng1,2016-01-04T09:00:00-05:00,reuters.com,https://example.com/gdelt,Fed news,ECON,Federal Reserve,-1,market\n"),
                 "sec_company_financials": ("sec_company_fact.csv", "cik,entity_name,taxonomy,tag,label,description,unit,fy,fp,form,filed,frame,end,value,accession_number,symbol\n1,Test Inc,us-gaap,Revenues,Revenue,,USD,2016,Q1,10-Q,2016-01-05,,2015-12-31,1,a1,XLF\n"),
-                "trading_economics_calendar_web": ("trading_economics_calendar_event.csv", "event_time,country,event,source_event_type,reference,actual,previous,consensus,te_forecast,revised,importance,symbol,source_url\n2016-01-08T08:30:00-05:00,United States,Payrolls,Labour,Dec,200K,180K,190K,,,3,,https://tradingeconomics.com/united-states/calendar\n"),
             }
             for source_id, (filename, content) in artifacts.items():
                 path = feed_root / source_id / "2016-01" / "runs" / "run_001" / "saved" / filename
@@ -224,17 +223,17 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             self.assertGreaterEqual(summary.event_feed_row_coverage["alpaca_news"], 1)
             self.assertGreaterEqual(summary.event_feed_row_coverage["gdelt_news"], 1)
             self.assertGreaterEqual(summary.event_feed_row_coverage["sec_company_financials"], 1)
-            self.assertGreaterEqual(summary.event_feed_row_coverage["trading_economics_calendar_web"], 1)
-            self.assertEqual(len(task_key["params"]["event_artifact_paths"]), 4)
+            self.assertNotIn("trading_economics_calendar_web", summary.event_feed_coverage)
+            self.assertEqual(len(task_key["params"]["event_artifact_paths"]), 3)
             self.assertEqual(summary.provider_calls, 0)
 
     def test_uses_latest_reviewed_feed_artifact_per_source_month(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             trading_data_root = tmp / "trading-data"
-            feed_root = trading_data_root / "storage" / "monthly_backfill" / "trading_economics_calendar_web" / "2016-01" / "runs"
-            old_path = feed_root / "run_old" / "saved" / "trading_economics_calendar_event.csv"
-            new_path = feed_root / "run_new" / "saved" / "trading_economics_calendar_event.csv"
+            feed_root = trading_data_root / "storage" / "monthly_backfill" / "gdelt_news" / "2016-01" / "runs"
+            old_path = feed_root / "run_old" / "saved" / "gdelt_article.csv"
+            new_path = feed_root / "run_new" / "saved" / "gdelt_article.csv"
             old_path.parent.mkdir(parents=True, exist_ok=True)
             new_path.parent.mkdir(parents=True, exist_ok=True)
             old_path.write_text("old\n", encoding="utf-8")
@@ -244,7 +243,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
 
             paths, coverage = _discover_event_feed_artifacts(trading_data_root=trading_data_root, start_month="2016-01", end_month="2016-01")
 
-            self.assertEqual(coverage["trading_economics_calendar_web"], 1)
+            self.assertEqual(coverage["gdelt_news"], 1)
             self.assertEqual(paths, [str(new_path)])
 
     def test_write_blocks_when_reviewed_event_feed_artifacts_have_zero_in_window_rows(self) -> None:
@@ -260,7 +259,6 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
                 "alpaca_news": ("equity_news.csv", "id,timeline_headline,created_at,updated_at,symbols,summary,event_link_url\nn1,Headline,2016-01-04T10:00:00-05:00,2016-01-04T10:01:00-05:00,XLF,Summary,https://example.com/news\n"),
                 "gdelt_news": ("gdelt_article.csv", "article_id,seen_at,source_domain,event_link_url,title,source_theme_tags,organizations,tone,impact_scope\ng1,2016-02-04T09:00:00-05:00,reuters.com,https://example.com/gdelt,Fed news,ECON,Federal Reserve,-1,market\n"),
                 "sec_company_financials": ("sec_company_fact.csv", "cik,entity_name,taxonomy,tag,label,description,unit,fy,fp,form,filed,frame,end,value,accession_number,symbol\n1,Test Inc,us-gaap,Revenues,Revenue,,USD,2016,Q1,10-Q,2016-01-05,,2015-12-31,1,a1,XLF\n"),
-                "trading_economics_calendar_web": ("trading_economics_calendar_event.csv", "event_time,country,event,source_event_type,reference,actual,previous,consensus,te_forecast,revised,importance,symbol,source_url\n2016-01-08T08:30:00-05:00,United States,Payrolls,Labour,Dec,200K,180K,190K,,,3,,https://tradingeconomics.com/united-states/calendar\n"),
             }
             for source_id, (filename, content) in artifacts.items():
                 path = feed_root / source_id / "2016-01" / "runs" / "run_001" / "saved" / filename

@@ -86,13 +86,12 @@ activate promoted models directly.
 
 ## Trading Economics calendar maintenance
 
-Trading Economics calendar handling is split into two manager-owned routes:
+Trading Economics calendar handling has one accepted source route:
 
-1. Historical seed: a bootstrap from reviewed saved monthly `07_feed_trading_economics_calendar_web` CSV artifacts into `trading_data.source_10_event_risk_governor`. The planner merges all in-window rows across runs into one filtered per-month artifact, excludes wrong-window rows, and prepares a `source_10_event_risk_governor` task key with `raw_artifact_retention=keep_forever_append_only_source_evidence`. Raw monthly CSV originals are keep-forever TE source evidence, while SQL carries the normalized event envelope and source artifact pointer.
-2. Recent poll: an ongoing provider-maintenance task key for the logged-out visible recent calendar page. It uses `date_range_mode=recent`, `use_authenticated_cookies=false`, and no API/download/export route. Parsed rows are appended by `event_time` month under `storage/01_source_data/monthly_backfill/trading_economics_calendar_web/YYYY-MM/runs/<run_id>` so TE has one long-lived append-only source root.
-3. Due-release refresh: when a scheduled event reaches its release time, the realtime system should fetch immediately. If TE fetch fails or returns no released `actual`/`revised` value, retry every 10 seconds for 6 additional attempts, roughly 1 minute total retry time, under `te_recent_release_fetch_retry_10s_six_attempts_then_websearch`. If all attempts fail or the release still appears missing, fall back to `websearch_public_macro_release` to find either the released value or a documented delay/cancellation/no-release reason. Fallback rows must preserve provenance and must not be silently merged into TE-origin rows.
+1. Canonical source: reviewed TE calendar payloads under `trading-storage/storage/01_source_data/monthly_backfill/trading_economics_calendar_web/YYYY-MM/runs/<run_id>/`. These files are append-only protected and Git-recoverable.
+2. Derived materializations: SQL rows, runtime receipts, control-plane filtered artifacts, and dashboard read models are rebuildable operational/materialized state, not the source of truth. TE macro rows should stay out of `source_10_event_risk_governor` and dashboard event markers until Layer 10 explicitly promotes macro events into the accepted event-risk/attention pool.
 
-Training should read TE macro events from SQL first. If narrow gaps remain, the manager may fill them with reviewed logged-out visible-page custom-date fetches or public macro web-search provenance rows; fallback provenance must remain explicit. Ongoing TE maintenance does not depend on an active TE subscription.
+The Trading Economics subscription is expired. Manager workflows must not treat the website URL as an active source, must not record TE website URLs as source references, and must not silently merge public web-search fallback rows into TE-origin source data.
 
 ## Useful Commands
 
@@ -103,6 +102,6 @@ PYTHONPATH=src python3 scripts/tasks/validate_request_handoff.py --from-db --req
 PYTHONPATH=src python3 scripts/tasks/record_completion_receipt.py completion_receipt.json --request-id mgrreq_example --component-id component --repo-id trading-data --receipt-uri storage://example/receipt.json
 PYTHONPATH=src python3 scripts/tasks/list_task_summary.py --limit 50
 PYTHONPATH=src python3 scripts/tasks/rehearse_task_system.py --end-month 2016-01 --limit 3 --scenario mixed --format jsonl
-PYTHONPATH=src python3 scripts/tasks/plan_trading_economics_calendar.py historical-seed --start-month 2016-01 --end-month 2026-05 --write-files
-PYTHONPATH=src python3 scripts/tasks/plan_trading_economics_calendar.py recent-poll --lookahead-days 45 --write-files
+# Retired/inventory only; does not create source_10 task keys.
+PYTHONPATH=src python3 scripts/tasks/plan_trading_economics_calendar.py historical-seed --start-month 2016-01 --end-month 2026-05
 ```

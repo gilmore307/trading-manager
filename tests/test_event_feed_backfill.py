@@ -28,7 +28,7 @@ class EventFeedBackfillTests(unittest.TestCase):
                 storage_root=Path(td),
                 write_files=True,
             )
-            self.assertEqual(summary.task_key_count, 4)
+            self.assertEqual(summary.task_key_count, len(REQUIRED_EVENT_FEED_IDS))
             self.assertTrue(summary.write_performed)
             self.assertEqual(summary.provider_calls, 0)
             self.assertFalse(summary.model_activation_performed)
@@ -37,12 +37,10 @@ class EventFeedBackfillTests(unittest.TestCase):
             for item in summary.task_keys:
                 payload = json.loads(Path(item.local_path).read_text())
                 by_feed[payload["feed"]] = payload
-                self.assertEqual(payload["manager_controls"]["allow_live_provider_calls"], False)
+            self.assertEqual(payload["manager_controls"]["allow_live_provider_calls"], False)
             self.assertEqual(by_feed["03_feed_alpaca_news"]["params"]["symbols"], ["AAPL"])
             self.assertEqual(by_feed["05_feed_gdelt_news"]["params"]["dry_run"], True)
-            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["params"]["allow_live_fetch"], False)
-            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["params"]["start_date"], "2016-01-01")
-            self.assertEqual(by_feed["07_feed_trading_economics_calendar_web"]["params"]["end_date"], "2016-02-01")
+            self.assertNotIn("07_feed_trading_economics_calendar_web", by_feed)
             self.assertEqual(by_feed["08_feed_sec_company_financials"]["params"]["cik"], "0000320193")
             self.assertNotIn("tag", by_feed["08_feed_sec_company_financials"]["params"])
 
