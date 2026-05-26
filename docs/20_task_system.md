@@ -91,7 +91,7 @@ Trading Economics calendar handling has one accepted source route:
 1. Canonical source: reviewed TE calendar payloads under `trading-storage/storage/01_source_data/monthly_backfill/trading_economics_calendar_web/YYYY-MM/runs/<run_id>/`. These files are append-only protected and Git-recoverable.
 2. Derived materializations: SQL rows, runtime receipts, control-plane filtered artifacts, and dashboard read models are rebuildable operational/materialized state, not the source of truth. TE macro rows should stay out of `source_10_event_risk_governor` and dashboard event markers until Layer 10 explicitly promotes macro events into the accepted event-risk/attention pool.
 
-The Trading Economics subscription is expired. Manager workflows must not treat the website URL as an active source, must not record TE website URLs as source references, and must not silently merge public web-search fallback rows into TE-origin source data.
+Manager workflows may schedule the bounded recent/future Trading Economics calendar refresh into canonical storage source rows. They must not record TE website URLs as source references, must not write TE macro rows into `source_10_event_risk_governor`, and must not silently merge public web-search fallback rows into TE-origin source data.
 
 ## Useful Commands
 

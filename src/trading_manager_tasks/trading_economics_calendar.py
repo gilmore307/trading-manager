@@ -1,13 +1,15 @@
 """Trading Economics calendar storage-source planning.
 
-This module prepares source-key plans from canonical storage artifacts. The
-Trading Economics website subscription is expired, so recent website polling is
-retired and returns a no-provider no-task receipt.
+This module separates canonical storage source maintenance from Layer 10 event
+admission. Recent/future calendar polling may acquire Trading Economics rows
+into storage source artifacts, but it does not materialize SQL event rows,
+activate models, submit broker orders, or mutate accounts.
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 from dataclasses import asdict, dataclass
@@ -23,6 +25,7 @@ from .storage_paths import data_storage_root
 
 DEFAULT_TE_MONTHLY_ROOT = data_storage_root() / "monthly_backfill" / "trading_economics_calendar_web"
 DEFAULT_RECENT_LOOKAHEAD_DAYS = 45
+TE_FEED_ID = "07_feed_trading_economics_calendar_web"
 
 
 def _te_monthly_root(trading_data_root: Path) -> Path:
@@ -205,21 +208,71 @@ def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root:
     )
 
 
+def _recent_task_key(*, start: date, end: date, output_root: str) -> dict[str, Any]:
+    return {
+        "feed": TE_FEED_ID,
+        "task_id": f"te_calendar_recent_{start.isoformat()}_{end.isoformat()}",
+        "output_root": output_root,
+        "params": {
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+            "country": "United States",
+            "importance": "3",
+            "allow_live_fetch": True,
+            "date_range_mode": "recent",
+            "use_authenticated_cookies": False,
+            "persist_failure_diagnostics": True,
+            "monthly_backfill_bucketed_output": True,
+            "source_materialization_role": "append_to_trading_economics_monthly_backfill",
+        },
+        "manager_controls": {
+            "allow_live_provider_calls": True,
+            "autonomous_historical_provider_acquisition": False,
+            "realtime_provider_maintenance": True,
+            "allowed_providers": ["trading_economics"],
+            "allowed_endpoint_families": ["calendar_web"],
+            "max_requests": 1,
+            "max_time_window": "45d",
+            "retry_policy_ref": "trading-data://provider-policy/recent-calendar-single-request",
+            "rate_limit_policy_ref": "trading-data://provider-policy/trading-economics-recent-calendar",
+            "website_url_persistence": False,
+            "database_writes_performed": False,
+            "model_activation_performed": False,
+            "broker_execution_performed": False,
+        },
+        "policy_refs": [
+            "bounded_recent_future_calendar_fetch",
+            "append_to_storage_source_only",
+            "no_website_url_persistence",
+            "no_layer_10_sql_materialization",
+            "no_model_activation",
+            "no_broker_execution",
+        ],
+    }
+
+
 def plan_recent_poll(*, as_of_date: date | None = None, lookahead_days: int = DEFAULT_RECENT_LOOKAHEAD_DAYS, storage_root: Path = DEFAULT_STORAGE_ROOT, write_files: bool = False) -> TeRecentPollSummary:
     if lookahead_days <= 0 or lookahead_days > 45:
         raise TaskSystemError("lookahead_days must be between 1 and 45")
     start = as_of_date or datetime.now(UTC).date()
     end = start + timedelta(days=lookahead_days)
+    payload = _recent_task_key(start=start, end=end, output_root="storage/monthly_backfill/trading_economics_calendar_web")
+    content = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+    task_hash = "sha256:" + hashlib.sha256(content).hexdigest()
+    task_key_path = (storage_root / "runtime" / "te_calendar" / "recent" / f"{start.isoformat()}_task_key.json").resolve()
+    if write_files:
+        task_key_path.parent.mkdir(parents=True, exist_ok=True)
+        task_key_path.write_bytes(content)
     return TeRecentPollSummary(
-        contract_type="te_calendar_recent_poll_retired",
+        contract_type="te_calendar_recent_poll_plan",
         start_date=start.isoformat(),
         end_date_exclusive=end.isoformat(),
-        task_key_path=None,
-        task_key_hash=None,
-        write_performed=False,
-        date_range_mode="retired",
+        task_key_path=str(task_key_path),
+        task_key_hash=task_hash,
+        write_performed=write_files,
+        date_range_mode="recent",
         use_authenticated_cookies=False,
-        retired_reason="Trading Economics website subscription is expired; use canonical storage snapshot only.",
+        retired_reason=None,
         provider_calls=0,
         database_writes_performed=False,
         model_activation_performed=False,

@@ -182,7 +182,7 @@ DEFAULT_SOURCES: tuple[SourceAvailability, ...] = (
         None,
         include_by_default=False,
         historical_backfill_supported=False,
-        note="Website route is retired because the subscription is expired; macro source data is the canonical storage snapshot.",
+        note="Recent/future TE refresh is current-only storage source maintenance; historical backfill remains excluded unless a reviewed route is accepted.",
     ),
     SourceAvailability(
         "thetadata_option_selection_snapshot",
