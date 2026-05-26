@@ -4,30 +4,30 @@ This file owns shared naming rules for model-layer source, feature, and model su
 
 ## Current Layer Stack
 
-| Layer | Boundary | Stable model id | Physical model surface |
+| Layer | Boundary | Stable model id | Model-generation table |
 |---|---|---|---|
-| 1 | MarketRegimeModel | `market_regime_model` | `model_01_market_regime` |
-| 2 | SectorContextModel | `sector_context_model` | `model_02_sector_context` |
-| 3 | TargetStateVectorModel | `target_state_vector_model` | `model_03_target_state_vector` |
-| 4 | EventFailureRiskModel | `event_failure_risk_model` | `model_04_event_failure_risk` |
-| 5 | AlphaConfidenceModel | `alpha_confidence_model` | `model_05_alpha_confidence` |
-| 6 | DynamicRiskPolicyModel | `dynamic_risk_policy_model` | `model_06_dynamic_risk_policy` |
-| 7 | PositionProjectionModel | `position_projection_model` | `model_07_position_projection` |
-| 8 | UnderlyingActionModel | `underlying_action_model` | `model_08_underlying_action` |
-| 9 | TradingGuidanceModel / OptionExpressionModel | `option_expression_model` | `model_09_option_expression` |
-| 10 | EventRiskGovernor / EventIntelligenceOverlay | `event_risk_governor` | `model_10_event_risk_governor` |
+| 1 | MarketRegimeModel | `market_regime_model` | `trading_model.m01_market_regime_model_generation` |
+| 2 | SectorContextModel | `sector_context_model` | `trading_model.m02_sector_context_model_generation` |
+| 3 | TargetStateVectorModel | `target_state_vector_model` | `trading_model.m03_target_state_vector_model_generation` |
+| 4 | EventFailureRiskModel | `event_failure_risk_model` | `trading_model.m04_event_failure_risk_model_generation` |
+| 5 | AlphaConfidenceModel | `alpha_confidence_model` | `trading_model.m05_alpha_confidence_model_generation` |
+| 6 | DynamicRiskPolicyModel | `dynamic_risk_policy_model` | `trading_model.m06_dynamic_risk_policy_model_generation` |
+| 7 | PositionProjectionModel | `position_projection_model` | `trading_model.m07_position_projection_model_generation` |
+| 8 | UnderlyingActionModel | `underlying_action_model` | `trading_model.m08_underlying_action_model_generation` |
+| 9 | TradingGuidanceModel / OptionExpressionModel | `option_expression_model` | `trading_model.m09_option_expression_model_generation` |
+| 10 | EventRiskGovernor / EventIntelligenceOverlay | `event_risk_governor` | `trading_model.m10_event_risk_governor_model_generation` |
 
 ## Stable Id Rule
 
 Use the stable model id for semantic interfaces: `model_id` fields, promotion targets, manager requests, completion/evaluation receipts, CLI `--model` arguments, scheduler/control-plane routing, and active registry payloads that name a model as an interface.
 
-Use `model_NN_*` only for physical implementation surfaces: import/package paths, script paths, SQL table names, source/feature/model artifact surface names, physical-surface audit rows, and legacy-normalization migrations.
+Use `mNN_<domain_slug>_<task_stage>` SQL names for physical table surfaces. Implementation package and script paths may continue to use existing directory names until a reviewed source-path migration is scheduled; SQL table naming should not follow those package-path names.
 
 ## SQL Table Surface Patterns
 
 SQL physical identifiers use lowercase snake_case. A dot separates only SQL namespace levels, normally `schema.table`. Do not use hyphens in SQL table, column, schema, registry, or task identifiers; reserve hyphenated slugs for filesystem or URL surfaces that already require them.
 
-New model/data table surfaces must use the current owner-domain-stage pattern:
+Model/data table surfaces must use the current owner-domain-stage pattern:
 
 ```text
 <schema>.<owner_prefix>_<domain_slug>_<task_stage>[_<artifact_role>]
@@ -50,36 +50,28 @@ trading_model.m01_market_regime_model_generation_explainability
 trading_model.m01_market_regime_model_generation_diagnostics
 ```
 
-Previously accepted layer-owned SQL tables used the older surface-stem pattern:
+Old `source_NN_*`, `feature_NN_*`, and `model_NN_*` names are migration debt, not current planning names. Do not introduce, document, or register new tables with the old surface-stem pattern. Historical applied migrations may still mention old names as immutable history.
+
+Layer-neutral governance, control-plane, registry, receipt, and audit tables must not invent a fake layer number; they should carry layer refs in row fields when needed.
+
+## Current Shared Table Examples
 
 ```text
-source_NN_<surface_slug>
-feature_NN_<surface_slug>
-model_NN_<layer_slug>
-model_NN_<layer_slug>_explainability
-model_NN_<layer_slug>_diagnostics
+trading_data.m01_market_regime_data_acquisition
+trading_data.m01_market_regime_feature_generation
+trading_model.m01_market_regime_model_generation
+trading_data.m02_sector_context_data_acquisition
+trading_data.m02_sector_context_feature_generation
+trading_data.m03_target_state_vector_data_acquisition
+trading_data.m03_target_state_vector_feature_generation
+trading_data.m09_option_expression_data_acquisition
+trading_data.m09_option_expression_feature_generation
+trading_data.m09_option_expression_contract_path_data_acquisition
+trading_data.m10_event_risk_governor_data_acquisition
+trading_data.m10_event_risk_governor_feature_generation
 ```
 
-Existing implemented `source_NN_*`, `feature_NN_*`, and `model_NN_*` tables remain explicit compatibility surfaces until a reviewed migration replaces them. Do not use the older pattern for newly planned tables.
-
-For older `model_NN_*`, `NN` is the accepted model-layer number. For older `source_NN_*` and `feature_NN_*`, `NN` follows the registered data-source or feature-surface contract and must be checked against the row meaning. Layer-neutral governance, control-plane, registry, receipt, and audit tables must not invent a fake layer number; they should carry layer refs in row fields when needed.
-
-## Current Shared Source/Feature Examples
-
-```text
-source_01_market_regime
-feature_01_market_regime
-feature_02_sector_context
-source_02_target_candidate_holdings
-source_03_target_state
-feature_03_target_state_vector
-source_05_option_expression
-source_06_position_execution
-feature_09_option_expression
-source_10_event_risk_governor
-```
-
-Source-family numbers are not automatic proof of model-layer ownership. The registered row and accepted boundary decide ownership.
+The table prefix is not automatic proof of business authority. The registered row and accepted boundary decide ownership.
 
 ## Field Prefix Rule
 
