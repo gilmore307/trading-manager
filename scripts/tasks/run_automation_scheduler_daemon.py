@@ -10,7 +10,7 @@ import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
-from trading_manager_tasks.agent_error_handler import handle_server_error
+from trading_manager_tasks.agent_error_handler import _env_truthy, handle_server_error
 from trading_manager_tasks.registry_values import registry_payload
 from trading_manager_tasks.scheduler_daemon import main as scheduler_daemon_main
 from trading_manager_tasks.storage_paths import manager_storage_root

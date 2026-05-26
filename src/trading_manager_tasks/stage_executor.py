@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping, TextIO
 
-from .agent_error_handler import handle_server_error
+from .agent_error_handler import _env_truthy, handle_server_error
 from .control_plane import TaskSystemError
 from .model_training_state import (
     DEFAULT_WORKFLOW_STATE_PATH,
@@ -298,7 +298,7 @@ def execute_stage_process(
             working_directory=str(cwd),
             evidence_refs=[f"manager_stage:{stage.stage_id}"],
             output_root=log_root.parent / "agent_error_handling",
-            call_agent=bool(os.environ.get("MANAGER_AGENT_ERROR_AUTOCALL")),
+            call_agent=_env_truthy("MANAGER_AGENT_ERROR_AUTOCALL"),
             catalog_storage=os.environ.get("MANAGER_AGENT_ERROR_CATALOG_STORAGE", "sql"),
         )
     summary = StageExecutionSummary(
