@@ -4,6 +4,7 @@ import json
 import tempfile
 import textwrap
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from trading_manager_tasks.monthly_backfill import plan_monthly_backfill_requests
@@ -91,6 +92,28 @@ class RequestHandoffValidationTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "allow_live_provider_calls"):
                 validate_request_handoff(request, storage_root=tmp, component_src_root=self._fake_data_src(tmp))
+
+    def test_concurrent_validation_preserves_dynamic_import_context(self):
+        request = plan_monthly_backfill_requests(start_month="2016-01", end_month="2016-01")[0]
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            materialized = materialize_request_payload(request, storage_root=tmp, write_file=True)
+            component_src_root = self._fake_data_src(tmp)
+
+            def validate_once() -> str:
+                result = validate_request_handoff(
+                    request,
+                    storage_root=tmp,
+                    component_src_root=component_src_root,
+                    input_binding=dict(materialized.input_binding),
+                    require_input_binding=True,
+                )
+                return result.status
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                statuses = list(executor.map(lambda _: validate_once(), range(20)))
+
+        self.assertEqual(statuses, ["validated"] * 20)
 
 
 if __name__ == "__main__":

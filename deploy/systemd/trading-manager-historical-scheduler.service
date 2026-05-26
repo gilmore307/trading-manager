@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/root/projects/trading-manager
-Environment=PYTHONPATH=/root/projects/trading-manager/src
+Environment=PYTHONPATH=/root/projects/trading-manager/src:/root/projects/trading-data/src:/root/projects/trading-storage/src:/root/projects/trading-model/src
 Environment=TRADING_MANAGER_HISTORICAL_START_MONTH=2016-01
 Environment=TRADING_MANAGER_HISTORICAL_END_MONTH=2016-06
 Environment=TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=5
