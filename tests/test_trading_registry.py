@@ -55,6 +55,30 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertLessEqual(current_kinds, set(constrained_kinds))
         self.assertIn("payload_format", constrained_kinds)
 
+    def test_term_payloads_are_tokens_not_inline_prose_or_lists(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+
+        generic_dictionary_keys = {
+            "CODEX",
+            "GITHUB",
+            "OPENCLAW",
+            "POSTGRESQL",
+            "SMB",
+            "SQL",
+            "TAILSCALE",
+            "TRADING_MANAGER_REGISTRY",
+        }
+        keys = {row["key"] for row in rows}
+        self.assertFalse(generic_dictionary_keys & keys)
+
+        bad_terms = [
+            row["key"]
+            for row in rows
+            if row["kind"] == "term" and re.search(r"[\s;=]", row["payload"])
+        ]
+        self.assertEqual([], bad_terms)
+
     def test_local_registry_paths_exist(self):
         repo_root = Path.cwd()
         missing = []
@@ -194,6 +218,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(rows["REPLAY_FEED_ACQUISITION_PLAN"]["payload"], "replay_feed_acquisition_plan")
         self.assertIn("event-layer feeds", rows["REPLAY_FEED_ACQUISITION_PLAN"]["note"])
+        self.assertEqual(rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["kind"], "config")
         self.assertEqual(
             rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["payload"],
             "03_feed_alpaca_news;05_feed_gdelt_news;07_feed_trading_economics_calendar_web;08_feed_sec_company_financials",
@@ -216,6 +241,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("REPLAY_LIQUIDITY_SAMPLED_ACQUISITION_POLICY", rows)
         self.assertNotIn("REPLAY_FULL_MONTH_LIQUIDITY_DEFERRED_POLICY", rows)
         self.assertNotIn("REPLAY_LIQUIDITY_FULL_DAILY_ACQUISITION_POLICY", rows)
+        self.assertEqual(rows["REPLAY_FEED_COVERAGE_STATUS_VALUES"]["kind"], "config")
         self.assertEqual(rows["OKX_HISTORICAL_REPLAY_CANDLE_ROUTE"]["payload"], "okx_history_candles_for_replay_windows")
         self.assertIn(
             "sealed one-time action",
@@ -546,7 +572,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(actual_providers, expected_current_providers)
         for obsolete_provider_term in {"BEA", "BLS", "CENSUS", "FRED", "US_TREASURY_FISCAL_DATA"}:
             self.assertNotIn(obsolete_provider_term, rows)
-        self.assertEqual(rows["GITHUB"]["kind"], "term")
+        self.assertNotIn("GITHUB", rows)
         expected_sources = {
             "SOURCE_01_MARKET_REGIME": "source_01_market_regime",
             "SOURCE_02_TARGET_CANDIDATE_HOLDINGS": "source_02_target_candidate_holdings",
@@ -978,6 +1004,7 @@ class RegistryHelperTests(unittest.TestCase):
             "promotion_review_waits_for_fold_layers_01_10_model_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
         )
+        self.assertEqual(rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["kind"], "config")
         self.assertIn("train_months=4", rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["payload"])
         self.assertEqual(
             rows["MONTH_SCOPED_INGEST_ONLY_DURING_FOUNDATION_CATCH_UP"]["payload"],
@@ -1021,6 +1048,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("dedup_window_seconds=3600", rows["MANAGER_AGENT_ERROR_DEDUP_POLICY"]["payload"])
         self.assertIn("occurred", rows["MANAGER_AGENT_ERROR_ALERT_TIME_POLICY"]["payload"])
         self.assertIn("run_safe_error_repair.py", rows["MANAGER_SAFE_ERROR_REPAIR_RUNNER"]["path"])
+        self.assertEqual(
+            rows["MANAGER_SAFE_ERROR_REPAIR_RUNNER"]["payload"],
+            "PYTHONPATH=src python3 scripts/tasks/run_safe_error_repair.py",
+        )
+        self.assertEqual(
+            rows["MANAGER_AGENT_ERROR_AGENT_RUNNER"]["payload"],
+            "PYTHONPATH=src python3 scripts/tasks/run_agent_error_agent.py",
+        )
         self.assertEqual(rows["DASHBOARD_HISTORICAL_TASK_TIMELINE"]["payload"], "historical_task_progress_summary.chart_payload.task_timeline")
         self.assertIn("task_timeline", rows["DASHBOARD_HISTORICAL_TASK_PROGRESS_PAGE"]["applies_to"])
         self.assertIn("layer_04_event_failure_risk", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
@@ -1030,6 +1065,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
         self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
+        self.assertEqual(rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["kind"], "template")
+        self.assertEqual(
+            rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["payload"],
+            "trading-manager-historical-scheduler.service",
+        )
         self.assertIn("trading-manager-historical-scheduler.service", rows["MANAGER_HISTORICAL_SCHEDULER_SYSTEMD_SERVICE_TEMPLATE"]["path"])
         self.assertEqual(rows["REVIEW_DECISION_ARTIFACT"]["payload"], "review_decision")
         self.assertNotIn("ACTIVATION_RECORD_ARTIFACT", rows)
