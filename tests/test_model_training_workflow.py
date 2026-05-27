@@ -301,21 +301,6 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--source-end", command)
         self.assertIn("${END_MONTH_EXCLUSIVE_START_ET}", command)
 
-    def test_layer_three_feature_generation_scopes_to_selected_target_symbol(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-06",
-                selected_target_symbol="aapl",
-                foundation_catch_up_only=False,
-            )
-
-        command = plan.layers[2].feature_command
-
-        self.assertIn("--target-symbol", command)
-        self.assertIn("AAPL", command)
-
     def test_layer_three_model_commands_use_database_rows_and_evaluation_summary(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")

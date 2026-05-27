@@ -377,7 +377,7 @@ FEATURE_MODULES: dict[str, str] = {
 }
 
 
-def feature_command(feature_cli: str | None, *, selected_target_symbol: str | None = None) -> list[str]:
+def feature_command(feature_cli: str | None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
     if feature_cli == "trading-data-feature-02-sector-context":
@@ -411,10 +411,6 @@ def feature_command(feature_cli: str | None, *, selected_target_symbol: str | No
             "--run-id",
             f"{FEATURE_MODULES[feature_cli].split('.')[-1]}_${{START_MONTH}}",
         ])
-    if feature_cli == "trading-data-feature-03-target-state-vector":
-        target = _normalize_selected_target_symbol(selected_target_symbol)
-        if target:
-            command.extend(["--target-symbol", target])
     return command
 
 
@@ -608,7 +604,7 @@ def _build_layer_workflow(
     generate = model_script(layer, slug, "generate")
     evaluate = model_script(layer, slug, "evaluate")
     review = model_script(layer, slug, "review")
-    feature = feature_command(meta.get("feature_cli"), selected_target_symbol=selected_target_symbol)
+    feature = feature_command(meta.get("feature_cli"))
     maintenance = maintenance_command(layer, slug)
     dataset_unit = _dataset_unit_for_layer(
         layer=layer,
