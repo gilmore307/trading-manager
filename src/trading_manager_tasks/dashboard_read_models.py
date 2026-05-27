@@ -1453,6 +1453,7 @@ def _task_timeline(
     runtime_root = storage_root / "runtime"
     selected_target_symbol = _selected_target_symbol(status)
     if runtime_root.exists():
+        fold_entries: list[tuple[str, list[Any], str | None, Path]] = []
         for fold_path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
             try:
                 fold_payload = _load_json_object(fold_path)
@@ -1472,6 +1473,11 @@ def _task_timeline(
             fold_key = _fold_period_label(fold_start, fold_end) if fold_start and fold_end else fold_path.stem
             if fold_end and not _month_visible_by_completed_cutoff(fold_end, max_month=max_dashboard_month):
                 continue
+            fold_entries.append((fold_key, raw_stages, fold_target_symbol, fold_path))
+        if selected_target_symbol:
+            selected_symbol = selected_target_symbol.upper()
+            fold_entries.sort(key=lambda entry: (entry[0], 0 if (entry[2] or "").upper() == selected_symbol else 1, entry[3].name))
+        for fold_key, raw_stages, _fold_target_symbol, _fold_path in fold_entries:
             if fold_key in included_months:
                 continue
             month_stage_sets.append((fold_key, raw_stages, True))

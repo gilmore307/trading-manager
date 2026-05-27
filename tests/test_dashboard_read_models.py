@@ -1585,6 +1585,86 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["expected_count"], 100)
         self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["unit_label"], "rows")
 
+    def test_task_timeline_prefers_selected_target_fold_over_stale_untargeted_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "blocked",
+                                "last_reason": "waiting for selected_target_symbol_required",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                                "last_reason": "stage completed by manager stage executor",
+                                "dataset_unit": {
+                                    "target_symbol": "AAPL",
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps({"current_month": "2016-07", "start_month": "2016-07"}) + "\n", encoding="utf-8")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-27T07:40:00Z")
+
+        task = next(
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if task["month"] == "2016-fold1" and task["task_id"] == "layer_03_target_state_vector.feature_generation"
+        )
+        self.assertEqual(task["status"], "succeeded")
+        self.assertEqual(task["target_symbol"], "AAPL")
+
     def test_task_timeline_places_fold_after_ending_month(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
