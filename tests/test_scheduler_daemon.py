@@ -304,6 +304,26 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selected, ("2016-03", "2016-04", "2016-05"))
         self.assertEqual(capped, ("2016-03", "2016-04"))
 
+    def test_month_ingest_worker_selection_ignores_open_month_after_cutoff(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            self._complete_monthly_substrate(storage_root=storage_root, month="2026-04")
+            open_path = workflow_state_path_for_month("2026-05", root=storage_root / "runtime")
+            open_path.parent.mkdir(parents=True, exist_ok=True)
+            open_path.write_text(
+                json.dumps({"start_month": "2026-05", "end_month": "2026-05", "stages": [{"status": "ready"}]}) + "\n",
+                encoding="utf-8",
+            )
+
+            selected = select_month_ingest_worker_months(
+                storage_root=storage_root,
+                default_start_month="2026-04",
+                worker_count=3,
+                max_month="2026-04",
+            )
+
+        self.assertEqual(selected, ())
+
 
     def test_model_worker_selects_first_complete_six_month_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
