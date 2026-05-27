@@ -31,6 +31,29 @@ class TaskProgressTests(unittest.TestCase):
             self.assertEqual(len(payloads), 1)
             self.assertFalse(list(progress_root.glob("*.tmp")))
 
+    def test_stage_started_node_reports_stage_level_running_progress(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            progress_root = Path(raw_tmp) / "progress"
+            write_task_progress_node(
+                progress_root=progress_root,
+                worker_id="model_worker_1",
+                task_uid="2016-01..2016-06:layer_05_alpha_confidence.model_generation",
+                stage_id="layer_05_alpha_confidence.model_generation",
+                status="running",
+                unit_label="model job",
+                node_id="stage_started",
+                node_label="Stage process started",
+            )
+
+            payloads = load_active_task_progress(progress_root)
+
+        progress = payloads["2016-01..2016-06:layer_05_alpha_confidence.model_generation"]
+        self.assertEqual(progress["expected_count"], 1)
+        self.assertEqual(progress["ready_count"], 0)
+        self.assertEqual(progress["pending_count"], 1)
+        self.assertEqual(progress["unit_label"], "model job")
+        self.assertEqual(progress["progress_source"], "active_progress_file")
+
 
 if __name__ == "__main__":
     unittest.main()

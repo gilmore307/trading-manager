@@ -93,12 +93,35 @@ def clear_worker_task_progress(*, progress_root: Path, worker_id: str) -> None:
         return
 
 
+def _default_unit_label_for_stage(row: Mapping[str, Any], fallback: str) -> str:
+    unit_label = row.get("unit_label")
+    if unit_label:
+        return str(unit_label)
+    stage_id = str(row.get("stage_id") or "")
+    if stage_id.endswith(".data_acquisition"):
+        if stage_id == "layer_04_event_failure_risk.data_acquisition":
+            return "event substrate"
+        if stage_id == "layer_09_option_expression.data_acquisition":
+            return "option gate"
+        return "source acquisition"
+    if stage_id.endswith(".feature_generation"):
+        return "feature job"
+    if stage_id.endswith(".model_generation"):
+        return "model job"
+    if stage_id.endswith(".model_evaluation"):
+        return "evaluation job"
+    if stage_id.endswith(".promotion_review"):
+        return "review decision"
+    if stage_id.endswith(".maintenance"):
+        return "maintenance step"
+    return fallback
+
+
 def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
     expected = row.get("expected_count")
     processed = row.get("processed_count")
     elapsed = row.get("elapsed_seconds")
     expected_seconds = row.get("expected_seconds")
-    unit_label = row.get("unit_label")
     try:
         expected_count = int(expected) if expected is not None else None
         ready_count = int(processed) if processed is not None else None
@@ -110,7 +133,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
         return {
             "stage_id": row.get("stage_id"),
             "status": row.get("status") or "running",
-            "unit_label": str(unit_label or "items"),
+            "unit_label": _default_unit_label_for_stage(row, "items"),
             "expected_count": expected_count,
             "ready_count": ready,
             "pending_count": max(expected_count - ready, 0),
@@ -130,7 +153,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
         return {
             "stage_id": row.get("stage_id"),
             "status": row.get("status") or "running",
-            "unit_label": str(unit_label or "seconds"),
+            "unit_label": _default_unit_label_for_stage(row, "seconds"),
             "expected_count": expected_whole,
             "ready_count": elapsed_whole,
             "pending_count": max(expected_whole - elapsed_whole, 0),
@@ -141,6 +164,25 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
     nodes = row.get("nodes")
     if isinstance(nodes, list) and nodes:
         node_rows = [node for node in nodes if isinstance(node, Mapping)]
+        status_text = str(row.get("status") or "").lower()
+        only_stage_start = (
+            status_text == "running"
+            and node_rows
+            and all(str(node.get("node_id") or "") == "stage_started" for node in node_rows)
+        )
+        if only_stage_start:
+            return {
+                "stage_id": row.get("stage_id"),
+                "status": row.get("status") or "running",
+                "unit_label": _default_unit_label_for_stage(row, "stage-step"),
+                "expected_count": 1,
+                "ready_count": 0,
+                "pending_count": 1,
+                "failed_count": 0,
+                "accepted_failed_count": 0,
+                "can_unlock_downstream": False,
+                "progress_source": "active_progress_file",
+            }
         meaningful_nodes = [
             node
             for node in node_rows
@@ -165,13 +207,14 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
         return {
             "stage_id": row.get("stage_id"),
             "status": row.get("status") or "running",
-            "unit_label": str(unit_label or "nodes"),
+            "unit_label": _default_unit_label_for_stage(row, "nodes"),
             "expected_count": expected_nodes,
             "ready_count": ready_nodes,
             "pending_count": max(expected_nodes - ready_nodes - len(failed_nodes), 0),
             "failed_count": len(failed_nodes),
             "accepted_failed_count": 0,
             "can_unlock_downstream": ready_nodes >= expected_nodes,
+            "progress_source": "active_progress_file",
         }
     return None
 

@@ -107,6 +107,26 @@ def _stage_progress_worker_id(*, start_month: str, end_month: str) -> str:
     return f"month_ingest_worker_stage_executor_{safe_month}"
 
 
+def _stage_progress_unit_label(stage: StageProgress) -> str:
+    if stage.stage_type == "data_acquisition":
+        if stage.stage_id == "layer_04_event_failure_risk.data_acquisition":
+            return "event substrate"
+        if stage.stage_id == "layer_09_option_expression.data_acquisition":
+            return "option gate"
+        return "source acquisition"
+    if stage.stage_type == "feature_generation":
+        return "feature job"
+    if stage.stage_type == "model_generation":
+        return "model job"
+    if stage.stage_type == "model_evaluation":
+        return "evaluation job"
+    if stage.stage_type == "promotion_review":
+        return "review decision"
+    if stage.stage_type == "maintenance":
+        return "maintenance step"
+    return "stage step"
+
+
 def _split_env(command: list[str]) -> tuple[dict[str, str], list[str]]:
     env: dict[str, str] = {}
     argv: list[str] = []
@@ -250,6 +270,7 @@ def execute_stage_process(
         task_uid=task_uid,
         stage_id=stage.stage_id,
         status="running",
+        unit_label=_stage_progress_unit_label(stage),
         node_id="stage_started",
         node_label="Stage process started",
     )
