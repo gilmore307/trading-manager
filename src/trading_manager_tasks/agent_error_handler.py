@@ -705,9 +705,9 @@ def _discord_message(request: Mapping[str, Any], diagnosis: Mapping[str, Any], *
         f"Occurred: {occurred_at}",
         f"Recorded: {created_at}",
         f"Agent diagnosis: {diagnosis_status}",
-        f"Error No: {error_ref}",
+        f"Manager Error No: {error_ref}",
         f"Deduplicated: {dedup_note}",
-        f"Request: {request_id}",
+        f"Agent Request: {request_id}",
     ]
     if server_id:
         lines.insert(1, f"Discord server: {server_id}")
