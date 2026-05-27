@@ -24,6 +24,8 @@ from .agent_error_handler import AGENT_ERROR_DIAGNOSIS_CONTRACT, _stable_id
 DEFAULT_CODEX_MODEL = "gpt-5.5"
 DEFAULT_CODEX_WORKDIR = "/root/.openclaw/workspace"
 DEFAULT_CODEX_ADD_DIR = "/root/projects"
+DEFAULT_CODEX_SANDBOX = "danger-full-access"
+CODEX_SANDBOXES = {"read-only", "workspace-write", "danger-full-access"}
 DEFAULT_TIMEOUT_SECONDS = 1800
 
 
@@ -68,6 +70,14 @@ def _codex_add_dirs() -> list[str]:
     return [part for part in raw.split(os.pathsep) if part]
 
 
+def _codex_sandbox() -> str:
+    sandbox = os.environ.get("MANAGER_AGENT_ERROR_CODEX_SANDBOX", DEFAULT_CODEX_SANDBOX).strip() or DEFAULT_CODEX_SANDBOX
+    if sandbox not in CODEX_SANDBOXES:
+        allowed = ", ".join(sorted(CODEX_SANDBOXES))
+        raise ValueError(f"MANAGER_AGENT_ERROR_CODEX_SANDBOX must be one of: {allowed}")
+    return sandbox
+
+
 def run_codex_cli_for_error(request: Mapping[str, Any]) -> dict[str, Any]:
     started = _now_utc()
     model = os.environ.get("MANAGER_AGENT_ERROR_CODEX_MODEL", DEFAULT_CODEX_MODEL).strip() or DEFAULT_CODEX_MODEL
@@ -82,7 +92,7 @@ def run_codex_cli_for_error(request: Mapping[str, Any]) -> dict[str, Any]:
         "--ignore-rules",
         "--skip-git-repo-check",
         "--sandbox",
-        "workspace-write",
+        _codex_sandbox(),
         "-C",
         workdir,
         "--output-last-message",

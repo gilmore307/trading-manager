@@ -267,6 +267,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
             {
                 "MANAGER_AGENT_ERROR_CODEX_MODEL": "gpt-5.5",
                 "MANAGER_AGENT_ERROR_CODEX_TIMEOUT_SECONDS": "60",
+                "MANAGER_AGENT_ERROR_CODEX_SANDBOX": "danger-full-access",
             },
             clear=False,
         ), patch("trading_manager_tasks.agent_error_agent_runner.subprocess.run") as run:
@@ -282,6 +283,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
         self.assertEqual(cmd[:4], ["codex", "exec", "--ephemeral", "--ignore-rules"])
         self.assertIn("-m", cmd)
         self.assertEqual(cmd[cmd.index("-m") + 1], "gpt-5.5")
+        self.assertEqual(cmd[cmd.index("--sandbox") + 1], "danger-full-access")
         self.assertIn("--output-last-message", cmd)
         self.assertIn("--add-dir", cmd)
         message = cmd[-1]

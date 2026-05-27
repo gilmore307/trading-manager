@@ -34,7 +34,7 @@ Default priority is `normal`. Summary ordering is priority, deadline, created ti
 
 ## Failure Handling
 
-Failures should become durable evidence, not chat-only notes. The failure register and agent-error helpers produce references that can be inspected, repaired, or escalated.
+Failures should become durable evidence, not chat-only notes. The failure register and agent-error helpers produce references that can be inspected, repaired, or escalated. The reviewed Codex error-repair runner uses `danger-full-access` so the `server-error-repair` closed-loop contract can commit/push maintained fixes and rerun internal database-backed stages; the prompt boundary still forbids broker/account/order/fill/position mutation and secret exposure.
 
 ## Safety Gates
 
