@@ -211,10 +211,10 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (3,),
         "progression_mode": "target_major_serial_chain",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_failure_context_id",
-        "candidate_progression_policy": "collect fold-scoped global/sector event observations before replay; target-local Layer 4 scoring later consumes only reviewed event/strategy-failure evidence",
-        "data_surface": "fold-scoped accepted global/sector event-observation substrate plus reviewed event/strategy-failure evidence; no raw event alpha requirement",
+        "candidate_progression_policy": "collect fold-scoped event-observation readiness, then generate model-facing event failure gates only from Layer 10 / review-owned event_interpretation_v1 evidence",
+        "data_surface": "fold-scoped event-observation readiness plus reviewed event_interpretation_v1 normalization into event_strategy_failure_gate evidence; no raw event alpha requirement",
         "input_stage": True,
-        "feature_cli": None,
+        "feature_cli": "manager-layer-04-event-failure-feature-generation",
     },
     {
         "layer": 5,
@@ -395,6 +395,17 @@ FEATURE_MODULES: dict[str, str] = {
 def feature_command(feature_cli: str | None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
+    if feature_cli == "manager-layer-04-event-failure-feature-generation":
+        return [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/execute_layer_four_event_failure_feature_generation.py",
+            "--start-month",
+            "${START_MONTH}",
+            "--end-month",
+            "${END_MONTH}",
+            "--write",
+        ]
     if feature_cli == "trading-data-feature-02-sector-context":
         return [
             "PYTHONPATH=src",

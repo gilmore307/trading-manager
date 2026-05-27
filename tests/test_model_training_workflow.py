@@ -97,7 +97,14 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "maintenance",
             ]
             if layer.layer == 4:
-                expected_stage_types = ["data_acquisition", "model_generation", "model_evaluation", "promotion_review", "maintenance"]
+                expected_stage_types = [
+                    "data_acquisition",
+                    "feature_generation",
+                    "model_generation",
+                    "model_evaluation",
+                    "promotion_review",
+                    "maintenance",
+                ]
             elif layer.layer in {5, 6, 7, 8, 10}:
                 expected_stage_types = ["model_generation", "model_evaluation", "promotion_review", "maintenance"]
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
@@ -118,7 +125,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertTrue(plan.foundation_catch_up_only)
         for layer in plan.layers:
-            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in {1, 2} else (["data_acquisition"] if layer.layer == 4 else [])
+            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in {1, 2, 4} else []
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertNotIn("model_generation", {stage.stage_type for stage in layer.stages})
             self.assertNotIn("model_evaluation", {stage.stage_type for stage in layer.stages})
@@ -248,7 +255,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.foundation_catch_up_layers, FOUNDATION_CATCH_UP_LAYERS)
         self.assertEqual(plan.reusable_substrate_stage_types, ("data_acquisition", "feature_generation"))
         for layer in plan.layers:
-            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in {1, 2} else (["data_acquisition"] if layer.layer == 4 else [])
+            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in {1, 2, 4} else []
             self.assertEqual(
                 [stage.stage_type for stage in layer.stages],
                 expected_stage_types,
@@ -534,8 +541,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
         layer_four_stage_types = [stage.stage_type for stage in plan.layers[3].stages]
-        self.assertEqual(layer_four_stage_types, ["data_acquisition", "model_generation", "model_evaluation", "promotion_review", "maintenance"])
-        self.assertNotIn("feature_generation", layer_four_stage_types)
+        self.assertEqual(
+            layer_four_stage_types,
+            ["data_acquisition", "feature_generation", "model_generation", "model_evaluation", "promotion_review", "maintenance"],
+        )
+        self.assertIn("execute_layer_four_event_failure_feature_generation.py", " ".join(plan.layers[3].feature_command))
         for layer_number in (5, 6, 7, 8):
             layer = plan.layers[layer_number - 1]
             stage_types = [stage.stage_type for stage in layer.stages]
