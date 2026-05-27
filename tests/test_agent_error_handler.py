@@ -44,9 +44,11 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertEqual(normalized["contract_type"], "server_error_agent_request")
             self.assertEqual(normalized["schema_version"], "1")
             self.assertIn("TaskSystemError", normalized["stderr_excerpt"])
-            self.assertTrue(any("do not submit broker orders" in item for item in normalized["forbidden_actions"]))
+            self.assertTrue(any("do not mutate broker" in item for item in normalized["forbidden_actions"]))
             self.assertIn("Error request:", normalized["agent_prompt"])
-            self.assertIn("server-error-diagnosis", normalized["agent_prompt"])
+            self.assertIn("server-error-repair", normalized["agent_prompt"])
+            self.assertTrue(any("rerun failed internal stages" in item for item in normalized["allowed_actions"]))
+            self.assertTrue(any("commit and push repository edits" in item for item in normalized["allowed_actions"]))
 
     def test_rejects_invalid_severity(self) -> None:
         with self.assertRaisesRegex(TaskSystemError, "severity"):

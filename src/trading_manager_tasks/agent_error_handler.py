@@ -2,8 +2,9 @@
 
 This module is intentionally component-neutral. Any server-side workflow can call
 it after an error to create one standard agent diagnosis/repair request. The
-request is evidence-first and read-only by default; optional agent invocation is
-behind an explicit runner command supplied by reviewed runtime configuration.
+request is evidence-first, repair-capable, and constrained by the server error
+repair skill; optional agent invocation is behind an explicit runner command
+supplied by reviewed runtime configuration.
 """
 
 from __future__ import annotations
@@ -68,15 +69,18 @@ SERVER_ERROR_CATALOG_COLUMNS = (
 SAFE_ALLOWED_ACTIONS = (
     "inspect referenced logs, receipts, status artifacts, source files, docs, and tests",
     "diagnose root cause and classify whether the failure is code, config, data, environment, provider, or operator-boundary related",
-    "prepare internal code, test, config-template, or documentation patches when they are reversible and within repository boundaries",
-    "run non-destructive verification commands such as tests, compile checks, lint/diff checks, and read-only status inspection",
-    "recommend a retry only after the suspected cause is fixed or classified as transient",
+    "edit internal source, tests, scripts, config templates, or docs when the repair is narrow, evidence-backed, and within repository boundaries",
+    "run verification commands such as tests, compile checks, lint/diff checks, dry-runs, and status inspection",
+    "rerun failed internal stages, regenerate missing internal artifacts, or write runtime/model outputs only when required to verify or complete the repair",
+    "restart internal services or perform storage maintenance only when required by the repair skill and when broker/account/order/fill/position state is untouched",
+    "commit and push repository edits after verification so the repaired workspace is durable",
+    "recommend retry or closure only after the suspected cause is fixed, superseded, no longer applicable, or classified as transient",
 )
 FORBIDDEN_ACTIONS = (
-    "do not call market-data providers unless a separate reviewed provider-dispatch gate authorizes it",
-    "do not submit broker orders, construct live order submission, mutate accounts, or touch funds/positions",
+    "do not mutate broker, account, order, fill, position, buying-power, or funds state",
     "do not exfiltrate secrets or print secret values; use aliases and redacted evidence only",
-    "do not delete data, rewrite durable storage, restart services, or change system packages without an explicit higher-level approval path",
+    "do not broaden the repair beyond the supplied error evidence and accepted current project contracts",
+    "do not perform destructive deletion, system package changes, or unrelated repository rewrites without an explicit higher-level approval path",
     "do not mark failures accepted, corrected, or skipped without durable diagnosis evidence and the appropriate review reference",
 )
 
@@ -135,9 +139,9 @@ def build_agent_prompt(request: Mapping[str, Any]) -> str:
     return "\n".join(
         [
             "You are the server-wide error diagnosis and repair agent for the trading system.",
-            "Use the fixed workspace skill server-error-diagnosis.",
-            "Diagnose the failure from the supplied evidence, identify the root cause, and attempt only safe internal repairs.",
-            "Return a concise JSON-compatible report with: diagnosis_status, root_cause, repair_attempted, files_changed, verification, retry_recommendation, and blockers.",
+            "Use the fixed workspace skill server-error-repair.",
+            "Diagnose the failure from the supplied evidence, repair it when possible, verify the repair, and leave the workspace in a durable state.",
+            "Return the strict JSON repair receipt required by server-error-repair, including diagnosis_status, root_cause, repair_attempted, files_changed, verification, retry_recommendation, and blockers.",
             "",
             "Allowed actions:",
             *[f"- {item}" for item in request.get("allowed_actions", [])],
