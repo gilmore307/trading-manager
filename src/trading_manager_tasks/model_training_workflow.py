@@ -368,6 +368,20 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
     return command
 
 
+def _target_scoped_generation_command(command: list[str], *, layer: int, selected_target_symbol: str | None) -> list[str]:
+    if layer not in {3, 4, 5} or not selected_target_symbol:
+        return command
+    target_token = selected_target_symbol.lower().replace(".", "_")
+    scoped = list(command)
+    scoped.extend(["--target-symbol", selected_target_symbol])
+    physical_model_key = scoped[2].split("/scripts/models/", 1)[1].split("/", 1)[0] if len(scoped) > 2 and "/scripts/models/" in scoped[2] else None
+    if not physical_model_key:
+        return scoped
+    default_output = f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/model_rows_${{START_MONTH}}.jsonl"
+    target_output = f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/model_rows_{target_token}_${{START_MONTH}}.jsonl"
+    return [target_output if token == default_output else token for token in scoped]
+
+
 FEATURE_MODULES: dict[str, str] = {
     "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime.from_feed_artifacts",
     "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context.from_feed_artifacts",
@@ -609,6 +623,7 @@ def _build_layer_workflow(
         end_month=end_month,
         selected_target_symbol=selected_target_symbol,
     )
+    generate = _target_scoped_generation_command(generate, layer=layer, selected_target_symbol=selected_target_symbol)
     input_dataset_unit = _input_dataset_unit_for_layer(
         layer=layer,
         start_month=start_month,
@@ -665,6 +680,8 @@ def _build_layer_workflow(
             "${END_MONTH}",
             "--write",
         ]
+        if selected_target_symbol:
+            acquisition_command.extend(["--target-symbol", selected_target_symbol])
     elif layer == 4:
         acquisition_command = [
             "PYTHONPATH=src",

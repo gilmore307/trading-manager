@@ -120,6 +120,54 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             task_key = json.loads(Path(summary.task_key_path).read_text(encoding="utf-8"))
             self.assertTrue(Path(task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
 
+    def test_selected_target_symbol_limits_materialization_to_that_target(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            trading_data_root = tmp / "trading-data"
+            storage_root = trading_data_root / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            for symbol in ("AAPL", "XLF"):
+                run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / symbol / "2016-01" / "runs" / "run_001"
+                (run_dir / "cleaned").mkdir(parents=True)
+                (run_dir / "cleaned" / "equity_bar.jsonl").write_text(
+                    f'{{"symbol":"{symbol}","timestamp":"2016-01-04T09:30:00-05:00"}}\n',
+                    encoding="utf-8",
+                )
+                receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / symbol / "2016-01" / "completion_receipt.json"
+                receipt_path.parent.mkdir(parents=True, exist_ok=True)
+                receipt_path.write_text(
+                    json.dumps(
+                        {
+                            "runs": [
+                                {
+                                    "run_id": "run_001",
+                                    "status": "succeeded",
+                                    "row_counts": {"equity_bar": 1},
+                                    "steps": {"clean": {"references": [f"storage/monthly_backfill/alpaca_bars/{symbol}/2016-01/runs/run_001/cleaned/equity_bar.jsonl"]}},
+                                }
+                            ]
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            summary = materialize_layer_three_target_state_inputs(
+                start_month="2016-01",
+                end_month="2016-01",
+                manager_storage_root=tmp / "manager-storage",
+                trading_data_root=trading_data_root,
+                trading_storage_root=storage_root,
+                universe_path=universe_path,
+                target_symbol="AAPL",
+                write=False,
+            )
+            candidates = [json.loads(line) for line in Path(summary.candidate_rows_path).read_text(encoding="utf-8").splitlines()]
+
+            self.assertEqual(summary.symbols, ("AAPL",))
+            self.assertEqual(summary.target_candidate_count, 1)
+            self.assertEqual(candidates[0]["routing_symbol_ref"], "AAPL")
+
     def test_fold_materialization_uses_one_candidate_per_symbol_across_months(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

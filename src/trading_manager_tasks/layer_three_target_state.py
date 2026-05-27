@@ -1,6 +1,6 @@
 """Safe Layer 3 target-state input materialization.
 
-This module turns already-approved Layer 2 Alpaca bar artifacts into the local
+This module turns already-approved target-local Alpaca bar artifacts into the local
 ``source_03_target_state`` input surface. It performs no provider calls; it only
 reads completed feed artifacts, writes a task key/evidence bundle, and delegates
 normalization to ``trading-data``'s source_03 runner.
@@ -166,7 +166,7 @@ def discover_layer_two_feed_artifacts(
     universe_path: Path = DEFAULT_TRADING_STORAGE_UNIVERSE,
     symbols: Iterable[str] | None = None,
 ) -> tuple[FeedArtifactRef, ...]:
-    """Find successful Layer 2 bar artifacts already present on disk."""
+    """Find successful target-local bar artifacts already present on disk."""
 
     allowed_symbols = {symbol.upper() for symbol in (symbols or _read_layer_two_symbols(universe_path))}
     refs: list[FeedArtifactRef] = []
@@ -275,7 +275,7 @@ def build_source_task_key(
     refs: Sequence[FeedArtifactRef],
 ) -> tuple[dict[str, Any], Path, Path, Path, int]:
     if not refs:
-        raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 3 target-state materialization")
+        raise TaskSystemError("no successful target-local feed artifacts are available for Layer 3 target-state materialization")
     source_start, source_end = _range_bounds(start_month, end_month)
     fold_key = _fold_key(start_month, end_month)
     candidate_path = output_dir / "target_candidates.jsonl"
@@ -311,11 +311,13 @@ def materialize_layer_three_target_state_inputs(
     trading_storage_root: Path = DEFAULT_TRADING_STORAGE_ROOT,
     universe_path: Path = DEFAULT_TRADING_STORAGE_UNIVERSE,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
+    target_symbol: str | None = None,
     run_id: str | None = None,
     write: bool = False,
 ) -> LayerThreeTargetStateMaterialization:
-    """Materialize source_03 target-state rows from existing Layer 2 feed artifacts."""
+    """Materialize source_03 target-state rows from existing target-local feed artifacts."""
 
+    selected_symbols = (target_symbol.strip().upper(),) if target_symbol and target_symbol.strip() else None
     refs = tuple(
         ref
         for month in _iter_months(start_month, end_month)
@@ -324,6 +326,7 @@ def materialize_layer_three_target_state_inputs(
             trading_data_root=trading_data_root,
             trading_storage_root=trading_storage_root,
             universe_path=universe_path,
+            symbols=selected_symbols,
         )
     )
     if not manager_storage_root.is_absolute():
@@ -388,7 +391,7 @@ def write_summary(summary: LayerThreeTargetStateMaterialization, *, output: Text
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize Layer 3 source_03_target_state rows from existing Layer 2 feed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize Layer 3 source_03_target_state rows from existing target-local feed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
@@ -396,6 +399,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trading-storage-root", type=Path, default=DEFAULT_TRADING_STORAGE_ROOT)
     parser.add_argument("--universe-path", type=Path, default=DEFAULT_TRADING_STORAGE_UNIVERSE)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--target-symbol", help="Selected Layer 3+ target symbol. When supplied, only that target's local bar artifacts are materialized.")
     parser.add_argument("--run-id")
     parser.add_argument("--write", action="store_true", help="Run the trading-data source_03 normalizer and write SQL rows.")
     args = parser.parse_args(argv)
@@ -407,6 +411,7 @@ def main(argv: list[str] | None = None) -> int:
         trading_storage_root=args.trading_storage_root,
         universe_path=args.universe_path,
         output_root=args.output_root,
+        target_symbol=args.target_symbol,
         run_id=args.run_id,
         write=args.write,
     )

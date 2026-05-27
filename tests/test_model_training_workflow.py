@@ -148,6 +148,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         command = plan.layers[2].stages[0].command
         self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", command)
         self.assertIn("--write", command)
+        self.assertIn("--target-symbol", command)
+        self.assertIn("AAPL", command)
         self.assertIsNone(plan.layers[2].stages[0].approval_gate_required)
         self.assertFalse(plan.layers[2].stages[0].provider_calls_allowed)
         self.assertTrue(plan.layers[2].stages[0].safe_without_provider_calls)
@@ -302,12 +304,15 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
     def test_layer_three_model_commands_use_database_rows_and_evaluation_summary(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
+            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01", selected_target_symbol="AAPL")
 
         layer = plan.layers[2]
         self.assertIn("--from-database", layer.model_generate_command)
         self.assertIn("--source-end", layer.model_generate_command)
+        self.assertIn("--target-symbol", layer.model_generate_command)
+        self.assertIn("AAPL", layer.model_generate_command)
         self.assertIn("--output", layer.model_generate_command)
+        self.assertTrue(any(token.endswith("model_rows_aapl_${START_MONTH}.jsonl") for token in layer.model_generate_command))
         self.assertIn("--from-database", layer.model_evaluate_command)
         self.assertIn("--output-json", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
@@ -329,7 +334,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertNotIn("materialize_layer_ten_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
         self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
         self.assertIn("--from-database", layer.model_generate_command)
+        self.assertIn("--target-symbol", layer.model_generate_command)
+        self.assertIn("AAPL", layer.model_generate_command)
         self.assertIn("--output-jsonl", layer.model_generate_command)
+        self.assertTrue(any(token.endswith("model_rows_aapl_${START_MONTH}.jsonl") for token in layer.model_generate_command))
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
 
