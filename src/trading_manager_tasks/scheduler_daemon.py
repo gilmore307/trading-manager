@@ -741,6 +741,19 @@ def select_model_worker_target(
     pinned = str(selected_target_symbol or "").strip().upper()
     target_queue = (pinned,) if pinned else load_model_worker_target_queue(target_queue_path)
     if not target_queue:
+        fold_selection = select_model_worker_fold(
+            storage_root=storage_root,
+            default_start_month=default_start_month,
+            max_month=max_month,
+            selected_target_symbol=None,
+        )
+        if fold_selection is not None:
+            return ModelWorkerTargetSelection(
+                selected_target_symbol=None,
+                target_queue=(),
+                reason_code="foundation_fold_has_open_model_worker_stage",
+                fold_selection=fold_selection,
+            )
         return None
     for symbol in target_queue:
         fold_selection = select_model_worker_fold(
@@ -1088,7 +1101,7 @@ def _run_model_worker_decision(
         selected_target_symbol=selected_target_symbol,
         target_queue_path=target_queue_path,
     )
-    if target_selection is None or target_selection.fold_selection is None or target_selection.selected_target_symbol is None:
+    if target_selection is None or target_selection.fold_selection is None:
         return None
     selection = target_selection.fold_selection
     target_symbol = target_selection.selected_target_symbol

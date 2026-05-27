@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from trading_manager_tasks.scheduler import ResourceSnapshot, SchedulerConfig
+from trading_manager_tasks.scheduler import ResourceSnapshot, SchedulerConfig, SchedulerDecision
 from trading_manager_tasks.model_training_state import advance_workflow_state, workflow_state_path_for_month
 from trading_manager_tasks.model_training_workflow import build_model_training_workflow_plan
 from trading_manager_tasks.scheduler_daemon import (
@@ -32,6 +32,7 @@ from trading_manager_tasks.scheduler_daemon import (
     select_next_historical_work,
     update_state_from_error,
     write_daemon_state,
+    _run_model_worker_decision,
 )
 
 
@@ -446,6 +447,67 @@ class SchedulerDaemonTests(unittest.TestCase):
         assert target_selection.fold_selection is not None
         self.assertEqual(target_selection.fold_selection.start_month, "2016-01")
         self.assertEqual(Path(target_selection.fold_selection.state_path or "").name, "model_training_fold_state_msft_2016-01_2016-06.json")
+
+    def test_model_worker_selects_foundation_fold_without_target_queue(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            queue_path = storage_root / "runtime" / "model_training_target_queue.json"
+            for month in rolling_fold_months("2016-01"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+
+            target_selection = select_model_worker_target(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-06",
+                target_queue_path=queue_path,
+            )
+
+        self.assertIsNotNone(target_selection)
+        assert target_selection is not None
+        self.assertIsNone(target_selection.selected_target_symbol)
+        self.assertEqual(target_selection.reason_code, "foundation_fold_has_open_model_worker_stage")
+        self.assertIsNotNone(target_selection.fold_selection)
+        assert target_selection.fold_selection is not None
+        self.assertEqual(target_selection.fold_selection.fold_id, "fold_2016-01_2016-06")
+
+    def test_model_worker_executes_foundation_fold_without_selected_target(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "manager-storage"
+            queue_path = storage_root / "runtime" / "model_training_target_queue.json"
+            for month in rolling_fold_months("2016-01"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-05-27T04:00:00+00:00",
+                now_et="2026-05-27T00:00:00-04:00",
+                decision_status="executed",
+                reason_code="workflow_stage_executed",
+                reason="executed model generation",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work="layer_01_market_regime.model_generation",
+                command=[],
+                next_internal_stage="model_generation",
+            )
+
+            with patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=decision) as run_once:
+                result = _run_model_worker_decision(
+                    storage_root=storage_root,
+                    component_src_root=tmp,
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                    execute_safe_offline_stages=True,
+                    selected_target_symbol=None,
+                    target_queue_path=queue_path,
+                )
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        target_selection, model_decision = result
+        self.assertIsNone(target_selection.selected_target_symbol)
+        self.assertEqual(target_selection.fold_selection.fold_id, "fold_2016-01_2016-06")
+        self.assertEqual(model_decision.selected_work, "layer_01_market_regime.model_generation")
+        self.assertIsNone(run_once.call_args.kwargs["selected_target_symbol"])
 
     def test_model_worker_does_not_select_until_validation_and_test_months_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
