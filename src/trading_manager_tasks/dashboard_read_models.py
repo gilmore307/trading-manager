@@ -340,13 +340,15 @@ def _agent_error_summary(
                 diagnosis = {}
         agent_payload = _agent_result_payload(diagnosis)
         repair_status = _agent_repair_status(diagnosis, agent_payload)
-        handling_status = _agent_error_handling_status(row, repair_status, agent_payload)
         retry_receipt = None
-        if repair_status == "repaired" and handling_status == "awaiting_retry":
-            stage_id = _stage_id_from_error_row(row)
-            retry_receipt = _successful_retry_receipt(storage_root, stage_id) if stage_id else None
-            if retry_receipt:
-                handling_status = "closed"
+        stage_id = _stage_id_from_error_row(row)
+        if stage_id:
+            retry_receipt = _successful_retry_receipt(storage_root, stage_id)
+            if retry_receipt and repair_status not in {"superseded", "no_action_needed"}:
+                repair_status = "repaired"
+        handling_status = _agent_error_handling_status(row, repair_status, agent_payload)
+        if retry_receipt and repair_status == "repaired":
+            handling_status = "closed"
         repair_payload = agent_payload.get("repair") if isinstance(agent_payload.get("repair"), Mapping) else {}
         files_changed = agent_payload.get("files_changed")
         if not isinstance(files_changed, list):
