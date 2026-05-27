@@ -40,14 +40,20 @@ DEFAULT_STALE_AFTER_SECONDS = 900
 MONTHLY_TASK_STAGE_TYPES = {"data_acquisition", "feature_generation"}
 FOLD_MODEL_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
 MONTHS_PER_MODEL_FOLD = 6
-MONTHLY_TASKS_PER_FOLD = MONTHS_PER_MODEL_FOLD * 6
-MODEL_TASKS_PER_FOLD = 9 * 4
-TASKS_PER_MODEL_FOLD = MONTHLY_TASKS_PER_FOLD + MODEL_TASKS_PER_FOLD
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
 MAX_AGENT_ERROR_SUMMARY_ROWS = 50
 STAGE_FAILURE_RE = re.compile(r"stage\s+([A-Za-z0-9_.-]+)\s+command", re.IGNORECASE)
 FOLD_LABEL_RE = re.compile(r"^(\d{4})-fold([1-9]\d*)$")
+TASK_STAGE_SORT_ORDER = {
+    "data_acquisition": 10,
+    "feature_generation": 20,
+    "model_generation": 30,
+    "model_evaluation": 40,
+    "promotion_review_preparation": 45,
+    "promotion_review": 50,
+    "maintenance": 60,
+}
 
 
 def now_utc() -> str:
@@ -1233,61 +1239,6 @@ def _public_period_visible_by_completed_cutoff(period: str | None, *, max_month:
     return _month_visible_by_completed_cutoff(period, max_month=max_month)
 
 
-def _monthly_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
-    stage_type = str(raw_stage.get("stage_type") or "")
-    if stage_type not in MONTHLY_TASK_STAGE_TYPES:
-        return None
-    try:
-        layer = int(raw_stage.get("layer"))
-    except (TypeError, ValueError):
-        return None
-    if layer not in MONTHLY_SUBSTRATE_LAYERS:
-        return None
-    type_offset = 1 if stage_type == "data_acquisition" else 2
-    return (layer - 1) * 2 + type_offset
-
-
-def _fold_model_task_ordinal(raw_stage: Mapping[str, Any]) -> int | None:
-    stage_type = str(raw_stage.get("stage_type") or "")
-    stage_offset = {
-        "data_acquisition": -1,
-        "feature_generation": 0,
-        "model_generation": 1,
-        "model_evaluation": 91,
-        "promotion_review": 92,
-        "maintenance": 93,
-    }.get(stage_type)
-    if stage_offset is None:
-        return None
-    try:
-        layer = int(raw_stage.get("layer"))
-    except (TypeError, ValueError):
-        return None
-    if layer <= 0:
-        return stage_offset
-    return (layer - 1) * 4 + stage_offset
-
-
-def _stable_task_number(raw_stage: Mapping[str, Any], *, task_period: str | None) -> int | None:
-    """Return the stable owner-facing task number for a timeline row."""
-
-    fold_start = _fold_start_month(task_period)
-    if fold_start:
-        offset = _month_offset(fold_start)
-        ordinal = _fold_model_task_ordinal(raw_stage)
-        if offset is None or ordinal is None:
-            return None
-        fold_index = max(0, offset // MONTHS_PER_MODEL_FOLD)
-        return fold_index * TASKS_PER_MODEL_FOLD + MONTHLY_TASKS_PER_FOLD + ordinal
-    offset = _month_offset(task_period)
-    ordinal = _monthly_task_ordinal(raw_stage)
-    if offset is None or ordinal is None:
-        return None
-    fold_index = max(0, offset // MONTHS_PER_MODEL_FOLD)
-    month_index_in_fold = offset % MONTHS_PER_MODEL_FOLD
-    return fold_index * TASKS_PER_MODEL_FOLD + month_index_in_fold * 6 + ordinal
-
-
 def _stable_task_uid(raw_stage: Mapping[str, Any], *, task_period: str | None) -> str:
     stage_id = str(raw_stage.get("stage_id") or "unknown_stage")
     period = _fold_label_range(task_period) or task_period or "unscheduled"
@@ -1681,7 +1632,6 @@ def _task_timeline(
                 dataset_unit = dashboard_stage.get("dataset_unit") if isinstance(dashboard_stage.get("dataset_unit"), Mapping) else None
                 task_month = _public_task_period(str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "")) or None
                 child_partitions = _child_partitions_for_period(task_month)
-                task_number = _stable_task_number(dashboard_stage, task_period=task_month)
                 worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
                     dashboard_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
                 )
@@ -1691,7 +1641,7 @@ def _task_timeline(
                     progress = dict(dashboard_stage["dashboard_progress"])
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
-                    "task_number": task_number,
+                    "task_number": None,
                     "task_uid": task_uid,
                     "month": task_month,
                     "period": task_month,
@@ -1837,7 +1787,23 @@ def _timeline_period_months(timeline_month: str | None) -> list[str]:
     return _months_in_span(start_month, end_month)
 
 
-def _task_timeline_sort_key(task: Mapping[str, Any]) -> tuple[int, int, int, int, int]:
+def _task_stage_sort_rank(task: Mapping[str, Any]) -> int:
+    return TASK_STAGE_SORT_ORDER.get(str(task.get("stage_type") or ""), 1_000)
+
+
+def _task_layer_sort_rank(task: Mapping[str, Any]) -> int:
+    try:
+        layer = int(task.get("layer"))
+    except (TypeError, ValueError):
+        layer_key = str(task.get("layer_key") or "")
+        match = re.match(r"layer_(\d+)_", layer_key)
+        if not match:
+            return 1_000
+        return int(match.group(1))
+    return layer if layer > 0 else 1_000
+
+
+def _task_timeline_sort_key(task: Mapping[str, Any]) -> tuple[int, int, int, int, int, int]:
     month = str(task.get("month") or "")
     months = _timeline_period_months(month)
     if months:
@@ -1846,20 +1812,17 @@ def _task_timeline_sort_key(task: Mapping[str, Any]) -> tuple[int, int, int, int
     else:
         end_offset = _month_offset(month)
         start_offset = end_offset
-    period_after_month = 1 if len(months) > 1 or FOLD_LABEL_RE.fullmatch(month) else 0
-    try:
-        task_number = int(task.get("task_number"))
-    except (TypeError, ValueError):
-        task_number = 1_000_000
     try:
         sequence = int(task.get("sequence"))
     except (TypeError, ValueError):
         sequence = 1_000_000
+    period_after_month = 1 if len(months) > 1 or FOLD_LABEL_RE.fullmatch(month) else 0
     return (
+        start_offset if start_offset is not None else 1_000_000,
         end_offset if end_offset is not None else 1_000_000,
         period_after_month,
-        start_offset if start_offset is not None else 1_000_000,
-        task_number,
+        _task_layer_sort_rank(task),
+        _task_stage_sort_rank(task),
         sequence,
     )
 
@@ -1868,6 +1831,7 @@ def _sort_task_timeline(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sorted_tasks = sorted(tasks, key=_task_timeline_sort_key)
     for index, task in enumerate(sorted_tasks, start=1):
         task["sequence"] = index
+        task["task_number"] = index
     return sorted_tasks
 
 

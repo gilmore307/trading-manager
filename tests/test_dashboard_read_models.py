@@ -1400,7 +1400,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual([task["month"] for task in task_timeline], ["2019-fold1"])
         self.assertEqual([task["task_state"] for task in task_timeline], ["completed"])
 
-    def test_task_timeline_uses_durable_month_inventory_and_stable_numbers(self):
+    def test_task_timeline_uses_durable_month_inventory_and_continuous_numbers(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -1455,7 +1455,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         tasks = payload["chart_payload"]["task_timeline"]
         durable_task = next(task for task in tasks if task["month"] == "2018-fold1")
-        self.assertEqual(durable_task["task_number"], 323)
+        self.assertEqual(durable_task["task_number"], durable_task["sequence"])
+        self.assertEqual(durable_task["task_number"], 1)
         self.assertEqual(durable_task["task_uid"], "2018-01..2018-06:layer_01_market_regime.data_acquisition")
 
     def test_task_timeline_shows_fold_target_chain_prep_rows(self):
@@ -1564,7 +1565,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
         self.assertEqual([task["stage_type"] for task in fold_tasks], ["data_acquisition", "model_generation", "model_generation", "data_acquisition"])
-        self.assertEqual(fold_tasks[0]["task_number"], 35)
+        self.assertEqual([task["task_number"] for task in fold_tasks], [1, 2, 3, 4])
+        self.assertEqual([task["sequence"] for task in fold_tasks], [1, 2, 3, 4])
         self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime.data_acquisition")
         self.assertEqual(fold_tasks[0]["detail"]["child_partitions"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
         self.assertIsNone(fold_tasks[1]["detail"]["progress"])
