@@ -203,7 +203,16 @@ def _agent_repair_status(diagnosis: Mapping[str, Any], agent_payload: Mapping[st
     verification = agent_payload.get("verification")
     verification_exit_code = verification.get("exit_code") if isinstance(verification, Mapping) else None
     if (
-        agent_status in {"repaired", "resolved", "fixed", "repair_verified", "repaired_verified", "repaired_awaiting_retry"}
+        agent_status
+        in {
+            "repaired",
+            "resolved",
+            "fixed",
+            "repair_verified",
+            "repaired_verified",
+            "repaired_awaiting_retry",
+            "repaired_with_blockers",
+        }
         or nested_repair_status == "repaired"
         or verification_exit_code == 0
     ):
@@ -255,6 +264,10 @@ def _agent_error_handling_status(
         payload = agent_payload or {}
         retry_recommendation = str(payload.get("retry_recommendation") or "").lower()
         blockers = payload.get("blockers")
+        if retry_recommendation in {"do_not_retry", "no_retry", "not_applicable"} or retry_recommendation.startswith(
+            "do not retry"
+        ):
+            return "closed"
         if retry_recommendation == "manual_review" and isinstance(blockers, list) and blockers:
             return "closed"
         scope = str(catalog_row.get("error_scope") or "")
