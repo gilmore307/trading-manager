@@ -49,6 +49,12 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py --start-
 
 The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes Layer 1 market context, Layer 2 sector context, and fold-scoped global or sector-scoped Layer 4 event-observation substrate. Layer 4 event-observation collection repeats per fold because the accepted observation pool may change between folds. These rows are shared across target research runs and must not be redownloaded merely because a new target is being studied.
 
+Historical training status surfaces use fold identity globally. Month-level
+provider batching and old month checkpoint files are implementation detail;
+the dashboard and owner-facing task inventory should show fold tasks with
+month child partitions rather than mixing Layer 1/2 month rows with Layer 3+
+fold rows.
+
 Layer 2 feature generation also prepares `source_02_target_candidate_holdings` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
 ## Target Rotation

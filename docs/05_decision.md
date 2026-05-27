@@ -35,6 +35,8 @@ Manager recognizes the current Layer 1-10 stack: MarketRegime, SectorContext, Ta
 
 The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes Layer 1 market/cross-asset context, Layer 2 sector/industry context, and fold-scoped global or sector-scoped Layer 4 event-observation context. Layer 4 event-observation substrate must be collected for each fold because the accepted event observation pool can change across folds. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
 
+Historical training uses the six-month fold as the public first-class work unit across all layers. Months are child partitions inside a fold for data coverage, receipts, and provider batching; they are not separate owner-facing training tasks. Dashboard task identity, stable task numbers, worker labels, and stage progress must therefore present Layer 1+ data acquisition, feature generation, model generation, evaluation, and review under the same fold period such as `2016-fold1`.
+
 ## D008 - Layer 9 is optional trading guidance/expression
 
 Layer 9 may produce optional offline trading-guidance records and option-expression plans from the Layer 8 direct-underlying thesis and point-in-time option context when available. It is not an event-risk governor and does not execute trades or mutate broker/account state.

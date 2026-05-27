@@ -12,7 +12,6 @@ from trading_manager_tasks.model_training_workflow import (
     LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER,
     MODEL_GROUP_REPLAY_COMPLETE_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
-    MONTHLY_SUBSTRATE_LAYERS,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
     LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
@@ -174,15 +173,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
         self.assertEqual(plan.layers[2].stages, ())
 
-    def test_monthly_substrate_stages_stay_month_scoped_while_model_stages_are_fold_scoped(self):
+    def test_foundation_substrate_stages_use_fold_scoped_units(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
-            monthly_plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-07",
-                end_month="2016-07",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
             fold_plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
                 start_month="2016-07",
@@ -191,8 +183,16 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        self.assertEqual(monthly_plan.layers[2].stages[0].command[monthly_plan.layers[2].stages[0].command.index("--end-month") + 1], "${END_MONTH}")
-        self.assertEqual(monthly_plan.end_month, "2016-07")
+        for layer_index in (0, 1):
+            for stage in fold_plan.layers[layer_index].stages[:2]:
+                self.assertEqual(stage.dataset_unit.start_month, "2016-07")
+                self.assertEqual(stage.dataset_unit.end_month, "2016-12")
+                self.assertEqual(stage.dataset_unit.unit_months, 6)
+            acquisition_stage = fold_plan.layers[layer_index].stages[0]
+            self.assertIn("--start-month", acquisition_stage.command)
+            self.assertIn("--end-month", acquisition_stage.command)
+            self.assertEqual(acquisition_stage.command[acquisition_stage.command.index("--start-month") + 1], "${START_MONTH}")
+            self.assertEqual(acquisition_stage.command[acquisition_stage.command.index("--end-month") + 1], "${END_MONTH}")
         self.assertEqual(fold_plan.layers[2].stages[2].stage_type, "model_generation")
         self.assertEqual(fold_plan.end_month, "2016-12")
         self.assertIn("${END_MONTH_EXCLUSIVE_START_ET}", fold_plan.layers[2].stages[2].command)

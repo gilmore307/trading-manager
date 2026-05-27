@@ -50,6 +50,11 @@ Failures should become durable evidence, not chat-only notes. The failure regist
 Model research tasks are grouped by data reuse and decision-cycle ownership, not by a
 linear Layer 1 through Layer 10 loop.
 
+The public task unit for historical training is the six-month fold. Month
+coverage remains visible as child partition evidence under the fold, but the
+operator-facing task list should not switch between month-scoped Layer 1/2
+work and fold-scoped downstream work.
+
 1. Foundation substrate. Build reusable market, sector, and fold-scoped
    global/sector event inputs for each historical window. This covers Layer 1,
    Layer 2, and the global or sector-scoped Layer 4 event-observation substrate.
