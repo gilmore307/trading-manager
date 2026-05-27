@@ -100,6 +100,13 @@ def _resolve_command_placeholders(command: list[str], *, start_month: str, end_m
     return resolved
 
 
+def _stage_progress_worker_id(*, start_month: str, end_month: str) -> str:
+    if start_month != end_month:
+        return "model_worker_1"
+    safe_month = start_month.replace("-", "_")
+    return f"month_ingest_worker_stage_executor_{safe_month}"
+
+
 def _split_env(command: list[str]) -> tuple[dict[str, str], list[str]]:
     env: dict[str, str] = {}
     argv: list[str] = []
@@ -373,7 +380,7 @@ def execute_next_ready_stage(
         log_root=log_root,
         progress_root=progress_root or storage_root / "runtime" / "task_progress",
         task_uid=task_uid,
-        worker_id="model_worker_1" if start_month != end_month else "month_ingest_worker_stage_executor",
+        worker_id=_stage_progress_worker_id(start_month=start_month, end_month=end_month),
     )
     updated = state
     if summary.status == "succeeded" and summary.receipt_path:
@@ -451,6 +458,7 @@ __all__ = [
     "SAFE_OFFLINE_STAGE_TYPES",
     "StageExecutionSummary",
     "_resolve_command_placeholders",
+    "_stage_progress_worker_id",
     "execute_next_ready_stage",
     "execute_stage_process",
     "write_stage_execution_summary",

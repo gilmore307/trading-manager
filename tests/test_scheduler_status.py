@@ -56,8 +56,8 @@ class SchedulerStatusTests(unittest.TestCase):
 
         row = status.summary_row()
         self.assertTrue(row["service_runtime_ready"])
-        self.assertEqual(row["auto_work_selection"]["start_month"], "2016-04")
-        self.assertEqual(row["current_month"], "2016-04")
+        self.assertEqual(row["auto_work_selection"]["start_month"], "2016-01")
+        self.assertEqual(row["current_month"], "2016-01")
         self.assertEqual(row["current_stage"], "prepare_layer_one_historical_training_batch")
         self.assertEqual(row["missing_service_flags"], [])
         self.assertIn("start_service_or_run_one_shot_smoke_to_create_daemon_state", row["open_operational_items"])
@@ -252,8 +252,8 @@ class SchedulerStatusTests(unittest.TestCase):
             )
 
         row = status.summary_row()
-        self.assertEqual(row["auto_work_selection"]["start_month"], "2019-02")
-        self.assertEqual(row["current_month"], "2019-02")
+        self.assertEqual(row["auto_work_selection"]["start_month"], "2016-01")
+        self.assertEqual(row["current_month"], "2016-01")
         self.assertIsNone(row["blocked_reason"])
         self.assertIsNone(row["latest_decision"])
         self.assertEqual(row["provider_status"]["status"], "no_provider_work_selected")

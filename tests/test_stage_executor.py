@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.model_training_state import StageProgress
-from trading_manager_tasks.stage_executor import _cwd_for_stage, _resolve_command_placeholders, execute_stage_process
+from trading_manager_tasks.stage_executor import _cwd_for_stage, _resolve_command_placeholders, _stage_progress_worker_id, execute_stage_process
 
 
 class StageExecutorTests(unittest.TestCase):
@@ -88,6 +88,13 @@ class StageExecutorTests(unittest.TestCase):
         command = _resolve_command_placeholders(["runner", "--month", "${START_MONTH}", "--path", "summary_${END_MONTH}.json"], start_month="2016-01", end_month="2016-02")
 
         self.assertEqual(command, ["runner", "--month", "2016-01", "--path", "summary_2016-02.json"])
+
+    def test_stage_progress_worker_id_is_unique_for_month_scoped_execution(self):
+        self.assertEqual(
+            _stage_progress_worker_id(start_month="2016-01", end_month="2016-01"),
+            "month_ingest_worker_stage_executor_2016_01",
+        )
+        self.assertEqual(_stage_progress_worker_id(start_month="2016-01", end_month="2016-06"), "model_worker_1")
 
     def test_manager_task_scripts_run_from_manager_root_even_with_trading_model_refs(self):
         stage = StageProgress(

@@ -61,6 +61,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_target_candidate_holdings.py`
 - `test_target_context_review.py`
 - `test_task_control_plane.py`
+- `test_task_progress.py`
 - `test_task_rehearsal.py`
 - `test_trading_bigquery.py`
 - `test_trading_economics_calendar.py`
