@@ -2221,6 +2221,9 @@ class RegistryHelperTests(unittest.TestCase):
 
     def test_manager_registry_value_helpers_resolve_by_stable_id(self):
         self.assertEqual(registry_payload("trm_MRM001"), "market_regime_model")
+        self.assertEqual(registry_payload("trm_L2CES001"), "context_etf_state")
+        self.assertEqual(registry_payload("trm_L2XES001"), "cross_etf_summary")
+        self.assertEqual(registry_payload("trm_L2TCP001"), "target_context_profile")
         self.assertEqual(registry_payload("trm_M6DRP01"), "model_06_dynamic_risk_policy")
         self.assertEqual(registry_payload("mlv_L10ERG001"), "layer_10_event_risk_governor")
         self.assertTrue(registry_value("out_TL2CTX001", "path").endswith("layer_02_target_context_mapping.csv"))
