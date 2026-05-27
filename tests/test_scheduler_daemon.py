@@ -17,6 +17,8 @@ from trading_manager_tasks.scheduler_daemon import (
     SchedulerDaemonState,
     acquire_daemon_lock,
     apply_auto_work_selection,
+    completed_historical_fold_cutoff,
+    completed_historical_fold_cutoff_month,
     completed_historical_month_cutoff,
     load_model_worker_target_queue,
     load_daemon_state,
@@ -167,6 +169,20 @@ class SchedulerDaemonTests(unittest.TestCase):
             "2026-05",
         )
 
+    def test_completed_historical_fold_cutoff_excludes_incomplete_six_month_fold(self):
+        self.assertEqual(completed_historical_fold_cutoff_month("2026-05"), "2025-12")
+        self.assertEqual(completed_historical_fold_cutoff_month("2026-06"), "2026-06")
+        self.assertEqual(completed_historical_fold_cutoff_month("2026-11"), "2026-06")
+        self.assertEqual(completed_historical_fold_cutoff_month("2026-12"), "2026-12")
+        self.assertEqual(
+            completed_historical_fold_cutoff(datetime(2026, 6, 30, 23, 59, tzinfo=ZoneInfo("America/New_York"))),
+            "2025-12",
+        )
+        self.assertEqual(
+            completed_historical_fold_cutoff(datetime(2026, 7, 1, 0, 1, tzinfo=ZoneInfo("America/New_York"))),
+            "2026-06",
+        )
+
     def test_select_next_historical_work_advances_after_latest_completed_month(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
@@ -213,7 +229,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.completed_months, ("2016-02", "2016-03"))
         self.assertEqual(selection.open_months, ())
 
-    def test_select_next_historical_work_does_not_publish_incomplete_calendar_month(self):
+    def test_select_next_historical_work_waits_for_complete_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             plan = build_model_training_workflow_plan(start_month="2026-04", end_month="2026-04", storage_root=storage_root)
@@ -234,9 +250,9 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_month="2026-04",
             )
 
-        self.assertEqual(selection.start_month, "2026-04")
-        self.assertEqual(selection.end_month, "2026-04")
-        self.assertEqual(selection.reason_code, "waiting_for_next_calendar_month_to_complete")
+        self.assertEqual(selection.start_month, "2025-12")
+        self.assertEqual(selection.end_month, "2025-12")
+        self.assertEqual(selection.reason_code, "waiting_for_next_training_fold_to_complete")
 
     def test_select_next_historical_work_ignores_open_month_after_cutoff(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -265,8 +281,8 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_month="2026-04",
             )
 
-        self.assertEqual(selection.start_month, "2026-04")
-        self.assertEqual(selection.reason_code, "waiting_for_next_calendar_month_to_complete")
+        self.assertEqual(selection.start_month, "2025-12")
+        self.assertEqual(selection.reason_code, "waiting_for_next_training_fold_to_complete")
         self.assertEqual(selection.open_months, ("2026-05",))
 
     def test_select_next_historical_work_advances_after_foundation_substrate_month(self):
@@ -323,10 +339,17 @@ class SchedulerDaemonTests(unittest.TestCase):
             )
 
             selected = select_month_ingest_worker_months(storage_root=storage_root, default_start_month="2016-01", worker_count=3)
-            capped = select_month_ingest_worker_months(storage_root=storage_root, default_start_month="2016-01", worker_count=3, max_month="2016-04")
+            capped = select_month_ingest_worker_months(storage_root=storage_root, default_start_month="2016-01", worker_count=3, max_month="2016-06")
+            before_fold_end = select_month_ingest_worker_months(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                worker_count=3,
+                max_month="2016-04",
+            )
 
         self.assertEqual(selected, ("2016-03", "2016-04", "2016-05"))
-        self.assertEqual(capped, ("2016-03", "2016-04"))
+        self.assertEqual(capped, ("2016-03", "2016-04", "2016-05"))
+        self.assertEqual(before_fold_end, ())
 
     def test_month_ingest_worker_selection_ignores_open_month_after_cutoff(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -679,10 +702,10 @@ class SchedulerDaemonTests(unittest.TestCase):
                 storage_root=storage_root,
                 default_start_month="2016-01",
                 worker_count=3,
-                max_month="2016-04",
+                max_month="2016-06",
             )
 
-        self.assertEqual(months, ("2016-01", "2016-04"))
+        self.assertEqual(months, ("2016-01", "2016-04", "2016-05"))
 
     def test_model_worker_selects_fold_with_ready_target_chain_preparation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -84,6 +84,36 @@ def completed_historical_month_cutoff(now: datetime | None = None) -> str:
     return previous_month(current_local.strftime("%Y-%m"))
 
 
+def completed_historical_fold_cutoff_month(max_completed_month: str) -> str:
+    """Return latest completed month whose six-month training fold is complete."""
+
+    year_text, month_text = max_completed_month.split("-", 1)
+    year = int(year_text)
+    month_number = int(month_text)
+    if month_number < 1 or month_number > 12:
+        raise ValueError(f"invalid month: {max_completed_month}")
+    if month_number < 6:
+        return f"{year - 1:04d}-12"
+    if month_number < 12:
+        return f"{year:04d}-06"
+    return f"{year:04d}-12"
+
+
+def completed_historical_fold_cutoff(now: datetime | None = None) -> str:
+    """Return latest month allowed for fold-scoped historical training.
+
+    Historical training is scheduled by complete six-month folds. A new fold
+    does not open until its final calendar month is complete in the project
+    timezone, so 2026-fold1 remains closed until July 2026 opens.
+    """
+
+    return completed_historical_fold_cutoff_month(completed_historical_month_cutoff(now))
+
+
+def _eligible_historical_fold_cutoff(max_month: str | None) -> str:
+    return completed_historical_fold_cutoff_month(max_month or completed_historical_month_cutoff())
+
+
 def next_month(month: str) -> str:
     """Return the next YYYY-MM month for chronological service progression."""
 
@@ -202,7 +232,7 @@ def select_next_historical_work(
     configured default bootstrap month.
     """
 
-    max_month = max_month or completed_historical_month_cutoff()
+    max_month = _eligible_historical_fold_cutoff(max_month)
     runtime_root = storage_root / "runtime"
     completed: list[str] = []
     open_months: list[str] = []
@@ -258,7 +288,7 @@ def select_next_historical_work(
             return HistoricalWorkSelection(
                 start_month=capped_month,
                 end_month=capped_month,
-                reason_code="waiting_for_next_calendar_month_to_complete",
+                reason_code="waiting_for_next_training_fold_to_complete",
                 completed_months=completed_tuple,
                 open_months=open_tuple,
             )
@@ -273,7 +303,7 @@ def select_next_historical_work(
         return HistoricalWorkSelection(
             start_month=max_month,
             end_month=max_month,
-            reason_code="waiting_for_next_calendar_month_to_complete",
+            reason_code="waiting_for_next_training_fold_to_complete",
             completed_months=completed_tuple,
             open_months=open_tuple,
         )
@@ -304,11 +334,11 @@ def select_month_ingest_worker_months(
     known month so all three ingest lanes can stay filled by default.
     """
 
-    if target_has_open_model_worker_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
+    max_month = _eligible_historical_fold_cutoff(max_month)
+    if target_has_open_model_worker_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol, max_month=max_month):
         return ()
 
     worker_count = max(1, int(worker_count))
-    max_month = max_month or completed_historical_month_cutoff()
     runtime_root = storage_root / "runtime"
     known_months: list[str] = []
     open_ingest_months: list[str] = []
@@ -528,12 +558,16 @@ def target_has_open_model_worker_fold(
     *,
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     selected_target_symbol: str | None = None,
+    max_month: str | None = None,
 ) -> bool:
     """Return whether a target already has a non-terminal Model Worker fold."""
 
+    max_month = _eligible_historical_fold_cutoff(max_month)
     if selected_target_symbol:
         selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
         if selection is None:
+            return False
+        if selection.end_month > max_month:
             return False
         return (
             _first_missing_workflow_month(
@@ -546,6 +580,8 @@ def target_has_open_model_worker_fold(
     for symbol in load_model_worker_target_queue(storage_root / "runtime" / "model_training_target_queue.json"):
         selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=symbol)
         if selection is None:
+            continue
+        if selection.end_month > max_month:
             continue
         if (
             _first_missing_workflow_month(
@@ -566,6 +602,9 @@ def target_has_open_model_worker_fold(
             continue
         if not _workflow_payload_all_stages_complete(payload) and _fold_payload_has_open_model_worker_stage(payload):
             start_month = str(payload.get("start_month") or "")
+            end_month = str(payload.get("end_month") or "")
+            if end_month and end_month > max_month:
+                continue
             if start_month and _first_missing_workflow_month(
                 storage_root=storage_root,
                 default_start_month="2016-01",
@@ -601,10 +640,12 @@ def select_model_worker_fold(
 ) -> ModelWorkerFoldSelection | None:
     """Select the earliest complete non-overlapping six-month fold with open Model Worker work."""
 
-    max_month = max_month or completed_historical_month_cutoff()
+    max_month = _eligible_historical_fold_cutoff(max_month)
     runtime_root = storage_root / "runtime"
     open_selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
     if open_selection is not None:
+        if open_selection.end_month > max_month:
+            return None
         if _first_missing_workflow_month(
             storage_root=storage_root,
             default_start_month=default_start_month,
@@ -734,7 +775,7 @@ def select_model_worker_target(
 
     A pinned target keeps current behavior. Without a pinned target, manager
     reads the ordered runtime target queue and skips any target whose
-    target-scoped fold states are complete through the completed-month cutoff.
+    target-scoped fold states are complete through the completed-fold cutoff.
     The next target then starts at the earliest ready fold, normally 2016-01.
     """
 
@@ -1406,7 +1447,7 @@ def run_daemon_loop(
                         advanced_month = False
                         if advance_month_on_complete and decision.reason_code == "month_workflow_complete" and active_start_month == active_end_month:
                             advanced_month_value = next_month(active_end_month)
-                            if advanced_month_value <= completed_historical_month_cutoff():
+                            if advanced_month_value <= completed_historical_fold_cutoff():
                                 advanced_month = True
                                 active_start_month = advanced_month_value
                                 active_end_month = advanced_month_value
@@ -1420,8 +1461,8 @@ def run_daemon_loop(
                             else:
                                 state = replace(
                                     state,
-                                    last_next_internal_stage="calendar_month_cutoff_wait",
-                                    last_work_selection_reason="waiting_for_next_calendar_month_to_complete",
+                                    last_next_internal_stage="training_fold_cutoff_wait",
+                                    last_work_selection_reason="waiting_for_next_training_fold_to_complete",
                                     updated_utc=completed,
                                 )
                         if decision.decision_status == "executed" or advanced_month:
@@ -1579,6 +1620,8 @@ __all__ = [
     "acquire_daemon_lock",
     "apply_auto_work_selection",
     "append_decision_log",
+    "completed_historical_fold_cutoff",
+    "completed_historical_fold_cutoff_month",
     "load_daemon_state",
     "release_daemon_lock",
     "load_model_worker_target_queue",

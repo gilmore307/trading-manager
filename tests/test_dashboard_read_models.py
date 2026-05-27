@@ -1662,7 +1662,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         ordered_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
         self.assertLess(ordered_months.index("2016-fold1"), ordered_months.index("2016-fold2"))
 
-    def test_current_incomplete_calendar_month_is_not_exposed_as_ready_task(self):
+    def test_current_incomplete_fold_is_not_exposed_as_ready_task(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -1721,6 +1721,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task_timeline = payload["chart_payload"]["task_timeline"]
         self.assertFalse(any(task["month"] == "2026-05" for task in task_timeline))
+        self.assertFalse(any(task["month"] == "2026-fold1" for task in task_timeline))
+        self.assertIsNone(payload["chart_payload"]["current_month"])
 
     def test_task_timeline_omits_nonexistent_no_feature_layer_input_tasks(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

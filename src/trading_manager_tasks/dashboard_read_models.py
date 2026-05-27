@@ -492,6 +492,16 @@ def _public_active_task_summary(task: Mapping[str, Any] | None) -> dict[str, Any
     }
 
 
+def _public_current_period(status: HistoricalSchedulerStatus, public_active_task: Mapping[str, Any] | None) -> str | None:
+    if public_active_task is not None:
+        value = public_active_task.get("month")
+        return str(value) if value else None
+    candidate = _public_task_period(status.current_month)
+    if candidate and _public_period_visible_by_completed_cutoff(candidate, max_month=completed_historical_month_cutoff()):
+        return candidate
+    return None
+
+
 def _owner_status(
     status: HistoricalSchedulerStatus,
     *,
@@ -2328,7 +2338,7 @@ def build_historical_task_progress_summary(
     dashboard_status, severity, summary = _owner_status(status, public_active_task=public_active_task)
     active_blocker = status.blocked_reason or (status.open_operational_items[0] if status.open_operational_items else None)
     chart_payload: dict[str, Any] = {
-        "current_month": public_active_task.get("month") if public_active_task else _public_task_period(status.current_month),
+        "current_month": _public_current_period(status, public_active_task),
         "active_stage": public_active_task.get("task_id") if public_active_task else None,
         "active_task": _public_active_task_summary(public_active_task),
         "internal_current_month": status.current_month,
