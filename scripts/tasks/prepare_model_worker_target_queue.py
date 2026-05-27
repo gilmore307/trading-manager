@@ -42,8 +42,14 @@ def _mapping_targets(mapping_csv: Path) -> list[str]:
 
 
 def build_target_queue(*, bootstrap_targets: list[str], mapping_csv: Path, generated_at_utc: str | None = None) -> dict[str, object]:
+    mapping_targets = _mapping_targets(mapping_csv)
+    accepted_targets = set(mapping_targets)
     targets: list[str] = []
-    for symbol in bootstrap_targets + _mapping_targets(mapping_csv):
+    for symbol in bootstrap_targets:
+        normal = _normal_symbol(symbol)
+        if normal and normal in accepted_targets and normal not in targets:
+            targets.append(normal)
+    for symbol in mapping_targets:
         normal = _normal_symbol(symbol)
         if normal and normal not in targets:
             targets.append(normal)
@@ -60,7 +66,7 @@ def build_target_queue(*, bootstrap_targets: list[str], mapping_csv: Path, gener
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mapping-csv", type=Path, default=DEFAULT_MAPPING_CSV)
-    parser.add_argument("--bootstrap-target", action="append", default=["AAPL"], help="Initial reviewed target to place before mapping-derived targets.")
+    parser.add_argument("--bootstrap-target", action="append", default=[], help="Initial reviewed target to place before mapping-derived targets.")
     parser.add_argument("--output-path", type=Path, default=DEFAULT_TARGET_QUEUE_PATH)
     parser.add_argument("--write", action="store_true")
     return parser.parse_args()

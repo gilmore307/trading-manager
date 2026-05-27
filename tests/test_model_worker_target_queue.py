@@ -31,6 +31,18 @@ class ModelWorkerTargetQueueTests(unittest.TestCase):
         self.assertEqual([row["symbol"] for row in payload["targets"]], ["AAPL", "AAOI"])
         self.assertFalse(payload["promotion_evidence"])
 
+    def test_queue_drops_bootstrap_targets_without_accepted_mapping(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            mapping = Path(raw_tmp) / "mapping.csv"
+            with mapping.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["target_symbol", "review_status"])
+                writer.writeheader()
+                writer.writerow({"target_symbol": "AAOI", "review_status": "accepted"})
+
+            payload = build_target_queue(bootstrap_targets=["AAPL"], mapping_csv=mapping, generated_at_utc="2026-05-20T00:00:00Z")
+
+        self.assertEqual([row["symbol"] for row in payload["targets"]], ["AAOI"])
+
 
 if __name__ == "__main__":
     unittest.main()

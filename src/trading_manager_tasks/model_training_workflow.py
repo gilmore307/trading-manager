@@ -43,6 +43,7 @@ MULTI_TARGET_SYMBOL_BLOCKER = "multiple_target_symbols_require_separate_workflow
 MODEL_RUNTIME_ROOT = model_runtime_root()
 LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER = "layer_04_event_observation_pool_ready"
 LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER = "layer_10_event_feed_coverage_ready"
+LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER = "layer_03_target_local_feed_artifacts_ready"
 
 
 @dataclass(frozen=True)
@@ -598,6 +599,34 @@ def _resolve_event_feed_storage_root(storage_root: Path, trading_storage_root: P
     return storage_root
 
 
+def _next_month(month: str) -> str:
+    year, month_number = int(month[:4]), int(month[5:])
+    if month_number == 12:
+        return f"{year + 1:04d}-01"
+    return f"{year:04d}-{month_number + 1:02d}"
+
+
+def _layer_three_target_local_feed_blockers(
+    *,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+    trading_storage_root: Path,
+) -> tuple[str, ...]:
+    target = _normalize_selected_target_symbol(selected_target_symbol)
+    if target is None:
+        return ()
+    from .layer_three_target_state import discover_layer_two_feed_artifacts
+
+    month = start_month
+    while month <= end_month:
+        refs = discover_layer_two_feed_artifacts(start_month=month, trading_storage_root=trading_storage_root, symbols=(target,))
+        if not refs:
+            return (LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,)
+        month = _next_month(month)
+    return ()
+
+
 def _build_layer_workflow(
     meta: dict[str, Any],
     *,
@@ -608,6 +637,7 @@ def _build_layer_workflow(
     selected_target_symbol: str | None,
     foundation_catch_up_only: bool,
     layer_four_event_observation_blockers: tuple[str, ...],
+    layer_three_target_local_feed_blockers: tuple[str, ...],
 ) -> LayerWorkflow:
     layer = int(meta["layer"])
     slug = str(meta["slug"])
@@ -648,6 +678,9 @@ def _build_layer_workflow(
     elif layer == 4:
         acquisition_status = "blocked" if layer_four_event_observation_blockers else "ready"
         acquisition_blockers, acquisition_gate = layer_four_event_observation_blockers, None
+    elif layer == 3 and layer_three_target_local_feed_blockers:
+        acquisition_status = "blocked"
+        acquisition_blockers, acquisition_gate = layer_three_target_local_feed_blockers, None
     else:
         acquisition_status, acquisition_blockers, acquisition_gate = "blocked", _upstream_layer_ready_blockers(
             tuple(meta["depends_on_layers"]),
@@ -870,6 +903,12 @@ def build_model_training_workflow_plan(
         end_month=end_month,
         trading_storage_root=resolved_trading_storage_root,
     )
+    layer_three_target_local_feed_blockers = _layer_three_target_local_feed_blockers(
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=normalized_target_symbol,
+        trading_storage_root=resolved_trading_storage_root,
+    )
     layers = tuple(
         _build_layer_workflow(
             meta,
@@ -880,6 +919,7 @@ def build_model_training_workflow_plan(
             selected_target_symbol=normalized_target_symbol,
             foundation_catch_up_only=foundation_catch_up_only,
             layer_four_event_observation_blockers=layer_four_event_observation_blockers,
+            layer_three_target_local_feed_blockers=layer_three_target_local_feed_blockers,
         )
         for meta in LAYER_METADATA
     )

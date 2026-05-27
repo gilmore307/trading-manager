@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -37,6 +38,38 @@ def _write_event_feed_artifacts(root: Path, *, month: str = "2016-01") -> None:
         path = root / "monthly_backfill" / source_id / month / "runs" / "run_001" / "saved" / filename
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+
+
+def _write_layer_three_feed_artifact(root: Path, *, symbol: str = "AAPL", month: str = "2016-01") -> None:
+    run_dir = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "runs" / "run_001"
+    (run_dir / "cleaned").mkdir(parents=True)
+    (run_dir / "cleaned" / "equity_bar.jsonl").write_text(
+        f'{{"symbol":"{symbol}","timestamp":"{month}-04T09:30:00-05:00"}}\n',
+        encoding="utf-8",
+    )
+    receipt_path = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "runs": [
+                    {
+                        "run_id": "run_001",
+                        "status": "succeeded",
+                        "row_counts": {"equity_bar": 1},
+                        "steps": {
+                            "clean": {
+                                "references": [
+                                    f"storage/monthly_backfill/alpaca_bars/{symbol}/{month}/runs/run_001/cleaned/equity_bar.jsonl"
+                                ]
+                            }
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 class ModelTrainingWorkflowTests(unittest.TestCase):
@@ -137,8 +170,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
     def test_layer_three_data_acquisition_uses_local_materializer_without_provider_dispatch(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
+            _write_layer_three_feed_artifact(Path(raw_tmp), symbol="AAPL", month="2016-01")
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
                 end_month="2016-01",
                 selected_target_symbol="AAPL",
@@ -153,6 +188,22 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIsNone(plan.layers[2].stages[0].approval_gate_required)
         self.assertFalse(plan.layers[2].stages[0].provider_calls_allowed)
         self.assertTrue(plan.layers[2].stages[0].safe_without_provider_calls)
+        self.assertEqual(plan.layers[2].stages[0].status, "blocked")
+
+    def test_layer_three_data_acquisition_blocks_without_target_local_feed_artifacts(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        stage = plan.layers[2].stages[0]
+        self.assertEqual(stage.status, "blocked")
+        self.assertEqual(stage.blockers, ("layer_03_target_local_feed_artifacts_ready",))
 
     def test_foundation_catch_up_omits_monthly_post_feature_model_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
