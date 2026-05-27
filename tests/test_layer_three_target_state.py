@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from trading_manager_tasks.layer_three_target_state import (
     build_source_task_key,
@@ -167,6 +168,59 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(summary.symbols, ("AAPL",))
             self.assertEqual(summary.target_candidate_count, 1)
             self.assertEqual(candidates[0]["routing_symbol_ref"], "AAPL")
+
+    def test_crypto_target_uses_reviewed_layer_two_context_proxy_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            trading_data_root = tmp / "trading-data"
+            storage_root = trading_data_root / "storage"
+            mapping_path = tmp / "target_context_mapping.csv"
+            universe_path = tmp / "universe.csv"
+            mapping_path.write_text(
+                "target_symbol,target_asset_class,spot_ref,layer2_context_symbol,review_status\n"
+                "BTC,crypto_spot,BTC,BKCH,accepted\n",
+                encoding="utf-8",
+            )
+            universe_path.write_text("symbol,model_layer\nBKCH,layer_02_sector_context\n", encoding="utf-8")
+            run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "BKCH" / "2016-01" / "runs" / "run_001"
+            (run_dir / "cleaned").mkdir(parents=True)
+            (run_dir / "cleaned" / "equity_bar.jsonl").write_text('{"symbol":"BKCH","timestamp":"2016-01-04T09:30:00-05:00"}\n', encoding="utf-8")
+            receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "BKCH" / "2016-01" / "completion_receipt.json"
+            receipt_path.parent.mkdir(parents=True, exist_ok=True)
+            receipt_path.write_text(
+                json.dumps(
+                    {
+                        "runs": [
+                            {
+                                "run_id": "run_001",
+                                "status": "succeeded",
+                                "row_counts": {"equity_bar": 1},
+                                "steps": {"clean": {"references": ["storage/monthly_backfill/alpaca_bars/BKCH/2016-01/runs/run_001/cleaned/equity_bar.jsonl"]}},
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("trading_manager_tasks.layer_three_target_state.DEFAULT_TARGET_CONTEXT_MAPPING", mapping_path):
+                summary = materialize_layer_three_target_state_inputs(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    manager_storage_root=tmp / "manager-storage",
+                    trading_data_root=trading_data_root,
+                    trading_storage_root=storage_root,
+                    universe_path=universe_path,
+                    target_symbol="BTC",
+                    write=False,
+                )
+
+            bars = [json.loads(line) for line in Path(summary.merged_bar_rows_path).read_text(encoding="utf-8").splitlines()]
+
+            self.assertEqual(summary.symbols, ("BTC",))
+            self.assertEqual(summary.feed_artifacts[0].evidence_symbol, "BKCH")
+            self.assertEqual(bars[0]["symbol"], "BTC")
+            self.assertEqual(bars[0]["source_evidence_symbol"], "BKCH")
 
     def test_fold_materialization_uses_one_candidate_per_symbol_across_months(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

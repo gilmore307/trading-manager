@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from trading_manager_tasks.model_training_workflow import (
     BASE_STACK_LAYER_COUNT,
@@ -200,6 +201,35 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
+
+        stage = plan.layers[2].stages[0]
+        self.assertEqual(stage.status, "blocked")
+        self.assertEqual(stage.blockers, ("layer_03_target_local_feed_artifacts_ready",))
+
+    def test_layer_three_data_acquisition_blocks_crypto_target_when_context_proxy_rows_are_empty(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            mapping_path = tmp / "target_context_mapping.csv"
+            mapping_path.write_text(
+                "target_symbol,target_asset_class,spot_ref,layer2_context_symbol,review_status\n"
+                "BTC,crypto_spot,BTC,BKCH,accepted\n",
+                encoding="utf-8",
+            )
+            _write_layer_three_feed_artifact(tmp, symbol="BKCH", month="2016-01")
+            receipt_path = tmp / "monthly_backfill" / "alpaca_bars" / "BKCH" / "2016-01" / "completion_receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["runs"][0]["row_counts"] = {"equity_bar": 0}
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            with patch("trading_manager_tasks.layer_three_target_state.DEFAULT_TARGET_CONTEXT_MAPPING", mapping_path):
+                plan = build_model_training_workflow_plan(
+                    storage_root=tmp,
+                    trading_storage_root=tmp,
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    selected_target_symbol="BTC",
+                    foundation_catch_up_only=False,
+                )
 
         stage = plan.layers[2].stages[0]
         self.assertEqual(stage.status, "blocked")

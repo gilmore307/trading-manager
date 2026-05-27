@@ -27,6 +27,7 @@ from .storage_paths import data_storage_root
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
+DEFAULT_TARGET_CONTEXT_MAPPING = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_03_target_state_vector" / "input_materialization"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SOURCE = "source_03_target_state"
@@ -43,6 +44,7 @@ class FeedArtifactRef:
     cleaned_bar_path: str
     run_id: str
     row_count: int
+    evidence_symbol: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -142,6 +144,31 @@ def _read_layer_two_symbols(universe_path: Path) -> tuple[str, ...]:
     return tuple(symbols)
 
 
+def _crypto_context_proxy_symbols(*, target_symbol: str, mapping_path: Path | None = None) -> tuple[str, ...]:
+    mapping_path = mapping_path or DEFAULT_TARGET_CONTEXT_MAPPING
+    if not mapping_path.exists():
+        return ()
+    with mapping_path.open(newline="", encoding="utf-8") as handle:
+        rows = [{str(k): str(v or "").strip() for k, v in row.items()} for row in csv.DictReader(handle)]
+    symbols: list[str] = []
+    for row in rows:
+        if row.get("target_symbol", "").upper() != target_symbol:
+            continue
+        if row.get("review_status", "").lower() != "accepted":
+            continue
+        if row.get("target_asset_class", "").lower() != "crypto_spot":
+            continue
+        layer_two_symbol = row.get("layer2_context_symbol", "").upper()
+        if layer_two_symbol:
+            symbols.append(layer_two_symbol)
+    return tuple(dict.fromkeys(symbols))
+
+
+def _target_evidence_symbols(target_symbol: str) -> tuple[str, ...]:
+    symbol = target_symbol.upper()
+    return (symbol,) + tuple(item for item in _crypto_context_proxy_symbols(target_symbol=symbol) if item != symbol)
+
+
 def _latest_successful_run(receipt: Mapping[str, Any]) -> Mapping[str, Any] | None:
     runs = [run for run in receipt.get("runs") or [] if isinstance(run, Mapping)]
     successful = [run for run in runs if str(run.get("status") or "").lower() in {"succeeded", "success", "completed", "complete", "ready"}]
@@ -168,42 +195,49 @@ def discover_layer_two_feed_artifacts(
 ) -> tuple[FeedArtifactRef, ...]:
     """Find successful target-local bar artifacts already present on disk."""
 
-    allowed_symbols = {symbol.upper() for symbol in (symbols or _read_layer_two_symbols(universe_path))}
+    requested_symbols = tuple(symbol.upper() for symbol in (symbols or _read_layer_two_symbols(universe_path)))
+    allowed_symbols: dict[str, tuple[str, ...]] = {symbol: _target_evidence_symbols(symbol) for symbol in requested_symbols}
     refs: list[FeedArtifactRef] = []
-    for symbol in sorted(allowed_symbols):
-        receipt_path = trading_storage_root / MONTHLY_BACKFILL_STORAGE_DIR / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
-        if not receipt_path.exists():
-            continue
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        run = _latest_successful_run(receipt)
-        if run is None:
-            continue
-        cleaned_refs = []
-        steps = run.get("steps") if isinstance(run.get("steps"), Mapping) else {}
-        clean_step = steps.get("clean") if isinstance(steps.get("clean"), Mapping) else {}
-        for ref in clean_step.get("references") or []:
-            if isinstance(ref, str) and ref.endswith("equity_bar.jsonl"):
-                cleaned_refs.append(ref)
-        if not cleaned_refs:
-            output_dir = str(run.get("output_dir") or "")
-            if output_dir:
-                cleaned_refs.append(str(Path(output_dir) / "cleaned" / "equity_bar.jsonl"))
-        if not cleaned_refs:
-            continue
-        cleaned_path = _resolve_component_path(cleaned_refs[-1], trading_data_root=trading_data_root, trading_storage_root=trading_storage_root)
-        if not cleaned_path.exists():
-            continue
-        row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
-        refs.append(
-            FeedArtifactRef(
-                symbol=symbol,
-                month=start_month,
-                receipt_path=str(receipt_path),
-                cleaned_bar_path=str(cleaned_path),
-                run_id=str(run.get("run_id") or ""),
-                row_count=int(row_counts.get("equity_bar") or 0),
+    for target_symbol in sorted(allowed_symbols):
+        for evidence_symbol in allowed_symbols[target_symbol]:
+            receipt_path = trading_storage_root / MONTHLY_BACKFILL_STORAGE_DIR / "alpaca_bars" / evidence_symbol / start_month / "completion_receipt.json"
+            if not receipt_path.exists():
+                continue
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            run = _latest_successful_run(receipt)
+            if run is None:
+                continue
+            cleaned_refs = []
+            steps = run.get("steps") if isinstance(run.get("steps"), Mapping) else {}
+            clean_step = steps.get("clean") if isinstance(steps.get("clean"), Mapping) else {}
+            for ref in clean_step.get("references") or []:
+                if isinstance(ref, str) and ref.endswith("equity_bar.jsonl"):
+                    cleaned_refs.append(ref)
+            if not cleaned_refs:
+                output_dir = str(run.get("output_dir") or "")
+                if output_dir:
+                    cleaned_refs.append(str(Path(output_dir) / "cleaned" / "equity_bar.jsonl"))
+            if not cleaned_refs:
+                continue
+            cleaned_path = _resolve_component_path(cleaned_refs[-1], trading_data_root=trading_data_root, trading_storage_root=trading_storage_root)
+            if not cleaned_path.exists():
+                continue
+            row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
+            row_count = int(row_counts.get("equity_bar") or 0)
+            if row_count <= 0:
+                continue
+            refs.append(
+                FeedArtifactRef(
+                    symbol=target_symbol,
+                    month=start_month,
+                    receipt_path=str(receipt_path),
+                    cleaned_bar_path=str(cleaned_path),
+                    run_id=str(run.get("run_id") or ""),
+                    row_count=row_count,
+                    evidence_symbol=evidence_symbol,
+                )
             )
-        )
+            break
     return tuple(refs)
 
 
@@ -260,7 +294,11 @@ def _iter_merged_bar_rows(refs: Sequence[FeedArtifactRef]) -> Iterable[dict[str,
                 if not line.strip():
                     continue
                 row = json.loads(line)
-                row.setdefault("symbol", ref.symbol)
+                evidence_symbol = getattr(ref, "evidence_symbol", None)
+                source_symbol = str(row.get("symbol") or evidence_symbol or ref.symbol).upper()
+                row["symbol"] = ref.symbol
+                if evidence_symbol and evidence_symbol != ref.symbol:
+                    row.setdefault("source_evidence_symbol", source_symbol)
                 if _ref_month(ref) != "unknown_month":
                     row.setdefault("fold_month", _ref_month(ref))
                 yield row
