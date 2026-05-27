@@ -169,7 +169,7 @@ class SchedulerDaemonTests(unittest.TestCase):
     def test_select_next_historical_work_advances_after_latest_completed_month(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
-            for month in ("2016-02", "2016-03"):
+            for month in ("2016-01", "2016-02", "2016-03"):
                 plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
                 all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
                 advance_workflow_state(
@@ -186,6 +186,29 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.start_month, "2016-04")
         self.assertEqual(selection.end_month, "2016-04")
         self.assertEqual(selection.reason_code, "advance_after_latest_completed_workflow_state")
+        self.assertEqual(selection.completed_months, ("2016-01", "2016-02", "2016-03"))
+        self.assertEqual(selection.open_months, ())
+
+    def test_select_next_historical_work_fills_missing_start_month_gap(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in ("2016-02", "2016-03"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=all_stage_ids,
+                    write=True,
+                )
+
+            selection = select_next_historical_work(storage_root=storage_root, default_start_month="2016-01", default_end_month="2016-01")
+
+        self.assertEqual(selection.start_month, "2016-01")
+        self.assertEqual(selection.end_month, "2016-01")
+        self.assertEqual(selection.reason_code, "fill_missing_workflow_state_gap")
         self.assertEqual(selection.completed_months, ("2016-02", "2016-03"))
         self.assertEqual(selection.open_months, ())
 
@@ -491,6 +514,38 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(next_selection.fold_id, "fold_2016-07_2016-12")
         self.assertEqual(next_selection.fold_months, ("2016-07", "2016-08", "2016-09", "2016-10", "2016-11", "2016-12"))
 
+    def test_model_worker_does_not_leapfrog_missing_foundation_month_gap(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+
+            state_path = model_worker_fold_state_path("2016-07", "2016-12", root=storage_root / "runtime")
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-07",
+                        "end_month": "2016-12",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 1,
+                                "status": "ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-12")
+
+        self.assertIsNone(selection)
+
     def test_model_worker_holds_blocked_fold_instead_of_selecting_next_ready_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
@@ -551,6 +606,21 @@ class SchedulerDaemonTests(unittest.TestCase):
             )
 
         self.assertEqual(months, ())
+
+    def test_month_ingest_worker_selection_fills_missing_start_month_gap(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            self._complete_monthly_substrate(storage_root=storage_root, month="2016-02")
+            self._complete_monthly_substrate(storage_root=storage_root, month="2016-03")
+
+            months = select_month_ingest_worker_months(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                worker_count=3,
+                max_month="2016-04",
+            )
+
+        self.assertEqual(months, ("2016-01", "2016-04"))
 
     def test_model_worker_selects_fold_with_ready_target_chain_preparation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

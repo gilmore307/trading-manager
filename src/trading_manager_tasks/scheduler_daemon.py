@@ -115,6 +115,26 @@ def _month_from_workflow_state_path(path: Path) -> str | None:
     return month
 
 
+def _workflow_state_path_for_month(storage_root: Path, month: str) -> Path:
+    return storage_root / "runtime" / f"model_training_workflow_state_{month}.json"
+
+
+def _first_missing_workflow_month(
+    *,
+    storage_root: Path,
+    default_start_month: str,
+    limit_month: str,
+) -> str | None:
+    if default_start_month > limit_month:
+        return None
+    month = default_start_month
+    while month <= limit_month:
+        if not _workflow_state_path_for_month(storage_root, month).exists():
+            return month
+        month = next_month(month)
+    return None
+
+
 def _workflow_payload_foundation_catch_up_complete(payload: dict[str, Any]) -> bool:
     stages = payload.get("stages")
     if not isinstance(stages, list) or not stages:
@@ -206,6 +226,21 @@ def select_next_historical_work(
 
     completed_tuple = tuple(sorted(set(completed)))
     open_tuple = tuple(sorted(set(open_months)))
+    known_tuple = tuple(sorted(set(completed_tuple + open_tuple)))
+    if known_tuple:
+        gap_cursor = default_start_month
+        gap_limit = min(known_tuple[-1], max_month)
+        known_set = set(known_tuple)
+        while gap_cursor <= gap_limit:
+            if gap_cursor not in known_set:
+                return HistoricalWorkSelection(
+                    start_month=gap_cursor,
+                    end_month=gap_cursor,
+                    reason_code="fill_missing_workflow_state_gap",
+                    completed_months=completed_tuple,
+                    open_months=open_tuple,
+                )
+            gap_cursor = next_month(gap_cursor)
     eligible_open_tuple = tuple(month for month in open_tuple if month <= max_month)
     if eligible_open_tuple:
         selected = eligible_open_tuple[0]
@@ -295,6 +330,15 @@ def select_month_ingest_worker_months(
                 open_ingest_months.append(month)
 
     selected: list[str] = []
+    if known_months:
+        known_set = set(known_months)
+        gap_cursor = default_start_month
+        gap_limit = min(max(known_months), max_month)
+        while gap_cursor <= gap_limit and len(selected) < worker_count:
+            if gap_cursor not in known_set and gap_cursor not in selected:
+                selected.append(gap_cursor)
+            gap_cursor = next_month(gap_cursor)
+
     for month in sorted(set(open_ingest_months)):
         if month > max_month:
             continue
@@ -488,9 +532,29 @@ def target_has_open_model_worker_fold(
     """Return whether a target already has a non-terminal Model Worker fold."""
 
     if selected_target_symbol:
-        return _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=selected_target_symbol) is not None
-    for symbol in load_model_worker_target_queue():
-        if _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=symbol) is not None:
+        selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
+        if selection is None:
+            return False
+        return (
+            _first_missing_workflow_month(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                limit_month=previous_month(selection.start_month),
+            )
+            is None
+        )
+    for symbol in load_model_worker_target_queue(storage_root / "runtime" / "model_training_target_queue.json"):
+        selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=symbol)
+        if selection is None:
+            continue
+        if (
+            _first_missing_workflow_month(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                limit_month=previous_month(selection.start_month),
+            )
+            is None
+        ):
             return True
     runtime_root = storage_root / "runtime"
     if not runtime_root.exists():
@@ -501,6 +565,13 @@ def target_has_open_model_worker_fold(
         except (OSError, json.JSONDecodeError):
             continue
         if not _workflow_payload_all_stages_complete(payload) and _fold_payload_has_open_model_worker_stage(payload):
+            start_month = str(payload.get("start_month") or "")
+            if start_month and _first_missing_workflow_month(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                limit_month=previous_month(start_month),
+            ):
+                continue
             return True
     return False
 
@@ -534,6 +605,12 @@ def select_model_worker_fold(
     runtime_root = storage_root / "runtime"
     open_selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
     if open_selection is not None:
+        if _first_missing_workflow_month(
+            storage_root=storage_root,
+            default_start_month=default_start_month,
+            limit_month=previous_month(open_selection.start_month),
+        ):
+            return None
         return open_selection
 
     known_months: set[str] = set()
@@ -551,6 +628,12 @@ def select_model_worker_fold(
         return None
     candidate = start
     while candidate <= last_start:
+        if _first_missing_workflow_month(
+            storage_root=storage_root,
+            default_start_month=default_start_month,
+            limit_month=previous_month(candidate),
+        ):
+            return None
         ready, months = _model_worker_fold_is_ready(storage_root, candidate)
         end_month = months[-1]
         state_path = model_worker_fold_state_path(

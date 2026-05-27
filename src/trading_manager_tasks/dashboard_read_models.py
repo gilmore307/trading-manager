@@ -880,6 +880,15 @@ def _stored_workflow_months(storage_root: Path, *, max_month: str) -> list[str]:
     return months
 
 
+def _has_control_plane_month_task_keys(storage_root: Path, month: str) -> bool:
+    """Return whether a missing workflow month has prepared control-plane work."""
+
+    monthly_root = storage_root / "monthly_backfill"
+    if not monthly_root.exists():
+        return False
+    return any(month_dir.is_dir() and (month_dir / "task_key.json").exists() for month_dir in monthly_root.glob(f"*/*/{month}"))
+
+
 def _workflow_state_payload(storage_root: Path, month: str) -> dict[str, Any] | None:
     path = storage_root / "runtime" / f"model_training_workflow_state_{month}.json"
     try:
@@ -1462,9 +1471,19 @@ def _task_timeline(
             month_key = str(payload.get("start_month") or month)
             month_stage_sets.append((month_key, raw_stages, False))
             included_months.add(month_key)
+    auto_work_selection = status.auto_work_selection if isinstance(status.auto_work_selection, Mapping) else {}
+    auto_start_month = str(auto_work_selection.get("start_month") or "")
+    if (
+        auto_work_selection.get("reason_code") == "fill_missing_workflow_state_gap"
+        and auto_start_month
+        and _has_control_plane_month_task_keys(storage_root, auto_start_month)
+    ):
+        lane_default_start_month = "2016-01"
+    else:
+        lane_default_start_month = status.current_month or status.workflow_checkpoint.start_month or "2016-01"
     lane_months = select_month_ingest_worker_months(
         storage_root=storage_root,
-        default_start_month=status.current_month or status.workflow_checkpoint.start_month or "2016-01",
+        default_start_month=lane_default_start_month,
         worker_count=month_ingest_worker_count,
         max_month=max_dashboard_month,
     )
@@ -1473,11 +1492,11 @@ def _task_timeline(
         if month in included_months:
             continue
         payload = _workflow_state_payload(storage_root, month)
-        if payload is None:
+        if payload is None and not _has_control_plane_month_task_keys(storage_root, month):
             continue
-        raw_stages = payload.get("stages")
+        raw_stages = payload.get("stages") if payload is not None else _planned_stage_rows(status, month=month)
         if isinstance(raw_stages, list):
-            month_key = str(payload.get("start_month") or month)
+            month_key = str(payload.get("start_month") or month) if payload is not None else month
             month_stage_sets.append((month_key, raw_stages, True))
             included_months.add(month_key)
     runtime_root = storage_root / "runtime"
