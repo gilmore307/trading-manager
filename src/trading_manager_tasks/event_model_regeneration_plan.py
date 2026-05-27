@@ -155,9 +155,9 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="04_materialize_layer_4_event_observation_fold_pool",
                 owner_repo="trading-manager",
-                action="materialize the fold-scoped Layer 4 global/sector event-observation substrate from reviewed local event feeds",
+                action="materialize the fold-scoped Layer 4 event-observation substrate, allowing an explicit empty pool before Layer 10 has accepted event attribution",
                 command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_observation_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
-                status="blocked_until_event_feed_coverage_ready",
+                status="ready_without_provider_calls",
                 mutation_class="local_event_observation_substrate_receipt",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,

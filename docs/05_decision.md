@@ -45,6 +45,11 @@ Layer 9 may produce optional offline trading-guidance records and option-express
 
 Layer 4 may condition alpha only with evidence packets that passed source precedence, point-in-time availability, non-overlap, matched controls, leakage review, and agent/manager acceptance. Raw anomalies and unreviewed event text cannot enter Layer 4 scoring.
 
+When Layer 10 has not yet produced accepted attribution or promotion evidence,
+the Layer 4 event-observation substrate may be empty. That is a valid state:
+Layer 4 should materialize a no-event-risk input and downstream scoring should
+resolve to `no_reviewed_event_failure_risk` rather than blocking the fold.
+
 C07 provisional untrained-event risk estimates are not Layer 4 inputs. They may
 support live trading-review decisions and later Layer 10/Layer 4 promotion
 research, but they cannot be treated as trained event-failure evidence until the

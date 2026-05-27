@@ -569,14 +569,11 @@ def _event_feed_coverage_blockers(*, start_month: str, end_month: str, trading_s
 
 
 def _layer_four_event_observation_blockers(*, start_month: str, end_month: str, trading_storage_root: Path) -> tuple[str, ...]:
-    blockers = _event_feed_coverage_blockers(
-        start_month=start_month,
-        end_month=end_month,
-        trading_storage_root=trading_storage_root,
+    _ = (start_month, end_month, trading_storage_root)
+    return (
+        "layer_01_market_regime.feature_or_input_ready",
+        "layer_02_sector_context.feature_or_input_ready",
     )
-    if blockers:
-        return (LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER,)
-    return ()
 
 
 def _resolve_event_feed_storage_root(storage_root: Path, trading_storage_root: Path | None) -> Path:

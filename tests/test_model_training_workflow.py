@@ -9,7 +9,6 @@ from trading_manager_tasks.model_training_workflow import (
     FOLD_STACK_PROMOTION_BLOCKER,
     FOUNDATION_CATCH_UP_BLOCKER,
     FOUNDATION_CATCH_UP_LAYERS,
-    LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER,
     MODEL_GROUP_REPLAY_COMPLETE_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
@@ -385,7 +384,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("after concentrated live-flow replay", plan.layers[9].candidate_progression_policy)
         self.assertIn(MODEL_GROUP_REPLAY_COMPLETE_BLOCKER, plan.layers[9].stages[0].blockers)
 
-    def test_layer_four_event_observation_data_acquisition_blocks_until_required_event_feeds_have_coverage(self):
+    def test_layer_four_event_observation_data_acquisition_waits_for_foundation_not_event_feeds(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
             plan = build_model_training_workflow_plan(
@@ -396,7 +395,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
-            blocked_stage = plan.layers[3].stages[0]
+            empty_pool_stage = plan.layers[3].stages[0]
 
             _write_event_feed_artifacts(root, month="2016-01")
             ready_plan = build_model_training_workflow_plan(
@@ -409,9 +408,13 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
             coverage_ready_stage = ready_plan.layers[3].stages[0]
 
-        self.assertIn(LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER, blocked_stage.blockers)
-        self.assertNotIn(LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER, coverage_ready_stage.blockers)
-        self.assertEqual(coverage_ready_stage.status, "ready")
+        self.assertEqual(empty_pool_stage.status, "blocked")
+        self.assertEqual(
+            empty_pool_stage.blockers,
+            ("layer_01_market_regime.feature_or_input_ready", "layer_02_sector_context.feature_or_input_ready"),
+        )
+        self.assertEqual(coverage_ready_stage.status, "blocked")
+        self.assertEqual(coverage_ready_stage.blockers, empty_pool_stage.blockers)
         self.assertIn("materialize_layer_four_event_observation_inputs.py", " ".join(coverage_ready_stage.command))
         self.assertEqual([stage.stage_type for stage in ready_plan.layers[9].stages[:1]], ["model_generation"])
         self.assertIn(MODEL_GROUP_REPLAY_COMPLETE_BLOCKER, ready_plan.layers[9].stages[0].blockers)

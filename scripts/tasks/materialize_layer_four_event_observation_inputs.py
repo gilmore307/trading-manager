@@ -17,7 +17,6 @@ from trading_manager_tasks.registry_values import registry_payload
 from trading_manager_tasks.request_payloads import DEFAULT_STORAGE_ROOT
 from trading_manager_tasks.storage_paths import data_storage_root
 
-BLOCKED = registry_payload("sts_MSH005")
 EVENT_FEED_ROW_COVERAGE = registry_payload("fld_L4EVTCOV002")
 SUCCEEDED = registry_payload("sts_MSH003")
 
@@ -43,19 +42,22 @@ def main() -> int:
     )
     missing_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
     missing_rows = _missing_event_feed_rows(event_feed_row_coverage)
-    status = BLOCKED if missing_artifacts or missing_rows else SUCCEEDED
     payload = {
         "contract_type": "manager_layer_04_event_observation_materialization",
         "manager_stage_id": "layer_04_event_failure_risk.data_acquisition",
         "stage_type": "data_acquisition",
-        "status": status,
+        "status": SUCCEEDED,
         "start_month": args.start_month,
         "end_month": args.end_month,
         "event_observation_scope": "global_sector_fold_substrate",
+        "event_observation_state": "no_reviewed_event_observations",
+        "event_failure_risk_default": "no_reviewed_event_failure_risk",
+        "layer_10_prior_attribution_required_for_non_empty_layer_4_event_risk": True,
         "event_feed_coverage": event_feed_coverage,
         EVENT_FEED_ROW_COVERAGE: event_feed_row_coverage,
         "missing_event_feed_artifacts": missing_artifacts,
         "missing_event_feed_rows": missing_rows,
+        "missing_event_feeds_block_layer_4": False,
         "provider_calls": 0,
         "model_activation_performed": False,
         "broker_execution_performed": False,
@@ -69,7 +71,7 @@ def main() -> int:
         payload["artifact_ref"] = str(output_path)
 
     print(json.dumps(payload, sort_keys=True))
-    return 1 if status == BLOCKED else 0
+    return 0
 
 
 if __name__ == "__main__":
