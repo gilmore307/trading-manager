@@ -1090,8 +1090,9 @@ def _worker_info_for_stage(
 
     Historical training exposes fold as the first-class task unit. Month-level
     ingestion lanes may still exist as internal execution detail, but the owner
-    dashboard should present Layer 1+ historical stages as model-worker fold
-    work so task identity stays consistent across layers.
+    dashboard should present Layer 1+ historical stages as fold work so task
+    identity stays consistent across layers. Worker fields stay diagnostic and
+    should not drive the owner-facing Tasks page.
     """
 
     explicit_id = raw_stage.get("worker_id") or raw_stage.get("worker_ref")
