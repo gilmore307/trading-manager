@@ -1541,13 +1541,14 @@ class RegistryHelperTests(unittest.TestCase):
             ],
         )
         by_id = {row["combination_id"]: row for row in rows}
-        self.assertEqual(by_id["rsp_spy"]["feature_bar_grain"], "30m")
+        self.assertEqual(by_id["rsp_spy"]["feature_bar_grain"], "1m")
         self.assertEqual(by_id["rsp_spy"]["model_layer"], "layer_01_market_regime")
         self.assertEqual(by_id["smh_xlk"]["model_layer"], "layer_02_sector_context")
         self.assertEqual({row["model_layer"] for row in rows}, {"layer_01_market_regime", "layer_02_sector_context"})
         self.assertEqual(by_id["tlt_shy"]["combination_type"], "primary")
         self.assertEqual(by_id["ief_shy"]["combination_type"], "primary")
-        self.assertEqual(by_id["smh_xlk"]["feature_bar_grain"], "1d")
+        self.assertEqual(by_id["smh_xlk"]["feature_bar_grain"], "1m")
+        self.assertEqual(by_id["smh_xlk"]["combination_type"], "context_rotation")
         self.assertNotIn("ibit_bitw", by_id)
         self.assertNotIn("etha_bitw", by_id)
         self.assertNotIn("fsol_bitw", by_id)
