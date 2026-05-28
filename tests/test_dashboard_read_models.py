@@ -523,7 +523,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["unit_label"], "source-months")
         self.assertEqual(evaluation_tasks[0]["detail"]["blockers"], ["replay_dataset_coverage_complete"])
         self.assertIn("coverage is incomplete", evaluation_tasks[0]["reason"])
-        self.assertEqual(evaluation_tasks[1]["task_label"], "Layer 10 EventRiskGovernor")
+        self.assertEqual(evaluation_tasks[1]["task_label"], "Layer 10 Event Risk Governor")
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 1)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 1)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "attribution-receipt")

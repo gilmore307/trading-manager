@@ -790,8 +790,6 @@ MODEL_NAME_BY_LAYER_KEY["layer_10_event_risk_governor"] = "EventRiskGovernor"
 
 
 def _spaced_model_name(model_name: str) -> str:
-    if model_name == "EventRiskGovernor":
-        return model_name
     spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", model_name)
     spaced = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", spaced)
     return spaced.replace(" / ", " / ")
@@ -805,7 +803,7 @@ def _model_task_label(layer_key: str, layer: int | None = None) -> str:
             return f"Layer {layer} {model_label}"
         return model_label
     if layer == 10:
-        return "Layer 10 EventRiskGovernor"
+        return "Layer 10 Event Risk Governor"
     return layer_key.replace("_", " ").title()
 
 
@@ -2476,7 +2474,7 @@ def _model_group_replay_timeline_tasks(
 
     append_task(
         task_id="model_group.model_10_event_risk_governor",
-        label="Layer 10 EventRiskGovernor",
+        label="Layer 10 Event Risk Governor",
         task_state="completed" if attribution_complete else ("current" if replay_complete else "future"),
         status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
         reason=(
