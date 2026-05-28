@@ -740,13 +740,63 @@ def _stage_coverage_chart(stage_coverage: Mapping[str, Any] | None) -> dict[str,
     return {
         "stage_id": stage_coverage.get("stage_id"),
         "status": stage_coverage.get("status"),
-        "unit_label": stage_coverage.get("unit_label") or "requests",
+        "unit_label": stage_coverage.get("unit_label") or "source-month requests",
         "expected_count": int(stage_coverage.get("expected_count") or 0),
         "ready_count": int(stage_coverage.get("ready_count") or 0),
         "pending_count": int(stage_coverage.get("pending_count") or 0),
         "failed_count": int(stage_coverage.get("failed_count") or 0),
         "accepted_failed_count": int(stage_coverage.get("accepted_failed_count") or 0),
         "can_unlock_downstream": bool(stage_coverage.get("can_unlock_downstream")),
+        "progress_source": stage_coverage.get("progress_source") or "stage_coverage",
+    }
+
+
+def _fold_stage_coverage_progress(
+    *,
+    storage_root: Path,
+    stage_id: str | None,
+    task_period: str | None,
+) -> dict[str, Any] | None:
+    if not stage_id or not task_period:
+        return None
+    months = _child_partitions_for_period(task_period)
+    if not months:
+        return None
+    coverage_root = storage_root / "runtime" / "stage_coverage"
+    if not coverage_root.exists():
+        return None
+    rows: list[dict[str, Any]] = []
+    for path in sorted(coverage_root.glob("*.json")):
+        payload = _load_optional_json_object(path)
+        if payload is None:
+            continue
+        if str(payload.get("stage_id") or "") != stage_id:
+            continue
+        month = str(payload.get("start_month") or "")
+        if month not in months:
+            continue
+        rows.append(payload)
+    if not rows:
+        return None
+    expected = sum(int(row.get("expected_count") or 0) for row in rows)
+    ready = sum(int(row.get("ready_count") or 0) for row in rows)
+    failed = sum(int(row.get("failed_count") or 0) for row in rows)
+    accepted_failed = sum(int(row.get("accepted_failed_count") or 0) for row in rows)
+    pending = sum(int(row.get("pending_count") or 0) for row in rows)
+    complete = expected > 0 and ready + accepted_failed >= expected and failed == accepted_failed
+    return {
+        "stage_id": stage_id,
+        "status": "complete" if complete else ("partial_ready" if ready or accepted_failed or failed else "pending"),
+        "unit_label": "source-month requests",
+        "expected_count": expected,
+        "ready_count": min(ready + accepted_failed, expected),
+        "pending_count": max(pending, expected - min(ready + accepted_failed + failed, expected)),
+        "failed_count": failed,
+        "accepted_failed_count": accepted_failed,
+        "can_unlock_downstream": complete,
+        "progress_source": "fold_stage_coverage",
+        "covered_partition_count": len(rows),
+        "expected_partition_count": len(months),
     }
 
 
@@ -1888,6 +1938,12 @@ def _task_timeline(
                     progress = active_task_progress.get(
                         _stable_task_uid({"stage_id": dashboard_stage.get("active_stage_id")}, task_period=task_month)
                     )
+                if progress is None and str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "") == "data_acquisition":
+                    progress = _fold_stage_coverage_progress(
+                        storage_root=storage_root,
+                        stage_id=str(dashboard_stage.get("active_stage_id") or dashboard_stage.get("stage_id") or ""),
+                        task_period=task_month,
+                    )
                 if progress is None and isinstance(dashboard_stage.get("dashboard_progress"), Mapping):
                     progress = dict(dashboard_stage["dashboard_progress"])
                 if progress is None:
@@ -1982,6 +2038,13 @@ def _int_field(payload: Mapping[str, Any], key: str) -> int:
         return int(payload.get(key) or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _unique_csv_values(path: Path, field: str) -> set[str]:
@@ -2234,6 +2297,122 @@ def _replay_month_progress(
     }
 
 
+def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | None:
+    replay_root = dataset_root / "replay_execution_runs"
+    if not replay_root.exists():
+        return None
+    candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
+    for receipt_path in sorted(replay_root.glob("*/replay_execution_receipt.json")):
+        receipt = _load_optional_json_object(receipt_path)
+        if receipt is None:
+            continue
+        if str(receipt.get("validation_status") or "") not in {"", "passed", "succeeded"}:
+            continue
+        created = str(receipt.get("generated_at_utc") or receipt_path.parent.name)
+        candidates.append((created, receipt_path, receipt))
+    if not candidates:
+        return None
+    _created, _receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
+    return dict(receipt)
+
+
+def _latest_replay_decision_rows_path(dataset_root: Path) -> Path | None:
+    receipt = _latest_replay_execution_receipt(dataset_root)
+    if receipt is None:
+        return None
+    decision_rows_ref = str(receipt.get("decision_rows_ref") or "")
+    if not decision_rows_ref:
+        return None
+    return Path(decision_rows_ref)
+
+
+def _replay_row_needs_layer_ten_attribution(row: Mapping[str, Any]) -> bool:
+    """Return whether a replay decision row represents an attribution unit.
+
+    Layer 10 owns post-replay failure/residual attribution. For the current
+    crypto replay surface, filled negative outcomes and rejected positive
+    outcomes are the concrete unit we can count without inventing percentages.
+    """
+
+    fill_status = str(row.get("fill_status") or "")
+    decision_status = str(row.get("decision_status") or "")
+    outcome_label = _int_field(row, "outcome_label")
+    realized_return = _safe_float(row.get("realized_return"))
+    baseline_return = _safe_float(row.get("baseline_return")) or 0.0
+    filled = fill_status == "simulated_filled" or decision_status in {"filled", "approved", "executed"}
+    if filled:
+        if outcome_label == 0:
+            return True
+        if realized_return is not None and realized_return <= baseline_return:
+            return True
+        return False
+    if outcome_label == 1:
+        return True
+    return False
+
+
+def _layer_ten_attribution_expected_count(dataset_root: Path) -> int:
+    decision_rows_path = _latest_replay_decision_rows_path(dataset_root)
+    if decision_rows_path is None:
+        return 0
+    return sum(1 for row in _load_jsonl_objects(decision_rows_path) if _replay_row_needs_layer_ten_attribution(row))
+
+
+def _count_jsonl_rows(path: Path) -> int:
+    return len(_load_jsonl_objects(path))
+
+
+def _attribution_ready_count(attribution_artifacts: Mapping[str, Any] | None, *, expected_count: int) -> int:
+    if attribution_artifacts is None:
+        return 0
+    receipt = attribution_artifacts.get("receipt")
+    if not isinstance(receipt, Mapping):
+        return expected_count
+    for key in (
+        "attributed_failure_count",
+        "resolved_failure_count",
+        "attributed_decision_count",
+        "processed_failure_count",
+        "ready_count",
+    ):
+        if key in receipt:
+            return min(_int_field(receipt, key), expected_count)
+    for key in ("attributed_decision_ids", "attributed_failure_ids", "resolved_failure_ids"):
+        value = receipt.get(key)
+        if isinstance(value, list):
+            return min(len(value), expected_count)
+    for key in ("attribution_rows_ref", "attribution_jsonl_ref", "output_jsonl_ref"):
+        value = receipt.get(key)
+        if value:
+            return min(_count_jsonl_rows(Path(str(value))), expected_count)
+    return expected_count
+
+
+def _layer_ten_attribution_progress(
+    *,
+    dataset_root: Path,
+    attribution_artifacts: Mapping[str, Any] | None,
+    replay_complete: bool,
+) -> dict[str, Any]:
+    expected = _layer_ten_attribution_expected_count(dataset_root) if replay_complete else 0
+    ready = _attribution_ready_count(attribution_artifacts, expected_count=expected)
+    pending = max(expected - ready, 0)
+    complete = expected > 0 and ready >= expected
+    return {
+        "stage_id": "model_group.model_10_event_risk_governor",
+        "status": "complete" if complete else ("ready" if replay_complete else "blocked"),
+        "unit_label": "failure attributions",
+        "expected_count": expected,
+        "ready_count": ready,
+        "pending_count": pending,
+        "failed_count": 0,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": attribution_artifacts is not None and (expected == 0 or ready >= expected),
+        "progress_source": "replay_failure_attribution_units",
+        "progress_basis": "replay rows where a filled decision lost money or a rejected decision missed a positive next outcome",
+    }
+
+
 def _single_step_progress(
     *,
     stage_id: str,
@@ -2483,6 +2662,11 @@ def _model_group_replay_timeline_tasks(
     replay_complete = bool(replay_progress["can_unlock_downstream"])
     attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root) if use_lifecycle_artifacts else None
     attribution_complete = attribution_artifacts is not None
+    attribution_progress = _layer_ten_attribution_progress(
+        dataset_root=dataset_root,
+        attribution_artifacts=attribution_artifacts,
+        replay_complete=replay_complete,
+    )
     promotion_artifacts = _latest_promotion_review_artifacts(dataset_root) if use_lifecycle_artifacts else None
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
     promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
@@ -2575,13 +2759,7 @@ def _model_group_replay_timeline_tasks(
         receipt_refs=list(attribution_artifacts["receipt_refs"]) if attribution_artifacts else None,
         blockers=[] if replay_complete else ["model_group.replay"],
         stage_type="model_10_event_risk_governor",
-        progress=_single_step_progress(
-            stage_id="model_group.model_10_event_risk_governor",
-            status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
-            complete=attribution_complete,
-            unit_label="attribution-receipt",
-            can_unlock_downstream=attribution_complete,
-        ),
+        progress=attribution_progress,
     )
 
     evaluation_complete = promotion_complete

@@ -581,9 +581,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[0]["detail"]["blockers"], ["replay_dataset_coverage_complete"])
         self.assertIn("coverage is incomplete", evaluation_tasks[0]["reason"])
         self.assertEqual(evaluation_tasks[1]["task_label"], "Layer 10 Event Risk Governor")
-        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 1)
-        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 1)
-        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "attribution-receipt")
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 0)
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 0)
+        self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "failure attributions")
         self.assertEqual(evaluation_tasks[1]["detail"]["blockers"], ["model_group.replay"])
         self.assertEqual(evaluation_tasks[2]["task_label"], "Model Evaluation")
         self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["expected_count"], 1)
@@ -855,6 +855,40 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            replay_run = replay_root / "replay_execution_runs" / "fixture"
+            replay_run.mkdir(parents=True)
+            decision_rows_path = replay_run / "decision_rows.jsonl"
+            decision_rows_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps({"decision_status": "rejected", "fill_status": "simulated_rejected", "outcome_label": 1}),
+                        json.dumps(
+                            {
+                                "decision_status": "approved",
+                                "fill_status": "simulated_filled",
+                                "outcome_label": 0,
+                                "realized_return": -0.02,
+                                "baseline_return": 0.0,
+                            }
+                        ),
+                        json.dumps({"decision_status": "rejected", "fill_status": "simulated_rejected", "outcome_label": 0}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_run / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "validation_status": "passed",
+                        "generated_at_utc": "2026-05-22T12:30:00Z",
+                        "decision_rows_ref": str(decision_rows_path),
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
             state_path = tmp / "runtime" / "historical_scheduler_state.json"
@@ -885,6 +919,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["task_state"], "completed")
         self.assertEqual(layer_ten_task["status"], "ready")
         self.assertEqual(layer_ten_task["task_state"], "current")
+        self.assertEqual(layer_ten_task["detail"]["progress"]["unit_label"], "failure attributions")
+        self.assertEqual(layer_ten_task["detail"]["progress"]["expected_count"], 2)
+        self.assertEqual(layer_ten_task["detail"]["progress"]["ready_count"], 0)
+        self.assertEqual(layer_ten_task["detail"]["progress"]["pending_count"], 2)
+        self.assertEqual(layer_ten_task["detail"]["progress"]["progress_source"], "replay_failure_attribution_units")
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.model_10_event_risk_governor")
         self.assertEqual(payload["chart_payload"]["blocker_category"], None)
         self.assertEqual(payload["status"], "running")
@@ -893,6 +932,96 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertFalse(
             any(ref.get("issue_id") == "model_group.replay" and ref.get("summary") == "waiting_for_model_group_lifecycle_tasks" for ref in payload["issue_refs"])
         )
+
+    def test_data_acquisition_progress_aggregates_fold_source_month_requests(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            fold_state = runtime / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            fold_state.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "ready",
+                                "dataset_unit": {
+                                    "unit_kind": "six_month_panel",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": False,
+                                },
+                            },
+                            {
+                                "stage_id": "layer_01_market_regime.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "blocked",
+                                "blockers": ["layer_01_market_regime.data_acquisition_complete"],
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            coverage_root = runtime / "stage_coverage"
+            coverage_root.mkdir(parents=True)
+            for month, ready_count in [("2016-01", 3), ("2016-02", 5), ("2016-03", 0)]:
+                (coverage_root / f"layer_01_market_regime_data_acquisition_{month}.json").write_text(
+                    json.dumps(
+                        {
+                            "contract_type": "manager_stage_coverage",
+                            "stage_id": "layer_01_market_regime.data_acquisition",
+                            "start_month": month,
+                            "end_month": month,
+                            "expected_count": 10,
+                            "ready_count": ready_count,
+                            "pending_count": 10 - ready_count,
+                            "failed_count": 0,
+                            "accepted_failed_count": 0,
+                            "status": "partial_ready",
+                            "can_unlock_downstream": False,
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps({"current_month": "2016-01", "start_month": "2016-01"}) + "\n", encoding="utf-8")
+            lock_path = tmp / "runtime" / "historical_scheduler.lock"
+            lock_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=state_path,
+                lock_path=lock_path,
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_01_market_regime")
+        progress = task["detail"]["progress"]
+        self.assertEqual(progress["progress_source"], "fold_stage_coverage")
+        self.assertEqual(progress["unit_label"], "source-month requests")
+        self.assertEqual(progress["expected_count"], 30)
+        self.assertEqual(progress["ready_count"], 8)
+        self.assertEqual(progress["pending_count"], 22)
+        self.assertEqual(progress["covered_partition_count"], 3)
+        self.assertEqual(progress["expected_partition_count"], 6)
 
     def test_model_group_promotion_review_uses_review_artifact(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
