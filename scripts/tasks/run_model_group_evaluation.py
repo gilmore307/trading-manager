@@ -16,6 +16,7 @@ def main() -> int:
     parser.add_argument("--contract-id", default="promotion_replay_candidate_policy")
     parser.add_argument("--target-symbol")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--force", action="store_true", help="write a fresh evaluation run even when one already exists for this replay")
     args = parser.parse_args()
 
     decision = run_model_group_evaluation_if_ready(
@@ -23,6 +24,7 @@ def main() -> int:
         contract_id=args.contract_id,
         selected_target_symbol=args.target_symbol,
         execute=not args.dry_run,
+        force=args.force,
     )
     if decision is None:
         print(json.dumps({"status": "not_ready", "reason_code": "model_group_evaluation_not_ready"}, sort_keys=True))

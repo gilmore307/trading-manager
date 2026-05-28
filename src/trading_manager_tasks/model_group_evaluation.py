@@ -39,6 +39,7 @@ def run_model_group_evaluation_if_ready(
     python_executable: str = sys.executable,
     selected_target_symbol: str | None = None,
     now_utc: datetime | None = None,
+    force: bool = False,
 ) -> SchedulerDecision | None:
     """Run one model-group evaluation build when Layer 10 evidence is complete."""
 
@@ -46,13 +47,16 @@ def run_model_group_evaluation_if_ready(
     replay_receipt_path, replay_receipt = _latest_replay_execution_receipt(dataset_root)
     if replay_receipt_path is None or replay_receipt is None:
         return None
-    attribution_receipt_path, attribution_receipt = _latest_attribution_receipt(dataset_root)
-    if attribution_receipt_path is None or attribution_receipt is None:
-        return None
-    if _latest_promotion_review_artifacts(dataset_root) is not None:
-        return None
     decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
     if not decision_rows_path.exists():
+        return None
+    attribution_receipt_path, attribution_receipt = _latest_attribution_receipt(
+        dataset_root,
+        decision_rows_ref=str(decision_rows_path),
+    )
+    if attribution_receipt_path is None or attribution_receipt is None:
+        return None
+    if not force and _latest_promotion_review_artifacts(dataset_root, replay_result_ref=str(replay_receipt_path)) is not None:
         return None
     attribution_rows_path = Path(str(attribution_receipt.get("attribution_rows_ref") or ""))
     if not attribution_rows_path.exists():
@@ -536,12 +540,23 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> tuple[Path | None, d
     return _latest_receipt(replay_root, "replay_execution_receipt.json", accepted_statuses=None)
 
 
-def _latest_attribution_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
+def _latest_attribution_receipt(dataset_root: Path, *, decision_rows_ref: str) -> tuple[Path | None, dict[str, Any] | None]:
     attribution_root = dataset_root / "post_replay_attribution_runs"
-    return _latest_receipt(attribution_root, "post_replay_attribution_receipt.json", accepted_statuses={"succeeded", "complete", "completed"})
+    return _latest_receipt(
+        attribution_root,
+        "post_replay_attribution_receipt.json",
+        accepted_statuses={"succeeded", "complete", "completed"},
+        required_field=("decision_rows_ref", decision_rows_ref),
+    )
 
 
-def _latest_receipt(root: Path, filename: str, *, accepted_statuses: set[str] | None) -> tuple[Path | None, dict[str, Any] | None]:
+def _latest_receipt(
+    root: Path,
+    filename: str,
+    *,
+    accepted_statuses: set[str] | None,
+    required_field: tuple[str, str] | None = None,
+) -> tuple[Path | None, dict[str, Any] | None]:
     if not root.exists():
         return None, None
     candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
@@ -553,6 +568,10 @@ def _latest_receipt(root: Path, filename: str, *, accepted_statuses: set[str] | 
             status = str(receipt.get("status") or receipt.get("attribution_status") or "")
             if status not in accepted_statuses:
                 continue
+        if required_field is not None:
+            key, expected = required_field
+            if str(receipt.get(key) or "") != expected:
+                continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or path.parent.name)
         candidates.append((created, path, receipt))
     if not candidates:
@@ -561,12 +580,13 @@ def _latest_receipt(root: Path, filename: str, *, accepted_statuses: set[str] | 
     return path, dict(receipt)
 
 
-def _latest_promotion_review_artifacts(dataset_root: Path) -> dict[str, Any] | None:
+def _latest_promotion_review_artifacts(dataset_root: Path, *, replay_result_ref: str) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
     if not review_root.exists():
         return None
     for path in sorted(review_root.glob("*/promotion_eligibility_decision.json")):
-        if _load_optional_json_object(path) is not None:
+        payload = _load_optional_json_object(path)
+        if payload is not None and str(payload.get("replay_validation_ref") or "") == replay_result_ref:
             return {"decision_path": str(path)}
     return None
 

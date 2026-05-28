@@ -93,6 +93,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "contract_type": "post_replay_event_attribution_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-28T00:00:01+00:00",
+                    "decision_rows_ref": str(decision_rows_path),
                     "attribution_rows_ref": str(attribution_rows_path),
                 }
             )

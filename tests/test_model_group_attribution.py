@@ -33,7 +33,15 @@ class ModelGroupAttributionTests(unittest.TestCase):
         decision_rows_path.write_text(
             "\n".join(
                 [
-                    json.dumps({"decision_id": "filled_loss", "fill_status": "simulated_filled", "outcome_label": 0, "month": "2021-01"}),
+                    json.dumps(
+                        {
+                            "decision_id": "filled_loss",
+                            "fill_status": "simulated_filled",
+                            "instrument_ref": "BTC-USDT",
+                            "outcome_label": 0,
+                            "timestamp": "2021-01-05T11:00:00-05:00",
+                        }
+                    ),
                     json.dumps({"decision_id": "filled_under_baseline", "decision_status": "approved", "outcome_label": 1, "realized_return": 0.01, "baseline_return": 0.02, "month": "2021-01"}),
                     json.dumps({"decision_id": "rejected_winner", "decision_status": "rejected", "outcome_label": 1, "month": "2021-02"}),
                     json.dumps({"decision_id": "good_fill", "fill_status": "simulated_filled", "outcome_label": 1, "realized_return": 0.04, "baseline_return": 0.02, "month": "2021-02"}),
@@ -72,12 +80,15 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["attributed_failure_count"], 3)
+            self.assertEqual(receipt["decision_rows_ref"], str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"))
             rows = [
                 json.loads(line)
                 for line in Path(receipt["attribution_rows_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
             self.assertEqual([row["source_decision_id"] for row in rows], ["filled_loss", "filled_under_baseline", "rejected_winner"])
+            self.assertEqual(rows[0]["replay_month"], "2021-01")
+            self.assertEqual(rows[0]["target_symbol"], "BTC")
 
     def test_ready_without_execute_does_not_write_receipt(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -102,8 +113,16 @@ class ModelGroupAttributionTests(unittest.TestCase):
             dataset_root = self._write_replay_dataset(storage_root)
             receipt_root = dataset_root / "post_replay_attribution_runs" / "existing"
             receipt_root.mkdir(parents=True)
+            decision_rows_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
             (receipt_root / "post_replay_attribution_receipt.json").write_text(
-                json.dumps({"contract_type": "post_replay_event_attribution_receipt", "status": "succeeded"}) + "\n",
+                json.dumps(
+                    {
+                        "contract_type": "post_replay_event_attribution_receipt",
+                        "decision_rows_ref": str(decision_rows_path),
+                        "status": "succeeded",
+                    }
+                )
+                + "\n",
                 encoding="utf-8",
             )
 

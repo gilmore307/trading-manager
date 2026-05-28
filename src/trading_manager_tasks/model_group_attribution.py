@@ -32,6 +32,7 @@ def run_model_group_post_replay_attribution_if_ready(
     python_executable: str = sys.executable,
     max_attribution_rows: int | None = None,
     now_utc: datetime | None = None,
+    force: bool = False,
 ) -> SchedulerDecision | None:
     """Run one post-replay attribution dispatch when replay is complete."""
 
@@ -40,13 +41,14 @@ def run_model_group_post_replay_attribution_if_ready(
     if replay_receipt is None:
         return None
     expected_months = _expected_replay_months(dataset_root)
-    ready_months = _ready_replay_months(dataset_root)
+    replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "")
+    ready_months = _ready_replay_months(dataset_root, replay_run_id=replay_run_id)
     if expected_months > 0 and len(ready_months) < expected_months:
         return None
     decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
     if not decision_rows_path.exists():
         return None
-    if _latest_complete_attribution_receipt(dataset_root) is not None:
+    if not force and _latest_complete_attribution_receipt(dataset_root, decision_rows_ref=str(decision_rows_path)) is not None:
         return None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
@@ -103,6 +105,10 @@ def run_model_group_post_replay_attribution_if_ready(
             "created_at_utc": now.isoformat(),
             "completed_at_utc": now.isoformat(),
             "decision_rows_ref": str(decision_rows_path),
+            "replay_execution_run_id": replay_run_id,
+            "replay_execution_receipt_ref": str(dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json")
+            if replay_run_id
+            else None,
             "attribution_rows_ref": str(attribution_rows_path),
             "expected_failure_count": len(attribution_rows),
             "attributed_failure_count": len(attribution_rows),
@@ -199,8 +205,8 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
         "source_decision_index": decision_index,
         "attribution_status": "attributed",
         "failure_type": failure_type,
-        "replay_month": row.get("month") or row.get("replay_month"),
-        "target_symbol": row.get("target_symbol") or row.get("symbol"),
+        "replay_month": _replay_month(row),
+        "target_symbol": _target_symbol(row),
         "fill_status": fill_status,
         "decision_status": decision_status,
         "outcome_label": outcome_label,
@@ -212,6 +218,27 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
             else "rejected decision missed a positive next outcome"
         ),
     }
+
+
+def _replay_month(row: Mapping[str, Any]) -> str | None:
+    explicit_month = str(row.get("month") or row.get("replay_month") or "").strip()
+    if explicit_month:
+        return explicit_month
+    timestamp = str(row.get("timestamp") or row.get("decision_timestamp") or "").strip()
+    if len(timestamp) >= 7:
+        return timestamp[:7]
+    return None
+
+
+def _target_symbol(row: Mapping[str, Any]) -> str | None:
+    for key in ("target_symbol", "symbol", "target_ref"):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value.split("-")[0].upper()
+    instrument_ref = str(row.get("instrument_ref") or "").strip()
+    if instrument_ref:
+        return instrument_ref.split("-")[0].upper()
+    return None
 
 
 def _replay_row_needs_attribution(row: Mapping[str, Any]) -> bool:
@@ -239,6 +266,8 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
         receipt = _load_optional_json_object(receipt_path)
         if receipt is None:
             continue
+        if "current_deterministic_crypto_policy" in str(receipt.get("candidate_model_ref") or ""):
+            continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt_path, receipt))
     if not candidates:
@@ -247,7 +276,7 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
     return dict(receipt)
 
 
-def _latest_complete_attribution_receipt(dataset_root: Path) -> dict[str, Any] | None:
+def _latest_complete_attribution_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
     attribution_root = dataset_root / "post_replay_attribution_runs"
     if not attribution_root.exists():
         return None
@@ -261,6 +290,8 @@ def _latest_complete_attribution_receipt(dataset_root: Path) -> dict[str, Any] |
             continue
         contract_type = str(receipt.get("contract_type") or "")
         if contract_type not in {"post_replay_event_attribution_receipt", "model_10_event_risk_governor_post_replay_attribution"}:
+            continue
+        if str(receipt.get("decision_rows_ref") or "") != decision_rows_ref:
             continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt))
@@ -285,13 +316,15 @@ def _expected_replay_months(dataset_root: Path) -> int:
     return max(1, (end.year - start.year) * 12 + end.month - start.month)
 
 
-def _ready_replay_months(dataset_root: Path) -> set[str]:
+def _ready_replay_months(dataset_root: Path, *, replay_run_id: str) -> set[str]:
     ready: set[str] = set()
     paths = sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]
     for path in paths:
         if not path.exists():
             continue
         for row in _load_jsonl_objects(path):
+            if replay_run_id and str(row.get("replay_execution_run_id") or "") != replay_run_id:
+                continue
             status = str(row.get("status") or row.get("replay_status") or "").lower()
             month = str(row.get("month") or row.get("replay_month") or "").strip()
             if month and status in {"succeeded", "completed", "complete"}:
