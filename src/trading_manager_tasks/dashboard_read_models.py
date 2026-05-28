@@ -2664,6 +2664,19 @@ def _model_group_maintenance_progress(
     )
 
 
+def _model_group_maintenance_not_applicable_progress() -> dict[str, Any]:
+    return _checklist_progress(
+        stage_id="model_group.maintenance",
+        status="not_applicable",
+        checks=MODEL_GROUP_MAINTENANCE_DATA_KINDS,
+        ready_checks=set(MODEL_GROUP_MAINTENANCE_DATA_KINDS),
+        unit_label="data types",
+        progress_source="model_group_maintenance_data_kinds",
+        progress_basis="maintenance handoff is not applicable because the candidate was not promotion eligible",
+        can_unlock_downstream=True,
+    )
+
+
 def _replay_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> list[str]:
     refs = [
         manifest.get("source_contract_ref"),
@@ -2903,6 +2916,7 @@ def _model_group_replay_timeline_tasks(
     promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")
     promotion_complete = promotion_decision is not None
     promotion_eligible = promotion_decision_status == "eligible"
+    promotion_terminal_not_eligible = promotion_complete and not promotion_eligible
     readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root) if lifecycle_artifacts_allowed else None
     readiness_record = readiness_artifacts["readiness"] if readiness_artifacts else None
     readiness_complete = (
@@ -3019,7 +3033,7 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.promotion",
         label="Model Promotion",
-        task_state="completed" if promotion_eligible else ("current" if evaluation_complete else "future"),
+        task_state="completed" if promotion_complete else ("current" if evaluation_complete else "future"),
         status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if evaluation_complete else "blocked",
         reason=(
             str(promotion_decision.get("decision_reason") or "Promotion review completed.") if promotion_decision else
@@ -3041,25 +3055,31 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.maintenance",
         label="Model Maintenance",
-        task_state="completed" if readiness_complete else ("current" if promotion_eligible else "future"),
-        status="succeeded" if readiness_complete else ("ready" if promotion_eligible else "blocked"),
+        task_state="completed" if readiness_complete else ("skipped" if promotion_terminal_not_eligible else ("current" if promotion_eligible else "future")),
+        status="succeeded" if readiness_complete else ("not_applicable" if promotion_terminal_not_eligible else ("ready" if promotion_eligible else "blocked")),
         reason=(
             "Promotion readiness handoff is complete; execution can admit the promoted model group to market-hours shadow review."
             if readiness_complete
+            else "Promotion review did not admit this candidate, so maintenance/shadow handoff is not applicable."
+            if promotion_terminal_not_eligible
             else
             "Model-group candidate is eligible for maintenance handoff after promotion."
             if promotion_eligible
             else "Waiting for eligible model-group promotion before maintenance can run."
         ),
         receipt_refs=list(readiness_artifacts["receipt_refs"]) if readiness_artifacts else None,
-        blockers=[] if promotion_eligible else ["model_group.promotion"],
+        blockers=[] if (promotion_eligible or promotion_terminal_not_eligible) else ["model_group.promotion"],
         stage_type="maintenance",
-        progress=_model_group_maintenance_progress(
-            status="succeeded" if readiness_complete else ("ready" if promotion_eligible else "blocked"),
-            promotion_decision=promotion_decision,
-            promotion_review=promotion_review if isinstance(promotion_review, Mapping) else {},
-            readiness_record=readiness_record,
-            readiness_complete=readiness_complete,
+        progress=(
+            _model_group_maintenance_not_applicable_progress()
+            if promotion_terminal_not_eligible
+            else _model_group_maintenance_progress(
+                status="succeeded" if readiness_complete else ("ready" if promotion_eligible else "blocked"),
+                promotion_decision=promotion_decision,
+                promotion_review=promotion_review if isinstance(promotion_review, Mapping) else {},
+                readiness_record=readiness_record,
+                readiness_complete=readiness_complete,
+            )
         ),
     )
     return tasks

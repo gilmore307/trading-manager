@@ -90,6 +90,32 @@ class SchedulerDaemonTests(unittest.TestCase):
         os.utime(readiness_path, (state_mtime + 10, state_mtime + 10))
         return readiness_path
 
+    def _write_terminal_promotion_decision_after(self, *, storage_root: Path, state_path: Path, status: str = "review_required") -> Path:
+        decision_path = (
+            storage_root.parent
+            / "05_replay_datasets"
+            / "promotion_replay_candidate_policy"
+            / "promotion_review_runs"
+            / f"review_after_{state_path.stem}"
+            / "promotion_eligibility_decision.json"
+        )
+        decision_path.parent.mkdir(parents=True, exist_ok=True)
+        decision_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "promotion_eligibility_decision",
+                    "decision_status": status,
+                    "created_at_utc": "2026-05-28T00:00:00Z",
+                    "source_fold_state_path": str(state_path),
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        state_mtime = state_path.stat().st_mtime
+        os.utime(decision_path, (state_mtime + 10, state_mtime + 10))
+        return decision_path
+
     def _fake_data_src(self, tmp: Path) -> Path:
         src = tmp / "trading-data-src"
         package = src / "data_feed" / "01_feed_alpaca_bars"
@@ -809,6 +835,49 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNone(blocked_next_fold)
         self.assertEqual(blocked_month_ingest, ())
+        self.assertIsNotNone(unblocked_next_fold)
+        assert unblocked_next_fold is not None
+        self.assertEqual(unblocked_next_fold.fold_id, "fold_2016-07_2016-12")
+
+    def test_non_eligible_promotion_decision_unblocks_next_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            first_plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            first_state_path = model_worker_fold_state_path("2016-01", "2016-06", root=storage_root / "runtime", selected_target_symbol="AAPL")
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                state_path=first_state_path,
+                completed_stage_ids=[stage.stage_id for layer in first_plan.layers for stage in layer.stages],
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+
+            blocked_next_fold = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            self._write_terminal_promotion_decision_after(storage_root=storage_root, state_path=first_state_path)
+            unblocked_next_fold = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertIsNone(blocked_next_fold)
         self.assertIsNotNone(unblocked_next_fold)
         assert unblocked_next_fold is not None
         self.assertEqual(unblocked_next_fold.fold_id, "fold_2016-07_2016-12")

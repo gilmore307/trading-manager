@@ -1452,13 +1452,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         promotion_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.promotion")
         maintenance_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.maintenance")
         self.assertEqual(promotion_task["status"], "review_required")
-        self.assertEqual(promotion_task["task_state"], "current")
+        self.assertEqual(promotion_task["task_state"], "completed")
         self.assertEqual(promotion_task["detail"]["progress"]["ready_count"], 5)
         self.assertEqual(promotion_task["detail"]["progress"]["pending_count"], 0)
         self.assertFalse(promotion_task["detail"]["progress"]["can_unlock_downstream"])
         self.assertEqual(promotion_task["detail"]["blockers"], ["missing anonymous comparison", "auroc_below_minimum"])
-        self.assertEqual(maintenance_task["status"], "blocked")
-        self.assertEqual(maintenance_task["detail"]["blockers"], ["model_group.promotion"])
+        self.assertEqual(maintenance_task["status"], "not_applicable")
+        self.assertEqual(maintenance_task["task_state"], "skipped")
+        self.assertEqual(maintenance_task["detail"]["blockers"], [])
+        self.assertEqual(maintenance_task["detail"]["progress"]["ready_count"], 4)
 
     def test_model_group_maintenance_completes_from_readiness_record(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

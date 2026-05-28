@@ -517,14 +517,42 @@ def _latest_promotion_readiness_mtime(storage_root: Path) -> float | None:
     return max(mtimes) if mtimes else None
 
 
+def _latest_promotion_decision_status_mtime(storage_root: Path) -> tuple[str, float] | None:
+    review_root = _model_group_replay_dataset_root(storage_root) / "promotion_review_runs"
+    if not review_root.exists():
+        return None
+    candidates: list[tuple[float, str]] = []
+    for decision_path in sorted(review_root.glob("*/promotion_eligibility_decision.json")):
+        try:
+            payload = json.loads(decision_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if str(payload.get("contract_type") or "") != "promotion_eligibility_decision":
+            continue
+        status = str(payload.get("decision_status") or "")
+        if not status:
+            continue
+        candidates.append((decision_path.stat().st_mtime, status))
+    if not candidates:
+        return None
+    mtime, status = max(candidates, key=lambda item: item[0])
+    return status, mtime
+
+
 def _fold_model_group_lifecycle_complete(storage_root: Path, state_path: Path) -> bool:
+    promotion_decision = _latest_promotion_decision_status_mtime(storage_root)
+    try:
+        state_mtime = state_path.stat().st_mtime
+    except OSError:
+        return False
+    if promotion_decision is not None:
+        decision_status, decision_mtime = promotion_decision
+        if decision_mtime >= state_mtime and decision_status in {"review_required", "rejected", "revoked", "superseded"}:
+            return True
     readiness_mtime = _latest_promotion_readiness_mtime(storage_root)
     if readiness_mtime is None:
         return False
-    try:
-        return readiness_mtime >= state_path.stat().st_mtime
-    except OSError:
-        return False
+    return readiness_mtime >= state_mtime
 
 
 def _completed_pre_replay_fold_states(
