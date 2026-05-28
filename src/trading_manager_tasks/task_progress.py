@@ -13,6 +13,41 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 DEFAULT_TASK_PROGRESS_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "task_progress"
 
+STAGE_PROGRESS_CONTRACTS: dict[str, dict[str, str]] = {
+    "data_acquisition": {
+        "unit_label": "source-month requests",
+        "progress_basis": "download/source partitions required by the six-month fold",
+    },
+    "feature_generation": {
+        "unit_label": "feature months",
+        "progress_basis": "feature partitions required by the six-month fold",
+    },
+    "model_generation": {
+        "unit_label": "train/validation/test partitions",
+        "progress_basis": "training, validation, and test partitions for the six-month fold",
+    },
+    "replay": {
+        "unit_label": "replay months",
+        "progress_basis": "event replay months in the fixed five-year replay window",
+    },
+    "model_10_event_risk_governor": {
+        "unit_label": "failure attributions",
+        "progress_basis": "replay failure, residual, missed-opportunity, and path-deviation attribution units",
+    },
+    "model_evaluation": {
+        "unit_label": "evaluation tests",
+        "progress_basis": "required model-evaluation test checks",
+    },
+    "promotion_review": {
+        "unit_label": "promotion tests",
+        "progress_basis": "required promotion-readiness test checks",
+    },
+    "maintenance": {
+        "unit_label": "data types",
+        "progress_basis": "required maintenance handoff data kinds",
+    },
+}
+
 
 def utc_now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -21,6 +56,25 @@ def utc_now_iso() -> str:
 def worker_progress_path(progress_root: Path, worker_id: str) -> Path:
     safe_worker_id = "".join(char if char.isalnum() or char in {"_", "-"} else "_" for char in worker_id)
     return progress_root / f"{safe_worker_id or 'worker'}.json"
+
+
+def _stage_type_from_stage_id(stage_id: object) -> str:
+    text = str(stage_id or "")
+    if "." in text:
+        return text.rsplit(".", 1)[-1]
+    if text.startswith("model_group."):
+        return text.removeprefix("model_group.")
+    return text
+
+
+def progress_contract_for_stage(stage_id: object, *, fallback_unit_label: str = "items") -> dict[str, str]:
+    """Return the dashboard progress unit contract for a manager stage."""
+
+    stage_type = _stage_type_from_stage_id(stage_id)
+    contract = STAGE_PROGRESS_CONTRACTS.get(stage_type)
+    if contract is None:
+        return {"unit_label": fallback_unit_label, "progress_basis": "explicit worker progress units"}
+    return dict(contract)
 
 
 def write_task_progress_node(
@@ -56,6 +110,7 @@ def write_task_progress_node(
         "elapsed_seconds": elapsed_seconds,
         "expected_seconds": expected_seconds,
         "updated_at_utc": now,
+        "progress_source": "active_progress_file",
         "nodes": [
             {
                 "node_id": node_id or stage_id,
@@ -71,6 +126,8 @@ def write_task_progress_node(
     }
     if extra:
         payload["extra"] = dict(extra)
+        if "progress_basis" in extra:
+            payload["progress_basis"] = extra["progress_basis"]
     tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
     try:
         tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -81,6 +138,60 @@ def write_task_progress_node(
         except FileNotFoundError:
             pass
     return path
+
+
+def write_task_progress_from_env(
+    *,
+    status: str = "running",
+    unit_label: str | None = None,
+    processed_count: int | None = None,
+    expected_count: int | None = None,
+    elapsed_seconds: float | None = None,
+    expected_seconds: float | None = None,
+    node_id: str | None = None,
+    node_label: str | None = None,
+    extra: Mapping[str, Any] | None = None,
+    env: Mapping[str, str] | None = None,
+) -> Path:
+    """Write active progress using the stage-executor environment contract."""
+
+    source_env = env or os.environ
+    progress_root_text = source_env.get("TRADING_MANAGER_TASK_PROGRESS_ROOT") or ""
+    progress_root = Path(progress_root_text)
+    worker_id = source_env.get("TRADING_MANAGER_TASK_PROGRESS_WORKER_ID") or ""
+    task_uid = source_env.get("TRADING_MANAGER_TASK_PROGRESS_TASK_UID") or ""
+    stage_id = source_env.get("TRADING_MANAGER_TASK_PROGRESS_STAGE_ID") or ""
+    missing = [
+        name
+        for name, value in (
+            ("TRADING_MANAGER_TASK_PROGRESS_ROOT", progress_root_text),
+            ("TRADING_MANAGER_TASK_PROGRESS_WORKER_ID", worker_id),
+            ("TRADING_MANAGER_TASK_PROGRESS_TASK_UID", task_uid),
+            ("TRADING_MANAGER_TASK_PROGRESS_STAGE_ID", stage_id),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError(f"missing task progress environment values: {', '.join(missing)}")
+    contract = progress_contract_for_stage(stage_id)
+    merged_extra: dict[str, Any] = {"progress_basis": contract["progress_basis"]}
+    if extra:
+        merged_extra.update(dict(extra))
+    return write_task_progress_node(
+        progress_root=progress_root,
+        worker_id=worker_id,
+        task_uid=task_uid,
+        stage_id=stage_id,
+        status=status,
+        unit_label=unit_label or contract["unit_label"],
+        processed_count=processed_count,
+        expected_count=expected_count,
+        elapsed_seconds=elapsed_seconds,
+        expected_seconds=expected_seconds,
+        node_id=node_id,
+        node_label=node_label,
+        extra=merged_extra,
+    )
 
 
 def clear_worker_task_progress(*, progress_root: Path, worker_id: str) -> None:
@@ -103,18 +214,25 @@ def _default_unit_label_for_stage(row: Mapping[str, Any], fallback: str) -> str:
             return "event substrate"
         if stage_id == "layer_09_option_expression.data_acquisition":
             return "option gate"
-        return "source acquisition"
-    if stage_id.endswith(".feature_generation"):
-        return "feature job"
-    if stage_id.endswith(".model_generation"):
-        return "model job"
-    if stage_id.endswith(".model_evaluation"):
-        return "evaluation job"
-    if stage_id.endswith(".promotion_review"):
-        return "review decision"
-    if stage_id.endswith(".maintenance"):
-        return "maintenance step"
-    return fallback
+    return progress_contract_for_stage(stage_id, fallback_unit_label=fallback)["unit_label"]
+
+
+def _progress_basis_for_stage(row: Mapping[str, Any]) -> str | None:
+    progress_basis = row.get("progress_basis")
+    if progress_basis:
+        return str(progress_basis)
+    extra = row.get("extra")
+    if isinstance(extra, Mapping) and extra.get("progress_basis"):
+        return str(extra["progress_basis"])
+    return progress_contract_for_stage(row.get("stage_id"), fallback_unit_label="items").get("progress_basis")
+
+
+def _with_progress_contract(row: Mapping[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    payload.setdefault("progress_source", row.get("progress_source") or "active_progress_file")
+    progress_basis = _progress_basis_for_stage(row)
+    if progress_basis:
+        payload.setdefault("progress_basis", progress_basis)
+    return payload
 
 
 def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -130,7 +248,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
         ready_count = None
     if expected_count and ready_count is not None:
         ready = max(0, min(ready_count, expected_count))
-        return {
+        return _with_progress_contract(row, {
             "stage_id": row.get("stage_id"),
             "status": row.get("status") or "running",
             "unit_label": _default_unit_label_for_stage(row, "items"),
@@ -140,7 +258,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
             "failed_count": 0,
             "accepted_failed_count": 0,
             "can_unlock_downstream": ready >= expected_count,
-        }
+        })
     try:
         expected_time = float(expected_seconds) if expected_seconds is not None else None
         elapsed_time = float(elapsed) if elapsed is not None else None
@@ -150,7 +268,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
     if expected_time and elapsed_time is not None:
         elapsed_whole = max(0, min(int(elapsed_time), int(expected_time)))
         expected_whole = max(1, int(expected_time))
-        return {
+        return _with_progress_contract(row, {
             "stage_id": row.get("stage_id"),
             "status": row.get("status") or "running",
             "unit_label": _default_unit_label_for_stage(row, "seconds"),
@@ -160,7 +278,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
             "failed_count": 0,
             "accepted_failed_count": 0,
             "can_unlock_downstream": elapsed_whole >= expected_whole,
-        }
+        })
     nodes = row.get("nodes")
     if isinstance(nodes, list) and nodes:
         node_rows = [node for node in nodes if isinstance(node, Mapping)]
@@ -171,7 +289,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
             and all(str(node.get("node_id") or "") == "stage_started" for node in node_rows)
         )
         if only_stage_start:
-            return {
+            return _with_progress_contract(row, {
                 "stage_id": row.get("stage_id"),
                 "status": row.get("status") or "running",
                 "unit_label": _default_unit_label_for_stage(row, "stage-step"),
@@ -182,7 +300,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
                 "accepted_failed_count": 0,
                 "can_unlock_downstream": False,
                 "progress_source": "active_progress_file",
-            }
+            })
         meaningful_nodes = [
             node
             for node in node_rows
@@ -204,7 +322,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
         failed_nodes = [node for node in node_rows if str(node.get("status") or "").lower() in {"failed", "error"}]
         expected_nodes = max(1, len(node_rows))
         ready_nodes = min(len(completed_nodes), expected_nodes)
-        return {
+        return _with_progress_contract(row, {
             "stage_id": row.get("stage_id"),
             "status": row.get("status") or "running",
             "unit_label": _default_unit_label_for_stage(row, "nodes"),
@@ -215,7 +333,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
             "accepted_failed_count": 0,
             "can_unlock_downstream": ready_nodes >= expected_nodes,
             "progress_source": "active_progress_file",
-        }
+        })
     return None
 
 
@@ -251,6 +369,8 @@ __all__ = [
     "DEFAULT_TASK_PROGRESS_ROOT",
     "clear_worker_task_progress",
     "load_active_task_progress",
+    "progress_contract_for_stage",
     "worker_progress_path",
+    "write_task_progress_from_env",
     "write_task_progress_node",
 ]

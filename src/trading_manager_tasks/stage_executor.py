@@ -29,7 +29,7 @@ from .model_training_state import (
 )
 from .model_training_workflow import build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .task_progress import DEFAULT_TASK_PROGRESS_ROOT, clear_worker_task_progress, worker_progress_path, write_task_progress_node
+from .task_progress import DEFAULT_TASK_PROGRESS_ROOT, clear_worker_task_progress, progress_contract_for_stage, worker_progress_path, write_task_progress_node
 
 DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_receipts"
 DEFAULT_LOG_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_logs"
@@ -108,23 +108,11 @@ def _stage_progress_worker_id(*, start_month: str, end_month: str) -> str:
 
 
 def _stage_progress_unit_label(stage: StageProgress) -> str:
-    if stage.stage_type == "data_acquisition":
-        if stage.stage_id == "layer_04_event_failure_risk.data_acquisition":
-            return "event substrate"
-        if stage.stage_id == "layer_09_option_expression.data_acquisition":
-            return "option gate"
-        return "source acquisition"
-    if stage.stage_type == "feature_generation":
-        return "feature job"
-    if stage.stage_type == "model_generation":
-        return "model job"
-    if stage.stage_type == "model_evaluation":
-        return "evaluation job"
-    if stage.stage_type == "promotion_review":
-        return "review decision"
-    if stage.stage_type == "maintenance":
-        return "maintenance step"
-    return "stage step"
+    if stage.stage_id == "layer_04_event_failure_risk.data_acquisition":
+        return "event substrate"
+    if stage.stage_id == "layer_09_option_expression.data_acquisition":
+        return "option gate"
+    return progress_contract_for_stage(stage.stage_id, fallback_unit_label="stage step")["unit_label"]
 
 
 def _split_env(command: list[str]) -> tuple[dict[str, str], list[str]]:
@@ -273,6 +261,7 @@ def execute_stage_process(
         unit_label=_stage_progress_unit_label(stage),
         node_id="stage_started",
         node_label="Stage process started",
+        extra={"progress_basis": progress_contract_for_stage(stage.stage_id)["progress_basis"]},
     )
     timeout_seconds = int(os.environ.get("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS") or DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS)
     run_env = {

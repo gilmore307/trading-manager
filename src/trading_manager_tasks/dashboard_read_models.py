@@ -32,7 +32,7 @@ from .scheduler_status import (
     collect_historical_scheduler_status,
 )
 from .agent_error_handler import DEFAULT_ERROR_CATALOG_NAME, fetch_server_error_catalog_rows
-from .task_progress import load_active_task_progress
+from .task_progress import load_active_task_progress, progress_contract_for_stage
 
 HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
 HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/06_dashboard_cache/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
@@ -49,6 +49,26 @@ FOLD_MODEL_STAGE_TYPES = {
     "maintenance",
 }
 MONTHS_PER_MODEL_FOLD = 6
+MODEL_GENERATION_SPLIT_COUNT = 3
+MODEL_GROUP_EVALUATION_TESTS = (
+    "replay_metrics",
+    "guardrail_checks",
+    "incumbent_comparison",
+    "layer_10_attribution",
+)
+MODEL_GROUP_PROMOTION_TESTS = (
+    "fixed_benchmark",
+    "blinded_comparison",
+    "uncertainty_review",
+    "shadow_readiness",
+    "blocking_issue_review",
+)
+MODEL_GROUP_MAINTENANCE_DATA_KINDS = (
+    "promotion_eligibility_decision",
+    "promotion_evaluation_review",
+    "promotion_readiness_record",
+    "activation_guardrails",
+)
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
 MAX_AGENT_ERROR_SUMMARY_ROWS = 50
@@ -748,6 +768,7 @@ def _stage_coverage_chart(stage_coverage: Mapping[str, Any] | None) -> dict[str,
         "accepted_failed_count": int(stage_coverage.get("accepted_failed_count") or 0),
         "can_unlock_downstream": bool(stage_coverage.get("can_unlock_downstream")),
         "progress_source": stage_coverage.get("progress_source") or "stage_coverage",
+        "progress_basis": stage_coverage.get("progress_basis"),
     }
 
 
@@ -795,9 +816,94 @@ def _fold_stage_coverage_progress(
         "accepted_failed_count": accepted_failed,
         "can_unlock_downstream": complete,
         "progress_source": "fold_stage_coverage",
+        "progress_basis": "download/source partitions required by the six-month fold",
         "covered_partition_count": len(rows),
         "expected_partition_count": len(months),
     }
+
+
+def _fold_month_partition_progress(
+    *,
+    stage_id: str,
+    stage_status: str,
+    task_period: str | None,
+    unit_label: str,
+    progress_source: str,
+    progress_basis: str,
+) -> dict[str, Any] | None:
+    months = _child_partitions_for_period(task_period)
+    if not months:
+        return None
+    status = str(stage_status or "").lower()
+    complete = status in {"succeeded", "not_applicable"}
+    failed = 1 if status == "failed" else 0
+    expected = len(months)
+    ready = expected if complete else 0
+    return {
+        "stage_id": stage_id,
+        "status": "complete" if complete else ("failed" if failed else status or "pending"),
+        "unit_label": unit_label,
+        "expected_count": expected,
+        "ready_count": ready,
+        "pending_count": max(expected - ready - failed, 0),
+        "failed_count": failed,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": complete,
+        "progress_source": progress_source,
+        "progress_basis": progress_basis,
+        "covered_partition_count": ready,
+        "expected_partition_count": expected,
+    }
+
+
+def _semantic_stage_progress(
+    *,
+    stage_id: str,
+    stage_type: str,
+    stage_status: str,
+    task_period: str | None,
+) -> dict[str, Any] | None:
+    if stage_type == "data_acquisition":
+        contract = progress_contract_for_stage(f"{stage_id}.data_acquisition")
+        return _fold_month_partition_progress(
+            stage_id=stage_id,
+            stage_status=stage_status,
+            task_period=task_period,
+            unit_label=contract["unit_label"],
+            progress_source="fold_data_acquisition_partitions",
+            progress_basis=contract["progress_basis"],
+        )
+    if stage_type == "feature_generation":
+        contract = progress_contract_for_stage(f"{stage_id}.feature_generation")
+        return _fold_month_partition_progress(
+            stage_id=stage_id,
+            stage_status=stage_status,
+            task_period=task_period,
+            unit_label=contract["unit_label"],
+            progress_source="fold_feature_generation_partitions",
+            progress_basis=contract["progress_basis"],
+        )
+    if stage_type == "model_generation":
+        status = str(stage_status or "").lower()
+        complete = status in {"succeeded", "not_applicable"}
+        failed = 1 if status == "failed" else 0
+        contract = progress_contract_for_stage(f"{stage_id}.model_generation")
+        ready = MODEL_GENERATION_SPLIT_COUNT if complete else 0
+        return {
+            "stage_id": stage_id,
+            "status": "complete" if complete else ("failed" if failed else status or "pending"),
+            "unit_label": contract["unit_label"],
+            "expected_count": MODEL_GENERATION_SPLIT_COUNT,
+            "ready_count": ready,
+            "pending_count": max(MODEL_GENERATION_SPLIT_COUNT - ready - failed, 0),
+            "failed_count": failed,
+            "accepted_failed_count": 0,
+            "can_unlock_downstream": complete,
+            "progress_source": "model_generation_split_partitions",
+            "progress_basis": contract["progress_basis"],
+            "expected_partition_count": MODEL_GENERATION_SPLIT_COUNT,
+        }
+    return None
 
 
 def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
@@ -1951,6 +2057,14 @@ def _task_timeline(
                         task_period=task_month,
                         status=stage_status,
                     )
+                if progress is None:
+                    semantic_stage_type = str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "")
+                    progress = _semantic_stage_progress(
+                        stage_id=stage_id,
+                        stage_type=semantic_stage_type,
+                        stage_status=stage_status,
+                        task_period=task_month,
+                    )
                 if progress is None and isinstance(dashboard_stage.get("dashboard_progress"), Mapping):
                     progress = dict(dashboard_stage["dashboard_progress"])
                 if progress is None:
@@ -2347,13 +2461,15 @@ def _replay_month_progress(
     return {
         "stage_id": stage_id,
         "status": "complete" if expected > 0 and ready >= expected else status,
-        "unit_label": "months",
+        "unit_label": "replay months",
         "expected_count": expected,
         "ready_count": min(ready, expected),
         "pending_count": pending,
         "failed_count": failed,
         "accepted_failed_count": 0,
         "can_unlock_downstream": expected > 0 and ready >= expected,
+        "progress_source": "replay_window_months",
+        "progress_basis": "event replay months in the fixed five-year replay window",
     }
 
 
@@ -2473,26 +2589,94 @@ def _layer_ten_attribution_progress(
     }
 
 
-def _single_step_progress(
+def _checklist_progress(
     *,
     stage_id: str,
     status: str,
-    complete: bool,
+    checks: tuple[str, ...],
+    ready_checks: set[str],
     unit_label: str,
+    progress_source: str,
+    progress_basis: str,
     can_unlock_downstream: bool | None = None,
 ) -> dict[str, Any]:
-    ready = 1 if complete else 0
+    expected = len(checks)
+    ready = min(len(ready_checks.intersection(checks)), expected)
+    complete = expected > 0 and ready >= expected
     return {
         "stage_id": stage_id,
         "status": "complete" if complete else status,
         "unit_label": unit_label,
-        "expected_count": 1,
+        "expected_count": expected,
         "ready_count": ready,
-        "pending_count": 0 if complete else 1,
+        "pending_count": max(expected - ready, 0),
         "failed_count": 0,
         "accepted_failed_count": 0,
         "can_unlock_downstream": complete if can_unlock_downstream is None else can_unlock_downstream,
+        "progress_source": progress_source,
+        "progress_basis": progress_basis,
+        "ready_checks": sorted(ready_checks.intersection(checks)),
+        "expected_checks": list(checks),
     }
+
+
+def _model_group_evaluation_progress(*, status: str, complete: bool) -> dict[str, Any]:
+    return _checklist_progress(
+        stage_id="model_group.evaluation",
+        status=status,
+        checks=MODEL_GROUP_EVALUATION_TESTS,
+        ready_checks=set(MODEL_GROUP_EVALUATION_TESTS) if complete else set(),
+        unit_label="evaluation tests",
+        progress_source="model_group_evaluation_test_contract",
+        progress_basis="required replay metrics, guardrail, incumbent-comparison, and Layer 10 attribution checks",
+        can_unlock_downstream=complete,
+    )
+
+
+def _model_group_promotion_progress(*, status: str, complete: bool, eligible: bool) -> dict[str, Any]:
+    return _checklist_progress(
+        stage_id="model_group.promotion",
+        status=status,
+        checks=MODEL_GROUP_PROMOTION_TESTS,
+        ready_checks=set(MODEL_GROUP_PROMOTION_TESTS) if complete else set(),
+        unit_label="promotion tests",
+        progress_source="model_group_promotion_test_contract",
+        progress_basis="required benchmark, blinded-comparison, uncertainty, shadow-readiness, and blocker-review checks",
+        can_unlock_downstream=eligible,
+    )
+
+
+def _model_group_maintenance_progress(
+    *,
+    status: str,
+    promotion_decision: Mapping[str, Any] | None,
+    promotion_review: Mapping[str, Any],
+    readiness_record: Mapping[str, Any] | None,
+    readiness_complete: bool,
+) -> dict[str, Any]:
+    ready_checks: set[str] = set()
+    if promotion_decision is not None:
+        ready_checks.add("promotion_eligibility_decision")
+    if promotion_review:
+        ready_checks.add("promotion_evaluation_review")
+    if readiness_record is not None:
+        ready_checks.add("promotion_readiness_record")
+    if (
+        readiness_record is not None
+        and readiness_record.get("model_activation_performed") is False
+        and readiness_record.get("active_model_config_written") is False
+    ):
+        ready_checks.add("activation_guardrails")
+    return _checklist_progress(
+        stage_id="model_group.maintenance",
+        status=status,
+        checks=MODEL_GROUP_MAINTENANCE_DATA_KINDS,
+        ready_checks=ready_checks,
+        unit_label="data types",
+        progress_source="model_group_maintenance_data_kinds",
+        progress_basis="required maintenance handoff data kinds before execution/shadow admission",
+        can_unlock_downstream=readiness_complete,
+    )
 
 
 def _replay_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> list[str]:
@@ -2788,6 +2972,8 @@ def _model_group_replay_timeline_tasks(
             "failed_count": 0,
             "accepted_failed_count": deferred,
             "can_unlock_downstream": False,
+            "progress_source": "replay_dataset_source_months",
+            "progress_basis": "source-month data acquisitions required before the five-year replay can start",
         }
 
     append_task(
@@ -2838,12 +3024,9 @@ def _model_group_replay_timeline_tasks(
         receipt_refs=list(promotion_artifacts["receipt_refs"]) if promotion_artifacts else None,
         blockers=[] if attribution_complete else ["model_group.model_10_event_risk_governor"],
         stage_type="model_evaluation",
-        progress=_single_step_progress(
-            stage_id="model_group.evaluation",
+        progress=_model_group_evaluation_progress(
             status="succeeded" if evaluation_complete else ("ready" if attribution_complete else "blocked"),
             complete=evaluation_complete,
-            unit_label="evaluation-packet",
-            can_unlock_downstream=evaluation_complete,
         ),
     )
 
@@ -2863,12 +3046,10 @@ def _model_group_replay_timeline_tasks(
             else ([] if evaluation_complete else ["model_group.evaluation", "promotion-evaluation-review"])
         ),
         stage_type="promotion_review",
-        progress=_single_step_progress(
-            stage_id="model_group.promotion",
+        progress=_model_group_promotion_progress(
             status=(promotion_decision_status or "ready") if evaluation_complete else "blocked",
             complete=promotion_complete and evaluation_complete,
-            unit_label="promotion-decision",
-            can_unlock_downstream=promotion_eligible,
+            eligible=promotion_eligible,
         ),
     )
     append_task(
@@ -2887,12 +3068,12 @@ def _model_group_replay_timeline_tasks(
         receipt_refs=list(readiness_artifacts["receipt_refs"]) if readiness_artifacts else None,
         blockers=[] if promotion_eligible else ["model_group.promotion"],
         stage_type="maintenance",
-        progress=_single_step_progress(
-            stage_id="model_group.maintenance",
+        progress=_model_group_maintenance_progress(
             status="succeeded" if readiness_complete else ("ready" if promotion_eligible else "blocked"),
-            complete=readiness_complete,
-            unit_label="maintenance-step",
-            can_unlock_downstream=readiness_complete,
+            promotion_decision=promotion_decision,
+            promotion_review=promotion_review if isinstance(promotion_review, Mapping) else {},
+            readiness_record=readiness_record,
+            readiness_complete=readiness_complete,
         ),
     )
     return tasks

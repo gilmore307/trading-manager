@@ -5,7 +5,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from trading_manager_tasks.task_progress import load_active_task_progress, write_task_progress_node
+from trading_manager_tasks.task_progress import load_active_task_progress, write_task_progress_from_env, write_task_progress_node
 
 
 class TaskProgressTests(unittest.TestCase):
@@ -53,6 +53,26 @@ class TaskProgressTests(unittest.TestCase):
         self.assertEqual(progress["pending_count"], 1)
         self.assertEqual(progress["unit_label"], "model job")
         self.assertEqual(progress["progress_source"], "active_progress_file")
+
+    def test_write_task_progress_from_env_uses_stage_progress_contract(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            progress_root = Path(raw_tmp) / "progress"
+            env = {
+                "TRADING_MANAGER_TASK_PROGRESS_ROOT": str(progress_root),
+                "TRADING_MANAGER_TASK_PROGRESS_WORKER_ID": "model_worker_1",
+                "TRADING_MANAGER_TASK_PROGRESS_TASK_UID": "2016-01..2016-06:layer_05_alpha_confidence.model_generation",
+                "TRADING_MANAGER_TASK_PROGRESS_STAGE_ID": "layer_05_alpha_confidence.model_generation",
+            }
+
+            write_task_progress_from_env(processed_count=1, expected_count=3, env=env)
+            payloads = load_active_task_progress(progress_root)
+
+        progress = payloads["2016-01..2016-06:layer_05_alpha_confidence.model_generation"]
+        self.assertEqual(progress["unit_label"], "train/validation/test partitions")
+        self.assertEqual(progress["expected_count"], 3)
+        self.assertEqual(progress["ready_count"], 1)
+        self.assertEqual(progress["progress_source"], "active_progress_file")
+        self.assertIn("training, validation, and test", progress["progress_basis"])
 
 
 if __name__ == "__main__":

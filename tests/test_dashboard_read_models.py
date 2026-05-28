@@ -236,9 +236,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task_timeline[0]["ended_at_utc"], "2026-05-12T09:30:00Z")
         self.assertEqual(task_timeline[0]["status_updated_at_utc"], "2026-05-12T10:00:00Z")
         self.assertEqual(task_timeline[0]["detail"]["progress"]["ready_count"], 3)
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["unit_label"], "model stages")
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["expected_count"], 2)
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["pending_count"], 2)
+        self.assertEqual(task_timeline[1]["detail"]["progress"]["unit_label"], "source-month requests")
+        self.assertEqual(task_timeline[1]["detail"]["progress"]["expected_count"], 6)
+        self.assertEqual(task_timeline[1]["detail"]["progress"]["pending_count"], 6)
         self.assertIn("Layer 2 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
         self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))
@@ -586,19 +586,19 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "failure attributions")
         self.assertEqual(evaluation_tasks[1]["detail"]["blockers"], ["model_group.replay"])
         self.assertEqual(evaluation_tasks[2]["task_label"], "Model Evaluation")
-        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["expected_count"], 1)
-        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["pending_count"], 1)
-        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["unit_label"], "evaluation-packet")
+        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["expected_count"], 4)
+        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["pending_count"], 4)
+        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["unit_label"], "evaluation tests")
         self.assertEqual(evaluation_tasks[2]["detail"]["blockers"], ["model_group.model_10_event_risk_governor"])
         self.assertEqual(evaluation_tasks[3]["task_label"], "Model Promotion")
-        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["expected_count"], 1)
-        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["pending_count"], 1)
-        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["unit_label"], "promotion-decision")
+        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["expected_count"], 5)
+        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["pending_count"], 5)
+        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["unit_label"], "promotion tests")
         self.assertIn("promotion-evaluation-review", evaluation_tasks[3]["detail"]["blockers"])
         self.assertEqual(evaluation_tasks[4]["task_label"], "Model Maintenance")
         self.assertEqual(evaluation_tasks[4]["detail"]["blockers"], ["model_group.promotion"])
-        self.assertEqual(evaluation_tasks[4]["detail"]["progress"]["expected_count"], 1)
-        self.assertEqual(evaluation_tasks[4]["detail"]["progress"]["unit_label"], "maintenance-step")
+        self.assertEqual(evaluation_tasks[4]["detail"]["progress"]["expected_count"], 4)
+        self.assertEqual(evaluation_tasks[4]["detail"]["progress"]["unit_label"], "data types")
         self.assertEqual(payload["status"], "blocked")
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
         self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
@@ -1023,6 +1023,133 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["covered_partition_count"], 3)
         self.assertEqual(progress["expected_partition_count"], 6)
 
+    def test_feature_generation_progress_uses_fold_month_partitions(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_symbol": "AAPL",
+                                },
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:30Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        progress = task["detail"]["progress"]
+        self.assertEqual(progress["progress_source"], "fold_feature_generation_partitions")
+        self.assertEqual(progress["unit_label"], "feature months")
+        self.assertEqual(progress["expected_count"], 6)
+        self.assertEqual(progress["ready_count"], 0)
+        self.assertEqual(progress["pending_count"], 6)
+        self.assertIn("six-month fold", progress["progress_basis"])
+
+    def test_model_generation_progress_uses_train_validation_test_partitions_without_rows(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_symbol": "AAPL",
+                                },
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:45Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        progress = task["detail"]["progress"]
+        self.assertEqual(progress["progress_source"], "model_generation_split_partitions")
+        self.assertEqual(progress["unit_label"], "train/validation/test partitions")
+        self.assertEqual(progress["expected_count"], 3)
+        self.assertEqual(progress["ready_count"], 0)
+        self.assertEqual(progress["pending_count"], 3)
+        self.assertIn("six-month fold", progress["progress_basis"])
+
     def test_completed_model_task_progress_uses_model_row_artifact_count(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -1169,7 +1296,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         maintenance_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.maintenance")
         self.assertEqual(promotion_task["status"], "review_required")
         self.assertEqual(promotion_task["task_state"], "current")
-        self.assertEqual(promotion_task["detail"]["progress"]["ready_count"], 1)
+        self.assertEqual(promotion_task["detail"]["progress"]["ready_count"], 5)
         self.assertEqual(promotion_task["detail"]["progress"]["pending_count"], 0)
         self.assertFalse(promotion_task["detail"]["progress"]["can_unlock_downstream"])
         self.assertEqual(promotion_task["detail"]["blockers"], ["missing anonymous comparison", "auroc_below_minimum"])
@@ -1254,8 +1381,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(maintenance_task["status"], "succeeded")
         self.assertEqual(maintenance_task["task_state"], "completed")
         self.assertEqual(maintenance_task["receipt_count"], 1)
-        self.assertEqual(maintenance_task["detail"]["progress"]["ready_count"], 1)
+        self.assertEqual(maintenance_task["detail"]["progress"]["expected_count"], 4)
+        self.assertEqual(maintenance_task["detail"]["progress"]["ready_count"], 4)
         self.assertEqual(maintenance_task["detail"]["progress"]["pending_count"], 0)
+        self.assertEqual(maintenance_task["detail"]["progress"]["unit_label"], "data types")
         self.assertTrue(maintenance_task["detail"]["progress"]["can_unlock_downstream"])
 
     def test_agent_error_summary_marks_repaired_smoke_closed(self):
