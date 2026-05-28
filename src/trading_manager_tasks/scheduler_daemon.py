@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
-from .model_group_replay import run_model_group_replay_if_ready
+from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_replay_if_ready
 from .model_training_state import advance_workflow_state
 from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -337,6 +337,8 @@ def select_month_ingest_worker_months(
     max_month = _eligible_historical_fold_cutoff(max_month)
     if target_has_open_model_worker_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol, max_month=max_month):
         return ()
+    if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
+        return ()
 
     worker_count = max(1, int(worker_count))
     runtime_root = storage_root / "runtime"
@@ -457,6 +459,92 @@ def _workflow_payload_all_stages_complete(payload: dict[str, Any]) -> bool:
         return False
     statuses = [stage.get("status") for stage in stages if isinstance(stage, dict)]
     return bool(statuses) and all(status in {"succeeded", "not_applicable"} for status in statuses)
+
+
+def _model_group_replay_dataset_root(storage_root: Path, contract_id: str = DEFAULT_REPLAY_CONTRACT_ID) -> Path:
+    return storage_root.parent / "05_replay_datasets" / contract_id
+
+
+def _latest_promotion_readiness_mtime(storage_root: Path) -> float | None:
+    readiness_root = _model_group_replay_dataset_root(storage_root) / "promotion_readiness_runs"
+    if not readiness_root.exists():
+        return None
+    mtimes: list[float] = []
+    for readiness_path in sorted(readiness_root.glob("*/promotion_readiness_record.json")):
+        try:
+            payload = json.loads(readiness_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if str(payload.get("contract_type") or "") != "promotion_readiness_record":
+            continue
+        mtimes.append(readiness_path.stat().st_mtime)
+    return max(mtimes) if mtimes else None
+
+
+def _fold_model_group_lifecycle_complete(storage_root: Path, state_path: Path) -> bool:
+    readiness_mtime = _latest_promotion_readiness_mtime(storage_root)
+    if readiness_mtime is None:
+        return False
+    try:
+        return readiness_mtime >= state_path.stat().st_mtime
+    except OSError:
+        return False
+
+
+def _completed_pre_replay_fold_states(
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+) -> tuple[Path, ...]:
+    runtime_root = storage_root / "runtime"
+    if not runtime_root.exists():
+        return ()
+    paths: list[tuple[str, str, Path]] = []
+    for path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        start_month = str(payload.get("start_month") or "")
+        end_month = str(payload.get("end_month") or "")
+        if not start_month or not end_month:
+            continue
+        if selected_target_symbol:
+            expected_path = model_worker_fold_state_path(
+                start_month,
+                end_month,
+                root=runtime_root,
+                selected_target_symbol=selected_target_symbol,
+            )
+            if path != expected_path:
+                continue
+        if not _workflow_payload_all_stages_complete(payload):
+            continue
+        paths.append((start_month, end_month, path))
+    return tuple(path for _start_month, _end_month, path in sorted(paths))
+
+
+def model_group_lifecycle_blocks_next_fold(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    selected_target_symbol: str | None = None,
+) -> bool:
+    """Return whether the earliest completed pre-replay fold still owns the lane.
+
+    Layer 10 may update the event-observation pool consumed by later Layer 4
+    folds. The scheduler therefore cannot start the next fold after Layer 1-9
+    alone; the current fold must complete replay, Layer 10, evaluation,
+    promotion, and maintenance readiness first.
+    """
+
+    completed_fold_states = _completed_pre_replay_fold_states(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
+    if not completed_fold_states:
+        return False
+    earliest_completed = completed_fold_states[0]
+    return not _fold_model_group_lifecycle_complete(storage_root, earliest_completed)
 
 
 def _is_model_worker_routable_stage(stage: dict[str, Any]) -> bool:
@@ -653,6 +741,8 @@ def select_model_worker_fold(
         ):
             return None
         return open_selection
+    if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
+        return None
 
     known_months: set[str] = set()
     if runtime_root.exists():
@@ -782,6 +872,13 @@ def select_model_worker_target(
     pinned = str(selected_target_symbol or "").strip().upper()
     target_queue = (pinned,) if pinned else load_model_worker_target_queue(target_queue_path)
     if not target_queue:
+        if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=None):
+            return ModelWorkerTargetSelection(
+                selected_target_symbol=None,
+                target_queue=(),
+                reason_code="model_group_lifecycle_holds_fold_lane",
+                fold_selection=None,
+            )
         fold_selection = select_model_worker_fold(
             storage_root=storage_root,
             default_start_month=default_start_month,
@@ -797,6 +894,13 @@ def select_model_worker_target(
             )
         return None
     for symbol in target_queue:
+        if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=symbol):
+            return ModelWorkerTargetSelection(
+                selected_target_symbol=symbol,
+                target_queue=target_queue,
+                reason_code="model_group_lifecycle_holds_target_lane",
+                fold_selection=None,
+            )
         fold_selection = select_model_worker_fold(
             storage_root=storage_root,
             default_start_month=default_start_month,

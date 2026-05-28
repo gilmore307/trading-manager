@@ -57,6 +57,13 @@ fold rows. A six-month fold opens only after its final calendar month has
 completed in `America/New_York`, so `2026-fold1` is not eligible before
 2026-07-01 even if some January-June child months already have source data.
 
+The service completes one fold's full run cycle before opening the next fold.
+Layer 1-9 completion is only the pre-replay boundary; it unlocks Replay, Layer
+10 Event Risk Governor attribution, Model Evaluation, Model Promotion, and
+Model Maintenance. Until that lifecycle emits maintenance/readiness evidence,
+the next fold and the next target remain blocked because Layer 10 may update
+the event-observation pool used by later Layer 4 folds.
+
 Layer 2 feature generation also prepares `source_02_target_candidate_holdings` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
 ## Target Rotation
@@ -77,7 +84,7 @@ Accepted queue shape:
 }
 ```
 
-If the first target has completed all eligible substrate windows through the completed-fold cutoff, the scheduler skips it and starts the next queued target from the earliest ready window, usually `2016-01`. The queue controls data-preparation routing only; it does not become fixed-target promotion evidence and does not replace component-led candidate selection replay.
+If the first target has completed all eligible substrate windows through the completed-fold cutoff and its current fold lifecycle has completed maintenance/readiness handoff, the scheduler skips it and starts the next queued target from the earliest ready window, usually `2016-01`. The queue controls data-preparation routing only; it does not become fixed-target promotion evidence and does not replace component-led candidate selection replay.
 
 The runtime queue can be prepared from reviewed target context mappings:
 

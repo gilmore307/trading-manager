@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import textwrap
@@ -63,6 +64,32 @@ class SchedulerDaemonTests(unittest.TestCase):
             selected_target_symbol="AAPL",
             write=True,
         )
+
+    def _write_promotion_readiness_after(self, *, storage_root: Path, state_path: Path) -> Path:
+        readiness_path = (
+            storage_root.parent
+            / "05_replay_datasets"
+            / "promotion_replay_candidate_policy"
+            / "promotion_readiness_runs"
+            / f"ready_after_{state_path.stem}"
+            / "promotion_readiness_record.json"
+        )
+        readiness_path.parent.mkdir(parents=True, exist_ok=True)
+        readiness_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "promotion_readiness_record",
+                    "created_at_utc": "2026-05-28T00:00:00Z",
+                    "source_fold_state_path": str(state_path),
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        state_mtime = state_path.stat().st_mtime
+        os.utime(readiness_path, (state_mtime + 10, state_mtime + 10))
+        return readiness_path
+
     def _fake_data_src(self, tmp: Path) -> Path:
         src = tmp / "trading-data-src"
         package = src / "data_feed" / "01_feed_alpaca_bars"
@@ -440,6 +467,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                     foundation_catch_up_only=False,
                     write=True,
                 )
+                self._write_promotion_readiness_after(storage_root=storage_root, state_path=state_path)
 
             queue_path = storage_root / "runtime" / "model_training_target_queue.json"
             queue_path.write_text(
@@ -592,12 +620,20 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_month="2016-12",
                 selected_target_symbol="AAPL",
             )
+            self._write_promotion_readiness_after(storage_root=storage_root, state_path=first_state_path)
+            next_selection_after_lifecycle = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
 
         self.assertIsNone(overlapping_selection)
-        self.assertIsNotNone(next_selection)
-        assert next_selection is not None
-        self.assertEqual(next_selection.fold_id, "fold_2016-07_2016-12")
-        self.assertEqual(next_selection.fold_months, ("2016-07", "2016-08", "2016-09", "2016-10", "2016-11", "2016-12"))
+        self.assertIsNone(next_selection)
+        self.assertIsNotNone(next_selection_after_lifecycle)
+        assert next_selection_after_lifecycle is not None
+        self.assertEqual(next_selection_after_lifecycle.fold_id, "fold_2016-07_2016-12")
+        self.assertEqual(next_selection_after_lifecycle.fold_months, ("2016-07", "2016-08", "2016-09", "2016-10", "2016-11", "2016-12"))
 
     def test_model_worker_does_not_leapfrog_missing_foundation_month_gap(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -646,12 +682,12 @@ class SchedulerDaemonTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_10_event_risk_governor.model_generation",
+                                "stage_id": "layer_09_option_expression.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": 9,
-                                "layer_key": "layer_10_event_risk_governor",
+                                "layer_key": "layer_09_option_expression",
                                 "status": "blocked",
-                                "last_reason": "waiting for layer_10_event_risk_governor.feature_or_input_ready",
+                                "last_reason": "waiting for layer_09_option_expression.feature_or_input_ready",
                             }
                         ],
                     }
@@ -666,6 +702,69 @@ class SchedulerDaemonTests(unittest.TestCase):
         assert selection is not None
         self.assertEqual(selection.fold_id, "fold_2016-01_2016-06")
         self.assertEqual(selection.reason_code, "blocked_model_worker_fold_holds_target_lane")
+
+    def test_completed_pre_replay_fold_holds_next_fold_until_model_group_lifecycle_completes(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            first_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            self.assertIsNotNone(first_selection)
+            assert first_selection is not None
+            first_state_path = seed_model_worker_fold_state(
+                storage_root=storage_root,
+                selection=first_selection,
+                selected_target_symbol="AAPL",
+            )
+            first_plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                state_path=first_state_path,
+                completed_stage_ids=[stage.stage_id for layer in first_plan.layers for stage in layer.stages],
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+
+            blocked_next_fold = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            blocked_month_ingest = select_month_ingest_worker_months(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                worker_count=3,
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            self._write_promotion_readiness_after(storage_root=storage_root, state_path=first_state_path)
+            unblocked_next_fold = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertIsNone(blocked_next_fold)
+        self.assertEqual(blocked_month_ingest, ())
+        self.assertIsNotNone(unblocked_next_fold)
+        assert unblocked_next_fold is not None
+        self.assertEqual(unblocked_next_fold.fold_id, "fold_2016-07_2016-12")
 
     def test_month_ingest_workers_pause_when_target_has_open_model_worker_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
