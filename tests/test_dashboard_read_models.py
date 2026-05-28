@@ -819,6 +819,81 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
         self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
 
+    def test_replay_completion_surfaces_layer_ten_ready_despite_internal_lifecycle_hold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            replay_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 2,
+                        "available_feed_acquisition_count": 2,
+                        "deferred_feed_acquisition_count": 0,
+                        "missing_feed_acquisition_count": 0,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
+            (replay_root / "replay_progress.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"stage_id": "model_group.replay", "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "month": "2021-02", "status": "completed"}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps({"current_month": "2020-07", "start_month": "2020-07"}) + "\n", encoding="utf-8")
+            lock_path = tmp / "runtime" / "historical_scheduler.lock"
+            lock_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=state_path,
+                lock_path=lock_path,
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:31:00Z")
+
+        self.assertEqual(status.current_stage, "model_group.replay")
+        self.assertEqual(status.blocked_reason, "waiting_for_model_group_lifecycle_tasks")
+        replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
+        layer_ten_task = next(
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if task["task_id"] == "model_group.model_10_event_risk_governor"
+        )
+        self.assertEqual(replay_task["status"], "succeeded")
+        self.assertEqual(replay_task["task_state"], "completed")
+        self.assertEqual(layer_ten_task["status"], "ready")
+        self.assertEqual(layer_ten_task["task_state"], "current")
+        self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.model_10_event_risk_governor")
+        self.assertEqual(payload["chart_payload"]["blocker_category"], None)
+        self.assertEqual(payload["status"], "running")
+        self.assertIn("Layer 10 Event Risk Governor", payload["summary"])
+        self.assertNotIn("blocked at model_group.replay", payload["summary"])
+        self.assertFalse(
+            any(ref.get("issue_id") == "model_group.replay" and ref.get("summary") == "waiting_for_model_group_lifecycle_tasks" for ref in payload["issue_refs"])
+        )
+
     def test_model_group_promotion_review_uses_review_artifact(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

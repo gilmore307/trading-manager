@@ -561,12 +561,6 @@ def _owner_status(
             "high",
             "Historical modeling service is not runtime-ready; service files or lock state need review.",
         )
-    if status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
-        return (
-            "blocked",
-            "medium",
-            f"Historical modeling is blocked at {status.current_stage or 'unknown stage'}: {status.blocked_reason}.",
-        )
     if public_active_task is not None:
         label = str(public_active_task.get("task_label") or public_active_task.get("task_id") or "the current task")
         period = str(public_active_task.get("month") or "the selected period")
@@ -587,6 +581,12 @@ def _owner_status(
             "ready",
             "info",
             f"Historical workflow is ready at {label} for {period}.",
+        )
+    if status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
+        return (
+            "blocked",
+            "medium",
+            f"Historical modeling is blocked at {status.current_stage or 'unknown stage'}: {status.blocked_reason}.",
         )
     if workflow.terminal_complete:
         return (
@@ -624,7 +624,26 @@ def _operational_item_requires_owner_action(item: str) -> bool:
     return item in {"review_systemd_template_flags", "remove_or_replace_stale_scheduler_lock_before_service_start"}
 
 
-def _issue_refs(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
+def _public_active_task_blocker(public_active_task: Mapping[str, Any] | None) -> str | None:
+    if public_active_task is None:
+        return None
+    if str(public_active_task.get("status") or "").lower() != "blocked":
+        return None
+    detail = public_active_task.get("detail")
+    if isinstance(detail, Mapping):
+        blockers = detail.get("blockers")
+        if isinstance(blockers, list) and blockers:
+            return str(blockers[0])
+    return str(public_active_task.get("task_id") or "current_task_blocked")
+
+
+def _active_blocker(status: HistoricalSchedulerStatus, public_active_task: Mapping[str, Any] | None) -> str | None:
+    if public_active_task is not None:
+        return _public_active_task_blocker(public_active_task)
+    return status.blocked_reason or (status.open_operational_items[0] if status.open_operational_items else None)
+
+
+def _issue_refs(status: HistoricalSchedulerStatus, public_active_task: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
     refs: list[dict[str, Any]] = []
     latest_stage_execution = _latest_stage_execution(status)
     if latest_stage_execution and latest_stage_execution.get("status") == "failed":
@@ -646,7 +665,18 @@ def _issue_refs(status: HistoricalSchedulerStatus) -> list[dict[str, Any]]:
                 "owner_action_required": _operational_item_requires_owner_action(item),
             }
         )
-    if status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
+    public_task_blocker = _public_active_task_blocker(public_active_task)
+    if public_task_blocker is not None:
+        refs.append(
+            {
+                "issue_type": "historical_workflow_blocked",
+                "issue_id": public_active_task.get("task_id") or "current_public_task",
+                "severity": "medium",
+                "owner_action_required": False,
+                "summary": public_task_blocker,
+            }
+        )
+    elif public_active_task is None and status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
         refs.append(
             {
                 "issue_type": "historical_workflow_blocked",
@@ -2727,7 +2757,7 @@ def build_historical_task_progress_summary(
         stage_counts = dict(sorted(stage_counts.items()))
     progress_percent = _progress_percent(stage_counts)
     dashboard_status, severity, summary = _owner_status(status, public_active_task=public_active_task)
-    active_blocker = status.blocked_reason or (status.open_operational_items[0] if status.open_operational_items else None)
+    active_blocker = _active_blocker(status, public_active_task)
     chart_payload: dict[str, Any] = {
         "current_month": _public_current_period(status, public_active_task),
         "active_stage": public_active_task.get("task_id") if public_active_task else None,
@@ -2764,7 +2794,7 @@ def build_historical_task_progress_summary(
             {"registry_ref": "HISTORICAL_TASK_PROGRESS_SUMMARY", "field": "contract_type"},
             {"registry_ref": "DASHBOARD_READ_MODEL_COMMON_ENVELOPE", "field": "common_envelope"},
         ],
-        "issue_refs": _issue_refs(status),
+        "issue_refs": _issue_refs(status, public_active_task=public_active_task),
         "diagnostic_refs": _diagnostic_refs(status, stage_coverage),
         "lineage_refs": [
             {"contract_type": status.contract_type, "generated_utc": status.generated_utc},
