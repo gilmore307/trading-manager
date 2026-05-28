@@ -49,7 +49,7 @@ FOLD_MODEL_STAGE_TYPES = {
     "maintenance",
 }
 MONTHS_PER_MODEL_FOLD = 6
-MODEL_GENERATION_SPLIT_COUNT = 3
+MODEL_GENERATION_FOLD_COUNT = 1
 MODEL_GROUP_EVALUATION_TESTS = (
     "replay_metrics",
     "guardrail_checks",
@@ -888,20 +888,20 @@ def _semantic_stage_progress(
         complete = status in {"succeeded", "not_applicable"}
         failed = 1 if status == "failed" else 0
         contract = progress_contract_for_stage(f"{stage_id}.model_generation")
-        ready = MODEL_GENERATION_SPLIT_COUNT if complete else 0
+        ready = MODEL_GENERATION_FOLD_COUNT if complete else 0
         return {
             "stage_id": stage_id,
             "status": "complete" if complete else ("failed" if failed else status or "pending"),
             "unit_label": contract["unit_label"],
-            "expected_count": MODEL_GENERATION_SPLIT_COUNT,
+            "expected_count": MODEL_GENERATION_FOLD_COUNT,
             "ready_count": ready,
-            "pending_count": max(MODEL_GENERATION_SPLIT_COUNT - ready - failed, 0),
+            "pending_count": max(MODEL_GENERATION_FOLD_COUNT - ready - failed, 0),
             "failed_count": failed,
             "accepted_failed_count": 0,
             "can_unlock_downstream": complete,
-            "progress_source": "model_generation_split_partitions",
+            "progress_source": "model_generation_fold_pass",
             "progress_basis": contract["progress_basis"],
-            "expected_partition_count": MODEL_GENERATION_SPLIT_COUNT,
+            "expected_partition_count": MODEL_GENERATION_FOLD_COUNT,
         }
     return None
 

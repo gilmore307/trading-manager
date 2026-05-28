@@ -64,15 +64,15 @@ class TaskProgressTests(unittest.TestCase):
                 "TRADING_MANAGER_TASK_PROGRESS_STAGE_ID": "layer_05_alpha_confidence.model_generation",
             }
 
-            write_task_progress_from_env(processed_count=1, expected_count=3, env=env)
+            write_task_progress_from_env(processed_count=1, expected_count=1, env=env)
             payloads = load_active_task_progress(progress_root)
 
         progress = payloads["2016-01..2016-06:layer_05_alpha_confidence.model_generation"]
-        self.assertEqual(progress["unit_label"], "train/validation/test partitions")
-        self.assertEqual(progress["expected_count"], 3)
+        self.assertEqual(progress["unit_label"], "model fold")
+        self.assertEqual(progress["expected_count"], 1)
         self.assertEqual(progress["ready_count"], 1)
         self.assertEqual(progress["progress_source"], "active_progress_file")
-        self.assertIn("training, validation, and test", progress["progress_basis"])
+        self.assertIn("six-month fold", progress["progress_basis"])
 
 
 if __name__ == "__main__":

@@ -23,8 +23,8 @@ STAGE_PROGRESS_CONTRACTS: dict[str, dict[str, str]] = {
         "progress_basis": "feature partitions required by the six-month fold",
     },
     "model_generation": {
-        "unit_label": "train/validation/test partitions",
-        "progress_basis": "training, validation, and test partitions for the six-month fold",
+        "unit_label": "model fold",
+        "progress_basis": "one deterministic model-generation pass over the six-month fold",
     },
     "replay": {
         "unit_label": "replay months",

@@ -1083,7 +1083,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["pending_count"], 6)
         self.assertIn("six-month fold", progress["progress_basis"])
 
-    def test_model_generation_progress_uses_train_validation_test_partitions_without_rows(self):
+    def test_model_generation_progress_uses_fold_generation_pass_without_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -1143,11 +1143,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         progress = task["detail"]["progress"]
-        self.assertEqual(progress["progress_source"], "model_generation_split_partitions")
-        self.assertEqual(progress["unit_label"], "train/validation/test partitions")
-        self.assertEqual(progress["expected_count"], 3)
+        self.assertEqual(progress["progress_source"], "model_generation_fold_pass")
+        self.assertEqual(progress["unit_label"], "model fold")
+        self.assertEqual(progress["expected_count"], 1)
         self.assertEqual(progress["ready_count"], 0)
-        self.assertEqual(progress["pending_count"], 3)
+        self.assertEqual(progress["pending_count"], 1)
         self.assertIn("six-month fold", progress["progress_basis"])
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
@@ -1203,10 +1203,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         progress = task["detail"]["progress"]
-        self.assertEqual(progress["progress_source"], "model_generation_split_partitions")
-        self.assertEqual(progress["unit_label"], "train/validation/test partitions")
-        self.assertEqual(progress["expected_count"], 3)
-        self.assertEqual(progress["ready_count"], 3)
+        self.assertEqual(progress["progress_source"], "model_generation_fold_pass")
+        self.assertEqual(progress["unit_label"], "model fold")
+        self.assertEqual(progress["expected_count"], 1)
+        self.assertEqual(progress["ready_count"], 1)
         self.assertEqual(progress["pending_count"], 0)
         self.assertNotIn("artifact_count", progress)
 
