@@ -1136,6 +1136,65 @@ class SchedulerDaemonTests(unittest.TestCase):
             self.assertEqual(len(log_rows), 1)
             self.assertEqual(log_rows[0]["provider_calls"], 0)
 
+    def test_daemon_dispatches_post_replay_attribution_after_scheduler_tick(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state_path = tmp / "runtime" / "state.json"
+            lock_path = tmp / "runtime" / "scheduler.lock"
+            decision_log = tmp / "runtime" / "decisions.jsonl"
+            scheduler_decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-05-28T00:00:00+00:00",
+                now_et="2026-05-27T20:00:00-04:00",
+                decision_status="ready",
+                reason_code="no_month_stage_ready",
+                reason="no month stage ready",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work=None,
+                command=[],
+                next_internal_stage="historical_training_work_loop",
+            )
+            attribution_decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-05-28T00:00:01+00:00",
+                now_et="2026-05-27T20:00:01-04:00",
+                decision_status="executed",
+                reason_code="model_group_post_replay_attribution_executed",
+                reason="executed Layer 10 attribution",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work="model_group.model_10_event_risk_governor",
+                command=[],
+                next_internal_stage="post_replay_attribution",
+            )
+
+            with patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=scheduler_decision), patch(
+                "trading_manager_tasks.scheduler_daemon.run_model_group_replay_if_ready", return_value=None
+            ), patch(
+                "trading_manager_tasks.scheduler_daemon.run_model_group_post_replay_attribution_if_ready",
+                return_value=attribution_decision,
+            ) as attribution:
+                state = run_daemon_loop(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp / "manager-storage",
+                    component_src_root=self._fake_data_src(tmp),
+                    state_path=state_path,
+                    lock_path=lock_path,
+                    decision_log_path=decision_log,
+                    interval_seconds=0,
+                    max_iterations=2,
+                    execute_safe_preparation=True,
+                    source_existing_bootstrap=False,
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                )
+
+            attribution.assert_called()
+            self.assertEqual(state.last_next_internal_stage, "post_replay_attribution")
+            log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_post_replay_attribution_executed"])
+
     def test_daemon_drain_continues_until_next_non_executed_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
