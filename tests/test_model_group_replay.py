@@ -164,7 +164,7 @@ class ModelGroupReplayTests(unittest.TestCase):
 
         self.assertIsNone(decision)
 
-    def test_replay_scope_mismatch_blocks_placeholder_crypto_dataset(self):
+    def test_replay_allows_free_trading_universe_when_fold_is_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -187,9 +187,35 @@ class ModelGroupReplayTests(unittest.TestCase):
 
             self.assertIsNotNone(decision)
             assert decision is not None
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_replay_executed")
+
+    def test_replay_scope_mismatch_blocks_wrong_fold_dataset(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            manifest_path = dataset_root / "dataset_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["candidate_fold_id"] = "fold_2016-07_2016-12"
+            manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+            self._write_completed_fold(storage_root)
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_scope_mismatch")
-            self.assertIn("do not include training target AAPL", decision.reason)
+            self.assertIn("does not match completed training fold", decision.reason)
 
     def test_skips_replay_when_all_months_are_already_complete(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

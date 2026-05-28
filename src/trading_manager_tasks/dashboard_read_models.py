@@ -2462,16 +2462,21 @@ def _replay_dataset_scope_status(
 ) -> dict[str, Any]:
     target_symbol = str(selected_target_symbol or (completed_training_fold[2] if completed_training_fold else "") or "").strip().upper()
     target_refs = _replay_dataset_target_refs(dataset_root=dataset_root, manifest=manifest or {})
-    if target_symbol and target_refs and target_symbol not in target_refs:
-        return {
-            "compatible": False,
-            "reason": f"Replay dataset targets {', '.join(sorted(target_refs))} do not include training target {target_symbol}.",
-            "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
+    manifest_fold_id = str((manifest or {}).get("candidate_fold_id") or (manifest or {}).get("fold_id") or "").strip()
+    if completed_training_fold is not None:
+        start_month, end_month, _target = completed_training_fold
+        expected_fold_id = _fold_period_label(start_month, end_month)
+        expected_fold_range = _fold_period_range(start_month, end_month)
+        if manifest_fold_id and manifest_fold_id not in {expected_fold_id, expected_fold_range, f"{start_month}_{end_month}"}:
+            return {
+                "compatible": False,
+                "reason": f"Replay dataset fold {manifest_fold_id} does not match completed training fold {expected_fold_id}.",
+                "dataset_target_refs": sorted(target_refs),
+                "training_target_symbol": target_symbol,
+            }
     return {
         "compatible": True,
-        "reason": "Replay dataset scope matches the completed training fold.",
+        "reason": "Replay dataset is eligible for fold-bound free-trading replay.",
         "dataset_target_refs": sorted(target_refs),
         "training_target_symbol": target_symbol,
     }
@@ -2507,20 +2512,16 @@ def _string_set(value: Any) -> set[str]:
     return set()
 
 
-def _compatible_replay_run_ids(*, dataset_root: Path, target_symbol: str | None) -> set[str]:
+def _compatible_replay_run_ids(*, dataset_root: Path) -> set[str]:
     replay_root = dataset_root / "replay_execution_runs"
     run_ids: set[str] = set()
     if not replay_root.exists():
         return run_ids
-    target = str(target_symbol or "").strip().upper()
     for receipt_path in sorted(replay_root.glob("*/replay_execution_receipt.json")):
         receipt = _load_optional_json_object(receipt_path)
         if receipt is None:
             continue
         if "current_deterministic_crypto_policy" in str(receipt.get("candidate_model_ref") or ""):
-            continue
-        target_refs = _string_set(receipt.get("target_refs") or receipt.get("candidate_target_refs"))
-        if target and target_refs and target not in target_refs:
             continue
         run_id = str(receipt.get("replay_execution_run_id") or receipt_path.parent.name).strip()
         if run_id:
@@ -3019,10 +3020,7 @@ def _model_group_replay_timeline_tasks(
     freeze_status = str((manifest or {}).get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
     compatible_replay_run_ids = (
-        _compatible_replay_run_ids(
-            dataset_root=dataset_root,
-            target_symbol=str(replay_scope_status.get("training_target_symbol") or ""),
-        )
+        _compatible_replay_run_ids(dataset_root=dataset_root)
         if lifecycle_artifacts_allowed
         else set()
     )
@@ -3043,21 +3041,21 @@ def _model_group_replay_timeline_tasks(
     )
     replay_started = bool(replay_ready_months)
     replay_complete = bool(replay_progress["can_unlock_downstream"])
-    attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root) if lifecycle_artifacts_allowed else None
+    attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root) if lifecycle_artifacts_allowed and replay_complete else None
     attribution_complete = attribution_artifacts is not None
     attribution_progress = _layer_ten_attribution_progress(
         dataset_root=dataset_root,
         attribution_artifacts=attribution_artifacts,
         replay_complete=replay_complete,
     )
-    promotion_artifacts = _latest_promotion_review_artifacts(dataset_root) if lifecycle_artifacts_allowed else None
+    promotion_artifacts = _latest_promotion_review_artifacts(dataset_root) if lifecycle_artifacts_allowed and attribution_complete else None
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
     promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
     promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")
     promotion_complete = promotion_decision is not None
     promotion_eligible = promotion_decision_status == "eligible"
     promotion_terminal_not_eligible = promotion_complete and not promotion_eligible
-    readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root) if lifecycle_artifacts_allowed else None
+    readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root) if lifecycle_artifacts_allowed and promotion_eligible else None
     readiness_record = readiness_artifacts["readiness"] if readiness_artifacts else None
     readiness_complete = (
         promotion_eligible
@@ -3103,6 +3101,8 @@ def _model_group_replay_timeline_tasks(
         if pre_replay_complete and manifest is not None and not coverage_complete
         else f"Replay dataset is covered but not frozen; current freeze_status={freeze_status}."
         if pre_replay_complete and manifest is not None and coverage_complete and not freeze_ready
+        else "Replay dataset is frozen and ready for fold-bound free-trading replay."
+        if pre_replay_complete and manifest is not None and freeze_ready and not replay_complete
         else "Waiting for pre-replay Layer 1-9 model generation to complete before replay can run."
     )
     if manifest is not None and replay_scope_status["compatible"] and not coverage_complete:

@@ -513,17 +513,9 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
             "receipt_target_refs": sorted(target_refs),
             "training_target_symbol": target_symbol,
         }
-    if target_symbol and target_refs and target_symbol not in target_refs:
-        return {
-            "compatible": False,
-            "reason": f"replay receipt targets {', '.join(sorted(target_refs))} do not include training target {target_symbol}",
-            "candidate_model_ref": candidate_model_ref,
-            "receipt_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
     return {
         "compatible": True,
-        "reason": "replay receipt scope matches completed training fold",
+        "reason": "replay receipt is eligible for fold-bound free-trading evaluation",
         "candidate_model_ref": candidate_model_ref,
         "receipt_target_refs": sorted(target_refs),
         "training_target_symbol": target_symbol,

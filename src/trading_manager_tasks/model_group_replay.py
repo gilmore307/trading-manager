@@ -273,7 +273,6 @@ def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | N
 
 
 def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
-    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
     fold_id = str(training_fold.get("fold_id") or "")
     manifest_fold_id = str(manifest.get("candidate_fold_id") or manifest.get("fold_id") or "").strip()
     target_refs = _replay_dataset_target_refs(dataset_root=dataset_root, manifest=manifest)
@@ -282,20 +281,13 @@ def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, A
             "compatible": False,
             "reason": f"replay dataset fold {manifest_fold_id} does not match completed training fold {fold_id}",
             "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
-    if target_symbol and target_refs and target_symbol not in target_refs:
-        return {
-            "compatible": False,
-            "reason": f"replay dataset targets {', '.join(sorted(target_refs))} do not include training target {target_symbol}",
-            "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
+            "training_target_symbol": str(training_fold.get("target_symbol") or "").strip().upper(),
         }
     return {
         "compatible": True,
-        "reason": "replay dataset scope matches completed training fold",
+        "reason": "replay dataset is eligible for fold-bound free-trading replay",
         "dataset_target_refs": sorted(target_refs),
-        "training_target_symbol": target_symbol,
+        "training_target_symbol": str(training_fold.get("target_symbol") or "").strip().upper(),
     }
 
 
@@ -378,10 +370,6 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "")
     if "current_deterministic_crypto_policy" in candidate_model_ref:
         return {"compatible": False, "reason": "deterministic crypto placeholder policy"}
-    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
-    target_refs = _string_set(replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
-    if target_symbol and target_refs and target_symbol not in target_refs:
-        return {"compatible": False, "reason": "replay target mismatch"}
     receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "")
     fold_id = str(training_fold.get("fold_id") or "")
     if receipt_fold_id and fold_id and receipt_fold_id != fold_id:

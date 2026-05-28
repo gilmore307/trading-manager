@@ -558,10 +558,6 @@ def _promotion_decision_valid_for_fold_state(payload: dict[str, Any], *, decisio
     candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "")
     if "current_deterministic_crypto_policy" in candidate_model_ref:
         return False
-    receipt_targets = _string_set(replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
-    target_symbol = str(fold_scope.get("target_symbol") or "").upper()
-    if target_symbol and receipt_targets and target_symbol not in receipt_targets:
-        return False
     receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "")
     if receipt_fold_id and fold_scope["fold_id"] and receipt_fold_id != fold_scope["fold_id"]:
         return False
