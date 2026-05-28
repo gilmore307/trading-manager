@@ -2757,6 +2757,7 @@ def _model_group_replay_timeline_tasks(
             if pre_replay_complete
             else None
         )
+    lifecycle_artifacts_allowed = use_lifecycle_artifacts and pre_replay_complete
     layer_key = "model_group"
     tasks: list[dict[str, Any]] = []
 
@@ -2851,7 +2852,7 @@ def _model_group_replay_timeline_tasks(
     coverage_complete = manifest is not None and expected > 0 and missing == 0
     freeze_status = str((manifest or {}).get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
-    replay_ready_months = _replay_ready_months(dataset_root) if use_lifecycle_artifacts else set()
+    replay_ready_months = _replay_ready_months(dataset_root) if lifecycle_artifacts_allowed else set()
     replay_progress = _replay_month_progress(
         dataset_root=dataset_root,
         stage_id="model_group.replay",
@@ -2864,20 +2865,20 @@ def _model_group_replay_timeline_tasks(
     )
     replay_started = bool(replay_ready_months)
     replay_complete = bool(replay_progress["can_unlock_downstream"])
-    attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root) if use_lifecycle_artifacts else None
+    attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root) if lifecycle_artifacts_allowed else None
     attribution_complete = attribution_artifacts is not None
     attribution_progress = _layer_ten_attribution_progress(
         dataset_root=dataset_root,
         attribution_artifacts=attribution_artifacts,
         replay_complete=replay_complete,
     )
-    promotion_artifacts = _latest_promotion_review_artifacts(dataset_root) if use_lifecycle_artifacts else None
+    promotion_artifacts = _latest_promotion_review_artifacts(dataset_root) if lifecycle_artifacts_allowed else None
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
     promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
     promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")
     promotion_complete = promotion_decision is not None
     promotion_eligible = promotion_decision_status == "eligible"
-    readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root) if use_lifecycle_artifacts else None
+    readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root) if lifecycle_artifacts_allowed else None
     readiness_record = readiness_artifacts["readiness"] if readiness_artifacts else None
     readiness_complete = (
         promotion_eligible
