@@ -46,6 +46,40 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _write_completed_pre_replay_fold(self, runtime: Path, *, symbol: str = "AAPL") -> Path:
+        fold_state = runtime / f"model_training_fold_state_{symbol.lower()}_2016-01_2016-06.json"
+        fold_state.parent.mkdir(parents=True, exist_ok=True)
+        fold_state.write_text(
+            json.dumps(
+                {
+                    "contract_type": "manager_model_training_workflow_state",
+                    "start_month": "2016-01",
+                    "end_month": "2016-06",
+                    "stages": [
+                        {
+                            "stage_id": f"layer_{layer:02d}_fixture.model_generation",
+                            "stage_type": "model_generation",
+                            "layer": layer,
+                            "layer_key": f"layer_{layer:02d}_fixture",
+                            "status": "succeeded",
+                            "dataset_unit": {
+                                "unit_kind": "six_month_target_fold",
+                                "unit_months": 6,
+                                "start_month": "2016-01",
+                                "end_month": "2016-06",
+                                "target_required": layer >= 3,
+                                "target_symbol": symbol if layer >= 3 else None,
+                            },
+                        }
+                        for layer in range(1, 10)
+                    ],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return fold_state
+
     def test_builds_historical_task_progress_summary_payload(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -511,6 +545,50 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
         self.assertEqual(payload["chart_payload"]["active_task"]["worker_id"], "evaluation_worker_1")
         self.assertNotEqual(payload["chart_payload"]["internal_active_stage"], payload["chart_payload"]["active_stage"])
+
+    def test_task_timeline_shows_model_group_lifecycle_after_layer_nine_completes_before_replay_manifest(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T09:20:00Z")
+
+        model_group_tasks = [
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if str(task["task_id"]).startswith("model_group.")
+        ]
+        self.assertEqual(
+            [task["task_id"] for task in model_group_tasks],
+            [
+                "model_group.data_acquisition",
+                "model_group.replay",
+                "model_group.post_replay_attribution",
+                "model_group.promotion_review",
+                "model_group.maintenance",
+            ],
+        )
+        self.assertEqual(model_group_tasks[0]["task_state"], "current")
+        self.assertEqual(model_group_tasks[0]["status"], "ready")
+        self.assertEqual(model_group_tasks[1]["detail"]["blockers"], ["model_group.data_acquisition"])
+        self.assertEqual(model_group_tasks[2]["detail"]["blockers"], ["model_group.replay"])
+        self.assertIn("post-replay", model_group_tasks[3]["reason"])
+        self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.data_acquisition")
 
     def test_ready_model_group_replay_does_not_override_active_scheduler_work(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -1901,10 +1901,24 @@ def _model_group_training_fold_window(
     storage_root: Path,
     selected_target_symbol: str | None,
 ) -> tuple[str, str, int]:
+    completed_fold = _completed_model_group_training_fold(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
+    if completed_fold is not None:
+        start_month, end_month, _target_symbol = completed_fold
+        return start_month, end_month, _month_span_count(start_month, end_month)
+    return ("2016-01", "2016-06", MONTHS_PER_MODEL_FOLD)
+
+
+def _completed_model_group_training_fold(
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+) -> tuple[str, str, str | None] | None:
     runtime_root = storage_root / "runtime"
-    fallback = ("2016-01", "2016-06", MONTHS_PER_MODEL_FOLD)
     if not runtime_root.exists():
-        return fallback
+        return None
     candidates: list[tuple[str, str, str | None]] = []
     for fold_path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
         try:
@@ -1919,15 +1933,13 @@ def _model_group_training_fold_window(
             continue
         candidates.append((start_month, end_month, _fold_state_target_symbol(payload)))
     if not candidates:
-        return fallback
+        return None
     selected_symbol = str(selected_target_symbol or "").strip().upper()
     if selected_symbol:
         symbol_candidates = [candidate for candidate in candidates if (candidate[2] or "").upper() == selected_symbol]
         if symbol_candidates:
-            start_month, end_month, _ = sorted(symbol_candidates)[0]
-            return start_month, end_month, _month_span_count(start_month, end_month)
-    start_month, end_month, _ = sorted(candidates)[0]
-    return start_month, end_month, _month_span_count(start_month, end_month)
+            return sorted(symbol_candidates)[0]
+    return sorted(candidates)[0]
 
 
 def _replay_ready_months(dataset_root: Path) -> set[str]:
@@ -2087,6 +2099,10 @@ def _model_group_replay_timeline_tasks(
     period = _fold_period_label(training_start_month, training_end_month)
     replay_start_month, replay_end_month = _replay_window_months(dataset_root)
     replay_unit_months = _replay_window_month_count(dataset_root)
+    completed_training_fold = _completed_model_group_training_fold(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
     layer_key = "model_group"
     tasks: list[dict[str, Any]] = []
 
@@ -2160,7 +2176,7 @@ def _model_group_replay_timeline_tasks(
             }
         )
 
-    if manifest is None and not dataset_root.exists():
+    if manifest is None and not dataset_root.exists() and completed_training_fold is None:
         return []
 
     if manifest is None:
