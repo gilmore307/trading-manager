@@ -466,6 +466,10 @@ def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[d
         if str(task.get("task_state") or "") == "current":
             current_tasks.append(task)
     internal_stage = str(status.current_stage or "")
+    if status.lock.status == "active":
+        for task in current_tasks:
+            if str(task.get("layer_key") or "") == "model_group":
+                return task
     if status.lock.status == "active" and internal_stage:
         for task in current_tasks:
             if str(task.get("task_id") or "") == internal_stage:
