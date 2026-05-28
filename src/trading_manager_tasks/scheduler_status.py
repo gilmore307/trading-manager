@@ -389,12 +389,19 @@ def collect_historical_scheduler_status(
     daemon_state = _read_json_object(state_path)
     latest_decision, decision_log_rows = _latest_jsonl_object(decision_log_path)
     auto_work_selection = select_next_historical_work(storage_root=storage_root).summary_row()
+    lifecycle_holds_fold_lane = auto_work_selection.get("reason_code") == "model_group_lifecycle_holds_fold_lane"
     stale_completed_decision = _is_stale_completed_decision(latest_decision, auto_work_selection)
-    current_decision = None if stale_completed_decision else latest_decision
+    current_decision = None if stale_completed_decision or lifecycle_holds_fold_lane else latest_decision
     state_month = str((daemon_state or {}).get("start_month") or "")
     selected_month = str(auto_work_selection.get("start_month") or "")
     stale_completed_state = bool(
-        state_month in _completed_months(auto_work_selection) and selected_month and selected_month != state_month
+        (
+            state_month in _completed_months(auto_work_selection)
+            or lifecycle_holds_fold_lane
+        )
+        and state_month
+        and selected_month
+        and selected_month != state_month
     )
     if stale_completed_state:
         state_month = ""
@@ -430,9 +437,15 @@ def collect_historical_scheduler_status(
     ):
         blocked_reason = None
     current_stage = workflow.next_stage_id or str((current_decision or {}).get("selected_work") or "") or None
+    if lifecycle_holds_fold_lane:
+        current_stage = "model_group.replay"
+        if blocked_reason is None:
+            blocked_reason = "waiting_for_model_group_lifecycle_tasks"
     if current_stage is None and current_month:
         current_stage = "prepare_layer_one_historical_training_batch" if not workflow.exists else "historical_work_selected"
     current_next_internal_stage = str((current_decision or {}).get("next_internal_stage") or workflow.next_stage_type or "") or None
+    if lifecycle_holds_fold_lane:
+        current_next_internal_stage = "model_group_replay"
     current_lock_plan = (current_decision or {}).get("lock_plan")
     if not isinstance(current_lock_plan, Mapping):
         current_lock_plan = scheduler_lock_plan(
@@ -468,7 +481,7 @@ def collect_historical_scheduler_status(
         reported_daemon_state = dict(daemon_state)
         reported_daemon_state.pop("last_next_internal_stage", None)
         reported_daemon_state["superseded_by_auto_work_selection"] = True
-    if stale_completed_decision:
+    if stale_completed_decision or lifecycle_holds_fold_lane:
         latest_decision = None
     elif latest_decision is not None:
         latest_decision = dict(latest_decision)

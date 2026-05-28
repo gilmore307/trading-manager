@@ -603,7 +603,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
         self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
         self.assertEqual(payload["chart_payload"]["active_task"]["worker_id"], "evaluation_worker_1")
-        self.assertNotEqual(payload["chart_payload"]["internal_active_stage"], payload["chart_payload"]["active_stage"])
+        self.assertEqual(payload["chart_payload"]["internal_active_stage"], payload["chart_payload"]["active_stage"])
 
     def test_task_timeline_shows_model_group_lifecycle_after_layer_nine_completes_before_replay_manifest(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

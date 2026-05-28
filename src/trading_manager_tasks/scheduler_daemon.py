@@ -208,6 +208,9 @@ class HistoricalWorkSelection:
     reason_code: str = "no_prior_workflow_state"
     completed_months: tuple[str, ...] = ()
     open_months: tuple[str, ...] = ()
+    blocked_fold_start_month: str | None = None
+    blocked_fold_end_month: str | None = None
+    blocked_fold_state_path: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
@@ -271,6 +274,19 @@ def select_next_historical_work(
                     open_months=open_tuple,
                 )
             gap_cursor = next_month(gap_cursor)
+    lifecycle_block = _first_incomplete_model_group_lifecycle_fold(storage_root=storage_root, selected_target_symbol=None)
+    if lifecycle_block is not None:
+        return HistoricalWorkSelection(
+            start_month=lifecycle_block["start_month"],
+            end_month=lifecycle_block["end_month"],
+            reason_code="model_group_lifecycle_holds_fold_lane",
+            completed_months=completed_tuple,
+            open_months=open_tuple,
+            blocked_fold_start_month=lifecycle_block["start_month"],
+            blocked_fold_end_month=lifecycle_block["end_month"],
+            blocked_fold_state_path=lifecycle_block["state_path"],
+        )
+
     eligible_open_tuple = tuple(month for month in open_tuple if month <= max_month)
     if eligible_open_tuple:
         selected = eligible_open_tuple[0]
@@ -522,6 +538,33 @@ def _completed_pre_replay_fold_states(
             continue
         paths.append((start_month, end_month, path))
     return tuple(path for _start_month, _end_month, path in sorted(paths))
+
+
+def _first_incomplete_model_group_lifecycle_fold(
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+) -> dict[str, str] | None:
+    for state_path in _completed_pre_replay_fold_states(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    ):
+        if _fold_model_group_lifecycle_complete(storage_root, state_path):
+            continue
+        try:
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        start_month = str(payload.get("start_month") or "")
+        end_month = str(payload.get("end_month") or "")
+        if not start_month or not end_month:
+            continue
+        return {
+            "start_month": start_month,
+            "end_month": end_month,
+            "state_path": str(state_path),
+        }
+    return None
 
 
 def model_group_lifecycle_blocks_next_fold(

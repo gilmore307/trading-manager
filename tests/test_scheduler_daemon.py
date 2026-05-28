@@ -766,6 +766,85 @@ class SchedulerDaemonTests(unittest.TestCase):
         assert unblocked_next_fold is not None
         self.assertEqual(unblocked_next_fold.fold_id, "fold_2016-07_2016-12")
 
+    def test_next_historical_work_pauses_on_incomplete_model_group_lifecycle(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                plan = build_model_training_workflow_plan(start_month=month, end_month=month, storage_root=storage_root)
+                monthly_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=workflow_state_path_for_month(month, root=storage_root / "runtime"),
+                    completed_stage_ids=monthly_stage_ids,
+                    write=True,
+                )
+            fold_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            self.assertIsNotNone(fold_selection)
+            assert fold_selection is not None
+            fold_state_path = seed_model_worker_fold_state(
+                storage_root=storage_root,
+                selection=fold_selection,
+                selected_target_symbol="AAPL",
+            )
+            fold_plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                state_path=fold_state_path,
+                completed_stage_ids=[stage.stage_id for layer in fold_plan.layers for stage in layer.stages],
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+
+            blocked = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                default_end_month="2016-01",
+                max_month="2016-12",
+            )
+            state = apply_auto_work_selection(
+                SchedulerDaemonState(
+                    start_month="2016-07",
+                    end_month="2016-07",
+                    last_work_selection_reason="advance_after_latest_completed_workflow_state",
+                ),
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                default_end_month="2016-01",
+            )
+            self._write_promotion_readiness_after(storage_root=storage_root, state_path=fold_state_path)
+            unblocked = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                default_end_month="2016-01",
+                max_month="2017-06",
+            )
+
+        self.assertEqual(blocked.reason_code, "model_group_lifecycle_holds_fold_lane")
+        self.assertEqual(blocked.start_month, "2016-01")
+        self.assertEqual(blocked.end_month, "2016-06")
+        self.assertEqual(blocked.blocked_fold_state_path, str(fold_state_path))
+        self.assertEqual(state.start_month, "2016-01")
+        self.assertEqual(state.end_month, "2016-06")
+        self.assertEqual(state.last_work_selection_reason, "model_group_lifecycle_holds_fold_lane")
+        self.assertEqual(unblocked.reason_code, "advance_after_latest_completed_workflow_state")
+        self.assertEqual(unblocked.start_month, "2017-01")
+
     def test_month_ingest_workers_pause_when_target_has_open_model_worker_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
