@@ -268,7 +268,7 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
             continue
         if "current_deterministic_crypto_policy" in str(receipt.get("candidate_model_ref") or ""):
             continue
-        created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
+        created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt.get("generated_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt_path, receipt))
     if not candidates:
         return None

@@ -258,6 +258,8 @@ def _build_settlement_run(
     labels = [int(label) for label, score in labels_scores if label is not None and score is not None]
     scores = [float(score) for label, score in labels_scores if label is not None and score is not None]
     auroc = _auroc(labels, scores) if labels and scores else None
+    filled_indices = [index for index, row in enumerate(decision_rows) if _is_filled_trade_row(row)]
+    filled_net_returns = [net_returns[index] for index in filled_indices]
     net_total = sum(net_returns)
     baseline_total = sum(baseline_returns)
     gate_failures: list[str] = []
@@ -278,9 +280,9 @@ def _build_settlement_run(
         "baseline_return_total": baseline_total,
         "excess_return_total": net_total - baseline_total,
         "max_drawdown": _max_drawdown(net_returns),
-        "turnover_proxy_count": sum(1 for row in decision_rows if str(row.get("action") or row.get("decision") or "").lower() not in {"", "hold", "skip", "no_trade"}),
-        "hit_rate": sum(1 for value in net_returns if value > 0) / len(net_returns) if net_returns else None,
-        "payoff_ratio": _payoff_ratio(net_returns),
+        "turnover_proxy_count": len(filled_indices),
+        "hit_rate": sum(1 for value in filled_net_returns if value > 0) / len(filled_net_returns) if filled_net_returns else 0.0,
+        "payoff_ratio": _payoff_ratio(filled_net_returns),
         "auroc": auroc,
         "auroc_pair_count": len(labels),
         "brier_score": sum((score - label) ** 2 for label, score in zip(labels, scores, strict=True)) / len(labels) if labels else None,
@@ -311,6 +313,14 @@ def _build_settlement_run(
         "broker_execution_performed": False,
         "account_mutation_performed": False,
     }
+
+
+def _is_filled_trade_row(row: Mapping[str, Any]) -> bool:
+    fill_status = str(row.get("fill_status") or "").strip().lower()
+    if fill_status in {"simulated_filled", "filled", "executed"}:
+        return True
+    action = str(row.get("action") or row.get("decision") or row.get("decision_action") or "").strip().lower()
+    return action not in {"", "hold", "skip", "no_trade", "reject_entry_thesis", "defer_entry_thesis", "simulated_rejected"}
 
 
 def _build_promotion_review(
@@ -572,7 +582,7 @@ def _latest_receipt(
             key, expected = required_field
             if str(receipt.get(key) or "") != expected:
                 continue
-        created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or path.parent.name)
+        created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt.get("generated_at_utc") or path.parent.name)
         candidates.append((created, path, receipt))
     if not candidates:
         return None, None

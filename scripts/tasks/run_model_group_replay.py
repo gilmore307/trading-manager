@@ -20,6 +20,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--runner-path", type=Path, default=Path("/root/projects/trading-evaluation/scripts/evaluation/run_replay_execution.py"))
     parser.add_argument("--evaluation-repo-root", type=Path, default=Path("/root/projects/trading-evaluation"))
     parser.add_argument("--execution-repo-root", type=Path, default=Path("/root/projects/trading-execution"))
+    parser.add_argument("--model-repo-root", type=Path, default=Path("/root/projects/trading-model"))
     parser.add_argument("--max-decision-rows", type=int)
     parser.add_argument("--plan-only", action="store_true")
     args = parser.parse_args(argv)
@@ -31,6 +32,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         runner_path=args.runner_path,
         evaluation_repo_root=args.evaluation_repo_root,
         execution_repo_root=args.execution_repo_root,
+        model_repo_root=args.model_repo_root,
         selected_target_symbol=args.target_symbol,
         max_decision_rows=args.max_decision_rows,
     )

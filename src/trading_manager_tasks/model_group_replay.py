@@ -27,6 +27,7 @@ from .model_training_workflow import base_stack_model_generation_splits_complete
 DEFAULT_REPLAY_CONTRACT_ID = "promotion_replay_candidate_policy"
 DEFAULT_EVALUATION_REPO_ROOT = projects_root() / "trading-evaluation"
 DEFAULT_EXECUTION_REPO_ROOT = projects_root() / "trading-execution"
+DEFAULT_MODEL_REPO_ROOT = projects_root() / "trading-model"
 DEFAULT_EVALUATION_RUNNER_PATH = DEFAULT_EVALUATION_REPO_ROOT / "scripts" / "evaluation" / "run_replay_execution.py"
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
@@ -40,6 +41,7 @@ def run_model_group_replay_if_ready(
     python_executable: str = sys.executable,
     evaluation_repo_root: Path = DEFAULT_EVALUATION_REPO_ROOT,
     execution_repo_root: Path = DEFAULT_EXECUTION_REPO_ROOT,
+    model_repo_root: Path = DEFAULT_MODEL_REPO_ROOT,
     runner_path: Path = DEFAULT_EVALUATION_RUNNER_PATH,
     selected_target_symbol: str | None = None,
     max_decision_rows: int | None = None,
@@ -127,6 +129,7 @@ def run_model_group_replay_if_ready(
         [
             str(evaluation_repo_root / "src"),
             str(execution_repo_root / "src"),
+            str(model_repo_root / "src"),
             env.get("PYTHONPATH", ""),
         ]
     ).rstrip(os.pathsep)
