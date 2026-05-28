@@ -667,6 +667,53 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNone(selection)
 
+    def test_model_worker_reopens_legacy_unsplit_completed_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+
+            state_path = model_worker_fold_state_path(
+                "2016-01",
+                "2016-06",
+                root=storage_root / "runtime",
+                selected_target_symbol="AAPL",
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": f"layer_{layer:02d}_fixture.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": layer,
+                                "layer_key": f"layer_{layer:02d}_fixture",
+                                "status": "succeeded",
+                            }
+                            for layer in range(1, 10)
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertIsNotNone(selection)
+        assert selection is not None
+        self.assertEqual(selection.fold_id, "fold_2016-01_2016-06")
+        self.assertEqual(selection.reason_code, "resume_open_model_worker_fold")
+
     def test_model_worker_holds_blocked_fold_instead_of_selecting_next_ready_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"

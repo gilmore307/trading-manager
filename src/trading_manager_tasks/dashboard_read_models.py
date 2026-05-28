@@ -18,7 +18,14 @@ from pathlib import Path
 from typing import Any, Mapping, TextIO
 
 from .model_training_state import advance_workflow_state
-from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, LAYER_METADATA, MONTHLY_SUBSTRATE_LAYERS, ROLLING_FOLD_SPLIT_MONTHS, build_model_training_workflow_plan
+from .model_training_workflow import (
+    FOUNDATION_CATCH_UP_STAGE_TYPES,
+    LAYER_METADATA,
+    MONTHLY_SUBSTRATE_LAYERS,
+    ROLLING_FOLD_SPLIT_MONTHS,
+    base_stack_model_generation_splits_complete,
+    build_model_training_workflow_plan,
+)
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, completed_historical_month_cutoff, select_model_worker_fold, select_month_ingest_worker_months
 from .scheduler_status import (
@@ -2304,6 +2311,8 @@ def _fold_state_target_symbol(payload: Mapping[str, Any]) -> str | None:
 def _is_completed_training_fold_state(payload: Mapping[str, Any]) -> bool:
     raw_stages = payload.get("stages")
     if not isinstance(raw_stages, list) or not raw_stages:
+        return False
+    if not base_stack_model_generation_splits_complete(raw_stages):
         return False
     presentable_stages = _presentable_fold_stages(raw_stages)
     if not presentable_stages:

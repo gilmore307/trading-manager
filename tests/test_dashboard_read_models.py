@@ -49,30 +49,37 @@ class DashboardReadModelProducerTests(unittest.TestCase):
     def _write_completed_pre_replay_fold(self, runtime: Path, *, symbol: str = "AAPL") -> Path:
         fold_state = runtime / f"model_training_fold_state_{symbol.lower()}_2016-01_2016-06.json"
         fold_state.parent.mkdir(parents=True, exist_ok=True)
+        stages = []
+        for layer in range(1, 10):
+            for split_name in ("train", "validation", "test"):
+                stages.append(
+                    {
+                        "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                        "stage_type": "model_generation",
+                        "layer": layer,
+                        "layer_key": f"layer_{layer:02d}_fixture",
+                        "status": "succeeded",
+                        "dataset_split": {
+                            "split_name": split_name,
+                            "split_policy": "chronological_rolling_fold_4_1_1",
+                        },
+                        "dataset_unit": {
+                            "unit_kind": "six_month_target_fold",
+                            "unit_months": 6,
+                            "start_month": "2016-01",
+                            "end_month": "2016-06",
+                            "target_required": layer >= 3,
+                            "target_symbol": symbol if layer >= 3 else None,
+                        },
+                    }
+                )
         fold_state.write_text(
             json.dumps(
                 {
                     "contract_type": "manager_model_training_workflow_state",
                     "start_month": "2016-01",
                     "end_month": "2016-06",
-                    "stages": [
-                        {
-                            "stage_id": f"layer_{layer:02d}_fixture.model_generation",
-                            "stage_type": "model_generation",
-                            "layer": layer,
-                            "layer_key": f"layer_{layer:02d}_fixture",
-                            "status": "succeeded",
-                            "dataset_unit": {
-                                "unit_kind": "six_month_target_fold",
-                                "unit_months": 6,
-                                "start_month": "2016-01",
-                                "end_month": "2016-06",
-                                "target_required": layer >= 3,
-                                "target_symbol": symbol if layer >= 3 else None,
-                            },
-                        }
-                        for layer in range(1, 10)
-                    ],
+                    "stages": stages,
                 }
             )
             + "\n",
@@ -500,36 +507,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "promotion_replay_candidate_policy,candidate_policy_replay,2021-01-01,2026-01-01,1255,candidate,route,tags,metrics\n",
                 encoding="utf-8",
             )
-            fold_state = tmp / "storage" / "02_control_plane" / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
-            fold_state.parent.mkdir(parents=True, exist_ok=True)
-            fold_state.write_text(
-                json.dumps(
-                    {
-                        "contract_type": "manager_model_training_workflow_state",
-                        "start_month": "2016-01",
-                        "end_month": "2016-06",
-                        "stages": [
-                            {
-                                "stage_id": "layer_03_target_state_vector.model_generation",
-                                "stage_type": "model_generation",
-                                "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
-                                "status": "succeeded",
-                                "dataset_unit": {
-                                    "unit_kind": "six_month_target_fold",
-                                    "unit_months": 6,
-                                    "start_month": "2016-01",
-                                    "end_month": "2016-06",
-                                    "target_required": True,
-                                    "target_symbol": "AAPL",
-                                },
-                            }
-                        ],
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
+            self._write_completed_pre_replay_fold(tmp / "storage" / "02_control_plane" / "runtime", symbol="AAPL")
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
@@ -748,33 +726,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
-                json.dumps(
-                    {
-                        "contract_type": "manager_model_training_workflow_state",
-                        "start_month": "2016-01",
-                        "end_month": "2016-06",
-                        "stages": [
-                            {
-                                "stage_id": "layer_03_target_state_vector.model_generation",
-                                "stage_type": "model_generation",
-                                "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
-                                "status": "succeeded",
-                                "dataset_unit": {
-                                    "unit_kind": "six_month_target_fold",
-                                    "unit_months": 6,
-                                    "start_month": "2016-01",
-                                    "end_month": "2016-06",
-                                    "target_symbol": "AAPL",
-                                },
-                            }
-                        ],
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
+            self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
             (runtime / "model_training_workflow_state_2020-07.json").write_text(
                 json.dumps(
                     {

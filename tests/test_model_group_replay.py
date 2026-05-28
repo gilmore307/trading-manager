@@ -42,21 +42,29 @@ class ModelGroupReplayTests(unittest.TestCase):
     def _write_completed_fold(self, storage_root: Path) -> None:
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True)
+        stages = []
+        for layer in range(1, 10):
+            for split_name in ("train", "validation", "test"):
+                stages.append(
+                    {
+                        "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                        "stage_type": "model_generation",
+                        "layer": layer,
+                        "layer_key": f"layer_{layer:02d}_fixture",
+                        "status": "succeeded",
+                        "dataset_split": {
+                            "split_name": split_name,
+                            "split_policy": "chronological_rolling_fold_4_1_1",
+                        },
+                    }
+                )
         state_path.write_text(
             json.dumps(
                 {
                     "contract_type": "manager_model_training_workflow_state",
                     "start_month": "2016-01",
                     "end_month": "2016-06",
-                    "stages": [
-                        {
-                            "stage_id": f"layer_{layer:02d}_fixture.model_generation",
-                            "stage_type": "model_generation",
-                            "layer": layer,
-                            "status": "succeeded",
-                        }
-                        for layer in range(1, 10)
-                    ],
+                    "stages": stages,
                 }
             )
             + "\n",
@@ -113,6 +121,47 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertFalse(decision.broker_execution_performed)
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
+
+    def test_legacy_unsplit_model_generation_fold_does_not_unlock_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": f"layer_{layer:02d}_fixture.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": layer,
+                                "layer_key": f"layer_{layer:02d}_fixture",
+                                "status": "succeeded",
+                            }
+                            for layer in range(1, 10)
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertIsNone(decision)
 
     def test_skips_replay_when_all_months_are_already_complete(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

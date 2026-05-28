@@ -17,7 +17,9 @@ from .model_training_workflow import (
     DatasetUnit,
     ModelTrainingWorkflowPlan,
     WorkflowStage,
+    base_stack_model_generation_splits_complete,
     build_model_training_workflow_plan,
+    model_generation_splits_complete,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .dashboard_refresh_events import trigger_dashboard_refresh_from_workflow_state_write
@@ -235,15 +237,14 @@ def _layer_model_evaluation_complete(layer_number: int, stages: Mapping[str, Sta
 
 
 def _layer_model_generation_complete(layer_number: int, stages: Mapping[str, StageProgress]) -> bool:
-    layer_stages = [stage for stage in stages.values() if stage.layer == layer_number and stage.stage_type == "model_generation"]
-    return bool(layer_stages) and all(stage.status in {"succeeded", "not_applicable"} for stage in layer_stages)
+    return model_generation_splits_complete(stages.values(), layer_number=layer_number)
 
 
 def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     if blocker in {"layer_01_task_key_preparation", FOUNDATION_CATCH_UP_BLOCKER, POST_MODEL_GENERATION_REBUILD_BLOCKER}:
         return False
     if blocker == FOLD_STACK_PROMOTION_BLOCKER:
-        return all(_layer_model_generation_complete(layer_number, stages) for layer_number in range(1, 10))
+        return base_stack_model_generation_splits_complete(stages.values())
     if blocker == "upstream_layers_01_08_complete":
         return all(_layer_complete(layer_number, stages) for layer_number in range(1, 9))
     if blocker == "active_target_chain_complete":

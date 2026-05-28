@@ -25,7 +25,12 @@ from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_replay_if_ready
 from .model_training_state import advance_workflow_state
-from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
+from .model_training_workflow import (
+    FOUNDATION_CATCH_UP_STAGE_TYPES,
+    MONTHLY_SUBSTRATE_LAYERS,
+    base_stack_model_generation_splits_complete,
+    build_model_training_workflow_plan,
+)
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import manager_storage_root
 from .source_existing_bootstrap import run_source_existing_bootstrap
@@ -473,8 +478,21 @@ def _workflow_payload_all_stages_complete(payload: dict[str, Any]) -> bool:
     stages = payload.get("stages")
     if not isinstance(stages, list) or not stages:
         return False
+    if not base_stack_model_generation_splits_complete(stages):
+        return False
     statuses = [stage.get("status") for stage in stages if isinstance(stage, dict)]
     return bool(statuses) and all(status in {"succeeded", "not_applicable"} for status in statuses)
+
+
+def _workflow_payload_missing_model_generation_splits(payload: dict[str, Any]) -> bool:
+    stages = payload.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return False
+    has_model_generation = any(
+        isinstance(stage, dict) and str(stage.get("stage_type") or "") == "model_generation"
+        for stage in stages
+    )
+    return has_model_generation and not base_stack_model_generation_splits_complete(stages)
 
 
 def _model_group_replay_dataset_root(storage_root: Path, contract_id: str = DEFAULT_REPLAY_CONTRACT_ID) -> Path:
@@ -604,6 +622,8 @@ def _is_model_worker_routable_stage(stage: dict[str, Any]) -> bool:
 
 
 def _fold_payload_has_open_model_worker_stage(payload: dict[str, Any]) -> bool:
+    if _workflow_payload_missing_model_generation_splits(payload):
+        return True
     stages = payload.get("stages")
     if not isinstance(stages, list) or not stages:
         return True
@@ -621,6 +641,13 @@ def _fold_payload_has_open_model_worker_stage(payload: dict[str, Any]) -> bool:
 def _fold_payload_has_ready_model_worker_stage(payload: dict[str, Any]) -> bool:
     stages = payload.get("stages")
     if not isinstance(stages, list) or not stages:
+        return True
+    if _workflow_payload_missing_model_generation_splits(payload) and not any(
+        isinstance(stage, dict)
+        and _is_model_worker_routable_stage(stage)
+        and str(stage.get("status") or "") not in {"succeeded", "not_applicable"}
+        for stage in stages
+    ):
         return True
     for stage in stages:
         if not isinstance(stage, dict):

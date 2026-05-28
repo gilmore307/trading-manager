@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping as MappingABC
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal, TextIO
@@ -41,6 +42,7 @@ ROLLING_FOLD_SPLIT_MONTHS = (
     ("validation", ROLLING_FOLD_VALIDATION_MONTHS),
     ("test", ROLLING_FOLD_TEST_MONTHS),
 )
+REQUIRED_MODEL_GENERATION_SPLIT_NAMES = tuple(split_name for split_name, _months in ROLLING_FOLD_SPLIT_MONTHS)
 PROMOTION_STAGE_TYPE = "promotion_review"
 FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_09_model_generation_complete"
 MODEL_GROUP_REPLAY_COMPLETE_BLOCKER = "model_group_replay_complete"
@@ -174,6 +176,46 @@ class ModelTrainingWorkflowPlan:
             "reusable_substrate_stage_types": list(self.reusable_substrate_stage_types),
             "post_model_generation_artifacts_policy": self.post_model_generation_artifacts_policy,
         }
+
+
+def _stage_field(stage: Any, field_name: str) -> Any:
+    if isinstance(stage, MappingABC):
+        return stage.get(field_name)
+    return getattr(stage, field_name, None)
+
+
+def _model_generation_split_name(stage: Any) -> str | None:
+    dataset_split = _stage_field(stage, "dataset_split")
+    if not isinstance(dataset_split, MappingABC):
+        return None
+    split_name = str(dataset_split.get("split_name") or "")
+    return split_name if split_name in REQUIRED_MODEL_GENERATION_SPLIT_NAMES else None
+
+
+def model_generation_splits_complete(stages: Any, *, layer_number: int) -> bool:
+    """Return whether one layer has completed every required chronological split."""
+
+    split_statuses: dict[str, str] = {}
+    for stage in stages:
+        if str(_stage_field(stage, "stage_type") or "") != "model_generation":
+            continue
+        try:
+            stage_layer = int(_stage_field(stage, "layer") or 0)
+        except (TypeError, ValueError):
+            continue
+        if stage_layer != layer_number:
+            continue
+        split_name = _model_generation_split_name(stage)
+        if split_name is None:
+            continue
+        split_statuses[split_name] = str(_stage_field(stage, "status") or "").lower()
+    return all(split_statuses.get(split_name) in {"succeeded", "not_applicable"} for split_name in REQUIRED_MODEL_GENERATION_SPLIT_NAMES)
+
+
+def base_stack_model_generation_splits_complete(stages: Any, *, layer_count: int = BASE_STACK_LAYER_COUNT) -> bool:
+    """Return whether Layers 1-9 have completed train/validation/test generation."""
+
+    return all(model_generation_splits_complete(stages, layer_number=layer_number) for layer_number in range(1, layer_count + 1))
 
 
 LAYER_METADATA: tuple[dict[str, Any], ...] = (

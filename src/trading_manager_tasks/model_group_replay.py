@@ -21,6 +21,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
 from .storage_paths import projects_root
+from .model_training_workflow import base_stack_model_generation_splits_complete
 
 DEFAULT_REPLAY_CONTRACT_ID = "promotion_replay_candidate_policy"
 DEFAULT_EVALUATION_REPO_ROOT = projects_root() / "trading-evaluation"
@@ -218,6 +219,8 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
             continue
         stages = payload.get("stages")
         if not isinstance(stages, list) or not stages:
+            continue
+        if not base_stack_model_generation_splits_complete(stages):
             continue
         if not all(str(stage.get("status") or "").lower() in {"succeeded", "not_applicable"} for stage in stages if isinstance(stage, Mapping)):
             continue
