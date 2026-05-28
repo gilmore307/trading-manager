@@ -234,6 +234,51 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("lineage_refs", payload)
         self.assertIn(payload["severity"], {"critical", "high", "medium", "low", "info"})
 
+    def test_task_timeline_attaches_status_level_progress_when_no_finer_counter_exists(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2020-07.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2020-07",
+                        "end_month": "2020-07",
+                        "stages": [
+                            {
+                                "stage_id": "scheduler_control.maintenance",
+                                "stage_type": "maintenance",
+                                "status": "ready",
+                                "last_reason": "ready for maintenance handoff",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "scheduler_control.maintenance")
+        progress = task["detail"]["progress"]
+        self.assertEqual(progress["progress_source"], "stage_status")
+        self.assertEqual(progress["expected_count"], 1)
+        self.assertEqual(progress["ready_count"], 0)
+        self.assertEqual(progress["pending_count"], 1)
+        self.assertEqual(progress["unit_label"], "task")
+
     def test_task_timeline_shows_started_ready_stage_as_running_without_static_blockers(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

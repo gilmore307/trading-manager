@@ -733,6 +733,7 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
             "failed_count": 0,
             "accepted_failed_count": 0,
             "can_unlock_downstream": True,
+            "progress_source": "stage_status",
         }
     if status == "failed":
         return {
@@ -745,18 +746,20 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
             "failed_count": 1,
             "accepted_failed_count": 0,
             "can_unlock_downstream": False,
+            "progress_source": "stage_status",
         }
     if status == "running":
         return {
             "stage_id": stage_id,
             "status": "running",
             "unit_label": "task",
-            "expected_count": 2,
-            "ready_count": 1,
+            "expected_count": 1,
+            "ready_count": 0,
             "pending_count": 1,
             "failed_count": 0,
             "accepted_failed_count": 0,
             "can_unlock_downstream": False,
+            "progress_source": "stage_status",
         }
     progress_status = status if status in {"ready", "blocked", "pending"} else "unknown"
     return {
@@ -769,6 +772,7 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
         "failed_count": 0,
         "accepted_failed_count": 0,
         "can_unlock_downstream": False,
+        "progress_source": "stage_status",
     }
 
 
@@ -1846,6 +1850,8 @@ def _task_timeline(
                     )
                 if progress is None and isinstance(dashboard_stage.get("dashboard_progress"), Mapping):
                     progress = dict(dashboard_stage["dashboard_progress"])
+                if progress is None:
+                    progress = _task_status_progress(stage_id, stage_status)
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
                     "task_number": None,
