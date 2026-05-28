@@ -250,6 +250,7 @@ def _build_settlement_run(
     decision_rows: Sequence[Mapping[str, Any]],
     created_at_utc: str,
 ) -> dict[str, Any]:
+    decision_rows = [row for row in decision_rows if str(row.get("entry_threshold_calibration_role") or "test") != "validation"]
     realized_returns = [_float(row, "net_return", "realized_return", "candidate_return") for row in decision_rows]
     baseline_returns = [_float(row, "baseline_return", "replay_return", "incumbent_return") for row in decision_rows]
     costs = [_float(row, "cost", "trading_cost", "cost_drag") for row in decision_rows]
