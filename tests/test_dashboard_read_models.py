@@ -1150,7 +1150,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["pending_count"], 3)
         self.assertIn("six-month fold", progress["progress_basis"])
 
-    def test_completed_model_task_progress_uses_model_row_artifact_count(self):
+    def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -1203,12 +1203,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         progress = task["detail"]["progress"]
-        self.assertEqual(progress["progress_source"], "model_row_artifacts")
-        self.assertEqual(progress["unit_label"], "model rows")
-        self.assertEqual(progress["expected_count"], 4)
-        self.assertEqual(progress["ready_count"], 4)
+        self.assertEqual(progress["progress_source"], "model_generation_split_partitions")
+        self.assertEqual(progress["unit_label"], "train/validation/test partitions")
+        self.assertEqual(progress["expected_count"], 3)
+        self.assertEqual(progress["ready_count"], 3)
         self.assertEqual(progress["pending_count"], 0)
-        self.assertEqual(progress["artifact_count"], 1)
+        self.assertNotIn("artifact_count", progress)
 
     def test_model_group_promotion_review_uses_review_artifact(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

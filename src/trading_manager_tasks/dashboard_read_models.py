@@ -2050,13 +2050,6 @@ def _task_timeline(
                         stage_id=str(dashboard_stage.get("active_stage_id") or dashboard_stage.get("stage_id") or ""),
                         task_period=task_month,
                     )
-                if progress is None and str(dashboard_stage.get("stage_type") or "") == "model_task":
-                    progress = _model_row_artifact_progress(
-                        storage_root=storage_root,
-                        layer_key=str(dashboard_stage.get("layer_key") or stage_id),
-                        task_period=task_month,
-                        status=stage_status,
-                    )
                 if progress is None:
                     semantic_stage_type = str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "")
                     progress = _semantic_stage_progress(
@@ -2166,59 +2159,6 @@ def _safe_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
-
-
-def _line_count(path: Path) -> int:
-    try:
-        with path.open("r", encoding="utf-8", errors="replace") as handle:
-            return sum(1 for line in handle if line.strip())
-    except OSError:
-        return 0
-
-
-def _model_surface_from_layer_key(layer_key: str) -> str | None:
-    match = re.match(r"^layer_(\d{2})_(.+)$", layer_key)
-    if match is None:
-        return None
-    return f"model_{match.group(1)}_{match.group(2)}"
-
-
-def _model_row_artifact_progress(
-    *,
-    storage_root: Path,
-    layer_key: str,
-    task_period: str | None,
-    status: str,
-) -> dict[str, Any] | None:
-    fold_start = _fold_start_month(task_period)
-    if not fold_start:
-        return None
-    model_surface = _model_surface_from_layer_key(layer_key)
-    if model_surface is None:
-        return None
-    artifact_root = storage_root.parent / "03_model_artifacts" / "runtime" / model_surface
-    if not artifact_root.exists():
-        return None
-    candidates = sorted(artifact_root.glob(f"model_rows*{fold_start}.jsonl"))
-    if not candidates:
-        return None
-    ready = sum(_line_count(path) for path in candidates)
-    if ready <= 0:
-        return None
-    complete = str(status or "").lower() in {"succeeded", "not_applicable"}
-    return {
-        "stage_id": layer_key,
-        "status": "complete" if complete else "partial_ready",
-        "unit_label": "model rows",
-        "expected_count": ready if complete else ready + 1,
-        "ready_count": ready,
-        "pending_count": 0 if complete else 1,
-        "failed_count": 0,
-        "accepted_failed_count": 0,
-        "can_unlock_downstream": complete,
-        "progress_source": "model_row_artifacts",
-        "artifact_count": len(candidates),
-    }
 
 
 def _unique_csv_values(path: Path, field: str) -> set[str]:
