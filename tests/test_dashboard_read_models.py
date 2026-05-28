@@ -1023,6 +1023,66 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["covered_partition_count"], 3)
         self.assertEqual(progress["expected_partition_count"], 6)
 
+    def test_completed_model_task_progress_uses_model_row_artifact_count(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_generation",
+                                "stage_type": "model_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": True,
+                                    "target_symbol": "AAPL",
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            model_root = tmp / "storage" / "03_model_artifacts" / "runtime" / "model_03_target_state_vector"
+            model_root.mkdir(parents=True)
+            (model_root / "model_rows_aapl_2016-01.jsonl").write_text(
+                "\n".join(json.dumps({"row": index}) for index in range(4)) + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:36:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        progress = task["detail"]["progress"]
+        self.assertEqual(progress["progress_source"], "model_row_artifacts")
+        self.assertEqual(progress["unit_label"], "model rows")
+        self.assertEqual(progress["expected_count"], 4)
+        self.assertEqual(progress["ready_count"], 4)
+        self.assertEqual(progress["pending_count"], 0)
+        self.assertEqual(progress["artifact_count"], 1)
+
     def test_model_group_promotion_review_uses_review_artifact(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
