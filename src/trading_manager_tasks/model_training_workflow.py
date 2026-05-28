@@ -22,7 +22,7 @@ from .storage_paths import data_storage_root, model_runtime_root
 
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
-BASE_STACK_LAYER_COUNT = 10
+BASE_STACK_LAYER_COUNT = 9
 BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 4, 9)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
@@ -37,7 +37,7 @@ ROLLING_FOLD_VALIDATION_MONTHS = 1
 ROLLING_FOLD_TEST_MONTHS = 1
 ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_MONTHS + ROLLING_FOLD_TEST_MONTHS
 PROMOTION_STAGE_TYPE = "promotion_review"
-FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_10_model_evaluation_complete"
+FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_09_model_generation_complete"
 MODEL_GROUP_REPLAY_COMPLETE_BLOCKER = "model_group_replay_complete"
 MULTI_TARGET_SYMBOL_BLOCKER = "multiple_target_symbols_require_separate_workflows"
 MODEL_RUNTIME_ROOT = model_runtime_root()
@@ -178,7 +178,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (),
         "progression_mode": "background_panel_continuous",
         "candidate_axis": "six_month_window",
-        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each six-month chronological unit; layer-local evaluation may finish before downstream layers, but promotion waits for Layer 1-10 fold-stack evaluation completion",
+        "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each six-month chronological unit; promotion waits for Layers 1-9 model generation, model-group replay, and post-replay Layer 10 attribution",
         "data_surface": "autonomous Alpaca ETF bars acquisition plus feature_01_market_regime",
         "feature_cli": "trading-data-feature-01-market-regime",
     },
@@ -189,7 +189,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1,),
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "six_month_window;sector_or_industry_symbol",
-        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists; layer-local evaluation may finish before target-chain layers, but promotion waits for Layer 1-10 fold-stack evaluation completion",
+        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists; promotion waits for Layers 1-9 model generation, model-group replay, and post-replay Layer 10 attribution",
         "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
         "feature_cli": "trading-data-feature-02-sector-context",
     },
@@ -270,17 +270,6 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "candidate_progression_policy": "finish the active base target chain through optional Layer 9 trading guidance / option expression; crypto/direct-underlying-only routes do not require option refs",
         "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 8 target chains require them plus feature_09_option_expression",
         "feature_cli": "trading-data-feature-09-option-expression",
-    },
-    {
-        "layer": 10,
-        "slug": "event_risk_governor",
-        "model_name": "EventRiskGovernor",
-        "depends_on_layers": (),
-        "progression_mode": "post_replay_event_failure_attribution",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_risk_context_id",
-        "candidate_progression_policy": "start only after concentrated live-flow replay exposes failures, residuals, missed opportunities, or path deviations; produce attribution/promotion evidence, not pre-replay inputs",
-        "data_surface": "post-replay failure/residual attribution over replay traces and PIT event observations; no pre-replay data-acquisition or feature-generation stage",
-        "feature_cli": None,
     },
 )
 
@@ -823,9 +812,6 @@ def _build_layer_workflow(
         foundation_catch_up_only=foundation_catch_up_only,
     ) + ((f"{key}.feature_or_input_ready",) if include_input_stage else ())
     model_generation_description = "Generate offline model/state-vector rows from a complete frozen rolling-fold train manifest, never from one month alone."
-    if layer == 10:
-        model_generation_blockers = (MODEL_GROUP_REPLAY_COMPLETE_BLOCKER,)
-        model_generation_description = "Run post-replay event failure/residual attribution after concentrated live-flow replay has settled."
 
     stages.append(
         WorkflowStage(

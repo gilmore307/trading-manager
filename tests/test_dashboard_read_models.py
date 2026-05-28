@@ -31,6 +31,21 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         wrapper.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
         return service, env, wrapper
 
+    def _write_post_replay_attribution_receipt(self, replay_root: Path) -> None:
+        receipt_root = replay_root / "post_replay_attribution_runs" / "fixture"
+        receipt_root.mkdir(parents=True, exist_ok=True)
+        (receipt_root / "post_replay_attribution_receipt.json").write_text(
+            json.dumps(
+                {
+                    "contract_type": "post_replay_event_attribution_receipt",
+                    "status": "succeeded",
+                    "created_at_utc": "2026-05-22T12:49:00Z",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     def test_builds_historical_task_progress_summary_payload(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -445,13 +460,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.data_acquisition",
                 "model_group.replay",
+                "model_group.post_replay_attribution",
                 "model_group.promotion_review",
                 "model_group.maintenance",
             ],
         )
         self.assertEqual(
             [task["stage_type"] for task in evaluation_tasks],
-            ["data_acquisition", "model_evaluation", "promotion_review", "maintenance"],
+            ["data_acquisition", "model_evaluation", "post_replay_attribution", "promotion_review", "maintenance"],
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
@@ -476,15 +492,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 60)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "months")
         self.assertIn("frozen replay contract", evaluation_tasks[1]["reason"])
-        self.assertEqual(evaluation_tasks[2]["task_label"], "Promotion Review")
+        self.assertEqual(evaluation_tasks[2]["task_label"], "Post-Replay Attribution")
         self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["expected_count"], 1)
         self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["pending_count"], 1)
-        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["unit_label"], "review-decision")
-        self.assertIn("promotion-evaluation-review", evaluation_tasks[2]["detail"]["blockers"])
-        self.assertEqual(evaluation_tasks[3]["task_label"], "Maintenance")
-        self.assertEqual(evaluation_tasks[3]["detail"]["blockers"], ["model_group.promotion_review"])
+        self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["unit_label"], "attribution-receipt")
+        self.assertEqual(evaluation_tasks[2]["detail"]["blockers"], ["model_group.replay"])
+        self.assertEqual(evaluation_tasks[3]["task_label"], "Promotion Review")
         self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["expected_count"], 1)
-        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["unit_label"], "maintenance-step")
+        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["pending_count"], 1)
+        self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["unit_label"], "review-decision")
+        self.assertIn("promotion-evaluation-review", evaluation_tasks[3]["detail"]["blockers"])
+        self.assertEqual(evaluation_tasks[4]["task_label"], "Maintenance")
+        self.assertEqual(evaluation_tasks[4]["detail"]["blockers"], ["model_group.promotion_review"])
+        self.assertEqual(evaluation_tasks[4]["detail"]["progress"]["expected_count"], 1)
+        self.assertEqual(evaluation_tasks[4]["detail"]["progress"]["unit_label"], "maintenance-step")
         self.assertEqual(payload["status"], "blocked")
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.data_acquisition")
         self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
@@ -626,6 +647,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            self._write_post_replay_attribution_receipt(replay_root)
             (review_root / "promotion_evaluation_review.json").write_text(
                 json.dumps(
                     {
@@ -717,6 +739,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            self._write_post_replay_attribution_receipt(replay_root)
             (review_root / "promotion_evaluation_review.json").write_text(
                 json.dumps({"recommendation": "eligible_for_shadow", "created_at_utc": "2026-05-22T12:50:00Z"}) + "\n",
                 encoding="utf-8",

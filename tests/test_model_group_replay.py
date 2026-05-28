@@ -49,8 +49,13 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "start_month": "2016-01",
                     "end_month": "2016-06",
                     "stages": [
-                        {"stage_id": "layer_01_market_regime.model_generation", "stage_type": "model_generation", "status": "succeeded"},
-                        {"stage_id": "layer_10_event_risk_governor.model_evaluation", "stage_type": "model_evaluation", "status": "succeeded"},
+                        {
+                            "stage_id": f"layer_{layer:02d}_fixture.model_generation",
+                            "stage_type": "model_generation",
+                            "layer": layer,
+                            "status": "succeeded",
+                        }
+                        for layer in range(1, 10)
                     ],
                 }
             )

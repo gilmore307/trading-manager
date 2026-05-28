@@ -238,7 +238,7 @@ def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     if blocker in {"layer_01_task_key_preparation", FOUNDATION_CATCH_UP_BLOCKER, POST_MODEL_GENERATION_REBUILD_BLOCKER}:
         return False
     if blocker == FOLD_STACK_PROMOTION_BLOCKER:
-        return all(_layer_model_evaluation_complete(layer_number, stages) for layer_number in range(1, 11))
+        return all(_layer_model_generation_complete(layer_number, stages) for layer_number in range(1, 10))
     if blocker == "upstream_layers_01_08_complete":
         return all(_layer_complete(layer_number, stages) for layer_number in range(1, 9))
     if blocker == "active_target_chain_complete":

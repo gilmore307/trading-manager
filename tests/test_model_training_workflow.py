@@ -10,7 +10,6 @@ from trading_manager_tasks.model_training_workflow import (
     BASE_STACK_LAYER_COUNT,
     FOUNDATION_CATCH_UP_BLOCKER,
     FOUNDATION_CATCH_UP_LAYERS,
-    MODEL_GROUP_REPLAY_COMPLETE_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
     POST_MODEL_GENERATION_REBUILD_BLOCKER,
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
@@ -73,7 +72,7 @@ def _write_layer_three_feed_artifact(root: Path, *, symbol: str = "AAPL", month:
 
 
 class ModelTrainingWorkflowTests(unittest.TestCase):
-    def test_base_stack_plan_covers_all_ten_layers_and_stage_types_after_foundation_catch_up(self):
+    def test_base_stack_plan_covers_pre_replay_layers_and_stage_types_after_foundation_catch_up(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -85,7 +84,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertEqual(plan.contract_type, "manager_model_training_workflow_plan")
         self.assertEqual(plan.layer_count, BASE_STACK_LAYER_COUNT)
-        self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 11)))
+        self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 10)))
         for layer in plan.layers:
             if layer.layer in {1, 2, 3, 4, 9}:
                 expected_stage_types = ["data_acquisition", "feature_generation", "model_generation"]
@@ -413,7 +412,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
 
-    def test_base_layers_four_to_ten_use_current_physical_model_rows_and_conservative_review(self):
+    def test_base_layers_four_to_nine_use_current_physical_model_rows_and_conservative_review(self):
         expected_scripts = {
             3: "generate_model_04_event_failure_risk.py",
             4: "generate_model_05_alpha_confidence.py",
@@ -421,7 +420,6 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             6: "generate_model_07_position_projection.py",
             7: "generate_model_08_underlying_action.py",
             8: "generate_model_09_option_expression.py",
-            9: "generate_model_10_event_risk_governor.py",
         }
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
@@ -459,10 +457,6 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layers[8].depends_on_layers, (8,))
         self.assertIn("crypto/direct-underlying-only routes do not require option refs", plan.layers[8].candidate_progression_policy)
         self.assertIn("upstream_layer_08_model_generation_complete", plan.layers[8].stages[0].blockers)
-        self.assertEqual(plan.layers[9].progression_mode, "post_replay_event_failure_attribution")
-        self.assertEqual(plan.layers[9].depends_on_layers, ())
-        self.assertIn("after concentrated live-flow replay", plan.layers[9].candidate_progression_policy)
-        self.assertIn(MODEL_GROUP_REPLAY_COMPLETE_BLOCKER, plan.layers[9].stages[0].blockers)
 
     def test_layer_four_event_observation_data_acquisition_waits_for_foundation_not_event_feeds(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -496,8 +490,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(coverage_ready_stage.status, "blocked")
         self.assertEqual(coverage_ready_stage.blockers, empty_pool_stage.blockers)
         self.assertIn("materialize_layer_four_event_observation_inputs.py", " ".join(coverage_ready_stage.command))
-        self.assertEqual([stage.stage_type for stage in ready_plan.layers[9].stages[:1]], ["model_generation"])
-        self.assertIn(MODEL_GROUP_REPLAY_COMPLETE_BLOCKER, ready_plan.layers[9].stages[0].blockers)
+        self.assertEqual([layer.layer for layer in ready_plan.layers], list(range(1, 10)))
 
     def test_layer_stages_stop_at_model_generation_before_model_group_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -38,7 +38,7 @@ HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
 HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/06_dashboard_cache/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
 DEFAULT_STALE_AFTER_SECONDS = 900
 MONTHLY_TASK_STAGE_TYPES = {"data_acquisition", "feature_generation"}
-FOLD_MODEL_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
+FOLD_MODEL_STAGE_TYPES = {"model_generation", "model_evaluation", "post_replay_attribution", "promotion_review", "maintenance"}
 MONTHS_PER_MODEL_FOLD = 6
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
@@ -50,6 +50,7 @@ TASK_STAGE_SORT_ORDER = {
     "feature_generation": 20,
     "model_generation": 30,
     "model_evaluation": 40,
+    "post_replay_attribution": 45,
     "promotion_review_preparation": 45,
     "promotion_review": 50,
     "maintenance": 60,
@@ -2021,6 +2022,29 @@ def _latest_promotion_review_artifacts(dataset_root: Path) -> dict[str, Any] | N
     return {"decision": dict(decision), "review": dict(review or {}), "receipt_refs": refs}
 
 
+def _latest_post_replay_attribution_artifacts(dataset_root: Path) -> dict[str, Any] | None:
+    attribution_root = dataset_root / "post_replay_attribution_runs"
+    if not attribution_root.exists():
+        return None
+    candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
+    for receipt_path in sorted(attribution_root.glob("*/post_replay_attribution_receipt.json")):
+        receipt = _load_optional_json_object(receipt_path)
+        if receipt is None:
+            continue
+        status = str(receipt.get("status") or receipt.get("attribution_status") or "")
+        if status not in {"succeeded", "complete", "completed"}:
+            continue
+        contract_type = str(receipt.get("contract_type") or "")
+        if contract_type not in {"post_replay_event_attribution_receipt", "model_10_event_risk_governor_post_replay_attribution"}:
+            continue
+        created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
+        candidates.append((created, receipt_path, receipt))
+    if not candidates:
+        return None
+    _created, receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
+    return {"receipt": dict(receipt), "receipt_refs": [str(receipt_path)]}
+
+
 def _latest_promotion_readiness_artifacts(dataset_root: Path) -> dict[str, Any] | None:
     readiness_root = dataset_root / "promotion_readiness_runs"
     if not readiness_root.exists():
@@ -2158,12 +2182,21 @@ def _model_group_replay_timeline_tasks(
             blockers=["model_group.data_acquisition"],
         )
         append_task(
+            task_id="model_group.post_replay_attribution",
+            label="Post-Replay Attribution",
+            task_state="future",
+            status="blocked",
+            reason="Waiting for model-group replay before Layer 10 event failure/residual attribution can run.",
+            blockers=["model_group.replay"],
+            stage_type="post_replay_attribution",
+        )
+        append_task(
             task_id="model_group.promotion_review",
             label="Promotion Review",
             task_state="future",
             status="blocked",
-            reason="Waiting for model-group replay evidence and promotion-evaluation-review.",
-            blockers=["model_group.replay", "promotion-evaluation-review"],
+            reason="Waiting for post-replay attribution and promotion-evaluation-review.",
+            blockers=["model_group.post_replay_attribution", "promotion-evaluation-review"],
             stage_type="promotion_review",
         )
         append_task(
@@ -2233,6 +2266,8 @@ def _model_group_replay_timeline_tasks(
     )
     replay_started = bool(replay_ready_months)
     replay_complete = bool(replay_progress["can_unlock_downstream"])
+    attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root)
+    attribution_complete = attribution_artifacts is not None
     promotion_artifacts = _latest_promotion_review_artifacts(dataset_root)
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
     promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
@@ -2276,22 +2311,49 @@ def _model_group_replay_timeline_tasks(
         progress=replay_progress,
     )
     append_task(
+        task_id="model_group.post_replay_attribution",
+        label="Post-Replay Attribution",
+        task_state="completed" if attribution_complete else ("current" if replay_complete else "future"),
+        status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
+        reason=(
+            "Layer 10 post-replay event failure/residual attribution is complete."
+            if attribution_complete
+            else "Layer 10 is ready to attribute replay failures, residuals, missed opportunities, and path deviations."
+            if replay_complete
+            else "Waiting for model-group replay before Layer 10 attribution can run."
+        ),
+        receipt_refs=list(attribution_artifacts["receipt_refs"]) if attribution_artifacts else None,
+        blockers=[] if replay_complete else ["model_group.replay"],
+        stage_type="post_replay_attribution",
+        progress=_single_step_progress(
+            stage_id="model_group.post_replay_attribution",
+            status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
+            complete=attribution_complete,
+            unit_label="attribution-receipt",
+            can_unlock_downstream=attribution_complete,
+        ),
+    )
+    append_task(
         task_id="model_group.promotion_review",
         label="Promotion Review",
-        task_state="completed" if promotion_eligible else ("current" if replay_complete else "future"),
-        status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if replay_complete else "blocked",
+        task_state="completed" if promotion_eligible else ("current" if attribution_complete else "future"),
+        status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if attribution_complete else "blocked",
         reason=(
             str(promotion_decision.get("decision_reason") or "Promotion review completed.") if promotion_decision else
             "Promotion review integrates replay metrics, guardrails, incumbent comparison, and advisory "
-            "promotion-evaluation-review evidence into a model-group decision."
+            "post-replay attribution plus promotion-evaluation-review evidence into a model-group decision."
         ),
         receipt_refs=list(promotion_artifacts["receipt_refs"]) if promotion_artifacts else None,
-        blockers=promotion_blockers if promotion_complete and not promotion_eligible else ([] if replay_complete else ["model_group.replay", "promotion-evaluation-review"]),
+        blockers=(
+            promotion_blockers
+            if promotion_complete and not promotion_eligible and attribution_complete
+            else ([] if attribution_complete else ["model_group.post_replay_attribution", "promotion-evaluation-review"])
+        ),
         stage_type="promotion_review",
         progress=_single_step_progress(
             stage_id="model_group.promotion_review",
-            status=(promotion_decision_status or "ready") if replay_complete else "blocked",
-            complete=promotion_complete,
+            status=(promotion_decision_status or "ready") if attribution_complete else "blocked",
+            complete=promotion_complete and attribution_complete,
             unit_label="review-decision",
             can_unlock_downstream=promotion_eligible,
         ),

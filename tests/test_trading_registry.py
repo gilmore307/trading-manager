@@ -1077,12 +1077,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["PROMOTION_STAGE_TYPE"]["payload"], "promotion_review")
         self.assertEqual(
             rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["payload"],
-            "pinned_layer_01_10_bundle_all_or_nothing_after_fold_evaluation_complete",
+            "pinned_layer_01_09_pre_replay_generation_then_replay_layer_10_attribution_complete",
         )
         self.assertIn("all-or-nothing", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
-        self.assertIn("pinned Layer 1-10 version bundle", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
-        self.assertIn("fold_layers_01_10_model_evaluation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
-        self.assertIn("pinned_layer_01_10_bundle_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("post-replay Layer 10 attribution", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
+        self.assertIn("fold_layers_01_09_model_generation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("post_replay_layer_10_attribution_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertEqual(
             rows["DYNAMIC_RISK_POLICY_MODEL_LAYER"]["payload"],
             "layer_06_dynamic_risk_policy_model_global_market_driven_premium_risk_budget_state",
@@ -1111,7 +1111,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("MANAGER_MATERIALIZE_LAYER_TEN_EVENT_RISK_INPUTS", rows)
         self.assertNotIn("MANAGER_LAYER_TEN_EVENT_RISK_INPUT_MATERIALIZATION", rows)
         self.assertIn(
-            "promotion_review_waits_for_fold_layers_01_10_model_evaluation_complete",
+            "promotion_review_waits_for_post_replay_layer_10_attribution_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
         )
         self.assertEqual(rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["kind"], "config")
@@ -1172,7 +1172,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_04_event_failure_risk", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertIn("model_09_option_expression", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertIn("layer_06_dynamic_risk_policy", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
-        self.assertIn("model_10_event_risk_governor", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertIn("post_replay_layer_10_attribution", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
         self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
