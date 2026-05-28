@@ -1292,6 +1292,16 @@ def _fold_label_for_month(month: str | None) -> str | None:
     return _fold_period_label(fold_start, fold_end)
 
 
+def _fold_window_for_period(period: str | None) -> tuple[str, str] | None:
+    fold_start = _fold_start_month(period)
+    if fold_start is None:
+        return None
+    fold_end = _add_months(fold_start, MONTHS_PER_MODEL_FOLD - 1)
+    if fold_end is None:
+        return None
+    return fold_start, fold_end
+
+
 def _public_task_period(period: str | None) -> str | None:
     """Normalize historical-training public task identity to fold where possible."""
 
@@ -2130,6 +2140,33 @@ def _completed_model_group_training_fold(
     return sorted(candidates)[0]
 
 
+def _pre_replay_fold_complete(
+    *,
+    storage_root: Path,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> bool:
+    runtime_root = storage_root / "runtime"
+    if not runtime_root.exists():
+        return False
+    selected_symbol = str(selected_target_symbol or "").strip().upper()
+    for fold_path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
+        try:
+            payload = _load_json_object(fold_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if str(payload.get("start_month") or "") != start_month or str(payload.get("end_month") or "") != end_month:
+            continue
+        if selected_symbol:
+            target_symbol = (_fold_state_target_symbol(payload) or "").upper()
+            if target_symbol and target_symbol != selected_symbol:
+                continue
+        if _is_completed_training_fold_state(payload):
+            return True
+    return False
+
+
 def _replay_ready_months(dataset_root: Path) -> set[str]:
     ready: set[str] = set()
     for path in sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]:
@@ -2272,25 +2309,41 @@ def _model_group_replay_timeline_tasks(
     generated_at_utc: str,
     starting_sequence: int,
     selected_target_symbol: str | None = None,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    pre_replay_complete: bool | None = None,
+    use_lifecycle_artifacts: bool = True,
 ) -> list[dict[str, Any]]:
     """Return owner-facing model-group replay and promotion-review tasks."""
 
+    explicit_training_fold = training_start_month is not None and training_end_month is not None
     contract_id = "promotion_replay_candidate_policy"
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     manifest_path = dataset_root / "dataset_manifest.json"
-    manifest = _load_optional_json_object(manifest_path)
+    manifest = _load_optional_json_object(manifest_path) if use_lifecycle_artifacts else None
     worker_info = _evaluation_worker_info()
-    training_start_month, training_end_month, training_unit_months = _model_group_training_fold_window(
-        storage_root=storage_root,
-        selected_target_symbol=selected_target_symbol,
-    )
+    if training_start_month is None or training_end_month is None:
+        training_start_month, training_end_month, training_unit_months = _model_group_training_fold_window(
+            storage_root=storage_root,
+            selected_target_symbol=selected_target_symbol,
+        )
+    else:
+        training_unit_months = _month_span_count(training_start_month, training_end_month)
     period = _fold_period_label(training_start_month, training_end_month)
     replay_start_month, replay_end_month = _replay_window_months(dataset_root)
     replay_unit_months = _replay_window_month_count(dataset_root)
-    completed_training_fold = _completed_model_group_training_fold(
-        storage_root=storage_root,
-        selected_target_symbol=selected_target_symbol,
-    )
+    if pre_replay_complete is None:
+        completed_training_fold = _completed_model_group_training_fold(
+            storage_root=storage_root,
+            selected_target_symbol=selected_target_symbol,
+        )
+        pre_replay_complete = completed_training_fold is not None
+    else:
+        completed_training_fold = (
+            (training_start_month, training_end_month, selected_target_symbol)
+            if pre_replay_complete
+            else None
+        )
     layer_key = "model_group"
     tasks: list[dict[str, Any]] = []
 
@@ -2364,10 +2417,9 @@ def _model_group_replay_timeline_tasks(
             }
         )
 
-    if manifest is None and not dataset_root.exists() and completed_training_fold is None:
+    if not explicit_training_fold and manifest is None and not dataset_root.exists() and completed_training_fold is None:
         return []
 
-    pre_replay_complete = completed_training_fold is not None
     receipt_refs = _replay_manifest_refs(manifest, dataset_root) if manifest is not None else []
     prepared_at = str((manifest or {}).get("prepared_at_utc") or generated_at_utc)
     tasks_updated_at = prepared_at or generated_at_utc
@@ -2386,7 +2438,7 @@ def _model_group_replay_timeline_tasks(
     coverage_complete = manifest is not None and expected > 0 and missing == 0
     freeze_status = str((manifest or {}).get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
-    replay_ready_months = _replay_ready_months(dataset_root)
+    replay_ready_months = _replay_ready_months(dataset_root) if use_lifecycle_artifacts else set()
     replay_progress = _replay_month_progress(
         dataset_root=dataset_root,
         stage_id="model_group.replay",
@@ -2399,15 +2451,15 @@ def _model_group_replay_timeline_tasks(
     )
     replay_started = bool(replay_ready_months)
     replay_complete = bool(replay_progress["can_unlock_downstream"])
-    attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root)
+    attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root) if use_lifecycle_artifacts else None
     attribution_complete = attribution_artifacts is not None
-    promotion_artifacts = _latest_promotion_review_artifacts(dataset_root)
+    promotion_artifacts = _latest_promotion_review_artifacts(dataset_root) if use_lifecycle_artifacts else None
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
     promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
     promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")
     promotion_complete = promotion_decision is not None
     promotion_eligible = promotion_decision_status == "eligible"
-    readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root)
+    readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root) if use_lifecycle_artifacts else None
     readiness_record = readiness_artifacts["readiness"] if readiness_artifacts else None
     readiness_complete = (
         promotion_eligible
@@ -2429,7 +2481,7 @@ def _model_group_replay_timeline_tasks(
     replay_blockers: list[str] = []
     if not pre_replay_complete:
         replay_blockers.append("fold_layers_01_09_model_generation_complete")
-    if manifest is None:
+    elif manifest is None:
         replay_blockers.append("replay_dataset_preparation_manifest")
     elif not coverage_complete:
         replay_blockers.append("replay_dataset_coverage_complete")
@@ -2578,6 +2630,68 @@ def _model_group_replay_timeline_tasks(
     return tasks
 
 
+def _model_group_lifecycle_tasks_for_visible_folds(
+    task_timeline: list[dict[str, Any]],
+    *,
+    storage_root: Path,
+    generated_at_utc: str,
+    selected_target_symbol: str | None,
+) -> list[dict[str, Any]]:
+    """Return fixed replay-through-maintenance task rows for visible folds."""
+
+    visible_periods: list[tuple[str, str, str]] = []
+    seen_periods: set[str] = set()
+    for task in task_timeline:
+        period = str(task.get("month") or "")
+        if period in seen_periods:
+            continue
+        window = _fold_window_for_period(period)
+        if window is None:
+            continue
+        start_month, end_month = window
+        visible_periods.append((period, start_month, end_month))
+        seen_periods.add(period)
+
+    if not visible_periods:
+        return _model_group_replay_timeline_tasks(
+            storage_root=storage_root,
+            generated_at_utc=generated_at_utc,
+            starting_sequence=len(task_timeline),
+            selected_target_symbol=selected_target_symbol,
+        )
+
+    completed_fold = _completed_model_group_training_fold(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
+    artifact_fold = (completed_fold[0], completed_fold[1]) if completed_fold is not None else None
+    if artifact_fold is None and visible_periods and _replay_dataset_root(storage_root, "promotion_replay_candidate_policy").exists():
+        _period, start_month, end_month = visible_periods[0]
+        artifact_fold = (start_month, end_month)
+    tasks: list[dict[str, Any]] = []
+    for _period, start_month, end_month in visible_periods:
+        pre_replay_complete = _pre_replay_fold_complete(
+            storage_root=storage_root,
+            start_month=start_month,
+            end_month=end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
+        use_lifecycle_artifacts = artifact_fold == (start_month, end_month)
+        tasks.extend(
+            _model_group_replay_timeline_tasks(
+                storage_root=storage_root,
+                generated_at_utc=generated_at_utc,
+                starting_sequence=len(task_timeline) + len(tasks),
+                selected_target_symbol=selected_target_symbol,
+                training_start_month=start_month,
+                training_end_month=end_month,
+                pre_replay_complete=pre_replay_complete,
+                use_lifecycle_artifacts=use_lifecycle_artifacts,
+            )
+        )
+    return tasks
+
+
 def build_historical_task_progress_summary(
     status: HistoricalSchedulerStatus,
     *,
@@ -2591,12 +2705,13 @@ def build_historical_task_progress_summary(
     stage_counts = _stage_counts(status)
     task_timeline = _task_timeline(status, stage_coverage=stage_coverage)
     storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    selected_target_symbol = _selected_target_symbol(status)
     task_timeline.extend(
-        _model_group_replay_timeline_tasks(
+        _model_group_lifecycle_tasks_for_visible_folds(
+            task_timeline,
             storage_root=storage_root,
             generated_at_utc=generated_at_utc,
-            starting_sequence=len(task_timeline),
-            selected_target_symbol=_selected_target_symbol(status),
+            selected_target_symbol=selected_target_symbol,
         )
     )
     task_timeline = _sort_task_timeline(task_timeline)
