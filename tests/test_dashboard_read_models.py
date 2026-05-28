@@ -210,22 +210,21 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["chart_payload"]["last_stage_execution"]["status"], "failed")
         self.assertEqual(payload["chart_payload"]["last_stage_execution"]["return_code"], 1)
         task_timeline = payload["chart_payload"]["task_timeline"]
-        self.assertEqual([task["task_state"] for task in task_timeline], ["completed", "failed", "future"])
-        self.assertEqual(task_timeline[1]["task_label"], "Data Acquisition")
+        self.assertEqual([task["task_state"] for task in task_timeline], ["completed", "failed"])
+        self.assertEqual(task_timeline[1]["task_label"], "TargetStateVectorModel")
         self.assertEqual(task_timeline[1]["month"], "2019-fold1")
         self.assertEqual(task_timeline[1]["detail"]["child_partitions"], ["2019-01", "2019-02", "2019-03", "2019-04", "2019-05", "2019-06"])
         self.assertEqual(task_timeline[1]["detail"]["last_execution"]["return_code"], 1)
         self.assertEqual(task_timeline[0]["worker_id"], "model_worker_1")
         self.assertEqual(task_timeline[0]["detail"]["worker"]["worker_label"], "Model Worker 1")
-        self.assertEqual(task_timeline[2]["stage_type"], "feature_generation")
-        self.assertEqual(task_timeline[2]["worker_label"], "Model Worker 1")
+        self.assertEqual(task_timeline[1]["stage_type"], "model_task")
+        self.assertEqual(task_timeline[1]["detail"]["active_stage_id"], "layer_03_target_state_vector.data_acquisition")
         self.assertIsNone(task_timeline[0]["created_at_utc"])
         self.assertEqual(task_timeline[0]["started_at_utc"], "2026-05-12T09:00:00Z")
         self.assertEqual(task_timeline[0]["ended_at_utc"], "2026-05-12T09:30:00Z")
         self.assertEqual(task_timeline[0]["status_updated_at_utc"], "2026-05-12T10:00:00Z")
         self.assertEqual(task_timeline[0]["detail"]["progress"]["ready_count"], 3)
         self.assertIsNone(task_timeline[1]["detail"]["progress"])
-        self.assertIsNone(task_timeline[2]["detail"]["progress"])
         self.assertIn("Layer 2 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
         self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))
@@ -282,7 +281,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T13:00:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression.data_acquisition")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["blocker_count"], 0)
@@ -332,7 +331,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T13:00:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression.data_acquisition")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
         self.assertEqual(task["status"], "blocked")
         self.assertEqual(task["blocker_count"], 1)
         self.assertEqual(task["detail"]["blockers"], ["upstream_layer_08_model_evaluation_complete"])
@@ -493,7 +492,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [task["task_id"] for task in evaluation_tasks],
             [
                 "model_group.replay",
-                "model_group.layer_10_attribution",
+                "model_group.model_10_event_risk_governor",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -501,7 +500,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertEqual(
             [task["stage_type"] for task in evaluation_tasks],
-            ["replay", "layer_10_attribution", "model_evaluation", "promotion_review", "maintenance"],
+            ["replay", "model_10_event_risk_governor", "model_evaluation", "promotion_review", "maintenance"],
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
@@ -522,7 +521,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["unit_label"], "source-months")
         self.assertEqual(evaluation_tasks[0]["detail"]["blockers"], ["replay_dataset_coverage_complete"])
         self.assertIn("coverage is incomplete", evaluation_tasks[0]["reason"])
-        self.assertEqual(evaluation_tasks[1]["task_label"], "Layer 10 Attribution")
+        self.assertEqual(evaluation_tasks[1]["task_label"], "EventRiskGovernor / EventIntelligenceOverlay")
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 1)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 1)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["unit_label"], "attribution-receipt")
@@ -531,7 +530,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["expected_count"], 1)
         self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["pending_count"], 1)
         self.assertEqual(evaluation_tasks[2]["detail"]["progress"]["unit_label"], "evaluation-packet")
-        self.assertEqual(evaluation_tasks[2]["detail"]["blockers"], ["model_group.layer_10_attribution"])
+        self.assertEqual(evaluation_tasks[2]["detail"]["blockers"], ["model_group.model_10_event_risk_governor"])
         self.assertEqual(evaluation_tasks[3]["task_label"], "Promotion")
         self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["expected_count"], 1)
         self.assertEqual(evaluation_tasks[3]["detail"]["progress"]["pending_count"], 1)
@@ -578,7 +577,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [task["task_id"] for task in model_group_tasks],
             [
                 "model_group.replay",
-                "model_group.layer_10_attribution",
+                "model_group.model_10_event_risk_governor",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -588,7 +587,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(model_group_tasks[0]["status"], "blocked")
         self.assertEqual(model_group_tasks[0]["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
         self.assertEqual(model_group_tasks[1]["detail"]["blockers"], ["model_group.replay"])
-        self.assertEqual(model_group_tasks[2]["detail"]["blockers"], ["model_group.layer_10_attribution"])
+        self.assertEqual(model_group_tasks[2]["detail"]["blockers"], ["model_group.model_10_event_risk_governor"])
         self.assertIn("Promotion waits", model_group_tasks[3]["reason"])
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
 
@@ -1715,7 +1714,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         durable_task = next(task for task in tasks if task["month"] == "2018-fold1")
         self.assertEqual(durable_task["task_number"], durable_task["sequence"])
         self.assertEqual(durable_task["task_number"], 1)
-        self.assertEqual(durable_task["task_uid"], "2018-01..2018-06:layer_01_market_regime.data_acquisition")
+        self.assertEqual(durable_task["task_uid"], "2018-01..2018-06:layer_01_market_regime")
 
     def test_task_timeline_shows_fold_target_chain_prep_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -1822,17 +1821,18 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
-        self.assertEqual([task["stage_type"] for task in fold_tasks], ["data_acquisition", "model_generation", "model_generation", "data_acquisition"])
-        self.assertEqual([task["task_number"] for task in fold_tasks], [1, 2, 3, 4])
-        self.assertEqual([task["sequence"] for task in fold_tasks], [1, 2, 3, 4])
-        self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime.data_acquisition")
+        self.assertEqual([task["stage_type"] for task in fold_tasks], ["model_task", "model_task", "model_task"])
+        self.assertEqual([task["task_number"] for task in fold_tasks], [1, 2, 3])
+        self.assertEqual([task["sequence"] for task in fold_tasks], [1, 2, 3])
+        self.assertEqual(fold_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime")
         self.assertEqual(fold_tasks[0]["detail"]["child_partitions"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
-        self.assertIsNone(fold_tasks[1]["detail"]["progress"])
-        self.assertIsNone(fold_tasks[2]["detail"]["progress"])
+        self.assertEqual(fold_tasks[0]["task_label"], "MarketRegimeModel")
+        self.assertEqual(fold_tasks[1]["task_label"], "SectorContextModel")
+        self.assertEqual(fold_tasks[2]["task_label"], "TargetStateVectorModel")
         fold_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if task["task_id"] == "layer_03_target_state_vector.data_acquisition"
+            if task["task_id"] == "layer_03_target_state_vector"
         ]
         self.assertEqual([task["month"] for task in fold_prep_tasks], ["2016-fold1"])
         timeline_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
@@ -1918,7 +1918,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if task["month"] == "2016-fold1" and task["task_id"] == "layer_03_target_state_vector.feature_generation"
+            if task["month"] == "2016-fold1" and task["task_id"] == "layer_03_target_state_vector"
         )
         self.assertEqual(task["status"], "succeeded")
         self.assertEqual(task["target_symbol"], "AAPL")
@@ -2129,8 +2129,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertFalse(
             any(task["layer"] == 5 and task["stage_type"] in {"data_acquisition", "feature_generation"} for task in task_timeline)
         )
-        self.assertTrue(any(task["layer"] == 5 and task["stage_type"] == "model_generation" for task in task_timeline))
-        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_09_option_expression.data_acquisition")
+        self.assertTrue(any(task["layer"] == 5 and task["stage_type"] == "model_task" for task in task_timeline))
+        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_09_option_expression")
         self.assertEqual(real_skip["task_state"], "skipped")
         self.assertIn("no active Layer 8", real_skip["reason"])
 
@@ -2246,7 +2246,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertEqual([task["month"] for task in current_tasks], ["2017-fold1"])
         self.assertEqual([task["worker_id"] for task in current_tasks], ["model_worker_1"])
-        self.assertTrue(all(task["task_id"] == "layer_02_sector_context.data_acquisition" for task in current_tasks))
+        self.assertTrue(all(task["task_id"] == "layer_02_sector_context" for task in current_tasks))
 
     def test_task_timeline_advances_after_completed_foundation_months(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2329,7 +2329,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-14T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertEqual(current_tasks, [])
+        self.assertEqual([(task["month"], task["task_id"]) for task in current_tasks], [("2020-fold2", "layer_03_target_state_vector")])
 
     def test_task_timeline_marks_ready_model_fold_current_not_blocked_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2391,7 +2391,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertIn(("2017-fold1", "layer_01_market_regime.model_generation"), [(task["month"], task["task_id"]) for task in current_tasks])
+        self.assertIn(("2017-fold1", "layer_01_market_regime"), [(task["month"], task["task_id"]) for task in current_tasks])
         blocked_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2")
         self.assertEqual(blocked_task["task_state"], "future")
 
@@ -2593,7 +2593,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertIn(
-            ("2016-fold2", "layer_03_target_state_vector.feature_generation", "AAPL", "Model Worker 1"),
+            ("2016-fold2", "layer_03_target_state_vector", "AAPL", "Model Worker 1"),
             [(task["month"], task["task_id"], task["target_symbol"], task["worker_label"]) for task in current_tasks],
         )
         self.assertNotIn(

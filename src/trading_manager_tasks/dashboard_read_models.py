@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Mapping, TextIO
 
 from .model_training_state import advance_workflow_state
-from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
+from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, LAYER_METADATA, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, completed_historical_month_cutoff, select_model_worker_fold, select_month_ingest_worker_months
 from .scheduler_status import (
@@ -39,9 +39,10 @@ HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/06_dashboard_cache/schemas/{HIST
 DEFAULT_STALE_AFTER_SECONDS = 900
 MONTHLY_TASK_STAGE_TYPES = {"data_acquisition", "feature_generation"}
 FOLD_MODEL_STAGE_TYPES = {
+    "model_task",
     "model_generation",
     "replay",
-    "layer_10_attribution",
+    "model_10_event_risk_governor",
     "model_evaluation",
     "post_replay_attribution",
     "promotion_review",
@@ -56,10 +57,11 @@ FOLD_LABEL_RE = re.compile(r"^(\d{4})-fold([1-9]\d*)$")
 TASK_STAGE_SORT_ORDER = {
     "data_acquisition": 10,
     "feature_generation": 20,
+    "model_task": 30,
     "model_generation": 30,
     "replay": 40,
     "post_replay_attribution": 45,
-    "layer_10_attribution": 45,
+    "model_10_event_risk_governor": 45,
     "model_evaluation": 48,
     "promotion_review_preparation": 45,
     "promotion_review": 50,
@@ -412,7 +414,10 @@ def _agent_error_summary(
 
 def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timeline: list[dict[str, Any]]) -> list[dict[str, Any]]:
     current_task_ids = {str(task.get("task_id") or "") for task in task_timeline}
-    has_current_layer_ten_event_risk = any(task_id.startswith("layer_10_event_risk_governor.") for task_id in current_task_ids)
+    has_current_layer_ten_event_risk = any(
+        task_id == "layer_10_event_risk_governor" or task_id.startswith("layer_10_event_risk_governor.")
+        for task_id in current_task_ids
+    )
     if not has_current_layer_ten_event_risk:
         return agent_errors
     updated_rows: list[dict[str, Any]] = []
@@ -775,6 +780,21 @@ def _public_stage_name(stage_id: object, stage_type: object) -> str:
     if phase:
         return phase.title()
     return stage_id_text.replace("_", " ").replace(".", " / ").title() or "Unknown Task"
+
+
+MODEL_NAME_BY_LAYER_KEY = {
+    f"layer_{int(meta['layer']):02d}_{meta['slug']}": str(meta["model_name"])
+    for meta in LAYER_METADATA
+}
+MODEL_NAME_BY_LAYER_KEY["layer_10_event_risk_governor"] = "EventRiskGovernor / EventIntelligenceOverlay"
+
+
+def _model_task_label(layer_key: str, layer: int | None = None) -> str:
+    if layer_key in MODEL_NAME_BY_LAYER_KEY:
+        return MODEL_NAME_BY_LAYER_KEY[layer_key]
+    if layer == 10:
+        return "EventRiskGovernor / EventIntelligenceOverlay"
+    return layer_key.replace("_", " ").title()
 
 
 def _storage_root_from_checkpoint_path(path: object) -> Path:
@@ -1154,9 +1174,10 @@ def _worker_info_for_stage(
     if stage_type in {"data_acquisition", "feature_generation"}:
         return _model_worker_info()
     if stage_type in {
+        "model_task",
         "model_generation",
         "replay",
-        "layer_10_attribution",
+        "model_10_event_risk_governor",
         "model_evaluation",
         "post_replay_attribution",
         "promotion_review",
@@ -1324,6 +1345,91 @@ def _is_layer_local_post_generation_stage(raw_stage: Mapping[str, Any]) -> bool:
         return False
 
 
+def _aggregate_status(stages: list[Mapping[str, Any]]) -> tuple[str, Mapping[str, Any] | None]:
+    terminal_statuses = {"succeeded", "not_applicable"}
+    for stage in stages:
+        status = str(stage.get("status") or "")
+        if status == "failed":
+            return "failed", stage
+    for stage in stages:
+        status = str(stage.get("status") or "")
+        if status not in terminal_statuses:
+            return status or "unknown", stage
+    if any(str(stage.get("status") or "") == "succeeded" for stage in stages):
+        return "succeeded", stages[-1] if stages else None
+    return "not_applicable", stages[-1] if stages else None
+
+
+def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    order: list[str] = []
+    passthrough: list[Any] = []
+    for raw_stage in raw_stages:
+        if not isinstance(raw_stage, Mapping):
+            continue
+        layer_key = str(raw_stage.get("layer_key") or "")
+        if not layer_key:
+            passthrough.append(raw_stage)
+            continue
+        if layer_key not in grouped:
+            grouped[layer_key] = []
+            order.append(layer_key)
+        grouped[layer_key].append(raw_stage)
+
+    rows: list[Any] = []
+    for layer_key in order:
+        stages = grouped[layer_key]
+        if not stages:
+            continue
+        status, active_stage = _aggregate_status(stages)
+        first_stage = stages[0]
+        active_stage = active_stage or first_stage
+        try:
+            layer = int(first_stage.get("layer"))
+        except (TypeError, ValueError):
+            layer = None
+        receipt_refs: list[str] = []
+        for stage in stages:
+            refs = stage.get("receipt_refs")
+            if isinstance(refs, list):
+                receipt_refs.extend(str(ref) for ref in refs if str(ref))
+        dataset_unit = active_stage.get("dataset_unit")
+        if not isinstance(dataset_unit, Mapping):
+            dataset_unit = first_stage.get("dataset_unit")
+        row = dict(active_stage)
+        row.update(
+            {
+                "stage_id": layer_key,
+                "stage_type": "model_task",
+                "task_label": _model_task_label(layer_key, layer=layer),
+                "status": status,
+                "layer": layer,
+                "layer_key": layer_key,
+                "dataset_unit": dataset_unit,
+                "blockers": list(active_stage.get("blockers") or []),
+                "receipt_refs": receipt_refs,
+                "safe_without_provider_calls": all(bool(stage.get("safe_without_provider_calls", True)) for stage in stages),
+                "provider_calls_allowed": any(bool(stage.get("provider_calls_allowed")) for stage in stages),
+                "model_activation_allowed": any(bool(stage.get("model_activation_allowed")) for stage in stages),
+                "broker_execution_allowed": any(bool(stage.get("broker_execution_allowed")) for stage in stages),
+                "active_stage_id": active_stage.get("stage_id"),
+                "active_stage_type": active_stage.get("stage_type"),
+                "internal_stages": [
+                    {
+                        "stage_id": stage.get("stage_id"),
+                        "stage_type": stage.get("stage_type"),
+                        "status": stage.get("status"),
+                        "blockers": list(stage.get("blockers") or []),
+                    }
+                    for stage in stages
+                ],
+            }
+        )
+        rows.append(row)
+    rows.extend(passthrough)
+    return rows
+
+
 def _public_task_stages(raw_stages: list[Any]) -> list[Any]:
     rows: list[Any] = []
     for raw_stage in raw_stages:
@@ -1332,7 +1438,7 @@ def _public_task_stages(raw_stages: list[Any]) -> list[Any]:
         if _is_layer_local_post_generation_stage(raw_stage):
             continue
         rows.append(raw_stage)
-    return rows
+    return _aggregate_model_task_stages(rows)
 
 
 def _monthly_dashboard_stage_rows(raw_stage: Mapping[str, Any], *, timeline_month: str | None) -> list[dict[str, Any]]:
@@ -1655,8 +1761,13 @@ def _task_timeline(
                 if not is_current:
                     is_current = bool((task_month_for_state, stage_id) in current_model_heads and not is_terminal)
                 if not is_current and not current_lane_heads and not current_model_heads:
+                    current_stage = str(status.current_stage or "")
                     is_current = bool(
-                        is_active_month and stage_id and stage_id == status.current_stage and stage_status == "ready" and not is_terminal
+                        is_active_month
+                        and stage_id
+                        and (stage_id == current_stage or current_stage.startswith(f"{stage_id}."))
+                        and stage_status == "ready"
+                        and not is_terminal
                     )
                 if stage_status == "running":
                     is_current = True
@@ -1666,7 +1777,10 @@ def _task_timeline(
                 if not current_lane_heads and active_fallback_allowed and not first_open_seen and stage_status == "ready" and not is_terminal:
                     is_current = True
                     first_open_seen = True
-                if latest_failed_stage and stage_id == latest_failed_stage and (
+                latest_failed_matches_stage = bool(
+                    latest_failed_stage and (stage_id == latest_failed_stage or str(latest_failed_stage).startswith(f"{stage_id}."))
+                )
+                if latest_failed_matches_stage and (
                     not latest_failed_month or task_month_for_state == latest_failed_month
                 ):
                     task_state = "failed"
@@ -1691,6 +1805,10 @@ def _task_timeline(
                 )
                 task_uid = _stable_task_uid(dashboard_stage, task_period=task_month)
                 progress = active_task_progress.get(task_uid)
+                if progress is None and dashboard_stage.get("active_stage_id"):
+                    progress = active_task_progress.get(
+                        _stable_task_uid({"stage_id": dashboard_stage.get("active_stage_id")}, task_period=task_month)
+                    )
                 if progress is None and isinstance(dashboard_stage.get("dashboard_progress"), Mapping):
                     progress = dict(dashboard_stage["dashboard_progress"])
                 task: dict[str, Any] = {
@@ -1727,17 +1845,21 @@ def _task_timeline(
                         "broker_execution_allowed": dashboard_stage.get("broker_execution_allowed"),
                         "dataset_unit": dataset_unit,
                         "child_partitions": child_partitions,
+                        "active_stage_id": dashboard_stage.get("active_stage_id"),
+                        "active_stage_type": dashboard_stage.get("active_stage_type"),
+                        "internal_stages": dashboard_stage.get("internal_stages") if isinstance(dashboard_stage.get("internal_stages"), list) else None,
                         "worker": worker_info,
                     },
                 }
                 if (
                     coverage_stage_id
-                    and stage_id == coverage_stage_id
+                    and (stage_id == coverage_stage_id or coverage_stage_id.startswith(f"{stage_id}."))
                     and stage_coverage is not None
                     and (not status.current_month or task_month == _public_task_period(status.current_month))
                 ):
                     task["detail"]["progress"] = _stage_coverage_chart(stage_coverage)
-                if latest_execution.get("stage_id") == stage_id and (
+                latest_execution_stage = str(latest_execution.get("stage_id") or "")
+                if (latest_execution_stage == stage_id or latest_execution_stage.startswith(f"{stage_id}.")) and (
                     not latest_failed_month or task_month == latest_failed_month
                 ):
                     task["detail"]["last_execution"] = {
@@ -2313,8 +2435,8 @@ def _model_group_replay_timeline_tasks(
     tasks[-1]["status_updated_at_utc"] = tasks_updated_at
 
     append_task(
-        task_id="model_group.layer_10_attribution",
-        label="Layer 10 Attribution",
+        task_id="model_group.model_10_event_risk_governor",
+        label="EventRiskGovernor / EventIntelligenceOverlay",
         task_state="completed" if attribution_complete else ("current" if replay_complete else "future"),
         status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
         reason=(
@@ -2326,9 +2448,9 @@ def _model_group_replay_timeline_tasks(
         ),
         receipt_refs=list(attribution_artifacts["receipt_refs"]) if attribution_artifacts else None,
         blockers=[] if replay_complete else ["model_group.replay"],
-        stage_type="layer_10_attribution",
+        stage_type="model_10_event_risk_governor",
         progress=_single_step_progress(
-            stage_id="model_group.layer_10_attribution",
+            stage_id="model_group.model_10_event_risk_governor",
             status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
             complete=attribution_complete,
             unit_label="attribution-receipt",
@@ -2350,7 +2472,7 @@ def _model_group_replay_timeline_tasks(
             else "Waiting for Layer 10 attribution before evaluation can run."
         ),
         receipt_refs=list(promotion_artifacts["receipt_refs"]) if promotion_artifacts else None,
-        blockers=[] if attribution_complete else ["model_group.layer_10_attribution"],
+        blockers=[] if attribution_complete else ["model_group.model_10_event_risk_governor"],
         stage_type="model_evaluation",
         progress=_single_step_progress(
             stage_id="model_group.evaluation",
