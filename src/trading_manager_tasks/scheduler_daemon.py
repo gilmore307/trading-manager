@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 from .model_group_attribution import run_model_group_post_replay_attribution_if_ready
+from .model_group_evaluation import run_model_group_evaluation_if_ready
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_replay_if_ready
 from .model_training_state import advance_workflow_state
 from .model_training_workflow import (
@@ -1415,6 +1416,7 @@ def run_daemon_loop(
     dashboard_refresh_command: tuple[str, ...] | None = None,
     execute_model_group_replay: bool = True,
     execute_model_group_attribution: bool = True,
+    execute_model_group_evaluation: bool = True,
     source_existing_bootstrap: bool = True,
     source_bootstrap_database_url: str | None = None,
     config: SchedulerConfig = SchedulerConfig(),
@@ -1473,7 +1475,12 @@ def run_daemon_loop(
                             storage_root=storage_root,
                             execute=False,
                         )
-                        lifecycle_holds_target_lane = replay_probe is not None or attribution_probe is not None
+                        evaluation_probe = run_model_group_evaluation_if_ready(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                            execute=False,
+                        )
+                        lifecycle_holds_target_lane = replay_probe is not None or attribution_probe is not None or evaluation_probe is not None
                         remaining_iterations = None if max_iterations is None else max_iterations - iterations
                         lane_limit = month_ingest_workers if remaining_iterations is None else min(month_ingest_workers, max(1, remaining_iterations))
                         if lifecycle_holds_target_lane:
@@ -1616,6 +1623,31 @@ def run_daemon_loop(
                                 row["worker_id"] = "post_replay_attribution_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                        evaluation_decision = run_model_group_evaluation_if_ready(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                            execute=execute_model_group_evaluation,
+                        )
+                        if evaluation_decision is not None:
+                            append_decision_log(decision_log_path, evaluation_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=evaluation_decision)
+                            state = replace(
+                                state,
+                                start_month=active_start_month,
+                                end_month=active_end_month,
+                                last_next_internal_stage="model_group_evaluation",
+                                last_work_selection_reason="model_group_evaluation_ready",
+                                updated_utc=completed,
+                            )
+                            refresh_needed = refresh_needed or evaluation_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(evaluation_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = evaluation_decision.summary_row()
+                                row["worker_id"] = "evaluation_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
                         if refresh_needed:
                             refresh_dashboard_read_models(
                                 enabled=refresh_dashboard_on_decision,
@@ -1711,6 +1743,23 @@ def run_daemon_loop(
                                 row["worker_id"] = "post_replay_attribution_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                        evaluation_decision = run_model_group_evaluation_if_ready(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                            execute=execute_model_group_evaluation,
+                        )
+                        if evaluation_decision is not None:
+                            append_decision_log(decision_log_path, evaluation_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=evaluation_decision)
+                            refresh_needed = refresh_needed or evaluation_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(evaluation_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = evaluation_decision.summary_row()
+                                row["worker_id"] = "evaluation_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
                         if refresh_needed:
                             refresh_dashboard_read_models(
                                 enabled=refresh_dashboard_on_decision,
@@ -1775,6 +1824,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dashboard-refresh-service-unit", default=DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT, help="systemd service unit to start for event-driven dashboard read-model refresh.")
     parser.add_argument("--disable-model-group-replay", action="store_true", help="Disable automatic side-effect-free model-group replay dispatch.")
     parser.add_argument("--disable-model-group-attribution", action="store_true", help="Disable automatic side-effect-free post-replay Layer 10 attribution dispatch.")
+    parser.add_argument("--disable-model-group-evaluation", action="store_true", help="Disable automatic side-effect-free model-group evaluation evidence build.")
     parser.add_argument("--disable-source-existing-bootstrap", action="store_true", help="Disable startup source-existing bootstrap. Default service startup inspects source tables and seeds workflow acquisition state so existing source data is reused.")
     parser.add_argument("--source-bootstrap-database-url", help="Database URL for startup source-existing bootstrap; defaults to OpenClaw database resolution.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
@@ -1817,6 +1867,7 @@ def main(argv: list[str] | None = None) -> int:
         dashboard_refresh_service_unit=args.dashboard_refresh_service_unit,
         execute_model_group_replay=not args.disable_model_group_replay,
         execute_model_group_attribution=not args.disable_model_group_attribution,
+        execute_model_group_evaluation=not args.disable_model_group_evaluation,
         source_existing_bootstrap=not args.disable_source_existing_bootstrap,
         source_bootstrap_database_url=args.source_bootstrap_database_url,
         config=config,

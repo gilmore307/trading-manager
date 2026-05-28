@@ -34,6 +34,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_layer_ten_event_risk_governor.py`
 - `test_layer_three_target_state.py`
 - `test_model_group_attribution.py`
+- `test_model_group_evaluation.py`
 - `test_model_group_replay.py`
 - `test_model_promotion.py`
 - `test_model_worker_target_queue.py`

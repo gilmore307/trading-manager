@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Run model-group evaluation when replay and Layer 10 attribution are ready."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from trading_manager_tasks.model_group_evaluation import run_model_group_evaluation_if_ready
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--storage-root", type=Path, default=Path("/root/projects/trading-storage/storage/02_control_plane"))
+    parser.add_argument("--contract-id", default="promotion_replay_candidate_policy")
+    parser.add_argument("--target-symbol")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    decision = run_model_group_evaluation_if_ready(
+        storage_root=args.storage_root,
+        contract_id=args.contract_id,
+        selected_target_symbol=args.target_symbol,
+        execute=not args.dry_run,
+    )
+    if decision is None:
+        print(json.dumps({"status": "not_ready", "reason_code": "model_group_evaluation_not_ready"}, sort_keys=True))
+        return 0
+    print(json.dumps(decision.summary_row(), indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
