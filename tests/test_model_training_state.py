@@ -365,7 +365,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             }
             for layer, key in layer_slugs.items():
                 prefix = f"layer_{layer:02d}_{key}"
-                stage_types = ["model_generation", "model_evaluation", "promotion_review", "maintenance"]
+                stage_types = ["model_generation"]
                 if layer not in {4, 5, 6, 7, 8}:
                     stage_types = ["data_acquisition", "feature_generation", *stage_types]
                 completions.extend(f"{prefix}.{stage_type}" for stage_type in stage_types)
@@ -382,47 +382,22 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertIsNone(layer_nine_acquisition.approval_gate_required)
             self.assertTrue(any(token.endswith("review_layer_nine_option_expression_gate.py") for token in layer_nine_acquisition.command))
 
-    def test_promotion_review_waits_until_all_layer_evaluations_complete(self):
+    def test_layer_workflow_state_has_no_layer_local_post_generation_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             state_path = tmp / "workflow_state.json"
-            layer_slugs = {
-                1: "market_regime",
-                2: "sector_context",
-                3: "target_state_vector",
-                4: "event_failure_risk",
-                5: "alpha_confidence",
-                6: "dynamic_risk_policy",
-                7: "position_projection",
-                8: "underlying_action",
-                9: "option_expression",
-                10: "event_risk_governor",
-            }
-            incomplete = [f"layer_{layer:02d}_{slug}.model_evaluation" for layer, slug in layer_slugs.items() if layer < 10]
             state = advance_workflow_state(
                 storage_root=tmp,
                 state_path=state_path,
-                completed_stage_ids=incomplete,
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
                 write=False,
             )
-            stage_by_id = {stage.stage_id: stage for stage in state.stages}
-            self.assertEqual(stage_by_id["layer_01_market_regime.promotion_review"].status, "blocked")
-            self.assertIn("fold_layers_01_10_model_evaluation_complete", stage_by_id["layer_01_market_regime.promotion_review"].last_reason or "")
-
-            complete = [f"layer_{layer:02d}_{slug}.model_evaluation" for layer, slug in layer_slugs.items()]
-            state = advance_workflow_state(
-                storage_root=tmp,
-                state_path=state_path,
-                completed_stage_ids=complete,
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-                write=False,
-            )
-            stage_by_id = {stage.stage_id: stage for stage in state.stages}
-            self.assertEqual(stage_by_id["layer_01_market_regime.promotion_review"].status, "ready")
-            self.assertEqual(stage_by_id["layer_10_event_risk_governor.promotion_review"].status, "ready")
+            stage_types = {stage.stage_type for stage in state.stages}
+            self.assertIn("model_generation", stage_types)
+            self.assertNotIn("model_evaluation", stage_types)
+            self.assertNotIn("promotion_review", stage_types)
+            self.assertNotIn("maintenance", stage_types)
 
     def test_layers_without_input_tasks_can_progress_from_upstream_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -441,9 +416,6 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                         f"{prefix}.data_acquisition",
                         f"{prefix}.feature_generation",
                         f"{prefix}.model_generation",
-                        f"{prefix}.model_evaluation",
-                        f"{prefix}.promotion_review",
-                        f"{prefix}.maintenance",
                     ]
                 )
             state = advance_workflow_state(

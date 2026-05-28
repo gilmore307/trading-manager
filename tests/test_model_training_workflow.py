@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 from trading_manager_tasks.model_training_workflow import (
     BASE_STACK_LAYER_COUNT,
-    FOLD_STACK_PROMOTION_BLOCKER,
     FOUNDATION_CATCH_UP_BLOCKER,
     FOUNDATION_CATCH_UP_LAYERS,
     MODEL_GROUP_REPLAY_COMPLETE_BLOCKER,
@@ -88,25 +87,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layer_count, BASE_STACK_LAYER_COUNT)
         self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 11)))
         for layer in plan.layers:
-            expected_stage_types = [
-                "data_acquisition",
-                "feature_generation",
-                "model_generation",
-                "model_evaluation",
-                "promotion_review",
-                "maintenance",
-            ]
-            if layer.layer == 4:
-                expected_stage_types = [
-                    "data_acquisition",
-                    "feature_generation",
-                    "model_generation",
-                    "model_evaluation",
-                    "promotion_review",
-                    "maintenance",
-                ]
-            elif layer.layer in {5, 6, 7, 8, 10}:
-                expected_stage_types = ["model_generation", "model_evaluation", "promotion_review", "maintenance"]
+            if layer.layer in {1, 2, 3, 4, 9}:
+                expected_stage_types = ["data_acquisition", "feature_generation", "model_generation"]
+            else:
+                expected_stage_types = ["model_generation"]
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertIn("model_", " ".join(layer.model_generate_command))
             self.assertIn("model_", " ".join(layer.model_evaluate_command))
@@ -418,7 +402,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         layer = plan.layers[4]
         self.assertEqual(layer.layer_key, "layer_05_alpha_confidence")
-        self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation", "model_evaluation", "promotion_review", "maintenance"])
+        self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation"])
         self.assertNotIn("materialize_layer_ten_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
         self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
         self.assertIn("--from-database", layer.model_generate_command)
@@ -474,7 +458,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layers[8].progression_mode, "optional_trading_guidance_after_underlying_action")
         self.assertEqual(plan.layers[8].depends_on_layers, (8,))
         self.assertIn("crypto/direct-underlying-only routes do not require option refs", plan.layers[8].candidate_progression_policy)
-        self.assertIn("upstream_layer_08_model_evaluation_complete", plan.layers[8].stages[0].blockers)
+        self.assertIn("upstream_layer_08_model_generation_complete", plan.layers[8].stages[0].blockers)
         self.assertEqual(plan.layers[9].progression_mode, "post_replay_event_failure_attribution")
         self.assertEqual(plan.layers[9].depends_on_layers, ())
         self.assertIn("after concentrated live-flow replay", plan.layers[9].candidate_progression_policy)
@@ -515,7 +499,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual([stage.stage_type for stage in ready_plan.layers[9].stages[:1]], ["model_generation"])
         self.assertIn(MODEL_GROUP_REPLAY_COMPLETE_BLOCKER, ready_plan.layers[9].stages[0].blockers)
 
-    def test_promotion_review_waits_for_full_fold_stack_evaluation(self):
+    def test_layer_stages_stop_at_model_generation_before_model_group_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -526,10 +510,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
 
         for layer in plan.layers:
-            promotion_stage = next(stage for stage in layer.stages if stage.stage_type == "promotion_review")
-            self.assertEqual(promotion_stage.blockers, (FOLD_STACK_PROMOTION_BLOCKER,))
-            self.assertIn("Layer 1-10 model evaluation", promotion_stage.description)
-            self.assertIn("pinned Layer 1-10 bundle", promotion_stage.description)
+            stage_types = {stage.stage_type for stage in layer.stages}
+            self.assertIn("model_generation", stage_types)
+            self.assertNotIn("model_evaluation", stage_types)
+            self.assertNotIn("promotion_review", stage_types)
+            self.assertNotIn("maintenance", stage_types)
 
     def test_layers_without_dedicated_data_features_do_not_create_nonexistent_tasks(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -543,7 +528,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         layer_four_stage_types = [stage.stage_type for stage in plan.layers[3].stages]
         self.assertEqual(
             layer_four_stage_types,
-            ["data_acquisition", "feature_generation", "model_generation", "model_evaluation", "promotion_review", "maintenance"],
+            ["data_acquisition", "feature_generation", "model_generation"],
         )
         self.assertIn("execute_layer_four_event_failure_feature_generation.py", " ".join(plan.layers[3].feature_command))
         for layer_number in (5, 6, 7, 8):
@@ -551,7 +536,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             stage_types = [stage.stage_type for stage in layer.stages]
             self.assertNotIn("data_acquisition", stage_types)
             self.assertNotIn("feature_generation", stage_types)
-            self.assertEqual(stage_types, ["model_generation", "model_evaluation", "promotion_review", "maintenance"])
+            self.assertEqual(stage_types, ["model_generation"])
             self.assertIn("no-dedicated-trading-data-feature-stage", " ".join(layer.feature_command))
 
     def test_dataset_units_are_layer_aware_and_target_visible(self):

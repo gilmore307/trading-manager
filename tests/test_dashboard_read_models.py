@@ -288,7 +288,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["blocker_count"], 1)
         self.assertEqual(task["detail"]["blockers"], ["upstream_layer_08_model_evaluation_complete"])
 
-    def test_layer_model_evaluation_is_visible_in_public_timeline(self):
+    def test_layer_model_evaluation_is_hidden_from_public_timeline(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -332,10 +332,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T12:00:00Z")
 
         task_ids = [task["task_id"] for task in payload["chart_payload"]["task_timeline"]]
-        self.assertIn("layer_03_target_state_vector.model_evaluation", task_ids)
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector.model_evaluation")
-        self.assertEqual(task["task_label"], "Local Layer Evaluation")
-        self.assertEqual(task["stage_type"], "model_evaluation")
+        self.assertNotIn("layer_03_target_state_vector.model_evaluation", task_ids)
         self.assertIsNone(payload["chart_payload"]["active_stage"])
         self.assertIn("internal_active_stage", payload["chart_payload"])
 

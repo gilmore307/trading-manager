@@ -229,6 +229,11 @@ def _layer_model_evaluation_complete(layer_number: int, stages: Mapping[str, Sta
     return bool(layer_stages) and all(stage.status in {"succeeded", "not_applicable"} for stage in layer_stages)
 
 
+def _layer_model_generation_complete(layer_number: int, stages: Mapping[str, StageProgress]) -> bool:
+    layer_stages = [stage for stage in stages.values() if stage.layer == layer_number and stage.stage_type == "model_generation"]
+    return bool(layer_stages) and all(stage.status in {"succeeded", "not_applicable"} for stage in layer_stages)
+
+
 def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     if blocker in {"layer_01_task_key_preparation", FOUNDATION_CATCH_UP_BLOCKER, POST_MODEL_GENERATION_REBUILD_BLOCKER}:
         return False
@@ -241,6 +246,9 @@ def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     if blocker.startswith("upstream_layer_") and blocker.endswith("_model_evaluation_complete"):
         layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_model_evaluation_complete"))
         return _layer_model_evaluation_complete(layer_number, stages)
+    if blocker.startswith("upstream_layer_") and blocker.endswith("_model_generation_complete"):
+        layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_model_generation_complete"))
+        return _layer_model_generation_complete(layer_number, stages)
     if blocker.startswith("upstream_layer_") and blocker.endswith("_complete"):
         layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_complete"))
         return _layer_complete(layer_number, stages)

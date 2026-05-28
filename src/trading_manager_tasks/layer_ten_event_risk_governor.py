@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
-from .layer_three_target_state import FeedArtifactRef, discover_layer_two_feed_artifacts
+from .layer_three_target_state import FeedArtifactRef, _latest_successful_run, _read_layer_two_symbols, _resolve_component_path, discover_layer_two_feed_artifacts
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root
 
@@ -143,6 +143,56 @@ def _fold_key(start_month: str, end_month: str) -> str:
 
 def _ref_month(ref: FeedArtifactRef) -> str:
     return str(getattr(ref, "month", "") or "unknown_month")
+
+
+def _discover_layer_two_feed_artifacts_including_zero_rows(
+    *,
+    start_month: str,
+    trading_data_root: Path,
+    trading_storage_root: Path,
+    universe_path: Path,
+) -> tuple[FeedArtifactRef, ...]:
+    refs = list(
+        discover_layer_two_feed_artifacts(
+            start_month=start_month,
+            trading_data_root=trading_data_root,
+            trading_storage_root=trading_storage_root,
+            universe_path=universe_path,
+        )
+    )
+    if refs:
+        return tuple(refs)
+    zero_refs: list[FeedArtifactRef] = []
+    for symbol in _read_layer_two_symbols(universe_path):
+        receipt_path = trading_storage_root / "monthly_backfill" / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
+        if not receipt_path.exists():
+            continue
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        run = _latest_successful_run(receipt)
+        if run is None:
+            continue
+        steps = run.get("steps") if isinstance(run.get("steps"), Mapping) else {}
+        clean_step = steps.get("clean") if isinstance(steps.get("clean"), Mapping) else {}
+        cleaned_refs = [ref for ref in clean_step.get("references") or [] if isinstance(ref, str) and ref.endswith("equity_bar.jsonl")]
+        if not cleaned_refs and run.get("output_dir"):
+            cleaned_refs.append(str(Path(str(run.get("output_dir"))) / "cleaned" / "equity_bar.jsonl"))
+        if not cleaned_refs:
+            continue
+        cleaned_path = _resolve_component_path(cleaned_refs[-1], trading_data_root=trading_data_root, trading_storage_root=trading_storage_root)
+        if not cleaned_path.exists():
+            continue
+        row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
+        zero_refs.append(
+            FeedArtifactRef(
+                symbol=symbol,
+                month=start_month,
+                receipt_path=str(receipt_path),
+                cleaned_bar_path=str(cleaned_path),
+                run_id=str(run.get("run_id") or ""),
+                row_count=int(row_counts.get("equity_bar") or 0),
+            )
+        )
+    return tuple(zero_refs)
 
 
 def _saved_bar_path(ref: FeedArtifactRef) -> Path:
@@ -400,7 +450,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
     refs = tuple(
         ref
         for month in _iter_months(start_month, end_month)
-        for ref in discover_layer_two_feed_artifacts(
+        for ref in _discover_layer_two_feed_artifacts_including_zero_rows(
             start_month=month,
             trading_data_root=trading_data_root,
             trading_storage_root=trading_storage_root,

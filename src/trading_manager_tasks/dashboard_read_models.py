@@ -1291,10 +1291,22 @@ def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
     return visible
 
 
+def _is_layer_local_post_generation_stage(raw_stage: Mapping[str, Any]) -> bool:
+    stage_type = str(raw_stage.get("stage_type") or "")
+    if stage_type not in {"model_evaluation", "promotion_review", "maintenance"}:
+        return False
+    try:
+        return int(raw_stage.get("layer")) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 def _public_task_stages(raw_stages: list[Any]) -> list[Any]:
     rows: list[Any] = []
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
+            continue
+        if _is_layer_local_post_generation_stage(raw_stage):
             continue
         rows.append(raw_stage)
     return rows

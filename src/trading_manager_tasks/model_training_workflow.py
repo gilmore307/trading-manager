@@ -571,7 +571,7 @@ def _normalize_selected_target_symbol(selected_target_symbol: str | None) -> str
 
 
 def _upstream_layer_ready_blockers(depends_on_layers: tuple[int, ...], *, foundation_catch_up_only: bool) -> tuple[str, ...]:
-    suffix = "complete" if foundation_catch_up_only else "model_evaluation_complete"
+    suffix = "complete" if foundation_catch_up_only else "model_generation_complete"
     return tuple(f"upstream_layer_{dep:02d}_{suffix}" for dep in depends_on_layers)
 
 
@@ -827,56 +827,24 @@ def _build_layer_workflow(
         model_generation_blockers = (MODEL_GROUP_REPLAY_COMPLETE_BLOCKER,)
         model_generation_description = "Run post-replay event failure/residual attribution after concentrated live-flow replay has settled."
 
-    for stage_type, command, description, blockers in (
-        (
-            "model_generation",
-            generate,
-            model_generation_description,
-            model_generation_blockers,
-        ),
-        (
-            "model_evaluation",
-            evaluate,
-            "Evaluate generated model rows against rolling-fold validation/test labels and baselines without activation.",
-            (f"{key}.model_generation_complete",),
-        ),
-        (
-            PROMOTION_STAGE_TYPE,
-            review,
-            "Run promotion review only after the fold has completed Layer 1-10 model evaluation; evaluation judges one pinned Layer 1-10 bundle, and layer-local artifacts are diagnostic only.",
-            (FOLD_STACK_PROMOTION_BLOCKER,),
-        ),
-        (
-            "maintenance",
-            maintenance,
-            "Refresh manager review/maintenance surfaces and receipts for this layer.",
-            (f"{key}.{PROMOTION_STAGE_TYPE}_complete",),
-        ),
-    ):
-        stage_blockers = blockers
-        if foundation_catch_up_only:
-            if layer in FOUNDATION_CATCH_UP_LAYERS:
-                stage_blockers = (POST_MODEL_GENERATION_REBUILD_BLOCKER,) + stage_blockers
-            elif layer >= 3:
-                stage_blockers = (FOUNDATION_CATCH_UP_BLOCKER,) + stage_blockers
-        stages.append(
-            WorkflowStage(
-                stage_id=f"{key}.{stage_type}",
+    stages.append(
+        WorkflowStage(
+            stage_id=f"{key}.model_generation",
+            layer=layer,
+            layer_key=key,
+            stage_type="model_generation",
+            description=model_generation_description,
+            status="blocked",
+            command=generate,
+            dataset_unit=dataset_unit,
+            blockers=_with_target_blocker(
+                model_generation_blockers,
                 layer=layer,
-                layer_key=key,
-                stage_type=stage_type,
-                description=description,
-                status="blocked",
-                command=command,
-                dataset_unit=dataset_unit,
-                blockers=_with_target_blocker(
-                    stage_blockers,
-                    layer=layer,
-                    selected_target_symbol=selected_target_symbol,
-                    stage_type=stage_type,
-                ),
-            )
+                selected_target_symbol=selected_target_symbol,
+                stage_type="model_generation",
+            ),
         )
+    )
     return LayerWorkflow(
         layer=layer,
         layer_key=key,

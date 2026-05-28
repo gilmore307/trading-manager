@@ -28,6 +28,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_governance_checks.py`
 - `test_historical_training.py`
 - `test_information_pass.py`
+- `test_layer_four_event_failure_features.py`
 - `test_layer_nine_feature_stage.py`
 - `test_layer_nine_option_expression.py`
 - `test_layer_ten_event_risk_governor.py`
