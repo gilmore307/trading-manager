@@ -81,14 +81,16 @@ class ModelGroupReplayTests(unittest.TestCase):
                 import sys
                 from pathlib import Path
 
+                run_id = sys.argv[sys.argv.index("--run-id") + 1]
+                candidate_model_ref = sys.argv[sys.argv.index("--candidate-model-ref") + 1]
                 progress_path = Path(sys.argv[sys.argv.index("--progress-path") + 1])
                 progress_path.parent.mkdir(parents=True, exist_ok=True)
                 rows = [
-                    {"contract_type": "evaluation_replay_progress", "stage_id": "model_group.replay", "month": "2021-01", "status": "completed"},
-                    {"contract_type": "evaluation_replay_progress", "stage_id": "model_group.replay", "month": "2021-02", "status": "completed"},
+                    {"contract_type": "evaluation_replay_progress", "stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-01", "status": "completed"},
+                    {"contract_type": "evaluation_replay_progress", "stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-02", "status": "completed"},
                 ]
                 progress_path.write_text("\\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\\n", encoding="utf-8")
-                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": "test_run", "decision_row_count": 2}))
+                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": run_id, "candidate_model_ref": candidate_model_ref, "decision_row_count": 2}))
                 """
             ).strip()
             + "\n",
@@ -120,8 +122,53 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_executed")
             self.assertEqual(decision.provider_calls, 0)
             self.assertFalse(decision.broker_execution_performed)
+            self.assertIn("--candidate-model-ref", decision.command)
+            self.assertIn("storage://trading-manager/model_group/2016-01_2016-06", decision.command)
+            self.assertEqual(
+                decision.execution_summary["replay_execution_receipt"]["candidate_model_ref"],
+                "storage://trading-manager/model_group/2016-01_2016-06",
+            )
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
+
+    def test_rejects_runner_receipt_that_falls_back_to_placeholder_policy(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            runner = tmp / "run_replay_execution.py"
+            runner.write_text(
+                textwrap.dedent(
+                    """
+                    import json
+                    print(json.dumps({
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": "bad_run",
+                        "candidate_model_ref": "trading-model://candidate_policy_replay/current_deterministic_crypto_policy",
+                        "decision_row_count": 0,
+                    }))
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=runner,
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_receipt_scope_mismatch")
+            self.assertIn("deterministic crypto placeholder", decision.reason)
 
     def test_legacy_unsplit_model_generation_fold_does_not_unlock_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

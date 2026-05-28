@@ -89,6 +89,7 @@ def run_model_group_replay_if_ready(
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
     progress_path = dataset_root / "replay_progress.jsonl"
+    candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
     command = [
         python_executable,
         str(runner_path),
@@ -96,6 +97,8 @@ def run_model_group_replay_if_ready(
         str(dataset_root),
         "--run-id",
         run_id,
+        "--candidate-model-ref",
+        candidate_model_ref,
         "--progress-path",
         str(progress_path),
     ]
@@ -144,8 +147,25 @@ def run_model_group_replay_if_ready(
             check=True,
             capture_output=True,
             text=True,
-        )
+    )
     receipt = json.loads(completed.stdout)
+    receipt_scope_status = _replay_receipt_scope_status(replay_receipt=receipt, training_fold=training_fold)
+    if not receipt_scope_status["compatible"]:
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_receipt_scope_mismatch",
+            reason=str(receipt_scope_status["reason"]),
+            selected_work="model_group.replay",
+            command=command,
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "replay_receipt_scope_status": receipt_scope_status,
+                "replay_execution_receipt": receipt,
+            },
+        )
     refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_ids={str(receipt.get("replay_execution_run_id") or run_id)})
     return _decision(
         now=now,
@@ -258,6 +278,7 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                 "end_month": end_month,
                 "target_symbol": target_symbol,
                 "state_path": str(path),
+                "candidate_model_ref": f"storage://trading-manager/model_group/{start_month}_{end_month}",
             }
         )
     return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))[0] if candidates else None
