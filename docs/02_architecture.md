@@ -22,8 +22,8 @@ This file is the manager-side map of the current Layer 1-10 stack. It is a routi
 | 6 | `DynamicRiskPolicyModel` | `layer_06_dynamic_risk_policy`, `model_06_dynamic_risk_policy` | Dynamic risk-budget and premium-policy state from global market regime, systemic event risk, alpha quality, and portfolio context | `dynamic_risk_policy_state` | Not an execution hard-limit gate and not order permission. |
 | 7 | `PositionProjectionModel` | `layer_07_position_projection`, `model_07_position_projection` | Abstract holding-state projection under Layer 6 risk policy | `position_projection_vector` | No buy/sell/hold order. |
 | 8 | `UnderlyingActionModel` | `layer_08_underlying_action`, `model_08_underlying_action` | Offline underlying thesis | `underlying_action_plan` | Not broker routing or order construction. |
-| 9 | `TradingGuidanceModel / OptionExpressionModel` | `layer_09_option_expression`, `model_09_option_expression` | Optional offline guidance and option-expression context from the Layer 8 thesis | `trading_guidance_record`, `option_expression_plan` | Not execution and not broker/account mutation. |
-| 10 | `EventRiskGovernor / EventIntelligenceOverlay` | `layer_10_event_risk_governor`, `model_10_event_risk_governor` | Residual event-risk governance over the Layer 8 direct-underlying thesis, with Layer 9 context optional | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
+| 9 | `OptionExpressionModel` | `layer_09_option_expression`, `model_09_option_expression` | Optional offline option-expression context from the Layer 8 thesis | `option_expression_plan` | Not execution and not broker/account mutation. |
+| 10 | `EventRiskGovernor` | `layer_10_event_risk_governor`, `model_10_event_risk_governor` | Residual event-risk governance over the Layer 8 direct-underlying thesis, with Layer 9 context optional | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
 
 ## Physical Surface Rule
 

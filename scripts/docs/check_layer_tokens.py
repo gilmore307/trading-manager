@@ -24,8 +24,8 @@ LAYER_REGISTRY_IDS = (
     (6, ("DynamicRiskPolicyModel",), "mlv_L6DRP001", "trm_DRPM001", "trm_M6DRP01", "trm_DRPS001"),
     (7, ("PositionProjectionModel",), "mlv_L7PP001", "trm_TPM001", "trm_MTP001", "trm_TSVEC01"),
     (8, ("UnderlyingActionModel",), "mlv_L8UA001", "trm_UAM001", "trm_M7UAM01", "trm_UAP001"),
-    (9, ("TradingGuidanceModel", "OptionExpressionModel"), "mlv_L9OE001", "trm_OEM001", "trm_M7OEM01", "trm_OEP001"),
-    (10, ("EventRiskGovernor", "EventIntelligenceOverlay"), "mlv_L10ERG001", "trm_ERG001", "trm_M9ERG01", "trm_ERI001"),
+    (9, ("OptionExpressionModel",), "mlv_L9OE001", "trm_OEM001", "trm_M7OEM01", "trm_OEP001"),
+    (10, ("EventRiskGovernor",), "mlv_L10ERG001", "trm_ERG001", "trm_M9ERG01", "trm_ERI001"),
 )
 
 FILES_TO_CHECK = (

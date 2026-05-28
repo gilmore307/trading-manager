@@ -263,7 +263,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
     {
         "layer": 9,
         "slug": "option_expression",
-        "model_name": "TradingGuidanceModel / OptionExpressionModel",
+        "model_name": "OptionExpressionModel",
         "depends_on_layers": (8,),
         "progression_mode": "optional_trading_guidance_after_underlying_action",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",

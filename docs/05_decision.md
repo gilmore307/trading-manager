@@ -29,7 +29,7 @@ competing for host capacity.
 
 ## D006 - The model stack has ten current layers
 
-Manager recognizes the current Layer 1-10 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, DynamicRiskPolicy, PositionProjection, UnderlyingAction, TradingGuidance/OptionExpression, and EventRiskGovernor/EventIntelligenceOverlay.
+Manager recognizes the current Layer 1-10 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, DynamicRiskPolicy, PositionProjection, UnderlyingAction, OptionExpression, and EventRiskGovernor.
 
 ## D007 - Reusable foundation catch-up is priority
 

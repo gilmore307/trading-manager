@@ -14,8 +14,8 @@ This file records the active numbering rule for manager-facing docs, scripts, an
 | 6 | DynamicRiskPolicyModel | `layer_06_dynamic_risk_policy`, `model_06_dynamic_risk_policy` |
 | 7 | PositionProjectionModel | `layer_07_position_projection`, `model_07_position_projection` |
 | 8 | UnderlyingActionModel | `layer_08_underlying_action`, `model_08_underlying_action` |
-| 9 | TradingGuidanceModel / OptionExpressionModel | `layer_09_option_expression`, `model_09_option_expression` |
-| 10 | EventRiskGovernor / EventIntelligenceOverlay | `layer_10_event_risk_governor`, `model_10_event_risk_governor` |
+| 9 | OptionExpressionModel | `layer_09_option_expression`, `model_09_option_expression` |
+| 10 | EventRiskGovernor | `layer_10_event_risk_governor`, `model_10_event_risk_governor` |
 
 ## Rule
 

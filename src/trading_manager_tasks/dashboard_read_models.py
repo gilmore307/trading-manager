@@ -786,14 +786,26 @@ MODEL_NAME_BY_LAYER_KEY = {
     f"layer_{int(meta['layer']):02d}_{meta['slug']}": str(meta["model_name"])
     for meta in LAYER_METADATA
 }
-MODEL_NAME_BY_LAYER_KEY["layer_10_event_risk_governor"] = "EventRiskGovernor / EventIntelligenceOverlay"
+MODEL_NAME_BY_LAYER_KEY["layer_10_event_risk_governor"] = "EventRiskGovernor"
+
+
+def _spaced_model_name(model_name: str) -> str:
+    if model_name == "EventRiskGovernor":
+        return model_name
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", model_name)
+    spaced = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", spaced)
+    return spaced.replace(" / ", " / ")
 
 
 def _model_task_label(layer_key: str, layer: int | None = None) -> str:
-    if layer_key in MODEL_NAME_BY_LAYER_KEY:
-        return MODEL_NAME_BY_LAYER_KEY[layer_key]
+    model_name = MODEL_NAME_BY_LAYER_KEY.get(layer_key)
+    if model_name:
+        model_label = _spaced_model_name(model_name)
+        if layer is not None:
+            return f"Layer {layer} {model_label}"
+        return model_label
     if layer == 10:
-        return "EventRiskGovernor / EventIntelligenceOverlay"
+        return "Layer 10 EventRiskGovernor"
     return layer_key.replace("_", " ").title()
 
 
@@ -1360,6 +1372,27 @@ def _aggregate_status(stages: list[Mapping[str, Any]]) -> tuple[str, Mapping[str
     return "not_applicable", stages[-1] if stages else None
 
 
+def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status: str) -> dict[str, Any]:
+    terminal_statuses = {"succeeded", "not_applicable"}
+    ready_count = sum(1 for stage in stages if str(stage.get("status") or "") in terminal_statuses)
+    failed_count = sum(1 for stage in stages if str(stage.get("status") or "") == "failed")
+    expected_count = len(stages)
+    pending_count = max(expected_count - ready_count - failed_count, 0)
+    progress_status = "complete" if expected_count and ready_count == expected_count and failed_count == 0 else status
+    return {
+        "stage_id": layer_key,
+        "status": progress_status,
+        "unit_label": "model stages",
+        "expected_count": expected_count,
+        "ready_count": ready_count,
+        "pending_count": pending_count,
+        "failed_count": failed_count,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": bool(expected_count and ready_count == expected_count and failed_count == 0),
+        "progress_source": "model_task_internal_stages",
+    }
+
+
 def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     order: list[str] = []
@@ -1414,6 +1447,10 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
                 "broker_execution_allowed": any(bool(stage.get("broker_execution_allowed")) for stage in stages),
                 "active_stage_id": active_stage.get("stage_id"),
                 "active_stage_type": active_stage.get("stage_type"),
+                "model_name": MODEL_NAME_BY_LAYER_KEY.get(layer_key),
+                "model_display_name": _spaced_model_name(MODEL_NAME_BY_LAYER_KEY.get(layer_key) or ""),
+                "layer_label": f"Layer {layer}" if layer is not None else None,
+                "dashboard_progress": _model_task_progress(layer_key, stages, status),
                 "internal_stages": [
                     {
                         "stage_id": stage.get("stage_id"),
@@ -1847,6 +1884,9 @@ def _task_timeline(
                         "child_partitions": child_partitions,
                         "active_stage_id": dashboard_stage.get("active_stage_id"),
                         "active_stage_type": dashboard_stage.get("active_stage_type"),
+                        "model_name": dashboard_stage.get("model_name"),
+                        "model_display_name": dashboard_stage.get("model_display_name"),
+                        "layer_label": dashboard_stage.get("layer_label"),
                         "internal_stages": dashboard_stage.get("internal_stages") if isinstance(dashboard_stage.get("internal_stages"), list) else None,
                         "worker": worker_info,
                     },
@@ -2422,7 +2462,7 @@ def _model_group_replay_timeline_tasks(
 
     append_task(
         task_id="model_group.replay",
-        label="Replay",
+        label="Model Replay",
         task_state=replay_state,
         status=replay_status,
         reason=replay_reason,
@@ -2436,7 +2476,7 @@ def _model_group_replay_timeline_tasks(
 
     append_task(
         task_id="model_group.model_10_event_risk_governor",
-        label="EventRiskGovernor / EventIntelligenceOverlay",
+        label="Layer 10 EventRiskGovernor",
         task_state="completed" if attribution_complete else ("current" if replay_complete else "future"),
         status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
         reason=(
@@ -2461,7 +2501,7 @@ def _model_group_replay_timeline_tasks(
     evaluation_complete = promotion_complete
     append_task(
         task_id="model_group.evaluation",
-        label="Evaluation",
+        label="Model Evaluation",
         task_state="completed" if evaluation_complete else ("current" if attribution_complete else "future"),
         status="succeeded" if evaluation_complete else ("ready" if attribution_complete else "blocked"),
         reason=(
@@ -2485,7 +2525,7 @@ def _model_group_replay_timeline_tasks(
 
     append_task(
         task_id="model_group.promotion",
-        label="Promotion",
+        label="Model Promotion",
         task_state="completed" if promotion_eligible else ("current" if evaluation_complete else "future"),
         status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if evaluation_complete else "blocked",
         reason=(
@@ -2509,7 +2549,7 @@ def _model_group_replay_timeline_tasks(
     )
     append_task(
         task_id="model_group.maintenance",
-        label="Maintenance",
+        label="Model Maintenance",
         task_state="completed" if readiness_complete else ("current" if promotion_eligible else "future"),
         status="succeeded" if readiness_complete else ("ready" if promotion_eligible else "blocked"),
         reason=(
