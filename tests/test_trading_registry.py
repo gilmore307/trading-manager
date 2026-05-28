@@ -1931,6 +1931,7 @@ class RegistryHelperTests(unittest.TestCase):
             "ALPHA_STRENGTH_SCORE_BY_HORIZON": "5_alpha_strength_score_<horizon>",
             "ALPHA_EXPECTED_RETURN_SCORE_BY_HORIZON": "5_expected_return_score_<horizon>",
             "ALPHA_CONFIDENCE_SCORE_BY_HORIZON": "5_alpha_confidence_score_<horizon>",
+            "AFTER_COST_ALPHA_SCORE_BY_HORIZON": "5_after_cost_alpha_score_<horizon>",
             "SIGNAL_RELIABILITY_SCORE_BY_HORIZON": "5_signal_reliability_score_<horizon>",
             "PATH_QUALITY_SCORE_BY_HORIZON": "5_path_quality_score_<horizon>",
             "REVERSAL_RISK_SCORE_BY_HORIZON": "5_reversal_risk_score_<horizon>",
