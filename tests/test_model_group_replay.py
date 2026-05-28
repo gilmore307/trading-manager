@@ -28,6 +28,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "freeze_status": "frozen",
                     "missing_feed_acquisition_count": 0,
                     "feed_acquisition_plan_ref": str(plan_path),
+                    "target_refs": ["AAPL"],
                 }
             )
             + "\n",
@@ -163,6 +164,33 @@ class ModelGroupReplayTests(unittest.TestCase):
 
         self.assertIsNone(decision)
 
+    def test_replay_scope_mismatch_blocks_placeholder_crypto_dataset(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            manifest_path = dataset_root / "dataset_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["target_refs"] = ["BTC", "ETH", "SOL"]
+            manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+            self._write_completed_fold(storage_root)
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_scope_mismatch")
+            self.assertIn("do not include training target AAPL", decision.reason)
+
     def test_skips_replay_when_all_months_are_already_complete(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -173,9 +201,24 @@ class ModelGroupReplayTests(unittest.TestCase):
             (dataset_root / "replay_progress.jsonl").write_text(
                 "\n".join(
                     [
-                        json.dumps({"stage_id": "model_group.replay", "month": "2021-01", "status": "completed"}),
-                        json.dumps({"stage_id": "model_group.replay", "month": "2021-02", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "compatible_run", "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "compatible_run", "month": "2021-02", "status": "completed"}),
                     ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            receipt_root = dataset_root / "replay_execution_runs" / "compatible_run"
+            receipt_root.mkdir(parents=True)
+            (receipt_root / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": "compatible_run",
+                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "target_refs": ["AAPL"],
+                        "validation_status": "passed",
+                    }
                 )
                 + "\n",
                 encoding="utf-8",

@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -28,6 +29,7 @@ DEFAULT_EVALUATION_REPO_ROOT = projects_root() / "trading-evaluation"
 DEFAULT_EXECUTION_REPO_ROOT = projects_root() / "trading-execution"
 DEFAULT_EVALUATION_RUNNER_PATH = DEFAULT_EVALUATION_REPO_ROOT / "scripts" / "evaluation" / "run_replay_execution.py"
 NEW_YORK = ZoneInfo("America/New_York")
+CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 
 
 def run_model_group_replay_if_ready(
@@ -60,8 +62,27 @@ def run_model_group_replay_if_ready(
     if training_fold is None:
         return None
 
+    scope_status = _replay_dataset_scope_status(dataset_root=dataset_root, manifest=manifest, training_fold=training_fold)
+    if not scope_status["compatible"]:
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_scope_mismatch",
+            reason=str(scope_status["reason"]),
+            selected_work="model_group.replay",
+            command=[],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "replay_scope_status": scope_status,
+            },
+        )
+
+    compatible_run_ids = _compatible_replay_run_ids(dataset_root=dataset_root, training_fold=training_fold)
     expected_months = _expected_replay_months(dataset_root)
-    ready_months = _ready_replay_months(dataset_root)
+    ready_months = _ready_replay_months(dataset_root, replay_run_ids=compatible_run_ids) if compatible_run_ids else set()
     if expected_months > 0 and len(ready_months) >= expected_months:
         return None
 
@@ -125,7 +146,7 @@ def run_model_group_replay_if_ready(
             text=True,
         )
     receipt = json.loads(completed.stdout)
-    refreshed_ready_months = _ready_replay_months(dataset_root)
+    refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_ids={str(receipt.get("replay_execution_run_id") or run_id)})
     return _decision(
         now=now,
         decision_status="executed",
@@ -228,16 +249,84 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
         end_month = str(payload.get("end_month") or "")
         if not start_month or not end_month:
             continue
+        target_symbol = _fold_state_target_symbol(path, payload)
         candidates.append(
             {
                 "fold_id": f"fold_{start_month}_{end_month}",
                 "fold_label": _fold_label(start_month, end_month),
                 "start_month": start_month,
                 "end_month": end_month,
+                "target_symbol": target_symbol,
                 "state_path": str(path),
             }
         )
     return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))[0] if candidates else None
+
+
+def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | None:
+    for key in ("target_symbol", "selected_target_symbol", "target_ref"):
+        value = str(payload.get(key) or "").strip().upper()
+        if value:
+            return value
+    match = re.match(r"^model_training_fold_state_([A-Za-z0-9.-]+)_\d{4}-\d{2}_\d{4}-\d{2}$", path.stem)
+    return match.group(1).upper() if match else None
+
+
+def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
+    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
+    fold_id = str(training_fold.get("fold_id") or "")
+    manifest_fold_id = str(manifest.get("candidate_fold_id") or manifest.get("fold_id") or "").strip()
+    target_refs = _replay_dataset_target_refs(dataset_root=dataset_root, manifest=manifest)
+    if manifest_fold_id and fold_id and manifest_fold_id != fold_id:
+        return {
+            "compatible": False,
+            "reason": f"replay dataset fold {manifest_fold_id} does not match completed training fold {fold_id}",
+            "dataset_target_refs": sorted(target_refs),
+            "training_target_symbol": target_symbol,
+        }
+    if target_symbol and target_refs and target_symbol not in target_refs:
+        return {
+            "compatible": False,
+            "reason": f"replay dataset targets {', '.join(sorted(target_refs))} do not include training target {target_symbol}",
+            "dataset_target_refs": sorted(target_refs),
+            "training_target_symbol": target_symbol,
+        }
+    return {
+        "compatible": True,
+        "reason": "replay dataset scope matches completed training fold",
+        "dataset_target_refs": sorted(target_refs),
+        "training_target_symbol": target_symbol,
+    }
+
+
+def _replay_dataset_target_refs(*, dataset_root: Path, manifest: Mapping[str, Any]) -> set[str]:
+    refs = _string_set(manifest.get("target_refs") or manifest.get("replay_target_refs") or manifest.get("candidate_target_refs"))
+    for row in _csv_rows(dataset_root / "feed_acquisition_plan.csv"):
+        source_id = str(row.get("source_id") or "").strip()
+        coverage_status = str(row.get("coverage_status") or "").strip().lower()
+        if coverage_status not in {"available", "succeeded", "complete", "completed"}:
+            continue
+        if source_id == "okx_crypto_market_data":
+            refs.update(CRYPTO_REPLAY_TARGET_REFS)
+        refs.update(_string_set(row.get("target_ref") or row.get("target_symbol") or row.get("symbol")))
+        params_text = str(row.get("params_json") or "").strip()
+        if params_text:
+            try:
+                params = json.loads(params_text)
+            except json.JSONDecodeError:
+                params = None
+            if isinstance(params, Mapping):
+                refs.update(_string_set(params.get("target_refs") or params.get("symbols") or params.get("target_symbol")))
+    return {ref.upper() for ref in refs if ref}
+
+
+def _string_set(value: Any) -> set[str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return {stripped.upper()} if stripped else set()
+    if isinstance(value, (list, tuple, set)):
+        return {str(item).strip().upper() for item in value if str(item).strip()}
+    return set()
 
 
 def _fold_label(start_month: str, end_month: str) -> str:
@@ -267,7 +356,40 @@ def _expected_replay_months(dataset_root: Path) -> int:
     return max(1, (end.year - start.year) * 12 + end.month - start.month)
 
 
-def _ready_replay_months(dataset_root: Path) -> set[str]:
+def _compatible_replay_run_ids(*, dataset_root: Path, training_fold: Mapping[str, Any]) -> set[str]:
+    run_ids: set[str] = set()
+    replay_root = dataset_root / "replay_execution_runs"
+    if not replay_root.exists():
+        return run_ids
+    for receipt_path in sorted(replay_root.glob("*/replay_execution_receipt.json")):
+        try:
+            receipt = _load_json_object(receipt_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if not _replay_receipt_scope_status(replay_receipt=receipt, training_fold=training_fold)["compatible"]:
+            continue
+        run_id = str(receipt.get("replay_execution_run_id") or receipt_path.parent.name).strip()
+        if run_id:
+            run_ids.add(run_id)
+    return run_ids
+
+
+def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
+    candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "")
+    if "current_deterministic_crypto_policy" in candidate_model_ref:
+        return {"compatible": False, "reason": "deterministic crypto placeholder policy"}
+    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
+    target_refs = _string_set(replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
+    if target_symbol and target_refs and target_symbol not in target_refs:
+        return {"compatible": False, "reason": "replay target mismatch"}
+    receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "")
+    fold_id = str(training_fold.get("fold_id") or "")
+    if receipt_fold_id and fold_id and receipt_fold_id != fold_id:
+        return {"compatible": False, "reason": "replay fold mismatch"}
+    return {"compatible": True, "reason": "compatible replay receipt"}
+
+
+def _ready_replay_months(dataset_root: Path, replay_run_ids: set[str] | None = None) -> set[str]:
     ready: set[str] = set()
     paths = sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]
     for path in paths:
@@ -278,6 +400,9 @@ def _ready_replay_months(dataset_root: Path) -> set[str]:
                 if not line.strip():
                     continue
                 row = json.loads(line)
+                run_id = str(row.get("replay_execution_run_id") or "").strip()
+                if replay_run_ids is not None and run_id not in replay_run_ids:
+                    continue
                 status = str(row.get("status") or row.get("replay_status") or "").lower()
                 month = str(row.get("month") or row.get("replay_month") or "").strip()
                 if month and status in {"succeeded", "completed", "complete"}:

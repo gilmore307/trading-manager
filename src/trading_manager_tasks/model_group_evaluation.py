@@ -61,6 +61,31 @@ def run_model_group_evaluation_if_ready(
     training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
     if training_fold is None:
         return None
+    replay_scope_status = _replay_receipt_scope_status(replay_receipt=replay_receipt, training_fold=training_fold)
+    if not replay_scope_status["compatible"]:
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_evaluation_replay_scope_mismatch",
+            reason=str(replay_scope_status["reason"]),
+            selected_work="model_group.evaluation",
+            command=[
+                python_executable,
+                "scripts/tasks/run_model_group_evaluation.py",
+                "--contract-id",
+                contract_id,
+                "--storage-root",
+                str(storage_root),
+            ],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "replay_execution_receipt_ref": str(replay_receipt_path),
+                "replay_scope_status": replay_scope_status,
+            },
+        )
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     run_id = "model_group_evaluation_" + now.strftime("%Y%m%dT%H%M%SZ")
@@ -447,11 +472,71 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                     "end_month": end_month,
                     "state_path": str(path),
                     "fold_id": f"fold_{start_month}_{end_month}",
+                    "target_symbol": _fold_state_target_symbol(path, payload),
                     "candidate_model_ref": f"storage://trading-manager/model_group/{start_month}_{end_month}",
                 },
             )
         )
     return sorted(candidates, key=lambda item: item[0])[0][1] if candidates else None
+
+
+def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | None:
+    import re
+
+    for key in ("target_symbol", "selected_target_symbol", "target_ref"):
+        value = str(payload.get(key) or "").strip().upper()
+        if value:
+            return value
+    match = re.match(r"^model_training_fold_state_([A-Za-z0-9.-]+)_\d{4}-\d{2}_\d{4}-\d{2}$", path.stem)
+    return match.group(1).upper() if match else None
+
+
+def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
+    candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "")
+    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
+    target_refs = _string_set(replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
+    receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "").strip()
+    training_fold_id = str(training_fold.get("fold_id") or "").strip()
+    if "current_deterministic_crypto_policy" in candidate_model_ref:
+        return {
+            "compatible": False,
+            "reason": "replay receipt used deterministic crypto placeholder policy instead of completed fold model artifacts",
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+            "training_target_symbol": target_symbol,
+        }
+    if receipt_fold_id and training_fold_id and receipt_fold_id != training_fold_id:
+        return {
+            "compatible": False,
+            "reason": f"replay receipt fold {receipt_fold_id} does not match completed training fold {training_fold_id}",
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+            "training_target_symbol": target_symbol,
+        }
+    if target_symbol and target_refs and target_symbol not in target_refs:
+        return {
+            "compatible": False,
+            "reason": f"replay receipt targets {', '.join(sorted(target_refs))} do not include training target {target_symbol}",
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+            "training_target_symbol": target_symbol,
+        }
+    return {
+        "compatible": True,
+        "reason": "replay receipt scope matches completed training fold",
+        "candidate_model_ref": candidate_model_ref,
+        "receipt_target_refs": sorted(target_refs),
+        "training_target_symbol": target_symbol,
+    }
+
+
+def _string_set(value: Any) -> set[str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return {stripped.upper()} if stripped else set()
+    if isinstance(value, (list, tuple, set)):
+        return {str(item).strip().upper() for item in value if str(item).strip()}
+    return set()
 
 
 def _latest_replay_execution_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:

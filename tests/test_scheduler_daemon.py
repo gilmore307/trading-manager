@@ -91,6 +91,32 @@ class SchedulerDaemonTests(unittest.TestCase):
         return readiness_path
 
     def _write_terminal_promotion_decision_after(self, *, storage_root: Path, state_path: Path, status: str = "review_required") -> Path:
+        state_payload = json.loads(state_path.read_text(encoding="utf-8"))
+        fold_id = f"fold_{state_payload['start_month']}_{state_payload['end_month']}"
+        model_ref = f"storage://trading-manager/model_group/{state_payload['start_month']}_{state_payload['end_month']}"
+        replay_receipt_path = (
+            storage_root.parent
+            / "05_replay_datasets"
+            / "promotion_replay_candidate_policy"
+            / "replay_execution_runs"
+            / f"replay_after_{state_path.stem}"
+            / "replay_execution_receipt.json"
+        )
+        replay_receipt_path.parent.mkdir(parents=True, exist_ok=True)
+        replay_receipt_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "evaluation_replay_execution_run",
+                    "candidate_model_ref": model_ref,
+                    "target_refs": ["AAPL"],
+                    "candidate_fold_id": fold_id,
+                    "validation_status": "passed",
+                    "created_at_utc": "2026-05-28T00:00:00Z",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         decision_path = (
             storage_root.parent
             / "05_replay_datasets"
@@ -104,8 +130,10 @@ class SchedulerDaemonTests(unittest.TestCase):
             json.dumps(
                 {
                     "contract_type": "promotion_eligibility_decision",
+                    "fold_id": fold_id,
                     "decision_status": status,
                     "created_at_utc": "2026-05-28T00:00:00Z",
+                    "replay_validation_ref": str(replay_receipt_path),
                     "source_fold_state_path": str(state_path),
                 }
             )

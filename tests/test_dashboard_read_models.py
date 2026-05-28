@@ -800,8 +800,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             (replay_root / "replay_progress.jsonl").write_text(
                 "\n".join(
                     [
-                        json.dumps({"stage_id": "model_group.replay", "month": "2021-01", "status": "completed"}),
-                        json.dumps({"stage_id": "model_group.replay", "month": "2021-02", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "fixture", "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "fixture", "month": "2021-02", "status": "completed"}),
                     ]
                 )
                 + "\n",
@@ -833,6 +833,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": "fixture",
+                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "target_refs": ["AAPL"],
                         "validation_status": "passed",
                         "generated_at_utc": "2026-05-22T12:30:00Z",
                         "decision_rows_ref": str(decision_rows_path),

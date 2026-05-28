@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -517,7 +518,7 @@ def _latest_promotion_readiness_mtime(storage_root: Path) -> float | None:
     return max(mtimes) if mtimes else None
 
 
-def _latest_promotion_decision_status_mtime(storage_root: Path) -> tuple[str, float] | None:
+def _latest_promotion_decision_status_mtime(storage_root: Path, *, state_path: Path) -> tuple[str, float] | None:
     review_root = _model_group_replay_dataset_root(storage_root) / "promotion_review_runs"
     if not review_root.exists():
         return None
@@ -532,6 +533,8 @@ def _latest_promotion_decision_status_mtime(storage_root: Path) -> tuple[str, fl
         status = str(payload.get("decision_status") or "")
         if not status:
             continue
+        if not _promotion_decision_valid_for_fold_state(payload, decision_path=decision_path, state_path=state_path):
+            continue
         candidates.append((decision_path.stat().st_mtime, status))
     if not candidates:
         return None
@@ -539,8 +542,60 @@ def _latest_promotion_decision_status_mtime(storage_root: Path) -> tuple[str, fl
     return status, mtime
 
 
+def _promotion_decision_valid_for_fold_state(payload: dict[str, Any], *, decision_path: Path, state_path: Path) -> bool:
+    fold_scope = _fold_scope_from_state_path(state_path)
+    if fold_scope["fold_id"] and str(payload.get("fold_id") or "") != fold_scope["fold_id"]:
+        return False
+    replay_validation_ref = str(payload.get("replay_validation_ref") or "").strip()
+    if not replay_validation_ref:
+        return False
+    try:
+        replay_receipt = json.loads(Path(replay_validation_ref).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(replay_receipt, dict):
+        return False
+    candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "")
+    if "current_deterministic_crypto_policy" in candidate_model_ref:
+        return False
+    receipt_targets = _string_set(replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
+    target_symbol = str(fold_scope.get("target_symbol") or "").upper()
+    if target_symbol and receipt_targets and target_symbol not in receipt_targets:
+        return False
+    receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "")
+    if receipt_fold_id and fold_scope["fold_id"] and receipt_fold_id != fold_scope["fold_id"]:
+        return False
+    return True
+
+
+def _fold_scope_from_state_path(state_path: Path) -> dict[str, str]:
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+    start_month = str(payload.get("start_month") or "")
+    end_month = str(payload.get("end_month") or "")
+    target_symbol = str(payload.get("target_symbol") or payload.get("selected_target_symbol") or payload.get("target_ref") or "").upper()
+    match = re.match(r"^model_training_fold_state_([A-Za-z0-9.-]+)_\d{4}-\d{2}_\d{4}-\d{2}$", state_path.stem)
+    if not target_symbol and match:
+        target_symbol = match.group(1).upper()
+    return {
+        "fold_id": f"fold_{start_month}_{end_month}" if start_month and end_month else "",
+        "target_symbol": target_symbol,
+    }
+
+
+def _string_set(value: Any) -> set[str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return {stripped.upper()} if stripped else set()
+    if isinstance(value, (list, tuple, set)):
+        return {str(item).strip().upper() for item in value if str(item).strip()}
+    return set()
+
+
 def _fold_model_group_lifecycle_complete(storage_root: Path, state_path: Path) -> bool:
-    promotion_decision = _latest_promotion_decision_status_mtime(storage_root)
+    promotion_decision = _latest_promotion_decision_status_mtime(storage_root, state_path=state_path)
     try:
         state_mtime = state_path.stat().st_mtime
     except OSError:
