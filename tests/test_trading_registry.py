@@ -1111,7 +1111,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("MANAGER_MATERIALIZE_LAYER_TEN_EVENT_RISK_INPUTS", rows)
         self.assertNotIn("MANAGER_LAYER_TEN_EVENT_RISK_INPUT_MATERIALIZATION", rows)
         self.assertIn(
-            "promotion_review_waits_for_post_replay_layer_10_attribution_complete",
+            "promotion_waits_for_model_group_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
         )
         self.assertEqual(rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["kind"], "config")

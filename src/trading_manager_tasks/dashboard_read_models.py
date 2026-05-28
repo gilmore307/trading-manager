@@ -38,7 +38,15 @@ HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
 HISTORICAL_TASK_PROGRESS_SCHEMA_REF = f"storage/06_dashboard_cache/schemas/{HISTORICAL_TASK_PROGRESS_CONTRACT}.schema.json"
 DEFAULT_STALE_AFTER_SECONDS = 900
 MONTHLY_TASK_STAGE_TYPES = {"data_acquisition", "feature_generation"}
-FOLD_MODEL_STAGE_TYPES = {"model_generation", "model_evaluation", "post_replay_attribution", "promotion_review", "maintenance"}
+FOLD_MODEL_STAGE_TYPES = {
+    "model_generation",
+    "replay",
+    "layer_10_attribution",
+    "model_evaluation",
+    "post_replay_attribution",
+    "promotion_review",
+    "maintenance",
+}
 MONTHS_PER_MODEL_FOLD = 6
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
@@ -49,8 +57,10 @@ TASK_STAGE_SORT_ORDER = {
     "data_acquisition": 10,
     "feature_generation": 20,
     "model_generation": 30,
-    "model_evaluation": 40,
+    "replay": 40,
     "post_replay_attribution": 45,
+    "layer_10_attribution": 45,
+    "model_evaluation": 48,
     "promotion_review_preparation": 45,
     "promotion_review": 50,
     "maintenance": 60,
@@ -1143,7 +1153,15 @@ def _worker_info_for_stage(
     stage_type = str(raw_stage.get("stage_type") or "unknown")
     if stage_type in {"data_acquisition", "feature_generation"}:
         return _model_worker_info()
-    if stage_type in {"model_generation", "model_evaluation", "promotion_review", "maintenance"}:
+    if stage_type in {
+        "model_generation",
+        "replay",
+        "layer_10_attribution",
+        "model_evaluation",
+        "post_replay_attribution",
+        "promotion_review",
+        "maintenance",
+    }:
         return _model_worker_info()
     return {"worker_id": "scheduler_control_worker", "worker_label": "Scheduler Control Worker", "worker_kind": "scheduler_control"}
 
@@ -2183,105 +2201,34 @@ def _model_group_replay_timeline_tasks(
     if manifest is None and not dataset_root.exists() and completed_training_fold is None:
         return []
 
-    if manifest is None:
-        append_task(
-            task_id="model_group.data_acquisition",
-            label="Data Acquisition",
-            task_state="current",
-            status="ready",
-            reason="Waiting for model-group replay data-acquisition preparation manifest.",
-            blockers=[],
-            stage_type="data_acquisition",
-        )
-        append_task(
-            task_id="model_group.replay",
-            label="Model Evaluation",
-            task_state="future",
-            status="blocked",
-            reason="Waiting for model-group replay data acquisition before replay can run.",
-            blockers=["model_group.data_acquisition"],
-        )
-        append_task(
-            task_id="model_group.post_replay_attribution",
-            label="Post-Replay Attribution",
-            task_state="future",
-            status="blocked",
-            reason="Waiting for model-group replay before Layer 10 event failure/residual attribution can run.",
-            blockers=["model_group.replay"],
-            stage_type="post_replay_attribution",
-        )
-        append_task(
-            task_id="model_group.promotion_review",
-            label="Promotion Review",
-            task_state="future",
-            status="blocked",
-            reason="Waiting for post-replay attribution and promotion-evaluation-review.",
-            blockers=["model_group.post_replay_attribution", "promotion-evaluation-review"],
-            stage_type="promotion_review",
-        )
-        append_task(
-            task_id="model_group.maintenance",
-            label="Maintenance",
-            task_state="future",
-            status="blocked",
-            reason="Waiting for model-group promotion review before maintenance can run.",
-            blockers=["model_group.promotion_review"],
-            stage_type="maintenance",
-        )
-        return tasks
-
-    receipt_refs = _replay_manifest_refs(manifest, dataset_root)
-    prepared_at = str(manifest.get("prepared_at_utc") or generated_at_utc)
+    pre_replay_complete = completed_training_fold is not None
+    receipt_refs = _replay_manifest_refs(manifest, dataset_root) if manifest is not None else []
+    prepared_at = str((manifest or {}).get("prepared_at_utc") or generated_at_utc)
     tasks_updated_at = prepared_at or generated_at_utc
-    tasks.clear()
 
-    expected = _int_field(manifest, "feed_acquisition_count")
-    ready = _int_field(manifest, "available_feed_acquisition_count")
-    deferred = _int_field(manifest, "deferred_feed_acquisition_count")
-    missing = _int_field(manifest, "missing_feed_acquisition_count")
-    if expected == 0:
+    expected = _int_field(manifest or {}, "feed_acquisition_count")
+    ready = _int_field(manifest or {}, "available_feed_acquisition_count")
+    deferred = _int_field(manifest or {}, "deferred_feed_acquisition_count")
+    missing = _int_field(manifest or {}, "missing_feed_acquisition_count")
+    if manifest is not None and expected == 0:
         coverage_rows = _replay_coverage_rows(dataset_root / "coverage_summary.csv")
         expected = sum(int(row.get("required_acquisition_count") or 0) for row in coverage_rows)
         ready = sum(int(row.get("available_acquisition_count") or 0) for row in coverage_rows)
         deferred = sum(int(row.get("deferred_acquisition_count") or 0) for row in coverage_rows)
         missing = sum(int(row.get("missing_acquisition_count") or 0) for row in coverage_rows)
 
-    coverage_complete = expected > 0 and missing == 0
-    append_task(
-        task_id="model_group.data_acquisition",
-        label="Data Acquisition",
-        task_state="completed" if coverage_complete else "current",
-        status="succeeded" if coverage_complete else "blocked",
-        reason=(
-            "Model-group replay data acquisition is complete."
-            if coverage_complete
-            else f"Model-group replay data acquisition is incomplete: {missing}/{expected} feed acquisitions missing."
-        ),
-        receipt_refs=receipt_refs,
-        blockers=[] if coverage_complete else ["one_shot_provider_acquisition_requires_separate_gate"],
-        stage_type="data_acquisition",
-        progress={
-            "stage_id": "model_group.data_acquisition",
-            "status": "complete" if coverage_complete else "partial_ready",
-            "unit_label": "source-months",
-            "expected_count": expected,
-            "ready_count": ready,
-            "pending_count": missing,
-            "failed_count": 0,
-            "accepted_failed_count": deferred,
-            "can_unlock_downstream": coverage_complete,
-        },
-    )
-    tasks[-1]["updated_at_utc"] = tasks_updated_at
-    tasks[-1]["status_updated_at_utc"] = tasks_updated_at
-
-    freeze_status = str(manifest.get("freeze_status") or "not_frozen")
+    coverage_complete = manifest is not None and expected > 0 and missing == 0
+    freeze_status = str((manifest or {}).get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
     replay_ready_months = _replay_ready_months(dataset_root)
     replay_progress = _replay_month_progress(
         dataset_root=dataset_root,
         stage_id="model_group.replay",
-        status="complete" if replay_ready_months and len(replay_ready_months) >= _replay_window_month_count(dataset_root) else ("ready" if freeze_ready else "blocked"),
+        status=(
+            "complete"
+            if replay_ready_months and len(replay_ready_months) >= _replay_window_month_count(dataset_root)
+            else ("ready" if freeze_ready else "blocked")
+        ),
         ready_months=replay_ready_months,
     )
     replay_started = bool(replay_ready_months)
@@ -2312,27 +2259,62 @@ def _model_group_replay_timeline_tasks(
         )
         if str(item)
     ]
+
+    replay_blockers: list[str] = []
+    if not pre_replay_complete:
+        replay_blockers.append("fold_layers_01_09_model_generation_complete")
+    if manifest is None:
+        replay_blockers.append("replay_dataset_preparation_manifest")
+    elif not coverage_complete:
+        replay_blockers.append("replay_dataset_coverage_complete")
+    elif not freeze_ready:
+        replay_blockers.append("model_group_replay_freeze_review")
+
+    replay_state = "completed" if replay_complete else ("current" if pre_replay_complete or replay_started else "future")
+    replay_status = "succeeded" if replay_complete else ("ready" if not replay_blockers else "blocked")
+    replay_reason = (
+        "Model-group replay is complete across the accepted replay window."
+        if replay_complete
+        else f"Model-group replay has started and completed {len(replay_ready_months)}/{_replay_window_month_count(dataset_root)} replay months."
+        if replay_started
+        else "Pre-replay Layer 1-9 fold is complete; replay is waiting for its fixed replay dataset preparation manifest."
+        if pre_replay_complete and manifest is None
+        else f"Replay dataset coverage is incomplete: {missing}/{expected} feed acquisitions missing."
+        if pre_replay_complete and manifest is not None and not coverage_complete
+        else f"Replay dataset is covered but not frozen; current freeze_status={freeze_status}."
+        if pre_replay_complete and manifest is not None and coverage_complete and not freeze_ready
+        else "Waiting for pre-replay Layer 1-9 model generation to complete before replay can run."
+    )
+    if manifest is not None and not coverage_complete:
+        replay_progress = {
+            "stage_id": "model_group.replay",
+            "status": "partial_ready",
+            "unit_label": "source-months",
+            "expected_count": expected,
+            "ready_count": ready,
+            "pending_count": missing,
+            "failed_count": 0,
+            "accepted_failed_count": deferred,
+            "can_unlock_downstream": False,
+        }
+
     append_task(
         task_id="model_group.replay",
-        label="Model Evaluation",
-        task_state="completed" if replay_complete else ("current" if replay_started else "future"),
-        status="succeeded" if replay_complete else ("ready" if freeze_ready else "blocked"),
-        reason=(
-            "Model-group replay is complete across the accepted replay window."
-            if replay_complete
-            else f"Model-group replay has started and completed {len(replay_ready_months)}/{_replay_window_month_count(dataset_root)} replay months."
-            if replay_started
-            else "Model-group replay is ready to run the frozen pre-attribution live-flow component graph; Layer 10 starts after replay for failure/residual attribution before evaluation."
-            if freeze_ready
-            else f"Waiting for complete model-group replay data acquisition and frozen replay contract; current freeze_status={freeze_status}."
-        ),
-        receipt_refs=[str(manifest_path)],
-        blockers=[] if freeze_ready else ["model_group.data_acquisition", "model_group_replay_freeze_review"],
+        label="Replay",
+        task_state=replay_state,
+        status=replay_status,
+        reason=replay_reason,
+        receipt_refs=[str(manifest_path)] if manifest is not None else receipt_refs,
+        blockers=replay_blockers,
         progress=replay_progress,
+        stage_type="replay",
     )
+    tasks[-1]["updated_at_utc"] = tasks_updated_at
+    tasks[-1]["status_updated_at_utc"] = tasks_updated_at
+
     append_task(
-        task_id="model_group.post_replay_attribution",
-        label="Post-Replay Attribution",
+        task_id="model_group.layer_10_attribution",
+        label="Layer 10 Attribution",
         task_state="completed" if attribution_complete else ("current" if replay_complete else "future"),
         status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
         reason=(
@@ -2344,37 +2326,62 @@ def _model_group_replay_timeline_tasks(
         ),
         receipt_refs=list(attribution_artifacts["receipt_refs"]) if attribution_artifacts else None,
         blockers=[] if replay_complete else ["model_group.replay"],
-        stage_type="post_replay_attribution",
+        stage_type="layer_10_attribution",
         progress=_single_step_progress(
-            stage_id="model_group.post_replay_attribution",
+            stage_id="model_group.layer_10_attribution",
             status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
             complete=attribution_complete,
             unit_label="attribution-receipt",
             can_unlock_downstream=attribution_complete,
         ),
     )
+
+    evaluation_complete = promotion_complete
     append_task(
-        task_id="model_group.promotion_review",
-        label="Promotion Review",
-        task_state="completed" if promotion_eligible else ("current" if attribution_complete else "future"),
-        status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if attribution_complete else "blocked",
+        task_id="model_group.evaluation",
+        label="Evaluation",
+        task_state="completed" if evaluation_complete else ("current" if attribution_complete else "future"),
+        status="succeeded" if evaluation_complete else ("ready" if attribution_complete else "blocked"),
+        reason=(
+            "Model-group evaluation evidence is complete and available for promotion."
+            if evaluation_complete
+            else "Evaluation is ready to aggregate replay metrics, guardrails, incumbent comparison, and Layer 10 attribution evidence."
+            if attribution_complete
+            else "Waiting for Layer 10 attribution before evaluation can run."
+        ),
+        receipt_refs=list(promotion_artifacts["receipt_refs"]) if promotion_artifacts else None,
+        blockers=[] if attribution_complete else ["model_group.layer_10_attribution"],
+        stage_type="model_evaluation",
+        progress=_single_step_progress(
+            stage_id="model_group.evaluation",
+            status="succeeded" if evaluation_complete else ("ready" if attribution_complete else "blocked"),
+            complete=evaluation_complete,
+            unit_label="evaluation-packet",
+            can_unlock_downstream=evaluation_complete,
+        ),
+    )
+
+    append_task(
+        task_id="model_group.promotion",
+        label="Promotion",
+        task_state="completed" if promotion_eligible else ("current" if evaluation_complete else "future"),
+        status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if evaluation_complete else "blocked",
         reason=(
             str(promotion_decision.get("decision_reason") or "Promotion review completed.") if promotion_decision else
-            "Promotion review integrates replay metrics, guardrails, incumbent comparison, and advisory "
-            "post-replay attribution plus promotion-evaluation-review evidence into a model-group decision."
+            "Promotion waits for completed model-group evaluation and promotion-evaluation-review evidence."
         ),
         receipt_refs=list(promotion_artifacts["receipt_refs"]) if promotion_artifacts else None,
         blockers=(
             promotion_blockers
-            if promotion_complete and not promotion_eligible and attribution_complete
-            else ([] if attribution_complete else ["model_group.post_replay_attribution", "promotion-evaluation-review"])
+            if promotion_complete and not promotion_eligible and evaluation_complete
+            else ([] if evaluation_complete else ["model_group.evaluation", "promotion-evaluation-review"])
         ),
         stage_type="promotion_review",
         progress=_single_step_progress(
-            stage_id="model_group.promotion_review",
-            status=(promotion_decision_status or "ready") if attribution_complete else "blocked",
-            complete=promotion_complete and attribution_complete,
-            unit_label="review-decision",
+            stage_id="model_group.promotion",
+            status=(promotion_decision_status or "ready") if evaluation_complete else "blocked",
+            complete=promotion_complete and evaluation_complete,
+            unit_label="promotion-decision",
             can_unlock_downstream=promotion_eligible,
         ),
     )
@@ -2387,12 +2394,12 @@ def _model_group_replay_timeline_tasks(
             "Promotion readiness handoff is complete; execution can admit the promoted model group to market-hours shadow review."
             if readiness_complete
             else
-            "Model-group candidate is eligible for maintenance handoff after promotion review."
+            "Model-group candidate is eligible for maintenance handoff after promotion."
             if promotion_eligible
-            else "Waiting for eligible model-group promotion review before maintenance can run."
+            else "Waiting for eligible model-group promotion before maintenance can run."
         ),
         receipt_refs=list(readiness_artifacts["receipt_refs"]) if readiness_artifacts else None,
-        blockers=[] if promotion_eligible else ["model_group.promotion_review"],
+        blockers=[] if promotion_eligible else ["model_group.promotion"],
         stage_type="maintenance",
         progress=_single_step_progress(
             stage_id="model_group.maintenance",
