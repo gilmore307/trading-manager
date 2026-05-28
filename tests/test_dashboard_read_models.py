@@ -1204,11 +1204,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
-        self.assertEqual(progress["unit_label"], "dataset splits")
-        self.assertEqual(progress["expected_count"], 3)
-        self.assertEqual(progress["ready_count"], 1)
+        self.assertEqual(progress["unit_label"], "dataset months")
+        self.assertEqual(progress["expected_count"], 6)
+        self.assertEqual(progress["ready_count"], 4)
         self.assertEqual(progress["pending_count"], 2)
-        self.assertIn("train/validation/test", progress["progress_basis"])
+        self.assertIn("train=4 months", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "layer_03_target_state_vector.model_generation.validation")
 
     def test_active_model_generation_progress_preserves_split_total(self):
@@ -1287,9 +1287,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         progress = task["detail"]["progress"]
         self.assertEqual(progress["status"], "running")
         self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
-        self.assertEqual(progress["unit_label"], "dataset splits")
-        self.assertEqual(progress["expected_count"], 3)
-        self.assertEqual(progress["ready_count"], 1)
+        self.assertEqual(progress["unit_label"], "dataset months")
+        self.assertEqual(progress["expected_count"], 6)
+        self.assertEqual(progress["ready_count"], 4)
         self.assertEqual(progress["pending_count"], 2)
         self.assertEqual(progress["stage_id"], "layer_03_target_state_vector.model_generation.validation")
         self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
@@ -1373,9 +1373,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
-        self.assertEqual(progress["unit_label"], "dataset splits")
-        self.assertEqual(progress["expected_count"], 3)
-        self.assertEqual(progress["ready_count"], 3)
+        self.assertEqual(progress["unit_label"], "dataset months")
+        self.assertEqual(progress["expected_count"], 6)
+        self.assertEqual(progress["ready_count"], 6)
         self.assertEqual(progress["pending_count"], 0)
         self.assertNotIn("artifact_count", progress)
 

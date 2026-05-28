@@ -68,7 +68,7 @@ class TaskProgressTests(unittest.TestCase):
             payloads = load_active_task_progress(progress_root)
 
         progress = payloads["2016-01..2016-06:layer_05_alpha_confidence.model_generation.validation"]
-        self.assertEqual(progress["unit_label"], "dataset splits")
+        self.assertEqual(progress["unit_label"], "dataset months")
         self.assertEqual(progress["expected_count"], 1)
         self.assertEqual(progress["ready_count"], 1)
         self.assertEqual(progress["progress_source"], "active_progress_file")

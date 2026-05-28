@@ -56,7 +56,7 @@ FOLD_MODEL_STAGE_TYPES = {
     "maintenance",
 }
 MONTHS_PER_MODEL_FOLD = 6
-MODEL_GENERATION_SPLIT_COUNT = len(ROLLING_FOLD_SPLIT_MONTHS)
+MODEL_GENERATION_SPLIT_MONTH_COUNT = sum(months for _name, months in ROLLING_FOLD_SPLIT_MONTHS)
 MODEL_GROUP_EVALUATION_TESTS = (
     "replay_metrics",
     "guardrail_checks",
@@ -1562,20 +1562,27 @@ def _aggregate_status(stages: list[Mapping[str, Any]]) -> tuple[str, Mapping[str
 def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status: str) -> dict[str, Any]:
     terminal_statuses = {"succeeded", "not_applicable"}
     model_generation_stages = [stage for stage in stages if str(stage.get("stage_type") or "") == "model_generation"]
-    expected_split_names = {name for name, _months in ROLLING_FOLD_SPLIT_MONTHS}
+    split_months_by_name = {name: months for name, months in ROLLING_FOLD_SPLIT_MONTHS}
     if model_generation_stages:
         counted_stages = [
             stage
             for stage in model_generation_stages
             if isinstance(stage.get("dataset_split"), Mapping)
-            and str(stage["dataset_split"].get("split_name") or "") in expected_split_names
+            and str(stage["dataset_split"].get("split_name") or "") in split_months_by_name
         ]
-        expected_count = MODEL_GENERATION_SPLIT_COUNT
+        expected_count = MODEL_GENERATION_SPLIT_MONTH_COUNT
     else:
         counted_stages = stages
         expected_count = len(counted_stages)
-    ready_count = sum(1 for stage in counted_stages if str(stage.get("status") or "") in terminal_statuses)
-    failed_count = sum(1 for stage in counted_stages if str(stage.get("status") or "") == "failed")
+    def stage_weight(stage: Mapping[str, Any]) -> int:
+        if not model_generation_stages:
+            return 1
+        dataset_split = stage.get("dataset_split")
+        split_name = str(dataset_split.get("split_name") or "") if isinstance(dataset_split, Mapping) else ""
+        return split_months_by_name.get(split_name, 0)
+
+    ready_count = sum(stage_weight(stage) for stage in counted_stages if str(stage.get("status") or "") in terminal_statuses)
+    failed_count = sum(stage_weight(stage) for stage in counted_stages if str(stage.get("status") or "") == "failed")
     pending_count = max(expected_count - ready_count - failed_count, 0)
     if expected_count and ready_count == expected_count and failed_count == 0:
         progress_status = "complete"
@@ -1585,10 +1592,10 @@ def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status
         progress_status = "pending"
     else:
         progress_status = status
-    unit_label = "dataset splits" if model_generation_stages else "model stages"
+    unit_label = "dataset months" if model_generation_stages else "model stages"
     progress_source = "model_generation_dataset_splits" if model_generation_stages else "model_task_internal_stages"
     progress_basis = (
-        "chronological train/validation/test splits required by the six-month fold"
+        "chronological train/validation/test month coverage required by the six-month fold: train=4 months, validation=1 month, test=1 month"
         if model_generation_stages
         else "layer-internal model task stages"
     )

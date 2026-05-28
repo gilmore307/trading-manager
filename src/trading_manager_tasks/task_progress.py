@@ -23,8 +23,8 @@ STAGE_PROGRESS_CONTRACTS: dict[str, dict[str, str]] = {
         "progress_basis": "feature partitions required by the six-month fold",
     },
     "model_generation": {
-        "unit_label": "dataset splits",
-        "progress_basis": "chronological train/validation/test splits required by the six-month fold",
+        "unit_label": "dataset months",
+        "progress_basis": "chronological train/validation/test month coverage required by the six-month fold",
     },
     "replay": {
         "unit_label": "replay months",
