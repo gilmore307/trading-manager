@@ -203,6 +203,7 @@ def _receipt_payload(
         "manager_stage_id": stage.stage_id,
         "stage_type": stage.stage_type,
         "status": summary.status,
+        "dataset_split": dict(stage.dataset_split) if stage.dataset_split is not None else None,
         "started_at": started_at,
         "completed_at": completed_at,
         "runs": [
@@ -261,7 +262,10 @@ def execute_stage_process(
         unit_label=_stage_progress_unit_label(stage),
         node_id="stage_started",
         node_label="Stage process started",
-        extra={"progress_basis": progress_contract_for_stage(stage.stage_id)["progress_basis"]},
+        extra={
+            "progress_basis": progress_contract_for_stage(stage.stage_id)["progress_basis"],
+            **({"dataset_split": stage.dataset_split} if stage.dataset_split is not None else {}),
+        },
     )
     timeout_seconds = int(os.environ.get("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS") or DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS)
     run_env = {
@@ -272,6 +276,14 @@ def execute_stage_process(
         "TRADING_MANAGER_TASK_PROGRESS_WORKER_ID": worker_id,
         "TRADING_MANAGER_TASK_PROGRESS_TASK_UID": task_uid,
         "TRADING_MANAGER_TASK_PROGRESS_STAGE_ID": stage.stage_id,
+        **(
+            {
+                "TRADING_MODEL_DATASET_SPLIT_NAME": str(stage.dataset_split["split_name"]),
+                "TRADING_MODEL_DATASET_SPLIT_POLICY": str(stage.dataset_split["split_policy"]),
+            }
+            if stage.dataset_split is not None
+            else {}
+        ),
     }
     try:
         result = subprocess.run(

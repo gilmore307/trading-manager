@@ -23,8 +23,8 @@ STAGE_PROGRESS_CONTRACTS: dict[str, dict[str, str]] = {
         "progress_basis": "feature partitions required by the six-month fold",
     },
     "model_generation": {
-        "unit_label": "model fold",
-        "progress_basis": "one deterministic model-generation pass over the six-month fold",
+        "unit_label": "dataset splits",
+        "progress_basis": "chronological train/validation/test splits required by the six-month fold",
     },
     "replay": {
         "unit_label": "replay months",
@@ -60,6 +60,8 @@ def worker_progress_path(progress_root: Path, worker_id: str) -> Path:
 
 def _stage_type_from_stage_id(stage_id: object) -> str:
     text = str(stage_id or "")
+    if ".model_generation." in text:
+        return "model_generation"
     if "." in text:
         return text.rsplit(".", 1)[-1]
     if text.startswith("model_group."):

@@ -59,6 +59,7 @@ class StageProgress:
     command: list[str]
     blockers: tuple[str, ...]
     dataset_unit: DatasetUnit | None = None
+    dataset_split: dict[str, Any] | None = None
     approval_gate_required: str | None = None
     approval_status: str | None = None
     artifact_refs: tuple[str, ...] = ()
@@ -74,6 +75,8 @@ class StageProgress:
         row = asdict(self)
         row["blockers"] = list(self.blockers)
         row["dataset_unit"] = self.dataset_unit.summary_row() if self.dataset_unit else None
+        if self.dataset_split is not None:
+            row["dataset_split"] = dict(self.dataset_split)
         row["artifact_refs"] = list(self.artifact_refs)
         row["receipt_refs"] = list(self.receipt_refs)
         return row
@@ -123,6 +126,7 @@ def _stage_from_plan(stage: WorkflowStage, *, now: str) -> StageProgress:
         command=stage.command,
         blockers=stage.blockers,
         dataset_unit=stage.dataset_unit,
+        dataset_split=dict(stage.dataset_split) if stage.dataset_split is not None else None,
         approval_gate_required=stage.approval_gate_required,
         updated_utc=now,
         created_at_utc=now,
@@ -177,6 +181,7 @@ def load_workflow_state(path: Path, plan: ModelTrainingWorkflowPlan) -> Workflow
             command=stage.command,
             blockers=stage.blockers,
             dataset_unit=stage.dataset_unit,
+            dataset_split=dict(stage.dataset_split) if stage.dataset_split is not None else None,
             approval_gate_required=stage.approval_gate_required,
             approval_status=row.get("approval_status"),
             artifact_refs=tuple(str(item) for item in row.get("artifact_refs") or []),
@@ -309,7 +314,13 @@ def refresh_workflow_state(state: WorkflowState, *, plan: ModelTrainingWorkflowP
     working = dict(current)
     for plan_stage in plan_stages.values():
         stage = working.get(plan_stage.stage_id) or _stage_from_plan(plan_stage, now=now)
-        stage = replace(stage, command=plan_stage.command, blockers=plan_stage.blockers, approval_gate_required=plan_stage.approval_gate_required)
+        stage = replace(
+            stage,
+            command=plan_stage.command,
+            blockers=plan_stage.blockers,
+            dataset_split=dict(plan_stage.dataset_split) if plan_stage.dataset_split is not None else None,
+            approval_gate_required=plan_stage.approval_gate_required,
+        )
         if stage.status in {"succeeded", "failed", "not_applicable"}:
             refreshed.append(stage)
             working[stage.stage_id] = stage

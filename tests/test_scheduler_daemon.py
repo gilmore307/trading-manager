@@ -417,7 +417,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             ready = [stage["stage_id"] for stage in payload["stages"] if stage["status"] == "ready"]
 
         self.assertEqual(state_path.name, "model_training_fold_state_aapl_2016-01_2016-06.json")
-        self.assertIn("layer_01_market_regime.model_generation", ready)
+        self.assertIn("layer_01_market_regime.model_generation.train", ready)
 
     def test_target_scoped_fold_state_path_prevents_cross_target_collision(self):
         path = model_worker_fold_state_path(

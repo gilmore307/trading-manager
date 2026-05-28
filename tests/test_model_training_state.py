@@ -365,11 +365,13 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             }
             for layer, key in layer_slugs.items():
                 prefix = f"layer_{layer:02d}_{key}"
-                stage_types = ["model_generation"]
+                stage_types = ["model_generation.train", "model_generation.validation", "model_generation.test"]
                 if layer not in {4, 5, 6, 7, 8}:
                     stage_types = ["data_acquisition", "feature_generation", *stage_types]
                 completions.extend(f"{prefix}.{stage_type}" for stage_type in stage_types)
             state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
                 storage_root=tmp,
                 state_path=state_path,
                 completed_stage_ids=completions + ["layer_04_event_failure_risk.data_acquisition"],
@@ -387,6 +389,8 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             state_path = tmp / "workflow_state.json"
             state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
                 storage_root=tmp,
                 state_path=state_path,
                 selected_target_symbol="AAPL",
@@ -415,10 +419,14 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                     [
                         f"{prefix}.data_acquisition",
                         f"{prefix}.feature_generation",
-                        f"{prefix}.model_generation",
+                        f"{prefix}.model_generation.train",
+                        f"{prefix}.model_generation.validation",
+                        f"{prefix}.model_generation.test",
                     ]
                 )
             state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
                 storage_root=tmp,
                 state_path=state_path,
                 completed_stage_ids=completions + ["layer_04_event_failure_risk.data_acquisition"],
@@ -429,7 +437,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             stage_by_id = {stage.stage_id: stage for stage in state.stages}
             self.assertNotIn("layer_05_alpha_confidence.data_acquisition", stage_by_id)
             self.assertNotIn("layer_05_alpha_confidence.feature_generation", stage_by_id)
-            self.assertEqual(stage_by_id["layer_04_event_failure_risk.model_generation"].status, "ready")
+            self.assertEqual(stage_by_id["layer_04_event_failure_risk.model_generation.train"].status, "ready")
 
     def test_workflow_state_write_triggers_dashboard_refresh_when_enabled(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

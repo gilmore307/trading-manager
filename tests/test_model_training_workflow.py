@@ -87,15 +87,47 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 10)))
         for layer in plan.layers:
             if layer.layer in {1, 2, 3, 4, 9}:
-                expected_stage_types = ["data_acquisition", "feature_generation", "model_generation"]
+                expected_stage_types = ["data_acquisition", "feature_generation", "model_generation", "model_generation", "model_generation"]
             else:
-                expected_stage_types = ["model_generation"]
+                expected_stage_types = ["model_generation", "model_generation", "model_generation"]
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
             self.assertIn("model_", " ".join(layer.model_generate_command))
             self.assertIn("model_", " ".join(layer.model_evaluate_command))
             self.assertTrue(layer.progression_mode)
             self.assertTrue(layer.candidate_axis)
             self.assertTrue(layer.candidate_progression_policy)
+
+    def test_model_generation_uses_chronological_train_validation_test_split_stages(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-06",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        layer = plan.layers[2]
+        split_stages = [stage for stage in layer.stages if stage.stage_type == "model_generation"]
+        self.assertEqual([stage.stage_id for stage in split_stages], [
+            "layer_03_target_state_vector.model_generation.train",
+            "layer_03_target_state_vector.model_generation.validation",
+            "layer_03_target_state_vector.model_generation.test",
+        ])
+        self.assertEqual([stage.dataset_split["split_name"] for stage in split_stages], ["train", "validation", "test"])
+        self.assertEqual([stage.dataset_split["split_months"] for stage in split_stages], [4, 1, 1])
+        self.assertIn("2016-01-01T00:00:00-05:00", split_stages[0].command)
+        self.assertIn("2016-05-01T00:00:00-05:00", split_stages[0].command)
+        self.assertIn("2016-05-01T00:00:00-05:00", split_stages[1].command)
+        self.assertIn("2016-06-01T00:00:00-05:00", split_stages[1].command)
+        self.assertIn("2016-06-01T00:00:00-05:00", split_stages[2].command)
+        self.assertIn("2016-07-01T00:00:00-05:00", split_stages[2].command)
+        self.assertTrue(any(token.endswith("model_rows_aapl_2016-01_train.jsonl") for token in split_stages[0].command))
+        self.assertTrue(any(token.endswith("model_rows_aapl_2016-05_validation.jsonl") for token in split_stages[1].command))
+        self.assertTrue(any(token.endswith("model_rows_aapl_2016-06_test.jsonl") for token in split_stages[2].command))
+        self.assertIn("TRADING_MODEL_DATASET_SPLIT_NAME=train", split_stages[0].command)
+        self.assertEqual(split_stages[1].blockers, ("layer_03_target_state_vector.model_generation.train_complete",))
+        self.assertEqual(split_stages[2].blockers, ("layer_03_target_state_vector.model_generation.validation_complete",))
 
     def test_foundation_catch_up_months_do_not_expose_model_or_promotion_review_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -267,7 +299,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertEqual(acquisition_stage.command[acquisition_stage.command.index("--end-month") + 1], "${END_MONTH}")
         self.assertEqual(fold_plan.layers[2].stages[2].stage_type, "model_generation")
         self.assertEqual(fold_plan.end_month, "2016-12")
-        self.assertIn("${END_MONTH_EXCLUSIVE_START_ET}", fold_plan.layers[2].stages[2].command)
+        self.assertIn("2016-11-01T00:00:00-05:00", fold_plan.layers[2].stages[2].command)
 
     def test_post_foundation_model_stages_can_be_reenabled_after_catch_up_acceptance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -401,7 +433,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         layer = plan.layers[4]
         self.assertEqual(layer.layer_key, "layer_05_alpha_confidence")
-        self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation"])
+        self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation", "model_generation", "model_generation"])
         self.assertNotIn("materialize_layer_ten_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
         self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
         self.assertIn("--from-database", layer.model_generate_command)
@@ -521,7 +553,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         layer_four_stage_types = [stage.stage_type for stage in plan.layers[3].stages]
         self.assertEqual(
             layer_four_stage_types,
-            ["data_acquisition", "feature_generation", "model_generation"],
+            ["data_acquisition", "feature_generation", "model_generation", "model_generation", "model_generation"],
         )
         self.assertIn("execute_layer_four_event_failure_feature_generation.py", " ".join(plan.layers[3].feature_command))
         for layer_number in (5, 6, 7, 8):
@@ -529,7 +561,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             stage_types = [stage.stage_type for stage in layer.stages]
             self.assertNotIn("data_acquisition", stage_types)
             self.assertNotIn("feature_generation", stage_types)
-            self.assertEqual(stage_types, ["model_generation"])
+            self.assertEqual(stage_types, ["model_generation", "model_generation", "model_generation"])
             self.assertIn("no-dedicated-trading-data-feature-stage", " ".join(layer.feature_command))
 
     def test_dataset_units_are_layer_aware_and_target_visible(self):

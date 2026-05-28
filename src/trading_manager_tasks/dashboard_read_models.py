@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Mapping, TextIO
 
 from .model_training_state import advance_workflow_state
-from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, LAYER_METADATA, MONTHLY_SUBSTRATE_LAYERS, build_model_training_workflow_plan
+from .model_training_workflow import FOUNDATION_CATCH_UP_STAGE_TYPES, LAYER_METADATA, MONTHLY_SUBSTRATE_LAYERS, ROLLING_FOLD_SPLIT_MONTHS, build_model_training_workflow_plan
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, completed_historical_month_cutoff, select_model_worker_fold, select_month_ingest_worker_months
 from .scheduler_status import (
@@ -49,7 +49,7 @@ FOLD_MODEL_STAGE_TYPES = {
     "maintenance",
 }
 MONTHS_PER_MODEL_FOLD = 6
-MODEL_GENERATION_FOLD_COUNT = 1
+MODEL_GENERATION_SPLIT_COUNT = len(ROLLING_FOLD_SPLIT_MONTHS)
 MODEL_GROUP_EVALUATION_TESTS = (
     "replay_metrics",
     "guardrail_checks",
@@ -884,25 +884,7 @@ def _semantic_stage_progress(
             progress_basis=contract["progress_basis"],
         )
     if stage_type == "model_generation":
-        status = str(stage_status or "").lower()
-        complete = status in {"succeeded", "not_applicable"}
-        failed = 1 if status == "failed" else 0
-        contract = progress_contract_for_stage(f"{stage_id}.model_generation")
-        ready = MODEL_GENERATION_FOLD_COUNT if complete else 0
-        return {
-            "stage_id": stage_id,
-            "status": "complete" if complete else ("failed" if failed else status or "pending"),
-            "unit_label": contract["unit_label"],
-            "expected_count": MODEL_GENERATION_FOLD_COUNT,
-            "ready_count": ready,
-            "pending_count": max(MODEL_GENERATION_FOLD_COUNT - ready - failed, 0),
-            "failed_count": failed,
-            "accepted_failed_count": 0,
-            "can_unlock_downstream": complete,
-            "progress_source": "model_generation_fold_pass",
-            "progress_basis": contract["progress_basis"],
-            "expected_partition_count": MODEL_GENERATION_FOLD_COUNT,
-        }
+        return None
     return None
 
 
@@ -1572,22 +1554,50 @@ def _aggregate_status(stages: list[Mapping[str, Any]]) -> tuple[str, Mapping[str
 
 def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status: str) -> dict[str, Any]:
     terminal_statuses = {"succeeded", "not_applicable"}
-    ready_count = sum(1 for stage in stages if str(stage.get("status") or "") in terminal_statuses)
-    failed_count = sum(1 for stage in stages if str(stage.get("status") or "") == "failed")
-    expected_count = len(stages)
+    model_generation_stages = [stage for stage in stages if str(stage.get("stage_type") or "") == "model_generation"]
+    expected_split_names = {name for name, _months in ROLLING_FOLD_SPLIT_MONTHS}
+    if model_generation_stages:
+        counted_stages = [
+            stage
+            for stage in model_generation_stages
+            if isinstance(stage.get("dataset_split"), Mapping)
+            and str(stage["dataset_split"].get("split_name") or "") in expected_split_names
+        ]
+        expected_count = MODEL_GENERATION_SPLIT_COUNT
+    else:
+        counted_stages = stages
+        expected_count = len(counted_stages)
+    ready_count = sum(1 for stage in counted_stages if str(stage.get("status") or "") in terminal_statuses)
+    failed_count = sum(1 for stage in counted_stages if str(stage.get("status") or "") == "failed")
     pending_count = max(expected_count - ready_count - failed_count, 0)
-    progress_status = "complete" if expected_count and ready_count == expected_count and failed_count == 0 else status
+    if expected_count and ready_count == expected_count and failed_count == 0:
+        progress_status = "complete"
+    elif failed_count:
+        progress_status = "failed"
+    elif model_generation_stages and str(status or "") in terminal_statuses:
+        progress_status = "pending"
+    else:
+        progress_status = status
+    unit_label = "dataset splits" if model_generation_stages else "model stages"
+    progress_source = "model_generation_dataset_splits" if model_generation_stages else "model_task_internal_stages"
+    progress_basis = (
+        "chronological train/validation/test splits required by the six-month fold"
+        if model_generation_stages
+        else "layer-internal model task stages"
+    )
     return {
         "stage_id": layer_key,
         "status": progress_status,
-        "unit_label": "model stages",
+        "unit_label": unit_label,
         "expected_count": expected_count,
         "ready_count": ready_count,
         "pending_count": pending_count,
         "failed_count": failed_count,
         "accepted_failed_count": 0,
         "can_unlock_downstream": bool(expected_count and ready_count == expected_count and failed_count == 0),
-        "progress_source": "model_task_internal_stages",
+        "progress_source": progress_source,
+        "progress_basis": progress_basis,
+        "expected_partition_count": expected_count,
     }
 
 
@@ -1655,6 +1665,7 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
                         "stage_type": stage.get("stage_type"),
                         "status": stage.get("status"),
                         "blockers": list(stage.get("blockers") or []),
+                        "dataset_split": stage.get("dataset_split") if isinstance(stage.get("dataset_split"), Mapping) else None,
                     }
                     for stage in stages
                 ],

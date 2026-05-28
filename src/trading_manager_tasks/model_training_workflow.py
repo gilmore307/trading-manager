@@ -36,6 +36,11 @@ ROLLING_FOLD_TRAIN_MONTHS = 4
 ROLLING_FOLD_VALIDATION_MONTHS = 1
 ROLLING_FOLD_TEST_MONTHS = 1
 ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_MONTHS + ROLLING_FOLD_TEST_MONTHS
+ROLLING_FOLD_SPLIT_MONTHS = (
+    ("train", ROLLING_FOLD_TRAIN_MONTHS),
+    ("validation", ROLLING_FOLD_VALIDATION_MONTHS),
+    ("test", ROLLING_FOLD_TEST_MONTHS),
+)
 PROMOTION_STAGE_TYPE = "promotion_review"
 FOLD_STACK_PROMOTION_BLOCKER = "fold_layers_01_09_model_generation_complete"
 MODEL_GROUP_REPLAY_COMPLETE_BLOCKER = "model_group_replay_complete"
@@ -75,6 +80,7 @@ class WorkflowStage:
     command: list[str]
     dataset_unit: DatasetUnit
     blockers: tuple[str, ...] = ()
+    dataset_split: dict[str, Any] | None = None
     approval_gate_required: str | None = None
     safe_without_provider_calls: bool = True
     provider_calls_allowed: bool = False
@@ -606,6 +612,69 @@ def _next_month(month: str) -> str:
     return f"{year:04d}-{month_number + 1:02d}"
 
 
+def _add_months(month: str, offset: int) -> str:
+    year, month_number = int(month[:4]), int(month[5:])
+    month_index = year * 12 + month_number - 1 + offset
+    return f"{month_index // 12:04d}-{month_index % 12 + 1:02d}"
+
+
+def _month_span_count(start_month: str, end_month: str) -> int:
+    start_year, start_number = int(start_month[:4]), int(start_month[5:])
+    end_year, end_number = int(end_month[:4]), int(end_month[5:])
+    return (end_year - start_year) * 12 + (end_number - start_number) + 1
+
+
+def _month_start_et(month: str) -> str:
+    return f"{month}-01T00:00:00-05:00"
+
+
+def _exclusive_month_start_et(month: str) -> str:
+    return f"{_add_months(month, 1)}-01T00:00:00-05:00"
+
+
+def _rolling_fold_dataset_splits(start_month: str, end_month: str) -> tuple[dict[str, Any], ...]:
+    """Return the accepted chronological 4/1/1 split contract for a six-month fold."""
+
+    if _month_span_count(start_month, end_month) != ROLLING_FOLD_SIZE_MONTHS:
+        return ()
+    splits: list[dict[str, Any]] = []
+    offset = 0
+    for split_order, (split_name, month_count) in enumerate(ROLLING_FOLD_SPLIT_MONTHS):
+        split_start = _add_months(start_month, offset)
+        split_end = _add_months(split_start, month_count - 1)
+        splits.append(
+            {
+                "split_name": split_name,
+                "split_order": split_order,
+                "split_start_month": split_start,
+                "split_end_month": split_end,
+                "split_months": month_count,
+                "split_start_time": _month_start_et(split_start),
+                "split_end_time": _exclusive_month_start_et(split_end),
+                "split_policy": "chronological_rolling_fold_4_1_1",
+            }
+        )
+        offset += month_count
+    return tuple(splits)
+
+
+def _generation_command_for_dataset_split(command: list[str], split: Mapping[str, Any]) -> list[str]:
+    split_name = str(split["split_name"])
+    replacements = {
+        "${START_MONTH_START_ET}": str(split["split_start_time"]),
+        "${END_MONTH_EXCLUSIVE_START_ET}": str(split["split_end_time"]),
+        "${START_MONTH}": f"{split['split_start_month']}_{split_name}",
+        "${END_MONTH}": str(split["split_end_month"]),
+    }
+    resolved: list[str] = [f"TRADING_MODEL_DATASET_SPLIT_NAME={split_name}", f"TRADING_MODEL_DATASET_SPLIT_POLICY={split['split_policy']}"]
+    for token in command:
+        text = token
+        for placeholder, value in replacements.items():
+            text = text.replace(placeholder, value)
+        resolved.append(text)
+    return resolved
+
+
 def _layer_three_target_local_feed_blockers(
     *,
     start_month: str,
@@ -811,26 +880,48 @@ def _build_layer_workflow(
         tuple(meta["depends_on_layers"]),
         foundation_catch_up_only=foundation_catch_up_only,
     ) + ((f"{key}.feature_or_input_ready",) if include_input_stage else ())
-    model_generation_description = "Generate offline model/state-vector rows from a complete frozen rolling-fold train manifest, never from one month alone."
-
-    stages.append(
-        WorkflowStage(
-            stage_id=f"{key}.model_generation",
-            layer=layer,
-            layer_key=key,
-            stage_type="model_generation",
-            description=model_generation_description,
-            status="blocked",
-            command=generate,
-            dataset_unit=dataset_unit,
-            blockers=_with_target_blocker(
-                model_generation_blockers,
-                layer=layer,
-                selected_target_symbol=selected_target_symbol,
-                stage_type="model_generation",
-            ),
-        )
+    model_generation_description = (
+        "Generate offline model/state-vector evidence from the accepted chronological rolling-fold split contract."
     )
+    dataset_splits = _rolling_fold_dataset_splits(start_month, end_month)
+    if dataset_splits:
+        split_blockers = model_generation_blockers
+        for split in dataset_splits:
+            split_name = str(split["split_name"])
+            stages.append(
+                WorkflowStage(
+                    stage_id=f"{key}.model_generation.{split_name}",
+                    layer=layer,
+                    layer_key=key,
+                    stage_type="model_generation",
+                    description=f"{model_generation_description} Split: {split_name}.",
+                    status="blocked",
+                    command=_generation_command_for_dataset_split(generate, split),
+                    dataset_unit=dataset_unit,
+                    blockers=_with_target_blocker(
+                        split_blockers,
+                        layer=layer,
+                        selected_target_symbol=selected_target_symbol,
+                        stage_type="model_generation",
+                    ),
+                    dataset_split=dict(split),
+                )
+            )
+            split_blockers = (f"{key}.model_generation.{split_name}_complete",)
+    else:
+        stages.append(
+            WorkflowStage(
+                stage_id=f"{key}.model_generation",
+                layer=layer,
+                layer_key=key,
+                stage_type="model_generation",
+                description=model_generation_description,
+                status="blocked",
+                command=generate,
+                dataset_unit=dataset_unit,
+                blockers=("rolling_fold_4_1_1_split_required",),
+            )
+        )
     return LayerWorkflow(
         layer=layer,
         layer_key=key,
