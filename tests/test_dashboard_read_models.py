@@ -1211,6 +1211,89 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("train/validation/test", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "layer_03_target_state_vector.model_generation.validation")
 
+    def test_active_model_generation_progress_preserves_split_total(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_generation.train",
+                                "stage_type": "model_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "succeeded",
+                                "dataset_split": {"split_name": "train"},
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_symbol": "AAPL",
+                                },
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_generation.validation",
+                                "stage_type": "model_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "ready",
+                                "dataset_split": {"split_name": "validation"},
+                            },
+                            {
+                                "stage_id": "layer_03_target_state_vector.model_generation.test",
+                                "stage_type": "model_generation",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
+                                "status": "blocked",
+                                "blockers": ["layer_03_target_state_vector.model_generation.validation_complete"],
+                                "dataset_split": {"split_name": "test"},
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            write_task_progress_node(
+                progress_root=runtime / "task_progress",
+                worker_id="model_worker_1",
+                task_uid="2016-01..2016-06:layer_03_target_state_vector.model_generation.validation",
+                stage_id="layer_03_target_state_vector.model_generation.validation",
+                unit_label="model rows",
+                expected_count=1,
+                node_id="stage_started",
+                node_label="Stage process started",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:50Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        progress = task["detail"]["progress"]
+        self.assertEqual(progress["status"], "running")
+        self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
+        self.assertEqual(progress["unit_label"], "dataset splits")
+        self.assertEqual(progress["expected_count"], 3)
+        self.assertEqual(progress["ready_count"], 1)
+        self.assertEqual(progress["pending_count"], 2)
+        self.assertEqual(progress["stage_id"], "layer_03_target_state_vector.model_generation.validation")
+        self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
+
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

@@ -2062,6 +2062,24 @@ def _task_timeline(
                     progress = active_task_progress.get(
                         _stable_task_uid({"stage_id": dashboard_stage.get("active_stage_id")}, task_period=task_month)
                     )
+                dashboard_progress = (
+                    dict(dashboard_stage["dashboard_progress"])
+                    if isinstance(dashboard_stage.get("dashboard_progress"), Mapping)
+                    else None
+                )
+                if (
+                    progress is not None
+                    and dashboard_progress is not None
+                    and dashboard_progress.get("progress_source") == "model_generation_dataset_splits"
+                ):
+                    progress = {
+                        **dashboard_progress,
+                        "status": progress.get("status") or dashboard_progress.get("status"),
+                        "stage_id": progress.get("stage_id") or dashboard_progress.get("stage_id"),
+                        "nodes": progress.get("nodes", []),
+                        "updated_at_utc": progress.get("updated_at_utc"),
+                        "worker_id": progress.get("worker_id"),
+                    }
                 if progress is None and str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "") == "data_acquisition":
                     progress = _fold_stage_coverage_progress(
                         storage_root=storage_root,
@@ -2076,8 +2094,8 @@ def _task_timeline(
                         stage_status=stage_status,
                         task_period=task_month,
                     )
-                if progress is None and isinstance(dashboard_stage.get("dashboard_progress"), Mapping):
-                    progress = dict(dashboard_stage["dashboard_progress"])
+                if progress is None and dashboard_progress is not None:
+                    progress = dashboard_progress
                 if progress is None:
                     progress = _task_status_progress(stage_id, stage_status)
                 task: dict[str, Any] = {
