@@ -200,6 +200,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(variable_diagnostics["coverage"]["decision_intended_side"]["values"]["flat"], 10)
             self.assertEqual(variable_diagnostics["coverage"]["decision_disposition"]["values"]["accepted"], 20)
             self.assertEqual(variable_diagnostics["coverage"]["decision_disposition"]["values"]["rejected"], 10)
+            self.assertIn("taken_good", variable_diagnostics["coverage"]["eval_action_class"]["values"])
+            self.assertIn("positive_excess", variable_diagnostics["coverage"]["eval_economic_class"]["values"])
             self.assertIn("eval_action_class", variable_diagnostics["normalized_row_samples"][0])
             self.assertIn("temporal_stability_diagnostics", metrics)
             self.assertIn("baseline_comparison_diagnostics", metrics)

@@ -449,8 +449,12 @@ def _decision_variable_schema_diagnostics(
         "decision_intended_action",
         "decision_disposition",
         "decision_agency",
+        "decision_confidence_band",
         "replay_fill_status",
+        "replay_execution_mode",
         "eval_outcome_label",
+        "eval_economic_class",
+        "eval_action_class",
     )
     unknown_counts = {
         name: sum(1 for row in normalized_rows if row.get(name) in (None, "", "unknown"))
