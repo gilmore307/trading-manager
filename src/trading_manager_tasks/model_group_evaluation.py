@@ -413,6 +413,11 @@ def _build_settlement_run(
             "reason": "block bootstrap confidence intervals require multiple completed comparable folds",
         },
         "feature_diagnostics": feature_diagnostics,
+        "diagnostic_availability": _diagnostic_availability(
+            feature_diagnostics=feature_diagnostics,
+            scorecards=scorecards,
+            decision_variable_schema_diagnostics=decision_variable_schema_diagnostics,
+        ),
     }
     return {
         "contract_type": "fold_settlement_run",
@@ -641,6 +646,40 @@ def _model_group_scorecards(
             "decision_disposition": _slice_scorecard(normalized_rows, "decision_disposition"),
             "decision_confidence_band": _slice_scorecard(normalized_rows, "decision_confidence_band"),
             "decision_agency": _slice_scorecard(normalized_rows, "decision_agency"),
+        },
+    }
+
+
+def _diagnostic_availability(
+    *,
+    feature_diagnostics: Mapping[str, Any],
+    scorecards: Mapping[str, Any],
+    decision_variable_schema_diagnostics: Mapping[str, Any],
+) -> dict[str, Any]:
+    pca = feature_diagnostics.get("pca") if isinstance(feature_diagnostics.get("pca"), Mapping) else {}
+    pcoa = feature_diagnostics.get("pcoa") if isinstance(feature_diagnostics.get("pcoa"), Mapping) else {}
+    silhouette = feature_diagnostics.get("silhouette") if isinstance(feature_diagnostics.get("silhouette"), Mapping) else {}
+    slices = scorecards.get("slices") if isinstance(scorecards.get("slices"), Mapping) else {}
+    feature_available = bool(pca.get("available") or pcoa.get("available"))
+    silhouette_available = bool(any(value is not None for value in silhouette.values()))
+    slice_available = bool(any(isinstance(value, list) and value for value in slices.values()))
+    schema_status = str(decision_variable_schema_diagnostics.get("status") or "not_reported")
+    return {
+        "feature_space": {
+            "status": "available" if feature_available else "unavailable",
+            "reason_code": "feature_space_published" if feature_available else "missing_feature_space_diagnostics",
+        },
+        "silhouette": {
+            "status": "available" if silhouette_available else "unavailable",
+            "reason_code": "silhouette_published" if silhouette_available else "missing_silhouette_diagnostics",
+        },
+        "slice_distribution": {
+            "status": "available" if slice_available else "unavailable",
+            "reason_code": "scorecard_slices_published" if slice_available else "missing_slice_scorecards",
+        },
+        "decision_variable_schema": {
+            "status": "available" if schema_status in {"passed", "warning"} else "unavailable",
+            "reason_code": f"decision_variable_schema_{schema_status}",
         },
     }
 

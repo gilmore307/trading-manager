@@ -210,6 +210,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(metrics["scorecards"]["selection_quality"]["taken_good_count"], 20)
             self.assertGreater(metrics["scorecards"]["economic_quality"]["excess_return_total"], 0)
             self.assertEqual(metrics["scorecards"]["slices"]["decision_intended_side"][1]["value"], "long")
+            self.assertEqual(metrics["diagnostic_availability"]["feature_space"]["status"], "available")
+            self.assertEqual(metrics["diagnostic_availability"]["slice_distribution"]["status"], "available")
             self.assertIn("temporal_stability_diagnostics", metrics)
             self.assertIn("baseline_comparison_diagnostics", metrics)
             self.assertIsInstance(metrics["silhouette_outcome_label"], float)
