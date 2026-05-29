@@ -30,6 +30,8 @@ A promotion packet should identify:
 - baseline comparisons;
 - leakage checks;
 - stability and sample-size evidence;
+- four replay scorecards: Ranking / Calibration, Selection Quality, Economic Quality, and Slices;
+- disagreement report entries where ranking, selection, and economic evidence conflict, such as AUROC below the old diagnostic threshold while excess utility is positive, or AUROC passing while excess return is negative;
 - known failure modes;
 - downstream shadow/activation scope;
 - evaluation decision evidence.
@@ -43,6 +45,8 @@ Manager must not activate production pointers or manage the active promoted-mode
 Runtime management of already promoted models belongs to the runtime component lifecycle owner. That component compares active, shadow, realtime-candidate, demotion-candidate, and eliminated model roles from live/shadow evidence. Manager may schedule the request and persist the receipt, but it must not independently choose the active production pointer.
 
 Deferred decisions, rejected decisions, failed runs, partial evidence, stale configs, target-only substrate runs, or route-only artifacts cannot activate production pointers.
+
+AUROC is ranking diagnostic evidence, not a standalone hard promotion gate. Promotion settlement must preserve AUROC/ROC, PR-AUC, calibration, and Brier evidence, but guardrails are based on sample sufficiency, point-in-time integrity, positive excess return, acceptable drawdown/tail behavior, positive intended-threshold utility, and acceptable bad-fill / model-missed-winner rates.
 
 For the first accepted model bundle, evaluation may set `first_model_bootstrap = true`. That bundle's own frozen settlement run becomes the bootstrap baseline for later anonymous incumbent comparisons. This is a promotion/readiness exception only; it still cannot activate a production pointer without execution-owned shadow-cycle evidence.
 

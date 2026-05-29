@@ -46,6 +46,10 @@ DEFAULT_PROMOTION_REVIEW_CODEX_ADD_DIR = Path("/root/projects")
 FEATURE_DIAGNOSTIC_SAMPLE_LIMIT = 160
 FEATURE_DIAGNOSTIC_POINT_LIMIT = 80
 DECISION_VARIABLE_SAMPLE_LIMIT = 12
+INTENDED_OPERATING_THRESHOLD = 0.70
+MAX_ACCEPTABLE_MAX_DRAWDOWN = -0.30
+MAX_ACCEPTABLE_BAD_FILL_RATE = 0.55
+MAX_ACCEPTABLE_MODEL_MISSED_WINNER_RATE = 0.45
 
 
 def run_model_group_evaluation_if_ready(
@@ -308,6 +312,24 @@ def _build_settlement_run(
     economic_diagnostics = _economic_diagnostics(net_returns=net_returns, realized_returns=realized_returns, costs=costs)
     data_integrity_diagnostics = _data_integrity_diagnostics(raw_decision_rows=raw_decision_rows, decision_rows=decision_rows)
     temporal_stability_diagnostics = _temporal_stability_diagnostics(scored_rows)
+    scorecards = _model_group_scorecards(
+        decision_rows=decision_rows,
+        scored_rows=scored_rows,
+        net_returns=net_returns,
+        baseline_returns=baseline_returns,
+        realized_returns=realized_returns,
+        costs=costs,
+        auroc=auroc,
+        predictive_diagnostics=predictive_diagnostics,
+        calibration_diagnostics=calibration_diagnostics,
+        economic_diagnostics=economic_diagnostics,
+    )
+    disagreement_report = _evaluation_disagreement_report(
+        auroc=auroc,
+        scorecards=scorecards,
+        net_total=net_total,
+        baseline_total=baseline_total,
+    )
     baseline_comparison_diagnostics = _baseline_comparison_diagnostics(
         labels=labels,
         scores=scores,
@@ -317,12 +339,20 @@ def _build_settlement_run(
     gate_failures: list[str] = []
     if len(decision_rows) < 20:
         gate_failures.append("decision_row_count_below_minimum")
+    if data_integrity_diagnostics.get("leakage_check_status") != "passed":
+        gate_failures.append("data_integrity_leakage_failed")
     if net_total <= baseline_total:
-        gate_failures.append("net_return_not_above_baseline")
-    if auroc is None:
-        gate_failures.append("auroc_unavailable")
-    elif auroc < 0.53:
-        gate_failures.append("auroc_below_minimum")
+        gate_failures.append("excess_return_not_positive")
+    max_drawdown = _max_drawdown(net_returns)
+    if max_drawdown < MAX_ACCEPTABLE_MAX_DRAWDOWN:
+        gate_failures.append("drawdown_too_severe")
+    intended_band = scorecards.get("selection_quality", {}).get("intended_operating_threshold_band", {})
+    if intended_band.get("selected_count") and (intended_band.get("return_per_selected") or 0.0) <= 0:
+        gate_failures.append("intended_threshold_utility_not_positive")
+    if (scorecards.get("selection_quality", {}).get("bad_fill_rate") or 0.0) > MAX_ACCEPTABLE_BAD_FILL_RATE:
+        gate_failures.append("bad_fill_rate_too_high")
+    if (scorecards.get("selection_quality", {}).get("model_missed_winner_rate") or 0.0) > MAX_ACCEPTABLE_MODEL_MISSED_WINNER_RATE:
+        gate_failures.append("model_missed_winner_rate_too_high")
     settlement_id = f"settlement_{_stable_token(fold_id, candidate_model_ref, replay_contract_ref, replay_result_ref)}"
     metrics = {
         "contract_type": "fold_settlement_metric",
@@ -374,6 +404,8 @@ def _build_settlement_run(
         "economic_diagnostics": economic_diagnostics,
         "data_integrity_diagnostics": data_integrity_diagnostics,
         "decision_variable_schema_diagnostics": decision_variable_schema_diagnostics,
+        "scorecards": scorecards,
+        "evaluation_disagreement_report": disagreement_report,
         "temporal_stability_diagnostics": temporal_stability_diagnostics,
         "baseline_comparison_diagnostics": baseline_comparison_diagnostics,
         "uncertainty_diagnostics": {
@@ -433,6 +465,19 @@ def _scored_rows(
     return scored
 
 
+def _normalized_decision_variable_rows(
+    *,
+    decision_rows: Sequence[Mapping[str, Any]],
+    net_returns: Sequence[float],
+    baseline_returns: Sequence[float],
+    costs: Sequence[float],
+) -> list[dict[str, Any]]:
+    return [
+        _normalized_decision_variable_row(row, net_return=net_return, baseline_return=baseline_return, cost=cost)
+        for row, net_return, baseline_return, cost in zip(decision_rows, net_returns, baseline_returns, costs, strict=True)
+    ]
+
+
 def _decision_variable_schema_diagnostics(
     *,
     decision_rows: Sequence[Mapping[str, Any]],
@@ -440,10 +485,12 @@ def _decision_variable_schema_diagnostics(
     baseline_returns: Sequence[float],
     costs: Sequence[float],
 ) -> dict[str, Any]:
-    normalized_rows = [
-        _normalized_decision_variable_row(row, net_return=net_return, baseline_return=baseline_return, cost=cost)
-        for row, net_return, baseline_return, cost in zip(decision_rows, net_returns, baseline_returns, costs, strict=True)
-    ]
+    normalized_rows = _normalized_decision_variable_rows(
+        decision_rows=decision_rows,
+        net_returns=net_returns,
+        baseline_returns=baseline_returns,
+        costs=costs,
+    )
     field_names = (
         "decision_intended_side",
         "decision_intended_action",
@@ -510,6 +557,215 @@ def _decision_variable_schema_diagnostics(
         "coverage": coverage,
         "issues": issues,
         "normalized_row_samples": normalized_rows[:DECISION_VARIABLE_SAMPLE_LIMIT],
+    }
+
+
+def _model_group_scorecards(
+    *,
+    decision_rows: Sequence[Mapping[str, Any]],
+    scored_rows: Sequence[Mapping[str, Any]],
+    net_returns: Sequence[float],
+    baseline_returns: Sequence[float],
+    realized_returns: Sequence[float],
+    costs: Sequence[float],
+    auroc: float | None,
+    predictive_diagnostics: Mapping[str, Any],
+    calibration_diagnostics: Mapping[str, Any],
+    economic_diagnostics: Mapping[str, Any],
+) -> dict[str, Any]:
+    normalized_rows = _normalized_decision_variable_rows(
+        decision_rows=decision_rows,
+        net_returns=net_returns,
+        baseline_returns=baseline_returns,
+        costs=costs,
+    )
+    action_counts = _value_counts(row.get("eval_action_class") for row in normalized_rows)
+    accepted_rows = [row for row in normalized_rows if row.get("decision_disposition") == "accepted"]
+    taken_good = action_counts.get("taken_good", 0)
+    taken_bad = action_counts.get("taken_bad", 0)
+    model_missed_good = sum(
+        1
+        for row in normalized_rows
+        if row.get("eval_action_class") == "missed_good" and row.get("decision_agency") in {"model", "unknown"}
+    )
+    blocked_good_by_agency = _value_counts(
+        row.get("decision_agency")
+        for row in normalized_rows
+        if row.get("eval_action_class") in {"missed_good", "blocked_good"} and row.get("decision_agency") not in {"model", "unknown"}
+    )
+    positive_opportunities = taken_good + model_missed_good
+    threshold_curve = predictive_diagnostics.get("threshold_return_curve")
+    threshold_points = threshold_curve if isinstance(threshold_curve, list) else []
+    intended_band = _threshold_band_summary(threshold_points, INTENDED_OPERATING_THRESHOLD)
+    return {
+        "contract_type": "model_group_evaluation_scorecards",
+        "ranking_calibration": {
+            "auroc": auroc,
+            "pr_auc": predictive_diagnostics.get("pr_auc"),
+            "base_rate": predictive_diagnostics.get("base_rate"),
+            "brier_score": _brier_score([int(row["label"]) for row in scored_rows], [float(row["score"]) for row in scored_rows]),
+            "ece": calibration_diagnostics.get("ece"),
+            "mce": calibration_diagnostics.get("mce"),
+            "score_decile_return": _score_decile_return(scored_rows),
+            "ranking_diagnostic_note": "AUROC is ranking evidence only; promotion gating uses economic and selection utility.",
+        },
+        "selection_quality": {
+            "accepted_count": len(accepted_rows),
+            "taken_good_count": taken_good,
+            "taken_bad_count": taken_bad,
+            "model_missed_good_count": model_missed_good,
+            "blocked_good_by_agency": blocked_good_by_agency,
+            "good_trade_rate": _round_metric(taken_good / len(accepted_rows)) if accepted_rows else None,
+            "bad_fill_rate": _round_metric(taken_bad / len(accepted_rows)) if accepted_rows else None,
+            "model_missed_winner_rate": _round_metric(model_missed_good / positive_opportunities) if positive_opportunities else None,
+            "profitable_opportunity_recall": _round_metric(taken_good / positive_opportunities) if positive_opportunities else None,
+            "precision_among_filled_trades": _round_metric(taken_good / (taken_good + taken_bad)) if taken_good + taken_bad else None,
+            "eval_action_class_counts": action_counts,
+            "intended_operating_threshold_band": intended_band,
+        },
+        "economic_quality": {
+            "net_return_total": _round_metric(sum(net_returns)),
+            "baseline_return_total": _round_metric(sum(baseline_returns)),
+            "excess_return_total": _round_metric(sum(net_returns) - sum(baseline_returns)),
+            "return_per_decision": economic_diagnostics.get("return_per_decision"),
+            "return_per_filled_trade": _return_per_filled_trade(normalized_rows),
+            "profit_factor": economic_diagnostics.get("profit_factor"),
+            "max_drawdown": _round_metric(_max_drawdown(net_returns)),
+            "tail_loss_p05": economic_diagnostics.get("tail_loss_p05"),
+            "cost_sensitivity": economic_diagnostics.get("cost_sensitivity"),
+            "cost_adjusted_return_total": _round_metric(sum(realized - cost for realized, cost in zip(realized_returns, costs, strict=True))),
+        },
+        "slices": {
+            "decision_intended_side": _slice_scorecard(normalized_rows, "decision_intended_side"),
+            "decision_intended_action": _slice_scorecard(normalized_rows, "decision_intended_action"),
+            "decision_disposition": _slice_scorecard(normalized_rows, "decision_disposition"),
+            "decision_confidence_band": _slice_scorecard(normalized_rows, "decision_confidence_band"),
+            "decision_agency": _slice_scorecard(normalized_rows, "decision_agency"),
+        },
+    }
+
+
+def _threshold_band_summary(threshold_points: Sequence[Any], threshold: float) -> dict[str, Any]:
+    usable = [point for point in threshold_points if isinstance(point, Mapping)]
+    if not usable:
+        return {"threshold": threshold, "selected_count": 0, "return_per_selected": None, "net_return_total": 0.0}
+    best = min(usable, key=lambda point: abs(_float(point, "threshold", default=threshold) - threshold))
+    return {
+        "threshold": _float(best, "threshold", default=threshold),
+        "selected_count": int(_float(best, "selected_count", default=0.0)),
+        "return_per_selected": best.get("return_per_selected"),
+        "net_return_total": best.get("net_return_total"),
+        "hit_rate": best.get("hit_rate"),
+    }
+
+
+def _return_per_filled_trade(normalized_rows: Sequence[Mapping[str, Any]]) -> float | None:
+    filled = [row for row in normalized_rows if row.get("decision_disposition") == "accepted"]
+    if not filled:
+        return None
+    return _round_metric(sum(_float(row, "replay_cost_adjusted_return") for row in filled) / len(filled))
+
+
+def _score_decile_return(scored_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    if not scored_rows:
+        return []
+    ordered = sorted(scored_rows, key=lambda row: float(row["score"]), reverse=True)
+    deciles: list[dict[str, Any]] = []
+    for index in range(10):
+        start = math.floor(index * len(ordered) / 10)
+        end = math.floor((index + 1) * len(ordered) / 10)
+        bucket = ordered[start:end]
+        if not bucket:
+            continue
+        returns = [float(row["net_return"]) for row in bucket]
+        excess = [float(row["net_return"]) - float(row["baseline_return"]) for row in bucket]
+        deciles.append(
+            {
+                "decile": index + 1,
+                "score_min": _round_metric(min(float(row["score"]) for row in bucket)),
+                "score_max": _round_metric(max(float(row["score"]) for row in bucket)),
+                "row_count": len(bucket),
+                "net_return_total": _round_metric(sum(returns)),
+                "excess_return_total": _round_metric(sum(excess)),
+                "return_per_decision": _round_metric(sum(returns) / len(returns)),
+                "positive_label_rate": _round_metric(sum(int(row["label"]) for row in bucket) / len(bucket)),
+            }
+        )
+    return deciles
+
+
+def _slice_scorecard(normalized_rows: Sequence[Mapping[str, Any]], field: str) -> list[dict[str, Any]]:
+    by_value: dict[str, list[Mapping[str, Any]]] = {}
+    for row in normalized_rows:
+        key = str(row.get(field) or "unknown")
+        by_value.setdefault(key, []).append(row)
+    slices: list[dict[str, Any]] = []
+    for value, rows in sorted(by_value.items()):
+        returns = [_float(row, "replay_cost_adjusted_return") for row in rows]
+        excess = [_float(row, "replay_excess_return") for row in rows]
+        action_counts = _value_counts(row.get("eval_action_class") for row in rows)
+        slices.append(
+            {
+                "value": value,
+                "row_count": len(rows),
+                "accepted_count": sum(1 for row in rows if row.get("decision_disposition") == "accepted"),
+                "net_return_total": _round_metric(sum(returns)),
+                "excess_return_total": _round_metric(sum(excess)),
+                "return_per_decision": _round_metric(sum(returns) / len(rows)) if rows else None,
+                "taken_good_count": action_counts.get("taken_good", 0),
+                "taken_bad_count": action_counts.get("taken_bad", 0),
+                "missed_good_count": action_counts.get("missed_good", 0),
+                "blocked_good_count": action_counts.get("blocked_good", 0),
+            }
+        )
+    return slices
+
+
+def _evaluation_disagreement_report(
+    *,
+    auroc: float | None,
+    scorecards: Mapping[str, Any],
+    net_total: float,
+    baseline_total: float,
+) -> dict[str, Any]:
+    ranking = scorecards.get("ranking_calibration") if isinstance(scorecards.get("ranking_calibration"), Mapping) else {}
+    selection = scorecards.get("selection_quality") if isinstance(scorecards.get("selection_quality"), Mapping) else {}
+    economic = scorecards.get("economic_quality") if isinstance(scorecards.get("economic_quality"), Mapping) else {}
+    disagreements: list[dict[str, Any]] = []
+    excess_total = net_total - baseline_total
+    intended_band = selection.get("intended_operating_threshold_band") if isinstance(selection.get("intended_operating_threshold_band"), Mapping) else {}
+    intended_utility = intended_band.get("return_per_selected")
+    if auroc is not None and auroc < 0.53 and (excess_total > 0 or (isinstance(intended_utility, (int, float)) and intended_utility > 0)):
+        disagreements.append({"type": "auroc_below_old_gate_but_positive_utility", "severity": "notice", "auroc": auroc, "excess_return_total": _round_metric(excess_total), "intended_return_per_selected": intended_utility})
+    if auroc is not None and auroc >= 0.53 and excess_total <= 0:
+        disagreements.append({"type": "auroc_passed_old_gate_but_negative_excess", "severity": "warning", "auroc": auroc, "excess_return_total": _round_metric(excess_total)})
+    if net_total > 0 and excess_total <= 0:
+        disagreements.append({"type": "positive_net_return_under_baseline", "severity": "warning", "net_return_total": _round_metric(net_total), "baseline_return_total": _round_metric(baseline_total)})
+    if selection.get("taken_bad_count"):
+        disagreements.append({"type": "filled_bad_or_under_baseline", "severity": "notice", "count": selection.get("taken_bad_count"), "bad_fill_rate": selection.get("bad_fill_rate")})
+    if selection.get("model_missed_good_count"):
+        disagreements.append({"type": "model_missed_winner", "severity": "warning", "count": selection.get("model_missed_good_count"), "model_missed_winner_rate": selection.get("model_missed_winner_rate")})
+    blocked_good = selection.get("blocked_good_by_agency")
+    if isinstance(blocked_good, Mapping) and blocked_good:
+        disagreements.append({"type": "non_model_blocked_winner", "severity": "info", "blocked_good_by_agency": dict(blocked_good)})
+    return {
+        "contract_type": "model_group_evaluation_disagreement_report",
+        "old_auroc_gate": 0.53,
+        "disagreement_count": len(disagreements),
+        "disagreements": disagreements,
+        "score_decile_return": ranking.get("score_decile_return"),
+        "long_short_action_slices": {
+            "decision_intended_side": (scorecards.get("slices") or {}).get("decision_intended_side") if isinstance(scorecards.get("slices"), Mapping) else [],
+            "decision_intended_action": (scorecards.get("slices") or {}).get("decision_intended_action") if isinstance(scorecards.get("slices"), Mapping) else [],
+        },
+        "promotion_gate_basis": {
+            "auroc_is_hard_gate": False,
+            "required_positive_excess_return": True,
+            "required_positive_intended_threshold_utility": True,
+            "bad_fill_rate_maximum": MAX_ACCEPTABLE_BAD_FILL_RATE,
+            "model_missed_winner_rate_maximum": MAX_ACCEPTABLE_MODEL_MISSED_WINNER_RATE,
+        },
+        "economic_summary": economic,
     }
 
 
@@ -1450,6 +1706,8 @@ def _build_promotion_review_packet(
             "pcoa_variance_top2": metrics.get("pcoa_variance_top2"),
             "silhouette_outcome_label": metrics.get("silhouette_outcome_label"),
             "silhouette_decision_action": metrics.get("silhouette_decision_action"),
+            "scorecards": metrics.get("scorecards"),
+            "evaluation_disagreement_report": metrics.get("evaluation_disagreement_report"),
         },
         "material_improvements": [f"settlement row count {metrics.get('decision_row_count')} is available"],
         "material_regressions": gate_failures,
