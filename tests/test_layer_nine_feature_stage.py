@@ -47,7 +47,7 @@ class LayerNineFeatureStageTests(unittest.TestCase):
             self.assertEqual(receipt["runs"][0]["row_counts"]["feature_09_option_expression_rows_required"], 0)
 
     def test_active_gate_review_delegates_to_trading_data_feature_generator(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_nine_feature_stage.subprocess.run") as run:
+        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_nine_feature_stage.option_source_table_exists", return_value=True), patch("trading_manager_tasks.layer_nine_feature_stage.subprocess.run") as run:
             tmp = Path(raw_tmp)
             review_root = tmp / "gate_review"
             review_root.mkdir(parents=True)
@@ -55,7 +55,7 @@ class LayerNineFeatureStageTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "manager_layer_09_option_expression_gate_review",
-                        "status": "approval_required",
+                        "status": "provider_acquisition_ready",
                         "active_request_count": 2,
                     }
                 )
@@ -79,6 +79,37 @@ class LayerNineFeatureStageTests(unittest.TestCase):
             self.assertIn("--source-start", summary.command)
             self.assertIn("2016-02-01T00:00:00-05:00", summary.command)
             self.assertTrue(run.called)
+
+    def test_active_gate_review_without_option_source_continues_underlying_only(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_nine_feature_stage.option_source_table_exists", return_value=False):
+            tmp = Path(raw_tmp)
+            review_root = tmp / "gate_review"
+            review_root.mkdir(parents=True)
+            (review_root / "layer_09_option_expression_gate_review_2016-02.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_layer_09_option_expression_gate_review",
+                        "status": "provider_acquisition_ready",
+                        "active_request_count": 2,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            summary = execute_layer_nine_feature_stage(
+                start_month="2016-02",
+                end_month="2016-02",
+                gate_review_root=review_root,
+                output_root=review_root,
+                trading_data_root=tmp / "trading-data",
+            )
+
+            self.assertEqual(summary.status, "succeeded")
+            self.assertEqual(summary.mode, "option_source_unavailable_underlying_only")
+            receipt = json.loads(Path(summary.receipt_path or "").read_text(encoding="utf-8"))
+            self.assertEqual(receipt["manager_stage_id"], "layer_09_option_expression.feature_generation")
+            self.assertEqual(receipt["runs"][0]["row_counts"]["feature_09_option_expression_rows_generated"], 0)
 
 
 if __name__ == "__main__":
