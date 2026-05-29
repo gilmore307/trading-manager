@@ -50,7 +50,13 @@ class EventFeedDispatchTests(unittest.TestCase):
                 stdout = ""
                 stderr = ""
 
-            with patch("trading_manager_tasks.event_feed_dispatch.subprocess.run", return_value=Result()) as run_mock:
+            captured_payloads = []
+
+            def fake_run(command, **_kwargs):
+                captured_payloads.append(json.loads(Path(command[3]).read_text()))
+                return Result()
+
+            with patch("trading_manager_tasks.event_feed_dispatch.subprocess.run", side_effect=fake_run) as run_mock:
                 summary = dispatch_event_feed_backfill(
                     start_month="2016-01",
                     end_month="2016-01",
@@ -65,8 +71,10 @@ class EventFeedDispatchTests(unittest.TestCase):
             self.assertEqual(summary.provider_calls, 2)
             self.assertEqual(run_mock.call_count, 2)
             by_feed = {}
-            for item in summary.items:
-                payload = json.loads(Path(item.runtime_task_key_path).read_text())
+            self.assertFalse(list((root / "runtime" / "event_feed_task_keys").glob("*/task_key.json")))
+            for item, payload in zip(summary.items, captured_payloads):
+                self.assertIsNone(item.runtime_task_key_path)
+                self.assertFalse(item.runtime_task_key_retained)
                 by_feed[payload["feed"]] = payload
                 self.assertFalse(payload["dry_run"])
                 self.assertTrue(payload["manager_controls"]["allow_live_provider_calls"])

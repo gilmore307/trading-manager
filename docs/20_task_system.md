@@ -44,6 +44,7 @@ Failures should become durable evidence, not chat-only notes. The failure regist
 - Manager must not activate production pointers directly.
 - Storage lifecycle mutation requires accepted lifecycle decision.
 - Broker/account mutation is not allowed in manager.
+- Live-enabled provider runtime task keys are execution scratch. The canonical prepared source task key remains under its request path; successful provider dispatch removes the runtime copy after the subprocess consumes it, while failed dispatch retains the runtime copy for diagnosis.
 
 ## Model Research Run Cycle
 

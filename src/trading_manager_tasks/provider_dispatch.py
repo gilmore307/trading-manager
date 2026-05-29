@@ -65,6 +65,7 @@ class ProviderDispatchItem:
     request_id: str
     task_key_path: str
     runtime_task_key_path: str | None
+    runtime_task_key_retained: bool
     command: list[str]
     receipt_path: str
     status: str
@@ -345,6 +346,7 @@ def dispatch_layer_provider_acquisition(
             request_id=str(request["request_id"]),
             task_key_path=str(_task_key_path(storage_root, request).resolve()),
             runtime_task_key_path=None,
+            runtime_task_key_retained=False,
             command=[],
             receipt_path="",
             status="skipped_registered_accepted_failure",
@@ -371,10 +373,12 @@ def dispatch_layer_provider_acquisition(
             raise TaskSystemError(f"task key must be a JSON object: {source_path}")
         runtime_task_key = (storage_root / "runtime" / "provider_task_keys" / str(request["request_id"]) / "task_key.json").resolve()
         command_path = source_path
+        runtime_task_key_retained = False
         if execute_provider_calls:
             runtime_task_key.parent.mkdir(parents=True, exist_ok=True)
             runtime_task_key.write_text(json.dumps(_autonomous_provider_task_key(task_key), indent=2, sort_keys=True) + "\n", encoding="utf-8")
             command_path = runtime_task_key
+            runtime_task_key_retained = True
         command = _command(command_path, str(request["request_id"]))
         relative_receipt_path = Path(str(task_key.get("output_root") or "storage")) / "completion_receipt.json"
         receipt_path = str((trading_data_root / relative_receipt_path).resolve()) if execute_provider_calls else str(relative_receipt_path)
@@ -393,12 +397,19 @@ def dispatch_layer_provider_acquisition(
             return_code = result.returncode
             status = "dispatched_succeeded" if result.returncode == 0 else "dispatched_failed"
             error_tail = "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part) if result.returncode != 0 else None
+            if result.returncode == 0:
+                try:
+                    runtime_task_key.unlink()
+                    runtime_task_key_retained = False
+                except FileNotFoundError:
+                    runtime_task_key_retained = False
             if result.returncode != 0 and not continue_on_error:
                 raise TaskSystemError(f"provider dispatch failed for {request['request_id']}: {error_tail}")
         return ProviderDispatchItem(
             request_id=str(request["request_id"]),
             task_key_path=str(source_path),
-            runtime_task_key_path=str(runtime_task_key) if execute_provider_calls else None,
+            runtime_task_key_path=str(runtime_task_key) if execute_provider_calls and runtime_task_key_retained else None,
+            runtime_task_key_retained=runtime_task_key_retained,
             command=command,
             receipt_path=receipt_path,
             status=status,

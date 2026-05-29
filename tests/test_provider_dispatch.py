@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -215,14 +216,17 @@ class ProviderDispatchTests(unittest.TestCase):
                     execute_provider_calls=True,
                     continue_on_error=True,
                 )
+            retained_runtime_key_exists = Path(dispatch.items[0].runtime_task_key_path or "").exists()
 
         self.assertEqual(dispatch.dispatch_count, 1)
         self.assertEqual(dispatch.provider_calls, 1)
         self.assertEqual(dispatch.items[0].status, "dispatched_failed")
         self.assertEqual(dispatch.items[0].return_code, 1)
         self.assertIn("component failed", dispatch.items[0].error_summary or "")
+        self.assertTrue(dispatch.items[0].runtime_task_key_retained)
+        self.assertTrue(retained_runtime_key_exists)
 
-    def test_execute_dispatch_writes_autonomous_runtime_task_key(self):
+    def test_execute_dispatch_removes_successful_autonomous_runtime_task_key(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             prepare_layer_one_historical_training_batch(
@@ -232,9 +236,15 @@ class ProviderDispatchTests(unittest.TestCase):
                 write=True,
                 validate_handoff=False,
             )
+            captured_payloads = []
+
+            def fake_run(command, **_kwargs):
+                captured_payloads.append(json.loads(Path(command[3]).read_text(encoding="utf-8")))
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
             with patch(
                 "trading_manager_tasks.provider_dispatch.subprocess.run",
-                return_value=SimpleNamespace(returncode=0, stdout="", stderr=""),
+                side_effect=fake_run,
             ):
                 dispatch = dispatch_layer_one_provider_acquisition(
                     start_month="2016-01",
@@ -244,9 +254,11 @@ class ProviderDispatchTests(unittest.TestCase):
                     symbols=("SPY",),
                     execute_provider_calls=True,
                 )
-            runtime_key = Path(dispatch.items[0].runtime_task_key_path or "")
-            self.assertTrue(runtime_key.exists())
-            payload = __import__("json").loads(runtime_key.read_text(encoding="utf-8"))
+            retained_runtime_keys = list((tmp / "runtime" / "provider_task_keys").glob("*/task_key.json"))
+            payload = captured_payloads[0]
+        self.assertEqual(retained_runtime_keys, [])
+        self.assertIsNone(dispatch.items[0].runtime_task_key_path)
+        self.assertFalse(dispatch.items[0].runtime_task_key_retained)
         self.assertFalse(payload["dry_run"])
         self.assertEqual(payload["production_mode"], "historical_provider_acquisition")
         self.assertTrue(payload["manager_controls"]["allow_live_provider_calls"])

@@ -51,6 +51,8 @@ The scheduler uses stable lock identities before increasing concurrency. Locks a
 
 Provider workers must not directly advance terminal workflow state. They write partitioned receipts; the reconcile lane owns stage coverage and workflow-state transitions.
 
+Provider dispatch may create live-enabled runtime task-key copies only as subprocess input. Successful dispatch removes those runtime copies after the provider command consumes them. Failed dispatch retains them as bounded diagnostic evidence. The prepared source task key remains the canonical request artifact.
+
 ## Normal Inspection
 
 ```bash

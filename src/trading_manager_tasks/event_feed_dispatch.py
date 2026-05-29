@@ -67,6 +67,7 @@ class EventFeedDispatchItem:
     source_id: str
     task_key_path: str
     runtime_task_key_path: str | None
+    runtime_task_key_retained: bool
     command: list[str]
     receipt_path: str
     status: str
@@ -237,6 +238,7 @@ def dispatch_event_feed_backfill(
             raise TaskSystemError(f"event feed task key feed mismatch for {task_key_path}: expected {feed_id}")
         command_path = task_key_path
         runtime_task_key_path: Path | None = None
+        runtime_task_key_retained = False
         status = "validated_not_dispatched"
         return_code = None
         error_summary = None
@@ -248,6 +250,7 @@ def dispatch_event_feed_backfill(
                 encoding="utf-8",
             )
             command_path = runtime_task_key_path
+            runtime_task_key_retained = True
         command = _command(feed_id, command_path, request_id)
         receipt_path = str((trading_data_root / str(task_key.get("output_root") or "storage") / "completion_receipt.json").resolve())
         attempt_count = 0
@@ -276,6 +279,12 @@ def dispatch_event_feed_backfill(
                 raise TaskSystemError("internal dispatch error: no subprocess result")
             return_code = last_result.returncode
             status = "dispatched_succeeded" if last_result.returncode == 0 else "dispatched_failed"
+            if last_result.returncode == 0 and runtime_task_key_path is not None:
+                try:
+                    runtime_task_key_path.unlink()
+                    runtime_task_key_retained = False
+                except FileNotFoundError:
+                    runtime_task_key_retained = False
             if last_result.returncode != 0:
                 error_summary = "\n".join(part for part in (last_result.stdout[-500:], last_result.stderr[-500:]) if part)
                 if not continue_on_error:
@@ -286,7 +295,8 @@ def dispatch_event_feed_backfill(
                 feed_id=feed_id,
                 source_id=source_id,
                 task_key_path=str(task_key_path),
-                runtime_task_key_path=str(runtime_task_key_path) if runtime_task_key_path is not None else None,
+                runtime_task_key_path=str(runtime_task_key_path) if runtime_task_key_path is not None and runtime_task_key_retained else None,
+                runtime_task_key_retained=runtime_task_key_retained,
                 command=command,
                 receipt_path=receipt_path,
                 status=status,
