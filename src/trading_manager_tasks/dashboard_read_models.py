@@ -47,6 +47,7 @@ DEFAULT_STALE_AFTER_SECONDS = 900
 MONTHLY_TASK_STAGE_TYPES = {"data_acquisition", "feature_generation"}
 FOLD_MODEL_STAGE_TYPES = {
     "model_task",
+    "model_training",
     "model_generation",
     "replay",
     "model_10_event_risk_governor",
@@ -85,6 +86,7 @@ FOLD_LABEL_RE = re.compile(r"^(\d{4})-fold([1-9]\d*)$")
 TASK_STAGE_SORT_ORDER = {
     "data_acquisition": 10,
     "feature_generation": 20,
+    "model_training": 28,
     "model_task": 30,
     "model_generation": 30,
     "replay": 40,
@@ -1365,6 +1367,7 @@ def _worker_info_for_stage(
         return _model_worker_info()
     if stage_type in {
         "model_task",
+        "model_training",
         "model_generation",
         "replay",
         "model_10_event_risk_governor",

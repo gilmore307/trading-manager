@@ -37,6 +37,7 @@ DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 30
 SAFE_OFFLINE_STAGE_TYPES = {
     "data_acquisition",
     "feature_generation",
+    "model_training",
     "model_generation",
     "model_evaluation",
     "promotion_review",
@@ -135,7 +136,7 @@ def _cwd_for_stage(stage: StageProgress, *, manager_root: Path, trading_data_roo
         return manager_root
     if "trading-data" in command_text or stage.stage_type == "feature_generation":
         return trading_data_root
-    if "trading-model" in command_text or stage.stage_type in {"model_generation", "model_evaluation", "promotion_review"}:
+    if "trading-model" in command_text or stage.stage_type in {"model_training", "model_generation", "model_evaluation", "promotion_review"}:
         return trading_model_root
     return manager_root
 

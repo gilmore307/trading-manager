@@ -88,6 +88,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         for layer in plan.layers:
             if layer.layer in {1, 2, 3, 4, 9}:
                 expected_stage_types = ["data_acquisition", "feature_generation", "model_generation", "model_generation", "model_generation"]
+            elif layer.layer == 5:
+                expected_stage_types = ["model_training", "model_generation", "model_generation", "model_generation"]
             else:
                 expected_stage_types = ["model_generation", "model_generation", "model_generation"]
             self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
@@ -433,8 +435,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         layer = plan.layers[4]
         self.assertEqual(layer.layer_key, "layer_05_alpha_confidence")
-        self.assertEqual([stage.stage_type for stage in layer.stages], ["model_generation", "model_generation", "model_generation"])
+        self.assertEqual([stage.stage_type for stage in layer.stages], ["model_training", "model_generation", "model_generation", "model_generation"])
         self.assertNotIn("materialize_layer_ten_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
+        self.assertIn("train_model_05_alpha_confidence.py", " ".join(layer.stages[0].command))
+        self.assertIn("--all-horizons", layer.stages[0].command)
+        self.assertIn("--from-database", layer.stages[0].command)
         self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
         self.assertIn("--from-database", layer.model_generate_command)
         self.assertIn("--target-symbol", layer.model_generate_command)
@@ -445,7 +450,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             "/root/projects/trading-storage/storage/03_model_artifacts/runtime/model_05_alpha_confidence/after_cost_alpha_model_aapl_2016-01_2016-06.json",
             layer.model_generate_command,
         )
-        self.assertIn("layer_05_after_cost_alpha_artifact_ready", layer.stages[0].blockers)
+        self.assertIn("upstream_layer_04_model_generation_complete", layer.stages[0].blockers)
+        self.assertEqual(
+            layer.stages[1].blockers,
+            ("upstream_layer_04_model_generation_complete", "layer_05_alpha_confidence.model_training.train_complete"),
+        )
         self.assertTrue(any(token.endswith("model_rows_aapl_${START_MONTH}.jsonl") for token in layer.model_generate_command))
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
@@ -567,7 +576,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             stage_types = [stage.stage_type for stage in layer.stages]
             self.assertNotIn("data_acquisition", stage_types)
             self.assertNotIn("feature_generation", stage_types)
-            self.assertEqual(stage_types, ["model_generation", "model_generation", "model_generation"])
+            expected_stage_types = ["model_training", "model_generation", "model_generation", "model_generation"] if layer_number == 5 else ["model_generation", "model_generation", "model_generation"]
+            self.assertEqual(stage_types, expected_stage_types)
             self.assertIn("no-dedicated-trading-data-feature-stage", " ".join(layer.feature_command))
 
     def test_dataset_units_are_layer_aware_and_target_visible(self):

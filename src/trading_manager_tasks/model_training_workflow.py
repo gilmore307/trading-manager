@@ -52,6 +52,7 @@ LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER = "layer_04_event_observation_pool
 LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER = "layer_10_event_feed_coverage_ready"
 LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER = "layer_03_target_local_feed_artifacts_ready"
 LAYER_FIVE_AFTER_COST_ALPHA_ARTIFACT_BLOCKER = "layer_05_after_cost_alpha_artifact_ready"
+LAYER_FIVE_AFTER_COST_ALPHA_TRAINING_STAGE_TYPE = "model_training"
 
 
 @dataclass(frozen=True)
@@ -452,23 +453,45 @@ def _with_required_layer_five_artifact_arg(
     ]
 
 
-def _layer_five_after_cost_artifact_blockers(
+def _layer_five_after_cost_training_command(
     *,
-    layer: int,
     start_month: str,
     end_month: str,
     selected_target_symbol: str | None,
-) -> tuple[str, ...]:
-    if layer != 5:
-        return ()
-    artifact_path = Path(
+    dataset_splits: tuple[dict[str, Any], ...],
+) -> list[str]:
+    train_split = next((split for split in dataset_splits if split.get("split_name") == "train"), None)
+    source_start = str((train_split or {}).get("split_start_time") or _month_start_et(start_month))
+    source_end = str((train_split or {}).get("split_end_time") or _exclusive_month_start_et(end_month))
+    command = [
+        "PYTHONPATH=/root/projects/trading-model/src",
+        "python3",
+        "/root/projects/trading-model/scripts/models/model_05_alpha_confidence/train_model_05_alpha_confidence.py",
+        "--from-database",
+        "--source-start",
+        source_start,
+        "--source-end",
+        source_end,
+        "--output-json",
         _layer_five_after_cost_artifact_path(
             start_month=start_month,
             end_month=end_month,
             selected_target_symbol=selected_target_symbol,
-        )
-    )
-    return () if artifact_path.exists() else (LAYER_FIVE_AFTER_COST_ALPHA_ARTIFACT_BLOCKER,)
+        ),
+        "--all-horizons",
+    ]
+    if selected_target_symbol:
+        command.extend(["--target-symbol", selected_target_symbol])
+    return command
+
+
+def _layer_five_generation_artifact_blockers(
+    *,
+    layer: int,
+) -> tuple[str, ...]:
+    if layer != 5:
+        return ()
+    return ("layer_05_alpha_confidence.model_training.train_complete",)
 
 
 FEATURE_MODULES: dict[str, str] = {
@@ -976,19 +999,45 @@ def _build_layer_workflow(
             stages=tuple(stages),
         )
 
+    dataset_splits = _rolling_fold_dataset_splits(start_month, end_month)
+    model_training_blockers = _upstream_layer_ready_blockers(
+        tuple(meta["depends_on_layers"]),
+        foundation_catch_up_only=foundation_catch_up_only,
+    )
+    if layer == 5 and dataset_splits:
+        train_split = next(split for split in dataset_splits if split["split_name"] == "train")
+        stages.append(
+            WorkflowStage(
+                stage_id=f"{key}.model_training.train",
+                layer=layer,
+                layer_key=key,
+                stage_type=LAYER_FIVE_AFTER_COST_ALPHA_TRAINING_STAGE_TYPE,
+                description="Train the frozen Layer 5 after-cost alpha artifact bundle from the four-month training split.",
+                status="blocked",
+                command=_layer_five_after_cost_training_command(
+                    start_month=start_month,
+                    end_month=end_month,
+                    selected_target_symbol=selected_target_symbol,
+                    dataset_splits=dataset_splits,
+                ),
+                dataset_unit=dataset_unit,
+                blockers=_with_target_blocker(
+                    model_training_blockers,
+                    layer=layer,
+                    selected_target_symbol=selected_target_symbol,
+                    stage_type=LAYER_FIVE_AFTER_COST_ALPHA_TRAINING_STAGE_TYPE,
+                ),
+                dataset_split=dict(train_split),
+            )
+        )
+
     model_generation_blockers = _upstream_layer_ready_blockers(
         tuple(meta["depends_on_layers"]),
         foundation_catch_up_only=foundation_catch_up_only,
-    ) + ((f"{key}.feature_or_input_ready",) if include_input_stage else ()) + _layer_five_after_cost_artifact_blockers(
-        layer=layer,
-        start_month=start_month,
-        end_month=end_month,
-        selected_target_symbol=selected_target_symbol,
-    )
+    ) + ((f"{key}.feature_or_input_ready",) if include_input_stage else ()) + _layer_five_generation_artifact_blockers(layer=layer)
     model_generation_description = (
         "Generate offline model/state-vector evidence from the accepted chronological rolling-fold split contract."
     )
-    dataset_splits = _rolling_fold_dataset_splits(start_month, end_month)
     if dataset_splits:
         split_blockers = model_generation_blockers
         for split in dataset_splits:
@@ -1155,6 +1204,8 @@ __all__ = [
     "LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS",
     "LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER",
     "LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER",
+    "LAYER_FIVE_AFTER_COST_ALPHA_ARTIFACT_BLOCKER",
+    "LAYER_FIVE_AFTER_COST_ALPHA_TRAINING_STAGE_TYPE",
     "POST_MODEL_GENERATION_REBUILD_BLOCKER",
     "LayerWorkflow",
     "ModelTrainingWorkflowPlan",

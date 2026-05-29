@@ -26,6 +26,10 @@ STAGE_PROGRESS_CONTRACTS: dict[str, dict[str, str]] = {
         "unit_label": "dataset months",
         "progress_basis": "chronological train/validation/test month coverage required by the six-month fold",
     },
+    "model_training": {
+        "unit_label": "training months",
+        "progress_basis": "chronological training months used to fit a frozen model artifact for the six-month fold",
+    },
     "replay": {
         "unit_label": "replay months",
         "progress_basis": "event replay months in the fixed five-year replay window",
@@ -60,6 +64,8 @@ def worker_progress_path(progress_root: Path, worker_id: str) -> Path:
 
 def _stage_type_from_stage_id(stage_id: object) -> str:
     text = str(stage_id or "")
+    if ".model_training." in text:
+        return "model_training"
     if ".model_generation." in text:
         return "model_generation"
     if "." in text:
