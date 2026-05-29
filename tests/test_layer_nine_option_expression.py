@@ -3,12 +3,16 @@ from __future__ import annotations
 import tempfile
 import unittest
 import inspect
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from trading_manager_tasks.layer_nine_option_expression import (
     STAGE_ID,
     build_layer_nine_gate_review,
     fetch_layer_8_rows,
+    main,
     request_previews_from_layer_8_rows,
     write_gate_review_artifacts,
 )
@@ -84,6 +88,58 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
             self.assertIn('"provider_calls": 0', receipt_text)
             self.assertIn('"broker_execution_performed": false', receipt_text)
             self.assertIn('"model_activation_performed": false', receipt_text)
+
+    def test_written_active_provider_ready_receipt_is_successful_gate_completion(self) -> None:
+        review = build_layer_nine_gate_review(
+            start_month="2016-01",
+            end_month="2016-01",
+            layer_8_rows=[
+                {
+                    "target_candidate_id": "tcand_active_abc123",
+                    "underlying": "AAPL",
+                    "available_time": "2016-01-05T09:30:00-05:00",
+                    "action_type": "open_long",
+                    "action_side": "long",
+                }
+            ],
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            _review_path, receipt_path = write_gate_review_artifacts(review, output_root=Path(raw_tmp))
+            receipt_text = receipt_path.read_text(encoding="utf-8")
+
+            self.assertIn('"status": "succeeded"', receipt_text)
+            self.assertIn('"active_layer_8_request_candidates": 1', receipt_text)
+            self.assertIn('"provider_calls": 0', receipt_text)
+            self.assertIn('"broker_execution_performed": false', receipt_text)
+
+    def test_active_provider_ready_main_returns_success(self) -> None:
+        rows = [
+            {
+                "target_candidate_id": "tcand_active_abc123",
+                "underlying": "AAPL",
+                "available_time": "2016-01-05T09:30:00-05:00",
+                "action_type": "open_long",
+                "action_side": "long",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            with patch("trading_manager_tasks.layer_nine_option_expression.fetch_layer_8_rows", return_value=rows):
+                with redirect_stdout(StringIO()):
+                    exit_code = main(
+                        [
+                            "--start-month",
+                            "2016-01",
+                            "--end-month",
+                            "2016-01",
+                            "--database-url",
+                            "postgresql://redacted",
+                            "--output-root",
+                            raw_tmp,
+                            "--write",
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 0)
 
     def test_layer_8_fetch_limits_symbol_lookup_to_fold_targets(self) -> None:
         source = inspect.getsource(fetch_layer_8_rows)
