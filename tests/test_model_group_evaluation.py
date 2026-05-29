@@ -8,7 +8,7 @@ import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 
-from trading_manager_tasks.model_group_evaluation import run_model_group_evaluation_if_ready
+from trading_manager_tasks.model_group_evaluation import _decision_variable_schema_diagnostics, run_model_group_evaluation_if_ready
 
 
 class ModelGroupEvaluationTests(unittest.TestCase):
@@ -89,6 +89,10 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "outcome_label": 1 if positive else 0,
                     "prediction_score": 0.8 if positive else 0.2,
                     "action": "trade" if positive else "skip",
+                    "decision_status": "approved" if positive else "rejected",
+                    "fill_status": "simulated_filled" if positive else "simulated_rejected",
+                    "8_resolved_action_side": "long" if positive else "flat",
+                    "8_resolved_underlying_action_type": "open_long" if positive else "no_trade",
                     "feature_momentum_7d": 0.8 if positive else -0.3,
                     "feature_momentum_30d": 0.6 if positive else -0.2,
                     "feature_volume_rank_30d": (index % 5) / 5,
@@ -176,6 +180,9 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertIsInstance(metrics["ece"], float)
             self.assertIsInstance(metrics["profit_factor"], float)
             self.assertEqual(metrics["data_integrity_status"], "warning")
+            self.assertEqual(metrics["decision_variable_schema_status"], "passed")
+            self.assertEqual(metrics["decision_intended_side_unknown_count"], 0)
+            self.assertEqual(metrics["decision_agency_unknown_count"], 0)
             self.assertIn("predictive_diagnostics", metrics)
             roc_curve = metrics["predictive_diagnostics"]["roc_curve"]
             self.assertGreaterEqual(len(roc_curve), 3)
@@ -186,6 +193,14 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertIn("calibration_diagnostics", metrics)
             self.assertIn("economic_diagnostics", metrics)
             self.assertIn("data_integrity_diagnostics", metrics)
+            self.assertIn("decision_variable_schema_diagnostics", metrics)
+            variable_diagnostics = metrics["decision_variable_schema_diagnostics"]
+            self.assertEqual(variable_diagnostics["feature_namespace_leakage_status"], "passed")
+            self.assertEqual(variable_diagnostics["coverage"]["decision_intended_side"]["values"]["long"], 20)
+            self.assertEqual(variable_diagnostics["coverage"]["decision_intended_side"]["values"]["flat"], 10)
+            self.assertEqual(variable_diagnostics["coverage"]["decision_disposition"]["values"]["accepted"], 20)
+            self.assertEqual(variable_diagnostics["coverage"]["decision_disposition"]["values"]["rejected"], 10)
+            self.assertIn("eval_action_class", variable_diagnostics["normalized_row_samples"][0])
             self.assertIn("temporal_stability_diagnostics", metrics)
             self.assertIn("baseline_comparison_diagnostics", metrics)
             self.assertIsInstance(metrics["silhouette_outcome_label"], float)
@@ -253,6 +268,30 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
             self.assertIn("deterministic crypto placeholder", decision.reason)
+
+    def test_decision_variable_audit_does_not_infer_side_from_outcome(self):
+        rows = [
+            {
+                "decision_id": "missing_side_positive",
+                "realized_return": 0.04,
+                "baseline_return": 0.01,
+                "outcome_label": 1,
+                "prediction_score": 0.8,
+                "feature_eval_outcome_label": 1,
+            }
+        ]
+
+        diagnostics = _decision_variable_schema_diagnostics(
+            decision_rows=rows,
+            net_returns=[0.04],
+            baseline_returns=[0.01],
+            costs=[0.0],
+        )
+
+        self.assertEqual(diagnostics["coverage"]["decision_intended_side"]["values"]["unknown"], 1)
+        self.assertEqual(diagnostics["feature_namespace_leakage_status"], "warning")
+        self.assertIn("feature_eval_outcome_label", diagnostics["feature_namespace_leakage_columns"])
+        self.assertEqual(diagnostics["normalized_row_samples"][0]["eval_economic_class"], "positive_excess")
 
 
 if __name__ == "__main__":

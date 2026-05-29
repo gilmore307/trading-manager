@@ -45,6 +45,7 @@ DEFAULT_PROMOTION_REVIEW_CODEX_WORKDIR = Path("/root/.openclaw/workspace")
 DEFAULT_PROMOTION_REVIEW_CODEX_ADD_DIR = Path("/root/projects")
 FEATURE_DIAGNOSTIC_SAMPLE_LIMIT = 160
 FEATURE_DIAGNOSTIC_POINT_LIMIT = 80
+DECISION_VARIABLE_SAMPLE_LIMIT = 12
 
 
 def run_model_group_evaluation_if_ready(
@@ -288,6 +289,12 @@ def _build_settlement_run(
     costs = [_float(row, "cost", "trading_cost", "cost_drag") for row in decision_rows]
     net_returns = [value - cost for value, cost in zip(realized_returns, costs, strict=True)]
     scored_rows = _scored_rows(decision_rows, net_returns, baseline_returns, costs)
+    decision_variable_schema_diagnostics = _decision_variable_schema_diagnostics(
+        decision_rows=decision_rows,
+        net_returns=net_returns,
+        baseline_returns=baseline_returns,
+        costs=costs,
+    )
     labels = [int(row["label"]) for row in scored_rows]
     scores = [float(row["score"]) for row in scored_rows]
     auroc = _auroc(labels, scores) if labels and scores else None
@@ -359,10 +366,14 @@ def _build_settlement_run(
         "pcoa_variance_top2": sum(feature_diagnostics["pcoa"]["explained_variance_ratio"]) if feature_diagnostics["pcoa"]["available"] else None,
         "silhouette_outcome_label": feature_diagnostics["silhouette"].get("outcome_label"),
         "silhouette_decision_action": feature_diagnostics["silhouette"].get("decision_action"),
+        "decision_variable_schema_status": decision_variable_schema_diagnostics.get("status"),
+        "decision_intended_side_unknown_count": decision_variable_schema_diagnostics.get("unknown_counts", {}).get("decision_intended_side"),
+        "decision_agency_unknown_count": decision_variable_schema_diagnostics.get("unknown_counts", {}).get("decision_agency"),
         "predictive_diagnostics": predictive_diagnostics,
         "calibration_diagnostics": calibration_diagnostics,
         "economic_diagnostics": economic_diagnostics,
         "data_integrity_diagnostics": data_integrity_diagnostics,
+        "decision_variable_schema_diagnostics": decision_variable_schema_diagnostics,
         "temporal_stability_diagnostics": temporal_stability_diagnostics,
         "baseline_comparison_diagnostics": baseline_comparison_diagnostics,
         "uncertainty_diagnostics": {
@@ -420,6 +431,303 @@ def _scored_rows(
             }
         )
     return scored
+
+
+def _decision_variable_schema_diagnostics(
+    *,
+    decision_rows: Sequence[Mapping[str, Any]],
+    net_returns: Sequence[float],
+    baseline_returns: Sequence[float],
+    costs: Sequence[float],
+) -> dict[str, Any]:
+    normalized_rows = [
+        _normalized_decision_variable_row(row, net_return=net_return, baseline_return=baseline_return, cost=cost)
+        for row, net_return, baseline_return, cost in zip(decision_rows, net_returns, baseline_returns, costs, strict=True)
+    ]
+    field_names = (
+        "decision_intended_side",
+        "decision_intended_action",
+        "decision_disposition",
+        "decision_agency",
+        "replay_fill_status",
+        "eval_outcome_label",
+    )
+    unknown_counts = {
+        name: sum(1 for row in normalized_rows if row.get(name) in (None, "", "unknown"))
+        for name in field_names
+    }
+    coverage = {
+        name: {
+            "known_count": len(normalized_rows) - unknown_counts[name],
+            "unknown_count": unknown_counts[name],
+            "values": _value_counts(row.get(name) for row in normalized_rows),
+        }
+        for name in field_names
+    }
+    feature_leakage_columns = _feature_namespace_leakage_columns(decision_rows)
+    issues: list[dict[str, Any]] = []
+    for name in ("decision_intended_action", "decision_disposition", "decision_agency"):
+        if unknown_counts[name]:
+            issues.append({"issue_code": f"{name}_unknown", "row_count": unknown_counts[name]})
+    if unknown_counts["decision_intended_side"]:
+        issues.append(
+            {
+                "issue_code": "decision_intended_side_unknown",
+                "row_count": unknown_counts["decision_intended_side"],
+                "severity": "notice",
+            }
+        )
+    if feature_leakage_columns:
+        issues.append(
+            {
+                "issue_code": "feature_namespace_contains_replay_or_eval_fields",
+                "columns": feature_leakage_columns,
+                "severity": "warning",
+            }
+        )
+    status = "warning" if any(issue.get("severity") == "warning" for issue in issues) else "passed"
+    return {
+        "contract_type": "decision_variable_schema_diagnostic",
+        "schema_namespaces": {
+            "decision": "point-in-time decision intent, disposition, agency, score, and slice variables",
+            "replay": "post-replay fill and economic observations; forbidden as training features",
+            "eval": "post-outcome evaluation labels/classes; forbidden as training features",
+        },
+        "row_count": len(normalized_rows),
+        "status": status,
+        "label_definition": {
+            "eval_outcome_label": "legacy outcome_label/label/realized_label when present, otherwise replay_cost_adjusted_return > 0",
+            "eval_economic_class": "based on replay_excess_return and replay_cost_adjusted_return",
+            "eval_action_class": "based on decision_disposition, decision_agency, and replay_excess_return",
+        },
+        "feature_namespace_leakage_status": "warning" if feature_leakage_columns else "passed",
+        "feature_namespace_leakage_columns": feature_leakage_columns,
+        "unknown_counts": unknown_counts,
+        "coverage": coverage,
+        "issues": issues,
+        "normalized_row_samples": normalized_rows[:DECISION_VARIABLE_SAMPLE_LIMIT],
+    }
+
+
+def _normalized_decision_variable_row(
+    row: Mapping[str, Any],
+    *,
+    net_return: float,
+    baseline_return: float,
+    cost: float,
+) -> dict[str, Any]:
+    intended_side = _decision_intended_side(row)
+    intended_action = _decision_intended_action(row)
+    disposition = _decision_disposition(row, intended_action=intended_action)
+    agency, agency_detail = _decision_agency(row, disposition=disposition, intended_action=intended_action)
+    replay_fill_status = _replay_fill_status(row)
+    replay_execution_mode = _replay_execution_mode(row)
+    eval_outcome_label = _label(row)
+    replay_excess_return = net_return - baseline_return
+    return {
+        "decision_id": str(row.get("decision_id") or row.get("replay_decision_id") or ""),
+        "decision_asof_ts": str(row.get("asof_ts") or row.get("timestamp") or row.get("decision_timestamp") or ""),
+        "decision_instrument_scope": _decision_instrument_scope(row),
+        "decision_intended_side": intended_side,
+        "decision_intended_action": intended_action,
+        "decision_expression_type": _decision_expression_type(row),
+        "decision_disposition": disposition,
+        "decision_agency": agency,
+        "decision_agency_detail": agency_detail,
+        "decision_score": _score(row),
+        "decision_confidence_band": _confidence_band(_score(row)),
+        "replay_fill_status": replay_fill_status,
+        "replay_execution_mode": replay_execution_mode,
+        "replay_realized_return": _round_metric(net_return + cost),
+        "replay_baseline_return": _round_metric(baseline_return),
+        "replay_excess_return": _round_metric(replay_excess_return),
+        "replay_cost": _round_metric(cost),
+        "replay_cost_adjusted_return": _round_metric(net_return),
+        "replay_opportunity_return": _round_metric(net_return) if disposition in {"skipped", "rejected", "deferred", "blocked"} else None,
+        "eval_outcome_label": eval_outcome_label,
+        "eval_economic_class": _eval_economic_class(net_return=net_return, excess_return=replay_excess_return),
+        "eval_action_class": _eval_action_class(disposition=disposition, agency=agency, excess_return=replay_excess_return),
+    }
+
+
+def _decision_instrument_scope(row: Mapping[str, Any]) -> str:
+    expression_type = _decision_expression_type(row)
+    if expression_type in {"long_call", "long_put"}:
+        return "option"
+    if expression_type in {"underlying_only", "no_option_expression"}:
+        return "underlying"
+    instrument_ref = str(row.get("instrument_ref") or row.get("target_ref") or "").lower()
+    if "option" in instrument_ref or "_c" in instrument_ref or "_p" in instrument_ref:
+        return "option"
+    return "unknown"
+
+
+def _decision_expression_type(row: Mapping[str, Any]) -> str:
+    value = _first_text(row, "decision_expression_type", "9_resolved_expression_type", "resolved_expression_type", "expression_type")
+    if value in {"long_call", "long_put", "underlying_only_expression", "underlying_only", "no_option_expression"}:
+        return "underlying_only" if value == "underlying_only_expression" else value
+    return "unknown" if not value else "other"
+
+
+def _decision_intended_side(row: Mapping[str, Any]) -> str:
+    explicit = _first_text(
+        row,
+        "decision_intended_side",
+        "intended_side",
+        "8_resolved_action_side",
+        "resolved_action_side",
+        "position_side",
+        "action_side",
+    )
+    normalized = _normalize_side(explicit)
+    if normalized != "unknown":
+        return normalized
+    action_type = _first_text(
+        row,
+        "8_resolved_underlying_action_type",
+        "resolved_underlying_action_type",
+        "planned_underlying_action_type",
+        "decision_intended_action",
+        "decision_action",
+        "action",
+    )
+    if action_type in {"open_long", "increase_long", "reduce_long", "close_long"}:
+        return "long"
+    if action_type in {"open_short", "increase_short", "reduce_short", "cover_short", "bearish_underlying_path_but_no_short_allowed"}:
+        return "short"
+    if action_type in {"no_trade", "skip", "hold", "watch"}:
+        return "flat"
+    expression_type = _decision_expression_type(row)
+    if expression_type == "long_call":
+        return "long"
+    if expression_type == "long_put":
+        return "short"
+    if expression_type == "no_option_expression":
+        return "flat"
+    return "unknown"
+
+
+def _decision_intended_action(row: Mapping[str, Any]) -> str:
+    value = _first_text(
+        row,
+        "decision_intended_action",
+        "8_resolved_underlying_action_type",
+        "resolved_underlying_action_type",
+        "planned_underlying_action_type",
+        "decision_action",
+        "action",
+    )
+    if value in {"open", "open_long", "open_short", "trade", "continue_to_option_review"}:
+        return "open"
+    if value in {"increase", "increase_long", "increase_short", "add"}:
+        return "increase"
+    if value in {"reduce", "reduce_long", "reduce_short"}:
+        return "reduce"
+    if value in {"close", "close_long", "cover_short", "stop", "sell"}:
+        return "close"
+    if value in {"maintain", "hold"}:
+        return "maintain"
+    if value in {"no_trade", "skip", "reject_entry_thesis", "bearish_underlying_path_but_no_short_allowed"}:
+        return "no_trade"
+    if value in {"watch", "watch_only", "monitor_only"}:
+        return "watch"
+    return "unknown"
+
+
+def _decision_disposition(row: Mapping[str, Any], *, intended_action: str) -> str:
+    explicit = _first_text(row, "decision_disposition", "disposition")
+    if explicit in {"accepted", "skipped", "rejected", "deferred", "blocked"}:
+        return explicit
+    status = _first_text(row, "decision_status", "status")
+    fill_status = _first_text(row, "fill_status", "replay_fill_status")
+    if status in {"accepted", "approved", "filled", "executed", "suitable"} or fill_status in {"filled", "simulated_filled"}:
+        return "accepted"
+    if status in {"rejected", "rejected_entry_thesis"}:
+        return "rejected"
+    if status == "deferred":
+        return "deferred"
+    if status == "blocked" or status.startswith("blocked_"):
+        return "blocked"
+    if intended_action in {"no_trade", "watch", "maintain"} or fill_status in {"not_filled", "simulated_rejected"}:
+        return "skipped"
+    return "unknown"
+
+
+def _decision_agency(row: Mapping[str, Any], *, disposition: str, intended_action: str) -> tuple[str, str | None]:
+    explicit = _first_text(row, "decision_agency", "agency")
+    if explicit in {"model", "risk", "execution", "capital", "data", "mandate", "operator"}:
+        return explicit, _first_text(row, "decision_agency_detail", "agency_detail") or None
+    reason_codes = _reason_codes(row)
+    joined = " ".join(reason_codes)
+    if any(token in joined for token in ("buying_power", "capital", "cash")):
+        return "capital", reason_codes[0] if reason_codes else None
+    if any(token in joined for token in ("risk", "exposure", "concentration", "event_failure", "hard_block", "halt")):
+        return "risk", reason_codes[0] if reason_codes else None
+    if any(token in joined for token in ("broker", "order", "fill", "execution")):
+        return "execution", reason_codes[0] if reason_codes else None
+    if any(token in joined for token in ("missing", "data", "provider")):
+        return "data", reason_codes[0] if reason_codes else None
+    if any(token in joined for token in ("mandate", "not_allowed", "no_short", "short_borrow")):
+        return "mandate", reason_codes[0] if reason_codes else None
+    if disposition in {"accepted", "skipped", "rejected", "deferred"} or intended_action in {"no_trade", "watch"}:
+        return "model", None
+    return "unknown", None
+
+
+def _replay_fill_status(row: Mapping[str, Any]) -> str:
+    value = _first_text(row, "replay_fill_status", "fill_status")
+    if value in {"filled", "simulated_filled", "executed"}:
+        return "filled"
+    if value in {"partial", "partially_filled"}:
+        return "partial"
+    if value in {"not_filled", "simulated_rejected", "rejected"}:
+        return "not_filled"
+    return "unknown"
+
+
+def _replay_execution_mode(row: Mapping[str, Any]) -> str:
+    fill_status = _first_text(row, "fill_status", "replay_fill_status")
+    if fill_status.startswith("simulated_") or str(row.get("simulation_mode") or "").lower() == "true":
+        return "simulated"
+    if fill_status in {"filled", "partial", "not_filled"}:
+        return "live_or_recorded"
+    return "unknown"
+
+
+def _eval_economic_class(*, net_return: float, excess_return: float) -> str:
+    if excess_return > 0:
+        return "positive_excess"
+    if net_return < 0:
+        return "negative_excess"
+    if net_return > 0 and excess_return <= 0:
+        return "under_baseline"
+    if net_return == 0:
+        return "neutral"
+    return "unknown"
+
+
+def _eval_action_class(*, disposition: str, agency: str, excess_return: float) -> str:
+    if disposition == "accepted":
+        return "taken_good" if excess_return > 0 else "taken_bad"
+    if disposition in {"skipped", "rejected", "deferred"}:
+        return "missed_good" if excess_return > 0 else "avoided_bad"
+    if disposition == "blocked":
+        return "blocked_good" if excess_return > 0 else "blocked_bad"
+    if agency != "unknown" and excess_return > 0:
+        return "missed_good"
+    return "ambiguous"
+
+
+def _confidence_band(score: float | None) -> str:
+    if score is None:
+        return "unknown"
+    if score >= 0.70:
+        return "high"
+    if score >= 0.55:
+        return "medium"
+    if score >= 0.45:
+        return "neutral"
+    return "low"
 
 
 def _predictive_diagnostics(scored_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -768,6 +1076,8 @@ def _feature_space_diagnostics(decision_rows: Sequence[Mapping[str, Any]]) -> di
             sampled_rows,
             [str(row.get("decision_action") or row.get("action") or "").strip().lower() or None for row in sampled_source_rows],
         ),
+        "decision_intended_side": _silhouette_for_label(sampled_rows, [_decision_intended_side(row) for row in sampled_source_rows]),
+        "decision_intended_action": _silhouette_for_label(sampled_rows, [_decision_intended_action(row) for row in sampled_source_rows]),
     }
     return {
         "contract_type": "feature_space_diagnostic",
@@ -790,7 +1100,12 @@ def _empty_feature_diagnostics(feature_columns: Sequence[str]) -> dict[str, Any]
         "sample_count": 0,
         "pca": {"available": False, "explained_variance_ratio": [], "points": []},
         "pcoa": {"available": False, "explained_variance_ratio": [], "points": []},
-        "silhouette": {"outcome_label": None, "decision_action": None},
+        "silhouette": {
+            "outcome_label": None,
+            "decision_action": None,
+            "decision_intended_side": None,
+            "decision_intended_action": None,
+        },
     }
 
 
@@ -980,6 +1295,9 @@ def _diagnostic_point_from_xy(x: float, y: float, source: Mapping[str, Any]) -> 
         "y": _round_metric(y),
         "outcome_label": _label(source),
         "decision_action": str(source.get("decision_action") or source.get("action") or ""),
+        "decision_intended_side": _decision_intended_side(source),
+        "decision_intended_action": _decision_intended_action(source),
+        "decision_disposition": _decision_disposition(source, intended_action=_decision_intended_action(source)),
         "target_ref": str(source.get("target_ref") or source.get("instrument_ref") or ""),
         "timestamp": str(source.get("timestamp") or ""),
     }
@@ -1582,6 +1900,75 @@ def _load_jsonl_objects(path: Path) -> Iterable[dict[str, Any]]:
         payload = json.loads(line)
         if isinstance(payload, Mapping):
             yield dict(payload)
+
+
+def _first_text(row: Mapping[str, Any], *names: str) -> str:
+    for name in names:
+        value = row.get(name)
+        if value in (None, ""):
+            continue
+        text = str(value).strip().lower()
+        if text:
+            return text
+    return ""
+
+
+def _normalize_side(value: str) -> str:
+    if value in {"long", "bullish", "buy", "call"}:
+        return "long"
+    if value in {"short", "bearish", "sell_short", "put"}:
+        return "short"
+    if value in {"flat", "neutral", "none", "no_trade", "skip"}:
+        return "flat"
+    return "unknown"
+
+
+def _reason_codes(row: Mapping[str, Any]) -> list[str]:
+    values: list[str] = []
+    for key in ("reason_codes", "block_reason_codes", "decision_reason_codes"):
+        value = row.get(key)
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            values.extend(str(item).strip().lower() for item in value if str(item).strip())
+        elif isinstance(value, str) and value.strip():
+            values.extend(part.strip().lower() for part in re.split(r"[,;| ]+", value) if part.strip())
+    hard_blocks = row.get("execution_hard_block_checks")
+    if isinstance(hard_blocks, Mapping):
+        values.extend(str(key).strip().lower() for key, value in hard_blocks.items() if value is True and str(key).strip())
+        nested = hard_blocks.get("reason_codes")
+        if isinstance(nested, Sequence) and not isinstance(nested, (str, bytes)):
+            values.extend(str(item).strip().lower() for item in nested if str(item).strip())
+    return values
+
+
+def _value_counts(values: Iterable[Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        key = str(value if value not in (None, "") else "unknown")
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _feature_namespace_leakage_columns(decision_rows: Sequence[Mapping[str, Any]]) -> list[str]:
+    forbidden_tokens = (
+        "outcome",
+        "label",
+        "realized_return",
+        "baseline_return",
+        "excess_return",
+        "cost_adjusted",
+        "replay_",
+        "eval_",
+        "fill_status",
+    )
+    columns: set[str] = set()
+    for row in decision_rows:
+        for key in row:
+            lowered = key.lower()
+            if not lowered.startswith("feature_"):
+                continue
+            if any(token in lowered for token in forbidden_tokens):
+                columns.add(key)
+    return sorted(columns)
 
 
 def _float(row: Mapping[str, Any], *names: str, default: float = 0.0) -> float:
