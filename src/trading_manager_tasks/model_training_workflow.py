@@ -51,6 +51,7 @@ MODEL_RUNTIME_ROOT = model_runtime_root()
 LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER = "layer_04_event_observation_pool_ready"
 LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER = "layer_10_event_feed_coverage_ready"
 LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER = "layer_03_target_local_feed_artifacts_ready"
+LAYER_FIVE_AFTER_COST_ALPHA_ARTIFACT_BLOCKER = "layer_05_after_cost_alpha_artifact_ready"
 
 
 @dataclass(frozen=True)
@@ -449,6 +450,25 @@ def _with_required_layer_five_artifact_arg(
             selected_target_symbol=selected_target_symbol,
         ),
     ]
+
+
+def _layer_five_after_cost_artifact_blockers(
+    *,
+    layer: int,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> tuple[str, ...]:
+    if layer != 5:
+        return ()
+    artifact_path = Path(
+        _layer_five_after_cost_artifact_path(
+            start_month=start_month,
+            end_month=end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
+    )
+    return () if artifact_path.exists() else (LAYER_FIVE_AFTER_COST_ALPHA_ARTIFACT_BLOCKER,)
 
 
 FEATURE_MODULES: dict[str, str] = {
@@ -959,7 +979,12 @@ def _build_layer_workflow(
     model_generation_blockers = _upstream_layer_ready_blockers(
         tuple(meta["depends_on_layers"]),
         foundation_catch_up_only=foundation_catch_up_only,
-    ) + ((f"{key}.feature_or_input_ready",) if include_input_stage else ())
+    ) + ((f"{key}.feature_or_input_ready",) if include_input_stage else ()) + _layer_five_after_cost_artifact_blockers(
+        layer=layer,
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     model_generation_description = (
         "Generate offline model/state-vector evidence from the accepted chronological rolling-fold split contract."
     )

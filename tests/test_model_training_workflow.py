@@ -445,6 +445,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             "/root/projects/trading-storage/storage/03_model_artifacts/runtime/model_05_alpha_confidence/after_cost_alpha_model_aapl_2016-01_2016-06.json",
             layer.model_generate_command,
         )
+        self.assertIn("layer_05_after_cost_alpha_artifact_ready", layer.stages[0].blockers)
         self.assertTrue(any(token.endswith("model_rows_aapl_${START_MONTH}.jsonl") for token in layer.model_generate_command))
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
