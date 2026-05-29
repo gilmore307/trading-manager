@@ -2,7 +2,11 @@
 
 This directory holds one-off SQL migrations for live/current PostgreSQL tables outside the registry migration ledger.
 
-There is currently no pending live/current table migration script. Old one-off numbering scripts were removed from the active tree after the 10-layer physical contract became canonical; use Git history for that audit trail.
+There is currently no pending live/current table migration script.
+
+## Applied Cleanup Scripts
+
+- `drop_stale_model_numbering_tables_20260529.sql` — removes empty pre-renumbering model/feature relations after the 10-layer physical contract became canonical. The script refuses to drop any table or materialized view that still contains rows.
 
 ## Use Only When
 
