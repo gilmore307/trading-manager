@@ -12,7 +12,6 @@ import argparse
 import json
 import os
 import sys
-import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, TextIO
@@ -21,12 +20,11 @@ from .scheduler_daemon import (
     DEFAULT_DECISION_LOG_PATH,
     DEFAULT_LOCK_PATH,
     DEFAULT_STATE_PATH,
-    _process_exists,
     load_model_worker_target_queue,
     select_next_historical_work,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .scheduler_locks import scheduler_lock_plan
+from .scheduler_locks import inspect_scheduler_lock, scheduler_lock_plan
 
 DEFAULT_SERVICE_TEMPLATE_PATH = Path("deploy/systemd/trading-manager-historical-scheduler.service")
 DEFAULT_SERVICE_ENV_PATH = Path("deploy/systemd/trading-manager-historical-scheduler.env")
@@ -167,14 +165,15 @@ def _latest_jsonl_object(path: Path) -> tuple[dict[str, Any] | None, int]:
 
 
 def _lock_status(path: Path) -> LockStatus:
-    if not path.exists():
-        return LockStatus(path=str(path), status="absent", reason="no scheduler lock file is present")
-    age_seconds = time.time() - path.stat().st_mtime
-    payload = _read_json_object(path) or {}
-    pid = int(payload.get("pid") or 0) if str(payload.get("pid") or "").isdigit() else None
-    if pid is not None and _process_exists(pid):
-        return LockStatus(path=str(path), status="active", pid=pid, age_seconds=age_seconds, reason="lock pid is running")
-    return LockStatus(path=str(path), status="stale", pid=pid, age_seconds=age_seconds, reason="lock file exists but pid is not running")
+    inspection = inspect_scheduler_lock(path)
+    status = "auto_replaceable" if inspection.auto_replace_on_acquire else inspection.status
+    return LockStatus(
+        path=inspection.path,
+        status=status,
+        pid=inspection.pid,
+        age_seconds=inspection.age_seconds,
+        reason=inspection.reason,
+    )
 
 
 def _workflow_state_path(storage_root: Path, month: str | None) -> Path:
@@ -360,8 +359,10 @@ def _open_operational_items(
         items.append("start_service_or_run_one_shot_smoke_to_create_daemon_state")
     if not decision_log_file.exists:
         items.append("start_service_or_run_one_shot_smoke_to_create_decision_log")
-    if lock.status == "stale":
-        items.append("remove_or_replace_stale_scheduler_lock_before_service_start")
+    if lock.status == "auto_replaceable":
+        items.append("scheduler_lock_will_be_replaced_on_next_service_start")
+    elif lock.status in {"malformed_recent"}:
+        items.append("review_recent_unreadable_scheduler_lock_before_service_start")
     target_boundary_block = (
         target_queue_ready
         and workflow.next_stage_status == "blocked"
@@ -458,7 +459,7 @@ def collect_historical_scheduler_status(
         and service_env.exists
         and daemon_wrapper.exists
         and flags_present
-        and lock.status in {"absent", "active"}
+        and lock.status in {"absent", "active", "auto_replaceable"}
     )
     operational_items = _open_operational_items(
         state_file=state_file,

@@ -440,6 +440,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--target-symbol", layer.model_generate_command)
         self.assertIn("AAPL", layer.model_generate_command)
         self.assertIn("--output-jsonl", layer.model_generate_command)
+        self.assertIn("--after-cost-alpha-model-json", layer.model_generate_command)
+        self.assertIn(
+            "/root/projects/trading-storage/storage/03_model_artifacts/runtime/model_05_alpha_confidence/after_cost_alpha_model_aapl_2016-01_2016-06.json",
+            layer.model_generate_command,
+        )
         self.assertTrue(any(token.endswith("model_rows_aapl_${START_MONTH}.jsonl") for token in layer.model_generate_command))
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)

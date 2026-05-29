@@ -420,6 +420,37 @@ def _target_scoped_generation_command(command: list[str], *, layer: int, selecte
     return [target_output if token == default_output else token for token in scoped]
 
 
+def _layer_five_after_cost_artifact_path(
+    *,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> str:
+    target_token = _normalize_selected_target_symbol(selected_target_symbol) or "target"
+    return f"{MODEL_RUNTIME_ROOT}/model_05_alpha_confidence/after_cost_alpha_model_{target_token.lower().replace('.', '_')}_{start_month}_{end_month}.json"
+
+
+def _with_required_layer_five_artifact_arg(
+    command: list[str],
+    *,
+    layer: int,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> list[str]:
+    if layer != 5:
+        return command
+    return [
+        *command,
+        "--after-cost-alpha-model-json",
+        _layer_five_after_cost_artifact_path(
+            start_month=start_month,
+            end_month=end_month,
+            selected_target_symbol=selected_target_symbol,
+        ),
+    ]
+
+
 FEATURE_MODULES: dict[str, str] = {
     "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime.from_feed_artifacts",
     "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context.from_feed_artifacts",
@@ -765,6 +796,13 @@ def _build_layer_workflow(
         selected_target_symbol=selected_target_symbol,
     )
     generate = _target_scoped_generation_command(generate, layer=layer, selected_target_symbol=selected_target_symbol)
+    generate = _with_required_layer_five_artifact_arg(
+        generate,
+        layer=layer,
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     input_dataset_unit = _input_dataset_unit_for_layer(
         layer=layer,
         start_month=start_month,

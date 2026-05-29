@@ -92,6 +92,7 @@ def run_model_group_replay_if_ready(
     run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
     progress_path = dataset_root / "replay_progress.jsonl"
     candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
+    after_cost_alpha_model_path = str(training_fold.get("layer_05_after_cost_alpha_model_ref") or "")
     command = [
         python_executable,
         str(runner_path),
@@ -101,6 +102,8 @@ def run_model_group_replay_if_ready(
         run_id,
         "--candidate-model-ref",
         candidate_model_ref,
+        "--after-cost-alpha-model-json",
+        after_cost_alpha_model_path,
         "--progress-path",
         str(progress_path),
     ]
@@ -273,6 +276,14 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
         if not start_month or not end_month:
             continue
         target_symbol = _fold_state_target_symbol(path, payload)
+        after_cost_alpha_model_path = _layer_05_after_cost_alpha_model_path(
+            storage_root=storage_root,
+            start_month=start_month,
+            end_month=end_month,
+            target_symbol=target_symbol,
+        )
+        if not after_cost_alpha_model_path.exists():
+            continue
         candidates.append(
             {
                 "fold_id": f"fold_{start_month}_{end_month}",
@@ -282,9 +293,21 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                 "target_symbol": target_symbol,
                 "state_path": str(path),
                 "candidate_model_ref": f"storage://trading-manager/model_group/{start_month}_{end_month}",
+                "layer_05_after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
             }
         )
     return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))[0] if candidates else None
+
+
+def _layer_05_after_cost_alpha_model_path(
+    *,
+    storage_root: Path,
+    start_month: str,
+    end_month: str,
+    target_symbol: str | None,
+) -> Path:
+    target_token = str(target_symbol or "target").strip().lower().replace(".", "_")
+    return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / f"after_cost_alpha_model_{target_token}_{start_month}_{end_month}.json"
 
 
 def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | None:

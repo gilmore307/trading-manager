@@ -285,6 +285,31 @@ class SchedulerStatusTests(unittest.TestCase):
         self.assertIn("review_systemd_template_flags", row["open_operational_items"])
         self.assertFalse(row["service_runtime_ready"])
 
+    def test_dead_pid_lock_is_reported_as_auto_replaceable_not_hard_blocking(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            service, env, wrapper = self._write_service_files(tmp)
+            lock_path = tmp / "runtime" / "historical_scheduler.lock"
+            lock_path.parent.mkdir(parents=True)
+            lock_path.write_text('{"pid": 999999999, "created_utc": "2026-05-13T00:00:00Z"}\n', encoding="utf-8")
+
+            status = collect_historical_scheduler_status(
+                storage_root=storage_root,
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=lock_path,
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+        row = status.summary_row()
+        self.assertEqual(row["lock"]["status"], "auto_replaceable")
+        self.assertTrue(row["service_runtime_ready"])
+        self.assertIn("scheduler_lock_will_be_replaced_on_next_service_start", row["open_operational_items"])
+        self.assertNotIn("remove_or_replace_stale_scheduler_lock_before_service_start", row["open_operational_items"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -48,6 +48,21 @@ class SchedulerLockRef:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class SchedulerLockInspection:
+    """Read-only observation for one scheduler lock file."""
+
+    path: str
+    status: Literal["absent", "active", "dead_pid", "malformed_recent", "malformed_stale"]
+    pid: int | None = None
+    age_seconds: float | None = None
+    reason: str | None = None
+    auto_replace_on_acquire: bool = False
+
+    def summary_row(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 def _require(value: str | None, name: str) -> str:
     text = str(value or "").strip()
     if not text:
@@ -176,6 +191,63 @@ def _process_exists(pid: int) -> bool:
     return True
 
 
+def inspect_scheduler_lock(path: Path, *, stale_after_seconds: int = 6 * 60 * 60) -> SchedulerLockInspection:
+    """Inspect a scheduler lock without mutating it."""
+
+    if not path.exists():
+        return SchedulerLockInspection(
+            path=str(path),
+            status="absent",
+            reason="no scheduler lock file is present",
+        )
+    try:
+        age_seconds = time.time() - path.stat().st_mtime
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        age_seconds = time.time() - path.stat().st_mtime
+        status: Literal["malformed_recent", "malformed_stale"] = "malformed_stale" if age_seconds >= stale_after_seconds else "malformed_recent"
+        return SchedulerLockInspection(
+            path=str(path),
+            status=status,
+            age_seconds=age_seconds,
+            reason="lock payload is not valid JSON",
+            auto_replace_on_acquire=status == "malformed_stale",
+        )
+    except OSError as exc:
+        return SchedulerLockInspection(
+            path=str(path),
+            status="malformed_recent",
+            reason=f"lock payload is unreadable: {exc}",
+        )
+    raw_pid = payload.get("pid") if isinstance(payload, dict) else None
+    pid = int(raw_pid) if str(raw_pid or "").isdigit() else None
+    if pid is not None and _process_exists(pid):
+        return SchedulerLockInspection(
+            path=str(path),
+            status="active",
+            pid=pid,
+            age_seconds=age_seconds,
+            reason="lock pid is running",
+        )
+    if pid is not None:
+        return SchedulerLockInspection(
+            path=str(path),
+            status="dead_pid",
+            pid=pid,
+            age_seconds=age_seconds,
+            reason="lock file exists but recorded pid is not running",
+            auto_replace_on_acquire=True,
+        )
+    status = "malformed_stale" if age_seconds >= stale_after_seconds else "malformed_recent"
+    return SchedulerLockInspection(
+        path=str(path),
+        status=status,
+        age_seconds=age_seconds,
+        reason="lock payload does not contain a valid pid",
+        auto_replace_on_acquire=status == "malformed_stale",
+    )
+
+
 @contextmanager
 def acquire_scheduler_lock(ref: SchedulerLockRef, *, stale_after_seconds: int = 6 * 60 * 60) -> Iterator[SchedulerLockRef]:
     """Acquire one filesystem scheduler lock for a narrow work lane.
@@ -200,17 +272,8 @@ def acquire_scheduler_lock(ref: SchedulerLockRef, *, stale_after_seconds: int = 
         try:
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
         except FileExistsError as exc:
-            existing_text = path.read_text(encoding="utf-8") if path.exists() else "{}"
-            try:
-                existing = json.loads(existing_text)
-            except json.JSONDecodeError:
-                existing = {}
-            existing_pid = int(existing.get("pid") or 0)
-            age = time.time() - path.stat().st_mtime if path.exists() else 0
-            if existing_pid > 0:
-                if _process_exists(existing_pid):
-                    raise RuntimeError(f"scheduler lock is active: {ref.lock_key} at {path}") from exc
-            elif age < stale_after_seconds:
+            inspection = inspect_scheduler_lock(path, stale_after_seconds=stale_after_seconds)
+            if not inspection.auto_replace_on_acquire:
                 raise RuntimeError(f"scheduler lock is active: {ref.lock_key} at {path}") from exc
             path.unlink(missing_ok=True)
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
@@ -277,9 +340,11 @@ def scheduler_lock_plan(
 __all__ = [
     "DEFAULT_DAEMON_LOCK_PATH",
     "DEFAULT_LOCKS_DIR",
+    "SchedulerLockInspection",
     "SchedulerLockRef",
     "acquire_scheduler_lock",
     "daemon_lock_ref",
+    "inspect_scheduler_lock",
     "lock_token",
     "month_stage_lock_ref",
     "promotion_lock_ref",

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 from datetime import UTC, datetime
@@ -17,23 +16,11 @@ from pathlib import Path
 from typing import Any, Mapping, TextIO
 
 from .agent_error_handler import AGENT_ERROR_DIAGNOSIS_CONTRACT, _stable_id
-from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
+from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH, inspect_scheduler_lock
 
 
 def _now_utc() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _process_exists(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
 
 
 def _resolve_path(raw: str, *, working_directory: str | None) -> Path:
@@ -80,28 +67,19 @@ def repair_scheduler_dead_pid_lock(request: Mapping[str, Any]) -> dict[str, Any]
             "reason": "lock path no longer exists",
             "files_changed": [],
         }
-    try:
-        payload = json.loads(lock_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    inspection = inspect_scheduler_lock(lock_path)
+    if inspection.status not in {"dead_pid"}:
         return {
             "repair_status": "not_repaired",
             "repair_kind": "scheduler_dead_pid_lock",
-            "reason": f"lock payload unreadable: {exc}",
-            "files_changed": [],
-        }
-    pid = int(payload.get("pid") or 0)
-    if _process_exists(pid):
-        return {
-            "repair_status": "not_repaired",
-            "repair_kind": "scheduler_dead_pid_lock",
-            "reason": f"lock owner pid {pid} is still running",
+            "reason": inspection.reason or f"lock status is {inspection.status}",
             "files_changed": [],
         }
     lock_path.unlink(missing_ok=True)
     return {
         "repair_status": "repaired",
         "repair_kind": "scheduler_dead_pid_lock",
-        "reason": f"removed dead-PID scheduler lock for pid {pid}",
+        "reason": f"removed dead-PID scheduler lock for pid {inspection.pid}",
         "files_changed": [str(lock_path)],
         "verification": "lock file removed only after confirming recorded PID was not running",
     }

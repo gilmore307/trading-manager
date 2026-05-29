@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,7 @@ from trading_manager_tasks.scheduler_locks import (
     DEFAULT_STORAGE_ROOT,
     acquire_scheduler_lock,
     daemon_lock_ref,
+    inspect_scheduler_lock,
     lock_token,
     month_stage_lock_ref,
     promotion_lock_ref,
@@ -95,6 +97,24 @@ class SchedulerLocksTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "scheduler lock is active"):
                     with acquire_scheduler_lock(ref):
                         pass
+
+            self.assertFalse(path.exists())
+
+    def test_acquire_scheduler_lock_replaces_dead_pid_lock_file(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            locks_dir = Path(raw_tmp) / "locks"
+            ref = month_stage_lock_ref("2016-01", "layer_01_market_regime.data_acquisition", locks_dir=locks_dir)
+            path = Path(ref.lock_path)
+            path.parent.mkdir(parents=True)
+            path.write_text('{"pid": 999999999, "created_utc": "2026-05-13T00:00:00Z"}\n', encoding="utf-8")
+
+            inspection = inspect_scheduler_lock(path)
+
+            self.assertEqual(inspection.status, "dead_pid")
+            self.assertTrue(inspection.auto_replace_on_acquire)
+            with acquire_scheduler_lock(ref):
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(payload["pid"], os.getpid())
 
             self.assertFalse(path.exists())
 

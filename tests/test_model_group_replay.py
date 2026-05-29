@@ -71,6 +71,9 @@ class ModelGroupReplayTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        artifact_path = storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / "after_cost_alpha_model_aapl_2016-01_2016-06.json"
+        artifact_path.parent.mkdir(parents=True)
+        artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
 
     def _write_runner(self, root: Path) -> Path:
         runner = root / "run_replay_execution.py"
@@ -124,6 +127,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
             self.assertIn("storage://trading-manager/model_group/2016-01_2016-06", decision.command)
+            self.assertIn("--after-cost-alpha-model-json", decision.command)
             self.assertEqual(
                 decision.execution_summary["replay_execution_receipt"]["candidate_model_ref"],
                 "storage://trading-manager/model_group/2016-01_2016-06",
