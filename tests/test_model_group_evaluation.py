@@ -163,6 +163,9 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             settlement = json.loads(settlement_paths[0].read_text(encoding="utf-8"))
             metrics = settlement["metrics"]
             self.assertEqual(eligibility["contract_type"], "promotion_eligibility_decision")
+            self.assertEqual(settlement["target_symbol"], "AAPL")
+            self.assertEqual(eligibility["target_symbol"], "AAPL")
+            self.assertEqual(settlement["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2016-06")
             self.assertEqual(eligibility["decision_status"], "deferred")
             self.assertEqual(eligibility["agent_review_recommendation"], "deferred")
             self.assertEqual(metrics["feature_column_count"], 3)

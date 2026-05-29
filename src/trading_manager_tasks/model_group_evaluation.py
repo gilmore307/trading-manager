@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -164,6 +165,7 @@ def run_model_group_evaluation_if_ready(
         review_root.mkdir(parents=True, exist_ok=True)
         settlement = _build_settlement_run(
             fold_id=str(training_fold["fold_id"]),
+            target_symbol=str(training_fold.get("target_symbol") or ""),
             candidate_model_ref=str(training_fold["candidate_model_ref"]),
             replay_contract_ref=f"trading-evaluation/replays/{contract_id}.json",
             replay_result_ref=str(replay_receipt_path),
@@ -272,6 +274,7 @@ def _decision(
 def _build_settlement_run(
     *,
     fold_id: str,
+    target_symbol: str,
     candidate_model_ref: str,
     replay_contract_ref: str,
     replay_result_ref: str,
@@ -372,6 +375,7 @@ def _build_settlement_run(
         "contract_type": "fold_settlement_run",
         "fold_settlement_run_id": settlement_id,
         "fold_id": fold_id,
+        "target_symbol": target_symbol,
         "candidate_model_ref": candidate_model_ref,
         "replay_contract_ref": replay_contract_ref,
         "replay_result_ref": replay_result_ref,
@@ -1042,6 +1046,7 @@ def _build_promotion_review_packet(
         "review_ref": settlement_ref.replace("fold_settlement_run.json", "promotion_evaluation_review.json"),
         "candidate_label": "model_a",
         "fold_id": str(settlement.get("fold_id") or ""),
+        "target_symbol": str(settlement.get("target_symbol") or ""),
         "benchmark_contract_ref": benchmark_contract_ref,
         "comparison_label": "model_b",
         "recommendation": "insufficient_evidence" if blocking_issues else "eligible_for_shadow",
@@ -1289,6 +1294,7 @@ def _build_promotion_eligibility_decision(
         "contract_type": "promotion_eligibility_decision",
         "promotion_eligibility_decision_id": f"promelig_{_stable_token(settlement.get('fold_id'), settlement_ref, decision_status)}",
         "fold_id": str(settlement.get("fold_id") or ""),
+        "target_symbol": str(settlement.get("target_symbol") or ""),
         "candidate_model_ref": str(settlement.get("candidate_model_ref") or ""),
         "replay_contract_ref": replay_contract_ref,
         "settlement_run_ref": settlement_ref,
@@ -1361,6 +1367,8 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
         end_month = str(payload.get("end_month") or "")
         if not start_month or not end_month:
             continue
+        target_symbol = _fold_state_target_symbol(path, payload)
+        target_ref_part = _candidate_model_ref_target_part(target_symbol)
         candidates.append(
             (
                 f"{start_month}:{end_month}:{path}",
@@ -1369,8 +1377,8 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                     "end_month": end_month,
                     "state_path": str(path),
                     "fold_id": f"fold_{start_month}_{end_month}",
-                    "target_symbol": _fold_state_target_symbol(path, payload),
-                    "candidate_model_ref": f"storage://trading-manager/model_group/{start_month}_{end_month}",
+                    "target_symbol": target_symbol,
+                    "candidate_model_ref": f"storage://trading-manager/model_group/{target_ref_part}/{start_month}_{end_month}",
                 },
             )
         )
@@ -1386,6 +1394,13 @@ def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | N
             return value
     match = re.match(r"^model_training_fold_state_([A-Za-z0-9.-]+)_\d{4}-\d{2}_\d{4}-\d{2}$", path.stem)
     return match.group(1).upper() if match else None
+
+
+def _candidate_model_ref_target_part(target_symbol: str | None) -> str:
+    target = str(target_symbol or "").strip().upper()
+    if not target:
+        return "unknown_target"
+    return re.sub(r"[^A-Z0-9]+", "_", target).strip("_").lower()
 
 
 def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
