@@ -177,6 +177,12 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertIsInstance(metrics["profit_factor"], float)
             self.assertEqual(metrics["data_integrity_status"], "warning")
             self.assertIn("predictive_diagnostics", metrics)
+            roc_curve = metrics["predictive_diagnostics"]["roc_curve"]
+            self.assertGreaterEqual(len(roc_curve), 3)
+            self.assertEqual(roc_curve[0]["false_positive_rate"], 0.0)
+            self.assertEqual(roc_curve[0]["true_positive_rate"], 0.0)
+            self.assertEqual(roc_curve[-1]["false_positive_rate"], 1.0)
+            self.assertEqual(roc_curve[-1]["true_positive_rate"], 1.0)
             self.assertIn("calibration_diagnostics", metrics)
             self.assertIn("economic_diagnostics", metrics)
             self.assertIn("data_integrity_diagnostics", metrics)

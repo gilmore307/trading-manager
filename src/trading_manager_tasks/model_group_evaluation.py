@@ -435,6 +435,7 @@ def _predictive_diagnostics(scored_rows: Sequence[Mapping[str, Any]]) -> dict[st
         "negative_count": row_count - positives,
         "base_rate": _round_metric(positives / row_count) if row_count else None,
         "pr_auc": _pr_auc(labels, scores),
+        "roc_curve": _roc_curve(labels, scores),
         "confusion_by_threshold": [_confusion_at_threshold(scored_rows, threshold) for threshold in thresholds],
         "threshold_return_curve": [_threshold_return(scored_rows, threshold) for threshold in thresholds],
     }
@@ -623,6 +624,44 @@ def _pr_auc(labels: Sequence[int], scores: Sequence[float]) -> float | None:
             true_positive += 1
             precision_sum += true_positive / rank
     return _round_metric(precision_sum / positives)
+
+
+def _roc_curve(labels: Sequence[int], scores: Sequence[float]) -> list[dict[str, Any]]:
+    pairs = sorted(zip(scores, labels, strict=True), key=lambda item: item[0], reverse=True)
+    positives = sum(labels)
+    negatives = len(labels) - positives
+    if not pairs or positives == 0 or negatives == 0:
+        return []
+    points: list[dict[str, Any]] = [
+        {
+            "threshold": None,
+            "false_positive_rate": 0.0,
+            "true_positive_rate": 0.0,
+            "true_positive": 0,
+            "false_positive": 0,
+        }
+    ]
+    true_positive = 0
+    false_positive = 0
+    index = 0
+    while index < len(pairs):
+        threshold = float(pairs[index][0])
+        while index < len(pairs) and float(pairs[index][0]) == threshold:
+            if int(pairs[index][1]) == 1:
+                true_positive += 1
+            else:
+                false_positive += 1
+            index += 1
+        points.append(
+            {
+                "threshold": _round_metric(threshold),
+                "false_positive_rate": _round_metric(false_positive / negatives),
+                "true_positive_rate": _round_metric(true_positive / positives),
+                "true_positive": true_positive,
+                "false_positive": false_positive,
+            }
+        )
+    return points
 
 
 def _confusion_at_threshold(scored_rows: Sequence[Mapping[str, Any]], threshold: float) -> dict[str, Any]:
