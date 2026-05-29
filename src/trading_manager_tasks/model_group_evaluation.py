@@ -278,20 +278,32 @@ def _build_settlement_run(
     decision_rows: Sequence[Mapping[str, Any]],
     created_at_utc: str,
 ) -> dict[str, Any]:
-    decision_rows = [row for row in decision_rows if str(row.get("entry_threshold_calibration_role") or "test") != "validation"]
+    raw_decision_rows = list(decision_rows)
+    decision_rows = [row for row in raw_decision_rows if str(row.get("entry_threshold_calibration_role") or "test") != "validation"]
     realized_returns = [_float(row, "net_return", "realized_return", "candidate_return") for row in decision_rows]
     baseline_returns = [_float(row, "baseline_return", "replay_return", "incumbent_return") for row in decision_rows]
     costs = [_float(row, "cost", "trading_cost", "cost_drag") for row in decision_rows]
     net_returns = [value - cost for value, cost in zip(realized_returns, costs, strict=True)]
-    labels_scores = [(_label(row), _score(row)) for row in decision_rows]
-    labels = [int(label) for label, score in labels_scores if label is not None and score is not None]
-    scores = [float(score) for label, score in labels_scores if label is not None and score is not None]
+    scored_rows = _scored_rows(decision_rows, net_returns, baseline_returns, costs)
+    labels = [int(row["label"]) for row in scored_rows]
+    scores = [float(row["score"]) for row in scored_rows]
     auroc = _auroc(labels, scores) if labels and scores else None
     filled_indices = [index for index, row in enumerate(decision_rows) if _is_filled_trade_row(row)]
     filled_net_returns = [net_returns[index] for index in filled_indices]
     net_total = sum(net_returns)
     baseline_total = sum(baseline_returns)
     feature_diagnostics = _feature_space_diagnostics(decision_rows)
+    predictive_diagnostics = _predictive_diagnostics(scored_rows)
+    calibration_diagnostics = _calibration_diagnostics(scored_rows)
+    economic_diagnostics = _economic_diagnostics(net_returns=net_returns, realized_returns=realized_returns, costs=costs)
+    data_integrity_diagnostics = _data_integrity_diagnostics(raw_decision_rows=raw_decision_rows, decision_rows=decision_rows)
+    temporal_stability_diagnostics = _temporal_stability_diagnostics(scored_rows)
+    baseline_comparison_diagnostics = _baseline_comparison_diagnostics(
+        labels=labels,
+        scores=scores,
+        net_total=net_total,
+        baseline_total=baseline_total,
+    )
     gate_failures: list[str] = []
     if len(decision_rows) < 20:
         gate_failures.append("decision_row_count_below_minimum")
@@ -315,7 +327,22 @@ def _build_settlement_run(
         "payoff_ratio": _payoff_ratio(filled_net_returns),
         "auroc": auroc,
         "auroc_pair_count": len(labels),
+        "pr_auc": predictive_diagnostics.get("pr_auc"),
+        "base_rate": predictive_diagnostics.get("base_rate"),
         "brier_score": sum((score - label) ** 2 for label, score in zip(labels, scores, strict=True)) / len(labels) if labels else None,
+        "ece": calibration_diagnostics.get("ece"),
+        "mce": calibration_diagnostics.get("mce"),
+        "brier_reliability": calibration_diagnostics.get("brier_decomposition", {}).get("reliability"),
+        "brier_resolution": calibration_diagnostics.get("brier_decomposition", {}).get("resolution"),
+        "brier_uncertainty": calibration_diagnostics.get("brier_decomposition", {}).get("uncertainty"),
+        "profit_factor": economic_diagnostics.get("profit_factor"),
+        "return_per_decision": economic_diagnostics.get("return_per_decision"),
+        "tail_loss_p05": economic_diagnostics.get("tail_loss_p05"),
+        "cost_sensitivity_2x": economic_diagnostics.get("cost_sensitivity", {}).get("2.0x"),
+        "worst_month_return": temporal_stability_diagnostics.get("worst_month_return"),
+        "month_slice_count": temporal_stability_diagnostics.get("month_slice_count"),
+        "data_integrity_status": data_integrity_diagnostics.get("status"),
+        "leakage_check_status": data_integrity_diagnostics.get("leakage_check_status"),
         "feature_column_count": feature_diagnostics["feature_column_count"],
         "feature_row_count": feature_diagnostics["feature_row_count"],
         "feature_sample_count": feature_diagnostics["sample_count"],
@@ -329,6 +356,16 @@ def _build_settlement_run(
         "pcoa_variance_top2": sum(feature_diagnostics["pcoa"]["explained_variance_ratio"]) if feature_diagnostics["pcoa"]["available"] else None,
         "silhouette_outcome_label": feature_diagnostics["silhouette"].get("outcome_label"),
         "silhouette_decision_action": feature_diagnostics["silhouette"].get("decision_action"),
+        "predictive_diagnostics": predictive_diagnostics,
+        "calibration_diagnostics": calibration_diagnostics,
+        "economic_diagnostics": economic_diagnostics,
+        "data_integrity_diagnostics": data_integrity_diagnostics,
+        "temporal_stability_diagnostics": temporal_stability_diagnostics,
+        "baseline_comparison_diagnostics": baseline_comparison_diagnostics,
+        "uncertainty_diagnostics": {
+            "available": False,
+            "reason": "block bootstrap confidence intervals require multiple completed comparable folds",
+        },
         "feature_diagnostics": feature_diagnostics,
     }
     return {
@@ -353,6 +390,317 @@ def _build_settlement_run(
         "broker_execution_performed": False,
         "account_mutation_performed": False,
     }
+
+
+def _scored_rows(
+    decision_rows: Sequence[Mapping[str, Any]],
+    net_returns: Sequence[float],
+    baseline_returns: Sequence[float],
+    costs: Sequence[float],
+) -> list[dict[str, Any]]:
+    scored: list[dict[str, Any]] = []
+    for row, net_return, baseline_return, cost in zip(decision_rows, net_returns, baseline_returns, costs, strict=True):
+        label = _label(row)
+        score = _score(row)
+        if label is None or score is None:
+            continue
+        scored.append(
+            {
+                "label": int(label),
+                "score": float(score),
+                "net_return": float(net_return),
+                "baseline_return": float(baseline_return),
+                "cost": float(cost),
+                "timestamp": str(row.get("timestamp") or row.get("decision_timestamp") or ""),
+                "decision_action": str(row.get("decision_action") or row.get("action") or ""),
+            }
+        )
+    return scored
+
+
+def _predictive_diagnostics(scored_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    labels = [int(row["label"]) for row in scored_rows]
+    scores = [float(row["score"]) for row in scored_rows]
+    positives = sum(labels)
+    row_count = len(scored_rows)
+    thresholds = [0.30, 0.40, 0.50, 0.60, 0.70]
+    return {
+        "contract_type": "predictive_diagnostic",
+        "row_count": row_count,
+        "positive_count": positives,
+        "negative_count": row_count - positives,
+        "base_rate": _round_metric(positives / row_count) if row_count else None,
+        "pr_auc": _pr_auc(labels, scores),
+        "confusion_by_threshold": [_confusion_at_threshold(scored_rows, threshold) for threshold in thresholds],
+        "threshold_return_curve": [_threshold_return(scored_rows, threshold) for threshold in thresholds],
+    }
+
+
+def _calibration_diagnostics(scored_rows: Sequence[Mapping[str, Any]], *, bin_count: int = 10) -> dict[str, Any]:
+    if not scored_rows:
+        return {
+            "contract_type": "calibration_diagnostic",
+            "available": False,
+            "reason": "no scored rows",
+            "ece": None,
+            "mce": None,
+            "bins": [],
+            "brier_decomposition": {"reliability": None, "resolution": None, "uncertainty": None},
+        }
+    bins: list[dict[str, Any]] = []
+    total = len(scored_rows)
+    base_rate = sum(int(row["label"]) for row in scored_rows) / total
+    reliability = 0.0
+    resolution = 0.0
+    ece = 0.0
+    mce = 0.0
+    for index in range(bin_count):
+        lower = index / bin_count
+        upper = (index + 1) / bin_count
+        if index == bin_count - 1:
+            bucket = [row for row in scored_rows if lower <= float(row["score"]) <= upper]
+        else:
+            bucket = [row for row in scored_rows if lower <= float(row["score"]) < upper]
+        if not bucket:
+            bins.append({"lower": lower, "upper": upper, "count": 0, "mean_score": None, "hit_rate": None, "gap": None})
+            continue
+        mean_score = sum(float(row["score"]) for row in bucket) / len(bucket)
+        hit_rate = sum(int(row["label"]) for row in bucket) / len(bucket)
+        gap = abs(hit_rate - mean_score)
+        weight = len(bucket) / total
+        reliability += weight * (mean_score - hit_rate) ** 2
+        resolution += weight * (hit_rate - base_rate) ** 2
+        ece += weight * gap
+        mce = max(mce, gap)
+        bins.append(
+            {
+                "lower": _round_metric(lower),
+                "upper": _round_metric(upper),
+                "count": len(bucket),
+                "mean_score": _round_metric(mean_score),
+                "hit_rate": _round_metric(hit_rate),
+                "gap": _round_metric(gap),
+            }
+        )
+    return {
+        "contract_type": "calibration_diagnostic",
+        "available": True,
+        "ece": _round_metric(ece),
+        "mce": _round_metric(mce),
+        "bins": bins,
+        "brier_decomposition": {
+            "reliability": _round_metric(reliability),
+            "resolution": _round_metric(resolution),
+            "uncertainty": _round_metric(base_rate * (1 - base_rate)),
+        },
+    }
+
+
+def _economic_diagnostics(*, net_returns: Sequence[float], realized_returns: Sequence[float], costs: Sequence[float]) -> dict[str, Any]:
+    row_count = len(net_returns)
+    return {
+        "contract_type": "economic_diagnostic",
+        "row_count": row_count,
+        "return_per_decision": _round_metric(sum(net_returns) / row_count) if row_count else None,
+        "profit_factor": _profit_factor(net_returns),
+        "tail_loss_p05": _percentile(net_returns, 0.05),
+        "tail_loss_p01": _percentile(net_returns, 0.01),
+        "worst_return": min(net_returns) if net_returns else None,
+        "cost_sensitivity": {
+            f"{multiplier:.1f}x": _round_metric(sum(value - multiplier * cost for value, cost in zip(realized_returns, costs, strict=True)))
+            for multiplier in (0.0, 1.0, 2.0, 3.0)
+        },
+    }
+
+
+def _data_integrity_diagnostics(
+    *,
+    raw_decision_rows: Sequence[Mapping[str, Any]],
+    decision_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    validation_rows = len(raw_decision_rows) - len(decision_rows)
+    label_horizon_failures = []
+    feature_timestamp_failures = []
+    missing_timestamp_count = 0
+    for row in decision_rows:
+        decision_time = _parse_datetime(row.get("timestamp") or row.get("decision_timestamp"))
+        next_time = _parse_datetime(row.get("next_timestamp") or row.get("label_timestamp") or row.get("outcome_timestamp"))
+        if decision_time is None:
+            missing_timestamp_count += 1
+        if decision_time is not None and next_time is not None and next_time <= decision_time:
+            label_horizon_failures.append(str(row.get("decision_id") or row.get("timestamp") or "unknown"))
+        for key, value in row.items():
+            if not (key.startswith("feature_") and key.endswith("timestamp")):
+                continue
+            feature_time = _parse_datetime(value)
+            if decision_time is not None and feature_time is not None and feature_time > decision_time:
+                feature_timestamp_failures.append(str(row.get("decision_id") or row.get("timestamp") or key))
+    leakage_failures = len(label_horizon_failures) + len(feature_timestamp_failures)
+    status = "passed" if leakage_failures == 0 and missing_timestamp_count == 0 else "warning"
+    return {
+        "contract_type": "data_integrity_diagnostic",
+        "status": status,
+        "leakage_check_status": "passed" if leakage_failures == 0 else "failed",
+        "raw_row_count": len(raw_decision_rows),
+        "evaluated_row_count": len(decision_rows),
+        "validation_row_excluded_count": validation_rows,
+        "missing_timestamp_count": missing_timestamp_count,
+        "label_horizon_failure_count": len(label_horizon_failures),
+        "feature_timestamp_failure_count": len(feature_timestamp_failures),
+        "fold_isolation_status": "not_assessed",
+        "fold_isolation_reason": "fold boundary evidence is tracked in training workflow state, not replay decision rows",
+    }
+
+
+def _temporal_stability_diagnostics(scored_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    by_month: dict[str, list[Mapping[str, Any]]] = {}
+    for row in scored_rows:
+        month = _month_key(row.get("timestamp"))
+        if month:
+            by_month.setdefault(month, []).append(row)
+    slices = []
+    for month, rows in sorted(by_month.items()):
+        labels = [int(row["label"]) for row in rows]
+        scores = [float(row["score"]) for row in rows]
+        returns = [float(row["net_return"]) for row in rows]
+        slices.append(
+            {
+                "month": month,
+                "row_count": len(rows),
+                "base_rate": _round_metric(sum(labels) / len(labels)) if labels else None,
+                "auroc": _auroc(labels, scores),
+                "brier_score": _brier_score(labels, scores),
+                "net_return_total": _round_metric(sum(returns)),
+                "max_drawdown": _round_metric(_max_drawdown(returns)),
+            }
+        )
+    returns_by_month = [float(item["net_return_total"]) for item in slices if item.get("net_return_total") is not None]
+    return {
+        "contract_type": "temporal_stability_diagnostic",
+        "month_slice_count": len(slices),
+        "slices": slices,
+        "worst_month_return": min(returns_by_month) if returns_by_month else None,
+        "best_month_return": max(returns_by_month) if returns_by_month else None,
+    }
+
+
+def _baseline_comparison_diagnostics(
+    *,
+    labels: Sequence[int],
+    scores: Sequence[float],
+    net_total: float,
+    baseline_total: float,
+) -> dict[str, Any]:
+    shuffled_labels = _deterministic_shuffle(labels)
+    return {
+        "contract_type": "baseline_comparison_diagnostic",
+        "no_trade_return_total": 0.0,
+        "recorded_baseline_return_total": _round_metric(baseline_total),
+        "candidate_return_total": _round_metric(net_total),
+        "candidate_minus_no_trade": _round_metric(net_total),
+        "candidate_minus_recorded_baseline": _round_metric(net_total - baseline_total),
+        "randomized_label_auroc": _auroc(shuffled_labels, scores) if shuffled_labels and scores else None,
+        "previous_version_comparison": {
+            "available": False,
+            "reason": "requires at least two comparable model-group versions",
+        },
+    }
+
+
+def _pr_auc(labels: Sequence[int], scores: Sequence[float]) -> float | None:
+    pairs = sorted(zip(scores, labels, strict=True), key=lambda item: item[0], reverse=True)
+    positives = sum(labels)
+    if not pairs or positives == 0:
+        return None
+    true_positive = 0
+    precision_sum = 0.0
+    for rank, (_score_value, label) in enumerate(pairs, start=1):
+        if label == 1:
+            true_positive += 1
+            precision_sum += true_positive / rank
+    return _round_metric(precision_sum / positives)
+
+
+def _confusion_at_threshold(scored_rows: Sequence[Mapping[str, Any]], threshold: float) -> dict[str, Any]:
+    tp = fp = tn = fn = 0
+    for row in scored_rows:
+        predicted_positive = float(row["score"]) >= threshold
+        actual_positive = int(row["label"]) == 1
+        if predicted_positive and actual_positive:
+            tp += 1
+        elif predicted_positive and not actual_positive:
+            fp += 1
+        elif not predicted_positive and actual_positive:
+            fn += 1
+        else:
+            tn += 1
+    precision = tp / (tp + fp) if tp + fp else None
+    recall = tp / (tp + fn) if tp + fn else None
+    return {
+        "threshold": _round_metric(threshold),
+        "true_positive": tp,
+        "false_positive": fp,
+        "true_negative": tn,
+        "false_negative": fn,
+        "precision": _round_metric(precision) if precision is not None else None,
+        "recall": _round_metric(recall) if recall is not None else None,
+    }
+
+
+def _threshold_return(scored_rows: Sequence[Mapping[str, Any]], threshold: float) -> dict[str, Any]:
+    selected = [row for row in scored_rows if float(row["score"]) >= threshold]
+    returns = [float(row["net_return"]) for row in selected]
+    labels = [int(row["label"]) for row in selected]
+    return {
+        "threshold": _round_metric(threshold),
+        "selected_count": len(selected),
+        "net_return_total": _round_metric(sum(returns)) if selected else 0.0,
+        "hit_rate": _round_metric(sum(labels) / len(labels)) if labels else None,
+        "return_per_selected": _round_metric(sum(returns) / len(returns)) if returns else None,
+    }
+
+
+def _brier_score(labels: Sequence[int], scores: Sequence[float]) -> float | None:
+    if not labels:
+        return None
+    return _round_metric(sum((score - label) ** 2 for label, score in zip(labels, scores, strict=True)) / len(labels))
+
+
+def _profit_factor(returns: Sequence[float]) -> float | None:
+    gains = sum(value for value in returns if value > 0)
+    losses = abs(sum(value for value in returns if value < 0))
+    if losses == 0:
+        return None
+    return _round_metric(gains / losses)
+
+
+def _percentile(values: Sequence[float], percentile: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, math.floor(percentile * (len(ordered) - 1))))
+    return _round_metric(ordered[index])
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        normalized = text.replace("Z", "+00:00")
+        return datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+
+def _month_key(value: Any) -> str | None:
+    parsed = _parse_datetime(value)
+    return parsed.strftime("%Y-%m") if parsed is not None else None
+
+
+def _deterministic_shuffle(values: Sequence[int]) -> list[int]:
+    keyed = sorted(((_stable_token(index, value), value) for index, value in enumerate(values)), key=lambda item: item[0])
+    return [value for _key, value in keyed]
 
 
 def _feature_space_diagnostics(decision_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -722,9 +1070,16 @@ def _build_promotion_review_packet(
             "payoff_ratio": metrics.get("payoff_ratio"),
             "turnover_proxy_count": metrics.get("turnover_proxy_count"),
             "auroc": metrics.get("auroc"),
+            "pr_auc": metrics.get("pr_auc"),
             "brier_score": metrics.get("brier_score"),
             "feature_column_count": metrics.get("feature_column_count"),
             "feature_row_count": metrics.get("feature_row_count"),
+            "ece": metrics.get("ece"),
+            "mce": metrics.get("mce"),
+            "profit_factor": metrics.get("profit_factor"),
+            "tail_loss_p05": metrics.get("tail_loss_p05"),
+            "worst_month_return": metrics.get("worst_month_return"),
+            "data_integrity_status": metrics.get("data_integrity_status"),
             "pca_variance_top2": metrics.get("pca_variance_top2"),
             "pcoa_variance_top2": metrics.get("pcoa_variance_top2"),
             "silhouette_outcome_label": metrics.get("silhouette_outcome_label"),
