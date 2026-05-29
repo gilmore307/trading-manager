@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import tempfile
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from trading_manager_tasks.model_group_evaluation import run_model_group_evaluation_if_ready
@@ -131,6 +133,20 @@ class ModelGroupEvaluationTests(unittest.TestCase):
 
             second = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
             self.assertIsNone(second)
+
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            newer_mtime = max(path.stat().st_mtime for path in decision_paths) + 1
+            os.utime(state_path, (newer_mtime, newer_mtime))
+
+            refreshed = run_model_group_evaluation_if_ready(
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                now_utc=datetime(2026, 5, 28, 0, 0, 5, tzinfo=UTC),
+            )
+            self.assertIsNotNone(refreshed)
+            assert refreshed is not None
+            self.assertEqual(refreshed.reason_code, "model_group_evaluation_executed")
+            self.assertEqual(len(list((dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json"))), 2)
 
     def test_placeholder_crypto_replay_does_not_unlock_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

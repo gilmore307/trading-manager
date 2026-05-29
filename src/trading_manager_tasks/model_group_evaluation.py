@@ -56,14 +56,17 @@ def run_model_group_evaluation_if_ready(
     )
     if attribution_receipt_path is None or attribution_receipt is None:
         return None
-    if not force and _latest_promotion_review_artifacts(dataset_root, replay_result_ref=str(replay_receipt_path)) is not None:
+    training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
+    if training_fold is None:
+        return None
+    if not force and _latest_promotion_review_artifacts(
+        dataset_root,
+        replay_result_ref=str(replay_receipt_path),
+        minimum_mtime=_state_mtime(training_fold),
+    ) is not None:
         return None
     attribution_rows_path = Path(str(attribution_receipt.get("attribution_rows_ref") or ""))
     if not attribution_rows_path.exists():
-        return None
-
-    training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
-    if training_fold is None:
         return None
     replay_scope_status = _replay_receipt_scope_status(replay_receipt=replay_receipt, training_fold=training_fold)
     if not replay_scope_status["compatible"]:
@@ -591,15 +594,34 @@ def _latest_receipt(
     return path, dict(receipt)
 
 
-def _latest_promotion_review_artifacts(dataset_root: Path, *, replay_result_ref: str) -> dict[str, Any] | None:
+def _state_mtime(training_fold: Mapping[str, Any]) -> float | None:
+    state_path = Path(str(training_fold.get("state_path") or ""))
+    try:
+        return state_path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def _latest_promotion_review_artifacts(
+    dataset_root: Path,
+    *,
+    replay_result_ref: str,
+    minimum_mtime: float | None = None,
+) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
     if not review_root.exists():
         return None
+    candidates: list[Path] = []
     for path in sorted(review_root.glob("*/promotion_eligibility_decision.json")):
         payload = _load_optional_json_object(path)
-        if payload is not None and str(payload.get("replay_validation_ref") or "") == replay_result_ref:
-            return {"decision_path": str(path)}
-    return None
+        if payload is None or str(payload.get("replay_validation_ref") or "") != replay_result_ref:
+            continue
+        if minimum_mtime is not None and path.stat().st_mtime < minimum_mtime:
+            continue
+        candidates.append(path)
+    if not candidates:
+        return None
+    return {"decision_path": str(max(candidates, key=lambda candidate: candidate.stat().st_mtime))}
 
 
 def _replay_dataset_root(storage_root: Path, contract_id: str) -> Path:
