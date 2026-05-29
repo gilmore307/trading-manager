@@ -535,6 +535,17 @@ def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[d
             if str(task.get("layer_key") or "") != "model_group":
                 return task
         return ready_tasks[0]
+    review_tasks: list[dict[str, Any]] = []
+    for task in task_timeline:
+        task_status = str(task.get("status") or "").lower()
+        progress = task.get("detail", {}).get("progress", {}) if isinstance(task.get("detail"), Mapping) else {}
+        if task_status == "review_required" and progress.get("can_unlock_downstream") is False:
+            review_tasks.append(task)
+    if review_tasks:
+        for task in review_tasks:
+            if str(task.get("layer_key") or "") == "model_group":
+                return task
+        return review_tasks[0]
     return None
 
 
@@ -601,6 +612,12 @@ def _owner_status(
                 "medium",
                 f"Historical workflow is blocked at {label} for {period}.",
             )
+        if task_status == "review_required":
+            return (
+                "action_required",
+                "medium",
+                f"Historical workflow requires review at {label} for {period}.",
+            )
         if status.lock.status == "active":
             return (
                 "running",
@@ -657,7 +674,7 @@ def _operational_item_requires_owner_action(item: str) -> bool:
 def _public_active_task_blocker(public_active_task: Mapping[str, Any] | None) -> str | None:
     if public_active_task is None:
         return None
-    if str(public_active_task.get("status") or "").lower() != "blocked":
+    if str(public_active_task.get("status") or "").lower() not in {"blocked", "review_required"}:
         return None
     detail = public_active_task.get("detail")
     if isinstance(detail, Mapping):
