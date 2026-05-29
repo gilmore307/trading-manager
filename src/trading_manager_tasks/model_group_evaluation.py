@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID
@@ -29,6 +32,16 @@ MODEL_GROUP_EVALUATION_CHECKS = (
     "incumbent_comparison",
     "layer_10_attribution",
 )
+PROMOTION_REVIEW_RECOMMENDATIONS = {"failed", "deferred", "eligible_for_shadow", "insufficient_evidence"}
+PROMOTION_REVIEW_CONFIDENCE = {"low", "medium", "high"}
+PROMOTION_REVIEW_STATUS = {"passed", "failed", "not_applicable", "insufficient_evidence"}
+PROMOTION_COMPARISON_STATUS = {"better", "not_materially_better", "worse", "mixed", "insufficient_evidence"}
+PROMOTION_UNCERTAINTY_STATUS = {"acceptable", "too_uncertain", "insufficient_evidence"}
+PROMOTION_SHADOW_READINESS_STATUS = {"ready", "not_ready", "not_assessed", "insufficient_evidence"}
+DEFAULT_PROMOTION_REVIEW_CODEX_MODEL = "gpt-5.5"
+DEFAULT_PROMOTION_REVIEW_CODEX_TIMEOUT_SECONDS = 900
+DEFAULT_PROMOTION_REVIEW_CODEX_WORKDIR = Path("/root/.openclaw/workspace")
+DEFAULT_PROMOTION_REVIEW_CODEX_ADD_DIR = Path("/root/projects")
 
 
 def run_model_group_evaluation_if_ready(
@@ -40,6 +53,11 @@ def run_model_group_evaluation_if_ready(
     selected_target_symbol: str | None = None,
     now_utc: datetime | None = None,
     force: bool = False,
+    call_agent_review: bool = True,
+    agent_reviewer: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
+    codex_bin: str = "codex",
+    codex_model: str | None = None,
+    codex_timeout_seconds: int = DEFAULT_PROMOTION_REVIEW_CODEX_TIMEOUT_SECONDS,
 ) -> SchedulerDecision | None:
     """Run one model-group evaluation build when Layer 10 evidence is complete."""
 
@@ -156,6 +174,11 @@ def run_model_group_evaluation_if_ready(
             benchmark_contract_ref=f"trading-evaluation/replays/{contract_id}.json",
             layer_10_attribution_ref=str(attribution_receipt_path),
             created_at_utc=now.isoformat(),
+            call_agent_review=call_agent_review,
+            agent_reviewer=agent_reviewer,
+            codex_bin=codex_bin,
+            codex_model=codex_model,
+            codex_timeout_seconds=codex_timeout_seconds,
         )
         eligibility = _build_promotion_eligibility_decision(
             settlement=settlement,
@@ -334,6 +357,56 @@ def _build_promotion_review(
     benchmark_contract_ref: str,
     layer_10_attribution_ref: str,
     created_at_utc: str,
+    call_agent_review: bool,
+    agent_reviewer: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None,
+    codex_bin: str,
+    codex_model: str | None,
+    codex_timeout_seconds: int,
+) -> dict[str, Any]:
+    packet = _build_promotion_review_packet(
+        settlement=settlement,
+        settlement_ref=settlement_ref,
+        benchmark_contract_ref=benchmark_contract_ref,
+        layer_10_attribution_ref=layer_10_attribution_ref,
+        created_at_utc=created_at_utc,
+    )
+    if agent_reviewer is not None:
+        try:
+            return _normalize_promotion_agent_review(
+                agent_reviewer(packet),
+                fallback=packet,
+                invocation_status="completed",
+                invocation_error="",
+            )
+        except Exception as exc:  # pragma: no cover - defensive runtime guard.
+            return _agent_failed_promotion_review(packet, f"agent_reviewer_failed: {exc}")
+    if not call_agent_review:
+        packet["agent_invocation_status"] = "not_invoked_local_fallback"
+        return packet
+    try:
+        agent_payload = _invoke_promotion_review_agent(
+            review_packet=packet,
+            codex_bin=codex_bin,
+            codex_model=codex_model,
+            timeout_seconds=codex_timeout_seconds,
+        )
+    except Exception as exc:
+        return _agent_failed_promotion_review(packet, f"codex_agent_call_failed: {exc}")
+    return _normalize_promotion_agent_review(
+        agent_payload,
+        fallback=packet,
+        invocation_status="completed",
+        invocation_error="",
+    )
+
+
+def _build_promotion_review_packet(
+    *,
+    settlement: Mapping[str, Any],
+    settlement_ref: str,
+    benchmark_contract_ref: str,
+    layer_10_attribution_ref: str,
+    created_at_utc: str,
 ) -> dict[str, Any]:
     metrics = settlement.get("metrics") if isinstance(settlement.get("metrics"), Mapping) else {}
     gate_failures = [str(item) for item in settlement.get("gate_failures") or []]
@@ -397,11 +470,180 @@ def _build_promotion_review(
             f"blocking_issues={len(blocking_issues)}"
         ),
         "created_at_utc": created_at_utc,
+        "agent_invocation_status": "pending",
+        "agent_invocation_error": "",
         "model_activation_performed": False,
         "active_model_config_written": False,
         "broker_execution_performed": False,
         "account_mutation_performed": False,
     }
+
+
+def _invoke_promotion_review_agent(
+    *,
+    review_packet: Mapping[str, Any],
+    codex_bin: str,
+    codex_model: str | None,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    prompt = _promotion_review_agent_prompt(review_packet)
+    model = codex_model or os.environ.get("TRADING_MANAGER_PROMOTION_REVIEW_CODEX_MODEL") or DEFAULT_PROMOTION_REVIEW_CODEX_MODEL
+    with tempfile.TemporaryDirectory(prefix="model-group-promotion-review-") as raw_tmp:
+        final_output_path = Path(raw_tmp) / "codex_final_output.txt"
+        command = [
+            codex_bin,
+            "exec",
+            "--ephemeral",
+            "--ignore-rules",
+            "--skip-git-repo-check",
+            "--sandbox",
+            "read-only",
+            "-C",
+            str(DEFAULT_PROMOTION_REVIEW_CODEX_WORKDIR),
+            "--output-last-message",
+            str(final_output_path),
+            "-m",
+            model,
+            "--add-dir",
+            str(DEFAULT_PROMOTION_REVIEW_CODEX_ADD_DIR),
+            prompt,
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds)
+        output = final_output_path.read_text(encoding="utf-8") if final_output_path.exists() else result.stdout
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout or f"codex exited {result.returncode}").strip()[:2000])
+    return _json_object_from_text(output)
+
+
+def _promotion_review_agent_prompt(review_packet: Mapping[str, Any]) -> str:
+    return (
+        "Use the promotion-evaluation-review skill. Review this completed model-group promotion candidate as an advisory reviewer only.\n"
+        "Do not activate a model, write active configs, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
+        "Return strict JSON only, with exactly this contract shape and no markdown:\n"
+        "{"
+        "\"review_type\":\"promotion_evaluation_review\","
+        "\"candidate_label\":\"string\","
+        "\"fold_id\":\"string\","
+        "\"benchmark_contract_ref\":\"string\","
+        "\"comparison_label\":\"string\","
+        "\"recommendation\":\"failed|deferred|eligible_for_shadow|insufficient_evidence\","
+        "\"confidence\":\"low|medium|high\","
+        "\"identity_blinding_status\":\"passed|failed|not_applicable|insufficient_evidence\","
+        "\"integrity_status\":\"passed|failed|insufficient_evidence\","
+        "\"hard_guardrail_status\":\"passed|failed|insufficient_evidence\","
+        "\"comparison_status\":\"better|not_materially_better|worse|mixed|insufficient_evidence\","
+        "\"uncertainty_status\":\"acceptable|too_uncertain|insufficient_evidence\","
+        "\"shadow_readiness_status\":\"ready|not_ready|not_assessed|insufficient_evidence\","
+        "\"material_improvements\":[\"string\"],"
+        "\"material_regressions\":[\"string\"],"
+        "\"blocking_issues\":[\"string\"],"
+        "\"required_followups\":[\"string\"],"
+        "\"rationale\":\"short evidence-grounded explanation\""
+        "}\n"
+        "Evidence packet:\n"
+        f"{json.dumps(review_packet, indent=2, sort_keys=True, default=str)}\n"
+    )
+
+
+def _json_object_from_text(text: str) -> dict[str, Any]:
+    stripped = text.strip()
+    try:
+        payload = json.loads(stripped)
+    except json.JSONDecodeError:
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start < 0 or end <= start:
+            raise ValueError("agent output did not contain a JSON object") from None
+        payload = json.loads(stripped[start : end + 1])
+    if not isinstance(payload, dict):
+        raise ValueError("agent output JSON was not an object")
+    return payload
+
+
+def _normalize_promotion_agent_review(
+    payload: Mapping[str, Any],
+    *,
+    fallback: Mapping[str, Any],
+    invocation_status: str,
+    invocation_error: str,
+) -> dict[str, Any]:
+    normalized = dict(fallback)
+    normalized.update(
+        {
+            "review_type": "promotion_evaluation_review",
+            "candidate_label": _string_choice(payload.get("candidate_label"), fallback.get("candidate_label"), allowed=None),
+            "fold_id": _string_choice(payload.get("fold_id"), fallback.get("fold_id"), allowed=None),
+            "benchmark_contract_ref": _string_choice(payload.get("benchmark_contract_ref"), fallback.get("benchmark_contract_ref"), allowed=None),
+            "comparison_label": _string_choice(payload.get("comparison_label"), fallback.get("comparison_label"), allowed=None),
+            "recommendation": _string_choice(payload.get("recommendation"), "insufficient_evidence", allowed=PROMOTION_REVIEW_RECOMMENDATIONS),
+            "confidence": _string_choice(payload.get("confidence"), "low", allowed=PROMOTION_REVIEW_CONFIDENCE),
+            "identity_blinding_status": _string_choice(payload.get("identity_blinding_status"), "insufficient_evidence", allowed=PROMOTION_REVIEW_STATUS),
+            "integrity_status": _string_choice(payload.get("integrity_status"), "insufficient_evidence", allowed={"passed", "failed", "insufficient_evidence"}),
+            "hard_guardrail_status": _string_choice(payload.get("hard_guardrail_status"), "insufficient_evidence", allowed={"passed", "failed", "insufficient_evidence"}),
+            "comparison_status": _string_choice(payload.get("comparison_status"), "insufficient_evidence", allowed=PROMOTION_COMPARISON_STATUS),
+            "uncertainty_status": _string_choice(payload.get("uncertainty_status"), "insufficient_evidence", allowed=PROMOTION_UNCERTAINTY_STATUS),
+            "shadow_readiness_status": _string_choice(payload.get("shadow_readiness_status"), "insufficient_evidence", allowed=PROMOTION_SHADOW_READINESS_STATUS),
+            "material_improvements": _string_list(payload.get("material_improvements")),
+            "material_regressions": _string_list(payload.get("material_regressions")),
+            "blocking_issues": _string_list(payload.get("blocking_issues")),
+            "required_followups": _string_list(payload.get("required_followups")),
+            "rationale": str(payload.get("rationale") or fallback.get("rationale") or ""),
+            "agent_invocation_status": invocation_status,
+            "agent_invocation_error": invocation_error,
+            "model_activation_performed": False,
+            "active_model_config_written": False,
+            "broker_execution_performed": False,
+            "account_mutation_performed": False,
+        }
+    )
+    return normalized
+
+
+def _agent_failed_promotion_review(fallback: Mapping[str, Any], error: str) -> dict[str, Any]:
+    payload = dict(fallback)
+    blocking = _string_list(payload.get("blocking_issues"))
+    blocking.append(error)
+    payload.update(
+        {
+            "recommendation": "insufficient_evidence",
+            "confidence": "low",
+            "identity_blinding_status": "insufficient_evidence",
+            "integrity_status": "insufficient_evidence",
+            "hard_guardrail_status": "insufficient_evidence",
+            "comparison_status": "insufficient_evidence",
+            "uncertainty_status": "insufficient_evidence",
+            "shadow_readiness_status": "insufficient_evidence",
+            "blocking_issues": blocking,
+            "required_followups": _string_list(payload.get("required_followups")) + ["rerun promotion-evaluation-review agent successfully"],
+            "rationale": f"Promotion review agent did not return accepted evidence: {error}",
+            "agent_invocation_status": "agent_call_failed",
+            "agent_invocation_error": error,
+            "model_activation_performed": False,
+            "active_model_config_written": False,
+            "broker_execution_performed": False,
+            "account_mutation_performed": False,
+        }
+    )
+    return payload
+
+
+def _string_choice(value: Any, fallback: Any, *, allowed: set[str] | None) -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = str(fallback or "").strip()
+    if allowed is not None and text not in allowed:
+        text = str(fallback or "").strip()
+        if text not in allowed:
+            text = sorted(allowed)[0]
+    return text
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value if str(item)]
+    if value in (None, ""):
+        return []
+    return [str(value)]
 
 
 def _build_promotion_eligibility_decision(
@@ -413,7 +655,7 @@ def _build_promotion_eligibility_decision(
     replay_contract_ref: str,
     created_at_utc: str,
 ) -> dict[str, Any]:
-    decision_status = "eligible" if review.get("recommendation") == "eligible_for_shadow" else "review_required"
+    decision_status = _promotion_decision_status(review.get("recommendation"))
     return {
         "contract_type": "promotion_eligibility_decision",
         "promotion_eligibility_decision_id": f"promelig_{_stable_token(settlement.get('fold_id'), settlement_ref, decision_status)}",
@@ -438,6 +680,14 @@ def _build_promotion_eligibility_decision(
         "bootstrap_baseline_ref": "",
         "created_at_utc": created_at_utc,
     }
+
+
+def _promotion_decision_status(recommendation: Any) -> str:
+    if recommendation == "eligible_for_shadow":
+        return "eligible"
+    if recommendation == "failed":
+        return "rejected"
+    return "deferred"
 
 
 def _evaluation_check_summary(*, rows: Sequence[Mapping[str, Any]], attribution_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:

@@ -90,7 +90,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         os.utime(readiness_path, (state_mtime + 10, state_mtime + 10))
         return readiness_path
 
-    def _write_terminal_promotion_decision_after(self, *, storage_root: Path, state_path: Path, status: str = "review_required") -> Path:
+    def _write_terminal_promotion_decision_after(self, *, storage_root: Path, state_path: Path, status: str = "deferred") -> Path:
         state_payload = json.loads(state_path.read_text(encoding="utf-8"))
         fold_id = f"fold_{state_payload['start_month']}_{state_payload['end_month']}"
         model_ref = f"storage://trading-manager/model_group/{state_payload['start_month']}_{state_payload['end_month']}"

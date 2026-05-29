@@ -12,6 +12,28 @@ from trading_manager_tasks.model_group_evaluation import run_model_group_evaluat
 
 
 class ModelGroupEvaluationTests(unittest.TestCase):
+    def _fake_deferred_agent_review(self, packet):
+        return {
+            "review_type": "promotion_evaluation_review",
+            "candidate_label": packet["candidate_label"],
+            "fold_id": packet["fold_id"],
+            "benchmark_contract_ref": packet["benchmark_contract_ref"],
+            "comparison_label": packet["comparison_label"],
+            "recommendation": "deferred",
+            "confidence": "medium",
+            "identity_blinding_status": "insufficient_evidence",
+            "integrity_status": "passed",
+            "hard_guardrail_status": packet["hard_guardrail_status"],
+            "comparison_status": "insufficient_evidence",
+            "uncertainty_status": "insufficient_evidence",
+            "shadow_readiness_status": "insufficient_evidence",
+            "material_improvements": ["settlement evidence was available"],
+            "material_regressions": packet["material_regressions"],
+            "blocking_issues": packet["blocking_issues"],
+            "required_followups": packet["required_followups"],
+            "rationale": "Agent deferred because anonymous comparison, config, and first-run evidence are missing.",
+        }
+
     def _write_completed_fold(self, storage_root: Path) -> None:
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True)
@@ -112,7 +134,11 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             dataset_root = self._write_ready_replay_and_attribution(storage_root)
             self._write_completed_fold(storage_root)
 
-            decision = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
+            decision = run_model_group_evaluation_if_ready(
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                agent_reviewer=self._fake_deferred_agent_review,
+            )
 
             self.assertIsNotNone(decision)
             assert decision is not None
@@ -127,9 +153,13 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["ready_check_count"], 4)
+            review = json.loads(review_paths[0].read_text(encoding="utf-8"))
+            self.assertEqual(review["agent_invocation_status"], "completed")
+            self.assertEqual(review["recommendation"], "deferred")
             eligibility = json.loads(decision_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(eligibility["contract_type"], "promotion_eligibility_decision")
-            self.assertEqual(eligibility["decision_status"], "review_required")
+            self.assertEqual(eligibility["decision_status"], "deferred")
+            self.assertEqual(eligibility["agent_review_recommendation"], "deferred")
 
             second = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
             self.assertIsNone(second)
@@ -142,11 +172,36 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 storage_root=storage_root,
                 selected_target_symbol="AAPL",
                 now_utc=datetime(2026, 5, 28, 0, 0, 5, tzinfo=UTC),
+                agent_reviewer=self._fake_deferred_agent_review,
             )
             self.assertIsNotNone(refreshed)
             assert refreshed is not None
             self.assertEqual(refreshed.reason_code, "model_group_evaluation_executed")
             self.assertEqual(len(list((dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json"))), 2)
+
+    def test_local_fallback_review_writes_terminal_deferred_decision(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_ready_replay_and_attribution(storage_root)
+            self._write_completed_fold(storage_root)
+
+            decision = run_model_group_evaluation_if_ready(
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                call_agent_review=False,
+            )
+
+            self.assertIsNotNone(decision)
+            decision_path = next((dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json"))
+            review_path = next((dataset_root / "promotion_review_runs").glob("*/promotion_evaluation_review.json"))
+            review = json.loads(review_path.read_text(encoding="utf-8"))
+            eligibility = json.loads(decision_path.read_text(encoding="utf-8"))
+            self.assertEqual(review["agent_invocation_status"], "not_invoked_local_fallback")
+            self.assertEqual(review["recommendation"], "insufficient_evidence")
+            self.assertEqual(eligibility["decision_status"], "deferred")
+            self.assertEqual(eligibility["agent_review_recommendation"], "insufficient_evidence")
 
     def test_placeholder_crypto_replay_does_not_unlock_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
