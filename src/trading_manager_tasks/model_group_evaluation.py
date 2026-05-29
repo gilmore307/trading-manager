@@ -42,6 +42,8 @@ DEFAULT_PROMOTION_REVIEW_CODEX_MODEL = "gpt-5.5"
 DEFAULT_PROMOTION_REVIEW_CODEX_TIMEOUT_SECONDS = 900
 DEFAULT_PROMOTION_REVIEW_CODEX_WORKDIR = Path("/root/.openclaw/workspace")
 DEFAULT_PROMOTION_REVIEW_CODEX_ADD_DIR = Path("/root/projects")
+FEATURE_DIAGNOSTIC_SAMPLE_LIMIT = 160
+FEATURE_DIAGNOSTIC_POINT_LIMIT = 80
 
 
 def run_model_group_evaluation_if_ready(
@@ -289,6 +291,7 @@ def _build_settlement_run(
     filled_net_returns = [net_returns[index] for index in filled_indices]
     net_total = sum(net_returns)
     baseline_total = sum(baseline_returns)
+    feature_diagnostics = _feature_space_diagnostics(decision_rows)
     gate_failures: list[str] = []
     if len(decision_rows) < 20:
         gate_failures.append("decision_row_count_below_minimum")
@@ -313,10 +316,20 @@ def _build_settlement_run(
         "auroc": auroc,
         "auroc_pair_count": len(labels),
         "brier_score": sum((score - label) ** 2 for label, score in zip(labels, scores, strict=True)) / len(labels) if labels else None,
-        "feature_column_count": 0,
-        "feature_row_count": 0,
-        "pca_available": False,
-        "pcoa_available": False,
+        "feature_column_count": feature_diagnostics["feature_column_count"],
+        "feature_row_count": feature_diagnostics["feature_row_count"],
+        "feature_sample_count": feature_diagnostics["sample_count"],
+        "pca_available": feature_diagnostics["pca"]["available"],
+        "pca_variance_pc1": feature_diagnostics["pca"]["explained_variance_ratio"][0] if feature_diagnostics["pca"]["available"] else None,
+        "pca_variance_pc2": feature_diagnostics["pca"]["explained_variance_ratio"][1] if feature_diagnostics["pca"]["available"] else None,
+        "pca_variance_top2": sum(feature_diagnostics["pca"]["explained_variance_ratio"]) if feature_diagnostics["pca"]["available"] else None,
+        "pcoa_available": feature_diagnostics["pcoa"]["available"],
+        "pcoa_variance_pc1": feature_diagnostics["pcoa"]["explained_variance_ratio"][0] if feature_diagnostics["pcoa"]["available"] else None,
+        "pcoa_variance_pc2": feature_diagnostics["pcoa"]["explained_variance_ratio"][1] if feature_diagnostics["pcoa"]["available"] else None,
+        "pcoa_variance_top2": sum(feature_diagnostics["pcoa"]["explained_variance_ratio"]) if feature_diagnostics["pcoa"]["available"] else None,
+        "silhouette_outcome_label": feature_diagnostics["silhouette"].get("outcome_label"),
+        "silhouette_decision_action": feature_diagnostics["silhouette"].get("decision_action"),
+        "feature_diagnostics": feature_diagnostics,
     }
     return {
         "contract_type": "fold_settlement_run",
@@ -340,6 +353,261 @@ def _build_settlement_run(
         "broker_execution_performed": False,
         "account_mutation_performed": False,
     }
+
+
+def _feature_space_diagnostics(decision_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    feature_columns = _feature_columns(decision_rows)
+    feature_rows, source_rows = _feature_matrix(decision_rows, feature_columns)
+    if not feature_rows:
+        return _empty_feature_diagnostics(feature_columns)
+
+    active_columns, standardized_rows = _standardize_feature_rows(feature_rows, feature_columns)
+    if len(active_columns) < 2 or len(standardized_rows) < 3:
+        diagnostics = _empty_feature_diagnostics(active_columns)
+        diagnostics["feature_row_count"] = len(standardized_rows)
+        return diagnostics
+
+    sampled_rows, sampled_indices = _even_sample(standardized_rows, FEATURE_DIAGNOSTIC_SAMPLE_LIMIT)
+    sampled_source_rows = [source_rows[index] for index in sampled_indices]
+    pca = _pca_diagnostic(sampled_rows, sampled_source_rows)
+    pcoa = _pcoa_diagnostic(sampled_rows, sampled_source_rows)
+    silhouette = {
+        "outcome_label": _silhouette_for_label(sampled_rows, [_label(row) for row in sampled_source_rows]),
+        "decision_action": _silhouette_for_label(
+            sampled_rows,
+            [str(row.get("decision_action") or row.get("action") or "").strip().lower() or None for row in sampled_source_rows],
+        ),
+    }
+    return {
+        "contract_type": "feature_space_diagnostic",
+        "feature_columns": active_columns,
+        "feature_column_count": len(active_columns),
+        "feature_row_count": len(standardized_rows),
+        "sample_count": len(sampled_rows),
+        "pca": pca,
+        "pcoa": pcoa,
+        "silhouette": silhouette,
+    }
+
+
+def _empty_feature_diagnostics(feature_columns: Sequence[str]) -> dict[str, Any]:
+    return {
+        "contract_type": "feature_space_diagnostic",
+        "feature_columns": list(feature_columns),
+        "feature_column_count": len(feature_columns),
+        "feature_row_count": 0,
+        "sample_count": 0,
+        "pca": {"available": False, "explained_variance_ratio": [], "points": []},
+        "pcoa": {"available": False, "explained_variance_ratio": [], "points": []},
+        "silhouette": {"outcome_label": None, "decision_action": None},
+    }
+
+
+def _feature_columns(decision_rows: Sequence[Mapping[str, Any]]) -> list[str]:
+    columns: set[str] = set()
+    for row in decision_rows:
+        for key, value in row.items():
+            if key.startswith("feature_") and _finite_float(value) is not None:
+                columns.add(key)
+    return sorted(columns)
+
+
+def _feature_matrix(
+    decision_rows: Sequence[Mapping[str, Any]],
+    feature_columns: Sequence[str],
+) -> tuple[list[list[float]], list[Mapping[str, Any]]]:
+    rows: list[list[float]] = []
+    source_rows: list[Mapping[str, Any]] = []
+    for row in decision_rows:
+        values = [_finite_float(row.get(column)) for column in feature_columns]
+        if values and all(value is not None for value in values):
+            rows.append([float(value) for value in values])
+            source_rows.append(row)
+    return rows, source_rows
+
+
+def _standardize_feature_rows(rows: Sequence[Sequence[float]], columns: Sequence[str]) -> tuple[list[str], list[list[float]]]:
+    if not rows:
+        return [], []
+    means = [sum(row[index] for row in rows) / len(rows) for index in range(len(columns))]
+    variances = [
+        sum((row[index] - means[index]) ** 2 for row in rows) / len(rows)
+        for index in range(len(columns))
+    ]
+    active_indices = [index for index, variance in enumerate(variances) if variance > 1e-12]
+    active_columns = [columns[index] for index in active_indices]
+    standardized = [
+        [(row[index] - means[index]) / math.sqrt(variances[index]) for index in active_indices]
+        for row in rows
+    ]
+    return active_columns, standardized
+
+
+def _even_sample(rows: Sequence[list[float]], limit: int) -> tuple[list[list[float]], list[int]]:
+    if len(rows) <= limit:
+        return list(rows), list(range(len(rows)))
+    if limit <= 1:
+        return [rows[0]], [0]
+    indices = sorted({round(index * (len(rows) - 1) / (limit - 1)) for index in range(limit)})
+    return [rows[index] for index in indices], indices
+
+
+def _pca_diagnostic(rows: Sequence[Sequence[float]], source_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    if len(rows) < 3 or len(rows[0]) < 2:
+        return {"available": False, "explained_variance_ratio": [], "points": []}
+    covariance = _covariance_matrix(rows)
+    eigenpairs = _jacobi_eigenpairs(covariance)
+    positive = [(value, vector) for value, vector in eigenpairs if value > 1e-12]
+    if len(positive) < 2:
+        return {"available": False, "explained_variance_ratio": [], "points": []}
+    total = sum(value for value, _vector in positive)
+    axes = [positive[0][1], positive[1][1]]
+    points = []
+    for row, source in zip(rows[:FEATURE_DIAGNOSTIC_POINT_LIMIT], source_rows[:FEATURE_DIAGNOSTIC_POINT_LIMIT], strict=True):
+        points.append(_diagnostic_point(row, axes, source))
+    return {
+        "available": True,
+        "explained_variance_ratio": [_round_metric(positive[0][0] / total), _round_metric(positive[1][0] / total)],
+        "points": points,
+    }
+
+
+def _pcoa_diagnostic(rows: Sequence[Sequence[float]], source_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    if len(rows) < 3:
+        return {"available": False, "explained_variance_ratio": [], "points": []}
+    n = len(rows)
+    distances_squared = [[_squared_distance(rows[i], rows[j]) for j in range(n)] for i in range(n)]
+    row_means = [sum(row) / n for row in distances_squared]
+    column_means = [sum(distances_squared[i][j] for i in range(n)) / n for j in range(n)]
+    grand_mean = sum(row_means) / n
+    centered = [
+        [-0.5 * (distances_squared[i][j] - row_means[i] - column_means[j] + grand_mean) for j in range(n)]
+        for i in range(n)
+    ]
+    eigenpairs = _jacobi_eigenpairs(centered)
+    positive = [(value, vector) for value, vector in eigenpairs if value > 1e-12]
+    if len(positive) < 2:
+        return {"available": False, "explained_variance_ratio": [], "points": []}
+    total = sum(value for value, _vector in positive)
+    points = []
+    for index, source in enumerate(source_rows[:FEATURE_DIAGNOSTIC_POINT_LIMIT]):
+        x = positive[0][1][index] * math.sqrt(positive[0][0])
+        y = positive[1][1][index] * math.sqrt(positive[1][0])
+        points.append(_diagnostic_point_from_xy(x, y, source))
+    return {
+        "available": True,
+        "explained_variance_ratio": [_round_metric(positive[0][0] / total), _round_metric(positive[1][0] / total)],
+        "points": points,
+    }
+
+
+def _silhouette_for_label(rows: Sequence[Sequence[float]], labels: Sequence[Any]) -> float | None:
+    usable = [(row, label) for row, label in zip(rows, labels, strict=True) if label not in (None, "")]
+    if len(usable) < 3:
+        return None
+    clusters: dict[Any, list[int]] = {}
+    for index, (_row, label) in enumerate(usable):
+        clusters.setdefault(label, []).append(index)
+    if len(clusters) < 2 or any(len(indices) == len(usable) for indices in clusters.values()):
+        return None
+    matrix = [[_squared_distance(usable[i][0], usable[j][0]) ** 0.5 for j in range(len(usable))] for i in range(len(usable))]
+    scores: list[float] = []
+    for index, (_row, label) in enumerate(usable):
+        own = [other for other in clusters[label] if other != index]
+        a = sum(matrix[index][other] for other in own) / len(own) if own else 0.0
+        b_values = []
+        for other_label, indices in clusters.items():
+            if other_label == label:
+                continue
+            b_values.append(sum(matrix[index][other] for other in indices) / len(indices))
+        b = min(b_values) if b_values else 0.0
+        denominator = max(a, b)
+        scores.append((b - a) / denominator if denominator else 0.0)
+    return _round_metric(sum(scores) / len(scores))
+
+
+def _covariance_matrix(rows: Sequence[Sequence[float]]) -> list[list[float]]:
+    n = len(rows)
+    columns = len(rows[0])
+    return [
+        [
+            sum(row[i] * row[j] for row in rows) / (n - 1)
+            for j in range(columns)
+        ]
+        for i in range(columns)
+    ]
+
+
+def _jacobi_eigenpairs(matrix: Sequence[Sequence[float]]) -> list[tuple[float, list[float]]]:
+    n = len(matrix)
+    a = [list(row) for row in matrix]
+    vectors = [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
+    for _iteration in range(80):
+        p, q, max_value = 0, 1 if n > 1 else 0, 0.0
+        for i in range(n):
+            for j in range(i + 1, n):
+                if abs(a[i][j]) > max_value:
+                    p, q, max_value = i, j, abs(a[i][j])
+        if max_value < 1e-10:
+            break
+        if abs(a[p][p] - a[q][q]) < 1e-12:
+            angle = math.pi / 4
+        else:
+            angle = 0.5 * math.atan2(2 * a[p][q], a[q][q] - a[p][p])
+        c = math.cos(angle)
+        s = math.sin(angle)
+        for i in range(n):
+            if i not in {p, q}:
+                aip = a[i][p]
+                aiq = a[i][q]
+                a[i][p] = a[p][i] = c * aip - s * aiq
+                a[i][q] = a[q][i] = s * aip + c * aiq
+        app = a[p][p]
+        aqq = a[q][q]
+        apq = a[p][q]
+        a[p][p] = c * c * app - 2 * s * c * apq + s * s * aqq
+        a[q][q] = s * s * app + 2 * s * c * apq + c * c * aqq
+        a[p][q] = a[q][p] = 0.0
+        for i in range(n):
+            vip = vectors[i][p]
+            viq = vectors[i][q]
+            vectors[i][p] = c * vip - s * viq
+            vectors[i][q] = s * vip + c * viq
+    pairs = [(a[i][i], [vectors[row][i] for row in range(n)]) for i in range(n)]
+    return sorted(pairs, key=lambda item: item[0], reverse=True)
+
+
+def _diagnostic_point(row: Sequence[float], axes: Sequence[Sequence[float]], source: Mapping[str, Any]) -> dict[str, Any]:
+    x = sum(value * axes[0][index] for index, value in enumerate(row))
+    y = sum(value * axes[1][index] for index, value in enumerate(row))
+    return _diagnostic_point_from_xy(x, y, source)
+
+
+def _diagnostic_point_from_xy(x: float, y: float, source: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "x": _round_metric(x),
+        "y": _round_metric(y),
+        "outcome_label": _label(source),
+        "decision_action": str(source.get("decision_action") or source.get("action") or ""),
+        "target_ref": str(source.get("target_ref") or source.get("instrument_ref") or ""),
+        "timestamp": str(source.get("timestamp") or ""),
+    }
+
+
+def _squared_distance(left: Sequence[float], right: Sequence[float]) -> float:
+    return sum((a - b) ** 2 for a, b in zip(left, right, strict=True))
+
+
+def _round_metric(value: float) -> float:
+    return round(float(value), 6)
+
+
+def _finite_float(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _is_filled_trade_row(row: Mapping[str, Any]) -> bool:
@@ -455,6 +723,12 @@ def _build_promotion_review_packet(
             "turnover_proxy_count": metrics.get("turnover_proxy_count"),
             "auroc": metrics.get("auroc"),
             "brier_score": metrics.get("brier_score"),
+            "feature_column_count": metrics.get("feature_column_count"),
+            "feature_row_count": metrics.get("feature_row_count"),
+            "pca_variance_top2": metrics.get("pca_variance_top2"),
+            "pcoa_variance_top2": metrics.get("pcoa_variance_top2"),
+            "silhouette_outcome_label": metrics.get("silhouette_outcome_label"),
+            "silhouette_decision_action": metrics.get("silhouette_decision_action"),
         },
         "material_improvements": [f"settlement row count {metrics.get('decision_row_count')} is available"],
         "material_regressions": gate_failures,

@@ -89,6 +89,9 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "outcome_label": 1 if positive else 0,
                     "prediction_score": 0.8 if positive else 0.2,
                     "action": "trade" if positive else "skip",
+                    "feature_momentum_7d": 0.8 if positive else -0.3,
+                    "feature_momentum_30d": 0.6 if positive else -0.2,
+                    "feature_volume_rank_30d": (index % 5) / 5,
                 }
             )
         decision_rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
@@ -157,9 +160,17 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(review["agent_invocation_status"], "completed")
             self.assertEqual(review["recommendation"], "deferred")
             eligibility = json.loads(decision_paths[0].read_text(encoding="utf-8"))
+            settlement = json.loads(settlement_paths[0].read_text(encoding="utf-8"))
+            metrics = settlement["metrics"]
             self.assertEqual(eligibility["contract_type"], "promotion_eligibility_decision")
             self.assertEqual(eligibility["decision_status"], "deferred")
             self.assertEqual(eligibility["agent_review_recommendation"], "deferred")
+            self.assertEqual(metrics["feature_column_count"], 3)
+            self.assertEqual(metrics["feature_row_count"], 30)
+            self.assertTrue(metrics["pca_available"])
+            self.assertTrue(metrics["pcoa_available"])
+            self.assertIsInstance(metrics["silhouette_outcome_label"], float)
+            self.assertIn("feature_diagnostics", metrics)
 
             second = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
             self.assertIsNone(second)
