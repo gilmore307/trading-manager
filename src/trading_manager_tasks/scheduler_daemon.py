@@ -598,7 +598,7 @@ def _fold_model_group_lifecycle_complete(storage_root: Path, state_path: Path) -
         return False
     if promotion_decision is not None:
         decision_status, decision_mtime = promotion_decision
-        if decision_mtime >= state_mtime and decision_status in {"deferred", "rejected", "revoked", "superseded"}:
+        if decision_mtime >= state_mtime and decision_status in {"review_required", "deferred", "rejected", "revoked", "superseded"}:
             return True
     readiness_mtime = _latest_promotion_readiness_mtime(storage_root)
     if readiness_mtime is None:
