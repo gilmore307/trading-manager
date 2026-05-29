@@ -278,6 +278,26 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
             self.assertIn("deterministic crypto placeholder", decision.reason)
 
+    def test_replay_target_refs_must_include_completed_training_target(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_ready_replay_and_attribution(storage_root)
+            self._write_completed_fold(storage_root)
+            receipt_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "replay_execution_receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["target_refs"] = ["BTC", "ETH", "SOL"]
+            receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
+
+            decision = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
+            self.assertIn("do not include completed training target AAPL", decision.reason)
+
     def test_decision_variable_audit_does_not_infer_side_from_outcome(self):
         rows = [
             {
@@ -301,6 +321,32 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         self.assertEqual(diagnostics["feature_namespace_leakage_status"], "warning")
         self.assertIn("feature_eval_outcome_label", diagnostics["feature_namespace_leakage_columns"])
         self.assertEqual(diagnostics["normalized_row_samples"][0]["eval_economic_class"], "positive_excess")
+
+    def test_rejected_entry_thesis_rows_are_flat_not_unknown_side(self):
+        rows = [
+            {
+                "decision_id": "rejected_entry",
+                "realized_return": 0.0,
+                "baseline_return": 0.0,
+                "outcome_label": 0,
+                "prediction_score": 0.2,
+                "decision_action": "reject_entry_thesis",
+                "action": "reject_entry_thesis",
+                "decision_status": "rejected",
+                "fill_status": "simulated_rejected",
+            }
+        ]
+
+        diagnostics = _decision_variable_schema_diagnostics(
+            decision_rows=rows,
+            net_returns=[0.0],
+            baseline_returns=[0.0],
+            costs=[0.0],
+        )
+
+        self.assertEqual(diagnostics["coverage"]["decision_intended_side"]["values"]["flat"], 1)
+        self.assertEqual(diagnostics["coverage"]["decision_intended_action"]["values"]["no_trade"], 1)
+        self.assertEqual(diagnostics["coverage"]["decision_disposition"]["values"]["rejected"], 1)
 
 
 if __name__ == "__main__":

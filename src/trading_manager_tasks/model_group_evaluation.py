@@ -85,15 +85,6 @@ def run_model_group_evaluation_if_ready(
     training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
     if training_fold is None:
         return None
-    if not force and _latest_promotion_review_artifacts(
-        dataset_root,
-        replay_result_ref=str(replay_receipt_path),
-        minimum_mtime=_state_mtime(training_fold),
-    ) is not None:
-        return None
-    attribution_rows_path = Path(str(attribution_receipt.get("attribution_rows_ref") or ""))
-    if not attribution_rows_path.exists():
-        return None
     replay_scope_status = _replay_receipt_scope_status(replay_receipt=replay_receipt, training_fold=training_fold)
     if not replay_scope_status["compatible"]:
         now = (now_utc or datetime.now(UTC)).astimezone(UTC)
@@ -119,6 +110,15 @@ def run_model_group_evaluation_if_ready(
                 "replay_scope_status": replay_scope_status,
             },
         )
+    if not force and _latest_promotion_review_artifacts(
+        dataset_root,
+        replay_result_ref=str(replay_receipt_path),
+        minimum_mtime=_state_mtime(training_fold),
+    ) is not None:
+        return None
+    attribution_rows_path = Path(str(attribution_receipt.get("attribution_rows_ref") or ""))
+    if not attribution_rows_path.exists():
+        return None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     run_id = "model_group_evaluation_" + now.strftime("%Y%m%dT%H%M%SZ")
@@ -855,7 +855,7 @@ def _decision_intended_side(row: Mapping[str, Any]) -> str:
         return "long"
     if action_type in {"open_short", "increase_short", "reduce_short", "cover_short", "bearish_underlying_path_but_no_short_allowed"}:
         return "short"
-    if action_type in {"no_trade", "skip", "hold", "watch"}:
+    if action_type in {"no_trade", "skip", "hold", "watch", "reject_entry_thesis", "defer_entry_thesis", "simulated_rejected"}:
         return "flat"
     expression_type = _decision_expression_type(row)
     if expression_type == "long_call":
@@ -2032,6 +2032,14 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         return {
             "compatible": False,
             "reason": "replay receipt used deterministic crypto placeholder policy instead of completed fold model artifacts",
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+            "training_target_symbol": target_symbol,
+        }
+    if target_symbol and target_refs and target_symbol not in target_refs:
+        return {
+            "compatible": False,
+            "reason": f"replay receipt targets {', '.join(sorted(target_refs))} do not include completed training target {target_symbol}",
             "candidate_model_ref": candidate_model_ref,
             "receipt_target_refs": sorted(target_refs),
             "training_target_symbol": target_symbol,
