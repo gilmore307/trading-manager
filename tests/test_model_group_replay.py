@@ -126,11 +126,13 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.provider_calls, 0)
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
-            self.assertIn("storage://trading-manager/model_group/2016-01_2016-06", decision.command)
+            self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2016-06", decision.command)
             self.assertIn("--after-cost-alpha-model-json", decision.command)
+            self.assertNotIn("--option-feature-database-url", decision.command)
+            self.assertTrue(decision.execution_summary["option_feature_database_configured"])
             self.assertEqual(
                 decision.execution_summary["replay_execution_receipt"]["candidate_model_ref"],
-                "storage://trading-manager/model_group/2016-01_2016-06",
+                "storage://trading-manager/model_group/aapl/2016-01_2016-06",
             )
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])

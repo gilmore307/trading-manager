@@ -29,6 +29,7 @@ DEFAULT_EVALUATION_REPO_ROOT = projects_root() / "trading-evaluation"
 DEFAULT_EXECUTION_REPO_ROOT = projects_root() / "trading-execution"
 DEFAULT_MODEL_REPO_ROOT = projects_root() / "trading-model"
 DEFAULT_EVALUATION_RUNNER_PATH = DEFAULT_EVALUATION_REPO_ROOT / "scripts" / "evaluation" / "run_replay_execution.py"
+DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 
@@ -93,6 +94,7 @@ def run_model_group_replay_if_ready(
     progress_path = dataset_root / "replay_progress.jsonl"
     candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
     after_cost_alpha_model_path = str(training_fold.get("layer_05_after_cost_alpha_model_ref") or "")
+    option_feature_database_url = _database_url()
     command = [
         python_executable,
         str(runner_path),
@@ -124,10 +126,13 @@ def run_model_group_replay_if_ready(
                 "training_fold": training_fold,
                 "expected_replay_months": expected_months,
                 "ready_replay_months": len(ready_months),
+                "option_feature_database_configured": bool(option_feature_database_url),
             },
         )
 
     env = dict(os.environ)
+    if option_feature_database_url and not env.get("OPENCLAW_DATABASE_URL"):
+        env["OPENCLAW_DATABASE_URL"] = option_feature_database_url
     env["PYTHONPATH"] = os.pathsep.join(
         [
             str(evaluation_repo_root / "src"),
@@ -187,6 +192,7 @@ def run_model_group_replay_if_ready(
             "expected_replay_months": expected_months,
             "ready_replay_months_before": len(ready_months),
             "ready_replay_months_after": len(refreshed_ready_months),
+            "option_feature_database_configured": bool(option_feature_database_url),
             "replay_execution_receipt": receipt,
         },
     )
@@ -238,6 +244,16 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"expected JSON object: {path}")
     return payload
+
+
+def _database_url() -> str | None:
+    for env_name in ("OPENCLAW_DATABASE_URL", "DATABASE_URL"):
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            return value
+    if DEFAULT_DB_URL_FILE.exists():
+        return DEFAULT_DB_URL_FILE.read_text(encoding="utf-8").strip()
+    return None
 
 
 def _dataset_is_frozen_and_complete(manifest: Mapping[str, Any], freeze_receipt: Mapping[str, Any]) -> bool:
@@ -292,7 +308,11 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                 "end_month": end_month,
                 "target_symbol": target_symbol,
                 "state_path": str(path),
-                "candidate_model_ref": f"storage://trading-manager/model_group/{start_month}_{end_month}",
+                "candidate_model_ref": _candidate_model_ref(
+                    target_symbol=target_symbol,
+                    start_month=start_month,
+                    end_month=end_month,
+                ),
                 "layer_05_after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
             }
         )
@@ -308,6 +328,11 @@ def _layer_05_after_cost_alpha_model_path(
 ) -> Path:
     target_token = str(target_symbol or "target").strip().lower().replace(".", "_")
     return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / f"after_cost_alpha_model_{target_token}_{start_month}_{end_month}.json"
+
+
+def _candidate_model_ref(*, target_symbol: str | None, start_month: str, end_month: str) -> str:
+    target_token = str(target_symbol or "target").strip().lower().replace(".", "_")
+    return f"storage://trading-manager/model_group/{target_token}/{start_month}_{end_month}"
 
 
 def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | None:
