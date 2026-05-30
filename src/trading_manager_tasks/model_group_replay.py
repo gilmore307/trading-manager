@@ -30,6 +30,7 @@ DEFAULT_EXECUTION_REPO_ROOT = projects_root() / "trading-execution"
 DEFAULT_MODEL_REPO_ROOT = projects_root() / "trading-model"
 DEFAULT_EVALUATION_RUNNER_PATH = DEFAULT_EVALUATION_REPO_ROOT / "scripts" / "evaluation" / "run_replay_execution.py"
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
+DEFAULT_PYTHON_EXECUTABLE = projects_root() / "trading-manager" / ".venv" / "bin" / "python"
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 
@@ -39,7 +40,7 @@ def run_model_group_replay_if_ready(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     contract_id: str = DEFAULT_REPLAY_CONTRACT_ID,
     execute: bool = True,
-    python_executable: str = sys.executable,
+    python_executable: str | None = None,
     evaluation_repo_root: Path = DEFAULT_EVALUATION_REPO_ROOT,
     execution_repo_root: Path = DEFAULT_EXECUTION_REPO_ROOT,
     model_repo_root: Path = DEFAULT_MODEL_REPO_ROOT,
@@ -95,8 +96,9 @@ def run_model_group_replay_if_ready(
     candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
     after_cost_alpha_model_path = str(training_fold.get("layer_05_after_cost_alpha_model_ref") or "")
     option_feature_database_url = _database_url()
+    resolved_python = python_executable or _python_executable()
     command = [
-        python_executable,
+        resolved_python,
         str(runner_path),
         "--dataset-root",
         str(dataset_root),
@@ -254,6 +256,12 @@ def _database_url() -> str | None:
     if DEFAULT_DB_URL_FILE.exists():
         return DEFAULT_DB_URL_FILE.read_text(encoding="utf-8").strip()
     return None
+
+
+def _python_executable() -> str:
+    if DEFAULT_PYTHON_EXECUTABLE.exists():
+        return str(DEFAULT_PYTHON_EXECUTABLE)
+    return sys.executable
 
 
 def _dataset_is_frozen_and_complete(manifest: Mapping[str, Any], freeze_receipt: Mapping[str, Any]) -> bool:
