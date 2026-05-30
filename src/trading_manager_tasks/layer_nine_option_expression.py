@@ -25,6 +25,11 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_09_option_expression" / "gate_review"
 STAGE_ID = "layer_09_option_expression.data_acquisition"
+SOURCE_ID = "m09_option_expression_data_acquisition"
+TARGET_COMPONENT_ID = "source_05_option_expression"
+OPTION_BUCKET_POLICY_REF = "LAYER_09_OPTION_BUCKET_STRIKE_POLICY"
+DEFAULT_OPTION_SNAPSHOT_MAX_DTE = 45
+DEFAULT_OPTION_SNAPSHOT_STRIKE_RANGE = 5
 ACTIVE_ACTION_TYPES = {
     "increase_long",
     "decrease_long",
@@ -52,11 +57,27 @@ class LayerNineRequestPreview:
     dominant_horizon: str | None
     action_confidence_score: float | None
     provider: str = "thetadata"
-    target_component_id: str = "source_05_option_expression"
+    target_component_id: str = TARGET_COMPONENT_ID
     snapshot_type: str = "entry"
+    max_dte: int = DEFAULT_OPTION_SNAPSHOT_MAX_DTE
+    strike_range: int = DEFAULT_OPTION_SNAPSHOT_STRIKE_RANGE
+    option_bucket_policy_ref: str = OPTION_BUCKET_POLICY_REF
 
     def summary_row(self) -> dict[str, Any]:
-        return asdict(self)
+        row = asdict(self)
+        row["source_task_key"] = {
+            "task_id": self.request_id,
+            "source": SOURCE_ID,
+            "params": {
+                "underlying": self.underlying,
+                "snapshot_time": self.snapshot_time,
+                "snapshot_type": self.snapshot_type,
+                "max_dte": self.max_dte,
+                "strike_range": self.strike_range,
+                "option_bucket_policy_ref": self.option_bucket_policy_ref,
+            },
+        }
+        return row
 
 
 @dataclass(frozen=True)

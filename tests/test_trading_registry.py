@@ -973,6 +973,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("manager_schedules_lifecycle", rows["PROMOTION_STORAGE_LIFECYCLE_BOUNDARY_POLICY"]["payload"])
         self.assertIn("near_to_far_listed_expirations", rows["LAYER_09_OPTION_BUCKET_EXPIRATION_POLICY"]["payload"])
         self.assertIn("three_listed_strike_levels_below", rows["LAYER_09_OPTION_BUCKET_STRIKE_POLICY"]["payload"])
+        self.assertIn("thetadata_strike_range_5_closed_loop_default", rows["LAYER_09_OPTION_BUCKET_STRIKE_POLICY"]["payload"])
         self.assertIn("no_acquisition_time_prefilter_for_model_construction", rows["LAYER_09_OPTION_BUCKET_PREFILTER_POLICY"]["payload"])
         self.assertIn("single_leg_only", rows["LAYER_09_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])
         self.assertIn("underlying_only_expression_non_option_fallback", rows["LAYER_09_OPTION_EXPRESSION_SINGLE_LEG_POLICY"]["payload"])

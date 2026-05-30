@@ -72,6 +72,13 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(previews[0].provider, "thetadata")
         self.assertEqual(previews[0].target_component_id, "source_05_option_expression")
         self.assertEqual(previews[0].snapshot_time, "2016-01-05T09:31:00-05:00")
+        self.assertEqual(previews[0].max_dte, 45)
+        self.assertEqual(previews[0].strike_range, 5)
+        self.assertEqual(previews[0].option_bucket_policy_ref, "LAYER_09_OPTION_BUCKET_STRIKE_POLICY")
+        source_task = previews[0].summary_row()["source_task_key"]
+        self.assertEqual(source_task["source"], "m09_option_expression_data_acquisition")
+        self.assertEqual(source_task["params"]["strike_range"], 5)
+        self.assertEqual(source_task["params"]["max_dte"], 45)
         self.assertEqual(review.status, "provider_acquisition_ready")
         self.assertEqual(review.active_request_count, 1)
         self.assertEqual(review.recommended_next_action, "prepare_option_expression_acquisition")
