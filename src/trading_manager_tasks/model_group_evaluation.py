@@ -2075,14 +2075,6 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
             "receipt_target_refs": sorted(target_refs),
             "training_target_symbol": target_symbol,
         }
-    if target_symbol and target_refs and target_symbol not in target_refs:
-        return {
-            "compatible": False,
-            "reason": f"replay receipt targets {', '.join(sorted(target_refs))} do not include completed training target {target_symbol}",
-            "candidate_model_ref": candidate_model_ref,
-            "receipt_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
     if receipt_fold_id and training_fold_id and receipt_fold_id != training_fold_id:
         return {
             "compatible": False,
