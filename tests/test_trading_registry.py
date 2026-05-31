@@ -1589,7 +1589,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 7)
+        self.assertEqual(len(rows), 8)
         self.assertEqual(
             list(rows[0].keys()),
             [
@@ -1610,12 +1610,15 @@ class RegistryHelperTests(unittest.TestCase):
         by_target: dict[str, list[dict[str, str]]] = {}
         for row in rows:
             by_target.setdefault(row["target_symbol"], []).append(row)
-        self.assertEqual(set(by_target), {"BTC", "ETH", "SOL", "AAOI"})
+        self.assertEqual(set(by_target), {"BTC", "ETH", "SOL", "AAPL", "AAOI"})
         self.assertEqual(by_target["BTC"][0]["layer2_context_symbol"], "BKCH")
         self.assertEqual(by_target["BTC"][0]["listed_proxy_symbol"], "IBIT")
         self.assertEqual(by_target["BTC"][0]["optionable_proxy_status"], "accepted_optionable_proxy")
         self.assertEqual(by_target["ETH"][0]["optionable_proxy_status"], "verify_before_option_use")
         self.assertEqual(by_target["SOL"][0]["optionable_proxy_status"], "verify_before_option_use")
+        self.assertEqual(by_target["AAPL"][0]["layer2_context_symbol"], "XLK")
+        self.assertEqual(by_target["AAPL"][0]["layer2_mapping_method_type"], "primary_sector_context")
+        self.assertEqual(by_target["AAPL"][0]["proxy_role_type"], "no_auxiliary_proxy_type")
         self.assertEqual(
             {row["layer2_context_symbol"] for row in by_target["AAOI"]},
             {"AIQ", "XLK", "SMH", "XLC"},
