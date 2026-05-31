@@ -197,13 +197,13 @@ def _source_stage_coverage(
 def _event_source_coverage(*, month: str, row_count: int) -> EventSourceCoverage:
     status = "ready" if row_count > 0 else "missing"
     reason = (
-        f"existing source_10_event_risk_governor rows found for {month}; Layer 10 event-risk lane can reuse source evidence"
+        f"existing m10_event_risk_governor_data_acquisition rows found for {month}; Layer 10 event-risk lane can reuse source evidence"
         if row_count > 0
-        else f"no source_10_event_risk_governor rows found for {month}; Layer 10 event-risk lane has no existing source evidence"
+        else f"no m10_event_risk_governor_data_acquisition rows found for {month}; Layer 10 event-risk lane has no existing source evidence"
     )
     return EventSourceCoverage(
         contract_type="manager_source_existing_event_coverage",
-        source_table="trading_data.source_10_event_risk_governor",
+        source_table="trading_data.m10_event_risk_governor_data_acquisition",
         month=month,
         row_count=int(row_count),
         status=status,
@@ -347,13 +347,13 @@ def _fetch_source_counts_from_database(
             else:
                 warnings.append("missing table trading_data.source_03_target_state")
 
-            if table_exists(cursor, "trading_data.source_10_event_risk_governor"):
+            if table_exists(cursor, "trading_data.m10_event_risk_governor_data_acquisition"):
                 cursor.execute(
                     f"""
                     SELECT
                       to_char(date_trunc('month', event_time AT TIME ZONE %s), 'YYYY-MM') AS month,
                       count(*)::BIGINT AS row_count
-                    FROM trading_data.source_10_event_risk_governor
+                    FROM trading_data.m10_event_risk_governor_data_acquisition
                     WHERE event_time >= (%s::date AT TIME ZONE %s)
                       AND event_time < (%s::date AT TIME ZONE %s)
                     GROUP BY 1
@@ -363,7 +363,7 @@ def _fetch_source_counts_from_database(
                 for row in cursor.fetchall():
                     source_10[str(row["month"])] = int(row["row_count"])
             else:
-                warnings.append("missing table trading_data.source_10_event_risk_governor")
+                warnings.append("missing table trading_data.m10_event_risk_governor_data_acquisition")
     return source_01, source_03, source_10, source_01_first_seen, tuple(warnings)
 
 

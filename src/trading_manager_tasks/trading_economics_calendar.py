@@ -200,7 +200,7 @@ def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root:
         task_key_path=None,
         task_key_hash=None,
         write_performed=False,
-        retired_reason="TE macro rows stay in canonical storage and are not materialized into source_10_event_risk_governor until a later accepted Layer 10 route promotes them.",
+        retired_reason="TE macro rows stay in canonical storage and are not materialized into m10_event_risk_governor_data_acquisition until a later accepted Layer 10 route promotes them.",
         provider_calls=0,
         database_writes_performed=False,
         model_activation_performed=False,

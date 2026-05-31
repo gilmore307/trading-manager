@@ -1,7 +1,7 @@
 """Layer 10 event-feed backfill preparation helpers.
 
 This module prepares the reviewed local feed artifacts required by the Layer 9
-`source_10_event_risk_governor` coverage gate. It only writes manager task-key files;
+`m10_event_risk_governor_data_acquisition` coverage gate. It only writes manager task-key files;
 it does not call providers, activate models, submit broker orders, mutate
 accounts, or write dashboard read models.
 """

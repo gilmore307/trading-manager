@@ -36,7 +36,7 @@ class TradingEconomicsCalendarPlanningTests(unittest.TestCase):
             self.assertIsNone(summary.task_key_path)
             self.assertIsNone(summary.task_key_hash)
             self.assertFalse(summary.write_performed)
-            self.assertIn("not materialized into source_10_event_risk_governor", summary.retired_reason or "")
+            self.assertIn("not materialized into m10_event_risk_governor_data_acquisition", summary.retired_reason or "")
             self.assertFalse(summary.database_writes_performed)
             self.assertEqual(summary.provider_calls, 0)
 

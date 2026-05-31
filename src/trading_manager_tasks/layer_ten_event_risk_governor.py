@@ -1,6 +1,6 @@
 """Safe Layer 10 event-risk input materialization.
 
-This module builds ``source_10_event_risk_governor`` rows only from already-saved local
+This module builds ``m10_event_risk_governor_data_acquisition`` rows only from already-saved local
 Layer 2 bar artifacts. It may run the trading-data equity abnormal activity
 source-detector, but it performs no provider calls, no model activation, no
 broker execution, and no storage lifecycle mutation.
@@ -30,7 +30,7 @@ DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_10_event_risk_governor" / "input_materialization"
 DETECTOR_SOURCE = "source_10_event_risk_governor.equity_abnormal_activity"
-SOURCE = "source_10_event_risk_governor"
+SOURCE = "m10_event_risk_governor_data_acquisition"
 REQUIRED_EVENT_FEED_ARTIFACTS = {
     "alpaca_news": "equity_news.csv",
     "gdelt_news": "gdelt_article.csv",
@@ -422,7 +422,7 @@ def _write_source_task_key(
         "manager_stage_id": "layer_10_event_risk_governor.data_acquisition",
         "source_policy": "local_event_index_over_source_detector_outputs_no_provider_calls",
     }
-    path = output_dir / "source_10_task_key.json"
+    path = output_dir / "m10_event_risk_governor_data_acquisition_task_key.json"
     path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
@@ -503,10 +503,10 @@ def materialize_layer_ten_event_risk_governor_inputs(
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
-        (log_dir / "source_10.stdout.log").write_text(result.stdout, encoding="utf-8")
-        (log_dir / "source_10.stderr.log").write_text(result.stderr, encoding="utf-8")
+        (log_dir / "m10_event_risk_governor_data_acquisition.stdout.log").write_text(result.stdout, encoding="utf-8")
+        (log_dir / "m10_event_risk_governor_data_acquisition.stderr.log").write_text(result.stderr, encoding="utf-8")
         if result.returncode != 0:
-            raise TaskSystemError(f"source_10_event_risk_governor materialization failed: {result.stderr.strip() or result.stdout.strip()}")
+            raise TaskSystemError(f"{SOURCE} materialization failed: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
         references = [str(item) for item in payload.get("references") or []]
         source_receipt_path = next((item for item in references if item.endswith("completion_receipt.json")), None)
@@ -536,7 +536,7 @@ def write_summary(summary: LayerTenEventRiskMaterialization, *, output: TextIO) 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize Layer 10 source_10_event_risk_governor rows from local reviewed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize Layer 10 m10_event_risk_governor_data_acquisition rows from local reviewed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

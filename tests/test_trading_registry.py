@@ -687,7 +687,7 @@ class RegistryHelperTests(unittest.TestCase):
             "SOURCE_01_MARKET_REGIME": "source_01_market_regime",
             "SOURCE_02_TARGET_CANDIDATE_HOLDINGS": "source_02_target_candidate_holdings",
             "SOURCE_03_TARGET_STATE": "source_03_target_state",
-            "SOURCE_10_EVENT_RISK_GOVERNOR": "source_10_event_risk_governor",
+            "SOURCE_10_EVENT_RISK_GOVERNOR": "m10_event_risk_governor_data_acquisition",
             "SOURCE_05_OPTION_EXPRESSION": "source_05_option_expression",
             "SOURCE_06_POSITION_EXECUTION": "source_06_position_execution",
         }
@@ -707,7 +707,10 @@ class RegistryHelperTests(unittest.TestCase):
         for key, payload in expected_sources.items():
             self.assertEqual(rows[key]["kind"], "data_source")
             self.assertEqual(rows[key]["payload"], payload)
-            self.assertIn(f"data_source/{payload}", rows[key]["path"])
+            if key == "SOURCE_10_EVENT_RISK_GOVERNOR":
+                self.assertIn("data_source/source_10_event_risk_governor", rows[key]["path"])
+            else:
+                self.assertIn(f"data_source/{payload}", rows[key]["path"])
             self.assertNotIn("_model_inputs", rows[key]["payload"])
             self.assertNotIn("_model_inputs", rows[key]["path"])
         for key, payload in expected_feeds.items():
@@ -1252,16 +1255,16 @@ class RegistryHelperTests(unittest.TestCase):
             "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "source_03_target_state"),
             "QUOTE_SPREAD_BPS": ("field", "spread_bps", "source_03_target_state"),
             "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "source_05_option_expression"),
-            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "source_10_event_risk_governor"),
-            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "source_10_event_risk_governor"),
-            "SCOPE_TYPE": ("classification_field", "scope_type", "source_10_event_risk_governor"),
-            "REFERENCE_TYPE": ("classification_field", "reference_type", "source_10_event_risk_governor"),
-            "EVENT_REFERENCE": ("path_field", "reference", "source_10_event_risk_governor"),
-            "EVENT_CANONICAL_EVENT_ID": ("identity_field", "canonical_event_id", "source_10_event_risk_governor"),
-            "EVENT_DEDUP_STATUS": ("classification_field", "dedup_status", "source_10_event_risk_governor"),
-            "EVENT_SOURCE_PRIORITY": ("field", "source_priority", "source_10_event_risk_governor"),
-            "EVENT_COVERAGE_REASON": ("text_field", "coverage_reason", "source_10_event_risk_governor"),
-            "EVENT_COVERED_BY_EVENT_ID": ("identity_field", "covered_by_event_id", "source_10_event_risk_governor"),
+            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "m10_event_risk_governor_data_acquisition"),
+            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "m10_event_risk_governor_data_acquisition"),
+            "SCOPE_TYPE": ("classification_field", "scope_type", "m10_event_risk_governor_data_acquisition"),
+            "REFERENCE_TYPE": ("classification_field", "reference_type", "m10_event_risk_governor_data_acquisition"),
+            "EVENT_REFERENCE": ("path_field", "reference", "m10_event_risk_governor_data_acquisition"),
+            "EVENT_CANONICAL_EVENT_ID": ("identity_field", "canonical_event_id", "m10_event_risk_governor_data_acquisition"),
+            "EVENT_DEDUP_STATUS": ("classification_field", "dedup_status", "m10_event_risk_governor_data_acquisition"),
+            "EVENT_SOURCE_PRIORITY": ("field", "source_priority", "m10_event_risk_governor_data_acquisition"),
+            "EVENT_COVERAGE_REASON": ("text_field", "coverage_reason", "m10_event_risk_governor_data_acquisition"),
+            "EVENT_COVERED_BY_EVENT_ID": ("identity_field", "covered_by_event_id", "m10_event_risk_governor_data_acquisition"),
             "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "source_05_option_expression"),
             "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "source_05_option_expression"),
             "QUOTE_BID_CONDITION": ("field", "bid_condition", "source_05_option_expression"),
@@ -1277,7 +1280,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
             self.assertIn("source_02_target_candidate_holdings", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
-            self.assertIn("source_10_event_risk_governor", rows[key]["applies_to"])
+            self.assertIn("m10_event_risk_governor_data_acquisition", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
         self.assertNotIn("OPTION_CONTRACTS", rows)
         self.assertNotIn("QUOTE_TIMESTAMP", rows)
@@ -1327,7 +1330,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("source_01_market_regime", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
         self.assertIn("model_03_target_state_vector", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
         self.assertIn("target_state_vector_model", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
-        self.assertIn("source_10_event_risk_governor", data_features["FEATURE_10_EVENT_RISK_GOVERNOR"]["applies_to"])
+        self.assertIn("m10_event_risk_governor_data_acquisition", data_features["FEATURE_10_EVENT_RISK_GOVERNOR"]["applies_to"])
         self.assertIn("event_risk_governor", data_features["FEATURE_10_EVENT_RISK_GOVERNOR"]["applies_to"])
         self.assertIn("source_05_option_expression", data_features["FEATURE_09_OPTION_EXPRESSION"]["applies_to"])
         self.assertIn("option_expression_model", data_features["FEATURE_09_OPTION_EXPRESSION"]["applies_to"])
