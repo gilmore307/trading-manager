@@ -1465,16 +1465,16 @@ class RegistryHelperTests(unittest.TestCase):
         expected = {
             "M01_MARKET_REGIME_DATA_ACQUISITION": ("data_source", "m01_market_regime_data_acquisition"),
             "M01_MARKET_REGIME_FEATURE_GENERATION": ("data_feature", "m01_market_regime_feature_generation"),
-            "MODEL_01_MARKET_REGIME": ("term", "model_01_market_regime"),
-            "MODEL_01_MARKET_REGIME_EXPLAINABILITY": ("term", "model_01_market_regime_explainability"),
-            "MODEL_01_MARKET_REGIME_DIAGNOSTICS": ("term", "model_01_market_regime_diagnostics"),
+            "MODEL_01_MARKET_REGIME": ("term", "m01_market_regime_model_generation"),
+            "MODEL_01_MARKET_REGIME_EXPLAINABILITY": ("term", "m01_market_regime_model_generation_explainability"),
+            "MODEL_01_MARKET_REGIME_DIAGNOSTICS": ("term", "m01_market_regime_model_generation_diagnostics"),
         }
         for key, (kind, payload) in expected.items():
             self.assertEqual(rows[key]["kind"], kind)
             self.assertEqual(rows[key]["payload"], payload)
 
-        self.assertIn("model_01_market_regime", rows["MODEL_01_MARKET_REGIME_EXPLAINABILITY"]["applies_to"])
-        self.assertIn("model_01_market_regime", rows["MODEL_01_MARKET_REGIME_DIAGNOSTICS"]["applies_to"])
+        self.assertIn("m01_market_regime_model_generation", rows["MODEL_01_MARKET_REGIME_EXPLAINABILITY"]["applies_to"])
+        self.assertIn("m01_market_regime_model_generation", rows["MODEL_01_MARKET_REGIME_DIAGNOSTICS"]["applies_to"])
 
     def test_market_regime_etf_universe_shared_csv_columns_are_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
