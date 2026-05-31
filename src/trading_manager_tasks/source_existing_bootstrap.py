@@ -32,8 +32,8 @@ DEFAULT_BOOTSTRAP_REPORT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "source_exist
 SOURCE_TIMEZONE = "America/New_York"
 
 STAGE_SOURCE_TABLES: Mapping[str, str] = {
-    "layer_01_market_regime.data_acquisition": "trading_data.source_01_market_regime",
-    "layer_02_sector_context.data_acquisition": "trading_data.source_01_market_regime",
+    "layer_01_market_regime.data_acquisition": "trading_data.m01_market_regime_data_acquisition",
+    "layer_02_sector_context.data_acquisition": "trading_data.m01_market_regime_data_acquisition",
     "layer_03_target_state_vector.data_acquisition": "trading_data.source_03_target_state",
 }
 
@@ -294,14 +294,14 @@ def _fetch_source_counts_from_database(
 
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         with connection.cursor() as cursor:
-            if table_exists(cursor, "trading_data.source_01_market_regime"):
+            if table_exists(cursor, "trading_data.m01_market_regime_data_acquisition"):
                 cursor.execute(
                     f"""
                     SELECT
                       to_char(date_trunc('month', timestamp AT TIME ZONE %s), 'YYYY-MM') AS month,
                       upper(symbol) AS symbol,
                       count(*)::BIGINT AS row_count
-                    FROM trading_data.source_01_market_regime
+                    FROM trading_data.m01_market_regime_data_acquisition
                     WHERE timestamp >= (%s::date AT TIME ZONE %s)
                       AND timestamp < (%s::date AT TIME ZONE %s)
                     GROUP BY 1, 2
@@ -315,7 +315,7 @@ def _fetch_source_counts_from_database(
                     SELECT
                       upper(symbol) AS symbol,
                       to_char(date_trunc('month', min(timestamp) AT TIME ZONE %s), 'YYYY-MM') AS first_month
-                    FROM trading_data.source_01_market_regime
+                    FROM trading_data.m01_market_regime_data_acquisition
                     GROUP BY 1
                     """,
                     [SOURCE_TIMEZONE],
@@ -323,7 +323,7 @@ def _fetch_source_counts_from_database(
                 for row in cursor.fetchall():
                     source_01_first_seen[str(row["symbol"])] = str(row["first_month"])
             else:
-                warnings.append("missing table trading_data.source_01_market_regime")
+                warnings.append("missing table trading_data.m01_market_regime_data_acquisition")
 
             if table_exists(cursor, "trading_data.source_03_target_state") and target:
                 cursor.execute(

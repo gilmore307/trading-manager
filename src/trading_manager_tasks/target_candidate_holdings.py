@@ -1,6 +1,6 @@
 """Layer 2 target-candidate holdings materialization.
 
-This module prepares source_02_target_candidate_holdings after Layer 2 sector
+This module prepares m02_sector_context_data_acquisition after Layer 2 sector
 context exists. Layer 3 consumes these rows; it should not own their generation.
 """
 
@@ -19,7 +19,8 @@ from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_OUTPUT_ROOT = Path("runtime/layer_02_sector_context/target_candidate_holdings")
-TARGET_CANDIDATE_HOLDINGS_SOURCE = "source_02_target_candidate_holdings"
+TARGET_CANDIDATE_HOLDINGS_SOURCE = "m02_sector_context_data_acquisition"
+TARGET_CANDIDATE_HOLDINGS_SOURCE_MODULE = "data_source.source_02_target_candidate_holdings"
 
 
 @dataclass(frozen=True)
@@ -180,7 +181,7 @@ def materialize_target_candidate_holdings(
     if write:
         payload = _run_trading_data_source(
             trading_data_root=trading_data_root,
-            source_module=f"data_source.{TARGET_CANDIDATE_HOLDINGS_SOURCE}",
+            source_module=TARGET_CANDIDATE_HOLDINGS_SOURCE_MODULE,
             task_key_path=task_key_path,
             run_id=run_id,
             output_dir=output_dir,
@@ -208,6 +209,7 @@ def write_summary(summary: TargetCandidateHoldingsMaterialization, *, output: Te
 
 __all__ = [
     "TARGET_CANDIDATE_HOLDINGS_SOURCE",
+    "TARGET_CANDIDATE_HOLDINGS_SOURCE_MODULE",
     "TargetCandidateHoldingsMaterialization",
     "build_target_candidate_holdings_task_key",
     "materialize_target_candidate_holdings",

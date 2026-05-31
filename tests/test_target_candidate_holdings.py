@@ -22,7 +22,7 @@ class TargetCandidateHoldingsTests(unittest.TestCase):
                 trading_data_output_root=tmp / "td-holdings-out",
             )
 
-            self.assertEqual(task_key["source"], "source_02_target_candidate_holdings")
+            self.assertEqual(task_key["source"], "m02_sector_context_data_acquisition")
             self.assertEqual(task_key["task_id"], "layer_02_target_candidate_holdings_2026_05_2026_05")
             self.assertEqual(task_key["params"]["start"], "2026-05-01T00:00:00-05:00")
             self.assertEqual(task_key["params"]["end"], "2026-06-01T00:00:00-05:00")
