@@ -214,11 +214,11 @@ def _event_source_coverage(*, month: str, row_count: int) -> EventSourceCoverage
 def build_source_coverages_from_counts(
     *,
     months: Sequence[str],
-    source_01_counts: Mapping[str, Mapping[str, int]],
+    m01_counts: Mapping[str, Mapping[str, int]],
     source_03_counts: Mapping[str, Mapping[str, int]],
     source_10_counts: Mapping[str, int],
     selected_target_symbol: str | None,
-    source_01_first_seen_month_by_symbol: Mapping[str, str] | None = None,
+    m01_first_seen_month_by_symbol: Mapping[str, str] | None = None,
 ) -> tuple[tuple[SourceStageCoverage, ...], tuple[EventSourceCoverage, ...], tuple[str, ...]]:
     """Build stage coverage objects from already-fetched monthly source counts."""
 
@@ -229,15 +229,15 @@ def build_source_coverages_from_counts(
     stage_coverages: list[SourceStageCoverage] = []
     event_coverages: list[EventSourceCoverage] = []
     for month in months:
-        source_01_month = {symbol.upper(): int(count) for symbol, count in dict(source_01_counts.get(month, {})).items()}
+        m01_month = {symbol.upper(): int(count) for symbol, count in dict(m01_counts.get(month, {})).items()}
         stage_coverages.append(
             _source_stage_coverage(
                 stage_id="layer_01_market_regime.data_acquisition",
                 source_table=STAGE_SOURCE_TABLES["layer_01_market_regime.data_acquisition"],
                 month=month,
                 expected_symbols=layer_one_symbols,
-                counts_by_symbol=source_01_month,
-                first_seen_month_by_symbol=source_01_first_seen_month_by_symbol,
+                counts_by_symbol=m01_month,
+                first_seen_month_by_symbol=m01_first_seen_month_by_symbol,
             )
         )
         stage_coverages.append(
@@ -246,8 +246,8 @@ def build_source_coverages_from_counts(
                 source_table=STAGE_SOURCE_TABLES["layer_02_sector_context.data_acquisition"],
                 month=month,
                 expected_symbols=layer_two_symbols,
-                counts_by_symbol=source_01_month,
-                first_seen_month_by_symbol=source_01_first_seen_month_by_symbol,
+                counts_by_symbol=m01_month,
+                first_seen_month_by_symbol=m01_first_seen_month_by_symbol,
             )
         )
         if target_symbol:
@@ -282,10 +282,10 @@ def _fetch_source_counts_from_database(
     warnings: list[str] = []
     start_date = _month_start_date(start_month)
     end_date = _month_end_date(end_month)
-    source_01: dict[str, dict[str, int]] = {}
+    m01: dict[str, dict[str, int]] = {}
     source_03: dict[str, dict[str, int]] = {}
     source_10: dict[str, int] = {}
-    source_01_first_seen: dict[str, str] = {}
+    m01_first_seen: dict[str, str] = {}
     target = selected_target_symbol.strip().upper() if selected_target_symbol else None
 
     def table_exists(cursor: Any, table_ref: str) -> bool:
@@ -309,7 +309,7 @@ def _fetch_source_counts_from_database(
                     [SOURCE_TIMEZONE, start_date, SOURCE_TIMEZONE, end_date, SOURCE_TIMEZONE],
                 )
                 for row in cursor.fetchall():
-                    source_01.setdefault(str(row["month"]), {})[str(row["symbol"])] = int(row["row_count"])
+                    m01.setdefault(str(row["month"]), {})[str(row["symbol"])] = int(row["row_count"])
                 cursor.execute(
                     f"""
                     SELECT
@@ -321,7 +321,7 @@ def _fetch_source_counts_from_database(
                     [SOURCE_TIMEZONE],
                 )
                 for row in cursor.fetchall():
-                    source_01_first_seen[str(row["symbol"])] = str(row["first_month"])
+                    m01_first_seen[str(row["symbol"])] = str(row["first_month"])
             else:
                 warnings.append("missing table trading_data.m01_market_regime_data_acquisition")
 
@@ -364,7 +364,7 @@ def _fetch_source_counts_from_database(
                     source_10[str(row["month"])] = int(row["row_count"])
             else:
                 warnings.append("missing table trading_data.m10_event_risk_governor_data_acquisition")
-    return source_01, source_03, source_10, source_01_first_seen, tuple(warnings)
+    return m01, source_03, source_10, m01_first_seen, tuple(warnings)
 
 
 def _coverage_report_path(*, report_root: Path, month: str, stage_id: str) -> Path:
@@ -421,10 +421,10 @@ def run_source_existing_bootstrap(
     report_root: Path | None = None,
     database_url: str | None = None,
     write: bool = False,
-    source_01_counts: Mapping[str, Mapping[str, int]] | None = None,
+    m01_counts: Mapping[str, Mapping[str, int]] | None = None,
     source_03_counts: Mapping[str, Mapping[str, int]] | None = None,
     source_10_counts: Mapping[str, int] | None = None,
-    source_01_first_seen_month_by_symbol: Mapping[str, str] | None = None,
+    m01_first_seen_month_by_symbol: Mapping[str, str] | None = None,
 ) -> SourceExistingBootstrapSummary:
     """Inspect existing source data and optionally seed workflow states.
 
@@ -435,7 +435,7 @@ def run_source_existing_bootstrap(
     started = utc_now_iso()
     months = iter_months(start_month, end_month)
     warnings: list[str] = []
-    if source_01_counts is None or source_03_counts is None or source_10_counts is None:
+    if m01_counts is None or source_03_counts is None or source_10_counts is None:
         try:
             db_url = resolve_database_url(database_url)
             fetched_01, fetched_03, fetched_10, fetched_01_first_seen, fetch_warnings = _fetch_source_counts_from_database(
@@ -444,24 +444,24 @@ def run_source_existing_bootstrap(
                 end_month=end_month,
                 selected_target_symbol=selected_target_symbol,
             )
-            source_01_counts = fetched_01
+            m01_counts = fetched_01
             source_03_counts = fetched_03
             source_10_counts = fetched_10
-            source_01_first_seen_month_by_symbol = fetched_01_first_seen
+            m01_first_seen_month_by_symbol = fetched_01_first_seen
             warnings.extend(fetch_warnings)
         except Exception as exc:
             warnings.append(f"source-existing bootstrap skipped database scan: {type(exc).__name__}: {exc}")
-            source_01_counts = {}
+            m01_counts = {}
             source_03_counts = {}
             source_10_counts = {}
 
     stage_coverages, event_coverages, coverage_warnings = build_source_coverages_from_counts(
         months=months,
-        source_01_counts=source_01_counts,
+        m01_counts=m01_counts,
         source_03_counts=source_03_counts,
         source_10_counts=source_10_counts,
         selected_target_symbol=selected_target_symbol,
-        source_01_first_seen_month_by_symbol=source_01_first_seen_month_by_symbol,
+        m01_first_seen_month_by_symbol=m01_first_seen_month_by_symbol,
     )
     warnings.extend(coverage_warnings)
 

@@ -229,8 +229,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "background_panel_continuous",
         "candidate_axis": "six_month_window",
         "candidate_progression_policy": "complete fixed Layer 1 market/cross-asset panel for each six-month chronological unit; promotion waits for Layers 1-9 model generation, model-group replay, and post-replay Layer 10 attribution",
-        "data_surface": "autonomous Alpaca ETF bars acquisition plus feature_01_market_regime",
-        "feature_cli": "trading-data-feature-01-market-regime",
+        "data_surface": "autonomous Alpaca ETF bars acquisition plus m01_market_regime_feature_generation",
+        "feature_cli": "trading-data-m01-market-regime-feature-generation",
     },
     {
         "layer": 2,
@@ -240,8 +240,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "sector_panel_continuous",
         "candidate_axis": "six_month_window;sector_or_industry_symbol",
         "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists; promotion waits for Layers 1-9 model generation, model-group replay, and post-replay Layer 10 attribution",
-        "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus feature_02_sector_context over materialized market/sector inputs",
-        "feature_cli": "trading-data-feature-02-sector-context",
+        "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus m02_sector_context_feature_generation over materialized market/sector inputs",
+        "feature_cli": "trading-data-m02-sector-context-feature-generation",
     },
     {
         "layer": 3,
@@ -495,8 +495,8 @@ def _layer_five_generation_artifact_blockers(
 
 
 FEATURE_MODULES: dict[str, str] = {
-    "trading-data-feature-01-market-regime": "data_feature.feature_01_market_regime.from_feed_artifacts",
-    "trading-data-feature-02-sector-context": "data_feature.feature_02_sector_context.from_feed_artifacts",
+    "trading-data-m01-market-regime-feature-generation": "data_feature.m01_market_regime_feature_generation.from_feed_artifacts",
+    "trading-data-m02-sector-context-feature-generation": "data_feature.m02_sector_context_feature_generation.from_feed_artifacts",
     "trading-data-feature-03-target-state-vector": "data_feature.feature_03_target_state_vector",
     "trading-data-feature-10-event-risk-governor": "data_feature.feature_10_event_risk_governor",
     "trading-data-feature-09-option-expression": "data_feature.feature_09_option_expression",
@@ -517,7 +517,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
             "${END_MONTH}",
             "--write",
         ]
-    if feature_cli == "trading-data-feature-02-sector-context":
+    if feature_cli == "trading-data-m02-sector-context-feature-generation":
         return [
             "PYTHONPATH=src",
             "python3",
@@ -537,7 +537,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
             "${END_MONTH}",
         ]
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
-    if feature_cli in {"trading-data-feature-01-market-regime", "trading-data-feature-02-sector-context"}:
+    if feature_cli in {"trading-data-m01-market-regime-feature-generation", "trading-data-m02-sector-context-feature-generation"}:
         command.extend(["--month", "${START_MONTH}"])
     if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-10-event-risk-governor"}:
         command.extend([

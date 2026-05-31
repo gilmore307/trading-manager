@@ -684,8 +684,8 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn(obsolete_provider_term, rows)
         self.assertNotIn("GITHUB", rows)
         expected_sources = {
-            "SOURCE_01_MARKET_REGIME": "source_01_market_regime",
-            "SOURCE_02_TARGET_CANDIDATE_HOLDINGS": "source_02_target_candidate_holdings",
+            "M01_MARKET_REGIME_DATA_ACQUISITION": "m01_market_regime_data_acquisition",
+            "M02_SECTOR_CONTEXT_DATA_ACQUISITION": "m02_sector_context_data_acquisition",
             "SOURCE_03_TARGET_STATE": "source_03_target_state",
             "SOURCE_10_EVENT_RISK_GOVERNOR": "m10_event_risk_governor_data_acquisition",
             "SOURCE_05_OPTION_EXPRESSION": "source_05_option_expression",
@@ -897,8 +897,8 @@ class RegistryHelperTests(unittest.TestCase):
             "MODEL_09_OPTION_EXPRESSION_GENERATE": "scripts/models/model_09_option_expression/generate_model_09_option_expression.py",
             "MODEL_09_OPTION_EXPRESSION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_09_option_expression/evaluate_model_09_option_expression.py",
             "MODEL_09_OPTION_EXPRESSION_REVIEW_PROMOTION": "scripts/models/model_09_option_expression/review_option_expression_promotion.py",
-            "FEATURE_01_MARKET_REGIME_GENERATE": "src/data_feature/feature_01_market_regime/__main__.py",
-            "FEATURE_02_SECTOR_CONTEXT_GENERATE": "src/data_feature/feature_02_sector_context/__main__.py",
+            "M01_MARKET_REGIME_FEATURE_GENERATION_GENERATE": "src/data_feature/m01_market_regime_feature_generation/__main__.py",
+            "M02_SECTOR_CONTEXT_FEATURE_GENERATION_GENERATE": "src/data_feature/m02_sector_context_feature_generation/__main__.py",
             "FEATURE_03_TARGET_STATE_VECTOR_GENERATE": "src/data_feature/feature_03_target_state_vector/__main__.py",
             "FEATURE_10_EVENT_RISK_GOVERNOR_GENERATE": "src/data_feature/feature_10_event_risk_governor/__main__.py",
             "FEATURE_09_OPTION_EXPRESSION_GENERATE": "src/data_feature/feature_09_option_expression/__main__.py",
@@ -909,9 +909,9 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn(expected_path, rows[key]["path"])
         self.assertIn("option_expression_model", rows["SOURCE_06_POSITION_EXECUTION"]["applies_to"])
         self.assertNotIn("position_execution_model", rows["SOURCE_06_POSITION_EXECUTION"]["applies_to"])
-        self.assertIn("anonymous_target_candidate_builder", rows["SOURCE_02_TARGET_CANDIDATE_HOLDINGS"]["applies_to"])
-        self.assertIn("model_03_target_state_vector", rows["SOURCE_02_TARGET_CANDIDATE_HOLDINGS"]["applies_to"])
-        self.assertNotIn("sector_context_model", rows["SOURCE_02_TARGET_CANDIDATE_HOLDINGS"]["applies_to"])
+        self.assertIn("anonymous_target_candidate_builder", rows["M02_SECTOR_CONTEXT_DATA_ACQUISITION"]["applies_to"])
+        self.assertIn("model_03_target_state_vector", rows["M02_SECTOR_CONTEXT_DATA_ACQUISITION"]["applies_to"])
+        self.assertNotIn("sector_context_model", rows["M02_SECTOR_CONTEXT_DATA_ACQUISITION"]["applies_to"])
         self.assertIn("layer_3_real_eval_deferred_upstream_layer_1_2_not_active_and_calibration_missing", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
         self.assertIn("layers_4_10_missing_production_eval_run_labels_metrics", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
         self.assertIn("layer_6_dynamic_risk_policy_physical_implementation_pending", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
@@ -1276,9 +1276,9 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn(applies_to, rows[key]["applies_to"])
 
         for key in ["SYMBOL", "DATA_TIMESTAMP", "BAR_OPEN", "BAR_VWAP"]:
-            self.assertIn("source_01_market_regime", rows[key]["applies_to"])
+            self.assertIn("m01_market_regime_data_acquisition", rows[key]["applies_to"])
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
-            self.assertIn("source_02_target_candidate_holdings", rows[key]["applies_to"])
+            self.assertIn("m02_sector_context_data_acquisition", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
             self.assertIn("m10_event_risk_governor_data_acquisition", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
@@ -1300,17 +1300,17 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(
             set(data_features),
             {
-                "FEATURE_01_MARKET_REGIME",
-                "FEATURE_02_SECTOR_CONTEXT",
+                "M01_MARKET_REGIME_FEATURE_GENERATION",
+                "M02_SECTOR_CONTEXT_FEATURE_GENERATION",
                 "FEATURE_03_TARGET_STATE_VECTOR",
                 "FEATURE_10_EVENT_RISK_GOVERNOR",
                 "FEATURE_09_OPTION_EXPRESSION",
             },
         )
-        self.assertEqual(data_features["FEATURE_01_MARKET_REGIME"]["payload"], "feature_01_market_regime")
-        self.assertIn("data_feature/feature_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["path"])
-        self.assertEqual(data_features["FEATURE_02_SECTOR_CONTEXT"]["payload"], "feature_02_sector_context")
-        self.assertIn("data_feature/feature_02_sector_context", data_features["FEATURE_02_SECTOR_CONTEXT"]["path"])
+        self.assertEqual(data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["payload"], "m01_market_regime_feature_generation")
+        self.assertIn("data_feature/m01_market_regime_feature_generation", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["path"])
+        self.assertEqual(data_features["M02_SECTOR_CONTEXT_FEATURE_GENERATION"]["payload"], "m02_sector_context_feature_generation")
+        self.assertIn("data_feature/m02_sector_context_feature_generation", data_features["M02_SECTOR_CONTEXT_FEATURE_GENERATION"]["path"])
         self.assertEqual(
             data_features["FEATURE_03_TARGET_STATE_VECTOR"]["payload"],
             "feature_03_target_state_vector",
@@ -1323,18 +1323,18 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("data_feature/feature_10_event_risk_governor", data_features["FEATURE_10_EVENT_RISK_GOVERNOR"]["path"])
         self.assertEqual(data_features["FEATURE_09_OPTION_EXPRESSION"]["payload"], "feature_09_option_expression")
         self.assertIn("data_feature/feature_09_option_expression", data_features["FEATURE_09_OPTION_EXPRESSION"]["path"])
-        self.assertIn("trading-data", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
-        self.assertIn("market_regime_model", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
-        self.assertIn("source_01_market_regime", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
-        self.assertIn("sector_context_model", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
-        self.assertIn("source_01_market_regime", data_features["FEATURE_02_SECTOR_CONTEXT"]["applies_to"])
+        self.assertIn("trading-data", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
+        self.assertIn("market_regime_model", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
+        self.assertIn("m01_market_regime_data_acquisition", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
+        self.assertIn("sector_context_model", data_features["M02_SECTOR_CONTEXT_FEATURE_GENERATION"]["applies_to"])
+        self.assertIn("m01_market_regime_data_acquisition", data_features["M02_SECTOR_CONTEXT_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("model_03_target_state_vector", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
         self.assertIn("target_state_vector_model", data_features["FEATURE_03_TARGET_STATE_VECTOR"]["applies_to"])
         self.assertIn("m10_event_risk_governor_data_acquisition", data_features["FEATURE_10_EVENT_RISK_GOVERNOR"]["applies_to"])
         self.assertIn("event_risk_governor", data_features["FEATURE_10_EVENT_RISK_GOVERNOR"]["applies_to"])
         self.assertIn("source_05_option_expression", data_features["FEATURE_09_OPTION_EXPRESSION"]["applies_to"])
         self.assertIn("option_expression_model", data_features["FEATURE_09_OPTION_EXPRESSION"]["applies_to"])
-        self.assertNotIn("feature_snapshots", data_features["FEATURE_01_MARKET_REGIME"]["applies_to"])
+        self.assertNotIn("feature_snapshots", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
         for row in rows:
             self.assertNotIn("trading-source/storage/templates/data_kinds", row["path"])
         for deleted_preview_key in {
@@ -1385,7 +1385,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(by_key["SNAPSHOT_TIME"]["kind"], "temporal_field")
         self.assertEqual(by_key["SNAPSHOT_TIME"]["payload"], "snapshot_time")
-        self.assertIn("feature_01_market_regime", by_key["SNAPSHOT_TIME"]["applies_to"])
+        self.assertIn("m01_market_regime_feature_generation", by_key["SNAPSHOT_TIME"]["applies_to"])
         self.assertNotIn("feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
         payloads = {row["payload"] for row in rows}
         for generated_feature_column in {"spy_return_30m", "spy_return_1d", "spy_return_5d", "spy_return_20d"}:
@@ -1463,8 +1463,8 @@ class RegistryHelperTests(unittest.TestCase):
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         expected = {
-            "SOURCE_01_MARKET_REGIME": ("data_source", "source_01_market_regime"),
-            "FEATURE_01_MARKET_REGIME": ("data_feature", "feature_01_market_regime"),
+            "M01_MARKET_REGIME_DATA_ACQUISITION": ("data_source", "m01_market_regime_data_acquisition"),
+            "M01_MARKET_REGIME_FEATURE_GENERATION": ("data_feature", "m01_market_regime_feature_generation"),
             "MODEL_01_MARKET_REGIME": ("term", "model_01_market_regime"),
             "MODEL_01_MARKET_REGIME_EXPLAINABILITY": ("term", "model_01_market_regime_explainability"),
             "MODEL_01_MARKET_REGIME_DIAGNOSTICS": ("term", "model_01_market_regime_diagnostics"),
@@ -1855,7 +1855,7 @@ class RegistryHelperTests(unittest.TestCase):
             "BAR_TRADE_COUNT": "bar_trade_count",
         }
         for key, payload in expected_bar_fields.items():
-            self.assertIn("source_01_market_regime", by_key[key]["applies_to"])
+            self.assertIn("m01_market_regime_data_acquisition", by_key[key]["applies_to"])
             self.assertIn("source_03_target_state", by_key[key]["applies_to"])
             self.assertIn("source_06_position_execution", by_key[key]["applies_to"])
             self.assertEqual(by_key[key]["payload"], payload)

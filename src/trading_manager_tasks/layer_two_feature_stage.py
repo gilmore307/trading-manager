@@ -1,7 +1,7 @@
 """Layer 2 feature stage executor.
 
 The Layer 2 feature stage owns both sector-context feature rows and the
-source_02 target-candidate holdings source used by downstream Layer 3 input
+m02 target-candidate holdings source used by downstream Layer 3 input
 preparation.
 """
 
@@ -48,7 +48,7 @@ def _run_layer_two_feature_command(
     output_dir: Path,
     write: bool,
 ) -> Mapping[str, Any]:
-    command = ["python3", "-m", "data_feature.feature_02_sector_context.from_feed_artifacts", "--month", month]
+    command = ["python3", "-m", "data_feature.m02_sector_context_feature_generation.from_feed_artifacts", "--month", month]
     if not write:
         command.append("--dry-run")
     result = subprocess.run(
@@ -61,10 +61,10 @@ def _run_layer_two_feature_command(
     )
     log_dir = output_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    (log_dir / f"feature_02_sector_context_{month}.stdout.log").write_text(result.stdout, encoding="utf-8")
-    (log_dir / f"feature_02_sector_context_{month}.stderr.log").write_text(result.stderr, encoding="utf-8")
+    (log_dir / f"m02_sector_context_feature_generation_{month}.stdout.log").write_text(result.stdout, encoding="utf-8")
+    (log_dir / f"m02_sector_context_feature_generation_{month}.stderr.log").write_text(result.stderr, encoding="utf-8")
     if result.returncode != 0:
-        raise TaskSystemError(f"feature_02_sector_context generation failed: {result.stderr.strip() or result.stdout.strip()}")
+        raise TaskSystemError(f"m02_sector_context_feature_generation generation failed: {result.stderr.strip() or result.stdout.strip()}")
     parsed = json.loads(result.stdout)
     return parsed if isinstance(parsed, Mapping) else {}
 
@@ -112,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--month", required=True)
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
-    parser.add_argument("--write", action="store_true", help="Persist feature_02 and source_02 outputs. Without this flag the command is a dry run.")
+    parser.add_argument("--write", action="store_true", help="Persist m02 feature and candidate-holdings outputs. Without this flag the command is a dry run.")
     args = parser.parse_args(argv)
     summary = execute_layer_two_feature_stage(
         month=args.month,

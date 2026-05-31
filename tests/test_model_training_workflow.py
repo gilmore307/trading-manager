@@ -344,7 +344,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         command = plan.layers[0].feature_command
 
-        self.assertIn("data_feature.feature_01_market_regime.from_feed_artifacts", command)
+        self.assertIn("data_feature.m01_market_regime_feature_generation.from_feed_artifacts", command)
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
 

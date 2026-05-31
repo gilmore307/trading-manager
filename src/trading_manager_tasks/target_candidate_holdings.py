@@ -20,7 +20,7 @@ from .storage_paths import data_storage_root
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_OUTPUT_ROOT = Path("runtime/layer_02_sector_context/target_candidate_holdings")
 TARGET_CANDIDATE_HOLDINGS_SOURCE = "m02_sector_context_data_acquisition"
-TARGET_CANDIDATE_HOLDINGS_SOURCE_MODULE = "data_source.source_02_target_candidate_holdings"
+TARGET_CANDIDATE_HOLDINGS_SOURCE_MODULE = "data_source.m02_sector_context_data_acquisition"
 
 
 @dataclass(frozen=True)

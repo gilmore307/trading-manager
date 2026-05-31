@@ -18,13 +18,13 @@ class SourceExistingBootstrapTests(unittest.TestCase):
     def test_builds_ready_stage_coverage_from_existing_source_rows(self) -> None:
         layer_one = _symbols(LAYER_ONE_MODEL_LAYER)
         layer_two = _symbols(LAYER_TWO_MODEL_LAYER)
-        source_01 = {"2016-01": {symbol: 10 for symbol in (*layer_one, *layer_two)}}
+        m01 = {"2016-01": {symbol: 10 for symbol in (*layer_one, *layer_two)}}
         source_03 = {"2016-01": {"AAPL": 20}}
         source_10 = {"2016-01": 3}
 
         stage_coverages, event_coverages, warnings = build_source_coverages_from_counts(
             months=("2016-01",),
-            source_01_counts=source_01,
+            m01_counts=m01,
             source_03_counts=source_03,
             source_10_counts=source_10,
             selected_target_symbol="AAPL",
@@ -45,14 +45,14 @@ class SourceExistingBootstrapTests(unittest.TestCase):
             storage_root = Path(raw_tmp) / "manager-storage"
             layer_one = _symbols(LAYER_ONE_MODEL_LAYER)
             layer_two = _symbols(LAYER_TWO_MODEL_LAYER)
-            source_01 = {"2016-01": {symbol: 10 for symbol in (*layer_one, *layer_two)}}
+            m01 = {"2016-01": {symbol: 10 for symbol in (*layer_one, *layer_two)}}
             source_03 = {"2016-01": {"AAPL": 20}}
             summary = run_source_existing_bootstrap(
                 start_month="2016-01",
                 end_month="2016-01",
                 selected_target_symbol="AAPL",
                 storage_root=storage_root,
-                source_01_counts=source_01,
+                m01_counts=m01,
                 source_03_counts=source_03,
                 source_10_counts={"2016-01": 0},
                 write=True,
@@ -73,13 +73,13 @@ class SourceExistingBootstrapTests(unittest.TestCase):
     def test_partial_source_coverage_does_not_seed_workflow_state(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
-            source_01 = {"2016-01": {_symbols(LAYER_ONE_MODEL_LAYER)[0]: 10}}
+            m01 = {"2016-01": {_symbols(LAYER_ONE_MODEL_LAYER)[0]: 10}}
             summary = run_source_existing_bootstrap(
                 start_month="2016-01",
                 end_month="2016-01",
                 selected_target_symbol="AAPL",
                 storage_root=storage_root,
-                source_01_counts=source_01,
+                m01_counts=m01,
                 source_03_counts={},
                 source_10_counts={},
                 write=True,

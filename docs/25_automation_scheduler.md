@@ -64,7 +64,7 @@ Model Maintenance. Until that lifecycle emits maintenance/readiness evidence,
 the next fold and the next target remain blocked because Layer 10 may update
 the event-observation pool used by later Layer 4 folds.
 
-Layer 2 feature generation also prepares `source_02_target_candidate_holdings` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
+Layer 2 feature generation also prepares `m02_sector_context_data_acquisition` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
 ## Target Rotation
 
