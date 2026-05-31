@@ -182,7 +182,7 @@ def _command(feed_id: str, task_key_path: Path, request_id: str, *, attempt: int
     module = FEED_MODULE_BY_ID.get(feed_id)
     if module is None:
         raise TaskSystemError(f"unsupported event feed dispatch target: {feed_id}")
-    return ["python3", "-m", module, str(task_key_path), "--run-id", _run_id(request_id, attempt=attempt)]
+    return [sys.executable, "-m", module, str(task_key_path), "--run-id", _run_id(request_id, attempt=attempt)]
 
 
 def _pythonpath(trading_data_root: Path) -> str:

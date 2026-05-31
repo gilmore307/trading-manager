@@ -1,4 +1,5 @@
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -32,6 +33,7 @@ class EventFeedDispatchTests(unittest.TestCase):
             self.assertEqual(summary.provider_calls, 0)
             self.assertEqual(summary.validation_count, 1)
             self.assertEqual(summary.items[0].status, "validated_not_dispatched")
+            self.assertEqual(summary.items[0].command[0], sys.executable)
             self.assertIn("data_feed.05_feed_gdelt_news", summary.items[0].command)
 
     def test_runtime_key_enables_only_selected_live_feed_controls(self):
