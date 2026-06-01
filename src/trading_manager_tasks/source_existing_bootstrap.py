@@ -522,8 +522,6 @@ def run_source_existing_bootstrap(
         resolved_report_root.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(summary.summary_row(), indent=2, sort_keys=True) + "\n"
         (resolved_report_root / "latest.json").write_text(payload, encoding="utf-8")
-        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        (resolved_report_root / f"source_existing_bootstrap_{timestamp}.json").write_text(payload, encoding="utf-8")
     return summary
 
 

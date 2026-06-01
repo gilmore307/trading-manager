@@ -141,6 +141,17 @@ def _cwd_for_stage(stage: StageProgress, *, manager_root: Path, trading_data_roo
     return manager_root
 
 
+def _contains_runtime_model_rows_output(command: list[str]) -> bool:
+    for index, token in enumerate(command):
+        if token in {"--output", "--output-jsonl"} and index + 1 < len(command):
+            output_path = command[index + 1]
+            if "model_rows" in output_path and output_path.endswith(".jsonl"):
+                return True
+        if "model_rows" in token and token.endswith(".jsonl"):
+            return True
+    return False
+
+
 def _validate_safe_stage(stage: StageProgress) -> None:
     if stage.status != "ready":
         raise TaskSystemError(f"stage is not ready: {stage.stage_id} status={stage.status}")
@@ -166,6 +177,8 @@ def _validate_safe_stage(stage: StageProgress) -> None:
         raise TaskSystemError(f"stage has no command: {stage.stage_id}")
     if any("${" in token for token in stage.command):
         raise TaskSystemError(f"stage command still contains unresolved placeholder: {stage.stage_id}")
+    if _contains_runtime_model_rows_output(stage.command):
+        raise TaskSystemError(f"stage command attempts to write deprecated runtime model_rows JSONL output: {stage.stage_id}")
 
 
 def _extract_json_from_stdout(stdout: str) -> Mapping[str, Any]:

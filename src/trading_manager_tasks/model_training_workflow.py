@@ -363,8 +363,6 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "${START_MONTH_START_ET}",
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
-            "--output-jsonl" if layer in {4, 5, 6, 7, 8, 9, 10} else "--output",
-            f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/model_rows_${{START_MONTH}}.jsonl",
         ])
     if layer in {1, 2} and verb == "evaluate":
         command.extend([
@@ -411,15 +409,9 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
 def _target_scoped_generation_command(command: list[str], *, layer: int, selected_target_symbol: str | None) -> list[str]:
     if layer not in {3, 4, 5} or not selected_target_symbol:
         return command
-    target_token = selected_target_symbol.lower().replace(".", "_")
     scoped = list(command)
     scoped.extend(["--target-symbol", selected_target_symbol])
-    physical_model_key = scoped[2].split("/scripts/models/", 1)[1].split("/", 1)[0] if len(scoped) > 2 and "/scripts/models/" in scoped[2] else None
-    if not physical_model_key:
-        return scoped
-    default_output = f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/model_rows_${{START_MONTH}}.jsonl"
-    target_output = f"{MODEL_RUNTIME_ROOT}/{physical_model_key}/model_rows_{target_token}_${{START_MONTH}}.jsonl"
-    return [target_output if token == default_output else token for token in scoped]
+    return scoped
 
 
 def _layer_five_after_cost_artifact_path(

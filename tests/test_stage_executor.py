@@ -89,6 +89,26 @@ class StageExecutorTests(unittest.TestCase):
 
         self.assertEqual(command, ["runner", "--month", "2016-01", "--path", "summary_2016-02.json"])
 
+    def test_rejects_deprecated_runtime_model_rows_output(self):
+        stage = StageProgress(
+            stage_id="layer_04_event_failure_risk.model_generation.train",
+            layer=4,
+            layer_key="layer_04_event_failure_risk",
+            stage_type="model_generation",
+            status="ready",
+            command=[
+                "python3",
+                "/root/projects/trading-model/scripts/models/model_04_event_failure_risk/generate_model_04_event_failure_risk.py",
+                "--from-database",
+                "--output-jsonl",
+                "/root/projects/trading-storage/storage/03_model_artifacts/runtime/model_04_event_failure_risk/model_rows_aapl_2016-01_train.jsonl",
+            ],
+            blockers=(),
+        )
+
+        with self.assertRaisesRegex(TaskSystemError, "deprecated runtime model_rows"):
+            execute_stage_process(stage, manager_root=Path("/manager"), trading_data_root=Path("/data"), trading_model_root=Path("/model"))
+
     def test_stage_progress_worker_id_is_unique_for_month_scoped_execution(self):
         self.assertEqual(
             _stage_progress_worker_id(start_month="2016-01", end_month="2016-01"),

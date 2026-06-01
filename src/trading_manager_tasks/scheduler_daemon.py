@@ -59,6 +59,7 @@ DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-r
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
 DEFAULT_MONTH_INGEST_WORKERS = 3
 DEFAULT_TARGET_QUEUE_PATH = DEFAULT_RUNTIME_DIR / "model_training_target_queue.json"
+DEFAULT_DECISION_LOG_MAX_BYTES = 8 * 1024 * 1024
 COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
 MODEL_WORKER_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
 MODEL_WORKER_PREP_STAGE_TYPES = {"data_acquisition", "feature_generation"}
@@ -1235,6 +1236,22 @@ def append_decision_log(path: Path, decision: SchedulerDecision) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(decision.summary_row(), sort_keys=True) + "\n")
+    compact_decision_log_tail(path)
+
+
+def compact_decision_log_tail(path: Path, *, max_bytes: int = DEFAULT_DECISION_LOG_MAX_BYTES) -> None:
+    if max_bytes <= 0 or not path.exists() or path.stat().st_size <= max_bytes:
+        return
+    with path.open("rb") as handle:
+        handle.seek(-max_bytes, os.SEEK_END)
+        payload = handle.read()
+    first_newline = payload.find(b"\n")
+    if first_newline < 0:
+        return
+    payload = payload[first_newline + 1 :]
+    temp_path = path.with_name(f"{path.name}.tmp")
+    temp_path.write_bytes(payload)
+    os.replace(temp_path, path)
 
 
 def _process_exists(pid: int) -> bool:
@@ -1972,6 +1989,7 @@ __all__ = [
     "acquire_daemon_lock",
     "apply_auto_work_selection",
     "append_decision_log",
+    "compact_decision_log_tail",
     "completed_historical_fold_cutoff",
     "completed_historical_fold_cutoff_month",
     "load_daemon_state",

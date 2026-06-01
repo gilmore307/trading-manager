@@ -124,9 +124,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("2016-06-01T00:00:00-05:00", split_stages[1].command)
         self.assertIn("2016-06-01T00:00:00-05:00", split_stages[2].command)
         self.assertIn("2016-07-01T00:00:00-05:00", split_stages[2].command)
-        self.assertTrue(any(token.endswith("model_rows_aapl_2016-01_train.jsonl") for token in split_stages[0].command))
-        self.assertTrue(any(token.endswith("model_rows_aapl_2016-05_validation.jsonl") for token in split_stages[1].command))
-        self.assertTrue(any(token.endswith("model_rows_aapl_2016-06_test.jsonl") for token in split_stages[2].command))
+        for split_stage in split_stages:
+            self.assertNotIn("--output", split_stage.command)
+            self.assertNotIn("--output-jsonl", split_stage.command)
+            self.assertFalse(any("model_rows" in token for token in split_stage.command))
         self.assertIn("TRADING_MODEL_DATASET_SPLIT_NAME=train", split_stages[0].command)
         self.assertEqual(split_stages[1].blockers, ("layer_03_target_state_vector.model_generation.train_complete",))
         self.assertEqual(split_stages[2].blockers, ("layer_03_target_state_vector.model_generation.validation_complete",))
@@ -416,8 +417,9 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--source-end", layer.model_generate_command)
         self.assertIn("--target-symbol", layer.model_generate_command)
         self.assertIn("AAPL", layer.model_generate_command)
-        self.assertIn("--output", layer.model_generate_command)
-        self.assertTrue(any(token.endswith("model_rows_aapl_${START_MONTH}.jsonl") for token in layer.model_generate_command))
+        self.assertNotIn("--output", layer.model_generate_command)
+        self.assertNotIn("--output-jsonl", layer.model_generate_command)
+        self.assertFalse(any("model_rows" in token for token in layer.model_generate_command))
         self.assertIn("--from-database", layer.model_evaluate_command)
         self.assertIn("--output-json", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
@@ -444,7 +446,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--from-database", layer.model_generate_command)
         self.assertIn("--target-symbol", layer.model_generate_command)
         self.assertIn("AAPL", layer.model_generate_command)
-        self.assertIn("--output-jsonl", layer.model_generate_command)
+        self.assertNotIn("--output-jsonl", layer.model_generate_command)
+        self.assertFalse(any("model_rows" in token for token in layer.model_generate_command))
         self.assertIn("--after-cost-alpha-model-json", layer.model_generate_command)
         self.assertIn(
             "/root/projects/trading-storage/storage/03_model_artifacts/runtime/model_05_alpha_confidence/after_cost_alpha_model_aapl_2016-01_2016-06.json",
@@ -455,11 +458,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             layer.stages[1].blockers,
             ("upstream_layer_04_model_generation_complete", "layer_05_alpha_confidence.model_training.train_complete"),
         )
-        self.assertTrue(any(token.endswith("model_rows_aapl_${START_MONTH}.jsonl") for token in layer.model_generate_command))
         self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
         self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
 
-    def test_base_layers_four_to_nine_use_current_physical_model_rows_and_conservative_review(self):
+    def test_base_layers_four_to_nine_use_database_generation_without_runtime_row_dumps(self):
         expected_scripts = {
             3: "generate_model_04_event_failure_risk.py",
             4: "generate_model_05_alpha_confidence.py",
@@ -481,7 +483,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             layer = plan.layers[index]
             self.assertIn(script_name, " ".join(layer.model_generate_command))
             self.assertIn("--from-database", layer.model_generate_command)
-            self.assertIn("--output-jsonl", layer.model_generate_command)
+            self.assertNotIn("--output-jsonl", layer.model_generate_command)
+            self.assertFalse(any("model_rows" in token for token in layer.model_generate_command))
             self.assertIn("--from-database", layer.model_evaluate_command)
             self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
             self.assertIn("--evaluation-summary-json", layer.promotion_review_command)

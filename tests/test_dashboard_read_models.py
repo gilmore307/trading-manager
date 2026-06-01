@@ -1408,12 +1408,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            model_root = tmp / "storage" / "03_model_artifacts" / "runtime" / "model_03_target_state_vector"
-            model_root.mkdir(parents=True)
-            (model_root / "model_rows_aapl_2016-01.jsonl").write_text(
-                "\n".join(json.dumps({"row": index}) for index in range(4)) + "\n",
-                encoding="utf-8",
-            )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",

@@ -60,6 +60,9 @@ class SourceExistingBootstrapTests(unittest.TestCase):
             state_path = workflow_state_path_for_month("2016-01", root=storage_root / "runtime")
             payload = json.loads(state_path.read_text(encoding="utf-8"))
             by_stage = {stage["stage_id"]: stage for stage in payload["stages"]}
+            report_root = storage_root / "runtime" / "source_existing_bootstrap"
+            bootstrap_latest_exists = (report_root / "latest.json").exists()
+            bootstrap_timestamp_reports = list(report_root.glob("source_existing_bootstrap_*.json"))
 
         self.assertEqual(summary.provider_calls, 0)
         self.assertEqual(summary.bootstrapped_months, ("2016-01",))
@@ -69,6 +72,8 @@ class SourceExistingBootstrapTests(unittest.TestCase):
         self.assertEqual(by_stage["layer_01_market_regime.feature_generation"]["status"], "ready")
         self.assertFalse(payload["model_activation_performed"])
         self.assertFalse(payload["broker_execution_performed"])
+        self.assertTrue(bootstrap_latest_exists)
+        self.assertEqual(bootstrap_timestamp_reports, [])
 
     def test_partial_source_coverage_does_not_seed_workflow_state(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

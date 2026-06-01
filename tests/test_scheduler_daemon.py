@@ -18,6 +18,7 @@ from trading_manager_tasks.scheduler_daemon import (
     SchedulerDaemonState,
     acquire_daemon_lock,
     apply_auto_work_selection,
+    compact_decision_log_tail,
     completed_historical_fold_cutoff,
     completed_historical_fold_cutoff_month,
     completed_historical_month_cutoff,
@@ -41,6 +42,33 @@ from trading_manager_tasks.scheduler_daemon import (
 
 
 class SchedulerDaemonTests(unittest.TestCase):
+
+    def test_decision_log_compaction_keeps_valid_bounded_jsonl_tail(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            path = Path(raw_tmp) / "runtime" / "historical_scheduler_decisions.jsonl"
+            path.parent.mkdir(parents=True)
+            with path.open("a", encoding="utf-8") as handle:
+                for index in range(20):
+                    handle.write(
+                        json.dumps(
+                            {
+                                "contract_type": "manager_scheduler_decision",
+                                "sequence": index,
+                                "reason": "x" * 512,
+                            },
+                            sort_keys=True,
+                        )
+                        + "\n"
+                    )
+
+            compact_decision_log_tail(path, max_bytes=2048)
+            compacted_size = path.stat().st_size
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertLessEqual(compacted_size, 2048)
+        self.assertGreater(len(rows), 0)
+        self.assertEqual(rows[-1]["sequence"], 19)
+        self.assertGreater(rows[0]["sequence"], 0)
 
     def _complete_monthly_substrate(self, *, storage_root: Path, month: str) -> None:
         plan = build_model_training_workflow_plan(
