@@ -2574,7 +2574,7 @@ def _replay_dataset_scope_status(
         start_month, end_month, _target = completed_training_fold
         expected_fold_id = _fold_period_label(start_month, end_month)
         expected_fold_range = _fold_period_range(start_month, end_month)
-        if manifest_fold_id and manifest_fold_id not in {expected_fold_id, expected_fold_range, f"{start_month}_{end_month}"}:
+        if manifest_fold_id and manifest_fold_id not in {expected_fold_id, expected_fold_range, f"{start_month}_{end_month}", f"fold_{start_month}_{end_month}"}:
             return {
                 "compatible": False,
                 "reason": f"Replay dataset fold {manifest_fold_id} does not match completed training fold {expected_fold_id}.",
@@ -2688,7 +2688,7 @@ def _replay_month_progress(
         "accepted_failed_count": 0,
         "can_unlock_downstream": expected > 0 and ready >= expected,
         "progress_source": "replay_window_months",
-        "progress_basis": "event replay months in the fixed five-year replay window",
+        "progress_basis": "event replay months in the fold-target replay window",
     }
 
 
