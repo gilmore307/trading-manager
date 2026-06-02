@@ -28,7 +28,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "freeze_status": "frozen",
                     "missing_feed_acquisition_count": 0,
                     "feed_acquisition_plan_ref": str(plan_path),
-                    "target_refs": ["AAPL"],
+                    "training_target_ref": "AAPL",
+                    "tradable_target_refs": ["AAPL"],
                 }
             )
             + "\n",
@@ -93,7 +94,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {"contract_type": "evaluation_replay_progress", "stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-02", "status": "completed"},
                 ]
                 progress_path.write_text("\\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\\n", encoding="utf-8")
-                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": run_id, "candidate_model_ref": candidate_model_ref, "target_refs": ["AAPL"], "decision_row_count": 2}))
+                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": run_id, "candidate_model_ref": candidate_model_ref, "training_target_ref": "AAPL", "tradable_target_refs": ["AAPL"], "target_refs": ["AAPL"], "decision_row_count": 2}))
                 """
             ).strip()
             + "\n",
@@ -217,7 +218,7 @@ class ModelGroupReplayTests(unittest.TestCase):
 
         self.assertIsNone(decision)
 
-    def test_replay_scope_mismatch_blocks_dataset_without_training_target(self):
+    def test_replay_tradable_universe_without_training_target_symbol_does_not_block_dataset(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -225,7 +226,9 @@ class ModelGroupReplayTests(unittest.TestCase):
             dataset_root = self._write_dataset(storage_root)
             manifest_path = dataset_root / "dataset_manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["target_refs"] = ["BTC", "ETH", "SOL"]
+            manifest["tradable_target_refs"] = ["BTC", "ETH", "SOL"]
+            manifest["training_target_ref"] = "AAPL"
+            manifest.pop("target_refs", None)
             manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
             self._write_completed_fold(storage_root)
 
@@ -240,9 +243,8 @@ class ModelGroupReplayTests(unittest.TestCase):
 
             self.assertIsNotNone(decision)
             assert decision is not None
-            self.assertEqual(decision.decision_status, "backoff")
-            self.assertEqual(decision.reason_code, "model_group_replay_scope_mismatch")
-            self.assertIn("target_refs must include completed training target AAPL", decision.reason)
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_replay_executed")
 
     def test_replay_scope_mismatch_blocks_wrong_fold_dataset(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -296,6 +298,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "compatible_run",
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["BTC", "ETH", "SOL"],
                         "target_refs": ["AAPL"],
                         "validation_status": "passed",
                     }

@@ -491,6 +491,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 120,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 180,
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "source_contract_ref": "trading-evaluation/replays/promotion_replay_candidate_policy.json",
                     }
@@ -790,6 +792,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 60,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 0,
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "source_contract_ref": "trading-evaluation/replays/promotion_replay_candidate_policy.json",
                     }
@@ -866,6 +870,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 60,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 0,
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                     }
                 )
@@ -920,6 +926,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 2,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 0,
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                     }
                 )
@@ -965,6 +973,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "fixture",
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "validation_status": "passed",
                         "generated_at_utc": "2026-05-22T12:30:00Z",
@@ -1038,6 +1048,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 2,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 0,
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                     }
                 )
@@ -1620,6 +1632,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "feed_acquisition_count": 2,
                         "available_feed_acquisition_count": 2,
                         "missing_feed_acquisition_count": 0,
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                     }
                 )
@@ -1638,6 +1652,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "validation_status": "passed",
                     }
@@ -1726,6 +1742,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "feed_acquisition_count": 2,
                         "available_feed_acquisition_count": 2,
                         "missing_feed_acquisition_count": 0,
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                     }
                 )
@@ -1741,6 +1759,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "training_target_ref": "AAPL",
+                        "tradable_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "validation_status": "passed",
                     }

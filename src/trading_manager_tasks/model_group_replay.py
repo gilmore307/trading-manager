@@ -371,23 +371,31 @@ def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, A
             "dataset_target_refs": sorted(target_refs),
             "training_target_symbol": training_target,
         }
-    if training_target not in target_refs:
+    manifest_training_target = str(manifest.get("training_target_ref") or "").strip().upper()
+    if not manifest_training_target:
         return {
             "compatible": False,
-            "reason": f"replay dataset target_refs must include completed training target {training_target}",
+            "reason": "replay dataset training_target_ref is required for completed training fold replay",
+            "dataset_target_refs": sorted(target_refs),
+            "training_target_symbol": training_target,
+        }
+    if training_target and manifest_training_target != training_target:
+        return {
+            "compatible": False,
+            "reason": f"replay dataset training target {manifest_training_target} does not match completed training target {training_target}",
             "dataset_target_refs": sorted(target_refs),
             "training_target_symbol": training_target,
         }
     return {
         "compatible": True,
-        "reason": "replay dataset is eligible for fold-bound target replay",
+        "reason": "replay dataset is eligible for fold-bound live-equivalent tradable universe replay",
         "dataset_target_refs": sorted(target_refs),
         "training_target_symbol": training_target,
     }
 
 
 def _replay_dataset_target_refs(*, dataset_root: Path, manifest: Mapping[str, Any]) -> set[str]:
-    refs = _string_set(manifest.get("target_refs") or manifest.get("replay_target_refs") or manifest.get("candidate_target_refs"))
+    refs = _string_set(manifest.get("tradable_target_refs"))
     for row in _csv_rows(dataset_root / "feed_acquisition_plan.csv"):
         source_id = str(row.get("source_id") or "").strip()
         coverage_status = str(row.get("coverage_status") or "").strip().lower()
@@ -470,12 +478,17 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     if receipt_fold_id and fold_id and receipt_fold_id != fold_id:
         return {"compatible": False, "reason": "replay fold mismatch"}
     target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
-    target_refs = _string_set(replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
+    receipt_training_target = str(replay_receipt.get("training_target_ref") or "").strip().upper()
     if not target_symbol:
         return {"compatible": False, "reason": "completed training fold has no target symbol for replay receipt validation"}
-    if target_symbol not in target_refs:
-        return {"compatible": False, "reason": f"replay receipt target_refs must include completed training target {target_symbol}"}
-    return {"compatible": True, "reason": "compatible fold-bound target replay receipt"}
+    if not receipt_training_target:
+        return {"compatible": False, "reason": "replay receipt training_target_ref is required for completed training fold replay"}
+    if receipt_training_target != target_symbol:
+        return {
+            "compatible": False,
+            "reason": f"replay receipt training target {receipt_training_target} does not match completed training target {target_symbol}",
+        }
+    return {"compatible": True, "reason": "compatible fold-bound live-equivalent tradable universe replay receipt"}
 
 
 def _ready_replay_months(dataset_root: Path, replay_run_ids: set[str] | None = None) -> set[str]:

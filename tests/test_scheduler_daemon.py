@@ -144,6 +144,8 @@ class SchedulerDaemonTests(unittest.TestCase):
                 {
                     "contract_type": "evaluation_replay_execution_run",
                     "candidate_model_ref": model_ref,
+                    "training_target_ref": "AAPL",
+                    "tradable_target_refs": ["AAPL"],
                     "target_refs": ["AAPL"],
                     "candidate_fold_id": fold_id,
                     "validation_status": "passed",
