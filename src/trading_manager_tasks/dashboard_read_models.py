@@ -2688,7 +2688,7 @@ def _replay_month_progress(
         "accepted_failed_count": 0,
         "can_unlock_downstream": expected > 0 and ready >= expected,
         "progress_source": "replay_window_months",
-        "progress_basis": "event replay months in the fold-target replay window",
+        "progress_basis": "event replay months in the target-bound replay window",
     }
 
 
@@ -3084,7 +3084,7 @@ def _model_group_replay_timeline_tasks(
                 "end_month": replay_end_month,
                 "contract_id": contract_id,
                 "target_required": False,
-                "description": "Fold-target replay window used to test the candidate model group.",
+                "description": "Target-bound replay window used to test the candidate model group.",
             },
             "worker": worker_info,
             "progress": progress,
@@ -3238,7 +3238,7 @@ def _model_group_replay_timeline_tasks(
             "accepted_failed_count": deferred,
             "can_unlock_downstream": False,
             "progress_source": "replay_dataset_source_months",
-            "progress_basis": "source-month data acquisitions required before fold-target replay can start",
+            "progress_basis": "source-month data acquisitions required before target-bound replay can start",
         }
 
     append_task(
