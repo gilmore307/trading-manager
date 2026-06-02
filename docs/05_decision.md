@@ -144,6 +144,10 @@ The candidate policy is rule-fixed: current Layer 2 selected/watch sectors, revi
 
 Layer 3 and later substrate work may remain target-major in task execution because routing symbols prepare data samples. That scheduling choice does not select the replay target. Promotion replay runs the live-flow component graph over the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. Fixed target/window panels remain diagnostic repair evidence only and are not accepted promotion evidence.
 
+Historical replay may acquire data that does not already exist locally. That acquisition is replay-owned, month-sharded, budget-gated, and temporary: it materializes only the historical candidate set needed for the shard, records lightweight receipts, coverage, hashes, and decision rows, and deletes transient month-cache inputs after the shard is accepted. Replay must not use preexisting local source directories as the candidate-selection mechanism.
+
+Realtime/live execution is different. It consumes the current provider stream or current provider snapshots through the live component graph and should not pre-download historical source bundles before making decisions. It still records lightweight runtime evidence, provider request metadata, decisions, gates, and fills for audit, replay, and post-trade analysis.
+
 ## D213 - Model-worker targets rotate autonomously
 
 Manager may run Layer 3+ historical model-worker training as target-scoped fold chains. Each target owns separate fold checkpoint files, so one completed target does not consume or overwrite another target's `2016-01` onward training state.
