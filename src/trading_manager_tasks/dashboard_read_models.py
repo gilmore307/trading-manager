@@ -1977,7 +1977,11 @@ def _task_timeline(
             fold_key = _fold_period_label(fold_start, fold_end) if fold_start and fold_end else fold_path.stem
             if fold_end and not _month_visible_by_completed_cutoff(fold_end, max_month=max_dashboard_month):
                 continue
-            fold_entries.append((fold_key, raw_stages, fold_target_symbol, fold_path))
+            sourced_stages = [
+                {**stage, "__dashboard_period_source": "persisted_fold_state"} if isinstance(stage, Mapping) else stage
+                for stage in raw_stages
+            ]
+            fold_entries.append((fold_key, sourced_stages, fold_target_symbol, fold_path))
         if selected_target_symbol:
             selected_symbol = selected_target_symbol.upper()
             fold_entries.sort(key=lambda entry: (entry[0], 0 if (entry[2] or "").upper() == selected_symbol else 1, entry[3].name))
@@ -2255,6 +2259,7 @@ def _task_timeline(
                         "internal_stages": dashboard_stage.get("internal_stages") if isinstance(dashboard_stage.get("internal_stages"), list) else None,
                         "worker": worker_info,
                     },
+                    "_period_source": dashboard_stage.get("__dashboard_period_source"),
                 }
                 if (
                     coverage_stage_id
@@ -2421,6 +2426,62 @@ def _sort_task_timeline(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         task["sequence"] = index
         task["task_number"] = index
     return sorted_tasks
+
+
+def _period_sort_key(period: str) -> tuple[int, int]:
+    months = _timeline_period_months(period)
+    if months:
+        start_offset = _month_offset(months[0])
+        end_offset = _month_offset(months[-1])
+    else:
+        start_offset = _month_offset(period)
+        end_offset = start_offset
+    return (
+        start_offset if start_offset is not None else 1_000_000,
+        end_offset if end_offset is not None else 1_000_000,
+    )
+
+
+def _is_fold_task_period(period: str) -> bool:
+    return bool(FOLD_LABEL_RE.fullmatch(period) or len(_timeline_period_months(period)) > 1)
+
+
+def _task_is_terminal_for_fold_gate(task: Mapping[str, Any]) -> bool:
+    status = str(task.get("status") or "").lower()
+    task_state = str(task.get("task_state") or "").lower()
+    return status in {"succeeded", "not_applicable"} or task_state in {"completed", "skipped"}
+
+
+def _trim_task_timeline_after_first_open_fold(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Hide later fold scaffolds until the earliest open fold finishes."""
+
+    tasks_by_period: dict[str, list[dict[str, Any]]] = {}
+    gate_periods: set[str] = set()
+    for task in tasks:
+        period = str(task.get("month") or "")
+        if not period or not _is_fold_task_period(period):
+            continue
+        tasks_by_period.setdefault(period, []).append(task)
+        if str(task.get("layer_key") or "") != "model_group" and task.get("_period_source") == "persisted_fold_state":
+            gate_periods.add(period)
+    for period in sorted(gate_periods, key=_period_sort_key):
+        period_tasks = tasks_by_period[period]
+        if period_tasks and all(_task_is_terminal_for_fold_gate(task) for task in period_tasks):
+            continue
+        cutoff_key = _period_sort_key(period)
+        return [
+            task
+            for task in tasks
+            if not _is_fold_task_period(str(task.get("month") or ""))
+            or _period_sort_key(str(task.get("month") or "")) <= cutoff_key
+        ]
+    return tasks
+
+
+def _strip_task_timeline_internal_fields(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for task in tasks:
+        task.pop("_period_source", None)
+    return tasks
 
 
 def _replay_window_months(dataset_root: Path) -> tuple[str, str]:
@@ -3469,6 +3530,8 @@ def build_historical_task_progress_summary(
             selected_target_symbol=selected_target_symbol,
         )
     )
+    task_timeline = _trim_task_timeline_after_first_open_fold(task_timeline)
+    task_timeline = _strip_task_timeline_internal_fields(task_timeline)
     task_timeline = _sort_task_timeline(task_timeline)
     public_active_task = _public_active_task(status, task_timeline)
     agent_error_summary = _mark_superseded_agent_errors(

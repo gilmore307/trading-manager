@@ -630,7 +630,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("Promotion waits", model_group_tasks[3]["reason"])
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
 
-    def test_task_timeline_shows_fixed_model_group_lifecycle_for_each_visible_fold(self):
+    def test_task_timeline_shows_fixed_model_group_lifecycle_for_first_open_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -686,16 +686,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
         fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2"]
         self.assertEqual(len(fold1_tasks), 14)
-        self.assertEqual(len(fold2_tasks), 14)
-        self.assertEqual([task["task_id"] for task in fold2_tasks[-5:]], [
+        self.assertEqual(fold2_tasks, [])
+        self.assertEqual([task["task_id"] for task in fold1_tasks[-5:]], [
             "model_group.replay",
             "model_group.model_10_event_risk_governor",
             "model_group.evaluation",
             "model_group.promotion",
             "model_group.maintenance",
         ])
-        self.assertEqual(fold2_tasks[-5]["task_state"], "future")
-        self.assertEqual(fold2_tasks[-5]["detail"]["blockers"], ["fold_layers_01_09_model_generation_complete"])
+        self.assertEqual(fold1_tasks[-5]["task_state"], "current")
+        self.assertEqual(fold1_tasks[-5]["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
 
     def test_ready_model_group_replay_becomes_active_after_pre_replay_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2795,7 +2795,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["status"], "succeeded")
         self.assertEqual(task["target_symbol"], "AAPL")
 
-    def test_task_timeline_places_fold_after_ending_month(self):
+    def test_task_timeline_hides_later_fold_after_first_open_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -2870,7 +2870,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         ordered_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
-        self.assertLess(ordered_months.index("2016-fold1"), ordered_months.index("2016-fold2"))
+        self.assertIn("2016-fold1", ordered_months)
+        self.assertNotIn("2016-fold2", ordered_months)
 
     def test_current_incomplete_fold_is_not_exposed_as_ready_task(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3203,7 +3204,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertEqual([(task["month"], task["task_id"]) for task in current_tasks], [("2020-fold2", "layer_03_target_state_vector")])
 
-    def test_task_timeline_marks_ready_model_fold_current_not_blocked_fold(self):
+    def test_task_timeline_hides_later_fold_until_earliest_open_fold_closes(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -3262,8 +3263,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T12:00:00Z")
 
-        current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertIn(("2017-fold1", "layer_01_market_regime"), [(task["month"], task["task_id"]) for task in current_tasks])
+        self.assertNotIn("2017-fold1", {task["month"] for task in payload["chart_payload"]["task_timeline"]})
         blocked_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2")
         self.assertEqual(blocked_task["task_state"], "future")
 
