@@ -212,6 +212,39 @@ def _retained_set(storage_root: Path) -> list[dict[str, Any]]:
     return retained
 
 
+def _storage_lifecycle_request(
+    *,
+    rerun_id: str,
+    plan_id: str,
+    delete_set: list[dict[str, Any]],
+    protected_set: list[dict[str, str]],
+    retained_set: list[dict[str, Any]],
+    controlled_artifact_roots: list[dict[str, str]],
+    reason: str,
+) -> dict[str, Any]:
+    return {
+        "contract_type": "storage_lifecycle_request",
+        "request_id": f"storage_lifecycle_request_{rerun_id}",
+        "request_origin": "model_group_rerun_plan",
+        "origin_ref": plan_id,
+        "origin_rerun_id": rerun_id,
+        "requested_action": "classify_rerun_invalidated_artifacts",
+        "reason": reason,
+        "candidate_refs": [str(row["ref"]) for row in delete_set],
+        "protected_refs": [str(row["ref"]) for row in protected_set],
+        "retained_refs": [str(row["ref"]) for row in retained_set],
+        "controlled_artifact_roots": controlled_artifact_roots,
+        "requires_storage_lifecycle_review": True,
+        "requires_artifact_index": True,
+        "requires_protected_set_clearance": True,
+        "requires_quarantine_recheck_before_delete": True,
+        "mutation_allowed_by_request": False,
+        "broker_execution_performed": False,
+        "model_activation_performed": False,
+        "storage_lifecycle_mutation_performed": False,
+    }
+
+
 def _stage_order_index(stages: Iterable[StageProgress], *, layer_id: int, stage_type: str) -> int:
     for index, stage in enumerate(stages):
         if stage.layer == layer_id and stage.stage_type == stage_type:
@@ -294,6 +327,8 @@ def build_model_group_rerun_plan(
         }
         for ref in PROTECTED_SOURCE_REFS
     ]
+    retained_set = _retained_set(storage_root)
+    controlled_artifact_roots = _controlled_artifact_roots(storage_root)
     return {
         "plan_id": plan_id_value,
         "contract_type": "model_group_rerun_plan",
@@ -319,8 +354,17 @@ def build_model_group_rerun_plan(
         },
         "delete_set": delete_set,
         "protected_set": protected_set,
-        "retained_set": _retained_set(storage_root),
-        "controlled_artifact_roots": _controlled_artifact_roots(storage_root),
+        "retained_set": retained_set,
+        "controlled_artifact_roots": controlled_artifact_roots,
+        "storage_lifecycle_request": _storage_lifecycle_request(
+            rerun_id=rerun_id_value,
+            plan_id=plan_id_value,
+            delete_set=delete_set,
+            protected_set=protected_set,
+            retained_set=retained_set,
+            controlled_artifact_roots=controlled_artifact_roots,
+            reason=reason,
+        ),
         "scheduler_reentry_stage": {
             "layer_id": layer_id,
             "stage": stage,

@@ -70,6 +70,24 @@ class ModelGroupRerunTests(unittest.TestCase):
         root_classes = {row["root_class"] for row in result.plan["controlled_artifact_roots"]}
         self.assertIn("rerun_reset_receipts", root_classes)
         self.assertIn("protected_source_data", root_classes)
+        lifecycle_request = result.plan["storage_lifecycle_request"]
+        self.assertEqual(lifecycle_request["contract_type"], "storage_lifecycle_request")
+        self.assertEqual(lifecycle_request["request_origin"], "model_group_rerun_plan")
+        self.assertEqual(lifecycle_request["origin_rerun_id"], result.rerun_id)
+        self.assertFalse(lifecycle_request["mutation_allowed_by_request"])
+        self.assertFalse(lifecycle_request["storage_lifecycle_mutation_performed"])
+        self.assertTrue(lifecycle_request["requires_storage_lifecycle_review"])
+        self.assertTrue(lifecycle_request["requires_artifact_index"])
+        self.assertTrue(lifecycle_request["requires_protected_set_clearance"])
+        self.assertTrue(lifecycle_request["requires_quarantine_recheck_before_delete"])
+        self.assertEqual(
+            set(lifecycle_request["protected_refs"]),
+            protected_refs,
+        )
+        self.assertEqual(
+            set(lifecycle_request["retained_refs"]),
+            retained_refs,
+        )
 
     def test_execute_resets_cutpoint_and_downstream_state_for_scheduler_reentry(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

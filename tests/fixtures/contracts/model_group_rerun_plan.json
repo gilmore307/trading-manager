@@ -67,6 +67,50 @@
       "policy": "protected reusable source data; rerun executor must not delete"
     }
   ],
+  "storage_lifecycle_request": {
+    "contract_type": "storage_lifecycle_request",
+    "request_id": "storage_lifecycle_request_model_group_rerun_2016_fold1_aapl_architecture_contract_change",
+    "request_origin": "model_group_rerun_plan",
+    "origin_ref": "mgr_rerun_plan_example_001",
+    "origin_rerun_id": "model_group_rerun_2016_fold1_aapl_architecture_contract_change",
+    "requested_action": "classify_rerun_invalidated_artifacts",
+    "reason": "Layer 5 model_generation contract changed; downstream model group outputs must be rebuilt.",
+    "candidate_refs": [
+      "postgres://trading_model.m05_alpha_confidence_model_generation?target=AAPL&start=2016-01&end=2016-06",
+      "storage://02_control_plane/runtime/model_training_workflow_state_2016-01.json#layer_05_plus"
+    ],
+    "protected_refs": [
+      "storage://01_source_data/monthly_backfill/alpaca_bars/"
+    ],
+    "retained_refs": [
+      "storage://01_source_data/monthly_backfill/alpaca_bars/"
+    ],
+    "controlled_artifact_roots": [
+      {
+        "root_class": "workflow_state",
+        "path": "/root/projects/trading-storage/storage/02_control_plane/runtime",
+        "policy": "manager-owned runtime state; rerun may invalidate bounded stage progress"
+      },
+      {
+        "root_class": "rerun_reset_receipts",
+        "path": "/root/projects/trading-storage/storage/02_control_plane/runtime/model_group_rerun_resets",
+        "policy": "durable reset receipts for state invalidation and scheduler reentry evidence"
+      },
+      {
+        "root_class": "protected_source_data",
+        "path": "/root/projects/trading-storage/storage/01_source_data/monthly_backfill/alpaca_bars",
+        "policy": "protected reusable source data; rerun executor must not delete"
+      }
+    ],
+    "requires_storage_lifecycle_review": true,
+    "requires_artifact_index": true,
+    "requires_protected_set_clearance": true,
+    "requires_quarantine_recheck_before_delete": true,
+    "mutation_allowed_by_request": false,
+    "broker_execution_performed": false,
+    "model_activation_performed": false,
+    "storage_lifecycle_mutation_performed": false
+  },
   "scheduler_reentry_stage": {
     "layer_id": 5,
     "stage": "model_generation"

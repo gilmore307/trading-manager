@@ -146,11 +146,12 @@ delete_set
 protected_set
 retained_set
 controlled_artifact_roots
+storage_lifecycle_request
 scheduler_reentry_stage
 expected_verification_gates
 ```
 
-This contract is not a broad deletion executor. It identifies the earliest affected workflow cutpoint, computes the downstream generated-output closure, separates deletion candidates from protected inputs, records reusable retained artifacts, lists the controlled roots that may contain rerun intermediates, and names the scheduler reentry stage. Any storage-path deletion in the plan remains subject to storage protected-set and lifecycle review unless the affected artifact is explicitly classified as disposable runtime state by an accepted storage policy.
+This contract is not a broad deletion executor. It identifies the earliest affected workflow cutpoint, computes the downstream generated-output closure, separates lifecycle candidates from protected inputs, records reusable retained artifacts, lists the controlled roots that may contain rerun intermediates, emits a `storage_lifecycle_request` bridge, and names the scheduler reentry stage. Any storage-path deletion in the plan remains subject to storage artifact-index, protected-set, quarantine/recheck, lifecycle review, and receipt gates.
 
 ## Workflow Stage Semantics
 
@@ -165,7 +166,7 @@ For example, `trading_data.m01_market_regime_feature_generation` is a valid feat
 
 ## Model Group Rerun Semantics
 
-A model group rerun is a controlled invalidation, deletion, and scheduler reentry operation used when an architecture, contract, schema, feature, source-scope, or execution-route change makes existing generated outputs stale.
+A model group rerun is a controlled invalidation and scheduler reentry operation used when an architecture, contract, schema, feature, source-scope, or execution-route change makes existing generated outputs stale. It is also a storage lifecycle trigger: stale downstream artifacts enter the storage lifecycle system as candidates, not as manager-owned deletion instructions.
 
 Rerun planning uses the earliest affected `layer.stage` cutpoint:
 
@@ -182,13 +183,13 @@ layer_XX.maintenance
 layer_XX.read_model_refresh
 ```
 
-The planner must compute the downstream closure from that cutpoint and produce `delete_set`, `protected_set`, `retained_set`, and `controlled_artifact_roots`. The delete set may include generated SQL rows, features, model outputs, model artifacts, replay outputs, attribution outputs, evaluation evidence, promotion-review evidence, read models, runtime state, and workflow completion state. Completed state after the cutpoint must be invalidated or removed, otherwise the scheduler may incorrectly skip the rerun. Reusable upstream files that remain valid, such as already-acquired source data, belong in `retained_set` so inherited artifacts stay controlled instead of becoming unexplained leftovers.
+The planner must compute the downstream closure from that cutpoint and produce `delete_set`, `protected_set`, `retained_set`, `controlled_artifact_roots`, and `storage_lifecycle_request`. `delete_set` is a compatibility field for rerun-invalidated lifecycle candidates; it is not physical deletion authority. It may include generated SQL rows, features, model outputs, model artifacts, replay outputs, attribution outputs, evaluation evidence, promotion-review evidence, read models, runtime state, and workflow completion state. Completed workflow state after the cutpoint may be invalidated so the scheduler does not skip the rerun. Durable artifacts and physical files enter storage lifecycle classification, where storage decides whether to retain, compress, archive, quarantine, or delete. Reusable upstream files that remain valid, such as already-acquired source data, belong in `retained_set` so inherited artifacts stay controlled instead of becoming unexplained leftovers.
 
 Source data is protected by default. It enters `delete_set` only when the cutpoint is `data_acquisition` and the task's required source data changed, the acquisition contract changed, the provider/source parameters changed, or the existing source partition is confirmed wrong, incomplete, duplicated, contaminated, or scoped to an obsolete experiment. When the cutpoint is `feature_generation` or later, source data remains in `protected_set` even if all downstream artifacts are rebuilt.
 
-Deletion scope must be the smallest affected scope: provider/source, target symbol, fold or month window, timeframe, artifact family, and contract/schema. A rerun plan must not use broad "delete everything after this layer" language without concrete refs.
+Candidate scope must be the smallest affected scope: provider/source, target symbol, fold or month window, timeframe, artifact family, and contract/schema. A rerun plan must not use broad "delete everything after this layer" language without concrete refs.
 
-Execution order is downstream deletion/invalidation first, durable reset receipt second, then scheduler reentry from the cutpoint through the current model-group lifecycle. Only one scheduler daemon may own a rerun scope at a time.
+Execution order is lifecycle classification request first, bounded workflow-state invalidation second, durable reset receipt third, then scheduler reentry from the cutpoint through the current model-group lifecycle. Physical file deletion is a later storage lifecycle action after artifact index, protected-set clearance, quarantine/recheck, reviewed decision, and deletion receipt. Only one scheduler daemon may own a rerun scope at a time.
 
 ## Review and Promotion Contracts
 

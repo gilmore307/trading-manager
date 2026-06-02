@@ -82,9 +82,9 @@ surface already covers the month.
 
 ## Model Group Reruns
 
-The scheduler does not treat a rerun as "start the same tasks again." A rerun begins with a `model_group_rerun_plan` that names the earliest affected `layer.stage` cutpoint, the affected fold/target scope, a concrete delete set, protected and retained sets, controlled artifact roots, source-data deletion requirements, and the scheduler reentry stage.
+The scheduler does not treat a rerun as "start the same tasks again." A rerun begins with a `model_group_rerun_plan` that names the earliest affected `layer.stage` cutpoint, the affected fold/target scope, concrete lifecycle candidates, protected and retained sets, controlled artifact roots, source-data lifecycle requirements, an embedded `storage_lifecycle_request`, and the scheduler reentry stage.
 
-For ordinary architecture changes after acquisition, source data stays protected and the scheduler reenters at `feature_generation`, `model_generation`, or a later lifecycle stage. If the required source data itself changed, the rerun cutpoint is `data_acquisition`; the matching source partitions may be deleted only within the plan's bounded provider/source/target/month/timeframe scope and only after storage lifecycle/protected-set gates allow the mutation.
+For ordinary architecture changes after acquisition, source data stays protected and the scheduler reenters at `feature_generation`, `model_generation`, or a later lifecycle stage. If the required source data itself changed, the rerun cutpoint is `data_acquisition`; the matching source partitions may become storage lifecycle candidates only within the plan's bounded provider/source/target/month/timeframe scope and only after artifact-index, storage lifecycle, protected-set, quarantine/recheck, and receipt gates allow any mutation.
 
 Before reentry, workflow state after the cutpoint must be invalidated so completed rows do not cause false progress. An executed reset writes `storage/02_control_plane/runtime/model_group_rerun_resets/<rerun_id>/...reset_receipt.json` to prove the cutpoint, preserved source roots, retained inherited artifacts, and allowed intermediate roots. During reentry, one resident scheduler owns the scope through its normal locks; launching a second same-scope daemon is invalid.
 

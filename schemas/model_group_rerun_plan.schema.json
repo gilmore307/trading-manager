@@ -279,6 +279,129 @@
         "scope_refs"
       ],
       "type": "object"
+    },
+    "storage_lifecycle_request": {
+      "additionalProperties": false,
+      "properties": {
+        "broker_execution_performed": {
+          "const": false
+        },
+        "candidate_refs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "contract_type": {
+          "const": "storage_lifecycle_request"
+        },
+        "controlled_artifact_roots": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "policy": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "root_class": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "root_class",
+              "path",
+              "policy"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "model_activation_performed": {
+          "const": false
+        },
+        "mutation_allowed_by_request": {
+          "const": false
+        },
+        "origin_ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "origin_rerun_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protected_refs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "request_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "request_origin": {
+          "const": "model_group_rerun_plan"
+        },
+        "requested_action": {
+          "const": "classify_rerun_invalidated_artifacts"
+        },
+        "requires_artifact_index": {
+          "const": true
+        },
+        "requires_protected_set_clearance": {
+          "const": true
+        },
+        "requires_quarantine_recheck_before_delete": {
+          "const": true
+        },
+        "requires_storage_lifecycle_review": {
+          "const": true
+        },
+        "retained_refs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "storage_lifecycle_mutation_performed": {
+          "const": false
+        }
+      },
+      "required": [
+        "contract_type",
+        "request_id",
+        "request_origin",
+        "origin_ref",
+        "origin_rerun_id",
+        "requested_action",
+        "reason",
+        "candidate_refs",
+        "protected_refs",
+        "retained_refs",
+        "controlled_artifact_roots",
+        "requires_storage_lifecycle_review",
+        "requires_artifact_index",
+        "requires_protected_set_clearance",
+        "requires_quarantine_recheck_before_delete",
+        "mutation_allowed_by_request",
+        "broker_execution_performed",
+        "model_activation_performed",
+        "storage_lifecycle_mutation_performed"
+      ],
+      "type": "object"
     }
   },
   "required": [
@@ -295,6 +418,7 @@
     "protected_set",
     "retained_set",
     "controlled_artifact_roots",
+    "storage_lifecycle_request",
     "scheduler_reentry_stage",
     "expected_verification_gates"
   ],
