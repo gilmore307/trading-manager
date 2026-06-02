@@ -2822,22 +2822,37 @@ def _replay_month_operation_detail(dataset_root: Path) -> dict[str, Any] | None:
         }
         sources.append(source_detail)
 
-    missing_sources = [
-        source["source_id"]
-        for source in sources
-        if source["coverage_status"] not in available_statuses
-    ]
-    deferred_sources = [source["source_id"] for source in sources if source["coverage_status"] == "deferred"]
-    available_sources = [source["source_id"] for source in sources if source["coverage_status"] in available_statuses]
+    missing_source_counts: dict[str, int] = {}
+    deferred_source_counts: dict[str, int] = {}
+    available_source_counts: dict[str, int] = {}
+    for source in sources:
+        source_id = source["source_id"]
+        status = source["coverage_status"]
+        if status in available_statuses:
+            available_source_counts[source_id] = available_source_counts.get(source_id, 0) + 1
+        elif status == "deferred":
+            deferred_source_counts[source_id] = deferred_source_counts.get(source_id, 0) + 1
+        else:
+            missing_source_counts[source_id] = missing_source_counts.get(source_id, 0) + 1
+    missing_sources = sorted(missing_source_counts)
+    deferred_sources = sorted(deferred_source_counts)
+    available_sources = sorted(available_source_counts)
+    missing_count = sum(missing_source_counts.values())
+    deferred_count = sum(deferred_source_counts.values())
+    available_count = sum(available_source_counts.values())
     return {
         "month": current_month,
         "source_count": len(sources),
-        "available_count": len(available_sources),
-        "missing_count": len(missing_sources),
-        "deferred_count": len(deferred_sources),
+        "available_count": available_count,
+        "missing_count": missing_count,
+        "deferred_count": deferred_count,
         "sources": sources,
         "missing_source_ids": missing_sources,
         "deferred_source_ids": deferred_sources,
+        "available_source_ids": available_sources,
+        "missing_source_counts": missing_source_counts,
+        "deferred_source_counts": deferred_source_counts,
+        "available_source_counts": available_source_counts,
         "operation_basis": "one monthly acquire-replay-cleanup operation over all required replay sources",
     }
 
@@ -3235,7 +3250,7 @@ def _model_group_replay_timeline_tasks(
                 "end_month": replay_end_month,
                 "contract_id": contract_id,
                 "target_required": False,
-                "description": "Target-bound replay window used to test the candidate model group.",
+                "description": "Model-group replay window used to test the candidate policy against the live-equivalent tradable universe.",
             },
             "worker": worker_info,
             "progress": progress,
@@ -3365,10 +3380,20 @@ def _model_group_replay_timeline_tasks(
     replay_status = "succeeded" if replay_complete else ("ready" if not replay_blockers else "blocked")
     replay_month_reason = None
     if month_operation_detail is not None and not coverage_complete:
-        missing_source_ids = list(month_operation_detail.get("missing_source_ids") or [])
-        missing_source_text = ", ".join(str(item) for item in missing_source_ids[:6])
-        if len(missing_source_ids) > 6:
-            missing_source_text = f"{missing_source_text}, ..."
+        missing_source_counts = (
+            month_operation_detail.get("missing_source_counts")
+            if isinstance(month_operation_detail.get("missing_source_counts"), Mapping)
+            else {}
+        )
+        missing_source_text = ", ".join(
+            f"{source_id}={count}"
+            for source_id, count in sorted(missing_source_counts.items())
+        )
+        if not missing_source_text:
+            missing_source_ids = list(month_operation_detail.get("missing_source_ids") or [])
+            missing_source_text = ", ".join(str(item) for item in missing_source_ids[:6])
+            if len(missing_source_ids) > 6:
+                missing_source_text = f"{missing_source_text}, ..."
         replay_month_reason = (
             f"Replay month {month_operation_detail['month']} is incomplete: "
             f"{month_operation_detail['missing_count']}/{month_operation_detail['source_count']} sources missing"
