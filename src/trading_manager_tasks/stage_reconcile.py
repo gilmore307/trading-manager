@@ -15,13 +15,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
-from .control_plane import CompletionReceiptRows, TaskSystemError, _error_summary, _receipt_runs, _status, normalize_completion_receipt, persist_completion_rows
+from .control_plane import CompletionReceiptRows, TaskSystemError, _error_summary, _receipt_runs, _status, fetch_manager_requests, normalize_completion_receipt, persist_completion_rows
 from .failure_register import persist_failure_register_rows, validate_failure_register_row
 from .model_training_state import advance_workflow_state, resolve_workflow_state_path
 from .request_payloads import DEFAULT_STORAGE_ROOT as DEFAULT_MANAGER_STORAGE_ROOT
 from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, reconcile_lock_ref
 from .stage_coverage import StageCoverageReport, collect_stage_coverage, write_stage_coverage
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+from .request_payloads import storage_uri_to_local_path
 from .storage_paths import data_storage_root
 
 DEFAULT_COMPONENT_STORAGE_ROOT = data_storage_root()
@@ -29,6 +30,7 @@ DEFAULT_COVERAGE_OUTPUT_ROOT = DEFAULT_MANAGER_STORAGE_ROOT / "runtime" / "stage
 SUPPORTED_PROVIDER_STAGE_IDS = (
     "layer_01_market_regime.data_acquisition",
     "layer_02_sector_context.data_acquisition",
+    "layer_09_option_expression.data_acquisition",
 )
 
 
@@ -88,6 +90,8 @@ def _model_layer_for_stage(stage_id: str) -> str:
         return LAYER_ONE_MODEL_LAYER
     if stage_id == "layer_02_sector_context.data_acquisition":
         return LAYER_TWO_MODEL_LAYER
+    if stage_id == "layer_09_option_expression.data_acquisition":
+        return "layer_09_option_expression"
     raise TaskSystemError(f"unsupported provider stage reconcile: {stage_id}")
 
 
@@ -111,11 +115,38 @@ def discover_stage_receipts(
     start_month: str,
     end_month: str,
     component_storage_root: Path = DEFAULT_COMPONENT_STORAGE_ROOT,
+    manager_storage_root: Path = DEFAULT_MANAGER_STORAGE_ROOT,
+    database_url: str | None = None,
 ) -> tuple[StageReceiptRef, ...]:
     """Discover existing completion receipts for a supported provider stage."""
 
-    if start_month != end_month:
+    if stage_id != "layer_09_option_expression.data_acquisition" and start_month != end_month:
         raise TaskSystemError("stage receipt discovery currently supports one month at a time")
+    if stage_id == "layer_09_option_expression.data_acquisition":
+        refs: list[StageReceiptRef] = []
+        for row in fetch_manager_requests(database_url=database_url):
+            if row.get("target_component_id") != "source_05_option_expression" or row.get("request_kind") != "option_snapshot":
+                continue
+            text = " ".join(str(row.get(key) or "") for key in ("request_id", "parameter_ref"))
+            if start_month not in text and end_month not in text:
+                continue
+            task_key_path = storage_uri_to_local_path(str(row.get("parameter_ref") or ""), storage_root=manager_storage_root)
+            if not task_key_path.exists():
+                continue
+            task_key = json.loads(task_key_path.read_text(encoding="utf-8"))
+            output_root = Path(str(task_key.get("output_root") or ""))
+            receipt_path = output_root / "completion_receipt.json"
+            if not receipt_path.exists():
+                continue
+            refs.append(
+                StageReceiptRef(
+                    request_id=str(row["request_id"]),
+                    symbol=str((task_key.get("params") or {}).get("underlying") or ""),
+                    receipt_path=receipt_path,
+                    receipt_uri=_storage_uri(receipt_path, storage_root=component_storage_root, repo_id="trading-data"),
+                )
+            )
+        return tuple(refs)
     model_layer = _model_layer_for_stage(stage_id)
     refs: list[StageReceiptRef] = []
     for member in load_market_regime_universe(model_layers=(model_layer,)):
@@ -162,8 +193,8 @@ def normalize_stage_receipts(refs: Sequence[StageReceiptRef]) -> CompletionRecei
             normalize_completion_receipt(
                 receipt,
                 request_id=ref.request_id,
-                component_id="01_feed_alpaca_bars",
-                component_kind="data_feed",
+                component_id="source_05_option_expression" if ref.receipt_path.as_posix().find("source_05_option_expression") >= 0 else "01_feed_alpaca_bars",
+                component_kind="data_source" if ref.receipt_path.as_posix().find("source_05_option_expression") >= 0 else "data_feed",
                 repo_id="trading-data",
                 receipt_uri=ref.receipt_uri,
                 ready_signal_kind="component_task_ready",
@@ -202,8 +233,8 @@ def propose_failure_register_rows(
                         "request_id": ref.request_id,
                         "run_id": run_id,
                         "stage_id": stage_id,
-                        "target_component_id": "01_feed_alpaca_bars",
-                        "source_id": "alpaca_bars",
+                        "target_component_id": "source_05_option_expression" if stage_id == "layer_09_option_expression.data_acquisition" else "01_feed_alpaca_bars",
+                        "source_id": "m09_option_expression_data_acquisition" if stage_id == "layer_09_option_expression.data_acquisition" else "alpaca_bars",
                         "symbol": ref.symbol,
                         "start_month": start_month,
                         "end_month": end_month,
@@ -259,6 +290,8 @@ def _reconcile_provider_stage_unlocked(
         start_month=start_month,
         end_month=end_month,
         component_storage_root=component_storage_root,
+        manager_storage_root=manager_storage_root,
+        database_url=database_url,
     )
     rows = normalize_stage_receipts(refs)
     if persist_control_plane:

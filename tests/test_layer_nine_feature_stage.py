@@ -47,7 +47,7 @@ class LayerNineFeatureStageTests(unittest.TestCase):
             self.assertEqual(receipt["runs"][0]["row_counts"]["feature_09_option_expression_rows_required"], 0)
 
     def test_active_gate_review_delegates_to_trading_data_feature_generator(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_nine_feature_stage.option_source_table_exists", return_value=True), patch("trading_manager_tasks.layer_nine_feature_stage.subprocess.run") as run:
+        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_nine_feature_stage.option_source_row_count", return_value=2), patch("trading_manager_tasks.layer_nine_feature_stage.subprocess.run") as run:
             tmp = Path(raw_tmp)
             review_root = tmp / "gate_review"
             review_root.mkdir(parents=True)
@@ -80,8 +80,8 @@ class LayerNineFeatureStageTests(unittest.TestCase):
             self.assertIn("2016-02-01T00:00:00-05:00", summary.command)
             self.assertTrue(run.called)
 
-    def test_active_gate_review_without_option_source_continues_underlying_only(self) -> None:
-        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_nine_feature_stage.option_source_table_exists", return_value=False):
+    def test_active_gate_review_without_option_source_fails_until_acquisition_completes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_nine_feature_stage.option_source_row_count", return_value=0):
             tmp = Path(raw_tmp)
             review_root = tmp / "gate_review"
             review_root.mkdir(parents=True)
@@ -105,10 +105,11 @@ class LayerNineFeatureStageTests(unittest.TestCase):
                 trading_data_root=tmp / "trading-data",
             )
 
-            self.assertEqual(summary.status, "succeeded")
-            self.assertEqual(summary.mode, "option_source_unavailable_underlying_only")
+            self.assertEqual(summary.status, "failed")
+            self.assertEqual(summary.mode, "option_source_coverage_missing")
             receipt = json.loads(Path(summary.receipt_path or "").read_text(encoding="utf-8"))
             self.assertEqual(receipt["manager_stage_id"], "layer_09_option_expression.feature_generation")
+            self.assertEqual(receipt["status"], "failed")
             self.assertEqual(receipt["runs"][0]["row_counts"]["feature_09_option_expression_rows_generated"], 0)
 
 

@@ -508,6 +508,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
             "--end-month",
             "${END_MONTH}",
             "--write",
+            "--persist-sql",
         ]
     if feature_cli == "trading-data-m02-sector-context-feature-generation":
         return [
@@ -947,8 +948,8 @@ def _build_layer_workflow(
                 dataset_unit=input_dataset_unit,
                 blockers=acquisition_blockers,
                 approval_gate_required=acquisition_gate,
-                safe_without_provider_calls=not (layer in {1, 2} or acquisition_gate is not None),
-                provider_calls_allowed=layer in {1, 2},
+                safe_without_provider_calls=not (layer in {1, 2, 9} or acquisition_gate is not None),
+                provider_calls_allowed=layer in {1, 2, 9},
             )
         )
         if meta.get("feature_cli") is not None:

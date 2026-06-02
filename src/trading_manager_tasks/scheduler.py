@@ -24,6 +24,7 @@ from .historical_training import (
     prepare_layer_one_historical_training_batch,
     prepare_target_local_historical_training_batch,
 )
+from .layer_nine_option_expression import prepare_layer_nine_option_acquisition
 from .layer_three_target_state import discover_layer_two_feed_artifacts
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_THREE_TARGET_STATE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .model_training_state import (
@@ -294,6 +295,7 @@ def live_runtime_historical_task_gate(config: SchedulerConfig = SchedulerConfig(
 PROVIDER_STAGE_MODEL_LAYERS = {
     "layer_01_market_regime.data_acquisition": LAYER_ONE_MODEL_LAYER,
     "layer_02_sector_context.data_acquisition": LAYER_TWO_MODEL_LAYER,
+    "layer_09_option_expression.data_acquisition": "layer_09_option_expression",
 }
 
 
@@ -360,16 +362,35 @@ def _execute_autonomous_provider_stage(
     state_path = workflow_state_path_for_month(start_month, root=storage_root / "runtime")
     locks_dir = storage_root / "runtime" / "locks"
     with acquire_scheduler_lock(month_stage_lock_ref(start_month, stage_id, locks_dir=locks_dir)):
-        preparation, _requests, _payloads, _validations = prepare_layer_historical_training_batch(
-            model_layer=model_layer,
-            start_month=start_month,
-            end_month=end_month,
-            storage_root=storage_root,
-            component_src_root=component_src_root,
-            write=True,
-            persist_sql=True,
-            validate_handoff=True,
-        )
+        if stage_id == "layer_09_option_expression.data_acquisition":
+            review, requests, task_key_paths = prepare_layer_nine_option_acquisition(
+                start_month=start_month,
+                end_month=end_month,
+                storage_root=storage_root,
+                output_root=storage_root / "runtime" / "layer_09_option_expression" / "gate_review",
+                write=True,
+                persist_sql=True,
+            )
+            preparation = {
+                "phase": "layer_09_option_expression_source_acquisition",
+                "model_layer": model_layer,
+                "month_start": start_month,
+                "month_end": end_month,
+                "request_count": len(requests),
+                "payload_count": len(task_key_paths),
+                "status": review.status,
+            }
+        else:
+            preparation, _requests, _payloads, _validations = prepare_layer_historical_training_batch(
+                model_layer=model_layer,
+                start_month=start_month,
+                end_month=end_month,
+                storage_root=storage_root,
+                component_src_root=component_src_root,
+                write=True,
+                persist_sql=True,
+                validate_handoff=True,
+            )
         started_state = advance_workflow_state(
             start_month=start_month,
             end_month=end_month,
@@ -416,7 +437,7 @@ def _execute_autonomous_provider_stage(
         write=False,
     )
     return {
-        "preparation": preparation.summary_row(),
+        "preparation": preparation if isinstance(preparation, dict) else preparation.summary_row(),
         "stage_run_controller": controller_receipt.summary_row(),
         "stage_run_dashboard": dashboard.summary_row(),
         "stage_reconcile": reconcile.summary_row(),

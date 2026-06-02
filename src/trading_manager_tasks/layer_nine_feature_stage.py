@@ -5,8 +5,8 @@ The Layer 9 option-expression feature stage has two valid paths:
 * if the reviewed Layer 8 gate accepted a no-provider/no-active-target skip,
   feature generation is also a reviewed no-op because no source_05 option
   rows are required for deterministic no-option model rows;
-* otherwise, after provider acquisition has populated source_05, the
-  adapter delegates to trading-data's feature_08 SQL generator.
+* otherwise, after provider acquisition has populated source_05 for the current
+  fold, the adapter delegates to trading-data's feature_09 SQL generator.
 """
 
 from __future__ import annotations
@@ -133,13 +133,13 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ga
         "contract_type": "component_completion_receipt",
         "manager_stage_id": FEATURE_STAGE_ID,
         "stage_type": "feature_generation",
-        "status": "succeeded",
+        "status": "failed",
         "started_at": now,
         "completed_at": now,
         "runs": [
             {
                 "run_id": f"layer_09_option_expression_feature_generation_option_source_unavailable_{start_month}",
-                "status": "succeeded",
+                "status": "failed",
                 "output_refs": [str(gate_review_path)],
                 "row_counts": {
                     "active_layer_8_request_candidates": int(gate_review.get("active_request_count") or 0),
@@ -155,11 +155,11 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ga
         "storage_lifecycle_mutation_performed": False,
         "reason": (
             "Layer 8 produced active target-chain rows, but the current fold has no "
-            "source_05/m09 option-expression source table. Layer 9 will continue with "
-            "explicit option_surface_status=optionable_chain_missing inputs instead of "
-            "failing the workflow."
+            "source_05/m09 option-expression source rows. Layer 9 feature generation "
+            "must wait for reviewed option source acquisition instead of continuing "
+            "with optionable_chain_missing fallback."
         ),
-        "evidence_refs": [str(gate_review_path), "sql:trading_data.m09_option_expression_data_acquisition:missing"],
+        "evidence_refs": [str(gate_review_path), "sql:trading_data.m09_option_expression_data_acquisition:coverage_missing"],
         "start_month": start_month,
         "end_month": end_month,
     }
@@ -186,6 +186,34 @@ def option_source_table_exists(*, database_url: str | None = None, source_schema
             cursor.execute("SELECT to_regclass(%s) AS table_ref", (f"{source_schema}.{source_table}",))
             row = cursor.fetchone()
             return bool(row and row.get("table_ref"))
+
+
+def option_source_row_count(
+    *,
+    start_month: str,
+    end_month: str,
+    database_url: str | None = None,
+    source_schema: str = "trading_data",
+    source_table: str = "m09_option_expression_data_acquisition",
+) -> int:
+    import psycopg  # type: ignore
+    from psycopg.rows import dict_row  # type: ignore
+
+    if not option_source_table_exists(database_url=database_url, source_schema=source_schema, source_table=source_table):
+        return 0
+    with psycopg.connect(_database_url(database_url), row_factory=dict_row) as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) AS row_count
+                FROM {source_schema}.{source_table}
+                WHERE snapshot_time::timestamptz >= %s::timestamptz
+                  AND snapshot_time::timestamptz < %s::timestamptz
+                """,
+                (_month_start(start_month), _exclusive_month_start(end_month)),
+            )
+            row = cursor.fetchone()
+            return int((row or {}).get("row_count") or 0)
 
 
 def execute_layer_nine_feature_stage(
@@ -220,7 +248,7 @@ def execute_layer_nine_feature_stage(
             receipt_path=str(receipt_path),
             reason="no active Layer 8 target chain; feature generation is a reviewed no-op",
         )
-    if review.get("status") == "provider_acquisition_ready" and not option_source_table_exists():
+    if review.get("status") == "provider_acquisition_ready" and option_source_row_count(start_month=start_month, end_month=end_month) <= 0:
         receipt_path = _write_missing_option_source_receipt(
             start_month=start_month,
             end_month=end_month,
@@ -233,10 +261,10 @@ def execute_layer_nine_feature_stage(
             stage_id=FEATURE_STAGE_ID,
             start_month=start_month,
             end_month=end_month,
-            status="succeeded",
-            mode="option_source_unavailable_underlying_only",
+            status="failed",
+            mode="option_source_coverage_missing",
             receipt_path=str(receipt_path),
-            reason="option source table is unavailable; downstream model generation will encode optionable_chain_missing",
+            reason="current fold option source coverage is missing; run Layer 9 source acquisition before feature generation",
         )
 
     command = (
@@ -305,6 +333,7 @@ __all__ = [
     "FEATURE_STAGE_ID",
     "LayerNineFeatureStageSummary",
     "execute_layer_nine_feature_stage",
+    "option_source_row_count",
     "option_source_table_exists",
     "write_layer_nine_feature_stage_summary",
 ]

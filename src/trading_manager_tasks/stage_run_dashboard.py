@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Sequence, TextIO
 
 from .control_plane import TaskSystemError
+from .layer_nine_option_expression import dispatch_layer_nine_option_acquisition
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .provider_dispatch import dispatch_layer_provider_acquisition
 from .stage_coverage import StageCoverageReport, collect_stage_coverage
@@ -29,6 +30,7 @@ DEFAULT_COMPONENT_STORAGE_ROOT = data_storage_root()
 SUPPORTED_DASHBOARD_STAGE_IDS = (
     "layer_01_market_regime.data_acquisition",
     "layer_02_sector_context.data_acquisition",
+    "layer_09_option_expression.data_acquisition",
 )
 
 
@@ -87,6 +89,8 @@ def _model_layer_for_stage(stage_id: str) -> str:
         return LAYER_ONE_MODEL_LAYER
     if stage_id == "layer_02_sector_context.data_acquisition":
         return LAYER_TWO_MODEL_LAYER
+    if stage_id == "layer_09_option_expression.data_acquisition":
+        return "layer_09_option_expression"
     raise TaskSystemError(f"unsupported stage dashboard: {stage_id}")
 
 
@@ -106,6 +110,21 @@ def _execute_command(
     request_ids: Sequence[str],
     reject_terminal_coverage: bool = True,
 ) -> tuple[str, ...]:
+    if stage_id == "layer_09_option_expression.data_acquisition":
+        command = [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/dispatch_layer_nine_option_acquisition.py",
+            "--start-month",
+            start_month,
+            "--end-month",
+            end_month,
+            "--execute-provider-calls",
+            "--continue-on-error",
+        ]
+        for request_id in request_ids:
+            command.extend(["--request-id", request_id])
+        return tuple(command)
     command = [
         "PYTHONPATH=src",
         "python3",
@@ -216,16 +235,26 @@ def preview_next_provider_dispatch(
             ),
         )
     try:
-        summary = dispatch_layer_provider_acquisition(
-            model_layer=_model_layer_for_stage(stage_id),
-            start_month=start_month,
-            end_month=end_month,
-            storage_root=storage_root,
-            request_ids=request_ids,
-            execute_provider_calls=False,
-            skip_registered_failures=True,
-            database_url=database_url,
-        )
+        if stage_id == "layer_09_option_expression.data_acquisition":
+            summary = dispatch_layer_nine_option_acquisition(
+                start_month=start_month,
+                end_month=end_month,
+                storage_root=storage_root,
+                request_ids=request_ids,
+                execute_provider_calls=False,
+                database_url=database_url,
+            )
+        else:
+            summary = dispatch_layer_provider_acquisition(
+                model_layer=_model_layer_for_stage(stage_id),
+                start_month=start_month,
+                end_month=end_month,
+                storage_root=storage_root,
+                request_ids=request_ids,
+                execute_provider_calls=False,
+                skip_registered_failures=True,
+                database_url=database_url,
+            )
     except TaskSystemError as exc:
         return StageRunProviderDispatchPreview(
             available=False,

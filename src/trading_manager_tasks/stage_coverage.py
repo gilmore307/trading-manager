@@ -73,10 +73,14 @@ def _model_layer_for_stage(stage_id: str) -> str:
         return LAYER_ONE_MODEL_LAYER
     if stage_id == "layer_02_sector_context.data_acquisition":
         return LAYER_TWO_MODEL_LAYER
+    if stage_id == "layer_09_option_expression.data_acquisition":
+        return "layer_09_option_expression"
     raise TaskSystemError(f"unsupported stage coverage gate: {stage_id}")
 
 
 def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
+    if stage_id == "layer_09_option_expression.data_acquisition":
+        return set()
     model_layer = _model_layer_for_stage(stage_id)
     return {
         f"mgrreq_backfill_alpaca_bars_{member.symbol.lower()}_{start_month.replace('-', '_')}"
@@ -85,6 +89,13 @@ def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
 
 
 def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str) -> bool:
+    if stage_id == "layer_09_option_expression.data_acquisition":
+        if row.get("target_component_id") != "source_05_option_expression":
+            return False
+        if row.get("request_kind") != "option_snapshot":
+            return False
+        text = _row_text(row)
+        return start_month in text or end_month in text
     if row.get("target_component_id") != "01_feed_alpaca_bars":
         return False
     if row.get("request_kind") != "data_backfill_month":

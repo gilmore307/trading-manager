@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from .control_plane import TaskSystemError
+from .layer_nine_option_expression import dispatch_layer_nine_option_acquisition
 from .provider_dispatch import dispatch_layer_provider_acquisition
 from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, provider_partition_lock_ref
 from .stage_run_dashboard import (
@@ -61,6 +62,8 @@ def _model_layer_for_stage(stage_id: str) -> str:
         return "layer_01_market_regime"
     if stage_id == "layer_02_sector_context.data_acquisition":
         return "layer_02_sector_context"
+    if stage_id == "layer_09_option_expression.data_acquisition":
+        return "layer_09_option_expression"
     raise TaskSystemError(f"unsupported stage controller: {stage_id}")
 
 
@@ -118,26 +121,39 @@ def run_stage_controller_step(
                             provider_partition_lock_ref(
                                 start_month,
                                 stage_id,
-                                "alpaca_bars",
+                                "option_snapshot" if stage_id == "layer_09_option_expression.data_acquisition" else "alpaca_bars",
                                 request_id,
                                 locks_dir=locks_dir,
                             )
                         )
                     )
-                summary = dispatch_layer_provider_acquisition(
-                    model_layer=_model_layer_for_stage(stage_id),
-                    start_month=start_month,
-                    end_month=end_month,
-                    storage_root=packet_storage_root,
-                    request_ids=request_ids,
-                    execute_provider_calls=True,
-                    continue_on_error=True,
-                    skip_registered_failures=True,
-                    reject_terminal_coverage=before.next_action != "autonomous_provider_failure_retry_ready",
-                    database_url=database_url,
-                    dynamic_workers=dynamic_workers,
-                    max_workers=max_workers,
-                )
+                if stage_id == "layer_09_option_expression.data_acquisition":
+                    summary = dispatch_layer_nine_option_acquisition(
+                        start_month=start_month,
+                        end_month=end_month,
+                        storage_root=packet_storage_root,
+                        request_ids=request_ids,
+                        execute_provider_calls=True,
+                        continue_on_error=True,
+                        database_url=database_url,
+                        dynamic_workers=dynamic_workers,
+                        max_workers=max_workers,
+                    )
+                else:
+                    summary = dispatch_layer_provider_acquisition(
+                        model_layer=_model_layer_for_stage(stage_id),
+                        start_month=start_month,
+                        end_month=end_month,
+                        storage_root=packet_storage_root,
+                        request_ids=request_ids,
+                        execute_provider_calls=True,
+                        continue_on_error=True,
+                        skip_registered_failures=True,
+                        reject_terminal_coverage=before.next_action != "autonomous_provider_failure_retry_ready",
+                        database_url=database_url,
+                        dynamic_workers=dynamic_workers,
+                        max_workers=max_workers,
+                    )
             provider_calls = summary.provider_calls
             dispatch_performed = summary.dispatch_performed
             action_status = "completed" if summary.dispatch_performed else "planned_no_dispatch"
