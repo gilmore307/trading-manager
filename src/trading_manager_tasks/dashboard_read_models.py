@@ -3569,6 +3569,13 @@ def _model_group_lifecycle_tasks_for_visible_folds(
     if artifact_fold is None and visible_periods and _replay_dataset_root(storage_root, "promotion_replay_candidate_policy").exists():
         _period, start_month, end_month = visible_periods[0]
         artifact_fold = (start_month, end_month)
+    if artifact_fold is not None:
+        artifact_period = _fold_period_label(*artifact_fold)
+        visible_periods = [
+            (period, start_month, end_month)
+            for period, start_month, end_month in visible_periods
+            if (start_month, end_month) == artifact_fold
+        ] or [(artifact_period, artifact_fold[0], artifact_fold[1])]
     tasks: list[dict[str, Any]] = []
     for _period, start_month, end_month in visible_periods:
         pre_replay_complete = _pre_replay_fold_complete(
