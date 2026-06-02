@@ -503,7 +503,7 @@ def _model_group_replay_dataset_root(storage_root: Path, contract_id: str = DEFA
     return storage_root.parent / "05_replay_datasets" / contract_id
 
 
-def _latest_promotion_readiness_mtime(storage_root: Path) -> float | None:
+def _latest_promotion_readiness_mtime(storage_root: Path, *, state_path: Path) -> float | None:
     readiness_root = _model_group_replay_dataset_root(storage_root) / "promotion_readiness_runs"
     if not readiness_root.exists():
         return None
@@ -514,6 +514,8 @@ def _latest_promotion_readiness_mtime(storage_root: Path) -> float | None:
         except (OSError, json.JSONDecodeError):
             continue
         if str(payload.get("contract_type") or "") != "promotion_readiness_record":
+            continue
+        if not _promotion_readiness_valid_for_fold_state(payload, state_path=state_path):
             continue
         mtimes.append(readiness_path.stat().st_mtime)
     return max(mtimes) if mtimes else None
@@ -565,6 +567,36 @@ def _promotion_decision_valid_for_fold_state(payload: dict[str, Any], *, decisio
     return True
 
 
+def _promotion_readiness_valid_for_fold_state(payload: dict[str, Any], *, state_path: Path) -> bool:
+    fold_scope = _fold_scope_from_state_path(state_path)
+    scoped = False
+
+    source_fold_state_path = str(payload.get("source_fold_state_path") or "").strip()
+    if source_fold_state_path:
+        scoped = True
+        if Path(source_fold_state_path).resolve(strict=False) != state_path.resolve(strict=False):
+            return False
+
+    payload_fold_id = str(payload.get("fold_id") or payload.get("candidate_fold_id") or "").strip()
+    if payload_fold_id:
+        scoped = True
+        if fold_scope["fold_id"] and payload_fold_id != fold_scope["fold_id"]:
+            return False
+
+    payload_targets = _string_set(
+        payload.get("target_symbol")
+        or payload.get("selected_target_symbol")
+        or payload.get("target_symbols")
+        or payload.get("selected_target_symbols")
+    )
+    if payload_targets:
+        scoped = True
+        if fold_scope["target_symbol"] and fold_scope["target_symbol"] not in payload_targets:
+            return False
+
+    return scoped
+
+
 def _fold_scope_from_state_path(state_path: Path) -> dict[str, str]:
     try:
         payload = json.loads(state_path.read_text(encoding="utf-8"))
@@ -601,7 +633,7 @@ def _fold_model_group_lifecycle_complete(storage_root: Path, state_path: Path) -
         decision_status, decision_mtime = promotion_decision
         if decision_mtime >= state_mtime and decision_status in {"review_required", "deferred", "rejected", "revoked", "superseded"}:
             return True
-    readiness_mtime = _latest_promotion_readiness_mtime(storage_root)
+    readiness_mtime = _latest_promotion_readiness_mtime(storage_root, state_path=state_path)
     if readiness_mtime is None:
         return False
     return readiness_mtime >= state_mtime
@@ -672,7 +704,7 @@ def model_group_lifecycle_blocks_next_fold(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     selected_target_symbol: str | None = None,
 ) -> bool:
-    """Return whether the earliest completed pre-replay fold still owns the lane.
+    """Return whether any completed pre-replay fold still owns the lane.
 
     Layer 10 may update the event-observation pool consumed by later Layer 4
     folds. The scheduler therefore cannot start the next fold after Layer 1-9
@@ -680,14 +712,10 @@ def model_group_lifecycle_blocks_next_fold(
     promotion, and maintenance readiness first.
     """
 
-    completed_fold_states = _completed_pre_replay_fold_states(
+    return _first_incomplete_model_group_lifecycle_fold(
         storage_root=storage_root,
         selected_target_symbol=selected_target_symbol,
-    )
-    if not completed_fold_states:
-        return False
-    earliest_completed = completed_fold_states[0]
-    return not _fold_model_group_lifecycle_complete(storage_root, earliest_completed)
+    ) is not None
 
 
 def _is_model_worker_routable_stage(stage: dict[str, Any]) -> bool:
@@ -882,6 +910,8 @@ def select_model_worker_fold(
 
     max_month = _eligible_historical_fold_cutoff(max_month)
     runtime_root = storage_root / "runtime"
+    if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
+        return None
     open_selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
     if open_selection is not None:
         if open_selection.end_month > max_month:
@@ -893,9 +923,6 @@ def select_model_worker_fold(
         ):
             return None
         return open_selection
-    if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
-        return None
-
     known_months: set[str] = set()
     if runtime_root.exists():
         for path in sorted(runtime_root.glob(WORKFLOW_STATE_GLOB)):
