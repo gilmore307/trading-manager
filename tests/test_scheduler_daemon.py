@@ -630,6 +630,9 @@ class SchedulerDaemonTests(unittest.TestCase):
                     component_src_root=tmp,
                     config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
                     execute_safe_offline_stages=True,
+                    execute_autonomous_provider_stages=True,
+                    provider_stage_next_limit=12,
+                    provider_stage_max_workers=3,
                     selected_target_symbol=None,
                     target_queue_path=queue_path,
                 )
@@ -641,6 +644,9 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(target_selection.fold_selection.fold_id, "fold_2016-01_2016-06")
         self.assertEqual(model_decision.selected_work, "layer_01_market_regime.model_generation")
         self.assertIsNone(run_once.call_args.kwargs["selected_target_symbol"])
+        self.assertTrue(run_once.call_args.kwargs["execute_autonomous_provider_stages"])
+        self.assertEqual(run_once.call_args.kwargs["provider_stage_next_limit"], 12)
+        self.assertEqual(run_once.call_args.kwargs["provider_stage_max_workers"], 3)
 
     def test_model_worker_does_not_select_until_validation_and_test_months_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
