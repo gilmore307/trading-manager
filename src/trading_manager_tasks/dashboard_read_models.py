@@ -3084,7 +3084,7 @@ def _model_group_replay_timeline_tasks(
                 "end_month": replay_end_month,
                 "contract_id": contract_id,
                 "target_required": False,
-                "description": "Fixed out-of-sample market window used to test the candidate model group.",
+                "description": "Fold-target replay window used to test the candidate model group.",
             },
             "worker": worker_info,
             "progress": progress,
@@ -3238,7 +3238,7 @@ def _model_group_replay_timeline_tasks(
             "accepted_failed_count": deferred,
             "can_unlock_downstream": False,
             "progress_source": "replay_dataset_source_months",
-            "progress_basis": "source-month data acquisitions required before the five-year replay can start",
+            "progress_basis": "source-month data acquisitions required before fold-target replay can start",
         }
 
     append_task(
