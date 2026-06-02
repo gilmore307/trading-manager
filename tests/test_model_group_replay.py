@@ -93,7 +93,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {"contract_type": "evaluation_replay_progress", "stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-02", "status": "completed"},
                 ]
                 progress_path.write_text("\\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\\n", encoding="utf-8")
-                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": run_id, "candidate_model_ref": candidate_model_ref, "decision_row_count": 2}))
+                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": run_id, "candidate_model_ref": candidate_model_ref, "target_refs": ["AAPL"], "decision_row_count": 2}))
                 """
             ).strip()
             + "\n",
@@ -217,7 +217,7 @@ class ModelGroupReplayTests(unittest.TestCase):
 
         self.assertIsNone(decision)
 
-    def test_replay_allows_free_trading_universe_when_fold_is_ready(self):
+    def test_replay_scope_mismatch_blocks_dataset_without_training_target(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -240,8 +240,9 @@ class ModelGroupReplayTests(unittest.TestCase):
 
             self.assertIsNotNone(decision)
             assert decision is not None
-            self.assertEqual(decision.decision_status, "executed")
-            self.assertEqual(decision.reason_code, "model_group_replay_executed")
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_scope_mismatch")
+            self.assertIn("target_refs must include completed training target AAPL", decision.reason)
 
     def test_replay_scope_mismatch_blocks_wrong_fold_dataset(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

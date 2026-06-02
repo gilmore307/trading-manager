@@ -280,7 +280,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
             self.assertIn("deterministic crypto placeholder", decision.reason)
 
-    def test_replay_allows_free_trading_universe_without_training_target_ref(self):
+    def test_replay_receipt_without_training_target_ref_does_not_unlock_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -296,8 +296,9 @@ class ModelGroupEvaluationTests(unittest.TestCase):
 
             self.assertIsNotNone(decision)
             assert decision is not None
-            self.assertEqual(decision.decision_status, "executed")
-            self.assertEqual(decision.reason_code, "model_group_evaluation_executed")
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
+            self.assertIn("target_refs must include completed training target AAPL", decision.reason)
 
     def test_decision_variable_audit_does_not_infer_side_from_outcome(self):
         rows = [

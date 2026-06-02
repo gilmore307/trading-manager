@@ -2581,9 +2581,23 @@ def _replay_dataset_scope_status(
                 "dataset_target_refs": sorted(target_refs),
                 "training_target_symbol": target_symbol,
             }
+    if not target_symbol:
+        return {
+            "compatible": False,
+            "reason": "Completed training fold has no target symbol for replay scope validation.",
+            "dataset_target_refs": sorted(target_refs),
+            "training_target_symbol": target_symbol,
+        }
+    if target_symbol not in target_refs:
+        return {
+            "compatible": False,
+            "reason": f"Replay dataset target_refs must include completed training target {target_symbol}.",
+            "dataset_target_refs": sorted(target_refs),
+            "training_target_symbol": target_symbol,
+        }
     return {
         "compatible": True,
-        "reason": "Replay dataset is eligible for fold-bound free-trading replay.",
+        "reason": "Replay dataset is eligible for fold-bound target replay.",
         "dataset_target_refs": sorted(target_refs),
         "training_target_symbol": target_symbol,
     }
@@ -3208,7 +3222,7 @@ def _model_group_replay_timeline_tasks(
         if pre_replay_complete and manifest is not None and not coverage_complete
         else f"Replay dataset is covered but not frozen; current freeze_status={freeze_status}."
         if pre_replay_complete and manifest is not None and coverage_complete and not freeze_ready
-        else "Replay dataset is frozen and ready for fold-bound free-trading replay."
+        else "Replay dataset is frozen and ready for fold-bound target replay."
         if pre_replay_complete and manifest is not None and freeze_ready and not replay_complete
         else "Waiting for pre-replay Layer 1-9 model generation to complete before replay can run."
     )

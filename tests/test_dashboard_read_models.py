@@ -487,10 +487,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "preparation_status": "prepared_candidate_policy_replay_acquisition_bundle",
                         "prepared_at_utc": "2026-05-21T02:34:48Z",
                         "freeze_status": "not_frozen",
-                        "feed_acquisition_count": 360,
+                        "feed_acquisition_count": 60,
                         "available_feed_acquisition_count": 0,
                         "deferred_feed_acquisition_count": 0,
-                        "missing_feed_acquisition_count": 360,
+                        "missing_feed_acquisition_count": 60,
+                        "target_refs": ["AAPL"],
                         "source_contract_ref": "trading-evaluation/replays/promotion_replay_candidate_policy.json",
                     }
                 )
@@ -553,8 +554,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[0]["task_label"], "Model Replay")
         self.assertEqual(evaluation_tasks[0]["task_state"], "current")
         self.assertEqual(evaluation_tasks[0]["status"], "blocked")
-        self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["expected_count"], 360)
-        self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["pending_count"], 360)
+        self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["expected_count"], 60)
+        self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["pending_count"], 60)
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["unit_label"], "source-months")
         self.assertEqual(evaluation_tasks[0]["detail"]["blockers"], ["replay_dataset_coverage_complete"])
         self.assertIn("coverage is incomplete", evaluation_tasks[0]["reason"])
@@ -713,7 +714,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 60,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 0,
-                        "target_refs": ["BTC", "ETH", "SOL"],
+                        "target_refs": ["AAPL"],
                         "source_contract_ref": "trading-evaluation/replays/promotion_replay_candidate_policy.json",
                     }
                 )
@@ -789,7 +790,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 60,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 0,
-                        "target_refs": ["BTC", "ETH", "SOL"],
+                        "target_refs": ["AAPL"],
                     }
                 )
                 + "\n",
@@ -843,6 +844,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 2,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 0,
+                        "target_refs": ["AAPL"],
                     }
                 )
                 + "\n",
@@ -960,6 +962,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "available_feed_acquisition_count": 2,
                         "deferred_feed_acquisition_count": 0,
                         "missing_feed_acquisition_count": 0,
+                        "target_refs": ["AAPL"],
                     }
                 )
                 + "\n",
@@ -1541,6 +1544,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "feed_acquisition_count": 2,
                         "available_feed_acquisition_count": 2,
                         "missing_feed_acquisition_count": 0,
+                        "target_refs": ["AAPL"],
                     }
                 )
                 + "\n",
@@ -1558,6 +1562,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "target_refs": ["AAPL"],
                         "validation_status": "passed",
                     }
                 )
@@ -1645,6 +1650,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "feed_acquisition_count": 2,
                         "available_feed_acquisition_count": 2,
                         "missing_feed_acquisition_count": 0,
+                        "target_refs": ["AAPL"],
                     }
                 )
                 + "\n",
@@ -1659,6 +1665,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "target_refs": ["AAPL"],
                         "validation_status": "passed",
                     }
                 )
