@@ -2797,6 +2797,65 @@ def _replay_dataset_month_operation_progress(
     }
 
 
+def _replay_month_operation_detail(dataset_root: Path) -> dict[str, Any] | None:
+    rows_by_month: dict[str, list[Mapping[str, str]]] = {}
+    for row in _replay_coverage_rows(dataset_root / "feed_acquisition_plan.csv"):
+        month = str(row.get("month") or "").strip()
+        if month:
+            rows_by_month.setdefault(month, []).append(row)
+    if not rows_by_month:
+        return None
+
+    available_statuses = {"available", "succeeded", "complete", "completed"}
+    current_month = ""
+    current_rows: list[Mapping[str, str]] = []
+    for month in sorted(rows_by_month):
+        rows = rows_by_month[month]
+        if any(str(row.get("coverage_status") or "").strip().lower() not in available_statuses for row in rows):
+            current_month = month
+            current_rows = rows
+            break
+    if not current_rows:
+        current_month = sorted(rows_by_month)[-1]
+        current_rows = rows_by_month[current_month]
+
+    sources: list[dict[str, str]] = []
+    for row in current_rows:
+        status = str(row.get("coverage_status") or "").strip().lower()
+        source_id = str(row.get("source_id") or "").strip()
+        feed = str(row.get("feed") or "").strip()
+        target_ref = str(row.get("target_ref") or row.get("target_symbol") or "").strip().upper()
+        source_detail = {
+            "source_id": source_id,
+            "feed": feed,
+            "target_ref": target_ref,
+            "coverage_status": status,
+            "coverage_receipt_path": str(row.get("coverage_receipt_path") or "").strip(),
+            "output_root": str(row.get("output_root") or "").strip(),
+            "acquisition_mode": str(row.get("acquisition_mode") or "").strip(),
+        }
+        sources.append(source_detail)
+
+    missing_sources = [
+        source["source_id"]
+        for source in sources
+        if source["coverage_status"] not in available_statuses
+    ]
+    deferred_sources = [source["source_id"] for source in sources if source["coverage_status"] == "deferred"]
+    available_sources = [source["source_id"] for source in sources if source["coverage_status"] in available_statuses]
+    return {
+        "month": current_month,
+        "source_count": len(sources),
+        "available_count": len(available_sources),
+        "missing_count": len(missing_sources),
+        "deferred_count": len(deferred_sources),
+        "sources": sources,
+        "missing_source_ids": missing_sources,
+        "deferred_source_ids": deferred_sources,
+        "operation_basis": "one monthly acquire-replay-cleanup operation over all required replay sources",
+    }
+
+
 def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | None:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
@@ -3164,6 +3223,7 @@ def _model_group_replay_timeline_tasks(
         receipt_refs: list[str] | None = None,
         blockers: list[str] | None = None,
         progress: dict[str, Any] | None = None,
+        extra_detail: Mapping[str, Any] | None = None,
         stage_type: str = "model_evaluation",
     ) -> None:
         sequence = starting_sequence + len(tasks) + 1
@@ -3194,6 +3254,8 @@ def _model_group_replay_timeline_tasks(
             "worker": worker_info,
             "progress": progress,
         }
+        if extra_detail:
+            detail.update(dict(extra_detail))
         tasks.append(
             {
                 "sequence": sequence,
@@ -3243,6 +3305,7 @@ def _model_group_replay_timeline_tasks(
         missing = sum(int(row.get("missing_acquisition_count") or 0) for row in coverage_rows)
 
     coverage_complete = manifest is not None and expected > 0 and missing == 0
+    month_operation_detail = _replay_month_operation_detail(dataset_root)
     freeze_status = str((manifest or {}).get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
     compatible_replay_run_ids = (
@@ -3308,12 +3371,23 @@ def _model_group_replay_timeline_tasks(
     elif not replay_scope_status["compatible"]:
         replay_blockers.append("replay_dataset_scope_matches_training_fold")
     elif not coverage_complete:
-        replay_blockers.append("replay_dataset_coverage_complete")
+        replay_blockers.append("replay_month_operation_complete")
     elif not freeze_ready:
         replay_blockers.append("model_group_replay_freeze_review")
 
     replay_state = "completed" if replay_complete else ("current" if pre_replay_complete or replay_started else "future")
     replay_status = "succeeded" if replay_complete else ("ready" if not replay_blockers else "blocked")
+    replay_month_reason = None
+    if month_operation_detail is not None and not coverage_complete:
+        missing_source_ids = list(month_operation_detail.get("missing_source_ids") or [])
+        missing_source_text = ", ".join(str(item) for item in missing_source_ids[:6])
+        if len(missing_source_ids) > 6:
+            missing_source_text = f"{missing_source_text}, ..."
+        replay_month_reason = (
+            f"Replay month {month_operation_detail['month']} is incomplete: "
+            f"{month_operation_detail['missing_count']}/{month_operation_detail['source_count']} sources missing"
+            f" ({missing_source_text})."
+        )
     replay_reason = (
         "Model-group replay is complete across the accepted replay window."
         if replay_complete
@@ -3323,6 +3397,8 @@ def _model_group_replay_timeline_tasks(
         if pre_replay_complete and manifest is None
         else str(replay_scope_status["reason"])
         if pre_replay_complete and manifest is not None and not replay_scope_status["compatible"]
+        else replay_month_reason
+        if replay_month_reason is not None
         else f"Replay dataset coverage is incomplete: {missing}/{expected} feed acquisitions missing."
         if pre_replay_complete and manifest is not None and not coverage_complete
         else f"Replay dataset is covered but not frozen; current freeze_status={freeze_status}."
@@ -3346,6 +3422,7 @@ def _model_group_replay_timeline_tasks(
         receipt_refs=[str(manifest_path)] if manifest is not None else receipt_refs,
         blockers=replay_blockers,
         progress=replay_progress,
+        extra_detail={"replay_month_operation": month_operation_detail} if month_operation_detail is not None else None,
         stage_type="replay",
     )
     tasks[-1]["updated_at_utc"] = tasks_updated_at

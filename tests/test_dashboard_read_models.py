@@ -487,10 +487,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "preparation_status": "prepared_candidate_policy_replay_acquisition_bundle",
                         "prepared_at_utc": "2026-05-21T02:34:48Z",
                         "freeze_status": "not_frozen",
-                        "feed_acquisition_count": 60,
-                        "available_feed_acquisition_count": 0,
+                        "feed_acquisition_count": 300,
+                        "available_feed_acquisition_count": 120,
                         "deferred_feed_acquisition_count": 0,
-                        "missing_feed_acquisition_count": 60,
+                        "missing_feed_acquisition_count": 180,
                         "target_refs": ["AAPL"],
                         "source_contract_ref": "trading-evaluation/replays/promotion_replay_candidate_policy.json",
                     }
@@ -500,7 +500,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             (replay_root / "coverage_summary.csv").write_text(
                 "contract_id,source_id,required_acquisition_count,available_acquisition_count,deferred_acquisition_count,missing_acquisition_count,coverage_status,notes\n"
-                "promotion_replay_candidate_policy,alpaca_bars,60,0,0,60,incomplete,missing\n",
+                "promotion_replay_candidate_policy,alpaca_bars,60,0,0,60,incomplete,missing\n"
+                "promotion_replay_candidate_policy,alpaca_liquidity,60,0,0,60,incomplete,missing\n"
+                "promotion_replay_candidate_policy,alpaca_news,60,0,0,60,incomplete,missing\n"
+                "promotion_replay_candidate_policy,gdelt_news,60,60,0,0,complete,available\n"
+                "promotion_replay_candidate_policy,trading_economics_calendar_web,60,60,0,0,complete,available\n",
                 encoding="utf-8",
             )
             (replay_root / "replay_window_manifest.csv").write_text(
@@ -508,6 +512,71 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "promotion_replay_candidate_policy,candidate_policy_replay,2021-01-01,2026-01-01,1255,candidate,route,tags,metrics\n",
                 encoding="utf-8",
             )
+            feed_fields = [
+                "acquisition_id",
+                "contract_id",
+                "source_id",
+                "feed",
+                "target_ref",
+                "asset_class",
+                "instrument_type",
+                "month",
+                "start_date",
+                "end_date_exclusive",
+                "timeframe",
+                "acquisition_mode",
+                "output_root",
+                "expected_output_ref",
+                "coverage_status",
+                "coverage_receipt_path",
+                "params_json",
+                "notes",
+            ]
+            source_rows = [
+                ("alpaca_bars", "01_feed_alpaca_bars", "AAPL", "missing"),
+                ("alpaca_liquidity", "02_feed_alpaca_liquidity", "AAPL", "missing"),
+                ("alpaca_news", "03_feed_alpaca_news", "AAPL", "missing"),
+                ("gdelt_news", "05_feed_gdelt_news", "", "available"),
+                ("trading_economics_calendar_web", "07_feed_trading_economics_calendar_web", "", "available"),
+            ]
+            feed_rows = [",".join(feed_fields)]
+            for offset in range(60):
+                year = 2021 + offset // 12
+                month_number = 1 + offset % 12
+                month = f"{year}-{month_number:02d}"
+                next_year = year + (1 if month_number == 12 else 0)
+                next_month_number = 1 if month_number == 12 else month_number + 1
+                start_date = f"{month}-01"
+                end_date = f"{next_year}-{next_month_number:02d}-01"
+                for source_id, feed, target_ref, coverage_status in source_rows:
+                    acquisition_id = f"acq_{source_id}_{month.replace('-', '_')}"
+                    output_root = f"/tmp/replay/{source_id}/{month}"
+                    receipt_path = f"{output_root}/completion_receipt.json"
+                    feed_rows.append(
+                        ",".join(
+                            [
+                                acquisition_id,
+                                "promotion_replay_candidate_policy",
+                                source_id,
+                                feed,
+                                target_ref,
+                                "equity",
+                                "stock",
+                                month,
+                                start_date,
+                                end_date,
+                                "1Min",
+                                "monthly_replay_source_acquisition",
+                                output_root,
+                                "",
+                                coverage_status,
+                                receipt_path,
+                                "{}",
+                                "",
+                            ]
+                        )
+                    )
+            (replay_root / "feed_acquisition_plan.csv").write_text("\n".join(feed_rows) + "\n", encoding="utf-8")
             self._write_completed_pre_replay_fold(tmp / "storage" / "02_control_plane" / "runtime", symbol="AAPL")
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
@@ -558,8 +627,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["pending_count"], 60)
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["unit_label"], "replay months")
         self.assertEqual(evaluation_tasks[0]["detail"]["progress"]["progress_source"], "replay_dataset_month_operations")
-        self.assertEqual(evaluation_tasks[0]["detail"]["blockers"], ["replay_dataset_coverage_complete"])
-        self.assertIn("coverage is incomplete", evaluation_tasks[0]["reason"])
+        self.assertEqual(evaluation_tasks[0]["detail"]["blockers"], ["replay_month_operation_complete"])
+        self.assertIn("Replay month 2021-01 is incomplete", evaluation_tasks[0]["reason"])
+        self.assertEqual(evaluation_tasks[0]["detail"]["replay_month_operation"]["month"], "2021-01")
+        self.assertEqual(evaluation_tasks[0]["detail"]["replay_month_operation"]["source_count"], 5)
+        self.assertEqual(
+            evaluation_tasks[0]["detail"]["replay_month_operation"]["missing_source_ids"],
+            ["alpaca_bars", "alpaca_liquidity", "alpaca_news"],
+        )
         self.assertEqual(evaluation_tasks[1]["task_label"], "Layer 10 Event Risk Governor")
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["expected_count"], 0)
         self.assertEqual(evaluation_tasks[1]["detail"]["progress"]["pending_count"], 0)
