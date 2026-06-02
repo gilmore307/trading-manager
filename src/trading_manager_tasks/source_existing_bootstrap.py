@@ -478,10 +478,11 @@ def run_source_existing_bootstrap(
         ready_coverages = [
             coverage
             for coverage in coverages_by_month.get(month, [])
-            if coverage.stage_id.startswith(("layer_01_", "layer_02_"))
+            if coverage.stage_id.startswith(("layer_01_", "layer_02_", "layer_03_"))
         ]
         if not ready_coverages:
             continue
+        include_post_foundation_stages = any(coverage.stage_id.startswith("layer_03_") for coverage in ready_coverages)
         report_paths: list[Path] = []
         for coverage in ready_coverages:
             path = _coverage_report_path(report_root=resolved_report_root, month=month, stage_id=coverage.stage_id)
@@ -497,6 +498,7 @@ def run_source_existing_bootstrap(
                 state_path=state_path,
                 stage_coverage_reports=report_paths,
                 selected_target_symbol=selected_target_symbol,
+                foundation_catch_up_only=not include_post_foundation_stages,
                 write=True,
             )
         bootstrapped_months.append(month)

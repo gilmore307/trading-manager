@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from trading_manager_tasks.model_training_state import (
     advance_workflow_state,
+    first_blocked_stage,
     initial_workflow_state,
     mark_stage_started,
     mark_stage_succeeded,
@@ -37,6 +38,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
         self.assertEqual(stage.status, "blocked")
         self.assertIn("layer_01_task_key_preparation", stage.last_reason or "")
         self.assertIsNone(next_ready_or_blocked_stage(state))
+        self.assertEqual(first_blocked_stage(state).stage_id, "layer_01_market_regime.data_acquisition")
 
     def test_approval_then_receipt_progresses_layer_one_to_feature_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

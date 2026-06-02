@@ -66,8 +66,13 @@ work and fold-scoped downstream work.
 2. Target substrate. Materialize target-specific source and feature evidence
    only when a downstream run needs it. This includes target state, target-local
    event slices, option-expression inputs, and other target-scoped source or
-   feature rows. These tasks prepare what the live components would have been
-   able to inspect, but they do not select a fixed trade target for replay.
+   feature rows. If the selected target lacks reviewed target-local bar
+   artifacts for a fold, manager prepares bounded `01_feed_alpaca_bars` requests
+   for that target and dispatches them through the autonomous provider gate; the
+   Layer 3 `source_03_target_state` materializer then consumes those local
+   artifacts without direct provider access. These tasks prepare what the live
+   components would have been able to inspect, but they do not select a fixed
+   trade target for replay.
 3. Live-flow replay. Replay simulates the real system under a historical
    point-in-time background. Components may scan the eligible candidate pool,
    choose no target, choose one target, or choose a target combination. Replay

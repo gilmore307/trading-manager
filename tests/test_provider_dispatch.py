@@ -7,8 +7,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from trading_manager_tasks.historical_training import prepare_layer_one_historical_training_batch, prepare_layer_two_historical_training_batch
-from trading_manager_tasks.monthly_backfill import LAYER_TWO_MODEL_LAYER
+from trading_manager_tasks.historical_training import (
+    prepare_layer_one_historical_training_batch,
+    prepare_layer_two_historical_training_batch,
+    prepare_target_local_historical_training_batch,
+)
+from trading_manager_tasks.monthly_backfill import LAYER_THREE_TARGET_STATE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from trading_manager_tasks.provider_dispatch import dispatch_layer_one_provider_acquisition, dispatch_layer_provider_acquisition, select_provider_worker_count
 from trading_manager_tasks.request_payloads import ALPACA_BARS_MONTHLY_MAX_PAGES
 
@@ -65,6 +69,33 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(dispatch.provider_calls, 0)
         self.assertFalse(dispatch.dispatch_performed)
         self.assertTrue(any("XLK/2016-01/task_key.json" in item.task_key_path for item in dispatch.items))
+
+    def test_target_local_dispatch_plans_selected_layer_three_target(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            prepare_target_local_historical_training_batch(
+                start_month="2016-07",
+                end_month="2016-07",
+                target_symbols=("AAPL",),
+                storage_root=tmp,
+                write=True,
+                validate_handoff=False,
+            )
+            dispatch = dispatch_layer_provider_acquisition(
+                model_layer=LAYER_THREE_TARGET_STATE_MODEL_LAYER,
+                start_month="2016-07",
+                end_month="2016-07",
+                storage_root=tmp,
+                target_symbols=("AAPL",),
+                execute_provider_calls=False,
+            )
+
+        self.assertEqual(dispatch.stage_id, "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(dispatch.request_count, 1)
+        self.assertEqual(dispatch.provider_calls, 0)
+        self.assertFalse(dispatch.dispatch_performed)
+        self.assertEqual(dispatch.items[0].request_id, "mgrreq_backfill_alpaca_bars_aapl_2016_07")
+        self.assertIn("AAPL/2016-07/task_key.json", dispatch.items[0].task_key_path)
 
     def test_layer_one_dispatch_can_limit_to_symbol_allowlist(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

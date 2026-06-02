@@ -68,7 +68,7 @@ class SourceExistingBootstrapTests(unittest.TestCase):
         self.assertEqual(summary.bootstrapped_months, ("2016-01",))
         self.assertEqual(by_stage["layer_01_market_regime.data_acquisition"]["status"], "succeeded")
         self.assertEqual(by_stage["layer_02_sector_context.data_acquisition"]["status"], "succeeded")
-        self.assertNotIn("layer_03_target_state_vector.data_acquisition", by_stage)
+        self.assertEqual(by_stage["layer_03_target_state_vector.data_acquisition"]["status"], "succeeded")
         self.assertEqual(by_stage["layer_01_market_regime.feature_generation"]["status"], "ready")
         self.assertFalse(payload["model_activation_performed"])
         self.assertFalse(payload["broker_execution_performed"])

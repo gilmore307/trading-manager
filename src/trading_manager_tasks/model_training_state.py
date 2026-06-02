@@ -362,6 +362,15 @@ def next_ready_or_blocked_stage(state: WorkflowState) -> StageProgress | None:
     return None
 
 
+def first_blocked_stage(state: WorkflowState) -> StageProgress | None:
+    """Return the first non-terminal blocked stage for diagnostics/backoff routing."""
+
+    for stage in state.stages:
+        if stage.status == "blocked":
+            return stage
+    return None
+
+
 def _terminal_receipt_success(receipt: Mapping[str, Any]) -> bool:
     runs = receipt.get("runs")
     if isinstance(runs, list) and runs:
@@ -844,6 +853,7 @@ __all__ = [
     "mark_stage_started",
     "mark_stage_succeeded",
     "next_ready_or_blocked_stage",
+    "first_blocked_stage",
     "refresh_workflow_state",
     "write_workflow_state",
 ]

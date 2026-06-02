@@ -21,8 +21,8 @@ from typing import Any, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
 from .failure_register import accepted_failure_request_ids_from_register
-from .historical_training import prepare_layer_historical_training_batch
-from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
+from .historical_training import prepare_layer_historical_training_batch, prepare_target_local_historical_training_batch
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_THREE_TARGET_STATE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .request_payloads import ALPACA_BARS_MONTHLY_MAX_PAGES
 from .stage_coverage import collect_stage_coverage
@@ -281,6 +281,7 @@ def dispatch_layer_provider_acquisition(
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
     symbols: Sequence[str] = (),
+    target_symbols: Sequence[str] = (),
     request_ids: Sequence[str] = (),
     limit: int | None = None,
     execute_provider_calls: bool = False,
@@ -296,17 +297,29 @@ def dispatch_layer_provider_acquisition(
     Approval artifacts are not required or read.
     """
 
-    if model_layer not in {LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER}:
+    if model_layer not in {LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, LAYER_THREE_TARGET_STATE_MODEL_LAYER}:
         raise TaskSystemError(f"unsupported provider dispatch model_layer: {model_layer}")
-    summary, requests, _payloads, _validations = prepare_layer_historical_training_batch(
-        model_layer=model_layer,
-        start_month=start_month,
-        end_month=end_month,
-        storage_root=storage_root,
-        write=False,
-        persist_sql=False,
-        validate_handoff=False,
-    )
+    if model_layer == LAYER_THREE_TARGET_STATE_MODEL_LAYER:
+        selected_targets = tuple(target_symbols or symbols)
+        summary, requests, _payloads, _validations = prepare_target_local_historical_training_batch(
+            start_month=start_month,
+            end_month=end_month,
+            target_symbols=selected_targets,
+            storage_root=storage_root,
+            write=False,
+            persist_sql=False,
+            validate_handoff=False,
+        )
+    else:
+        summary, requests, _payloads, _validations = prepare_layer_historical_training_batch(
+            model_layer=model_layer,
+            start_month=start_month,
+            end_month=end_month,
+            storage_root=storage_root,
+            write=False,
+            persist_sql=False,
+            validate_handoff=False,
+        )
     selected_requests = _filter_requests(requests, symbols=symbols, request_ids=request_ids, limit=limit)
     registered_skip_ids: set[str] = set()
     registered_skip_refs: tuple[str, ...] = ()
@@ -460,12 +473,13 @@ def write_dispatch_summary(summary: ProviderDispatchSummary, *, output: TextIO) 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Plan or dispatch autonomous layer provider acquisition.")
-    parser.add_argument("--model-layer", default=LAYER_ONE_MODEL_LAYER, choices=(LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER))
+    parser.add_argument("--model-layer", default=LAYER_ONE_MODEL_LAYER, choices=(LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, LAYER_THREE_TARGET_STATE_MODEL_LAYER))
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
     parser.add_argument("--symbol", action="append", default=[], help="Limit dispatch to one symbol; repeat for multiple symbols.")
+    parser.add_argument("--target-symbol", action="append", default=[], help="Layer 3 target-local symbol; repeat for multiple targets.")
     parser.add_argument("--request-id", action="append", default=[], help="Limit dispatch to one request id; repeat for multiple ids.")
     parser.add_argument("--limit", type=int, help="Limit dispatch to the first N selected requests after symbol/request filtering.")
     parser.add_argument(
@@ -493,6 +507,7 @@ def main(argv: list[str] | None = None) -> int:
         storage_root=args.storage_root,
         trading_data_root=args.trading_data_root,
         symbols=args.symbol,
+        target_symbols=args.target_symbol,
         request_ids=args.request_id,
         limit=args.limit,
         execute_provider_calls=args.execute_provider_calls,

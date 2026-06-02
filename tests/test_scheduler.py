@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 from trading_manager_tasks.model_training_workflow import BASE_STACK_LAYER_COUNT
 from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
@@ -245,6 +246,79 @@ class SchedulerTests(unittest.TestCase):
         self.assertFalse(decision.storage_lifecycle_mutation_performed)
         execute_provider_stage.assert_called_once()
         self.assertEqual(execute_provider_stage.call_args.kwargs["selected_target_symbol"], "AAPL")
+
+    def test_scheduler_reports_first_blocked_stage_instead_of_plan_fallback(self):
+        blocked_stage = SimpleNamespace(
+            stage_id="layer_03_target_state_vector.data_acquisition",
+            status="blocked",
+            blockers=("layer_03_target_local_feed_artifacts_ready",),
+            command=["materialize-l3"],
+            stage_type="data_acquisition",
+        )
+        state = SimpleNamespace(
+            stages=(blocked_stage,),
+            summary_row=lambda: {"stages": [{"stage_id": blocked_stage.stage_id, "status": blocked_stage.status}]},
+        )
+        plan_stage = SimpleNamespace(stage_id="layer_01_market_regime.data_acquisition", command=["layer1"], stage_type="data_acquisition")
+        plan = SimpleNamespace(
+            summary_row=lambda: {"next_stage": {"stage_id": plan_stage.stage_id}},
+            next_stage=plan_stage,
+            layer_one_task_key_count=99,
+            layer_two_task_key_count=99,
+        )
+        with patch("trading_manager_tasks.scheduler.build_model_training_workflow_plan", return_value=plan), patch(
+            "trading_manager_tasks.scheduler.advance_workflow_state", return_value=state
+        ), patch("trading_manager_tasks.scheduler.next_ready_or_blocked_stage", return_value=None), patch(
+            "trading_manager_tasks.scheduler.first_blocked_stage", return_value=blocked_stage
+        ):
+            decision = run_scheduler_once(
+                now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
+                resource_snapshot=self._healthy_resource_snapshot(),
+                selected_target_symbol=None,
+            )
+
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "workflow_stage_blocked")
+        self.assertEqual(decision.selected_work, "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(decision.command, ["materialize-l3"])
+
+    def test_scheduler_surfaces_target_local_provider_work_for_layer_three_blocker(self):
+        blocked_stage = SimpleNamespace(
+            stage_id="layer_03_target_state_vector.data_acquisition",
+            status="blocked",
+            blockers=("layer_03_target_local_feed_artifacts_ready",),
+            command=["materialize-l3"],
+            stage_type="data_acquisition",
+        )
+        state = SimpleNamespace(
+            stages=(blocked_stage,),
+            summary_row=lambda: {"stages": [{"stage_id": blocked_stage.stage_id, "status": blocked_stage.status}]},
+        )
+        plan = SimpleNamespace(
+            summary_row=lambda: {"next_stage": None},
+            next_stage=None,
+            layer_one_task_key_count=99,
+            layer_two_task_key_count=99,
+        )
+        with patch("trading_manager_tasks.scheduler.build_model_training_workflow_plan", return_value=plan), patch(
+            "trading_manager_tasks.scheduler.advance_workflow_state", return_value=state
+        ), patch("trading_manager_tasks.scheduler.next_ready_or_blocked_stage", return_value=None), patch(
+            "trading_manager_tasks.scheduler.first_blocked_stage", return_value=blocked_stage
+        ), patch(
+            "trading_manager_tasks.scheduler._missing_target_local_feed_months", return_value=("2016-07", "2016-08")
+        ):
+            decision = run_scheduler_once(
+                now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
+                resource_snapshot=self._healthy_resource_snapshot(),
+                selected_target_symbol="AAPL",
+                execute_autonomous_provider_stages=False,
+            )
+
+        self.assertEqual(decision.decision_status, "ready")
+        self.assertEqual(decision.reason_code, "target_local_provider_stage_ready")
+        self.assertEqual(decision.selected_work, "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(decision.next_internal_stage, "autonomous_target_local_provider_acquisition")
+        self.assertIn("--target-symbol", decision.command)
 
 
 if __name__ == "__main__":

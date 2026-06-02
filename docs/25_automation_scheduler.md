@@ -66,6 +66,20 @@ the event-observation pool used by later Layer 4 folds.
 
 Layer 2 feature generation also prepares `m02_sector_context_data_acquisition` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
+Layer 3 target-state materialization remains a local source-stage command: it
+turns reviewed target-local `01_feed_alpaca_bars` artifacts into
+`source_03_target_state` and does not call providers. When a target fold is
+blocked only by `layer_03_target_local_feed_artifacts_ready`, the scheduler may
+prepare and dispatch bounded target-local Alpaca bar requests for the selected
+target through the same autonomous provider controls used by Layer 1/2. Once
+those feed artifacts exist, the normal safe offline L3 materialization stage
+continues.
+
+Source-existing bootstrap may seed Layer 3 data acquisition from durable
+`source_03_target_state` rows for the selected target. That prevents a clean
+control-plane reset from redownloading target-local bars when the accepted source
+surface already covers the month.
+
 ## Model Group Reruns
 
 The scheduler does not treat a rerun as "start the same tasks again." A rerun begins with a `model_group_rerun_plan` that names the earliest affected `layer.stage` cutpoint, the affected fold/target scope, a concrete delete set, a protected set, source-data deletion requirements, and the scheduler reentry stage.

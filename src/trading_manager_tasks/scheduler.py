@@ -19,10 +19,28 @@ from pathlib import Path
 from typing import Any, Literal, TextIO
 from zoneinfo import ZoneInfo
 
-from .historical_training import prepare_layer_historical_training_batch, prepare_layer_one_historical_training_batch
-from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
-from .model_training_state import advance_workflow_state, mark_stage_started, next_ready_or_blocked_stage, workflow_state_path_for_month, write_workflow_state
-from .model_training_workflow import LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS, LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS, build_model_training_workflow_plan
+from .historical_training import (
+    prepare_layer_historical_training_batch,
+    prepare_layer_one_historical_training_batch,
+    prepare_target_local_historical_training_batch,
+)
+from .layer_three_target_state import discover_layer_two_feed_artifacts
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_THREE_TARGET_STATE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
+from .model_training_state import (
+    advance_workflow_state,
+    first_blocked_stage,
+    mark_stage_started,
+    next_ready_or_blocked_stage,
+    workflow_state_path_for_month,
+    write_workflow_state,
+)
+from .model_training_workflow import (
+    LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
+    LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
+    LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
+    build_model_training_workflow_plan,
+)
+from .provider_dispatch import dispatch_layer_provider_acquisition
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .stage_executor import execute_next_ready_stage
 from .stage_reconcile import DEFAULT_COMPONENT_STORAGE_ROOT, reconcile_provider_stage
@@ -411,6 +429,105 @@ def _execute_autonomous_provider_stage(
     }
 
 
+def _next_month(month: str) -> str:
+    year = int(month[:4])
+    month_number = int(month[5:])
+    if month_number == 12:
+        return f"{year + 1:04d}-01"
+    return f"{year:04d}-{month_number + 1:02d}"
+
+
+def _missing_target_local_feed_months(*, start_month: str, end_month: str, target_symbol: str, component_storage_root: Path) -> tuple[str, ...]:
+    missing: list[str] = []
+    month = start_month
+    while month <= end_month:
+        refs = discover_layer_two_feed_artifacts(
+            start_month=month,
+            trading_storage_root=component_storage_root,
+            symbols=(target_symbol,),
+        )
+        if not refs:
+            missing.append(month)
+        month = _next_month(month)
+    return tuple(missing)
+
+
+def _target_local_feed_selected_request_ids(*, months: tuple[str, ...], target_symbol: str) -> tuple[str, ...]:
+    symbol = target_symbol.lower()
+    return tuple(f"mgrreq_backfill_alpaca_bars_{symbol}_{month.replace('-', '_')}" for month in months)
+
+
+def _execute_target_local_feed_stage(
+    *,
+    start_month: str,
+    end_month: str,
+    storage_root: Path,
+    component_src_root: Path,
+    target_symbol: str,
+    next_limit: int,
+    max_workers: int,
+) -> dict[str, Any]:
+    missing_months = _missing_target_local_feed_months(
+        start_month=start_month,
+        end_month=end_month,
+        target_symbol=target_symbol,
+        component_storage_root=DEFAULT_COMPONENT_STORAGE_ROOT,
+    )
+    if not missing_months:
+        return {
+            "preparation": None,
+            "dispatch": None,
+            "missing_months_before": [],
+            "missing_months_after": [],
+            "provider_calls": 0,
+            "dispatch_performed": False,
+            "model_activation_performed": False,
+            "broker_execution_performed": False,
+            "storage_lifecycle_mutation_performed": False,
+        }
+    preparation, _requests, _payloads, _validations = prepare_target_local_historical_training_batch(
+        start_month=start_month,
+        end_month=end_month,
+        target_symbols=(target_symbol,),
+        storage_root=storage_root,
+        component_src_root=component_src_root,
+        write=True,
+        persist_sql=True,
+        validate_handoff=True,
+    )
+    request_ids = _target_local_feed_selected_request_ids(months=missing_months, target_symbol=target_symbol)[:next_limit]
+    dispatch = dispatch_layer_provider_acquisition(
+        model_layer=LAYER_THREE_TARGET_STATE_MODEL_LAYER,
+        start_month=start_month,
+        end_month=end_month,
+        storage_root=storage_root,
+        target_symbols=(target_symbol,),
+        request_ids=request_ids,
+        execute_provider_calls=True,
+        continue_on_error=True,
+        skip_registered_failures=False,
+        dynamic_workers=True,
+        max_workers=max_workers,
+    )
+    missing_after = _missing_target_local_feed_months(
+        start_month=start_month,
+        end_month=end_month,
+        target_symbol=target_symbol,
+        component_storage_root=DEFAULT_COMPONENT_STORAGE_ROOT,
+    )
+    return {
+        "preparation": preparation.summary_row(),
+        "dispatch": dispatch.summary_row(),
+        "missing_months_before": list(missing_months),
+        "missing_months_after": list(missing_after),
+        "provider_calls": dispatch.provider_calls,
+        "dispatch_performed": dispatch.dispatch_performed,
+        "model_activation_performed": dispatch.model_activation_performed,
+        "broker_execution_performed": dispatch.broker_execution_performed,
+        "storage_lifecycle_mutation_performed": False,
+    }
+
+
 def run_scheduler_once(
     *,
     now_utc: datetime | None = None,
@@ -509,6 +626,7 @@ def run_scheduler_once(
         write=False,
     )
     workflow_next_stage = next_ready_or_blocked_stage(workflow_state)
+    workflow_blocked_stage = first_blocked_stage(workflow_state)
     if workflow_next_stage is None and all(stage.status in {"succeeded", "not_applicable"} for stage in workflow_state.stages):
         return SchedulerDecision(
             contract_type="manager_scheduler_decision",
@@ -529,6 +647,96 @@ def run_scheduler_once(
                 next_internal_stage="chronological_month_advance",
             ),
         )
+    target_symbol = selected_target_symbol.strip().upper() if selected_target_symbol and selected_target_symbol.strip() else None
+    if (
+        workflow_next_stage is None
+        and workflow_blocked_stage is not None
+        and workflow_blocked_stage.stage_id == "layer_03_target_state_vector.data_acquisition"
+        and LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER in workflow_blocked_stage.blockers
+        and target_symbol
+    ):
+        missing_months = _missing_target_local_feed_months(
+            start_month=start_month,
+            end_month=end_month,
+            target_symbol=target_symbol,
+            component_storage_root=DEFAULT_COMPONENT_STORAGE_ROOT,
+        )
+        if missing_months:
+            command = [
+                "PYTHONPATH=src",
+                "python3",
+                "scripts/tasks/dispatch_provider_acquisition.py",
+                "--model-layer",
+                LAYER_THREE_TARGET_STATE_MODEL_LAYER,
+                "--start-month",
+                start_month,
+                "--end-month",
+                end_month,
+                "--target-symbol",
+                target_symbol,
+                "--execute-provider-calls",
+                "--continue-on-error",
+            ]
+            if not execute_autonomous_provider_stages:
+                return SchedulerDecision(
+                    contract_type="manager_scheduler_decision",
+                    now_utc=now.isoformat(),
+                    now_et=now_et.isoformat(),
+                    decision_status="ready",
+                    reason_code="target_local_provider_stage_ready",
+                    reason=f"Layer 3 target-local feed artifacts are missing for {target_symbol}; autonomous target-local provider acquisition can fill {len(missing_months)} month(s)",
+                    market_protection_active=False,
+                    resource_pressure_active=False,
+                    selected_work=workflow_blocked_stage.stage_id,
+                    command=command,
+                    next_internal_stage="autonomous_target_local_provider_acquisition",
+                    execution_summary={
+                        "missing_months": list(missing_months),
+                        "workflow_plan": workflow_plan.summary_row(),
+                        "workflow_state": workflow_state.summary_row(),
+                    },
+                    lock_plan=scheduler_lock_plan(
+                        month=start_month,
+                        selected_work=workflow_blocked_stage.stage_id,
+                        next_internal_stage="autonomous_target_local_provider_acquisition",
+                    ),
+                )
+            with acquire_scheduler_lock(
+                month_stage_lock_ref(start_month, workflow_blocked_stage.stage_id, locks_dir=storage_root / "runtime" / "locks")
+            ):
+                execution_summary = _execute_target_local_feed_stage(
+                    start_month=start_month,
+                    end_month=end_month,
+                    storage_root=storage_root,
+                    component_src_root=component_src_root,
+                    target_symbol=target_symbol,
+                    next_limit=provider_stage_next_limit,
+                    max_workers=provider_stage_max_workers,
+                )
+            return SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc=now.isoformat(),
+                now_et=now_et.isoformat(),
+                decision_status="executed",
+                reason_code="target_local_provider_stage_executed",
+                reason="executed one bounded autonomous target-local provider-dispatch slice for Layer 3 feed artifacts",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work=workflow_blocked_stage.stage_id,
+                command=command,
+                next_internal_stage="autonomous_target_local_provider_acquisition",
+                provider_calls=int(execution_summary.get("provider_calls") or 0),
+                dispatch_performed=bool(execution_summary.get("dispatch_performed")),
+                model_activation_performed=bool(execution_summary.get("model_activation_performed")),
+                broker_execution_performed=bool(execution_summary.get("broker_execution_performed")),
+                storage_lifecycle_mutation_performed=bool(execution_summary.get("storage_lifecycle_mutation_performed")),
+                execution_summary=execution_summary | {"workflow_plan": workflow_plan.summary_row(), "workflow_state": workflow_state.summary_row()},
+                lock_plan=scheduler_lock_plan(
+                    month=start_month,
+                    selected_work=workflow_blocked_stage.stage_id,
+                    next_internal_stage="autonomous_target_local_provider_acquisition",
+                ),
+            )
     if workflow_next_stage and workflow_next_stage.status == "ready" and workflow_next_stage.stage_id in PROVIDER_STAGE_MODEL_LAYERS:
         if not execute_autonomous_provider_stages:
             return SchedulerDecision(
@@ -648,7 +856,7 @@ def run_scheduler_once(
 
     preparation_model_layer = _next_preparation_model_layer(workflow_plan=workflow_plan, workflow_state=workflow_state)
     if preparation_model_layer is None:
-        next_stage = workflow_next_stage or workflow_plan.next_stage
+        next_stage = workflow_next_stage or workflow_blocked_stage or workflow_plan.next_stage
         return SchedulerDecision(
             contract_type="manager_scheduler_decision",
             now_utc=now.isoformat(),

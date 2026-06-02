@@ -28,6 +28,7 @@ DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
 )
 LAYER_ONE_MODEL_LAYER = "layer_01_market_regime"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
+LAYER_THREE_TARGET_STATE_MODEL_LAYER = "layer_03_target_state_vector"
 SUPPORTED_MARKET_REGIME_MODEL_LAYERS = (LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER)
 SUPPORTED_FEATURE_GRAINS = {"1m", "30m", "1d"}
 MARKET_CONTEXT_SOURCE_TIMEFRAME = "1Min"
@@ -360,6 +361,54 @@ def plan_monthly_backfill_requests(
                     )
             else:
                 planned.append(_plan_source_window(source=source, window=window, requested_by=requested_by))
+    return planned
+
+
+def plan_target_local_alpaca_bar_requests(
+    *,
+    start_month: str = DEFAULT_START_MONTH,
+    end_month: str,
+    target_symbols: Iterable[str],
+    requested_by: str = DEFAULT_REQUESTED_BY,
+) -> list[dict[str, object]]:
+    """Plan Layer 3 target-local Alpaca bar requests for selected targets."""
+
+    requested_start = Month.parse(start_month)
+    accepted_start = Month.parse(DEFAULT_START_MONTH)
+    effective_start = accepted_start if requested_start < accepted_start else requested_start
+    requested_end = Month.parse(end_month)
+    if requested_end < requested_start:
+        raise ValueError("end_month must be >= start_month")
+    if requested_end < effective_start:
+        return []
+
+    symbols = tuple(dict.fromkeys(symbol.strip().upper() for symbol in target_symbols if symbol and symbol.strip()))
+    if not symbols:
+        raise ValueError("target_symbols must contain at least one symbol")
+
+    alpaca_bars = next(source for source in DEFAULT_SOURCES if source.source_id == "alpaca_bars")
+    source_start = alpaca_bars.effective_start(effective_start)
+    if source_start is None or source_start > requested_end:
+        return []
+
+    planned: list[dict[str, object]] = []
+    for window in iter_monthly_windows(str(effective_start), str(requested_end)):
+        if Month.parse(window.month) < source_start:
+            continue
+        for symbol in symbols:
+            member = MarketRegimeUniverseMember(
+                symbol=symbol,
+                model_layer=LAYER_THREE_TARGET_STATE_MODEL_LAYER,
+                feature_grain="1m",
+                timeframe=MARKET_CONTEXT_SOURCE_TIMEFRAME,
+                exposure_type="selected_target",
+                universe_type="target_local",
+            )
+            row = _plan_source_window(source=alpaca_bars, window=window, requested_by=requested_by, universe_member=member)
+            row["universe_ref"] = "manager_model_training_target_queue.selected_target_symbol"
+            row["policy_refs"] = [*DEFAULT_POLICY_REFS, "layer_03_target_local_feed_artifacts_ready"]
+            row["priority"] = "high"
+            planned.append(row)
     return planned
 
 
