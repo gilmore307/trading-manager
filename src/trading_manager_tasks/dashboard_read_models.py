@@ -2692,6 +2692,50 @@ def _replay_month_progress(
     }
 
 
+def _replay_dataset_month_operation_progress(
+    *,
+    dataset_root: Path,
+    stage_id: str,
+) -> dict[str, Any]:
+    rows_by_month: dict[str, list[Mapping[str, str]]] = {}
+    for row in _replay_coverage_rows(dataset_root / "feed_acquisition_plan.csv"):
+        month = str(row.get("month") or "").strip()
+        if month:
+            rows_by_month.setdefault(month, []).append(row)
+    expected = len(rows_by_month) or _replay_window_month_count(dataset_root)
+    ready = 0
+    missing_source_months = 0
+    deferred_source_months = 0
+    for rows in rows_by_month.values():
+        month_ready = bool(rows)
+        for row in rows:
+            status = str(row.get("coverage_status") or "").strip().lower()
+            if status not in {"available", "succeeded", "complete", "completed"}:
+                month_ready = False
+            if status == "missing":
+                missing_source_months += 1
+            if status == "deferred":
+                deferred_source_months += 1
+        if month_ready:
+            ready += 1
+    pending = max(expected - ready, 0)
+    return {
+        "stage_id": stage_id,
+        "status": "complete" if expected > 0 and ready >= expected else "partial_ready",
+        "unit_label": "replay months",
+        "expected_count": expected,
+        "ready_count": ready,
+        "pending_count": pending,
+        "failed_count": 0,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": False,
+        "progress_source": "replay_dataset_month_operations",
+        "progress_basis": "monthly acquire-replay-cleanup operations required before downstream evaluation",
+        "missing_source_month_count": missing_source_months,
+        "deferred_source_month_count": deferred_source_months,
+    }
+
+
 def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | None:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
@@ -3227,19 +3271,10 @@ def _model_group_replay_timeline_tasks(
         else "Waiting for pre-replay Layer 1-9 model generation to complete before replay can run."
     )
     if manifest is not None and replay_scope_status["compatible"] and not coverage_complete:
-        replay_progress = {
-            "stage_id": "model_group.replay",
-            "status": "partial_ready",
-            "unit_label": "source-months",
-            "expected_count": expected,
-            "ready_count": ready,
-            "pending_count": missing,
-            "failed_count": 0,
-            "accepted_failed_count": deferred,
-            "can_unlock_downstream": False,
-            "progress_source": "replay_dataset_source_months",
-            "progress_basis": "source-month data acquisitions required before target-bound replay can start",
-        }
+        replay_progress = _replay_dataset_month_operation_progress(
+            dataset_root=dataset_root,
+            stage_id="model_group.replay",
+        )
 
     append_task(
         task_id="model_group.replay",
