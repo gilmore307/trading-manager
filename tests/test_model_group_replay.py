@@ -28,7 +28,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "freeze_status": "frozen",
                     "missing_feed_acquisition_count": 0,
                     "feed_acquisition_plan_ref": str(plan_path),
-                    "tradable_target_refs": ["AAPL"],
+                    "pre_replay_target_refs": ["AAPL"],
                 }
             )
             + "\n",
@@ -93,7 +93,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {"contract_type": "evaluation_replay_progress", "stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-02", "status": "completed"},
                 ]
                 progress_path.write_text("\\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\\n", encoding="utf-8")
-                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": run_id, "candidate_model_ref": candidate_model_ref, "tradable_target_refs": ["AAPL"], "target_refs": ["AAPL"], "decision_row_count": 2}))
+                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": run_id, "candidate_model_ref": candidate_model_ref, "pre_replay_target_refs": ["AAPL"], "target_refs": ["AAPL"], "decision_row_count": 2}))
                 """
             ).strip()
             + "\n",
@@ -217,7 +217,7 @@ class ModelGroupReplayTests(unittest.TestCase):
 
         self.assertIsNone(decision)
 
-    def test_replay_tradable_universe_without_training_symbol_does_not_block_dataset(self):
+    def test_replay_base_context_without_training_symbol_does_not_block_dataset(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -225,7 +225,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             dataset_root = self._write_dataset(storage_root)
             manifest_path = dataset_root / "dataset_manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["tradable_target_refs"] = ["BTC", "ETH", "SOL"]
+            manifest["pre_replay_target_refs"] = ["BTC", "ETH", "SOL"]
             manifest.pop("target_refs", None)
             manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
             self._write_completed_fold(storage_root)
@@ -296,7 +296,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "compatible_run",
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
-                        "tradable_target_refs": ["BTC", "ETH", "SOL"],
+                        "pre_replay_target_refs": ["BTC", "ETH", "SOL"],
                         "target_refs": ["AAPL"],
                         "validation_status": "passed",
                     }

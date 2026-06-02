@@ -361,18 +361,16 @@ def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, A
             "compatible": False,
             "reason": f"replay dataset fold {manifest_fold_id} does not match completed training fold {fold_id}",
             "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": str(training_fold.get("target_symbol") or "").strip().upper(),
         }
     return {
         "compatible": True,
-        "reason": "replay dataset is eligible for fold-bound live-equivalent tradable universe replay",
+        "reason": "replay dataset is eligible for fold-bound execution-component-graph replay",
         "dataset_target_refs": sorted(target_refs),
-        "training_target_symbol": str(training_fold.get("target_symbol") or "").strip().upper(),
     }
 
 
 def _replay_dataset_target_refs(*, dataset_root: Path, manifest: Mapping[str, Any]) -> set[str]:
-    refs = _string_set(manifest.get("tradable_target_refs"))
+    refs = _string_set(manifest.get("pre_replay_target_refs"))
     for row in _csv_rows(dataset_root / "feed_acquisition_plan.csv"):
         source_id = str(row.get("source_id") or "").strip()
         coverage_status = str(row.get("coverage_status") or "").strip().lower()
@@ -454,7 +452,7 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     fold_id = str(training_fold.get("fold_id") or "")
     if receipt_fold_id and fold_id and receipt_fold_id != fold_id:
         return {"compatible": False, "reason": "replay fold mismatch"}
-    return {"compatible": True, "reason": "compatible fold-bound live-equivalent tradable universe replay receipt"}
+    return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
 
 def _ready_replay_months(dataset_root: Path, replay_run_ids: set[str] | None = None) -> set[str]:

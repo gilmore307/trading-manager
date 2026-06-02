@@ -2063,8 +2063,7 @@ def _candidate_model_ref_target_part(target_symbol: str | None) -> str:
 
 def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
     candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "")
-    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
-    target_refs = _string_set(replay_receipt.get("tradable_target_refs") or replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
+    target_refs = _string_set(replay_receipt.get("pre_replay_target_refs") or replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
     receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "").strip()
     training_fold_id = str(training_fold.get("fold_id") or "").strip()
     if "current_deterministic_crypto_policy" in candidate_model_ref:
@@ -2073,7 +2072,6 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
             "reason": "replay receipt used deterministic crypto placeholder policy instead of completed fold model artifacts",
             "candidate_model_ref": candidate_model_ref,
             "receipt_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
         }
     if receipt_fold_id and training_fold_id and receipt_fold_id != training_fold_id:
         return {
@@ -2081,14 +2079,12 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
             "reason": f"replay receipt fold {receipt_fold_id} does not match completed training fold {training_fold_id}",
             "candidate_model_ref": candidate_model_ref,
             "receipt_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
         }
     return {
         "compatible": True,
-        "reason": "replay receipt is eligible for fold-bound live-equivalent tradable universe evaluation",
+        "reason": "replay receipt is eligible for fold-bound execution-component-graph replay evaluation",
         "candidate_model_ref": candidate_model_ref,
         "receipt_target_refs": sorted(target_refs),
-        "training_target_symbol": target_symbol,
     }
 
 

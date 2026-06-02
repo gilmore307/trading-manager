@@ -2628,7 +2628,6 @@ def _replay_dataset_scope_status(
     selected_target_symbol: str | None,
     completed_training_fold: tuple[str, str, str | None] | None,
 ) -> dict[str, Any]:
-    target_symbol = str(selected_target_symbol or (completed_training_fold[2] if completed_training_fold else "") or "").strip().upper()
     target_refs = _replay_dataset_target_refs(dataset_root=dataset_root, manifest=manifest or {})
     manifest_fold_id = str((manifest or {}).get("candidate_fold_id") or (manifest or {}).get("fold_id") or "").strip()
     if completed_training_fold is not None:
@@ -2640,18 +2639,16 @@ def _replay_dataset_scope_status(
                 "compatible": False,
                 "reason": f"Replay dataset fold {manifest_fold_id} does not match completed training fold {expected_fold_id}.",
                 "dataset_target_refs": sorted(target_refs),
-                "training_target_symbol": target_symbol,
             }
     return {
         "compatible": True,
-        "reason": "Replay dataset is eligible for fold-bound live-equivalent tradable universe replay.",
+        "reason": "Replay dataset is eligible for fold-bound execution-component-graph replay.",
         "dataset_target_refs": sorted(target_refs),
-        "training_target_symbol": target_symbol,
     }
 
 
 def _replay_dataset_target_refs(*, dataset_root: Path, manifest: Mapping[str, Any]) -> set[str]:
-    refs = _string_set(manifest.get("tradable_target_refs"))
+    refs = _string_set(manifest.get("pre_replay_target_refs"))
     for row in _replay_coverage_rows(dataset_root / "feed_acquisition_plan.csv"):
         source_id = str(row.get("source_id") or "").strip()
         coverage_status = str(row.get("coverage_status") or "").strip().lower()
@@ -2735,7 +2732,7 @@ def _replay_month_progress(
         "accepted_failed_count": 0,
         "can_unlock_downstream": expected > 0 and ready >= expected,
         "progress_source": "replay_window_months",
-        "progress_basis": "event replay months in the fold and live-equivalent tradable-universe replay window",
+        "progress_basis": "event replay months in the fold and execution-component-graph replay window",
     }
 
 
@@ -3250,7 +3247,7 @@ def _model_group_replay_timeline_tasks(
                 "end_month": replay_end_month,
                 "contract_id": contract_id,
                 "target_required": False,
-                "description": "Model-group replay window used to test the candidate policy against the live-equivalent tradable universe.",
+                "description": "Model-group replay window used to test the candidate policy against the execution component graph.",
             },
             "worker": worker_info,
             "progress": progress,
@@ -3414,7 +3411,7 @@ def _model_group_replay_timeline_tasks(
         if pre_replay_complete and manifest is not None and not coverage_complete
         else f"Replay dataset is covered but not frozen; current freeze_status={freeze_status}."
         if pre_replay_complete and manifest is not None and coverage_complete and not freeze_ready
-        else "Replay dataset is frozen and ready for fold-bound live-equivalent tradable universe replay."
+        else "Replay dataset is frozen and ready for fold-bound execution-component-graph replay."
         if pre_replay_complete and manifest is not None and freeze_ready and not replay_complete
         else "Waiting for pre-replay Layer 1-9 model generation to complete before replay can run."
     )
