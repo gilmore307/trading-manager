@@ -44,7 +44,7 @@ class LayerNineFeatureStageTests(unittest.TestCase):
             self.assertEqual(summary.provider_calls, 0)
             receipt = json.loads(Path(summary.receipt_path or "").read_text(encoding="utf-8"))
             self.assertEqual(receipt["manager_stage_id"], "layer_09_option_expression.feature_generation")
-            self.assertEqual(receipt["runs"][0]["row_counts"]["feature_09_option_expression_rows_required"], 0)
+            self.assertEqual(receipt["runs"][0]["row_counts"]["m09_option_expression_feature_generation_rows_required"], 0)
 
     def test_active_gate_review_delegates_to_trading_data_feature_generator(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.layer_nine_feature_stage.option_source_row_count", return_value=2), patch("trading_manager_tasks.layer_nine_feature_stage.subprocess.run") as run:
@@ -110,7 +110,7 @@ class LayerNineFeatureStageTests(unittest.TestCase):
             receipt = json.loads(Path(summary.receipt_path or "").read_text(encoding="utf-8"))
             self.assertEqual(receipt["manager_stage_id"], "layer_09_option_expression.feature_generation")
             self.assertEqual(receipt["status"], "failed")
-            self.assertEqual(receipt["runs"][0]["row_counts"]["feature_09_option_expression_rows_generated"], 0)
+            self.assertEqual(receipt["runs"][0]["row_counts"]["m09_option_expression_feature_generation_rows_generated"], 0)
 
 
 if __name__ == "__main__":

@@ -28,11 +28,11 @@ from .storage_paths import data_storage_root
 
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_09_option_expression" / "gate_review"
-DEFAULT_SOURCE_OUTPUT_ROOT = data_storage_root() / "layer_09_option_expression" / "source_05_option_expression"
+DEFAULT_SOURCE_OUTPUT_ROOT = data_storage_root() / "layer_09_option_expression" / "m09_option_expression_data_acquisition"
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 STAGE_ID = "layer_09_option_expression.data_acquisition"
 SOURCE_ID = "m09_option_expression_data_acquisition"
-TARGET_COMPONENT_ID = "source_05_option_expression"
+TARGET_COMPONENT_ID = "m09_option_expression_data_acquisition"
 OPTION_BUCKET_POLICY_REF = "LAYER_09_OPTION_BUCKET_STRIKE_POLICY"
 DEFAULT_OPTION_SNAPSHOT_MAX_DTE = 45
 DEFAULT_OPTION_SNAPSHOT_STRIKE_RANGE = 5
@@ -158,11 +158,11 @@ def _request_id(row: Mapping[str, Any], *, start_month: str) -> str:
 
 
 def _task_key_path_for_request(request_id: str, *, start_month: str, storage_root: Path = DEFAULT_STORAGE_ROOT) -> Path:
-    return storage_root / "runtime" / "layer_09_option_expression" / "source_05_option_expression" / start_month / request_id / "task_key.json"
+    return storage_root / "runtime" / "layer_09_option_expression" / "m09_option_expression_data_acquisition" / start_month / request_id / "task_key.json"
 
 
 def _task_key_ref_for_request(request_id: str, *, start_month: str) -> str:
-    return f"storage://trading-manager/runtime/layer_09_option_expression/source_05_option_expression/{start_month}/{request_id}/task_key.json"
+    return f"storage://trading-manager/runtime/layer_09_option_expression/m09_option_expression_data_acquisition/{start_month}/{request_id}/task_key.json"
 
 
 def _source_output_root_for_request(request_id: str, *, start_month: str, source_output_root: Path = DEFAULT_SOURCE_OUTPUT_ROOT) -> Path:
@@ -268,7 +268,7 @@ def fetch_layer_8_rows(*, database_url: str, start_month: str, end_month: str) -
           SELECT DISTINCT ON (target_candidate_id)
             source.target_candidate_id,
             source.symbol AS underlying
-          FROM trading_data.source_03_target_state source
+          FROM trading_data.m03_target_state_vector_data_acquisition source
           JOIN (SELECT DISTINCT target_candidate_id FROM l8_rows) ids USING (target_candidate_id)
           ORDER BY source.target_candidate_id, source.available_time ASC
         )
@@ -411,7 +411,7 @@ def prepare_layer_nine_option_acquisition(
         start_month=start_month,
         end_month=end_month,
         layer_8_rows=rows,
-        evidence_refs=("sql:trading_model.model_08_underlying_action", "sql:trading_data.source_03_target_state"),
+        evidence_refs=("sql:trading_model.model_08_underlying_action", "sql:trading_data.m03_target_state_vector_data_acquisition"),
     )
     if write:
         review_path, receipt_path = write_gate_review_artifacts(review, output_root=output_root)
@@ -497,7 +497,7 @@ def dispatch_layer_nine_option_acquisition(
     dynamic_workers: bool = True,
     max_workers: int = 4,
 ) -> ProviderDispatchSummary:
-    """Plan or dispatch reviewed Layer 9 source_05 option snapshot acquisition."""
+    """Plan or dispatch reviewed Layer 9 M09 option snapshot acquisition."""
 
     rows = _layer_nine_request_rows(start_month=start_month, end_month=end_month, request_ids=request_ids, database_url=database_url)
     if limit is not None:
@@ -525,7 +525,7 @@ def dispatch_layer_nine_option_acquisition(
             runtime_task_key.write_text(json.dumps(_runtime_task_key(task_key), indent=2, sort_keys=True) + "\n", encoding="utf-8")
             command_path = runtime_task_key
             runtime_retained = True
-        command = ["python3", "-m", "data_source.source_05_option_expression", str(command_path), "--run-id", _run_id(request_id)]
+        command = ["python3", "-m", "data_source.m09_option_expression_data_acquisition", str(command_path), "--run-id", _run_id(request_id)]
         receipt_path = str(Path(str(task_key.get("output_root") or "")) / "completion_receipt.json")
         status = "validated_not_dispatched"
         return_code = None

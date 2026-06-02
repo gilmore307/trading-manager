@@ -29,7 +29,7 @@ DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_10_event_risk_governor" / "input_materialization"
-DETECTOR_SOURCE = "source_10_event_risk_governor.equity_abnormal_activity"
+DETECTOR_SOURCE = "m10_event_risk_governor_data_acquisition.equity_abnormal_activity"
 SOURCE = "m10_event_risk_governor_data_acquisition"
 REQUIRED_EVENT_FEED_ARTIFACTS = {
     "alpaca_news": "equity_news.csv",
@@ -244,7 +244,7 @@ def _run_detector(
     event_count = 0
     status = "prepared"
     if write:
-        command = [sys.executable, "-m", "data_source.source_10_event_risk_governor.equity_abnormal_activity", str(task_key_path), "--run-id", f"{run_id}_{symbol.lower()}"]
+        command = [sys.executable, "-m", "data_source.m10_event_risk_governor_data_acquisition.equity_abnormal_activity", str(task_key_path), "--run-id", f"{run_id}_{symbol.lower()}"]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs" / "detectors"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -499,7 +499,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
     source_receipt_path: str | None = None
     source_event_count = len(events)
     if write:
-        command = [sys.executable, "-m", "data_source.source_10_event_risk_governor", str(source_task_key_path), "--run-id", run_id]
+        command = [sys.executable, "-m", "data_source.m10_event_risk_governor_data_acquisition", str(source_task_key_path), "--run-id", run_id]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)

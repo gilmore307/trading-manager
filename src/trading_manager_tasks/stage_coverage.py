@@ -90,7 +90,7 @@ def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
 
 def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str) -> bool:
     if stage_id == "layer_09_option_expression.data_acquisition":
-        if row.get("target_component_id") != "source_05_option_expression":
+        if row.get("target_component_id") != "m09_option_expression_data_acquisition":
             return False
         if row.get("request_kind") != "option_snapshot":
             return False

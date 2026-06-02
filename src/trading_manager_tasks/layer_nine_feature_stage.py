@@ -3,10 +3,11 @@
 The Layer 9 option-expression feature stage has two valid paths:
 
 * if the reviewed Layer 8 gate accepted a no-provider/no-active-target skip,
-  feature generation is also a reviewed no-op because no source_05 option
-  rows are required for deterministic no-option model rows;
-* otherwise, after provider acquisition has populated source_05 for the current
-  fold, the adapter delegates to trading-data's feature_09 SQL generator.
+  feature generation is also a reviewed no-op because no M09 option source rows
+  are required for deterministic no-option model rows;
+* otherwise, after provider acquisition has populated the M09 option-expression
+  source for the current fold, the adapter delegates to trading-data's M09
+  feature generator.
 """
 
 from __future__ import annotations
@@ -103,8 +104,8 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
                 "output_refs": [str(gate_review_path)],
                 "row_counts": {
                     "active_layer_8_request_candidates": int(gate_review.get("active_request_count") or 0),
-                    "source_05_option_expression_rows_required": 0,
-                    "feature_09_option_expression_rows_required": 0,
+                    "m09_option_expression_data_acquisition_rows_required": 0,
+                    "m09_option_expression_feature_generation_rows_required": 0,
                 },
             }
         ],
@@ -115,7 +116,7 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
         "storage_lifecycle_mutation_performed": False,
         "reason": (
             "Reviewed Layer 8 gate accepted no-provider/no-active-target skip; "
-            "source_05 and feature_08 rows are not required before deterministic no-option model generation."
+            "M09 option-expression source and feature rows are not required before deterministic no-option model generation."
         ),
         "evidence_refs": [str(gate_review_path)],
         "start_month": start_month,
@@ -143,8 +144,8 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ga
                 "output_refs": [str(gate_review_path)],
                 "row_counts": {
                     "active_layer_8_request_candidates": int(gate_review.get("active_request_count") or 0),
-                    "source_05_option_expression_rows_available": 0,
-                    "feature_09_option_expression_rows_generated": 0,
+                    "m09_option_expression_data_acquisition_rows_available": 0,
+                    "m09_option_expression_feature_generation_rows_generated": 0,
                 },
             }
         ],
@@ -155,7 +156,7 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ga
         "storage_lifecycle_mutation_performed": False,
         "reason": (
             "Layer 8 produced active target-chain rows, but the current fold has no "
-            "source_05/m09 option-expression source rows. Layer 9 feature generation "
+            "m09_option_expression_data_acquisition rows. Layer 9 feature generation "
             "must wait for reviewed option source acquisition instead of continuing "
             "with optionable_chain_missing fallback."
         ),
@@ -270,13 +271,13 @@ def execute_layer_nine_feature_stage(
     command = (
         "python3",
         "-m",
-        "data_feature.feature_09_option_expression",
+        "data_feature.m09_option_expression_feature_generation",
         "--source-start",
         _month_start(start_month),
         "--source-end",
         _exclusive_month_start(end_month),
         "--run-id",
-        f"feature_09_option_expression_{start_month}",
+        f"m09_option_expression_feature_generation_{start_month}",
     )
     result = subprocess.run(
         list(command),

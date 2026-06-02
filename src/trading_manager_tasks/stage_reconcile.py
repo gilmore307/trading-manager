@@ -125,7 +125,7 @@ def discover_stage_receipts(
     if stage_id == "layer_09_option_expression.data_acquisition":
         refs: list[StageReceiptRef] = []
         for row in fetch_manager_requests(database_url=database_url):
-            if row.get("target_component_id") != "source_05_option_expression" or row.get("request_kind") != "option_snapshot":
+            if row.get("target_component_id") != "m09_option_expression_data_acquisition" or row.get("request_kind") != "option_snapshot":
                 continue
             text = " ".join(str(row.get(key) or "") for key in ("request_id", "parameter_ref"))
             if start_month not in text and end_month not in text:
@@ -193,8 +193,8 @@ def normalize_stage_receipts(refs: Sequence[StageReceiptRef]) -> CompletionRecei
             normalize_completion_receipt(
                 receipt,
                 request_id=ref.request_id,
-                component_id="source_05_option_expression" if ref.receipt_path.as_posix().find("source_05_option_expression") >= 0 else "01_feed_alpaca_bars",
-                component_kind="data_source" if ref.receipt_path.as_posix().find("source_05_option_expression") >= 0 else "data_feed",
+                component_id="m09_option_expression_data_acquisition" if ref.receipt_path.as_posix().find("m09_option_expression_data_acquisition") >= 0 else "01_feed_alpaca_bars",
+                component_kind="data_source" if ref.receipt_path.as_posix().find("m09_option_expression_data_acquisition") >= 0 else "data_feed",
                 repo_id="trading-data",
                 receipt_uri=ref.receipt_uri,
                 ready_signal_kind="component_task_ready",
@@ -233,7 +233,7 @@ def propose_failure_register_rows(
                         "request_id": ref.request_id,
                         "run_id": run_id,
                         "stage_id": stage_id,
-                        "target_component_id": "source_05_option_expression" if stage_id == "layer_09_option_expression.data_acquisition" else "01_feed_alpaca_bars",
+                        "target_component_id": "m09_option_expression_data_acquisition" if stage_id == "layer_09_option_expression.data_acquisition" else "01_feed_alpaca_bars",
                         "source_id": "m09_option_expression_data_acquisition" if stage_id == "layer_09_option_expression.data_acquisition" else "alpaca_bars",
                         "symbol": ref.symbol,
                         "start_month": start_month,

@@ -34,7 +34,7 @@ SOURCE_TIMEZONE = "America/New_York"
 STAGE_SOURCE_TABLES: Mapping[str, str] = {
     "layer_01_market_regime.data_acquisition": "trading_data.m01_market_regime_data_acquisition",
     "layer_02_sector_context.data_acquisition": "trading_data.m01_market_regime_data_acquisition",
-    "layer_03_target_state_vector.data_acquisition": "trading_data.source_03_target_state",
+    "layer_03_target_state_vector.data_acquisition": "trading_data.m03_target_state_vector_data_acquisition",
 }
 
 
@@ -262,7 +262,7 @@ def build_source_coverages_from_counts(
                 )
             )
         else:
-            warnings.append("selected_target_symbol missing; source_03_target_state bootstrap was skipped")
+            warnings.append("selected_target_symbol missing; m03_target_state_vector_data_acquisition bootstrap was skipped")
         event_coverages.append(_event_source_coverage(month=month, row_count=int(source_10_counts.get(month, 0))))
     return tuple(stage_coverages), tuple(event_coverages), tuple(dict.fromkeys(warnings))
 
@@ -325,14 +325,14 @@ def _fetch_source_counts_from_database(
             else:
                 warnings.append("missing table trading_data.m01_market_regime_data_acquisition")
 
-            if table_exists(cursor, "trading_data.source_03_target_state") and target:
+            if table_exists(cursor, "trading_data.m03_target_state_vector_data_acquisition") and target:
                 cursor.execute(
                     f"""
                     SELECT
                       to_char(date_trunc('month', timestamp AT TIME ZONE %s), 'YYYY-MM') AS month,
                       upper(symbol) AS symbol,
                       count(*)::BIGINT AS row_count
-                    FROM trading_data.source_03_target_state
+                    FROM trading_data.m03_target_state_vector_data_acquisition
                     WHERE timestamp >= (%s::date AT TIME ZONE %s)
                       AND timestamp < (%s::date AT TIME ZONE %s)
                       AND upper(symbol) = %s
@@ -343,9 +343,9 @@ def _fetch_source_counts_from_database(
                 for row in cursor.fetchall():
                     source_03.setdefault(str(row["month"]), {})[str(row["symbol"])] = int(row["row_count"])
             elif not target:
-                warnings.append("selected_target_symbol missing; source_03_target_state database scan skipped")
+                warnings.append("selected_target_symbol missing; m03_target_state_vector_data_acquisition database scan skipped")
             else:
-                warnings.append("missing table trading_data.source_03_target_state")
+                warnings.append("missing table trading_data.m03_target_state_vector_data_acquisition")
 
             if table_exists(cursor, "trading_data.m10_event_risk_governor_data_acquisition"):
                 cursor.execute(
@@ -536,7 +536,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Bootstrap historical workflow state from already-existing source data.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
-    parser.add_argument("--target-symbol", help="Target symbol used to validate source_03_target_state coverage.")
+    parser.add_argument("--target-symbol", help="Target symbol used to validate m03_target_state_vector_data_acquisition coverage.")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--report-root", type=Path)
     parser.add_argument("--database-url")

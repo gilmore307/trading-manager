@@ -402,7 +402,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         command = plan.layers[2].feature_command
 
-        self.assertIn("data_feature.feature_03_target_state_vector", command)
+        self.assertIn("data_feature.m03_target_state_vector_feature_generation", command)
         self.assertIn("--source-start", command)
         self.assertIn("${START_MONTH_START_ET}", command)
         self.assertIn("--source-end", command)

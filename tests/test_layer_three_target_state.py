@@ -66,7 +66,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
                 refs=refs,  # type: ignore[arg-type]
             )
 
-            self.assertEqual(task_key["source"], "source_03_target_state")
+            self.assertEqual(task_key["source"], "m03_target_state_vector_data_acquisition")
             self.assertEqual(bar_count, 1)
             self.assertTrue(task_key_path.exists())
             self.assertTrue(candidate_path.exists())

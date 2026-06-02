@@ -70,7 +70,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(len(previews), 1)
         self.assertTrue(previews[0].request_id.startswith("mgrreq_layer9_option_snapshot_aapl_2016_01_"))
         self.assertEqual(previews[0].provider, "thetadata")
-        self.assertEqual(previews[0].target_component_id, "source_05_option_expression")
+        self.assertEqual(previews[0].target_component_id, "m09_option_expression_data_acquisition")
         self.assertEqual(previews[0].snapshot_time, "2016-01-05T09:31:00-05:00")
         self.assertEqual(previews[0].max_dte, 45)
         self.assertEqual(previews[0].strike_range, 5)

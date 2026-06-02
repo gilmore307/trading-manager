@@ -69,7 +69,7 @@ work and fold-scoped downstream work.
    feature rows. If the selected target lacks reviewed target-local bar
    artifacts for a fold, manager prepares bounded `01_feed_alpaca_bars` requests
    for that target and dispatches them through the autonomous provider gate; the
-   Layer 3 `source_03_target_state` materializer then consumes those local
+   Layer 3 `m03_target_state_vector_data_acquisition` materializer then consumes those local
    artifacts without direct provider access. These tasks prepare what the live
    components would have been able to inspect, but they do not select a fixed
    trade target for replay.

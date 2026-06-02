@@ -68,7 +68,7 @@ Layer 2 feature generation also prepares `m02_sector_context_data_acquisition` a
 
 Layer 3 target-state materialization remains a local source-stage command: it
 turns reviewed target-local `01_feed_alpaca_bars` artifacts into
-`source_03_target_state` and does not call providers. When a target fold is
+`m03_target_state_vector_data_acquisition` and does not call providers. When a target fold is
 blocked only by `layer_03_target_local_feed_artifacts_ready`, the scheduler may
 prepare and dispatch bounded target-local Alpaca bar requests for the selected
 target through the same autonomous provider controls used by Layer 1/2. Once
@@ -76,7 +76,7 @@ those feed artifacts exist, the normal safe offline L3 materialization stage
 continues.
 
 Source-existing bootstrap may seed Layer 3 data acquisition from durable
-`source_03_target_state` rows for the selected target. That prevents a clean
+`m03_target_state_vector_data_acquisition` rows for the selected target. That prevents a clean
 control-plane reset from redownloading target-local bars when the accepted source
 surface already covers the month.
 

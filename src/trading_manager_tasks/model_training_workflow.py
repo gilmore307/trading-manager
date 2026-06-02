@@ -251,8 +251,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "target_major_serial_chain",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id",
         "candidate_progression_policy": "target-major task execution is allowed because routing symbols contribute anonymous target-state samples; evaluation and promotion must aggregate by fold and fixed candidate-universe policy batch",
-        "data_surface": "Layer 3 candidate policy plus target candidate/source_03 inputs, feature_03_target_state_vector, and anonymous target handoff ranking evidence",
-        "feature_cli": "trading-data-feature-03-target-state-vector",
+        "data_surface": "Layer 3 candidate policy plus target candidate/source_03 inputs, m03_target_state_vector_feature_generation, and anonymous target handoff ranking evidence",
+        "feature_cli": "trading-data-m03-target-state-vector-feature-generation",
     },
     {
         "layer": 4,
@@ -318,8 +318,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "optional_trading_guidance_after_underlying_action",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
         "candidate_progression_policy": "finish the active base target chain through optional Layer 9 trading guidance / option expression; crypto/direct-underlying-only routes do not require option refs",
-        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 8 target chains require them plus feature_09_option_expression",
-        "feature_cli": "trading-data-feature-09-option-expression",
+        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 8 target chains require them plus m09_option_expression_feature_generation",
+        "feature_cli": "trading-data-m09-option-expression-feature-generation",
     },
 )
 
@@ -489,9 +489,9 @@ def _layer_five_generation_artifact_blockers(
 FEATURE_MODULES: dict[str, str] = {
     "trading-data-m01-market-regime-feature-generation": "data_feature.m01_market_regime_feature_generation.from_feed_artifacts",
     "trading-data-m02-sector-context-feature-generation": "data_feature.m02_sector_context_feature_generation.from_feed_artifacts",
-    "trading-data-feature-03-target-state-vector": "data_feature.feature_03_target_state_vector",
-    "trading-data-feature-10-event-risk-governor": "data_feature.feature_10_event_risk_governor",
-    "trading-data-feature-09-option-expression": "data_feature.feature_09_option_expression",
+    "trading-data-m03-target-state-vector-feature-generation": "data_feature.m03_target_state_vector_feature_generation",
+    "trading-data-m10-event-risk-governor-feature-generation": "data_feature.m10_event_risk_governor_feature_generation",
+    "trading-data-m09-option-expression-feature-generation": "data_feature.m09_option_expression_feature_generation",
 }
 
 
@@ -519,7 +519,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
             "${START_MONTH}",
             "--write",
         ]
-    if feature_cli == "trading-data-feature-09-option-expression":
+    if feature_cli == "trading-data-m09-option-expression-feature-generation":
         return [
             "PYTHONPATH=src",
             "python3",
@@ -532,7 +532,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-m01-market-regime-feature-generation", "trading-data-m02-sector-context-feature-generation"}:
         command.extend(["--month", "${START_MONTH}"])
-    if feature_cli in {"trading-data-feature-03-target-state-vector", "trading-data-feature-10-event-risk-governor"}:
+    if feature_cli in {"trading-data-m03-target-state-vector-feature-generation", "trading-data-m10-event-risk-governor-feature-generation"}:
         command.extend([
             "--source-start",
             "${START_MONTH_START_ET}",

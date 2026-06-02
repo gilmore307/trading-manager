@@ -1,7 +1,7 @@
 """Safe Layer 3 target-state input materialization.
 
 This module turns already-approved target-local Alpaca bar artifacts into the local
-``source_03_target_state`` input surface. It performs no provider calls; it only
+``m03_target_state_vector_data_acquisition`` input surface. It performs no provider calls; it only
 reads completed feed artifacts, writes a task key/evidence bundle, and delegates
 normalization to ``trading-data``'s source_03 runner.
 """
@@ -30,7 +30,7 @@ DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/sha
 DEFAULT_TARGET_CONTEXT_MAPPING = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_03_target_state_vector" / "input_materialization"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
-SOURCE = "source_03_target_state"
+SOURCE = "m03_target_state_vector_data_acquisition"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
 
 
@@ -384,7 +384,7 @@ def materialize_layer_three_target_state_inputs(
     trading_data_receipt_path: str | None = None
     source_row_count = 0
     if write:
-        command = ["python3", "-m", "data_source.source_03_target_state", str(task_key_path), "--run-id", run_id]
+        command = ["python3", "-m", "data_source.m03_target_state_vector_data_acquisition", str(task_key_path), "--run-id", run_id]
         result = subprocess.run(
             command,
             cwd=trading_data_root,
@@ -398,7 +398,7 @@ def materialize_layer_three_target_state_inputs(
         (log_dir / f"{run_id}.stdout.log").write_text(result.stdout, encoding="utf-8")
         (log_dir / f"{run_id}.stderr.log").write_text(result.stderr, encoding="utf-8")
         if result.returncode != 0:
-            raise TaskSystemError(f"source_03_target_state materialization failed: {result.stderr.strip() or result.stdout.strip()}")
+            raise TaskSystemError(f"m03_target_state_vector_data_acquisition materialization failed: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
         source_row_count = int((payload.get("row_counts") or {}).get(SOURCE) or 0)
         refs_out = [str(item) for item in payload.get("references") or []]
@@ -429,7 +429,7 @@ def write_summary(summary: LayerThreeTargetStateMaterialization, *, output: Text
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize Layer 3 source_03_target_state rows from existing target-local feed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize Layer 3 m03_target_state_vector_data_acquisition rows from existing target-local feed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

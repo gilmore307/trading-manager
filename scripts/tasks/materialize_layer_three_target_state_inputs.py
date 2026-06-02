@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize Layer 3 source_03_target_state rows from local approved artifacts."""
+"""Materialize Layer 3 m03_target_state_vector_data_acquisition rows from local approved artifacts."""
 
 from __future__ import annotations
 
