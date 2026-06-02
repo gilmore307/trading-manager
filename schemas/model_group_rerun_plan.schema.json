@@ -73,6 +73,32 @@
     "contract_type": {
       "const": "model_group_rerun_plan"
     },
+    "controlled_artifact_roots": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "policy": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "root_class": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "root_class",
+          "path",
+          "policy"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
     "created_at_utc": {
       "minLength": 20,
       "type": "string"
@@ -158,6 +184,43 @@
       "minLength": 1,
       "type": "string"
     },
+    "retained_set": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "control_policy": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "empty_dir_count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "empty_dir_examples": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ref": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "retain_reason": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "retain_reason",
+          "control_policy"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
     "rerun_id": {
       "minLength": 1,
       "type": "string"
@@ -230,6 +293,8 @@
     "source_data_delete",
     "delete_set",
     "protected_set",
+    "retained_set",
+    "controlled_artifact_roots",
     "scheduler_reentry_stage",
     "expected_verification_gates"
   ],

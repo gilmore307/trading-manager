@@ -104,6 +104,8 @@ Trading Economics calendar handling has one accepted source route:
 
 Manager workflows may schedule the bounded recent/future Trading Economics calendar refresh into canonical storage source rows. They must not record TE website URLs as source references, must not write TE macro rows into `m10_event_risk_governor_data_acquisition`, and must not silently merge public web-search fallback rows into TE-origin source data.
 
+TE refresh creates normal daily Git changes in the canonical source-data tree. Maintenance commits should include those changed/new TE source files with the code or docs batch when they are relevant to the same acceptance window; their presence in `git status` is not a cleanup problem. Rerun resets must preserve these files, record the TE root in `protected_set`/`retained_set`, and never delete TE canonical source data.
+
 ## Useful Commands
 
 ```bash

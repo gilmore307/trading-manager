@@ -43,6 +43,30 @@
       "protect_reason": "source data remains valid because cutpoint is model_generation"
     }
   ],
+  "retained_set": [
+    {
+      "ref": "storage://01_source_data/monthly_backfill/alpaca_bars/",
+      "retain_reason": "source data remains reusable upstream evidence for this rerun",
+      "control_policy": "preserve during rerun and keep tracked changes in routine maintenance commits"
+    }
+  ],
+  "controlled_artifact_roots": [
+    {
+      "root_class": "workflow_state",
+      "path": "/root/projects/trading-storage/storage/02_control_plane/runtime",
+      "policy": "manager-owned runtime state; rerun may invalidate bounded stage progress"
+    },
+    {
+      "root_class": "rerun_reset_receipts",
+      "path": "/root/projects/trading-storage/storage/02_control_plane/runtime/model_group_rerun_resets",
+      "policy": "durable reset receipts for state invalidation and scheduler reentry evidence"
+    },
+    {
+      "root_class": "protected_source_data",
+      "path": "/root/projects/trading-storage/storage/01_source_data/monthly_backfill/alpaca_bars",
+      "policy": "protected reusable source data; rerun executor must not delete"
+    }
+  ],
   "scheduler_reentry_stage": {
     "layer_id": 5,
     "stage": "model_generation"

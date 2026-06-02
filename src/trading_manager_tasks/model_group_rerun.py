@@ -38,6 +38,14 @@ PROTECTED_SOURCE_REFS = (
     "storage://01_source_data/monthly_backfill/alpaca_bars/",
     "storage://01_source_data/monthly_backfill/trading_economics_calendar_web/",
 )
+PROTECTED_SOURCE_POLICIES = {
+    "storage://01_source_data/monthly_backfill/alpaca_bars/": (
+        "source data is protected for this rerun; reusable partitions remain controlled upstream evidence"
+    ),
+    "storage://01_source_data/monthly_backfill/trading_economics_calendar_web/": (
+        "Trading Economics calendar source data is append-only protected; daily tracked changes belong in routine maintenance commits"
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -54,6 +62,8 @@ class ModelGroupRerunResult:
     cutpoint_stage_id: str
     source_data_delete_required: bool
     write_performed: bool
+    reset_receipt_path: str | None
+    reset_receipt_written: bool
     plan: dict[str, Any]
 
     def summary_row(self) -> dict[str, Any]:
@@ -68,6 +78,8 @@ class ModelGroupRerunResult:
             "cutpoint_stage_id": self.cutpoint_stage_id,
             "source_data_delete_required": self.source_data_delete_required,
             "write_performed": self.write_performed,
+            "reset_receipt_path": self.reset_receipt_path,
+            "reset_receipt_written": self.reset_receipt_written,
             "plan": self.plan,
         }
 
@@ -92,6 +104,112 @@ def _artifact_class_for_stage(stage: StageProgress) -> str:
     if stage.stage_type == "promotion_review":
         return "promotion_artifact"
     return "runtime_state"
+
+
+def _safe_timestamp_for_path(value: str) -> str:
+    return value.replace(":", "").replace("+00:00", "Z")
+
+
+def _component_root_for_manager_storage(storage_root: Path, component_dir: str) -> Path:
+    if storage_root.name == "02_control_plane":
+        return storage_root.parent / component_dir
+    return storage_root / component_dir
+
+
+def _controlled_artifact_roots(storage_root: Path) -> list[dict[str, str]]:
+    data_root = _component_root_for_manager_storage(storage_root, "01_source_data")
+    model_root = _component_root_for_manager_storage(storage_root, "03_model_artifacts")
+    replay_root = _component_root_for_manager_storage(storage_root, "05_replay_datasets")
+    dashboard_root = _component_root_for_manager_storage(storage_root, "06_dashboard_cache")
+    return [
+        {
+            "root_class": "workflow_state",
+            "path": str(storage_root / "runtime"),
+            "policy": "manager-owned runtime state; rerun may invalidate bounded stage progress",
+        },
+        {
+            "root_class": "stage_receipts",
+            "path": str(storage_root / "runtime" / "model_training_stage_receipts"),
+            "policy": "manager-owned stage execution receipts; append-only evidence for scheduler progress",
+        },
+        {
+            "root_class": "stage_logs",
+            "path": str(storage_root / "runtime" / "model_training_stage_logs"),
+            "policy": "manager-owned execution logs; lifecycle cleanup requires explicit storage policy",
+        },
+        {
+            "root_class": "provider_task_keys",
+            "path": str(storage_root / "runtime" / "provider_task_keys"),
+            "policy": "runtime provider dispatch bookkeeping; empty residual directories are housekeeping candidates only",
+        },
+        {
+            "root_class": "rerun_reset_receipts",
+            "path": str(storage_root / "runtime" / "model_group_rerun_resets"),
+            "policy": "durable reset receipts for state invalidation and scheduler reentry evidence",
+        },
+        {
+            "root_class": "protected_source_data",
+            "path": str(data_root / "monthly_backfill" / "alpaca_bars"),
+            "policy": "protected reusable source data; rerun executor must not delete",
+        },
+        {
+            "root_class": "protected_source_data",
+            "path": str(data_root / "monthly_backfill" / "trading_economics_calendar_web"),
+            "policy": "append-only protected TE source data; changed/new files are normal maintenance commit inputs",
+        },
+        {
+            "root_class": "model_artifacts",
+            "path": str(model_root / "runtime"),
+            "policy": "generated model artifacts; stale artifacts require bounded invalidation evidence",
+        },
+        {
+            "root_class": "replay_datasets",
+            "path": str(replay_root),
+            "policy": "generated replay inputs/outputs; lifecycle cleanup requires explicit storage policy",
+        },
+        {
+            "root_class": "dashboard_cache",
+            "path": str(dashboard_root),
+            "policy": "generated dashboard/read-model cache; rebuildable from accepted sources and receipts",
+        },
+    ]
+
+
+def _empty_provider_task_key_dirs(storage_root: Path) -> list[str]:
+    root = storage_root / "runtime" / "provider_task_keys"
+    if not root.exists():
+        return []
+    empty_dirs: list[str] = []
+    for path in sorted(item for item in root.rglob("*") if item.is_dir()):
+        try:
+            next(path.iterdir())
+        except StopIteration:
+            empty_dirs.append(str(path.relative_to(root)))
+    return empty_dirs
+
+
+def _retained_set(storage_root: Path) -> list[dict[str, Any]]:
+    retained: list[dict[str, Any]] = []
+    for ref in PROTECTED_SOURCE_REFS:
+        retained.append(
+            {
+                "ref": ref,
+                "retain_reason": PROTECTED_SOURCE_POLICIES[ref],
+                "control_policy": "preserve during rerun; include tracked changes in routine repository maintenance commits",
+            }
+        )
+    empty_task_key_dirs = _empty_provider_task_key_dirs(storage_root)
+    if empty_task_key_dirs:
+        retained.append(
+            {
+                "ref": "storage://02_control_plane/runtime/provider_task_keys/",
+                "retain_reason": "no task_key.json files remain; empty directories are harmless runtime residue until housekeeping runs",
+                "control_policy": "do not treat as rerun blocker; clean only through bounded housekeeping/lifecycle policy",
+                "empty_dir_count": len(empty_task_key_dirs),
+                "empty_dir_examples": empty_task_key_dirs[:10],
+            }
+        )
+    return retained
 
 
 def _stage_order_index(stages: Iterable[StageProgress], *, layer_id: int, stage_type: str) -> int:
@@ -129,6 +247,7 @@ def build_model_group_rerun_plan(
     *,
     state: WorkflowState,
     state_path: Path,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
     layer_id: int,
     stage: RerunStage,
     reason: str,
@@ -171,7 +290,7 @@ def build_model_group_rerun_plan(
     protected_set = [
         {
             "ref": ref,
-            "protect_reason": "source data is protected for this rerun; source_data_delete.required is false",
+            "protect_reason": PROTECTED_SOURCE_POLICIES[ref],
         }
         for ref in PROTECTED_SOURCE_REFS
     ]
@@ -200,16 +319,71 @@ def build_model_group_rerun_plan(
         },
         "delete_set": delete_set,
         "protected_set": protected_set,
+        "retained_set": _retained_set(storage_root),
+        "controlled_artifact_roots": _controlled_artifact_roots(storage_root),
         "scheduler_reentry_stage": {
             "layer_id": layer_id,
             "stage": stage,
         },
         "expected_verification_gates": [
             "model_group_rerun_plan_schema_validation",
+            "rerun_reset_receipt_written",
+            "controlled_artifact_root_audit",
             "workflow_state_reentry_from_cutpoint",
             "historical_scheduler_decision_executed_after_reentry",
         ],
     }
+
+
+def _reset_receipt_path(*, storage_root: Path, rerun_id: str, created_at_utc: str) -> Path:
+    safe_rerun_id = "".join(ch if ch.isalnum() or ch in {"_", "-", "."} else "_" for ch in rerun_id)
+    filename = f"{_safe_timestamp_for_path(created_at_utc)}.reset_receipt.json"
+    return storage_root / "runtime" / "model_group_rerun_resets" / safe_rerun_id / filename
+
+
+def _write_reset_receipt(
+    *,
+    storage_root: Path,
+    result_summary: dict[str, Any],
+    reset_state: WorkflowState,
+    created_at_utc: str,
+) -> str:
+    receipt_path = _reset_receipt_path(
+        storage_root=storage_root,
+        rerun_id=str(result_summary["rerun_id"]),
+        created_at_utc=created_at_utc,
+    )
+    payload = {
+        "contract_type": "manager_model_group_rerun_reset_receipt",
+        "created_at_utc": created_at_utc,
+        "rerun_id": result_summary["rerun_id"],
+        "plan_id": result_summary["plan_id"],
+        "dry_run": result_summary["dry_run"],
+        "write_performed": result_summary["write_performed"],
+        "state_path": result_summary["state_path"],
+        "cutpoint_stage_id": result_summary["cutpoint_stage_id"],
+        "changed_stage_count": result_summary["changed_stage_count"],
+        "preserved_stage_count": result_summary["preserved_stage_count"],
+        "source_data_delete_required": result_summary["source_data_delete_required"],
+        "protected_set": result_summary["plan"]["protected_set"],
+        "retained_set": result_summary["plan"]["retained_set"],
+        "controlled_artifact_roots": result_summary["plan"]["controlled_artifact_roots"],
+        "runtime_residue": {
+            "empty_provider_task_key_dirs": _empty_provider_task_key_dirs(storage_root),
+            "cleanup_policy": "empty runtime directories may be cleaned only by bounded housekeeping; protected source data is never cleaned by rerun reset",
+        },
+        "post_reset_stage_statuses": [
+            {
+                "stage_id": stage.stage_id,
+                "status": stage.status,
+                "last_reason": stage.last_reason,
+            }
+            for stage in reset_state.stages
+        ],
+    }
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return str(receipt_path)
 
 
 def execute_model_group_rerun_reset(
@@ -243,6 +417,7 @@ def execute_model_group_rerun_reset(
     rerun_plan = build_model_group_rerun_plan(
         state=state,
         state_path=resolved_state_path,
+        storage_root=storage_root,
         layer_id=layer_id,
         stage=stage,
         reason=reason,
@@ -277,18 +452,31 @@ def execute_model_group_rerun_reset(
     )
     if write:
         write_workflow_state(resolved_state_path, reset_state)
+    result_kwargs = {
+        "contract_type": "manager_model_group_rerun_reset",
+        "plan_id": str(rerun_plan["plan_id"]),
+        "rerun_id": str(rerun_plan["rerun_id"]),
+        "dry_run": not write,
+        "state_path": str(resolved_state_path),
+        "changed_stage_count": changed,
+        "preserved_stage_count": preserved,
+        "cutpoint_stage_id": state.stages[cutpoint_index].stage_id,
+        "source_data_delete_required": False,
+        "write_performed": write,
+        "reset_receipt_path": None,
+        "reset_receipt_written": False,
+        "plan": rerun_plan,
+    }
+    if write:
+        result_kwargs["reset_receipt_path"] = _write_reset_receipt(
+            storage_root=storage_root,
+            result_summary=result_kwargs,
+            reset_state=reset_state,
+            created_at_utc=now,
+        )
+        result_kwargs["reset_receipt_written"] = True
     return ModelGroupRerunResult(
-        contract_type="manager_model_group_rerun_reset",
-        plan_id=str(rerun_plan["plan_id"]),
-        rerun_id=str(rerun_plan["rerun_id"]),
-        dry_run=not write,
-        state_path=str(resolved_state_path),
-        changed_stage_count=changed,
-        preserved_stage_count=preserved,
-        cutpoint_stage_id=state.stages[cutpoint_index].stage_id,
-        source_data_delete_required=False,
-        write_performed=write,
-        plan=rerun_plan,
+        **result_kwargs,
     )
 
 

@@ -58,11 +58,18 @@ class ModelGroupRerunTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
         self.assertFalse(result.write_performed)
+        self.assertFalse(result.reset_receipt_written)
+        self.assertIsNone(result.reset_receipt_path)
         self.assertEqual(before, after)
         self.assertEqual(result.cutpoint_stage_id, "layer_03_target_state_vector.data_acquisition")
         self.assertFalse(result.source_data_delete_required)
         protected_refs = {row["ref"] for row in result.plan["protected_set"]}
         self.assertIn("storage://01_source_data/monthly_backfill/trading_economics_calendar_web/", protected_refs)
+        retained_refs = {row["ref"] for row in result.plan["retained_set"]}
+        self.assertIn("storage://01_source_data/monthly_backfill/trading_economics_calendar_web/", retained_refs)
+        root_classes = {row["root_class"] for row in result.plan["controlled_artifact_roots"]}
+        self.assertIn("rerun_reset_receipts", root_classes)
+        self.assertIn("protected_source_data", root_classes)
 
     def test_execute_resets_cutpoint_and_downstream_state_for_scheduler_reentry(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -104,8 +111,17 @@ class ModelGroupRerunTests(unittest.TestCase):
             )
             payload = json.loads(state_path.read_text(encoding="utf-8"))
             by_stage = {stage["stage_id"]: stage for stage in payload["stages"]}
+            receipt_payload = json.loads(Path(result.reset_receipt_path or "").read_text(encoding="utf-8"))
 
         self.assertTrue(result.write_performed)
+        self.assertTrue(result.reset_receipt_written)
+        self.assertIsNotNone(result.reset_receipt_path)
+        self.assertEqual(receipt_payload["contract_type"], "manager_model_group_rerun_reset_receipt")
+        self.assertEqual(receipt_payload["rerun_id"], result.rerun_id)
+        self.assertEqual(receipt_payload["cutpoint_stage_id"], "layer_03_target_state_vector.data_acquisition")
+        receipt_root_classes = {row["root_class"] for row in receipt_payload["controlled_artifact_roots"]}
+        self.assertIn("rerun_reset_receipts", receipt_root_classes)
+        self.assertIn("protected_source_data", receipt_root_classes)
         self.assertEqual(by_stage["layer_01_market_regime.data_acquisition"]["status"], "succeeded")
         self.assertEqual(by_stage["layer_02_sector_context.data_acquisition"]["status"], "succeeded")
         self.assertEqual(by_stage["layer_03_target_state_vector.data_acquisition"]["status"], "blocked")
