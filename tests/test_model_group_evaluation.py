@@ -106,7 +106,6 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "contract_type": "evaluation_replay_execution_run",
                     "created_at_utc": "2026-05-28T00:00:00+00:00",
                     "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
-                    "training_target_ref": "AAPL",
                     "tradable_target_refs": ["AAPL"],
                     "target_refs": ["AAPL"],
                     "decision_rows_ref": str(decision_rows_path),
@@ -282,7 +281,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
             self.assertIn("deterministic crypto placeholder", decision.reason)
 
-    def test_replay_receipt_without_training_target_ref_does_not_unlock_evaluation(self):
+    def test_replay_receipt_tradable_universe_without_training_symbol_unlocks_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -292,16 +291,14 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             receipt_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "replay_execution_receipt.json"
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             receipt["target_refs"] = ["BTC", "ETH", "SOL"]
-            receipt.pop("training_target_ref", None)
+            receipt["tradable_target_refs"] = ["BTC", "ETH", "SOL"]
             receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
 
             decision = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
 
             self.assertIsNotNone(decision)
             assert decision is not None
-            self.assertEqual(decision.decision_status, "backoff")
-            self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
-            self.assertIn("training_target_ref is required", decision.reason)
+            self.assertNotEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
 
     def test_decision_variable_audit_does_not_infer_side_from_outcome(self):
         rows = [

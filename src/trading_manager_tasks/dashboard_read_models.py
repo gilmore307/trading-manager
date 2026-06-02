@@ -2642,28 +2642,6 @@ def _replay_dataset_scope_status(
                 "dataset_target_refs": sorted(target_refs),
                 "training_target_symbol": target_symbol,
             }
-    if not target_symbol:
-        return {
-            "compatible": False,
-            "reason": "Completed training fold has no target symbol for replay scope validation.",
-            "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
-    manifest_training_target = str((manifest or {}).get("training_target_ref") or "").strip().upper()
-    if not manifest_training_target:
-        return {
-            "compatible": False,
-            "reason": "Replay dataset training_target_ref is required for completed training fold replay.",
-            "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
-    if target_symbol and manifest_training_target != target_symbol:
-        return {
-            "compatible": False,
-            "reason": f"Replay dataset training target {manifest_training_target} does not match completed training target {target_symbol}.",
-            "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
     return {
         "compatible": True,
         "reason": "Replay dataset is eligible for fold-bound live-equivalent tradable universe replay.",

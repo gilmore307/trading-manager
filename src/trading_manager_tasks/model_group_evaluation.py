@@ -2065,7 +2065,6 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "")
     target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
     target_refs = _string_set(replay_receipt.get("tradable_target_refs") or replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
-    receipt_training_target = str(replay_receipt.get("training_target_ref") or "").strip().upper()
     receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "").strip()
     training_fold_id = str(training_fold.get("fold_id") or "").strip()
     if "current_deterministic_crypto_policy" in candidate_model_ref:
@@ -2080,30 +2079,6 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         return {
             "compatible": False,
             "reason": f"replay receipt fold {receipt_fold_id} does not match completed training fold {training_fold_id}",
-            "candidate_model_ref": candidate_model_ref,
-            "receipt_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
-    if not target_symbol:
-        return {
-            "compatible": False,
-            "reason": "completed training fold has no target symbol for replay receipt validation",
-            "candidate_model_ref": candidate_model_ref,
-            "receipt_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
-    if not receipt_training_target:
-        return {
-            "compatible": False,
-            "reason": "replay receipt training_target_ref is required for completed training fold evaluation",
-            "candidate_model_ref": candidate_model_ref,
-            "receipt_target_refs": sorted(target_refs),
-            "training_target_symbol": target_symbol,
-        }
-    if receipt_training_target != target_symbol:
-        return {
-            "compatible": False,
-            "reason": f"replay receipt training target {receipt_training_target} does not match completed training target {target_symbol}",
             "candidate_model_ref": candidate_model_ref,
             "receipt_target_refs": sorted(target_refs),
             "training_target_symbol": target_symbol,

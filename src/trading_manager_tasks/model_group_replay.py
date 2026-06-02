@@ -363,34 +363,11 @@ def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, A
             "dataset_target_refs": sorted(target_refs),
             "training_target_symbol": str(training_fold.get("target_symbol") or "").strip().upper(),
         }
-    training_target = str(training_fold.get("target_symbol") or "").strip().upper()
-    if not training_target:
-        return {
-            "compatible": False,
-            "reason": "completed training fold has no target symbol for replay scope validation",
-            "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": training_target,
-        }
-    manifest_training_target = str(manifest.get("training_target_ref") or "").strip().upper()
-    if not manifest_training_target:
-        return {
-            "compatible": False,
-            "reason": "replay dataset training_target_ref is required for completed training fold replay",
-            "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": training_target,
-        }
-    if training_target and manifest_training_target != training_target:
-        return {
-            "compatible": False,
-            "reason": f"replay dataset training target {manifest_training_target} does not match completed training target {training_target}",
-            "dataset_target_refs": sorted(target_refs),
-            "training_target_symbol": training_target,
-        }
     return {
         "compatible": True,
         "reason": "replay dataset is eligible for fold-bound live-equivalent tradable universe replay",
         "dataset_target_refs": sorted(target_refs),
-        "training_target_symbol": training_target,
+        "training_target_symbol": str(training_fold.get("target_symbol") or "").strip().upper(),
     }
 
 
@@ -477,17 +454,6 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     fold_id = str(training_fold.get("fold_id") or "")
     if receipt_fold_id and fold_id and receipt_fold_id != fold_id:
         return {"compatible": False, "reason": "replay fold mismatch"}
-    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
-    receipt_training_target = str(replay_receipt.get("training_target_ref") or "").strip().upper()
-    if not target_symbol:
-        return {"compatible": False, "reason": "completed training fold has no target symbol for replay receipt validation"}
-    if not receipt_training_target:
-        return {"compatible": False, "reason": "replay receipt training_target_ref is required for completed training fold replay"}
-    if receipt_training_target != target_symbol:
-        return {
-            "compatible": False,
-            "reason": f"replay receipt training target {receipt_training_target} does not match completed training target {target_symbol}",
-        }
     return {"compatible": True, "reason": "compatible fold-bound live-equivalent tradable universe replay receipt"}
 
 
