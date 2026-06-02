@@ -3391,14 +3391,14 @@ def _model_group_replay_timeline_tasks(
     replay_reason = (
         "Model-group replay is complete across the accepted replay window."
         if replay_complete
+        else replay_month_reason
+        if replay_month_reason is not None
         else f"Model-group replay has started and completed {len(replay_ready_months)}/{_replay_window_month_count(dataset_root)} replay months."
         if replay_started
         else "Pre-replay Layer 1-9 fold is complete; replay is waiting for its fixed replay dataset preparation manifest."
         if pre_replay_complete and manifest is None
         else str(replay_scope_status["reason"])
         if pre_replay_complete and manifest is not None and not replay_scope_status["compatible"]
-        else replay_month_reason
-        if replay_month_reason is not None
         else f"Replay dataset coverage is incomplete: {missing}/{expected} feed acquisitions missing."
         if pre_replay_complete and manifest is not None and not coverage_complete
         else f"Replay dataset is covered but not frozen; current freeze_status={freeze_status}."
