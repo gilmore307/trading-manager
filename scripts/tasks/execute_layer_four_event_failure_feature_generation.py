@@ -21,7 +21,8 @@ def main() -> int:
     parser.add_argument("--input-root", type=Path, default=DEFAULT_INPUT_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--write", action="store_true")
-    parser.add_argument("--write-database", action="store_true")
+    parser.add_argument("--write-database", dest="write_database", action="store_true")
+    parser.add_argument("--persist-sql", dest="write_database", action="store_true")
     parser.add_argument("--database-url")
     args = parser.parse_args()
 

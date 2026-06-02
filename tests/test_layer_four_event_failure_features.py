@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -66,6 +69,37 @@ class LayerFourEventFailureFeatureTests(unittest.TestCase):
             rows = [json.loads(line) for line in Path(str(receipt.feature_rows_path)).read_text(encoding="utf-8").splitlines()]
             self.assertEqual(rows[0]["target_candidate_id"], "tcand_test")
             self.assertEqual(rows[0]["event_strategy_failure_gate"]["agent_review_decision"], "accept_layer_04_event_failure_risk_scope")
+
+    def test_cli_accepts_workflow_persist_sql_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            env = os.environ.copy()
+            env["PYTHONPATH"] = "src"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/tasks/execute_layer_four_event_failure_feature_generation.py",
+                    "--start-month",
+                    "2016-01",
+                    "--end-month",
+                    "2016-06",
+                    "--input-root",
+                    str(tmp / "missing"),
+                    "--output-root",
+                    str(tmp / "output"),
+                    "--write",
+                    "--persist-sql",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["status"], "succeeded")
 
 
 if __name__ == "__main__":
