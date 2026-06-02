@@ -352,17 +352,23 @@ def select_month_ingest_worker_months(
     """Return up to `worker_count` month-scoped ingest lanes to work now.
 
     This selector is intentionally narrower than ``select_next_historical_work``:
-    it only considers the Layer 1/2 foundation substrate as ingest work. Months
-    whose Layer 1/2 data acquisition and feature generation are complete are not
-    assigned to month-ingest workers even if their later Layer 3+ stages are
-    blocked behind foundation catch-up. New months are appended after the latest
-    known month so all three ingest lanes can stay filled by default.
+    it only considers the Layer 1/2 foundation substrate as ingest work. If a
+    complete foundation fold is already ready for model-worker execution, the
+    fold owns the lane and month-ingest workers pause instead of prebuilding
+    later fold inputs.
     """
 
     max_month = _eligible_historical_fold_cutoff(max_month)
     if target_has_open_model_worker_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol, max_month=max_month):
         return ()
     if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
+        return ()
+    if select_model_worker_fold(
+        storage_root=storage_root,
+        default_start_month=default_start_month,
+        max_month=max_month,
+        selected_target_symbol=selected_target_symbol,
+    ):
         return ()
 
     worker_count = max(1, int(worker_count))

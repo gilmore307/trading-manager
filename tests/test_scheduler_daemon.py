@@ -1161,6 +1161,22 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertEqual(months, ())
 
+    def test_month_ingest_workers_pause_when_model_worker_fold_is_ready(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+
+            months = select_month_ingest_worker_months(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                worker_count=3,
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertEqual(months, ())
+
     def test_month_ingest_worker_selection_fills_missing_start_month_gap(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
