@@ -127,6 +127,29 @@ month / stage_id / provider_id / partition_id / model_id / candidate_ref as appl
 
 Lock scopes are `daemon`, `month_stage`, `provider_partition`, `reconcile`, and `promotion`. Provider partition locks permit concurrent partition work only; reconcile locks own stage-state transitions. Dry-run decisions and status snapshots expose `scheduler_lock_plan` with the lock refs/templates required for the selected work; execution paths acquire local file-backed locks for the corresponding stage, provider partition, reconcile, and persisted promotion-request lanes.
 
+### `model_group_rerun_plan`
+
+Schema: `schemas/model_group_rerun_plan.schema.json`.
+
+A dry-run-first plan for architecture-driven model group regeneration.
+
+Required idea:
+
+```text
+plan_id
+rerun_id
+reason
+change_origin layer + stage
+affected_scope
+source_data_delete required/reason/scope_refs
+delete_set
+protected_set
+scheduler_reentry_stage
+expected_verification_gates
+```
+
+This contract is not an executor. It identifies the earliest affected workflow cutpoint, computes the downstream generated-output closure, separates deletion candidates from protected inputs, and names the scheduler reentry stage. Any storage-path deletion in the plan remains subject to storage protected-set and lifecycle review unless the affected artifact is explicitly classified as disposable runtime state by an accepted storage policy.
+
 ## Workflow Stage Semantics
 
 Historical workflow stages must keep source data, derived features, and model-dependent state separate.
@@ -137,6 +160,33 @@ Historical workflow stages must keep source data, derived features, and model-de
 - Model outputs, replay state, promotion review evidence, and maintenance surfaces must not be stored under source/feature contracts just because they are convenient downstream inputs.
 
 For example, `trading_data.m01_market_regime_feature_generation` is a valid feature surface when it is deterministically derived from acquired market bars. A target/event table that requires TargetStateVectorModel output, EventFailureRiskModel output, or replay portfolio state is not a feature surface under this definition.
+
+## Model Group Rerun Semantics
+
+A model group rerun is a controlled invalidation, deletion, and scheduler reentry operation used when an architecture, contract, schema, feature, source-scope, or execution-route change makes existing generated outputs stale.
+
+Rerun planning uses the earliest affected `layer.stage` cutpoint:
+
+```text
+layer_XX.data_acquisition
+layer_XX.feature_generation
+layer_XX.model_generation
+layer_XX.model_evaluation
+layer_XX.replay_execution
+layer_XX.post_replay_attribution
+layer_XX.fold_settlement
+layer_XX.promotion_review
+layer_XX.maintenance
+layer_XX.read_model_refresh
+```
+
+The planner must compute the downstream closure from that cutpoint and produce both `delete_set` and `protected_set`. The delete set may include generated SQL rows, features, model outputs, model artifacts, replay outputs, attribution outputs, evaluation evidence, promotion-review evidence, read models, runtime state, and workflow completion state. Completed state after the cutpoint must be invalidated or removed, otherwise the scheduler may incorrectly skip the rerun.
+
+Source data is protected by default. It enters `delete_set` only when the cutpoint is `data_acquisition` and the task's required source data changed, the acquisition contract changed, the provider/source parameters changed, or the existing source partition is confirmed wrong, incomplete, duplicated, contaminated, or scoped to an obsolete experiment. When the cutpoint is `feature_generation` or later, source data remains in `protected_set` even if all downstream artifacts are rebuilt.
+
+Deletion scope must be the smallest affected scope: provider/source, target symbol, fold or month window, timeframe, artifact family, and contract/schema. A rerun plan must not use broad "delete everything after this layer" language without concrete refs.
+
+Execution order is downstream deletion/invalidation first, then scheduler reentry from the cutpoint through the current model-group lifecycle. Only one scheduler daemon may own a rerun scope at a time.
 
 ## Review and Promotion Contracts
 

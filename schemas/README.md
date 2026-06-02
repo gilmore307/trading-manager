@@ -13,5 +13,6 @@ Current first slice:
 - `artifact_ref.schema.json`
 - `ready_signal.schema.json`
 - `scheduler_lock.schema.json`
+- `model_group_rerun_plan.schema.json` — dry-run-first invalidation and regeneration plan for architecture-driven model group reruns.
 
 Large component payloads remain by reference; these schemas validate ids, status values, refs, clocks, and readiness facts only.

@@ -1,0 +1,55 @@
+{
+  "plan_id": "mgr_rerun_plan_example_001",
+  "contract_type": "model_group_rerun_plan",
+  "rerun_id": "model_group_rerun_2016_fold1_aapl_architecture_contract_change",
+  "reason": "Layer 5 model_generation contract changed; downstream model group outputs must be rebuilt.",
+  "created_at_utc": "2026-06-02T04:30:00Z",
+  "dry_run": true,
+  "change_origin": {
+    "layer_id": 5,
+    "stage": "model_generation",
+    "description": "Alpha confidence output schema and scoring contract changed."
+  },
+  "affected_scope": {
+    "fold_id": "2016-fold1",
+    "start_month": "2016-01",
+    "end_month": "2016-06",
+    "target_symbols": [
+      "AAPL"
+    ]
+  },
+  "source_data_delete": {
+    "required": false,
+    "reason": null,
+    "scope_refs": []
+  },
+  "delete_set": [
+    {
+      "artifact_class": "model_output",
+      "ref": "postgres://trading_model.m05_alpha_confidence_model_generation?target=AAPL&start=2016-01&end=2016-06",
+      "delete_reason": "Earliest affected model_generation stage changed.",
+      "requires_storage_lifecycle_review": false
+    },
+    {
+      "artifact_class": "workflow_state",
+      "ref": "storage://02_control_plane/runtime/model_training_workflow_state_2016-01.json#layer_05_plus",
+      "delete_reason": "Completed downstream stage state would otherwise block rerun.",
+      "requires_storage_lifecycle_review": false
+    }
+  ],
+  "protected_set": [
+    {
+      "ref": "storage://01_source_data/monthly_backfill/alpaca_bars/",
+      "protect_reason": "source data remains valid because cutpoint is model_generation"
+    }
+  ],
+  "scheduler_reentry_stage": {
+    "layer_id": 5,
+    "stage": "model_generation"
+  },
+  "expected_verification_gates": [
+    "contract_example_validation",
+    "model_output_quality_gate",
+    "dashboard_read_model_refresh"
+  ]
+}

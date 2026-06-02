@@ -66,6 +66,14 @@ the event-observation pool used by later Layer 4 folds.
 
 Layer 2 feature generation also prepares `m02_sector_context_data_acquisition` after sector context exists so downstream Layer 3 target-state feature generation can bind point-in-time sector/ETF context without manual SQL repair. Issuer holdings rows are accepted only inside their visible time window; historical windows with no official point-in-time holdings evidence remain empty instead of borrowing current holdings.
 
+## Model Group Reruns
+
+The scheduler does not treat a rerun as "start the same tasks again." A rerun begins with a `model_group_rerun_plan` that names the earliest affected `layer.stage` cutpoint, the affected fold/target scope, a concrete delete set, a protected set, source-data deletion requirements, and the scheduler reentry stage.
+
+For ordinary architecture changes after acquisition, source data stays protected and the scheduler reenters at `feature_generation`, `model_generation`, or a later lifecycle stage. If the required source data itself changed, the rerun cutpoint is `data_acquisition`; the matching source partitions may be deleted only within the plan's bounded provider/source/target/month/timeframe scope and only after storage lifecycle/protected-set gates allow the mutation.
+
+Before reentry, workflow state after the cutpoint must be invalidated so completed rows do not cause false progress. During reentry, one resident scheduler owns the scope through its normal locks; launching a second same-scope daemon is invalid.
+
 ## Target Rotation
 
 Target substrate work uses target-scoped checkpoints only for data preparation and diagnostics. It does not mean replay is forced to trade that target. Live-flow replay must simulate the real component graph over the eligible historical candidate pool, where components may select no target, one target, or a target combination.

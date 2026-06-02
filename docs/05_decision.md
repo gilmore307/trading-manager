@@ -151,3 +151,11 @@ Manager may run Layer 3+ historical model-worker training as target-scoped fold 
 When no target is pinned by the service command, the scheduler reads the ordered runtime target queue and selects the first target with an open or unstarted six-month fold. If the current target has completed all eligible folds through the latest fully completed training fold, manager skips it and starts the next target from the earliest ready fold, normally `2016-01`.
 
 The target queue is an execution-routing queue, not promotion evidence and not a replacement for Layer 3 candidate-policy replay. Promotion still requires evaluation-owned replay evidence over the accepted candidate policy.
+
+## D214 - Model group reruns start from the earliest affected workflow cutpoint
+
+Architecture-driven regeneration is a controlled `model_group_rerun_plan`, not an ad hoc repeat of completed tasks.
+
+The plan must identify the earliest affected `layer.stage`, compute all downstream generated outputs and completed workflow state that must be deleted or invalidated, and preserve unaffected upstream/source evidence. Source data is protected by default. It may enter the delete set only when the cutpoint is `data_acquisition` and the required source data definition, provider/source parameters, acquisition contract, or existing source partition is itself stale or wrong.
+
+After the delete/protected sets are accepted and any storage lifecycle gates clear, the single active scheduler reenters from the cutpoint and runs forward under current contracts. Rerun verification must include contract validation, model-output quality checks, lifecycle/evaluation artifacts where applicable, and dashboard/read-model refresh.

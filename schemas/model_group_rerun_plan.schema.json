@@ -1,0 +1,238 @@
+{
+  "$id": "https://gilmore307.github.io/trading-manager/schemas/model_group_rerun_plan.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "affected_scope": {
+      "additionalProperties": false,
+      "properties": {
+        "end_month": {
+          "minLength": 7,
+          "type": "string"
+        },
+        "fold_id": {
+          "minLength": 1,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "start_month": {
+          "minLength": 7,
+          "type": "string"
+        },
+        "target_symbols": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "start_month",
+        "end_month",
+        "target_symbols"
+      ],
+      "type": "object"
+    },
+    "change_origin": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "layer_id": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "stage": {
+          "enum": [
+            "data_acquisition",
+            "feature_generation",
+            "model_generation",
+            "model_evaluation",
+            "replay_execution",
+            "post_replay_attribution",
+            "fold_settlement",
+            "promotion_review",
+            "maintenance",
+            "read_model_refresh"
+          ]
+        }
+      },
+      "required": [
+        "layer_id",
+        "stage",
+        "description"
+      ],
+      "type": "object"
+    },
+    "contract_type": {
+      "const": "model_group_rerun_plan"
+    },
+    "created_at_utc": {
+      "minLength": 20,
+      "type": "string"
+    },
+    "delete_set": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_class": {
+            "enum": [
+              "source_data",
+              "feature_data",
+              "model_output",
+              "model_artifact",
+              "evaluation_artifact",
+              "replay_artifact",
+              "promotion_artifact",
+              "read_model",
+              "workflow_state",
+              "runtime_state",
+              "sql_rows"
+            ]
+          },
+          "delete_reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "ref": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "requires_storage_lifecycle_review": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "artifact_class",
+          "ref",
+          "delete_reason",
+          "requires_storage_lifecycle_review"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "expected_verification_gates": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "plan_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "protected_set": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "protect_reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "ref": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "protect_reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "reason": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "rerun_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "scheduler_reentry_stage": {
+      "additionalProperties": false,
+      "properties": {
+        "layer_id": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "stage": {
+          "enum": [
+            "data_acquisition",
+            "feature_generation",
+            "model_generation",
+            "model_evaluation",
+            "replay_execution",
+            "post_replay_attribution",
+            "fold_settlement",
+            "promotion_review",
+            "maintenance",
+            "read_model_refresh"
+          ]
+        }
+      },
+      "required": [
+        "layer_id",
+        "stage"
+      ],
+      "type": "object"
+    },
+    "source_data_delete": {
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope_refs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "required",
+        "scope_refs"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "plan_id",
+    "contract_type",
+    "rerun_id",
+    "reason",
+    "created_at_utc",
+    "dry_run",
+    "change_origin",
+    "affected_scope",
+    "source_data_delete",
+    "delete_set",
+    "protected_set",
+    "scheduler_reentry_stage",
+    "expected_verification_gates"
+  ],
+  "title": "model_group_rerun_plan",
+  "type": "object"
+}
