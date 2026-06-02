@@ -1180,6 +1180,104 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["pending_count"], 6)
         self.assertIn("six-month fold", progress["progress_basis"])
 
+    def test_task_timeline_exposes_target_and_instrument_scope(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_target_queue.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_target_queue",
+                        "queue_policy": "ordered_first_open_fold",
+                        "rotation_boundary": "layer_03_plus_model_worker",
+                        "targets": [{"symbol": "AAPL"}, {"symbol": "NVDA"}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.model_task",
+                                "stage_type": "model_task",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "six_month_panel",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": False,
+                                    "target_symbol": None,
+                                },
+                            },
+                            {
+                                "stage_id": "layer_08_underlying_action.model_task",
+                                "stage_type": "model_task",
+                                "layer": 8,
+                                "layer_key": "layer_08_underlying_action",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": True,
+                                    "target_symbol": "AAPL",
+                                },
+                            },
+                            {
+                                "stage_id": "layer_09_option_expression.model_task",
+                                "stage_type": "model_task",
+                                "layer": 9,
+                                "layer_key": "layer_09_option_expression",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": True,
+                                    "target_symbol": "AAPL",
+                                },
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:40Z")
+
+        tasks = payload["chart_payload"]["task_timeline"]
+        layer_one = next(task for task in tasks if task["layer"] == 1)
+        layer_eight = next(task for task in tasks if task["layer"] == 8)
+        layer_nine = next(task for task in tasks if task["layer"] == 9)
+        self.assertEqual(layer_one["target_scope"], "market_context_panel")
+        self.assertEqual(layer_one["instrument_scope"], "market_context_proxy_panel")
+        self.assertEqual(layer_eight["target_scope"], "target_symbol")
+        self.assertEqual(layer_eight["instrument_scope"], "underlying_action_plan")
+        self.assertEqual(layer_nine["instrument_scope"], "option_expression_or_underlying_fallback")
+        self.assertEqual(payload["chart_payload"]["target_queue"]["enabled_targets"], ["AAPL", "NVDA"])
+
     def test_model_generation_progress_uses_dataset_splits_without_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

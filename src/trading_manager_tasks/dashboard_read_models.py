@@ -27,7 +27,13 @@ from .model_training_workflow import (
     build_model_training_workflow_plan,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .scheduler_daemon import DEFAULT_MONTH_INGEST_WORKERS, completed_historical_month_cutoff, select_model_worker_fold, select_month_ingest_worker_months
+from .scheduler_daemon import (
+    DEFAULT_MONTH_INGEST_WORKERS,
+    DEFAULT_TARGET_QUEUE_PATH,
+    completed_historical_month_cutoff,
+    select_model_worker_fold,
+    select_month_ingest_worker_months,
+)
 from .scheduler_status import (
     DEFAULT_DAEMON_WRAPPER_PATH,
     DEFAULT_DECISION_LOG_PATH,
@@ -1749,6 +1755,81 @@ def _target_symbol_from_fold_stages(raw_stages: list[Any]) -> str | None:
     return None
 
 
+def _target_scope_for_task(layer: object, dataset_unit: Mapping[str, Any] | None) -> str:
+    try:
+        layer_number = int(layer)
+    except (TypeError, ValueError):
+        layer_number = 0
+    unit_kind = str(dataset_unit.get("unit_kind") if dataset_unit else "")
+    target_symbol = str(dataset_unit.get("target_symbol") if dataset_unit else "").strip().upper()
+    if layer_number == 1:
+        return "market_context_panel"
+    if layer_number == 2:
+        return "sector_context_panel"
+    if target_symbol:
+        return "target_symbol"
+    if unit_kind:
+        return "target_required_unselected"
+    return "not_applicable"
+
+
+def _instrument_scope_for_task(layer: object) -> str:
+    try:
+        layer_number = int(layer)
+    except (TypeError, ValueError):
+        return "not_applicable"
+    if layer_number == 1:
+        return "market_context_proxy_panel"
+    if layer_number == 2:
+        return "sector_context_proxy_panel"
+    if layer_number in {3, 4, 5, 6, 7}:
+        return "target_underlying_evidence"
+    if layer_number == 8:
+        return "underlying_action_plan"
+    if layer_number == 9:
+        return "option_expression_or_underlying_fallback"
+    return "not_applicable"
+
+
+def _target_queue_summary(storage_root: Path) -> dict[str, Any] | None:
+    queue_path = storage_root / "runtime" / DEFAULT_TARGET_QUEUE_PATH.name
+    if not queue_path.exists() and DEFAULT_TARGET_QUEUE_PATH.exists():
+        queue_path = DEFAULT_TARGET_QUEUE_PATH
+    if not queue_path.exists():
+        return None
+    try:
+        payload = _load_json_object(queue_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    raw_targets = payload.get("targets")
+    if not isinstance(raw_targets, list):
+        return None
+    enabled_targets: list[str] = []
+    disabled_targets: list[str] = []
+    for raw_target in raw_targets:
+        if isinstance(raw_target, Mapping):
+            symbol = str(raw_target.get("symbol") or "").strip().upper()
+            enabled = raw_target.get("enabled") is not False
+        else:
+            symbol = str(raw_target or "").strip().upper()
+            enabled = True
+        if not symbol:
+            continue
+        if enabled:
+            enabled_targets.append(symbol)
+        else:
+            disabled_targets.append(symbol)
+    return {
+        "contract_type": payload.get("contract_type"),
+        "queue_policy": payload.get("queue_policy"),
+        "rotation_boundary": payload.get("rotation_boundary"),
+        "enabled_targets": enabled_targets,
+        "disabled_targets": disabled_targets,
+        "target_count": len(enabled_targets),
+        "path": str(queue_path),
+    }
+
+
 def _active_model_worker_fold_key(status: HistoricalSchedulerStatus) -> str | None:
     latest_decision = status.latest_decision or {}
     if not isinstance(latest_decision, Mapping):
@@ -2079,6 +2160,8 @@ def _task_timeline(
                 if not isinstance(receipt_refs, list):
                     receipt_refs = []
                 dataset_unit = dashboard_stage.get("dataset_unit") if isinstance(dashboard_stage.get("dataset_unit"), Mapping) else None
+                target_scope = _target_scope_for_task(dashboard_stage.get("layer"), dataset_unit)
+                instrument_scope = _instrument_scope_for_task(dashboard_stage.get("layer"))
                 task_month = _public_task_period(str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "")) or None
                 child_partitions = _child_partitions_for_period(task_month)
                 worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
@@ -2144,6 +2227,8 @@ def _task_timeline(
                     "dataset_unit_months": dataset_unit.get("unit_months") if dataset_unit else None,
                     "target_symbol": dataset_unit.get("target_symbol") if dataset_unit else None,
                     "target_required": dataset_unit.get("target_required") if dataset_unit else None,
+                    "target_scope": target_scope,
+                    "instrument_scope": instrument_scope,
                     **worker_info,
                     "updated_at_utc": dashboard_stage.get("updated_utc"),
                     **timestamp_fields,
@@ -2159,6 +2244,8 @@ def _task_timeline(
                         "model_activation_allowed": dashboard_stage.get("model_activation_allowed"),
                         "broker_execution_allowed": dashboard_stage.get("broker_execution_allowed"),
                         "dataset_unit": dataset_unit,
+                        "target_scope": target_scope,
+                        "instrument_scope": instrument_scope,
                         "child_partitions": child_partitions,
                         "active_stage_id": dashboard_stage.get("active_stage_id"),
                         "active_stage_type": dashboard_stage.get("active_stage_type"),
@@ -3351,6 +3438,8 @@ def build_historical_task_progress_summary(
         "current_month": _public_current_period(status, public_active_task),
         "active_stage": public_active_task.get("task_id") if public_active_task else None,
         "active_task": _public_active_task_summary(public_active_task),
+        "selected_target_symbol": selected_target_symbol,
+        "target_queue": _target_queue_summary(storage_root),
         "internal_current_month": status.current_month,
         "internal_active_stage": status.current_stage,
         "progress_percent": progress_percent,
