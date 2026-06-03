@@ -93,7 +93,18 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {"contract_type": "evaluation_replay_progress", "stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-02", "status": "completed"},
                 ]
                 progress_path.write_text("\\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\\n", encoding="utf-8")
-                print(json.dumps({"contract_type": "evaluation_replay_execution_run", "replay_execution_run_id": run_id, "candidate_model_ref": candidate_model_ref, "pre_replay_target_refs": ["AAPL"], "target_refs": ["AAPL"], "decision_row_count": 2}))
+                print(json.dumps({
+                    "contract_type": "evaluation_replay_execution_run",
+                    "replay_execution_run_id": run_id,
+                    "candidate_model_ref": candidate_model_ref,
+                    "pre_replay_target_refs": ["XLK"],
+                    "target_refs": ["AAPL"],
+                    "asset_class_counts": {"us_equity": 1},
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                    "candidate_handoff_symbols": ["AAPL"],
+                    "decision_row_count": 2,
+                }))
                 """
             ).strip()
             + "\n",
@@ -271,6 +282,91 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_scope_mismatch")
             self.assertIn("does not match completed training fold", decision.reason)
 
+    def test_runner_failure_returns_backoff_decision(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            runner = tmp / "run_replay_execution.py"
+            runner.write_text(
+                textwrap.dedent(
+                    """
+                    import sys
+                    print("missing Layer 2 target-candidate handoff", file=sys.stderr)
+                    raise SystemExit(2)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=runner,
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_execution_failed")
+            self.assertIn("missing Layer 2 target-candidate handoff", decision.reason)
+            self.assertEqual(decision.execution_summary["runner_returncode"], 2)
+
+    def test_legacy_equity_replay_without_candidate_handoff_does_not_unlock_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            (dataset_root / "replay_progress.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "legacy_run", "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "legacy_run", "month": "2021-02", "status": "completed"}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            receipt_root = dataset_root / "replay_execution_runs" / "legacy_run"
+            receipt_root.mkdir(parents=True)
+            (receipt_root / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": "legacy_run",
+                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "pre_replay_target_refs": ["XLK"],
+                        "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "validation_status": "passed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_replay_executed")
+
     def test_skips_replay_when_all_months_are_already_complete(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -296,8 +392,12 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "compatible_run",
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
-                        "pre_replay_target_refs": ["BTC", "ETH", "SOL"],
+                        "pre_replay_target_refs": ["XLK"],
                         "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                        "candidate_handoff_symbols": ["AAPL"],
                         "validation_status": "passed",
                     }
                 )

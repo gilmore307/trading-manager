@@ -153,14 +153,35 @@ def run_model_group_replay_if_ready(
         candidate_ref=contract_id,
     )
     with acquire_scheduler_lock(lock_ref):
-        completed = subprocess.run(
-            command,
-            cwd=evaluation_repo_root,
-            env=env,
-            check=True,
-            capture_output=True,
-            text=True,
-    )
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=evaluation_repo_root,
+                env=env,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            return _decision(
+                now=now,
+                decision_status="backoff",
+                reason_code="model_group_replay_execution_failed",
+                reason=(exc.stderr or exc.stdout or str(exc)).strip(),
+                selected_work="model_group.replay",
+                command=command,
+                execution_summary={
+                    "contract_id": contract_id,
+                    "dataset_root": str(dataset_root),
+                    "training_fold": training_fold,
+                    "expected_replay_months": expected_months,
+                    "ready_replay_months_before": len(ready_months),
+                    "option_feature_database_configured": bool(option_feature_database_url),
+                    "runner_returncode": exc.returncode,
+                    "runner_stdout": exc.stdout,
+                    "runner_stderr": exc.stderr,
+                },
+            )
     receipt = json.loads(completed.stdout)
     receipt_scope_status = _replay_receipt_scope_status(replay_receipt=receipt, training_fold=training_fold)
     if not receipt_scope_status["compatible"]:
@@ -452,6 +473,22 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     fold_id = str(training_fold.get("fold_id") or "")
     if receipt_fold_id and fold_id and receipt_fold_id != fold_id:
         return {"compatible": False, "reason": "replay fold mismatch"}
+    target_refs = _string_set(replay_receipt.get("target_refs") or replay_receipt.get("pre_replay_target_refs"))
+    asset_class_counts = replay_receipt.get("asset_class_counts")
+    if not isinstance(asset_class_counts, Mapping):
+        asset_class_counts = {}
+    has_equity_or_option_scope = (
+        any(ref and ref not in CRYPTO_REPLAY_TARGET_REFS for ref in target_refs)
+        or int(asset_class_counts.get("us_equity") or 0) > 0
+        or int(asset_class_counts.get("us_option") or 0) > 0
+    )
+    if has_equity_or_option_scope:
+        candidate_handoff_status = str(replay_receipt.get("candidate_handoff_status") or "")
+        if candidate_handoff_status not in {"available", "override"}:
+            return {
+                "compatible": False,
+                "reason": "equity/options replay receipt missing Layer 2 target-candidate handoff evidence",
+            }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
 
