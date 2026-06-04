@@ -1585,6 +1585,23 @@ class RegistryHelperTests(unittest.TestCase):
                 self.assertEqual(registry[key]["path"], "trading-storage/main/shared/layer_01_02_market_context_relative_strength_combinations.csv")
             self.assertIn("market_regime_relative_strength_combinations", registry[key]["applies_to"])
 
+    def test_equity_total_symbol_pool_route_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            registry = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        artifact = registry["EQUITY_TOTAL_SYMBOL_POOL_SHARED_CSV"]
+        self.assertEqual(artifact["kind"], "shared_artifact")
+        self.assertEqual(artifact["payload"], "trading-storage/main/shared/equity_total_symbol_pool.csv")
+        self.assertEqual(artifact["path"], "/root/projects/trading-storage/main/shared/equity_total_symbol_pool.csv")
+        self.assertIn("calendar_maintenance", artifact["applies_to"])
+        self.assertIn("optionable", artifact["note"])
+
+        script = registry["BUILD_EQUITY_TOTAL_SYMBOL_POOL"]
+        self.assertEqual(script["kind"], "script")
+        self.assertEqual(script["path"], "trading-data/scripts/data/build_equity_total_symbol_pool.py")
+        self.assertIn("tradingview_manual_export", script["applies_to"])
+        self.assertIn("must not automate TradingView", script["note"])
+
     def test_target_layer2_context_mapping_shared_csv_is_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
         with shared_path.open(newline="") as csv_file:
