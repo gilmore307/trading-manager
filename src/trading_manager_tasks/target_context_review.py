@@ -55,7 +55,7 @@ REQUIRED_CHECKS = (
     "verify every target has a reviewed Layer 2 context symbol",
     "verify proxy symbols remain target-specific auxiliary evidence references",
     "verify optionable_proxy_status gates option-specific provider tasks",
-    "verify targets outside direct Layer 2 holdings have reviewed business/theme mappings rather than implicit Layer 1/2 universe additions",
+    "verify target context symbols are accepted broad Layer 2 anchors or the BKCH crypto context-anchor exception",
 )
 
 
@@ -172,7 +172,7 @@ def build_target_context_agent_review_request(
         "expected_outputs": [TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT],
         "policy_refs": [
             "target_layer2_context_mapping",
-            "target_context_business_mapping",
+            "target_context_sector_anchor_mapping",
             "proxy_not_layer_context",
             "script_called_agent_review",
         ],

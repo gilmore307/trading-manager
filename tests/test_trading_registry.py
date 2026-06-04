@@ -1625,7 +1625,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 8)
+        self.assertEqual(len(rows), 6)
         self.assertEqual(
             list(rows[0].keys()),
             [
@@ -1657,14 +1657,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(by_target["AAPL"][0]["proxy_role_type"], "no_auxiliary_proxy_type")
         self.assertEqual(
             {row["layer2_context_symbol"] for row in by_target["AAOI"]},
-            {"AIQ", "XLK", "SMH", "XLC"},
+            {"XLK", "XLC"},
         )
         self.assertEqual(
             {row["layer2_mapping_method_type"] for row in by_target["AAOI"]},
             {
-                "primary_business_context",
-                "secondary_sector_context",
-                "industry_chain_context",
+                "primary_sector_context",
                 "weak_demand_side_context",
             },
         )
@@ -1680,8 +1678,8 @@ class RegistryHelperTests(unittest.TestCase):
             "/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv",
         )
         self.assertEqual(registry["TARGET_LAYER2_CONTEXT_MAPPING"]["payload"], "target_layer2_context_mapping")
-        self.assertIn("target_context_business_mapping", registry["TARGET_LAYER2_CONTEXT_MAPPING"]["applies_to"])
-        self.assertEqual(registry["TARGET_CONTEXT_BUSINESS_MAPPING"]["payload"], "target_context_business_mapping")
+        self.assertIn("target_context_sector_anchor_mapping", registry["TARGET_LAYER2_CONTEXT_MAPPING"]["applies_to"])
+        self.assertEqual(registry["TARGET_CONTEXT_SECTOR_ANCHOR_MAPPING"]["payload"], "target_context_sector_anchor_mapping")
         self.assertEqual(registry["TARGET_CONTEXT_MULTI_ROW_BY_TARGET"]["payload"], "target_context_multi_row_by_target")
         self.assertEqual(registry["TARGET_SYMBOL"]["payload"], "target_symbol")
         self.assertIn("target_layer2_context_mapping", registry["TARGET_SYMBOL"]["applies_to"])

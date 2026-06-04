@@ -100,13 +100,13 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             trading_data_root = tmp / "trading-data"
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nARKF,layer_02_sector_context\n", encoding="utf-8")
-            run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "ARKF" / "2016-02" / "runs" / "run_001"
+            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-02" / "runs" / "run_001"
             (run_dir / "cleaned").mkdir(parents=True)
             (run_dir / "saved").mkdir(parents=True)
             (run_dir / "cleaned" / "equity_bar.jsonl").write_text("", encoding="utf-8")
             (run_dir / "saved" / "equity_bar.csv").write_text("symbol,timestamp,bar_open,bar_high,bar_low,bar_close,bar_volume,timeframe\n", encoding="utf-8")
-            receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "ARKF" / "2016-02" / "completion_receipt.json"
+            receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-02" / "completion_receipt.json"
             receipt_path.parent.mkdir(parents=True, exist_ok=True)
             receipt_path.write_text(
                 json.dumps(
@@ -116,7 +116,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
                                 "run_id": "run_001",
                                 "status": "succeeded",
                                 "row_counts": {"equity_bar": 0},
-                                "steps": {"clean": {"references": ["storage/monthly_backfill/alpaca_bars/ARKF/2016-02/runs/run_001/cleaned/equity_bar.jsonl"]}},
+                                "steps": {"clean": {"references": ["storage/monthly_backfill/alpaca_bars/XLF/2016-02/runs/run_001/cleaned/equity_bar.jsonl"]}},
                             }
                         ]
                     }

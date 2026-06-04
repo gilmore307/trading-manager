@@ -238,9 +238,9 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "SectorContextModel",
         "depends_on_layers": (1,),
         "progression_mode": "sector_panel_continuous",
-        "candidate_axis": "six_month_window;sector_or_industry_symbol",
-        "candidate_progression_policy": "complete fixed Layer 2 sector/industry panel for each six-month chronological unit once Layer 1 context exists; promotion waits for Layers 1-9 model generation, model-group replay, and post-replay Layer 10 attribution",
-        "data_surface": "autonomous Alpaca sector/industry ETF bars acquisition plus m02_sector_context_feature_generation over materialized market/sector inputs",
+        "candidate_axis": "six_month_window;sector_context_symbol",
+        "candidate_progression_policy": "complete fixed Layer 2 broad sector-anchor plus crypto-context panel for each six-month chronological unit once Layer 1 context exists; promotion waits for Layers 1-9 model generation, model-group replay, and post-replay Layer 10 attribution",
+        "data_surface": "autonomous Alpaca Layer 2 context ETF bars acquisition plus m02_sector_context_feature_generation over materialized market/sector inputs",
         "feature_cli": "trading-data-m02-sector-context-feature-generation",
     },
     {

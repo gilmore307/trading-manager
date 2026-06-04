@@ -34,13 +34,13 @@ class TargetContextReviewTests(unittest.TestCase):
 
         normalized = validate_target_context_agent_review_request(request)
         self.assertEqual(normalized["target_symbols"], ["AAOI"])
-        self.assertEqual(len(normalized["mapping_rows"]), 4)
+        self.assertEqual(len(normalized["mapping_rows"]), 2)
         self.assertEqual(
             {row["layer2_context_symbol"] for row in normalized["mapping_rows"]},
-            {"AIQ", "XLK", "SMH", "XLC"},
+            {"XLK", "XLC"},
         )
         self.assertTrue(all(row["optionable_proxy_status"] == "not_applicable" for row in normalized["mapping_rows"]))
-        self.assertIn("target_context_business_mapping", normalized["policy_refs"])
+        self.assertIn("target_context_sector_anchor_mapping", normalized["policy_refs"])
 
     def test_rejects_missing_target_symbol(self) -> None:
         with self.assertRaisesRegex(TaskSystemError, "not found"):
