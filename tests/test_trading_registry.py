@@ -1599,8 +1599,17 @@ class RegistryHelperTests(unittest.TestCase):
         script = registry["BUILD_EQUITY_TOTAL_SYMBOL_POOL"]
         self.assertEqual(script["kind"], "script")
         self.assertEqual(script["path"], "trading-data/scripts/data/build_equity_total_symbol_pool.py")
-        self.assertIn("tradingview_manual_export", script["applies_to"])
-        self.assertIn("must not automate TradingView", script["note"])
+        self.assertIn("tradingview_screener_snapshot", script["applies_to"])
+        self.assertIn("strict optionable-symbol list", script["note"])
+
+        fetch_script = registry["FETCH_TRADINGVIEW_EQUITY_SCREENER"]
+        self.assertEqual(fetch_script["kind"], "script")
+        self.assertEqual(fetch_script["path"], "trading-data/scripts/data/fetch_tradingview_equity_screener.py")
+        self.assertIn("volume_rank", fetch_script["applies_to"])
+
+        refresh_script = registry["REFRESH_EQUITY_TOTAL_SYMBOL_POOL_FROM_TRADINGVIEW"]
+        self.assertEqual(refresh_script["kind"], "script")
+        self.assertIn("uncertain optionability", refresh_script["note"])
 
     def test_target_layer2_context_mapping_shared_csv_is_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
