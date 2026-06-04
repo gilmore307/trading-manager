@@ -1172,9 +1172,10 @@ def _temporal_stability_diagnostics(scored_rows: Sequence[Mapping[str, Any]]) ->
             by_month.setdefault(month, []).append(row)
     slices = []
     for month, rows in sorted(by_month.items()):
+        ordered_rows = sorted(enumerate(rows), key=lambda item: (str(item[1].get("timestamp") or ""), item[0]))
         labels = [int(row["label"]) for row in rows]
         scores = [float(row["score"]) for row in rows]
-        returns = [float(row["net_return"]) for row in rows]
+        returns = [float(row["net_return"]) for _index, row in ordered_rows]
         slices.append(
             {
                 "month": month,
@@ -1184,6 +1185,7 @@ def _temporal_stability_diagnostics(scored_rows: Sequence[Mapping[str, Any]]) ->
                 "brier_score": _brier_score(labels, scores),
                 "net_return_total": _round_metric(sum(returns)),
                 "max_drawdown": _round_metric(_max_drawdown(returns)),
+                "net_return_path_ohlc": _return_path_ohlc(returns),
             }
         )
     returns_by_month = [float(item["net_return_total"]) for item in slices if item.get("net_return_total") is not None]
@@ -2332,6 +2334,22 @@ def _max_drawdown(returns: Sequence[float]) -> float:
         peak = max(peak, current)
         max_dd = min(max_dd, current - peak)
     return max_dd
+
+
+def _return_path_ohlc(returns: Sequence[float]) -> dict[str, float]:
+    current = 0.0
+    high = 0.0
+    low = 0.0
+    for value in returns:
+        current += float(value)
+        high = max(high, current)
+        low = min(low, current)
+    return {
+        "open": 1.0,
+        "high": _round_metric(1.0 + high),
+        "low": _round_metric(1.0 + low),
+        "close": _round_metric(1.0 + current),
+    }
 
 
 def _payoff_ratio(returns: Sequence[float]) -> float | None:

@@ -8,7 +8,11 @@ import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 
-from trading_manager_tasks.model_group_evaluation import _decision_variable_schema_diagnostics, run_model_group_evaluation_if_ready
+from trading_manager_tasks.model_group_evaluation import (
+    _decision_variable_schema_diagnostics,
+    _temporal_stability_diagnostics,
+    run_model_group_evaluation_if_ready,
+)
 
 
 class ModelGroupEvaluationTests(unittest.TestCase):
@@ -64,6 +68,20 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             )
             + "\n",
             encoding="utf-8",
+        )
+
+    def test_temporal_stability_publishes_monthly_return_path_ohlc(self):
+        diagnostics = _temporal_stability_diagnostics(
+            [
+                {"timestamp": "2021-01-02T00:00:00Z", "label": 1, "score": 0.8, "net_return": 0.10},
+                {"timestamp": "2021-01-03T00:00:00Z", "label": 0, "score": 0.2, "net_return": -0.30},
+                {"timestamp": "2021-01-04T00:00:00Z", "label": 1, "score": 0.7, "net_return": 0.05},
+            ]
+        )
+
+        self.assertEqual(
+            diagnostics["slices"][0]["net_return_path_ohlc"],
+            {"open": 1.0, "high": 1.1, "low": 0.8, "close": 0.85},
         )
 
     def _write_ready_replay_and_attribution(self, storage_root: Path) -> Path:
