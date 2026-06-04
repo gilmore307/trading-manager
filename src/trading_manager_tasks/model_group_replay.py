@@ -33,7 +33,7 @@ DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = projects_root() / "trading-manager" / ".venv" / "bin" / "python"
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
-EQUITY_SYMBOL_POOL_SOURCE_POLICY = "fixed_current_snapshot_historical_equity_candidate_universe"
+CANDIDATE_UNIVERSE_SOURCE_POLICY = "fixed_current_snapshot_historical_candidate_universe"
 
 
 def run_model_group_replay_if_ready(
@@ -47,7 +47,7 @@ def run_model_group_replay_if_ready(
     model_repo_root: Path = DEFAULT_MODEL_REPO_ROOT,
     runner_path: Path = DEFAULT_EVALUATION_RUNNER_PATH,
     selected_target_symbol: str | None = None,
-    equity_candidate_universe_path: Path | None = None,
+    candidate_universe_path: Path | None = None,
     max_decision_rows: int | None = None,
     now_utc: datetime | None = None,
 ) -> SchedulerDecision | None:
@@ -100,8 +100,9 @@ def run_model_group_replay_if_ready(
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
     replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
-    resolved_equity_candidate_universe_path = equity_candidate_universe_path or _historical_equity_candidate_universe_path(storage_root)
-    fixed_equity_universe_symbols = _fixed_historical_equity_candidate_symbols(resolved_equity_candidate_universe_path)
+    resolved_candidate_universe_path = candidate_universe_path or _historical_candidate_universe_path(storage_root)
+    fixed_candidate_universe_symbols = _fixed_historical_candidate_symbols(resolved_candidate_universe_path)
+    fixed_equity_universe_symbols = _fixed_historical_candidate_symbols(resolved_candidate_universe_path, asset_class="us_equity")
     equity_pool_symbols = _replay_equity_symbols_from_fixed_universe(
         fixed_universe_symbols=fixed_equity_universe_symbols,
         replay_plan_symbols=replay_plan_equity_symbols,
@@ -143,10 +144,11 @@ def run_model_group_replay_if_ready(
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
                 "replay_plan_equity_symbol_count": len(replay_plan_equity_symbols),
-                "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
-                "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
+                "candidate_universe_path": str(resolved_candidate_universe_path),
+                "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
+                "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
-                "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
+                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
                 "required_next_step": "refresh the frozen replay dataset with Alpaca bars for the fixed historical equity candidate universe before fold replay",
             },
         )
@@ -166,10 +168,11 @@ def run_model_group_replay_if_ready(
                 "expected_replay_months": expected_months,
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
-                "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
-                "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
+                "candidate_universe_path": str(resolved_candidate_universe_path),
+                "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
+                "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
-                "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
+                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
             },
         )
 
@@ -218,10 +221,11 @@ def run_model_group_replay_if_ready(
                     "expected_replay_months": expected_months,
                     "ready_replay_months_before": len(ready_months),
                     "option_feature_database_configured": bool(option_feature_database_url),
-                    "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
-                    "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
+                    "candidate_universe_path": str(resolved_candidate_universe_path),
+                    "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
+                    "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                     "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
-                    "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
+                    "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
                     "runner_returncode": exc.returncode,
                     "runner_stdout": exc.stdout,
                     "runner_stderr": exc.stderr,
@@ -243,10 +247,11 @@ def run_model_group_replay_if_ready(
                 "training_fold": training_fold,
                 "replay_receipt_scope_status": receipt_scope_status,
                 "replay_execution_receipt": receipt,
-                "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
-                "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
+                "candidate_universe_path": str(resolved_candidate_universe_path),
+                "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
+                "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
-                "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
+                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
             },
         )
     refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_ids={str(receipt.get("replay_execution_run_id") or run_id)})
@@ -265,10 +270,11 @@ def run_model_group_replay_if_ready(
             "ready_replay_months_before": len(ready_months),
             "ready_replay_months_after": len(refreshed_ready_months),
             "option_feature_database_configured": bool(option_feature_database_url),
-            "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
-            "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
+            "candidate_universe_path": str(resolved_candidate_universe_path),
+            "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
+            "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
             "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
-            "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
+            "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
             "replay_execution_receipt": receipt,
         },
     )
@@ -332,17 +338,19 @@ def _database_url() -> str | None:
     return None
 
 
-def _historical_equity_candidate_universe_path(storage_root: Path) -> Path:
+def _historical_candidate_universe_path(storage_root: Path) -> Path:
     trading_storage_root = storage_root.parent.parent
-    return trading_storage_root / "main" / "shared" / "historical_equity_candidate_universe.csv"
+    return trading_storage_root / "main" / "shared" / "historical_candidate_universe.csv"
 
 
-def _fixed_historical_equity_candidate_symbols(path: Path) -> set[str]:
+def _fixed_historical_candidate_symbols(path: Path, *, asset_class: str | None = None) -> set[str]:
     symbols: set[str] = set()
     for row in _csv_rows(path):
         symbol = str(row.get("symbol") or "").strip().upper()
         status = str(row.get("replay_candidate_status") or row.get("pool_membership_status") or "active").strip().lower()
         if status != "active":
+            continue
+        if asset_class is not None and str(row.get("asset_class") or "").strip().lower() != asset_class:
             continue
         if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
             continue

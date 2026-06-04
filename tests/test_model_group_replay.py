@@ -101,7 +101,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
-                    "candidate_handoff_source": "fixed_current_snapshot_historical_equity_candidate_universe",
+                    "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                     "candidate_handoff_symbols": ["AAPL"],
                     "decision_row_count": 2,
                 }))
@@ -115,10 +115,11 @@ class ModelGroupReplayTests(unittest.TestCase):
     def _write_fixed_equity_universe(self, path: Path, symbols: list[str]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["symbol", "replay_candidate_status"])
+            writer = csv.DictWriter(handle, fieldnames=["symbol", "asset_class", "replay_candidate_status"])
             writer.writeheader()
             for symbol in symbols:
-                writer.writerow({"symbol": symbol, "replay_candidate_status": "active"})
+                asset_class = "crypto_spot" if symbol in {"BTC", "ETH", "SOL"} else "us_equity"
+                writer.writerow({"symbol": symbol, "asset_class": asset_class, "replay_candidate_status": "active"})
 
     def test_runs_replay_when_fold_and_frozen_dataset_are_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -156,15 +157,15 @@ class ModelGroupReplayTests(unittest.TestCase):
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
 
-    def test_plan_passes_fixed_historical_equity_candidates_with_available_bars(self):
+    def test_plan_passes_fixed_historical_candidate_universe_equity_subset_with_available_bars(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_dataset(storage_root)
             self._write_completed_fold(storage_root)
-            fixed_universe = tmp / "historical_equity_candidate_universe.csv"
-            self._write_fixed_equity_universe(fixed_universe, ["AAPL", "MSFT", "NVDA"])
+            fixed_universe = tmp / "historical_candidate_universe.csv"
+            self._write_fixed_equity_universe(fixed_universe, ["AAPL", "MSFT", "NVDA", "BTC"])
             plan_path = dataset_root / "feed_acquisition_plan.csv"
             with plan_path.open("a", newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
@@ -179,7 +180,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 execution_repo_root=tmp,
                 python_executable=sys.executable,
                 selected_target_symbol="AAPL",
-                equity_candidate_universe_path=fixed_universe,
+                candidate_universe_path=fixed_universe,
                 execute=False,
             )
 
@@ -192,8 +193,9 @@ class ModelGroupReplayTests(unittest.TestCase):
             ]
             self.assertEqual(pairs, ["AAPL", "MSFT"])
             self.assertEqual(decision.execution_summary["equity_symbol_pool_symbol_count"], 2)
-            self.assertEqual(decision.execution_summary["fixed_equity_candidate_universe_symbol_count"], 3)
-            self.assertEqual(decision.execution_summary["equity_symbol_pool_source_policy"], "fixed_current_snapshot_historical_equity_candidate_universe")
+            self.assertEqual(decision.execution_summary["fixed_candidate_universe_symbol_count"], 4)
+            self.assertEqual(decision.execution_summary["fixed_equity_candidate_symbol_count"], 3)
+            self.assertEqual(decision.execution_summary["candidate_universe_source_policy"], "fixed_current_snapshot_historical_candidate_universe")
 
     def test_rejects_runner_receipt_that_falls_back_to_placeholder_policy(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -443,7 +445,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "fixed_current_snapshot_historical_equity_candidate_universe",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                         "candidate_handoff_symbols": ["AAPL"],
                         "validation_status": "passed",
                     }

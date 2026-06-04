@@ -1607,10 +1607,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("calendar_maintenance", artifact["applies_to"])
         self.assertIn("active inactive membership evidence", artifact["note"])
 
-        historical_artifact = registry["HISTORICAL_EQUITY_CANDIDATE_UNIVERSE_SHARED_CSV"]
+        historical_artifact = registry["HISTORICAL_CANDIDATE_UNIVERSE_SHARED_CSV"]
         self.assertEqual(historical_artifact["kind"], "shared_artifact")
-        self.assertEqual(historical_artifact["payload"], "trading-storage/main/shared/historical_equity_candidate_universe.csv")
-        self.assertIn("historical_equity_candidate_universe", historical_artifact["applies_to"])
+        self.assertEqual(historical_artifact["payload"], "trading-storage/main/shared/historical_candidate_universe.csv")
+        self.assertIn("historical_candidate_universe", historical_artifact["applies_to"])
+        self.assertIn("crypto_context_anchor", historical_artifact["applies_to"])
         self.assertIn("not point-in-time historical", historical_artifact["note"])
 
         script = registry["BUILD_EQUITY_TOTAL_SYMBOL_POOL"]
@@ -1619,10 +1620,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("tradingview_screener_snapshot", script["applies_to"])
         self.assertIn("preserves observed inactive rows", script["note"])
 
-        historical_script = registry["BUILD_HISTORICAL_EQUITY_CANDIDATE_UNIVERSE"]
+        historical_script = registry["BUILD_HISTORICAL_CANDIDATE_UNIVERSE"]
         self.assertEqual(historical_script["kind"], "script")
-        self.assertEqual(historical_script["path"], "trading-data/scripts/data/build_historical_equity_candidate_universe.py")
-        self.assertIn("historical_equity_candidate_universe", historical_script["applies_to"])
+        self.assertEqual(historical_script["path"], "trading-data/scripts/data/build_historical_candidate_universe.py")
+        self.assertIn("historical_candidate_universe", historical_script["applies_to"])
+        self.assertIn("crypto_spot", historical_script["applies_to"])
 
         fetch_script = registry["FETCH_TRADINGVIEW_EQUITY_SCREENER"]
         self.assertEqual(fetch_script["kind"], "script")
