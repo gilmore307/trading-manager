@@ -282,7 +282,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("candidate_policy_replay", policy["payload"])
         self.assertIn("canonical_2021_2025_historical_clock_replay", policy["payload"])
         self.assertIn("fixed_replay_window_2021_01_01_to_2026_01_01_end_exclusive", policy["payload"])
-        self.assertIn("model_selects_targets_from_frozen_point_in_time_candidate_universe", policy["payload"])
+        self.assertIn("model_selects_targets_from_fixed_current_snapshot_candidate_universe", policy["payload"])
         self.assertIn("final_tickers_not_preselected", policy["payload"])
         self.assertIn("fixed_replay_window", policy["payload"])
         self.assertIn("fixed_selection_metrics", policy["payload"])
@@ -1607,11 +1607,22 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("calendar_maintenance", artifact["applies_to"])
         self.assertIn("active inactive membership evidence", artifact["note"])
 
+        historical_artifact = registry["HISTORICAL_EQUITY_CANDIDATE_UNIVERSE_SHARED_CSV"]
+        self.assertEqual(historical_artifact["kind"], "shared_artifact")
+        self.assertEqual(historical_artifact["payload"], "trading-storage/main/shared/historical_equity_candidate_universe.csv")
+        self.assertIn("historical_equity_candidate_universe", historical_artifact["applies_to"])
+        self.assertIn("not point-in-time historical", historical_artifact["note"])
+
         script = registry["BUILD_EQUITY_TOTAL_SYMBOL_POOL"]
         self.assertEqual(script["kind"], "script")
         self.assertEqual(script["path"], "trading-data/scripts/data/build_equity_total_symbol_pool.py")
         self.assertIn("tradingview_screener_snapshot", script["applies_to"])
         self.assertIn("preserves observed inactive rows", script["note"])
+
+        historical_script = registry["BUILD_HISTORICAL_EQUITY_CANDIDATE_UNIVERSE"]
+        self.assertEqual(historical_script["kind"], "script")
+        self.assertEqual(historical_script["path"], "trading-data/scripts/data/build_historical_equity_candidate_universe.py")
+        self.assertIn("historical_equity_candidate_universe", historical_script["applies_to"])
 
         fetch_script = registry["FETCH_TRADINGVIEW_EQUITY_SCREENER"]
         self.assertEqual(fetch_script["kind"], "script")

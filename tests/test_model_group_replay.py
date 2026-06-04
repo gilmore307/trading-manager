@@ -101,7 +101,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
-                    "candidate_handoff_source": "point_in_time_replay_candidate_universe",
+                    "candidate_handoff_source": "fixed_current_snapshot_historical_equity_candidate_universe",
                     "candidate_handoff_symbols": ["AAPL"],
                     "decision_row_count": 2,
                 }))
@@ -111,6 +111,14 @@ class ModelGroupReplayTests(unittest.TestCase):
             encoding="utf-8",
         )
         return runner
+
+    def _write_fixed_equity_universe(self, path: Path, symbols: list[str]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["symbol", "replay_candidate_status"])
+            writer.writeheader()
+            for symbol in symbols:
+                writer.writerow({"symbol": symbol, "replay_candidate_status": "active"})
 
     def test_runs_replay_when_fold_and_frozen_dataset_are_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -148,13 +156,15 @@ class ModelGroupReplayTests(unittest.TestCase):
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
 
-    def test_plan_passes_point_in_time_replay_equity_candidates(self):
+    def test_plan_passes_fixed_historical_equity_candidates_with_available_bars(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_dataset(storage_root)
             self._write_completed_fold(storage_root)
+            fixed_universe = tmp / "historical_equity_candidate_universe.csv"
+            self._write_fixed_equity_universe(fixed_universe, ["AAPL", "MSFT", "NVDA"])
             plan_path = dataset_root / "feed_acquisition_plan.csv"
             with plan_path.open("a", newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
@@ -169,6 +179,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 execution_repo_root=tmp,
                 python_executable=sys.executable,
                 selected_target_symbol="AAPL",
+                equity_candidate_universe_path=fixed_universe,
                 execute=False,
             )
 
@@ -181,7 +192,8 @@ class ModelGroupReplayTests(unittest.TestCase):
             ]
             self.assertEqual(pairs, ["AAPL", "MSFT"])
             self.assertEqual(decision.execution_summary["equity_symbol_pool_symbol_count"], 2)
-            self.assertEqual(decision.execution_summary["equity_symbol_pool_source_policy"], "frozen_replay_plan_point_in_time_candidate_universe")
+            self.assertEqual(decision.execution_summary["fixed_equity_candidate_universe_symbol_count"], 3)
+            self.assertEqual(decision.execution_summary["equity_symbol_pool_source_policy"], "fixed_current_snapshot_historical_equity_candidate_universe")
 
     def test_rejects_runner_receipt_that_falls_back_to_placeholder_policy(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -329,7 +341,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 textwrap.dedent(
                     """
                     import sys
-                    print("missing point-in-time candidate universe evidence", file=sys.stderr)
+                    print("missing fixed historical candidate universe evidence", file=sys.stderr)
                     raise SystemExit(2)
                     """
                 ).strip()
@@ -350,7 +362,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_execution_failed")
-            self.assertIn("missing point-in-time candidate universe evidence", decision.reason)
+            self.assertIn("missing fixed historical candidate universe evidence", decision.reason)
             self.assertEqual(decision.execution_summary["runner_returncode"], 2)
 
     def test_legacy_equity_replay_without_candidate_handoff_does_not_unlock_replay(self):
@@ -431,7 +443,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "point_in_time_replay_candidate_universe",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_equity_candidate_universe",
                         "candidate_handoff_symbols": ["AAPL"],
                         "validation_status": "passed",
                     }

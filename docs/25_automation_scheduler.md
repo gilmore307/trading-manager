@@ -64,7 +64,7 @@ Model Maintenance. Until that lifecycle emits maintenance/readiness evidence,
 the next fold and the next target remain blocked because Layer 10 may update
 the event-observation pool used by later Layer 4 folds.
 
-Layer 2 feature generation prepares sector/context features only. It does not fetch ETF holdings or materialize target-candidate holdings. Downstream Layer 3 target-state feature generation consumes target-local evidence and accepted target-context mappings; historical replay candidate coverage comes from its frozen point-in-time replay dataset rather than the realtime total pool or current ETF holdings.
+Layer 2 feature generation prepares sector/context features only. It does not fetch ETF holdings or materialize target-candidate holdings. Downstream Layer 3 target-state feature generation consumes target-local evidence and accepted target-context mappings; historical replay candidate coverage comes from the fixed historical candidate-universe table and matching replay bars rather than the mutable realtime total pool or current ETF holdings.
 
 Layer 3 target-state materialization remains a local source-stage command: it
 turns reviewed target-local `01_feed_alpaca_bars` artifacts into

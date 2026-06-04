@@ -41,9 +41,9 @@ Layer 9 remains the optional base guidance/expression layer. It should not direc
 
 ## Layer 3 Candidate Policy
 
-Layer 3 candidate generation is rule-fixed, not final-ticker-fixed. Live routing should build candidates from the reviewed realtime total-symbol pool, target metadata, current hot/liquid market-wide names, and point-in-time liquidity, spread, data-quality, and optional optionability filters. Promotion replay must build candidates from its frozen point-in-time replay universe rather than the current realtime pool. Layer 3 may rank the anonymous candidate-policy batch for target handoff, but downstream layers still own alpha confidence, action, sizing, option expression, and execution.
+Layer 3 candidate generation is rule-fixed, not final-ticker-fixed. Live routing should build candidates from the reviewed realtime total-symbol pool, target metadata, current hot/liquid market-wide names, and point-in-time liquidity, spread, data-quality, and optional optionability filters. Promotion replay uses the fixed `historical_equity_candidate_universe.csv` table seeded from the current realtime pool; it is stable replay scope, not point-in-time historical market-wide ranking evidence. Layer 3 may rank the anonymous candidate-policy batch for target handoff, but downstream layers still own alpha confidence, action, sizing, option expression, and execution.
 
-Manager may schedule target-major substrate work because routing symbols only prepare data samples. That scheduling choice does not select the replay target. Live-flow replay must run the component graph against the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. A fixed-symbol run is a diagnostic repair scenario, not ordinary promotion evidence.
+Manager may schedule target-major substrate work because routing symbols only prepare data samples. That scheduling choice does not select the replay target. Live-flow replay must run the component graph against the fixed historical candidate pool, allowing components to choose no target, one target, or a target combination. A fixed-symbol run is a diagnostic repair scenario, not ordinary promotion evidence.
 
 Layer 4 event evidence has both reusable global/sector substrate and
 target-local slices. Global/sector event-observation substrate belongs with

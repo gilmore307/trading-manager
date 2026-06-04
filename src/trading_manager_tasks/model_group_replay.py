@@ -33,7 +33,7 @@ DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = projects_root() / "trading-manager" / ".venv" / "bin" / "python"
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
-EQUITY_SYMBOL_POOL_SOURCE_POLICY = "frozen_replay_plan_point_in_time_candidate_universe"
+EQUITY_SYMBOL_POOL_SOURCE_POLICY = "fixed_current_snapshot_historical_equity_candidate_universe"
 
 
 def run_model_group_replay_if_ready(
@@ -47,6 +47,7 @@ def run_model_group_replay_if_ready(
     model_repo_root: Path = DEFAULT_MODEL_REPO_ROOT,
     runner_path: Path = DEFAULT_EVALUATION_RUNNER_PATH,
     selected_target_symbol: str | None = None,
+    equity_candidate_universe_path: Path | None = None,
     max_decision_rows: int | None = None,
     now_utc: datetime | None = None,
 ) -> SchedulerDecision | None:
@@ -99,7 +100,12 @@ def run_model_group_replay_if_ready(
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
     replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
-    equity_pool_symbols = _point_in_time_replay_equity_symbols(replay_plan_equity_symbols)
+    resolved_equity_candidate_universe_path = equity_candidate_universe_path or _historical_equity_candidate_universe_path(storage_root)
+    fixed_equity_universe_symbols = _fixed_historical_equity_candidate_symbols(resolved_equity_candidate_universe_path)
+    equity_pool_symbols = _replay_equity_symbols_from_fixed_universe(
+        fixed_universe_symbols=fixed_equity_universe_symbols,
+        replay_plan_symbols=replay_plan_equity_symbols,
+    )
     command = [
         resolved_python,
         str(runner_path),
@@ -125,7 +131,7 @@ def run_model_group_replay_if_ready(
             decision_status="backoff",
             reason_code="model_group_replay_candidate_coverage_missing",
             reason=(
-                "frozen replay plan has equity instruments, but none pass the point-in-time replay candidate symbol validation"
+                "frozen replay plan has equity instruments, but none overlap the fixed historical equity candidate universe"
             ),
             selected_work="model_group.replay",
             command=command,
@@ -137,9 +143,11 @@ def run_model_group_replay_if_ready(
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
                 "replay_plan_equity_symbol_count": len(replay_plan_equity_symbols),
+                "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
+                "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
-                "required_next_step": "refresh the frozen replay dataset with point-in-time equity candidate symbols and monthly Alpaca candidate bars before fold replay",
+                "required_next_step": "refresh the frozen replay dataset with Alpaca bars for the fixed historical equity candidate universe before fold replay",
             },
         )
 
@@ -158,6 +166,8 @@ def run_model_group_replay_if_ready(
                 "expected_replay_months": expected_months,
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
+                "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
+                "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
             },
@@ -208,6 +218,8 @@ def run_model_group_replay_if_ready(
                     "expected_replay_months": expected_months,
                     "ready_replay_months_before": len(ready_months),
                     "option_feature_database_configured": bool(option_feature_database_url),
+                    "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
+                    "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
                     "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                     "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
                     "runner_returncode": exc.returncode,
@@ -231,6 +243,8 @@ def run_model_group_replay_if_ready(
                 "training_fold": training_fold,
                 "replay_receipt_scope_status": receipt_scope_status,
                 "replay_execution_receipt": receipt,
+                "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
+                "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
             },
@@ -251,6 +265,8 @@ def run_model_group_replay_if_ready(
             "ready_replay_months_before": len(ready_months),
             "ready_replay_months_after": len(refreshed_ready_months),
             "option_feature_database_configured": bool(option_feature_database_url),
+            "equity_candidate_universe_path": str(resolved_equity_candidate_universe_path),
+            "fixed_equity_candidate_universe_symbol_count": len(fixed_equity_universe_symbols),
             "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
             "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
             "replay_execution_receipt": receipt,
@@ -316,10 +332,30 @@ def _database_url() -> str | None:
     return None
 
 
-def _point_in_time_replay_equity_symbols(replay_plan_symbols: set[str]) -> tuple[str, ...]:
+def _historical_equity_candidate_universe_path(storage_root: Path) -> Path:
+    trading_storage_root = storage_root.parent.parent
+    return trading_storage_root / "main" / "shared" / "historical_equity_candidate_universe.csv"
+
+
+def _fixed_historical_equity_candidate_symbols(path: Path) -> set[str]:
+    symbols: set[str] = set()
+    for row in _csv_rows(path):
+        symbol = str(row.get("symbol") or "").strip().upper()
+        status = str(row.get("replay_candidate_status") or row.get("pool_membership_status") or "active").strip().lower()
+        if status != "active":
+            continue
+        if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
+            continue
+        symbols.add(symbol)
+    return symbols
+
+
+def _replay_equity_symbols_from_fixed_universe(*, fixed_universe_symbols: set[str], replay_plan_symbols: set[str]) -> tuple[str, ...]:
     symbols: list[str] = []
     seen: set[str] = set()
-    for symbol in sorted(replay_plan_symbols):
+    if not fixed_universe_symbols:
+        return ()
+    for symbol in sorted(replay_plan_symbols & fixed_universe_symbols):
         if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
             continue
         if symbol in seen:
@@ -548,7 +584,7 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         if candidate_handoff_status not in {"available", "override"}:
             return {
                 "compatible": False,
-                "reason": "equity/options replay receipt missing point-in-time candidate universe evidence",
+                "reason": "equity/options replay receipt missing fixed historical candidate universe evidence",
             }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
