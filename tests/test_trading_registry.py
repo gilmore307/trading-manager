@@ -1629,7 +1629,7 @@ class RegistryHelperTests(unittest.TestCase):
         fetch_script = registry["FETCH_TRADINGVIEW_EQUITY_SCREENER"]
         self.assertEqual(fetch_script["kind"], "script")
         self.assertEqual(fetch_script["path"], "trading-data/scripts/data/fetch_tradingview_equity_screener.py")
-        self.assertIn("volume_rank", fetch_script["applies_to"])
+        self.assertIn("dollar_volume_rank", fetch_script["applies_to"])
 
         refresh_script = registry["REFRESH_EQUITY_TOTAL_SYMBOL_POOL_FROM_TRADINGVIEW"]
         self.assertEqual(refresh_script["kind"], "script")
