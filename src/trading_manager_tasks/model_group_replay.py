@@ -31,8 +31,10 @@ DEFAULT_MODEL_REPO_ROOT = projects_root() / "trading-model"
 DEFAULT_EVALUATION_RUNNER_PATH = DEFAULT_EVALUATION_REPO_ROOT / "scripts" / "evaluation" / "run_replay_execution.py"
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = projects_root() / "trading-manager" / ".venv" / "bin" / "python"
+DEFAULT_EQUITY_SYMBOL_POOL_PATH = projects_root() / "trading-storage" / "main" / "shared" / "equity_total_symbol_pool.csv"
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
+EQUITY_SYMBOL_POOL_SOURCE_POLICY = "active_layer2_etf_holdings_intersect_frozen_replay_plan"
 
 
 def run_model_group_replay_if_ready(
@@ -46,6 +48,7 @@ def run_model_group_replay_if_ready(
     model_repo_root: Path = DEFAULT_MODEL_REPO_ROOT,
     runner_path: Path = DEFAULT_EVALUATION_RUNNER_PATH,
     selected_target_symbol: str | None = None,
+    equity_symbol_pool_path: Path | None = None,
     max_decision_rows: int | None = None,
     now_utc: datetime | None = None,
 ) -> SchedulerDecision | None:
@@ -97,6 +100,12 @@ def run_model_group_replay_if_ready(
     after_cost_alpha_model_path = str(training_fold.get("layer_05_after_cost_alpha_model_ref") or "")
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
+    resolved_equity_symbol_pool_path = equity_symbol_pool_path or _equity_symbol_pool_path(storage_root)
+    replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
+    equity_pool_symbols = _equity_symbol_pool_symbols(
+        pool_path=resolved_equity_symbol_pool_path,
+        replay_plan_symbols=replay_plan_equity_symbols,
+    )
     command = [
         resolved_python,
         str(runner_path),
@@ -111,8 +120,39 @@ def run_model_group_replay_if_ready(
         "--progress-path",
         str(progress_path),
     ]
+    for symbol in equity_pool_symbols:
+        command.extend(["--equity-symbol", symbol])
     if max_decision_rows is not None:
         command.extend(["--max-decision-rows", str(max_decision_rows)])
+
+    candidate_handoff_row_count = _layer_two_candidate_handoff_row_count(option_feature_database_url)
+    if replay_plan_equity_symbols and not equity_pool_symbols and candidate_handoff_row_count <= 0:
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_candidate_handoff_missing",
+            reason=(
+                "frozen replay plan has equity instruments, but equity_total_symbol_pool.csv has no active Layer2 symbols "
+                "inside that frozen replay plan and trading_data.m02_sector_context_data_acquisition has no rows"
+            ),
+            selected_work="model_group.replay",
+            command=command,
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "expected_replay_months": expected_months,
+                "ready_replay_months": len(ready_months),
+                "option_feature_database_configured": bool(option_feature_database_url),
+                "replay_plan_equity_symbol_count": len(replay_plan_equity_symbols),
+                "equity_symbol_pool_path": str(resolved_equity_symbol_pool_path),
+                "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
+                "candidate_handoff_table_ref": "trading_data.m02_sector_context_data_acquisition",
+                "candidate_handoff_row_count": candidate_handoff_row_count,
+                "required_next_step": "materialize Layer2 target-candidate handoff and monthly Alpaca candidate bars before fold replay",
+            },
+        )
 
     if not execute:
         return _decision(
@@ -129,6 +169,9 @@ def run_model_group_replay_if_ready(
                 "expected_replay_months": expected_months,
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
+                "equity_symbol_pool_path": str(resolved_equity_symbol_pool_path),
+                "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
             },
         )
 
@@ -177,6 +220,9 @@ def run_model_group_replay_if_ready(
                     "expected_replay_months": expected_months,
                     "ready_replay_months_before": len(ready_months),
                     "option_feature_database_configured": bool(option_feature_database_url),
+                    "equity_symbol_pool_path": str(resolved_equity_symbol_pool_path),
+                    "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                    "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
                     "runner_returncode": exc.returncode,
                     "runner_stdout": exc.stdout,
                     "runner_stderr": exc.stderr,
@@ -198,6 +244,9 @@ def run_model_group_replay_if_ready(
                 "training_fold": training_fold,
                 "replay_receipt_scope_status": receipt_scope_status,
                 "replay_execution_receipt": receipt,
+                "equity_symbol_pool_path": str(resolved_equity_symbol_pool_path),
+                "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
             },
         )
     refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_ids={str(receipt.get("replay_execution_run_id") or run_id)})
@@ -216,6 +265,9 @@ def run_model_group_replay_if_ready(
             "ready_replay_months_before": len(ready_months),
             "ready_replay_months_after": len(refreshed_ready_months),
             "option_feature_database_configured": bool(option_feature_database_url),
+            "equity_symbol_pool_path": str(resolved_equity_symbol_pool_path),
+            "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+            "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
             "replay_execution_receipt": receipt,
         },
     )
@@ -277,6 +329,72 @@ def _database_url() -> str | None:
     if DEFAULT_DB_URL_FILE.exists():
         return DEFAULT_DB_URL_FILE.read_text(encoding="utf-8").strip()
     return None
+
+
+def _layer_two_candidate_handoff_row_count(database_url: str | None) -> int:
+    if not database_url:
+        return 0
+    try:
+        import psycopg  # type: ignore
+    except ModuleNotFoundError:
+        return 0
+    try:
+        with psycopg.connect(database_url) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT to_regclass(%s)", ("trading_data.m02_sector_context_data_acquisition",))
+                if cursor.fetchone()[0] is None:
+                    return 0
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM trading_data.m02_sector_context_data_acquisition
+                    WHERE holding_symbol IS NOT NULL
+                    """
+                )
+                return int(cursor.fetchone()[0] or 0)
+    except Exception:
+        return 0
+
+
+def _equity_symbol_pool_path(storage_root: Path) -> Path:
+    trading_storage_root = storage_root.parent.parent
+    return trading_storage_root / "main" / "shared" / "equity_total_symbol_pool.csv"
+
+
+def _equity_symbol_pool_symbols(*, pool_path: Path, replay_plan_symbols: set[str]) -> tuple[str, ...]:
+    if not pool_path.exists():
+        return ()
+    if not replay_plan_symbols:
+        return ()
+    symbols: list[str] = []
+    seen: set[str] = set()
+    with pool_path.open(newline="", encoding="utf-8-sig") as handle:
+        for row in csv.DictReader(handle):
+            symbol = str(row.get("symbol") or "").strip().upper()
+            if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
+                continue
+            if symbol in seen:
+                continue
+            if symbol not in replay_plan_symbols:
+                continue
+            if str(row.get("pool_membership_status") or "").strip().lower() != "active":
+                continue
+            if str(row.get("in_layer2_etf_holdings") or "").strip().lower() != "true":
+                continue
+            symbols.append(symbol)
+            seen.add(symbol)
+    return tuple(symbols)
+
+
+def _replay_dataset_available_equity_symbols(dataset_root: Path) -> set[str]:
+    symbols: set[str] = set()
+    for row in _csv_rows(dataset_root / "feed_acquisition_plan.csv"):
+        if str(row.get("source_id") or "").strip() != "alpaca_bars":
+            continue
+        if str(row.get("coverage_status") or "").strip().lower() not in {"available", "succeeded", "complete", "completed"}:
+            continue
+        symbols.update(_string_set(row.get("target_ref") or row.get("target_symbol") or row.get("symbol")))
+    return symbols
 
 
 def _python_executable() -> str:

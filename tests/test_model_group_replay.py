@@ -17,7 +17,7 @@ class ModelGroupReplayTests(unittest.TestCase):
         dataset_root.mkdir(parents=True)
         plan_path = dataset_root / "feed_acquisition_plan.csv"
         with plan_path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status"])
+            writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
             writer.writeheader()
             writer.writerow({"month": "2021-01", "source_id": "okx_crypto_market_data", "coverage_status": "available"})
             writer.writerow({"month": "2021-02", "source_id": "okx_crypto_market_data", "coverage_status": "available"})
@@ -74,6 +74,24 @@ class ModelGroupReplayTests(unittest.TestCase):
         artifact_path = storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / "after_cost_alpha_model_aapl_2016-01_2016-06.json"
         artifact_path.parent.mkdir(parents=True)
         artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
+
+    def _write_equity_symbol_pool(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=[
+                    "symbol",
+                    "pool_membership_status",
+                    "in_layer2_etf_holdings",
+                ],
+            )
+            writer.writeheader()
+            writer.writerow({"symbol": "AAPL", "pool_membership_status": "active", "in_layer2_etf_holdings": "true"})
+            writer.writerow({"symbol": "MSFT", "pool_membership_status": "active", "in_layer2_etf_holdings": "true"})
+            writer.writerow({"symbol": "TSLA", "pool_membership_status": "inactive", "in_layer2_etf_holdings": "true"})
+            writer.writerow({"symbol": "TOP100", "pool_membership_status": "active", "in_layer2_etf_holdings": "false"})
+            writer.writerow({"symbol": "BAD SYMBOL", "pool_membership_status": "active", "in_layer2_etf_holdings": "true"})
 
     def _write_runner(self, root: Path) -> Path:
         runner = root / "run_replay_execution.py"
@@ -147,6 +165,43 @@ class ModelGroupReplayTests(unittest.TestCase):
             )
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
+
+    def test_plan_passes_active_layer2_equity_symbol_pool_candidates(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            plan_path = dataset_root / "feed_acquisition_plan.csv"
+            with plan_path.open("a", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
+                writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "AAPL"})
+                writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "MSFT"})
+            pool_path = tmp / "shared" / "equity_total_symbol_pool.csv"
+            self._write_equity_symbol_pool(pool_path)
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                equity_symbol_pool_path=pool_path,
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            pairs = [
+                decision.command[index + 1]
+                for index, value in enumerate(decision.command)
+                if value == "--equity-symbol"
+            ]
+            self.assertEqual(pairs, ["AAPL", "MSFT"])
+            self.assertEqual(decision.execution_summary["equity_symbol_pool_symbol_count"], 2)
+            self.assertEqual(decision.execution_summary["equity_symbol_pool_source_policy"], "active_layer2_etf_holdings_intersect_frozen_replay_plan")
 
     def test_rejects_runner_receipt_that_falls_back_to_placeholder_policy(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
