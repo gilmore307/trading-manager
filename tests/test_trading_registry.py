@@ -1480,7 +1480,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 30)
+        self.assertEqual(len(rows), 31)
         self.assertEqual(
             list(rows[0].keys()),
             ["symbol", "universe_type", "model_layer", "exposure_type", "feature_grain", "fund_name", "issuer_name", "interpretation"],
@@ -1491,14 +1491,14 @@ class RegistryHelperTests(unittest.TestCase):
         layer_two_symbols = {row["symbol"] for row in rows if row["model_layer"] == "layer_02_sector_context"}
         self.assertEqual(
             layer_two_symbols,
-            {"XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"},
+            {"BKCH", "XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"},
         )
         self.assertIn("RSP", {row["symbol"] for row in rows})
         self.assertIn("SHY", {row["symbol"] for row in rows})
         self.assertIn("IEF", {row["symbol"] for row in rows})
         self.assertNotIn("SMH", {row["symbol"] for row in rows})
         self.assertNotIn("AIQ", {row["symbol"] for row in rows})
-        self.assertNotIn("BKCH", {row["symbol"] for row in rows})
+        self.assertIn("BKCH", {row["symbol"] for row in rows})
         self.assertNotIn("IBIT", {row["symbol"] for row in rows})
         self.assertNotIn("ETHA", {row["symbol"] for row in rows})
         self.assertNotIn("FSOL", {row["symbol"] for row in rows})
@@ -1537,7 +1537,7 @@ class RegistryHelperTests(unittest.TestCase):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_relative_strength_combinations.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
-        self.assertEqual(len(rows), 38)
+        self.assertEqual(len(rows), 39)
         self.assertEqual(
             list(rows[0].keys()),
             [
@@ -1561,7 +1561,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(by_id["xlk_spy"]["combination_type"], "sector_rotation")
         self.assertNotIn("smh_xlk", by_id)
         self.assertNotIn("aiq_qqq", by_id)
-        self.assertNotIn("bkch_bitw", by_id)
+        self.assertEqual(by_id["bkch_bitw"]["model_layer"], "layer_02_sector_context")
+        self.assertEqual(by_id["bkch_bitw"]["combination_type"], "sector_rotation")
         self.assertNotIn("ibit_bitw", by_id)
         self.assertNotIn("etha_bitw", by_id)
         self.assertNotIn("fsol_bitw", by_id)
