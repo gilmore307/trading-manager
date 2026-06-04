@@ -1594,13 +1594,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(artifact["payload"], "trading-storage/main/shared/equity_total_symbol_pool.csv")
         self.assertEqual(artifact["path"], "/root/projects/trading-storage/main/shared/equity_total_symbol_pool.csv")
         self.assertIn("calendar_maintenance", artifact["applies_to"])
-        self.assertIn("optionable", artifact["note"])
+        self.assertIn("active inactive membership evidence", artifact["note"])
 
         script = registry["BUILD_EQUITY_TOTAL_SYMBOL_POOL"]
         self.assertEqual(script["kind"], "script")
         self.assertEqual(script["path"], "trading-data/scripts/data/build_equity_total_symbol_pool.py")
         self.assertIn("tradingview_screener_snapshot", script["applies_to"])
-        self.assertIn("strict optionable-symbol list", script["note"])
+        self.assertIn("preserves observed inactive rows", script["note"])
 
         fetch_script = registry["FETCH_TRADINGVIEW_EQUITY_SCREENER"]
         self.assertEqual(fetch_script["kind"], "script")
