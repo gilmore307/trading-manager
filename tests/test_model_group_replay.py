@@ -75,24 +75,6 @@ class ModelGroupReplayTests(unittest.TestCase):
         artifact_path.parent.mkdir(parents=True)
         artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
 
-    def _write_equity_symbol_pool(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(
-                handle,
-                fieldnames=[
-                    "symbol",
-                    "pool_membership_status",
-                    "in_layer2_etf_holdings",
-                ],
-            )
-            writer.writeheader()
-            writer.writerow({"symbol": "AAPL", "pool_membership_status": "active", "in_layer2_etf_holdings": "true"})
-            writer.writerow({"symbol": "MSFT", "pool_membership_status": "active", "in_layer2_etf_holdings": "true"})
-            writer.writerow({"symbol": "TSLA", "pool_membership_status": "inactive", "in_layer2_etf_holdings": "true"})
-            writer.writerow({"symbol": "TOP100", "pool_membership_status": "active", "in_layer2_etf_holdings": "false"})
-            writer.writerow({"symbol": "BAD SYMBOL", "pool_membership_status": "active", "in_layer2_etf_holdings": "true"})
-
     def _write_runner(self, root: Path) -> Path:
         runner = root / "run_replay_execution.py"
         runner.write_text(
@@ -119,7 +101,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
-                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                    "candidate_handoff_source": "point_in_time_replay_candidate_universe",
                     "candidate_handoff_symbols": ["AAPL"],
                     "decision_row_count": 2,
                 }))
@@ -166,7 +148,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
 
-    def test_plan_passes_active_layer2_equity_symbol_pool_candidates(self):
+    def test_plan_passes_point_in_time_replay_equity_candidates(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -178,8 +160,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
                 writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "AAPL"})
                 writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "MSFT"})
-            pool_path = tmp / "shared" / "equity_total_symbol_pool.csv"
-            self._write_equity_symbol_pool(pool_path)
+                writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "BAD SYMBOL"})
 
             decision = run_model_group_replay_if_ready(
                 storage_root=storage_root,
@@ -188,7 +169,6 @@ class ModelGroupReplayTests(unittest.TestCase):
                 execution_repo_root=tmp,
                 python_executable=sys.executable,
                 selected_target_symbol="AAPL",
-                equity_symbol_pool_path=pool_path,
                 execute=False,
             )
 
@@ -201,7 +181,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             ]
             self.assertEqual(pairs, ["AAPL", "MSFT"])
             self.assertEqual(decision.execution_summary["equity_symbol_pool_symbol_count"], 2)
-            self.assertEqual(decision.execution_summary["equity_symbol_pool_source_policy"], "active_layer2_etf_holdings_intersect_frozen_replay_plan")
+            self.assertEqual(decision.execution_summary["equity_symbol_pool_source_policy"], "frozen_replay_plan_point_in_time_candidate_universe")
 
     def test_rejects_runner_receipt_that_falls_back_to_placeholder_policy(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -349,7 +329,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 textwrap.dedent(
                     """
                     import sys
-                    print("missing Layer 2 target-candidate handoff", file=sys.stderr)
+                    print("missing point-in-time candidate universe evidence", file=sys.stderr)
                     raise SystemExit(2)
                     """
                 ).strip()
@@ -370,7 +350,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_execution_failed")
-            self.assertIn("missing Layer 2 target-candidate handoff", decision.reason)
+            self.assertIn("missing point-in-time candidate universe evidence", decision.reason)
             self.assertEqual(decision.execution_summary["runner_returncode"], 2)
 
     def test_legacy_equity_replay_without_candidate_handoff_does_not_unlock_replay(self):
@@ -451,7 +431,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                        "candidate_handoff_source": "point_in_time_replay_candidate_universe",
                         "candidate_handoff_symbols": ["AAPL"],
                         "validation_status": "passed",
                     }

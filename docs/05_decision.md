@@ -140,7 +140,7 @@ Ordinary bar, volume, spread, liquidity, target-state, option-expression, Layer 
 
 Layer 3 candidate selection is part of the model stack, not an externally preselected final ticker list. Manager recognizes Layer 3 as an anonymous target-state model that may rank the current candidate-policy batch for target handoff.
 
-The candidate policy is rule-fixed: current Layer 2 selected/watch sectors, reviewed sector constituents or proxies, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast.
+The candidate policy is rule-fixed: current realtime routing uses the reviewed realtime total-symbol pool, target metadata, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast. Promotion replay uses its frozen point-in-time candidate universe and must not borrow the current realtime pool or current ETF holdings.
 
 Layer 3 and later substrate work may remain target-major in task execution because routing symbols prepare data samples. That scheduling choice does not select the replay target. Promotion replay runs the live-flow component graph over the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. Fixed target/window panels remain diagnostic repair evidence only and are not accepted promotion evidence.
 

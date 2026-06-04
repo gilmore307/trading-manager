@@ -1,8 +1,6 @@
 """Layer 2 feature stage executor.
 
-The Layer 2 feature stage owns both sector-context feature rows and the
-m02 target-candidate holdings source used by downstream Layer 3 input
-preparation.
+The Layer 2 feature stage owns sector-context feature rows only.
 """
 
 from __future__ import annotations
@@ -18,11 +16,8 @@ from typing import Any, Mapping, TextIO
 
 from .control_plane import TaskSystemError
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .target_candidate_holdings import (
-    DEFAULT_TRADING_DATA_ROOT,
-    TargetCandidateHoldingsMaterialization,
-    materialize_target_candidate_holdings,
-)
+
+DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 
 
 @dataclass(frozen=True)
@@ -32,7 +27,6 @@ class LayerTwoFeatureStageSummary:
     contract_type: str
     month: str
     sector_feature_summary: Mapping[str, Any]
-    target_candidate_holdings_summary: Mapping[str, Any]
     provider_calls: int
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
@@ -85,20 +79,11 @@ def execute_layer_two_feature_stage(
         output_dir=output_dir,
         write=write,
     )
-    holdings: TargetCandidateHoldingsMaterialization = materialize_target_candidate_holdings(
-        start_month=month,
-        end_month=month,
-        manager_storage_root=manager_storage_root,
-        trading_data_root=trading_data_root,
-        run_id=f"layer_02_target_candidate_holdings_{month.replace('-', '_')}",
-        write=write,
-    )
     return LayerTwoFeatureStageSummary(
         contract_type="manager_layer_two_feature_stage",
         month=month,
         sector_feature_summary=sector_feature_summary,
-        target_candidate_holdings_summary=holdings.summary_row(),
-        provider_calls=holdings.provider_calls,
+        provider_calls=0,
     )
 
 
@@ -108,7 +93,7 @@ def write_summary(summary: LayerTwoFeatureStageSummary, *, output: TextIO) -> No
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Execute Layer 2 feature generation and target-candidate holdings materialization.")
+    parser = argparse.ArgumentParser(description="Execute Layer 2 sector-context feature generation.")
     parser.add_argument("--month", required=True)
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)

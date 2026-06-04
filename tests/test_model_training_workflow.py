@@ -349,7 +349,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
 
-    def test_layer_two_feature_generation_materializes_features_and_source_two(self):
+    def test_layer_two_feature_generation_materializes_features_without_provider_calls(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
 
@@ -360,8 +360,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--month", command)
         self.assertIn("${START_MONTH}", command)
         self.assertIn("--write", command)
-        self.assertTrue(stage.provider_calls_allowed)
-        self.assertFalse(stage.safe_without_provider_calls)
+        self.assertFalse(stage.provider_calls_allowed)
+        self.assertTrue(stage.safe_without_provider_calls)
 
     def test_layer_nine_option_expression_feature_generation_uses_option_adapter_with_no_provider_skip_support(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

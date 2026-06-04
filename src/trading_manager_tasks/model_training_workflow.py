@@ -26,7 +26,7 @@ StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 BASE_STACK_LAYER_COUNT = 9
 BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 4, 9)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
-LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 25
+LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 12
 DATASET_UNIT_MONTHS = 6
 FOUNDATION_CATCH_UP_LAYERS = (1, 2, 4)
 MONTHLY_SUBSTRATE_LAYERS = (1, 2)
@@ -969,8 +969,8 @@ def _build_layer_workflow(
                         selected_target_symbol=selected_target_symbol,
                         stage_type="feature_generation",
                     ),
-                    safe_without_provider_calls=layer != 2,
-                    provider_calls_allowed=layer == 2,
+                    safe_without_provider_calls=True,
+                    provider_calls_allowed=False,
                 )
             )
     if foundation_catch_up_only:
