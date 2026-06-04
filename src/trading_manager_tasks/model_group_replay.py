@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 import re
 import subprocess
@@ -31,6 +32,7 @@ DEFAULT_MODEL_REPO_ROOT = projects_root() / "trading-model"
 DEFAULT_EVALUATION_RUNNER_PATH = DEFAULT_EVALUATION_REPO_ROOT / "scripts" / "evaluation" / "run_replay_execution.py"
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = projects_root() / "trading-manager" / ".venv" / "bin" / "python"
+DEFAULT_REPLAY_INITIAL_CAPITAL_USD = 25_000.0
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 CANDIDATE_UNIVERSE_SOURCE_POLICY = "fixed_current_snapshot_historical_candidate_universe"
@@ -50,6 +52,7 @@ def run_model_group_replay_if_ready(
     selected_target_symbol: str | None = None,
     candidate_universe_path: Path | None = None,
     max_decision_rows: int | None = None,
+    initial_capital_usd: float = DEFAULT_REPLAY_INITIAL_CAPITAL_USD,
     now_utc: datetime | None = None,
 ) -> SchedulerDecision | None:
     """Run one model-group replay dispatch when the accepted prerequisites hold."""
@@ -104,6 +107,7 @@ def run_model_group_replay_if_ready(
     resolved_candidate_universe_path = candidate_universe_path or _historical_candidate_universe_path(storage_root)
     fixed_candidate_universe_symbols = _fixed_historical_candidate_symbols(resolved_candidate_universe_path)
     fixed_equity_universe_symbols = _fixed_historical_candidate_symbols(resolved_candidate_universe_path, asset_class="us_equity")
+    initial_capital_usd = _validated_initial_capital_usd(initial_capital_usd)
     equity_pool_symbols = _replay_equity_symbols_from_fixed_universe(
         fixed_universe_symbols=fixed_equity_universe_symbols,
         replay_plan_symbols=replay_plan_equity_symbols,
@@ -121,6 +125,8 @@ def run_model_group_replay_if_ready(
         after_cost_alpha_model_path,
         "--progress-path",
         str(progress_path),
+        "--initial-capital-usd",
+        str(initial_capital_usd),
     ]
     for symbol in equity_pool_symbols:
         command.extend(["--equity-symbol", symbol])
@@ -149,6 +155,7 @@ def run_model_group_replay_if_ready(
                 "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
                 "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
                 "required_next_step": "refresh the frozen replay dataset with Alpaca bars for the fixed historical equity candidate universe before fold replay",
             },
@@ -173,6 +180,7 @@ def run_model_group_replay_if_ready(
                 "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
                 "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
             },
         )
@@ -200,6 +208,7 @@ def run_model_group_replay_if_ready(
                 "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
                 "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
                 "required_next_step": "rerun the TradingView refresh and fixed candidate-universe build after the market close before executing replay",
             },
@@ -254,6 +263,7 @@ def run_model_group_replay_if_ready(
                     "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
                     "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                     "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                    "initial_capital_usd": initial_capital_usd,
                     "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
                     "runner_returncode": exc.returncode,
                     "runner_stdout": exc.stdout,
@@ -280,6 +290,7 @@ def run_model_group_replay_if_ready(
                 "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
                 "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
             },
         )
@@ -303,6 +314,7 @@ def run_model_group_replay_if_ready(
             "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
             "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
             "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+            "initial_capital_usd": initial_capital_usd,
             "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
             "replay_execution_receipt": receipt,
         },
@@ -365,6 +377,13 @@ def _database_url() -> str | None:
     if DEFAULT_DB_URL_FILE.exists():
         return DEFAULT_DB_URL_FILE.read_text(encoding="utf-8").strip()
     return None
+
+
+def _validated_initial_capital_usd(value: float) -> float:
+    capital = float(value)
+    if not math.isfinite(capital) or capital <= 0:
+        raise ValueError("initial_capital_usd must be a positive finite number")
+    return capital
 
 
 def _historical_candidate_universe_path(storage_root: Path) -> Path:

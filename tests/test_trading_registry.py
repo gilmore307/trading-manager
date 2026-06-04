@@ -282,6 +282,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("candidate_policy_replay", policy["payload"])
         self.assertIn("canonical_2021_2025_historical_clock_replay", policy["payload"])
         self.assertIn("fixed_replay_window_2021_01_01_to_2026_01_01_end_exclusive", policy["payload"])
+        self.assertIn("fixed_initial_capital_25000_usd", policy["payload"])
         self.assertIn("model_selects_targets_from_fixed_current_snapshot_candidate_universe", policy["payload"])
         self.assertIn("final_tickers_not_preselected", policy["payload"])
         self.assertIn("fixed_replay_window", policy["payload"])
@@ -295,6 +296,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("REPLAY_SECTOR_COVERAGE_TAGS", rows)
         self.assertNotIn("REPLAY_EVENT_COVERAGE_TAGS", rows)
         self.assertNotIn("REPLAY_TRAINING_EXCLUSION_REASON", rows)
+        initial_capital = rows["EVALUATION_REPLAY_INITIAL_CAPITAL_USD"]
+        self.assertEqual(initial_capital["payload_format"], "decimal")
+        self.assertEqual(initial_capital["payload"], "25000.0")
+        self.assertIn("replay equity-path diagnostics", initial_capital["note"])
+        self.assertIn("not broker account state", initial_capital["note"])
         self.assertIn(
             "prepare_replay_dataset.py",
             rows["TRADING_EVALUATION_PREPARE_REPLAY_DATASET"]["path"],

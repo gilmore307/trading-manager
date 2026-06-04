@@ -87,6 +87,7 @@ class ModelGroupReplayTests(unittest.TestCase):
 
                 run_id = sys.argv[sys.argv.index("--run-id") + 1]
                 candidate_model_ref = sys.argv[sys.argv.index("--candidate-model-ref") + 1]
+                initial_capital_usd = float(sys.argv[sys.argv.index("--initial-capital-usd") + 1])
                 progress_path = Path(sys.argv[sys.argv.index("--progress-path") + 1])
                 progress_path.parent.mkdir(parents=True, exist_ok=True)
                 rows = [
@@ -104,6 +105,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                     "candidate_handoff_symbols": ["AAPL"],
+                    "initial_capital_usd": initial_capital_usd,
+                    "initial_capital": {"amount": initial_capital_usd, "currency": "USD"},
                     "decision_row_count": 2,
                 }))
                 """
@@ -149,8 +152,12 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertIn("--candidate-model-ref", decision.command)
             self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2016-06", decision.command)
             self.assertIn("--after-cost-alpha-model-json", decision.command)
+            self.assertIn("--initial-capital-usd", decision.command)
+            self.assertEqual(decision.command[decision.command.index("--initial-capital-usd") + 1], "25000.0")
             self.assertNotIn("--option-feature-database-url", decision.command)
             self.assertTrue(decision.execution_summary["option_feature_database_configured"])
+            self.assertEqual(decision.execution_summary["initial_capital_usd"], 25000.0)
+            self.assertEqual(decision.execution_summary["replay_execution_receipt"]["initial_capital_usd"], 25000.0)
             self.assertEqual(
                 decision.execution_summary["replay_execution_receipt"]["candidate_model_ref"],
                 "storage://trading-manager/model_group/aapl/2016-01_2016-06",
