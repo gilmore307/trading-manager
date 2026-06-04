@@ -6,6 +6,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from trading_manager_tasks.model_group_replay import run_model_group_replay_if_ready
@@ -112,14 +113,14 @@ class ModelGroupReplayTests(unittest.TestCase):
         )
         return runner
 
-    def _write_fixed_equity_universe(self, path: Path, symbols: list[str]) -> None:
+    def _write_fixed_equity_universe(self, path: Path, symbols: list[str], *, freeze_as_of_date: str = "") -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["symbol", "asset_class", "replay_candidate_status"])
+            writer = csv.DictWriter(handle, fieldnames=["symbol", "asset_class", "replay_candidate_status", "freeze_as_of_date"])
             writer.writeheader()
             for symbol in symbols:
                 asset_class = "crypto_spot" if symbol in {"BTC", "ETH", "SOL"} else "us_equity"
-                writer.writerow({"symbol": symbol, "asset_class": asset_class, "replay_candidate_status": "active"})
+                writer.writerow({"symbol": symbol, "asset_class": asset_class, "replay_candidate_status": "active", "freeze_as_of_date": freeze_as_of_date})
 
     def test_runs_replay_when_fold_and_frozen_dataset_are_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -196,6 +197,53 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.execution_summary["fixed_candidate_universe_symbol_count"], 4)
             self.assertEqual(decision.execution_summary["fixed_equity_candidate_symbol_count"], 3)
             self.assertEqual(decision.execution_summary["candidate_universe_source_policy"], "fixed_current_snapshot_historical_candidate_universe")
+
+    def test_execution_blocks_current_day_candidate_universe_before_post_close_ready_time(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            fixed_universe = tmp / "historical_candidate_universe.csv"
+            self._write_fixed_equity_universe(fixed_universe, ["AAPL"], freeze_as_of_date="2026-06-04")
+            plan_path = dataset_root / "feed_acquisition_plan.csv"
+            with plan_path.open("a", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
+                writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "AAPL"})
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                candidate_universe_path=fixed_universe,
+                now_utc=datetime(2026, 6, 4, 15, 30, tzinfo=UTC),
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_candidate_universe_intraday_pending_close")
+            self.assertFalse(decision.execution_summary["candidate_universe_close_status"]["ready_for_replay"])
+
+            plan_decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                candidate_universe_path=fixed_universe,
+                now_utc=datetime(2026, 6, 4, 15, 30, tzinfo=UTC),
+                execute=False,
+            )
+
+            self.assertIsNotNone(plan_decision)
+            assert plan_decision is not None
+            self.assertEqual(plan_decision.decision_status, "ready")
 
     def test_rejects_runner_receipt_that_falls_back_to_placeholder_policy(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -13,7 +13,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from pathlib import Path
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
@@ -34,6 +34,7 @@ DEFAULT_PYTHON_EXECUTABLE = projects_root() / "trading-manager" / ".venv" / "bin
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 CANDIDATE_UNIVERSE_SOURCE_POLICY = "fixed_current_snapshot_historical_candidate_universe"
+REPLAY_CANDIDATE_UNIVERSE_CLOSE_READY_TIME = time(16, 15)
 
 
 def run_model_group_replay_if_ready(
@@ -173,6 +174,34 @@ def run_model_group_replay_if_ready(
                 "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+            },
+        )
+
+    candidate_universe_close_status = _candidate_universe_close_status(
+        resolved_candidate_universe_path,
+        now=now,
+    )
+    if not candidate_universe_close_status["ready_for_replay"]:
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_candidate_universe_intraday_pending_close",
+            reason="fixed candidate universe was frozen during the current market day before the accepted post-close readiness time",
+            selected_work="model_group.replay",
+            command=command,
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "expected_replay_months": expected_months,
+                "ready_replay_months": len(ready_months),
+                "candidate_universe_path": str(resolved_candidate_universe_path),
+                "candidate_universe_close_status": candidate_universe_close_status,
+                "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
+                "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
+                "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+                "required_next_step": "rerun the TradingView refresh and fixed candidate-universe build after the market close before executing replay",
             },
         )
 
@@ -356,6 +385,23 @@ def _fixed_historical_candidate_symbols(path: Path, *, asset_class: str | None =
             continue
         symbols.add(symbol)
     return symbols
+
+
+def _candidate_universe_close_status(path: Path, *, now: datetime) -> dict[str, Any]:
+    rows = _csv_rows(path)
+    freeze_dates = sorted({str(row.get("freeze_as_of_date") or "").strip() for row in rows if str(row.get("freeze_as_of_date") or "").strip()})
+    now_et = now.astimezone(NEW_YORK)
+    today_et = now_et.date().isoformat()
+    current_day_freeze = today_et in freeze_dates
+    ready_for_replay = not current_day_freeze or now_et.time() >= REPLAY_CANDIDATE_UNIVERSE_CLOSE_READY_TIME
+    return {
+        "candidate_universe_path": str(path),
+        "freeze_as_of_dates": freeze_dates,
+        "now_et": now_et.isoformat(),
+        "post_close_ready_time_et": REPLAY_CANDIDATE_UNIVERSE_CLOSE_READY_TIME.isoformat(),
+        "current_day_freeze": current_day_freeze,
+        "ready_for_replay": ready_for_replay,
+    }
 
 
 def _replay_equity_symbols_from_fixed_universe(*, fixed_universe_symbols: set[str], replay_plan_symbols: set[str]) -> tuple[str, ...]:
