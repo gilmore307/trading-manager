@@ -125,15 +125,14 @@ def run_model_group_replay_if_ready(
     if max_decision_rows is not None:
         command.extend(["--max-decision-rows", str(max_decision_rows)])
 
-    candidate_handoff_row_count = _layer_two_candidate_handoff_row_count(option_feature_database_url)
-    if replay_plan_equity_symbols and not equity_pool_symbols and candidate_handoff_row_count <= 0:
+    if replay_plan_equity_symbols and not equity_pool_symbols:
         return _decision(
             now=now,
             decision_status="backoff",
-            reason_code="model_group_replay_candidate_handoff_missing",
+            reason_code="model_group_replay_candidate_coverage_missing",
             reason=(
-                "frozen replay plan has equity instruments, but equity_total_symbol_pool.csv has no active Layer2 symbols "
-                "inside that frozen replay plan and trading_data.m02_sector_context_data_acquisition has no rows"
+                "frozen replay plan has equity instruments, but none intersect the active reviewed equity_total_symbol_pool.csv "
+                "candidate symbols under the current broad-sector-anchor Layer 2 contract"
             ),
             selected_work="model_group.replay",
             command=command,
@@ -148,9 +147,7 @@ def run_model_group_replay_if_ready(
                 "equity_symbol_pool_path": str(resolved_equity_symbol_pool_path),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "equity_symbol_pool_source_policy": EQUITY_SYMBOL_POOL_SOURCE_POLICY,
-                "candidate_handoff_table_ref": "trading_data.m02_sector_context_data_acquisition",
-                "candidate_handoff_row_count": candidate_handoff_row_count,
-                "required_next_step": "materialize Layer2 target-candidate handoff and monthly Alpaca candidate bars before fold replay",
+                "required_next_step": "refresh the frozen replay dataset with active reviewed equity candidate symbols and monthly Alpaca candidate bars before fold replay",
             },
         )
 
@@ -329,31 +326,6 @@ def _database_url() -> str | None:
     if DEFAULT_DB_URL_FILE.exists():
         return DEFAULT_DB_URL_FILE.read_text(encoding="utf-8").strip()
     return None
-
-
-def _layer_two_candidate_handoff_row_count(database_url: str | None) -> int:
-    if not database_url:
-        return 0
-    try:
-        import psycopg  # type: ignore
-    except ModuleNotFoundError:
-        return 0
-    try:
-        with psycopg.connect(database_url) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT to_regclass(%s)", ("trading_data.m02_sector_context_data_acquisition",))
-                if cursor.fetchone()[0] is None:
-                    return 0
-                cursor.execute(
-                    """
-                    SELECT COUNT(*)
-                    FROM trading_data.m02_sector_context_data_acquisition
-                    WHERE holding_symbol IS NOT NULL
-                    """
-                )
-                return int(cursor.fetchone()[0] or 0)
-    except Exception:
-        return 0
 
 
 def _equity_symbol_pool_path(storage_root: Path) -> Path:

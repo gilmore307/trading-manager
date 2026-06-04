@@ -81,15 +81,16 @@ class HistoricalTrainingPreparationTests(unittest.TestCase):
 
         self.assertEqual(summary.phase, LAYER_TWO_PHASE)
         self.assertEqual(summary.model_layer, "layer_02_sector_context")
-        self.assertEqual(summary.request_count, 25)
-        self.assertEqual(summary.payload_count, 25)
-        self.assertEqual(summary.handoff_validation_count, 25)
+        self.assertEqual(summary.request_count, 11)
+        self.assertEqual(summary.payload_count, 11)
+        self.assertEqual(summary.handoff_validation_count, 11)
         self.assertIn("XLK", summary.symbols)
         self.assertNotIn("SPY", summary.symbols)
         self.assertTrue(all(row["model_layer"] == "layer_02_sector_context" for row in requests))
         self.assertTrue(all(row["timeframe"] == "1Min" for row in requests))
         self.assertTrue(any(row["symbol"] == "XLB" and row["timeframe"] == "1Min" for row in requests))
-        self.assertTrue(any(row["symbol"] == "AIQ" and row["timeframe"] == "1Min" for row in requests))
+        self.assertFalse(any(row["symbol"] == "AIQ" for row in requests))
+        self.assertFalse(any(row["symbol"] == "SMH" for row in requests))
         self.assertTrue(all(row["provider_calls"] == 0 for row in validations))
 
     def test_default_preview_does_not_write_or_validate_handoff(self):

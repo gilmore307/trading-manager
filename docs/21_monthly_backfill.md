@@ -23,7 +23,7 @@ plan monthly window
 
 ## Layer 1/2 Foundation Catch-up
 
-Layer 1 market/cross-asset and Layer 2 sector/industry data are targetless foundation panels. During catch-up, these panels advance before ordinary Layer 3+ target work.
+Layer 1 market/cross-asset and Layer 2 broad sector-anchor data are targetless foundation panels. During catch-up, these panels advance before ordinary Layer 3+ target work.
 
 Valid provider data, cleaned monthly data, deterministic features, feature-ready manifests, and coverage evidence may be reused when their point-in-time semantics and schema still match. Dependent model/evaluation/promotion artifacts must be rebuilt when their substrate changed.
 
