@@ -385,6 +385,11 @@ def _reset_receipt_path(*, storage_root: Path, rerun_id: str, created_at_utc: st
     return storage_root / "runtime" / "model_group_rerun_resets" / safe_rerun_id / filename
 
 
+def _reset_batch_receipt_path(*, storage_root: Path, batch_id: str) -> Path:
+    safe_batch_id = "".join(ch if ch.isalnum() or ch in {"_", "-", "."} else "_" for ch in batch_id)
+    return storage_root / "runtime" / "model_group_rerun_resets" / "batches" / f"{safe_batch_id}.reset_batch_receipt.json"
+
+
 def _write_reset_receipt(
     *,
     storage_root: Path,
@@ -428,6 +433,118 @@ def _write_reset_receipt(
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return str(receipt_path)
+
+
+def _load_reset_receipt(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("contract_type") != "manager_model_group_rerun_reset_receipt":
+        raise ValueError(f"not a model-group reset receipt: {path}")
+    return payload
+
+
+def _month_key_from_state_path(state_path: str) -> str | None:
+    stem = Path(state_path).stem
+    if stem.startswith("model_training_workflow_state_"):
+        return stem.removeprefix("model_training_workflow_state_")
+    if stem.startswith("model_training_fold_state_"):
+        parts = stem.split("_")
+        if len(parts) >= 6:
+            return parts[-2]
+    return None
+
+
+def _target_symbol_from_state_path(state_path: str) -> str | None:
+    stem = Path(state_path).stem
+    prefix = "model_training_fold_state_"
+    if not stem.startswith(prefix):
+        return None
+    rest = stem.removeprefix(prefix)
+    parts = rest.split("_")
+    if len(parts) == 3:
+        return parts[0].upper()
+    return None
+
+
+def write_reset_batch_receipt(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    batch_id: str,
+    receipt_paths: Iterable[Path],
+    reason: str,
+    created_at_utc: str | None = None,
+) -> str:
+    """Write the human-facing summary receipt for a batch of state reset receipts."""
+
+    created = created_at_utc or _utc_now()
+    loaded: list[tuple[Path, dict[str, Any]]] = []
+    for path in receipt_paths:
+        loaded.append((path, _load_reset_receipt(path)))
+    if not loaded:
+        raise ValueError("at least one reset receipt is required")
+
+    receipt_rows: list[dict[str, Any]] = []
+    months: list[str] = []
+    targets: set[str] = set()
+    cutpoints: set[str] = set()
+    changed_total = 0
+    preserved_total = 0
+    source_data_delete_required = False
+    protected_refs: set[str] = set()
+    retained_refs: set[str] = set()
+
+    for path, payload in sorted(loaded, key=lambda item: (str(item[1].get("state_path") or ""), str(item[0]))):
+        state_path = str(payload["state_path"])
+        month_key = _month_key_from_state_path(state_path)
+        if month_key:
+            months.append(month_key)
+        target_symbol = _target_symbol_from_state_path(state_path)
+        if target_symbol:
+            targets.add(target_symbol)
+        cutpoints.add(str(payload["cutpoint_stage_id"]))
+        changed_total += int(payload["changed_stage_count"])
+        preserved_total += int(payload["preserved_stage_count"])
+        source_data_delete_required = source_data_delete_required or bool(payload["source_data_delete_required"])
+        protected_refs.update(str(row["ref"]) for row in payload.get("protected_set", []))
+        retained_refs.update(str(row["ref"]) for row in payload.get("retained_set", []))
+        receipt_rows.append(
+            {
+                "state_path": state_path,
+                "rerun_id": payload["rerun_id"],
+                "plan_id": payload["plan_id"],
+                "receipt_path": str(path),
+                "cutpoint_stage_id": payload["cutpoint_stage_id"],
+                "changed_stage_count": payload["changed_stage_count"],
+                "preserved_stage_count": payload["preserved_stage_count"],
+            }
+        )
+
+    payload = {
+        "contract_type": "manager_model_group_rerun_reset_batch_receipt",
+        "created_at_utc": created,
+        "batch_id": batch_id,
+        "reason": reason,
+        "operator_entrypoint": (
+            "Use this batch receipt as the reset summary; per-state reset receipts are audit drill-down references."
+        ),
+        "scope": {
+            "start_month": min(months) if months else None,
+            "end_month": max(months) if months else None,
+            "target_symbols": sorted(targets),
+            "cutpoint_stage_ids": sorted(cutpoints),
+        },
+        "receipt_count": len(receipt_rows),
+        "state_count": len({row["state_path"] for row in receipt_rows}),
+        "changed_stage_count": changed_total,
+        "preserved_stage_count": preserved_total,
+        "source_data_delete_required": source_data_delete_required,
+        "protected_refs": sorted(protected_refs),
+        "retained_refs": sorted(retained_refs),
+        "reset_receipts": receipt_rows,
+    }
+    batch_path = _reset_batch_receipt_path(storage_root=storage_root, batch_id=batch_id)
+    batch_path.parent.mkdir(parents=True, exist_ok=True)
+    batch_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return str(batch_path)
 
 
 def execute_model_group_rerun_reset(
@@ -529,6 +646,67 @@ def write_summary(result: ModelGroupRerunResult, *, output: TextIO) -> None:
     output.write("\n")
 
 
+def _parse_created_at(value: str) -> datetime:
+    if value.endswith("Z"):
+        value = f"{value[:-1]}+00:00"
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
+
+
+def _iter_reset_receipt_paths(
+    *,
+    storage_root: Path,
+    receipt_glob: str,
+    created_after: str | None,
+    created_before: str | None,
+) -> list[Path]:
+    lower = _parse_created_at(created_after) if created_after else None
+    upper = _parse_created_at(created_before) if created_before else None
+    candidates = [
+        path
+        for path in (storage_root / "runtime" / "model_group_rerun_resets").glob(receipt_glob)
+        if path.is_file() and path.name.endswith(".reset_receipt.json")
+    ]
+    selected: list[Path] = []
+    for path in candidates:
+        payload = _load_reset_receipt(path)
+        created = _parse_created_at(str(payload["created_at_utc"]))
+        if lower and created < lower:
+            continue
+        if upper and created > upper:
+            continue
+        selected.append(path)
+    return sorted(selected)
+
+
+def batch_main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Summarize model-group rerun reset receipts into one batch receipt.")
+    parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
+    parser.add_argument("--batch-id", required=True)
+    parser.add_argument("--reason", required=True)
+    parser.add_argument("--receipt-glob", default="*/*.reset_receipt.json")
+    parser.add_argument("--created-after")
+    parser.add_argument("--created-before")
+    args = parser.parse_args(argv)
+    receipt_paths = _iter_reset_receipt_paths(
+        storage_root=args.storage_root,
+        receipt_glob=args.receipt_glob,
+        created_after=args.created_after,
+        created_before=args.created_before,
+    )
+    batch_path = write_reset_batch_receipt(
+        storage_root=args.storage_root,
+        batch_id=args.batch_id,
+        receipt_paths=receipt_paths,
+        reason=args.reason,
+    )
+    json.dump({"batch_receipt_path": batch_path, "receipt_count": len(receipt_paths)}, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Plan or execute a controlled model-group rerun state reset.")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
@@ -560,6 +738,7 @@ __all__ = [
     "ModelGroupRerunResult",
     "build_model_group_rerun_plan",
     "execute_model_group_rerun_reset",
+    "write_reset_batch_receipt",
 ]
 
 

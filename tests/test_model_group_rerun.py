@@ -7,7 +7,7 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
-from trading_manager_tasks.model_group_rerun import execute_model_group_rerun_reset
+from trading_manager_tasks.model_group_rerun import execute_model_group_rerun_reset, write_reset_batch_receipt
 from trading_manager_tasks.model_training_state import advance_workflow_state
 from trading_manager_tasks.model_training_workflow import build_model_training_workflow_plan
 
@@ -154,6 +154,67 @@ class ModelGroupRerunTests(unittest.TestCase):
             by_stage["layer_03_target_state_vector.feature_generation"]["last_reason"],
             "waiting for layer_03_target_state_vector.data_acquisition_complete",
         )
+
+    def test_batch_receipt_summarizes_per_state_reset_receipts(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            receipt_paths = []
+            for month in ("2016-07", "2016-08"):
+                state_path = storage_root / "runtime" / f"model_training_workflow_state_{month}.json"
+                plan = build_model_training_workflow_plan(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    selected_target_symbol=None,
+                    foundation_catch_up_only=False,
+                )
+                completed = [
+                    stage.stage_id
+                    for layer in plan.layers
+                    for stage in layer.stages
+                    if stage.layer <= 3
+                ]
+                advance_workflow_state(
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    state_path=state_path,
+                    completed_stage_ids=completed,
+                    selected_target_symbol=None,
+                    foundation_catch_up_only=False,
+                    write=True,
+                )
+                result = execute_model_group_rerun_reset(
+                    storage_root=storage_root,
+                    state_path=state_path,
+                    start_month=month,
+                    end_month=month,
+                    target_symbol=None,
+                    layer_id=2,
+                    stage="data_acquisition",
+                    reason="Layer 2 contract changed.",
+                    write=True,
+                )
+                receipt_paths.append(Path(result.reset_receipt_path or ""))
+
+            batch_path = write_reset_batch_receipt(
+                storage_root=storage_root,
+                batch_id="layer2_reset_test",
+                receipt_paths=receipt_paths,
+                reason="Layer 2 contract changed.",
+                created_at_utc="2026-06-05T08:00:00+00:00",
+            )
+            batch_payload = json.loads(Path(batch_path).read_text(encoding="utf-8"))
+
+        self.assertEqual(batch_payload["contract_type"], "manager_model_group_rerun_reset_batch_receipt")
+        self.assertEqual(batch_payload["receipt_count"], 2)
+        self.assertEqual(batch_payload["state_count"], 2)
+        self.assertEqual(batch_payload["scope"]["start_month"], "2016-07")
+        self.assertEqual(batch_payload["scope"]["end_month"], "2016-08")
+        self.assertEqual(batch_payload["scope"]["cutpoint_stage_ids"], ["layer_02_sector_context.data_acquisition"])
+        self.assertFalse(batch_payload["source_data_delete_required"])
+        self.assertIn("operator_entrypoint", batch_payload)
+        self.assertEqual(len(batch_payload["reset_receipts"]), 2)
 
 
 if __name__ == "__main__":
