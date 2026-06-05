@@ -49,11 +49,12 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py --start-
 
 The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes Layer 1 market context, Layer 2 sector context, and fold-scoped global or sector-scoped Layer 4 event-observation substrate. Layer 4 event-observation collection repeats per fold because the accepted observation pool may change between folds. These rows are shared across target research runs and must not be redownloaded merely because a new target is being studied.
 
-Historical training status surfaces use fold identity globally. Month-level
-provider batching and old month checkpoint files are implementation detail;
-the dashboard and owner-facing task inventory should show fold tasks with
-month child partitions rather than mixing Layer 1/2 month rows with Layer 3+
-fold rows. A six-month fold opens only after its final calendar month has
+Historical status surfaces expose one current task fact, not a future task
+scaffold. Month checkpoints, fold states, and downstream blocked stages remain
+internal scheduler evidence. The dashboard may show completed history and the
+single current fold- or month-scoped task, with child partitions inside detail,
+but it must not project later Layer 4-10 dependencies as independent Future
+Tasks rows. A six-month fold opens only after its final calendar month has
 completed in `America/New_York`, so `2026-fold1` is not eligible before
 2026-07-01 even if some January-June child months already have source data.
 Runtime execution advances one canonical month at a time. Historical scheduler
@@ -64,8 +65,8 @@ The service completes one fold's full run cycle before opening the next fold.
 Layer 1-9 completion is only the pre-replay boundary; it unlocks Replay, Layer
 10 Event Risk Governor attribution, Model Evaluation, Model Promotion, and
 Model Maintenance. Until that lifecycle emits maintenance/readiness evidence,
-the next fold and the next target remain blocked because Layer 10 may update
-the event-observation pool used by later Layer 4 folds.
+the next fold and the next target stay internal workflow dependencies because
+Layer 10 may update the event-observation pool used by later Layer 4 folds.
 
 Layer 2 feature generation prepares sector/context features only. It does not fetch ETF holdings or materialize target-candidate holdings. Downstream Layer 3 target-state feature generation consumes target-local evidence and accepted target-context mappings; historical replay candidate coverage comes from the fixed historical candidate-universe table and matching replay bars rather than the mutable realtime total pool or current ETF holdings.
 

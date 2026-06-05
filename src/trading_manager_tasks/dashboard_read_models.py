@@ -2603,6 +2603,19 @@ def _strip_task_timeline_internal_fields(tasks: list[dict[str, Any]]) -> list[di
     return tasks
 
 
+def _project_public_task_facts(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return the owner-facing task facts, not the internal future scaffold.
+
+    Workflow state may carry every downstream blocked stage so the scheduler can
+    reason deterministically. The Tasks surface is narrower: it shows completed
+    history, failures, and the single current executable/review task. Future
+    dependencies stay in the current task detail or workflow checkpoint.
+    """
+
+    visible_states = {"completed", "skipped", "failed", "current"}
+    return [task for task in tasks if str(task.get("task_state") or "").lower() in visible_states]
+
+
 def _replay_window_months(dataset_root: Path) -> tuple[str, str]:
     rows = _replay_coverage_rows(dataset_root / "replay_window_manifest.csv")
     if not rows:
@@ -3744,10 +3757,12 @@ def build_historical_task_progress_summary(
     task_timeline = _trim_task_timeline_after_first_open_fold(task_timeline)
     task_timeline = _strip_task_timeline_internal_fields(task_timeline)
     task_timeline = _sort_task_timeline(task_timeline)
+    internal_task_timeline = list(task_timeline)
+    task_timeline = _sort_task_timeline(_project_public_task_facts(task_timeline))
     public_active_task = _public_active_task(status, task_timeline)
     agent_error_summary = _mark_superseded_agent_errors(
         _agent_error_summary(storage_root, database_url=database_url),
-        task_timeline,
+        internal_task_timeline,
     )
     if not stage_counts and task_timeline:
         for task in task_timeline:
