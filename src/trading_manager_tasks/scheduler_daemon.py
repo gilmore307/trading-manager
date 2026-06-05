@@ -1145,7 +1145,7 @@ def seed_model_worker_fold_state(
         end_month=selection.end_month,
         storage_root=storage_root,
         state_path=state_path,
-        completed_stage_ids=foundation_stage_ids if not state_path.exists() else (),
+        completed_stage_ids=foundation_stage_ids,
         selected_target_symbol=selected_target_symbol,
         foundation_catch_up_only=False,
         write=True,

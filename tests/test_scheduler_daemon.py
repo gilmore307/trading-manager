@@ -510,6 +510,54 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(state_path.name, "model_training_fold_state_aapl_2016-01_2016-06.json")
         self.assertIn("layer_01_market_regime.model_generation.train", ready)
 
+    def test_seed_model_worker_fold_state_refreshes_existing_monthly_foundation_stages(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2016-06", selected_target_symbol="AAPL")
+            self.assertIsNotNone(selection)
+            assert selection is not None
+            state_path = model_worker_fold_state_path(
+                selection.start_month,
+                selection.end_month,
+                root=storage_root / "runtime",
+                selected_target_symbol="AAPL",
+            )
+            plan = build_model_training_workflow_plan(
+                start_month=selection.start_month,
+                end_month=selection.end_month,
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            layer_one_foundation = [
+                stage.stage_id
+                for layer in plan.layers
+                if layer.layer == 1
+                for stage in layer.stages
+                if stage.stage_type in {"data_acquisition", "feature_generation"}
+            ]
+            advance_workflow_state(
+                start_month=selection.start_month,
+                end_month=selection.end_month,
+                storage_root=storage_root,
+                state_path=state_path,
+                completed_stage_ids=layer_one_foundation,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+
+            seeded_path = seed_model_worker_fold_state(storage_root=storage_root, selection=selection, selected_target_symbol="AAPL")
+            payload = json.loads(seeded_path.read_text(encoding="utf-8"))
+            statuses = {stage["stage_id"]: stage["status"] for stage in payload["stages"]}
+
+        self.assertEqual(seeded_path, state_path)
+        self.assertEqual(statuses["layer_02_sector_context.data_acquisition"], "succeeded")
+        self.assertEqual(statuses["layer_02_sector_context.feature_generation"], "succeeded")
+        self.assertEqual(payload["next_stage"]["stage_id"], "layer_01_market_regime.model_generation.train")
+
     def test_target_scoped_fold_state_path_prevents_cross_target_collision(self):
         path = model_worker_fold_state_path(
             "2016-01",
