@@ -96,6 +96,7 @@ class StageReconcileTests(unittest.TestCase):
                 start_month="2016-01",
                 end_month="2016-01",
                 component_storage_root=root,
+                locks_dir=root / "locks",
             )
 
         self.assertEqual(summary.contract_type, "manager_provider_stage_reconcile")
@@ -144,26 +145,38 @@ class StageReconcileTests(unittest.TestCase):
             "trading_manager_tasks.stage_reconcile.collect_stage_coverage",
             return_value=_coverage(),
         ), patch("trading_manager_tasks.stage_reconcile.persist_failure_register_rows") as failure_persist_mock:
-            root = Path(raw_tmp)
-            _write_receipt(root, symbol="XLK", status="failed")
-            proposal_path = root / "failure_proposals.jsonl"
-            summary = reconcile_provider_stage(
-                stage_id="layer_02_sector_context.data_acquisition",
-                start_month="2016-01",
-                end_month="2016-01",
-                component_storage_root=root,
-                failure_proposal_path=proposal_path,
-                write_failure_proposal=True,
-                persist_failure_register=True,
-            )
+            with patch("trading_manager_tasks.stage_reconcile.handle_server_error") as error_handoff_mock:
+                error_handoff_mock.return_value = {
+                    "error_number": 12,
+                    "error_ref": "ERR-000012",
+                    "request_path": "/tmp/request.json",
+                    "diagnosis_path": "/tmp/diagnosis.json",
+                    "status": "queued",
+                }
+                root = Path(raw_tmp)
+                _write_receipt(root, symbol="XLK", status="failed")
+                proposal_path = root / "failure_proposals.jsonl"
+                summary = reconcile_provider_stage(
+                    stage_id="layer_02_sector_context.data_acquisition",
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    component_storage_root=root,
+                    failure_proposal_path=proposal_path,
+                    write_failure_proposal=True,
+                    persist_failure_register=True,
+                    locks_dir=root / "locks",
+                )
 
             self.assertEqual(summary.failure_proposal_count, 1)
             self.assertEqual(summary.failure_proposal_path, str(proposal_path))
             self.assertTrue(summary.persisted_failure_register)
+            self.assertEqual(summary.agent_error_ref, "ERR-000012")
+            self.assertEqual(summary.agent_error_status, "queued")
             row = json.loads(proposal_path.read_text(encoding="utf-8").strip())
             self.assertEqual(row["failure_status"], "agent_review_required")
             self.assertFalse(row["skip_future_matching"])
             failure_persist_mock.assert_called_once()
+            error_handoff_mock.assert_called_once()
 
     def test_reconcile_can_write_coverage_and_advance_workflow_only_from_written_report(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch(
@@ -186,6 +199,7 @@ class StageReconcileTests(unittest.TestCase):
                 advance_workflow=True,
                 workflow_state_path=root / "workflow.json",
                 write_workflow_state=True,
+                locks_dir=root / "locks",
             )
 
             self.assertTrue(summary.persisted_control_plane)

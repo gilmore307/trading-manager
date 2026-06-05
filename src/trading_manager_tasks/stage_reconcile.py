@@ -9,6 +9,7 @@ providers.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import asdict, dataclass
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import CompletionReceiptRows, TaskSystemError, _error_summary, _receipt_runs, _status, fetch_manager_requests, normalize_completion_receipt, persist_completion_rows
+from .agent_error_handler import handle_server_error
 from .failure_register import persist_failure_register_rows, validate_failure_register_row
 from .model_training_state import advance_workflow_state, resolve_workflow_state_path
 from .request_payloads import DEFAULT_STORAGE_ROOT as DEFAULT_MANAGER_STORAGE_ROOT
@@ -72,6 +74,11 @@ class StageReconcileSummary:
     coverage_pending_count: int | None
     workflow_state_path: str | None
     workflow_advanced: bool
+    agent_error_request_path: str | None
+    agent_error_diagnosis_path: str | None
+    agent_error_number: int | None
+    agent_error_ref: str | None
+    agent_error_status: str | None
     receipt_refs: tuple[StageReceiptRef, ...]
     provider_calls: int = 0
     dispatch_performed: bool = False
@@ -258,6 +265,89 @@ def write_failure_proposals(rows: Sequence[Mapping[str, Any]], path: Path) -> No
             handle.write(json.dumps(dict(row), sort_keys=True) + "\n")
 
 
+def _stage_failure_agent_request_id(
+    *,
+    stage_id: str,
+    start_month: str,
+    end_month: str,
+    rows: Sequence[Mapping[str, Any]],
+) -> str:
+    digest_source = json.dumps(
+        {
+            "stage_id": stage_id,
+            "start_month": start_month,
+            "end_month": end_month,
+            "failures": [
+                {
+                    "request_id": row.get("request_id"),
+                    "error_summary": row.get("error_summary"),
+                    "failure_kind": row.get("failure_kind"),
+                }
+                for row in rows
+            ],
+        },
+        sort_keys=True,
+    )
+    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:16]
+    safe_stage = "".join(char.lower() if char.isalnum() else "_" for char in stage_id)
+    return f"erragent_stage_failure_{safe_stage}_{start_month.replace('-', '_')}_{end_month.replace('-', '_')}_{digest}"
+
+
+def _stage_failure_agent_summary(*, stage_id: str, rows: Sequence[Mapping[str, Any]]) -> str:
+    error_counts: dict[str, int] = {}
+    for row in rows:
+        error = str(row.get("error_summary") or "unclassified provider failure")
+        error_counts[error] = error_counts.get(error, 0) + 1
+    top_errors = sorted(error_counts.items(), key=lambda item: (-item[1], item[0]))[:3]
+    error_text = "; ".join(f"{count}x {error}" for error, count in top_errors)
+    return f"provider stage {stage_id} has {len(rows)} failed request(s) requiring agent review: {error_text}"
+
+
+def _handle_stage_failure_agent_handoff(
+    *,
+    stage_id: str,
+    start_month: str,
+    end_month: str,
+    rows: Sequence[Mapping[str, Any]],
+    proposal_path: Path | None,
+    database_url: str | None,
+) -> dict[str, Any] | None:
+    if not rows:
+        return None
+    evidence_refs: list[str] = []
+    if proposal_path is not None:
+        evidence_refs.append(str(proposal_path))
+    for row in rows[:20]:
+        evidence = row.get("evidence_refs")
+        if isinstance(evidence, list):
+            evidence_refs.extend(str(ref) for ref in evidence if ref)
+    return handle_server_error(
+        source_component="trading-manager.stage_reconcile",
+        source_repo="trading-manager",
+        error_scope="server.provider_stage_failure_register",
+        error_kind="provider_stage_requests_failed",
+        severity="warning",
+        summary=_stage_failure_agent_summary(stage_id=stage_id, rows=rows),
+        evidence_refs=evidence_refs,
+        command=[
+            "reconcile_provider_stage",
+            "--stage-id",
+            stage_id,
+            "--start-month",
+            start_month,
+            "--end-month",
+            end_month,
+        ],
+        request_id=_stage_failure_agent_request_id(
+            stage_id=stage_id,
+            start_month=start_month,
+            end_month=end_month,
+            rows=rows,
+        ),
+        database_url=database_url,
+    )
+
+
 def default_coverage_report_path(*, stage_id: str, start_month: str) -> Path:
     safe_stage = stage_id.replace(".", "_")
     return DEFAULT_COVERAGE_OUTPUT_ROOT / f"{safe_stage}_{start_month}.json"
@@ -304,6 +394,18 @@ def _reconcile_provider_stage_unlocked(
         write_failure_proposals(failure_rows, proposal_path)
     if persist_failure_register:
         persist_failure_register_rows(failure_rows, database_url=database_url)
+    agent_error_result = (
+        _handle_stage_failure_agent_handoff(
+            stage_id=stage_id,
+            start_month=start_month,
+            end_month=end_month,
+            rows=failure_rows,
+            proposal_path=proposal_path,
+            database_url=database_url,
+        )
+        if persist_failure_register and failure_rows
+        else None
+    )
 
     report: StageCoverageReport | None = None
     if collect_coverage:
@@ -357,6 +459,11 @@ def _reconcile_provider_stage_unlocked(
         coverage_pending_count=report.pending_count if report else None,
         workflow_state_path=str(resolved_workflow_state_path) if advance_workflow else None,
         workflow_advanced=advance_workflow,
+        agent_error_request_path=str(agent_error_result.get("request_path")) if agent_error_result else None,
+        agent_error_diagnosis_path=str(agent_error_result.get("diagnosis_path")) if agent_error_result else None,
+        agent_error_number=int(agent_error_result["error_number"]) if agent_error_result else None,
+        agent_error_ref=str(agent_error_result.get("error_ref")) if agent_error_result else None,
+        agent_error_status=str(agent_error_result.get("status")) if agent_error_result else None,
         receipt_refs=refs,
     )
 

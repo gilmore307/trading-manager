@@ -45,6 +45,7 @@ from .scheduler_status import (
     collect_historical_scheduler_status,
 )
 from .agent_error_handler import DEFAULT_ERROR_CATALOG_NAME, fetch_server_error_catalog_rows
+from .failure_register import fetch_failure_register_rows, validate_failure_register_row
 from .task_progress import load_active_task_progress, progress_contract_for_stage
 
 HISTORICAL_TASK_PROGRESS_CONTRACT = "historical_task_progress_summary"
@@ -472,6 +473,195 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
         else:
             updated_rows.append(row)
     return updated_rows
+
+
+def _failure_register_proposal_rows(storage_root: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    coverage_root = storage_root / "runtime" / "stage_coverage"
+    if not coverage_root.exists():
+        return rows
+    for path in sorted(coverage_root.glob("*_failure_register_proposals.jsonl")):
+        for row in _load_jsonl_objects(path):
+            try:
+                normalized = validate_failure_register_row(row)
+            except Exception:
+                continue
+            normalized["source_path"] = str(path)
+            rows.append(normalized)
+    return rows
+
+
+def _failure_register_summary(storage_root: Path, *, database_url: str | None = None) -> list[dict[str, Any]]:
+    if database_url or storage_root == DEFAULT_STORAGE_ROOT:
+        try:
+            return fetch_failure_register_rows(database_url=database_url)
+        except Exception:
+            return _failure_register_proposal_rows(storage_root)
+    return _failure_register_proposal_rows(storage_root)
+
+
+def _task_period_window(period: object) -> tuple[str | None, str | None]:
+    text = str(period or "")
+    fold_window = _fold_window_for_period(text)
+    if fold_window is not None:
+        return fold_window
+    if _is_month_key(text):
+        return text, text
+    return None, None
+
+
+def _task_stage_ids(task: Mapping[str, Any]) -> set[str]:
+    detail = task.get("detail")
+    active_stage_id = detail.get("active_stage_id") if isinstance(detail, Mapping) else None
+    stage_ids = {str(value) for value in (task.get("task_id"), active_stage_id) if value}
+    if isinstance(detail, Mapping):
+        internal = detail.get("internal_stages")
+        if isinstance(internal, list):
+            for stage in internal:
+                if isinstance(stage, Mapping) and stage.get("stage_id"):
+                    stage_ids.add(str(stage["stage_id"]))
+    return stage_ids
+
+
+def _row_matches_task_period(row: Mapping[str, Any], task: Mapping[str, Any]) -> bool:
+    task_start, task_end = _task_period_window(task.get("month") or task.get("period"))
+    if not task_start or not task_end:
+        return True
+    row_start = str(row.get("start_month") or "")
+    row_end = str(row.get("end_month") or row_start)
+    if not row_start:
+        return True
+    return row_start <= task_end and row_end >= task_start
+
+
+def _stage_ref_matches_task(stage_ref: object, task: Mapping[str, Any]) -> bool:
+    stage_text = str(stage_ref or "")
+    if not stage_text:
+        return False
+    for task_stage_id in _task_stage_ids(task):
+        if stage_text == task_stage_id or stage_text.startswith(f"{task_stage_id}.") or task_stage_id.startswith(f"{stage_text}."):
+            return True
+    return False
+
+
+def _failure_rows_for_task(rows: list[dict[str, Any]], task: Mapping[str, Any]) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in rows
+        if _stage_ref_matches_task(row.get("stage_id"), task) and _row_matches_task_period(row, task)
+    ]
+
+
+def _agent_errors_for_task(rows: list[dict[str, Any]], task: Mapping[str, Any]) -> list[dict[str, Any]]:
+    matches: list[dict[str, Any]] = []
+    for row in rows:
+        stage_id = _stage_id_from_error_row(row)
+        if stage_id and _stage_ref_matches_task(stage_id, task):
+            matches.append(row)
+            continue
+        text = " ".join(str(row.get(field) or "") for field in ("summary", "error_scope", "root_cause"))
+        if any(stage_id and stage_id in text for stage_id in _task_stage_ids(task)):
+            matches.append(row)
+    return matches
+
+
+def _compact_failure_register(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    error_counts: dict[str, int] = {}
+    for row in rows:
+        status = str(row.get("failure_status") or "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        error = str(row.get("error_summary") or "unclassified provider failure")
+        error_counts[error] = error_counts.get(error, 0) + 1
+    top_errors = [
+        {"error_summary": error, "count": count}
+        for error, count in sorted(error_counts.items(), key=lambda item: (-item[1], item[0]))[:5]
+    ]
+    return {
+        "failure_count": len(rows),
+        "status_counts": dict(sorted(status_counts.items())),
+        "agent_review_required_count": status_counts.get("agent_review_required", 0),
+        "retry_required_count": status_counts.get("retry_required", 0),
+        "corrected_count": status_counts.get("corrected", 0),
+        "accepted_skip_count": status_counts.get("accepted_skip", 0),
+        "top_errors": top_errors,
+    }
+
+
+def _task_progress_unreviewed_failures(task: Mapping[str, Any]) -> int:
+    detail = task.get("detail")
+    progress = detail.get("progress") if isinstance(detail, Mapping) else None
+    if not isinstance(progress, Mapping):
+        return 0
+    try:
+        failed = int(progress.get("failed_count") or 0)
+        accepted = int(progress.get("accepted_failed_count") or 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(failed - accepted, 0)
+
+
+def _task_error_intervention_status(
+    *,
+    task: Mapping[str, Any],
+    failure_rows: list[dict[str, Any]],
+    agent_errors: list[dict[str, Any]],
+) -> str | None:
+    if agent_errors:
+        open_errors = [row for row in agent_errors if str(row.get("handling_status") or "") not in {"closed", "no_action_required"}]
+        if open_errors:
+            if any(str(row.get("repair_status") or "") == "queued" for row in open_errors):
+                return "agent_diagnosis_queued"
+            if any(str(row.get("handling_status") or "") == "awaiting_retry" for row in open_errors):
+                return "repair_completed_awaiting_retry"
+            return "agent_diagnosis_open"
+        return "agent_diagnosis_closed"
+    if any(str(row.get("failure_status") or "") == "agent_review_required" for row in failure_rows):
+        return "failure_register_agent_review_required"
+    if _task_progress_unreviewed_failures(task):
+        return "unreviewed_stage_failures"
+    return None
+
+
+def _attach_task_error_context(
+    tasks: list[dict[str, Any]],
+    *,
+    storage_root: Path,
+    agent_errors: list[dict[str, Any]],
+    database_url: str | None = None,
+) -> list[dict[str, Any]]:
+    failure_rows = _failure_register_summary(storage_root, database_url=database_url)
+    updated_tasks: list[dict[str, Any]] = []
+    for task in tasks:
+        updated = dict(task)
+        detail = dict(updated.get("detail") or {})
+        task_failure_rows = _failure_rows_for_task(failure_rows, updated)
+        task_agent_errors = _agent_errors_for_task(agent_errors, updated)
+        if task_failure_rows:
+            detail["failure_register"] = _compact_failure_register(task_failure_rows)
+        if task_agent_errors:
+            detail["agent_error_summary"] = task_agent_errors
+        intervention_status = _task_error_intervention_status(
+            task=updated,
+            failure_rows=task_failure_rows,
+            agent_errors=task_agent_errors,
+        )
+        if intervention_status:
+            detail["repair_intervention_status"] = intervention_status
+            blockers = list(detail.get("blockers") or [])
+            if intervention_status not in blockers and intervention_status != "agent_diagnosis_closed":
+                blockers.append(intervention_status)
+            detail["blockers"] = blockers
+            updated["blocker_count"] = len(blockers)
+            if _task_progress_unreviewed_failures(updated) and str(updated.get("task_state") or "") not in {"completed", "skipped", "failed"}:
+                updated["task_state"] = "current"
+                updated["status"] = "review_required"
+                if not updated.get("reason"):
+                    count = _task_progress_unreviewed_failures(updated)
+                    updated["reason"] = f"{count} failed source-month request(s) require agent review before downstream unlock."
+        updated["detail"] = detail
+        updated_tasks.append(updated)
+    return updated_tasks
 
 
 def _latest_stage_execution(status: HistoricalSchedulerStatus) -> dict[str, Any] | None:
@@ -3757,13 +3947,19 @@ def build_historical_task_progress_summary(
     task_timeline = _trim_task_timeline_after_first_open_fold(task_timeline)
     task_timeline = _strip_task_timeline_internal_fields(task_timeline)
     task_timeline = _sort_task_timeline(task_timeline)
+    agent_error_summary = _mark_superseded_agent_errors(
+        _agent_error_summary(storage_root, database_url=database_url),
+        task_timeline,
+    )
+    task_timeline = _attach_task_error_context(
+        task_timeline,
+        storage_root=storage_root,
+        agent_errors=agent_error_summary,
+        database_url=database_url,
+    )
     internal_task_timeline = list(task_timeline)
     task_timeline = _sort_task_timeline(_project_public_task_facts(task_timeline))
     public_active_task = _public_active_task(status, task_timeline)
-    agent_error_summary = _mark_superseded_agent_errors(
-        _agent_error_summary(storage_root, database_url=database_url),
-        internal_task_timeline,
-    )
     if not stage_counts and task_timeline:
         for task in task_timeline:
             task_status = str(task.get("status") or "unknown")
