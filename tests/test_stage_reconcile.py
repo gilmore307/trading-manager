@@ -176,7 +176,7 @@ class StageReconcileTests(unittest.TestCase):
         persist_mock.assert_not_called()
         collect_mock.assert_called_once()
 
-    def test_failed_receipts_generate_agent_review_required_failure_proposals(self) -> None:
+    def test_failed_receipts_generate_auto_repair_required_failure_proposals(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
             _write_receipt(root, symbol="XLK", status="failed")
@@ -196,7 +196,7 @@ class StageReconcileTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["contract_type"], "manager_failure_register")
         self.assertEqual(rows[0]["request_id"], "mgrreq_backfill_alpaca_bars_xlk_2016_01")
-        self.assertEqual(rows[0]["failure_status"], "agent_review_required")
+        self.assertEqual(rows[0]["failure_status"], "auto_repair_required")
         self.assertEqual(rows[0]["failure_kind"], "unclassified_provider_failure")
         self.assertFalse(rows[0]["skip_future_matching"])
         self.assertIsNone(rows[0]["agent_review_ref"])
@@ -224,11 +224,11 @@ class StageReconcileTests(unittest.TestCase):
         self.assertEqual(rows[0]["failure_kind"], "provider_service_unavailable")
         self.assertIn("automatic retry", rows[0]["note"])
 
-    def test_failure_classifier_keeps_provider_policy_errors_for_agent_review(self) -> None:
+    def test_failure_classifier_routes_provider_policy_errors_to_auto_repair(self) -> None:
         status, kind, note = classify_provider_failure("ProviderPolicyError: provider not allowed: thetadata")
-        self.assertEqual(status, "agent_review_required")
+        self.assertEqual(status, "auto_repair_required")
         self.assertEqual(kind, "unclassified_provider_failure")
-        self.assertIn("requires agent review", note)
+        self.assertIn("automatic repair", note)
 
     def test_retried_receipt_with_latest_success_does_not_propose_stale_failure(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -284,7 +284,7 @@ class StageReconcileTests(unittest.TestCase):
             self.assertEqual(summary.agent_error_ref, "ERR-000012")
             self.assertEqual(summary.agent_error_status, "queued")
             row = json.loads(proposal_path.read_text(encoding="utf-8").strip())
-            self.assertEqual(row["failure_status"], "agent_review_required")
+            self.assertEqual(row["failure_status"], "auto_repair_required")
             self.assertFalse(row["skip_future_matching"])
             correction_mock.assert_called_once()
             failure_persist_mock.assert_called_once()

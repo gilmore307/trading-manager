@@ -573,7 +573,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("target-context-review", rows["TARGET_LAYER2_CONTEXT_AGENT_REVIEW"]["note"])
         self.assertIn("server-error-diagnosis", rows["SERVER_WIDE_AGENT_ERROR_HANDOFF"]["note"])
         self.assertIn("storage-lifecycle-review", rows["AGENT_STORAGE_LIFECYCLE_DECISION"]["note"])
-        self.assertIn("failure-register-review", rows["MANAGER_FAILED_REQUEST_AGENT_REVIEW_REQUIRED_POLICY"]["note"])
+        self.assertIn("automatic repair", rows["MANAGER_FAILED_REQUEST_DECISION_GATE_POLICY"]["note"])
         self.assertIn("event-strategy-promotion-review", rows["EVENT_FAMILY_TO_LAYER_04_PROMOTION_POLICY"]["note"])
 
     def test_event_risk_governor_layer_policy_terms_are_registered(self):

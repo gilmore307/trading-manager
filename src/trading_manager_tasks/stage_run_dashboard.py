@@ -217,7 +217,7 @@ def preview_next_provider_dispatch(
         return StageRunProviderDispatchPreview(
             available=False,
             reason=(
-                "failed coverage requires review; no retryable provider-policy failures detected"
+                "failed coverage requires automatic repair; no retryable provider-policy failures detected"
                 if coverage.status == "failed"
                 else "no pending request ids available for provider dispatch"
             ),
@@ -331,7 +331,7 @@ def _next_action(*, coverage: StageCoverageReport, preview: StageRunProviderDisp
     if coverage.status == "failed":
         if preview.available and "retryable provider policy" in preview.reason:
             return ("autonomous_provider_failure_retry_ready", f"{coverage.reason}; {preview.reason}")
-        return ("review_stage_failures", coverage.reason)
+        return ("automatic_repair_required", coverage.reason)
     if coverage.can_unlock_downstream:
         return ("advance_downstream_workflow", coverage.reason)
     if preview.available:

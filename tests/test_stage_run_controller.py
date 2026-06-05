@@ -107,10 +107,10 @@ class StageRunControllerTests(unittest.TestCase):
         self.assertEqual(receipt.provider_calls, 0)
         dispatch_mock.assert_not_called()
 
-    def test_controller_still_stops_for_failed_stage_review(self) -> None:
+    def test_controller_surfaces_failed_stage_auto_repair(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch(
             "trading_manager_tasks.stage_run_controller.build_stage_run_dashboard",
-            side_effect=[_dashboard("review_stage_failures"), _dashboard("review_stage_failures")],
+            side_effect=[_dashboard("automatic_repair_required"), _dashboard("automatic_repair_required")],
         ), patch("trading_manager_tasks.stage_run_controller.dispatch_layer_provider_acquisition") as dispatch_mock:
             receipt, _dashboard_row = run_stage_controller_step(
                 stage_id="layer_02_sector_context.data_acquisition",
@@ -119,8 +119,8 @@ class StageRunControllerTests(unittest.TestCase):
                 dashboard_path=Path(raw_tmp) / "dashboard.json",
             )
 
-        self.assertEqual(receipt.action_taken, "failure_review_required")
-        self.assertEqual(receipt.action_status, "human_review_gate")
+        self.assertEqual(receipt.action_taken, "automatic_repair_required")
+        self.assertEqual(receipt.action_status, "automatic_repair_pending")
         self.assertEqual(receipt.provider_calls, 0)
         dispatch_mock.assert_not_called()
 

@@ -1,8 +1,9 @@
 """Manager failure register helpers.
 
-Failed component requests are durable facts. A failure can be corrected,
-retried, left unresolved, or accepted as a normal skip only after agent review.
-The register preserves the failed state instead of rewriting it to ready.
+Failed component requests are durable facts. Ordinary errors move through
+automatic repair/retry states; decision gates such as accepted skips still need
+review evidence. The register preserves the failed state instead of rewriting it
+to ready.
 """
 
 from __future__ import annotations
@@ -38,7 +39,15 @@ FAILURE_REGISTER_COLUMNS = (
     "note",
 )
 
-FAILURE_STATUSES = {"observed", "agent_review_required", "retry_required", "corrected", "accepted_skip", "unresolved"}
+FAILURE_STATUSES = {
+    "observed",
+    "auto_repair_required",
+    "agent_review_required",
+    "retry_required",
+    "corrected",
+    "accepted_skip",
+    "unresolved",
+}
 
 
 def _stable_token(value: str) -> str:
@@ -135,7 +144,7 @@ def mark_failure_register_requests_corrected(
         start_month=start_month,
         end_month=end_month,
     )
-    mutable_statuses = {"observed", "agent_review_required", "retry_required", "unresolved"}
+    mutable_statuses = {"observed", "auto_repair_required", "agent_review_required", "retry_required", "unresolved"}
     corrected_rows: list[dict[str, Any]] = []
     for row in rows:
         request_id = str(row.get("request_id") or "")

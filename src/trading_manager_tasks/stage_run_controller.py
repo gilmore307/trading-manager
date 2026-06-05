@@ -159,9 +159,9 @@ def run_stage_controller_step(
             action_status = "completed" if summary.dispatch_performed else "planned_no_dispatch"
         else:
             action_status = "dry_run_no_provider_calls"
-    elif before.next_action == "review_stage_failures":
-        action_taken = "failure_review_required"
-        action_status = "human_review_gate"
+    elif before.next_action == "automatic_repair_required":
+        action_taken = "automatic_repair_required"
+        action_status = "automatic_repair_pending"
     elif before.next_action == "advance_downstream_workflow":
         action_taken = "downstream_unlock_available"
         action_status = "requires_workflow_advance"

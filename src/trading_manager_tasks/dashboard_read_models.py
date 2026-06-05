@@ -615,6 +615,7 @@ def _compact_failure_register(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "failure_count": len(rows),
         "status_counts": dict(sorted(status_counts.items())),
+        "auto_repair_required_count": status_counts.get("auto_repair_required", 0),
         "agent_review_required_count": status_counts.get("agent_review_required", 0),
         "retry_required_count": status_counts.get("retry_required", 0),
         "corrected_count": status_counts.get("corrected", 0),
@@ -636,8 +637,12 @@ def _task_progress_unreviewed_failures(task: Mapping[str, Any]) -> int:
     return max(failed - accepted, 0)
 
 
-def _failure_register_review_required_count(failure_rows: list[dict[str, Any]]) -> int:
-    return sum(1 for row in failure_rows if str(row.get("failure_status") or "") == "agent_review_required")
+def _failure_register_auto_repair_required_count(failure_rows: list[dict[str, Any]]) -> int:
+    return sum(
+        1
+        for row in failure_rows
+        if str(row.get("failure_status") or "") in {"auto_repair_required", "agent_review_required"}
+    )
 
 
 def _failure_register_retry_required_count(failure_rows: list[dict[str, Any]]) -> int:
@@ -661,12 +666,12 @@ def _task_error_intervention_status(
                 return "repair_completed_awaiting_retry"
             return "agent_diagnosis_open"
         return "agent_diagnosis_closed"
-    if any(str(row.get("failure_status") or "") == "agent_review_required" for row in failure_rows):
-        return "failure_register_agent_review_required"
+    if any(str(row.get("failure_status") or "") in {"auto_repair_required", "agent_review_required"} for row in failure_rows):
+        return "automatic_repair_required"
     if any(str(row.get("failure_status") or "") == "retry_required" for row in failure_rows):
         return "provider_retry_required"
     if _task_progress_unreviewed_failures(task):
-        return "unreviewed_stage_failures"
+        return "automatic_repair_required"
     return None
 
 
@@ -685,13 +690,13 @@ def _attach_task_error_context(
         task_failure_rows = _failure_rows_for_task(failure_rows, updated)
         task_agent_errors = _agent_errors_for_task(agent_errors, updated)
         progress_failure_count = _task_progress_unreviewed_failures(updated)
-        register_review_count = _failure_register_review_required_count(task_failure_rows)
+        register_repair_count = _failure_register_auto_repair_required_count(task_failure_rows)
         register_retry_count = _failure_register_retry_required_count(task_failure_rows)
         has_open_agent_error = any(
             str(row.get("handling_status") or "") == "open" or str(row.get("repair_status") or "") == "queued"
             for row in task_agent_errors
         )
-        if task_agent_errors and not progress_failure_count and not register_review_count and not has_open_agent_error:
+        if task_agent_errors and not progress_failure_count and not register_repair_count and not has_open_agent_error:
             task_agent_errors = _close_nonblocking_awaiting_retry_errors(task_agent_errors)
         if task_failure_rows:
             detail["failure_register"] = _compact_failure_register(task_failure_rows)
@@ -702,32 +707,32 @@ def _attach_task_error_context(
             failure_rows=task_failure_rows,
             agent_errors=task_agent_errors,
         )
-        if intervention_status == "agent_diagnosis_closed" and not progress_failure_count and not register_review_count:
+        if intervention_status == "agent_diagnosis_closed" and not progress_failure_count and not register_repair_count:
             intervention_status = None
         if intervention_status:
             detail["repair_intervention_status"] = intervention_status
             blockers = list(detail.get("blockers") or [])
             if intervention_status not in blockers and intervention_status != "agent_diagnosis_closed":
                 blockers.append(intervention_status)
-            if register_review_count and "failure_register_agent_review_required" not in blockers:
-                blockers.append("failure_register_agent_review_required")
+            if register_repair_count and "automatic_repair_required" not in blockers:
+                blockers.append("automatic_repair_required")
             elif register_retry_count and "provider_retry_required" not in blockers:
                 blockers.append("provider_retry_required")
-            elif progress_failure_count and "unreviewed_stage_failures" not in blockers:
-                blockers.append("unreviewed_stage_failures")
+            elif progress_failure_count and "automatic_repair_required" not in blockers:
+                blockers.append("automatic_repair_required")
             detail["blockers"] = blockers
             updated["blocker_count"] = len(blockers)
-            if (progress_failure_count or register_review_count or register_retry_count) and str(updated.get("task_state") or "") not in {
+            if (progress_failure_count or register_repair_count or register_retry_count) and str(updated.get("task_state") or "") not in {
                 "completed",
                 "skipped",
                 "failed",
             }:
                 updated["task_state"] = "current"
-                updated["status"] = "running" if register_retry_count and not register_review_count else "review_required"
+                updated["status"] = "running"
                 if not updated.get("reason"):
-                    if register_review_count:
+                    if register_repair_count:
                         updated["reason"] = (
-                            f"{register_review_count} failure-register item(s) require agent review before downstream unlock."
+                            f"{register_repair_count} failure-register item(s) require automatic repair before downstream unlock."
                         )
                     elif register_retry_count:
                         updated["reason"] = (
@@ -735,7 +740,7 @@ def _attach_task_error_context(
                         )
                     else:
                         updated["reason"] = (
-                            f"{progress_failure_count} failed source-month request(s) require agent review before downstream unlock."
+                            f"{progress_failure_count} failed source-month request(s) require automatic repair before downstream unlock."
                         )
         updated["detail"] = detail
         updated_tasks.append(updated)
@@ -786,10 +791,13 @@ def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[d
         detail = task.get("detail", {}) if isinstance(task.get("detail"), Mapping) else {}
         progress = detail.get("progress", {}) if isinstance(detail, Mapping) else {}
         failure_register = detail.get("failure_register", {}) if isinstance(detail, Mapping) else {}
-        register_review_count = (
-            int(failure_register.get("agent_review_required_count") or 0) if isinstance(failure_register, Mapping) else 0
+        register_repair_count = (
+            int(failure_register.get("auto_repair_required_count") or 0)
+            + int(failure_register.get("agent_review_required_count") or 0)
+            if isinstance(failure_register, Mapping)
+            else 0
         )
-        if task_status == "review_required" and (progress.get("can_unlock_downstream") is False or register_review_count):
+        if task_status == "review_required" and (progress.get("can_unlock_downstream") is False or register_repair_count):
             review_tasks.append(task)
     if review_tasks:
         for task in review_tasks:

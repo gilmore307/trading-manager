@@ -44,7 +44,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "error_number": 6,
                 "handling_status": "open",
                 "repair_status": "unknown",
-                "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests requiring agent review",
+                "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests requiring automatic repair",
             },
         ]
         task = {"task_id": "layer_09_option_expression", "detail": {"active_stage_id": "layer_09_option_expression.data_acquisition"}}
@@ -2061,7 +2061,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "symbol": "AAPL",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
-                        "failure_status": "agent_review_required",
+                        "failure_status": "auto_repair_required",
                         "failure_kind": "unclassified_provider_failure",
                         "observed_status": "failed",
                         "error_summary": "ProviderPolicyError: provider not allowed: thetadata",
@@ -2108,7 +2108,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.provider_stage_failure_register",
                         "error_kind": "provider_stage_requests_failed",
                         "severity": "warning",
-                        "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests requiring agent review",
+                        "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests requiring automatic repair",
                         "occurred_at_utc": "2026-06-05T10:33:32Z",
                         "created_at_utc": "2026-06-05T10:33:32Z",
                     }
@@ -2129,10 +2129,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T10:40:00Z")
 
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
-        self.assertEqual(task["status"], "review_required")
+        self.assertEqual(task["status"], "running")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["detail"]["progress"]["failed_count"], 0)
-        self.assertEqual(task["detail"]["failure_register"]["agent_review_required_count"], 1)
+        self.assertEqual(task["detail"]["failure_register"]["auto_repair_required_count"], 1)
+        self.assertEqual(task["detail"]["failure_register"]["agent_review_required_count"], 0)
         self.assertEqual(task["detail"]["agent_error_summary"][0]["error_ref"], "ERR-000009")
         self.assertEqual(task["detail"]["repair_intervention_status"], "agent_diagnosis_queued")
 

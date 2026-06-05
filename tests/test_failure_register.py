@@ -68,7 +68,7 @@ class FailureRegisterTests(unittest.TestCase):
                 "symbol": "AAPL",
                 "start_month": "2016-01",
                 "end_month": "2016-06",
-                "failure_status": "agent_review_required",
+                "failure_status": "auto_repair_required",
                 "failure_kind": "provider_service_unavailable",
                 "observed_status": "failed",
                 "error_summary": "connection refused",

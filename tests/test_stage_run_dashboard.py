@@ -104,7 +104,7 @@ class StageRunDashboardTests(unittest.TestCase):
                 next_limit=1,
             )
 
-        self.assertEqual(dashboard.next_action, "review_stage_failures")
+        self.assertEqual(dashboard.next_action, "automatic_repair_required")
         self.assertIn("downstream remains blocked", dashboard.blocking_reason)
 
     def test_failed_provider_policy_coverage_can_retry_autonomously(self) -> None:
