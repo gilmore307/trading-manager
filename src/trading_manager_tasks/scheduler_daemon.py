@@ -15,7 +15,6 @@ import re
 import subprocess
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -57,7 +56,7 @@ DEFAULT_DRAIN_MAX_STEPS = 50
 DEFAULT_DRAIN_MAX_SECONDS = 300.0
 DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-refresh.service"
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
-DEFAULT_MONTH_INGEST_WORKERS = 3
+DEFAULT_MONTH_INGEST_WORKERS = 1
 DEFAULT_TARGET_QUEUE_PATH = DEFAULT_RUNTIME_DIR / "model_training_target_queue.json"
 DEFAULT_DECISION_LOG_MAX_BYTES = 8 * 1024 * 1024
 COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
@@ -349,13 +348,14 @@ def select_month_ingest_worker_months(
     max_month: str | None = None,
     selected_target_symbol: str | None = None,
 ) -> tuple[str, ...]:
-    """Return up to `worker_count` month-scoped ingest lanes to work now.
+    """Return the single month-scoped ingest lane to work now.
 
     This selector is intentionally narrower than ``select_next_historical_work``:
     it only considers the Layer 1/2 foundation substrate as ingest work. If a
     complete foundation fold is already ready for model-worker execution, the
-    fold owns the lane and month-ingest workers pause instead of prebuilding
-    later fold inputs.
+    fold owns the lane and month ingest pauses instead of prebuilding later
+    fold inputs. ``worker_count`` is accepted for service compatibility only;
+    the historical scheduler now advances one canonical month at a time.
     """
 
     max_month = _eligible_historical_fold_cutoff(max_month)
@@ -371,7 +371,7 @@ def select_month_ingest_worker_months(
     ):
         return ()
 
-    worker_count = max(1, int(worker_count))
+    worker_count = 1
     runtime_root = storage_root / "runtime"
     known_months: list[str] = []
     open_ingest_months: list[str] = []
@@ -1496,34 +1496,27 @@ def _run_month_ingest_worker_decisions(
 ) -> list[tuple[str, SchedulerDecision]]:
     if not months:
         return []
-    per_lane_next_limit = max(1, (provider_stage_next_limit + len(months) - 1) // len(months))
-    per_lane_provider_workers = max(1, provider_stage_max_workers // len(months))
-
-    def run_month(month: str) -> tuple[str, SchedulerDecision]:
-        return (
-            month,
-            run_scheduler_once(
-                config=config,
-                start_month=month,
-                end_month=month,
-                storage_root=storage_root,
-                component_src_root=component_src_root,
-                execute_safe_preparation=execute_safe_preparation,
-                execute_safe_offline_stages=execute_safe_offline_stages,
-                execute_autonomous_provider_stages=execute_autonomous_provider_stages,
-                provider_stage_next_limit=per_lane_next_limit,
-                provider_stage_max_workers=per_lane_provider_workers,
-                selected_target_symbol=selected_target_symbol,
-            ),
+    decisions: list[tuple[str, SchedulerDecision]] = []
+    for month in months:
+        decisions.append(
+            (
+                month,
+                run_scheduler_once(
+                    config=config,
+                    start_month=month,
+                    end_month=month,
+                    storage_root=storage_root,
+                    component_src_root=component_src_root,
+                    execute_safe_preparation=execute_safe_preparation,
+                    execute_safe_offline_stages=execute_safe_offline_stages,
+                    execute_autonomous_provider_stages=execute_autonomous_provider_stages,
+                    provider_stage_next_limit=provider_stage_next_limit,
+                    provider_stage_max_workers=provider_stage_max_workers,
+                    selected_target_symbol=selected_target_symbol,
+                ),
+            )
         )
-
-    by_month: dict[str, SchedulerDecision] = {}
-    with ThreadPoolExecutor(max_workers=len(months)) as executor:
-        futures = {executor.submit(run_month, month): month for month in months}
-        for future in as_completed(futures):
-            month, decision = future.result()
-            by_month[month] = decision
-    return [(month, by_month[month]) for month in months]
+    return decisions
 
 
 def run_daemon_loop(
@@ -1565,9 +1558,11 @@ def run_daemon_loop(
 
     ``max_iterations`` is provided for tests, smoke runs, and one-shot service
     validation. ``None`` means run until the process is stopped by the service
-    manager.
+    manager. Historical runtime is single-month; ``month_ingest_workers`` is
+    retained only so older service invocations do not fail argument parsing.
     """
 
+    month_ingest_workers = 1
     acquire_daemon_lock(lock_path)
     state = load_daemon_state(
         state_path,
@@ -1603,8 +1598,8 @@ def run_daemon_loop(
                 should_continue_drain = False
                 decisions_this_cycle = 0
                 try:
-                    use_month_ingest_lanes = auto_select_next_work and month_ingest_workers > 1
-                    if use_month_ingest_lanes:
+                    use_single_month_work_loop = auto_select_next_work
+                    if use_single_month_work_loop:
                         replay_probe = run_model_group_replay_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -1620,8 +1615,7 @@ def run_daemon_loop(
                             execute=False,
                         )
                         lifecycle_holds_target_lane = replay_probe is not None or attribution_probe is not None or evaluation_probe is not None
-                        remaining_iterations = None if max_iterations is None else max_iterations - iterations
-                        lane_limit = month_ingest_workers if remaining_iterations is None else min(month_ingest_workers, max(1, remaining_iterations))
+                        lane_limit = 1
                         if lifecycle_holds_target_lane:
                             months = ()
                         else:
@@ -1651,8 +1645,7 @@ def run_daemon_loop(
                                 state,
                                 start_month=active_start_month,
                                 end_month=active_end_month,
-                                last_next_internal_stage="month_ingest_worker_lanes",
-                                last_work_selection_reason="month_ingest_worker_lanes_selected",
+                                last_next_internal_stage="single_month_work_loop",
                                 last_open_months=months,
                                 updated_utc=completed,
                             )
@@ -1664,8 +1657,7 @@ def run_daemon_loop(
                                 state,
                                 start_month=active_start_month,
                                 end_month=active_end_month,
-                                last_next_internal_stage="month_ingest_worker_lanes",
-                                last_work_selection_reason="month_ingest_worker_lanes_selected",
+                                last_next_internal_stage="single_month_work_loop",
                                 last_open_months=months,
                                 updated_utc=completed,
                             )
@@ -1954,7 +1946,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Allow one bounded autonomous provider-dispatch/reconcile slice per tick when provider acquisition is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one daemon tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one daemon tick.")
-    parser.add_argument("--month-ingest-workers", type=int, default=DEFAULT_MONTH_INGEST_WORKERS, help="Number of month-ingest worker lanes to keep filled for month-scoped acquisition and feature generation.")
+    parser.add_argument("--month-ingest-workers", type=int, default=DEFAULT_MONTH_INGEST_WORKERS, help="Compatibility option retained for older service env files; historical runtime advances one month at a time.")
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
     parser.add_argument("--target-queue-path", type=Path, default=DEFAULT_TARGET_QUEUE_PATH, help="Ordered JSON target queue used when --target-symbol is omitted.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")

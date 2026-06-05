@@ -443,7 +443,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.completed_months, ("2016-01",))
         self.assertEqual(selection.open_months, ("2016-02",))
 
-    def test_month_ingest_worker_selection_fills_three_lanes_after_completed_months(self):
+    def test_month_ingest_worker_selection_uses_single_month_after_completed_months(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             for month in ("2016-01", "2016-02"):
@@ -465,8 +465,8 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_month="2016-04",
             )
 
-        self.assertEqual(selected, ("2016-03", "2016-04", "2016-05"))
-        self.assertEqual(capped, ("2016-03", "2016-04", "2016-05"))
+        self.assertEqual(selected, ("2016-03",))
+        self.assertEqual(capped, ("2016-03",))
         self.assertEqual(before_fold_end, ())
 
     def test_month_ingest_worker_selection_ignores_open_month_after_cutoff(self):
@@ -1242,7 +1242,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_month="2016-06",
             )
 
-        self.assertEqual(months, ("2016-01", "2016-04", "2016-05"))
+        self.assertEqual(months, ("2016-01",))
 
     def test_model_worker_selects_fold_with_ready_target_chain_preparation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

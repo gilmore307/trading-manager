@@ -62,9 +62,9 @@ PYTHONPATH=src python3 scripts/tasks/build_historical_task_progress_summary.py
 
 ## Current Priority
 
-Reusable foundation catch-up remains first. A month can advance during this phase after reusable data-acquisition and feature-generation substrate is complete for market context, sector context, and fold-scoped global/sector Layer 4 event-observation context. Layer 4 event-observation substrate is collected each fold because the accepted event observation pool may differ across folds. Researching another target later must reuse that foundation evidence instead of redownloading it.
+Reusable foundation catch-up remains first. Runtime advances exactly one canonical month during this phase after reusable data-acquisition and feature-generation substrate is complete for market context, sector context, and fold-scoped global/sector Layer 4 event-observation context. Layer 4 event-observation substrate is collected each fold because the accepted event observation pool may differ across folds. Researching another target later must reuse that foundation evidence instead of redownloading it.
 
-Target-specific substrate work is the second phase. It prepares target state, target-local event evidence, option-expression inputs, and other target-scoped source/feature rows only when a downstream run needs them. Target-substrate checkpoints are data-preparation lanes; they do not force replay to trade that target.
+Target-specific substrate work is the second phase. It prepares target state, target-local event evidence, option-expression inputs, and other target-scoped source/feature rows only when a downstream run needs them. Target-substrate checkpoints are data-preparation state, not parallel public task lanes; they do not force replay to trade that target.
 
 Fold progression is serial. After a fold finishes Layer 1-9 pre-replay model work, the scheduler holds the fold lane until model replay, Layer 10 Event Risk Governor attribution, model evaluation, model promotion, and maintenance/readiness handoff complete. It must not start the next fold or rotate to another target while that model-group lifecycle is still open, because Layer 10 may change the accepted event-observation pool that the next fold's Layer 4 substrate consumes.
 

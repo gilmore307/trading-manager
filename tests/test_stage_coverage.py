@@ -115,12 +115,12 @@ class StageCoverageTests(unittest.TestCase):
             stage_id="layer_02_sector_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
-            expected_count=25,
+            expected_count=len(layer_two_symbols),
         )
 
-        self.assertEqual(report.observed_count, 25)
+        self.assertEqual(report.observed_count, len(layer_two_symbols))
         self.assertEqual(report.ready_count, 2)
-        self.assertEqual(report.pending_count, 23)
+        self.assertEqual(report.pending_count, len(layer_two_symbols) - 2)
         self.assertEqual(report.status, "partial_ready")
 
     def test_failed_coverage_blocks_downstream_unlock(self):

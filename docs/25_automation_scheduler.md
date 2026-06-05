@@ -56,6 +56,9 @@ month child partitions rather than mixing Layer 1/2 month rows with Layer 3+
 fold rows. A six-month fold opens only after its final calendar month has
 completed in `America/New_York`, so `2026-fold1` is not eligible before
 2026-07-01 even if some January-June child months already have source data.
+Runtime execution advances one canonical month at a time. Historical scheduler
+inputs may retain compatibility fields such as `month_ingest_workers`, but they
+must not open multiple month lanes or project parallel month work into Tasks.
 
 The service completes one fold's full run cycle before opening the next fold.
 Layer 1-9 completion is only the pre-replay boundary; it unlocks Replay, Layer

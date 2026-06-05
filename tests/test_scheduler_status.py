@@ -169,7 +169,7 @@ class SchedulerStatusTests(unittest.TestCase):
                     "end_month": "2016-01",
                     "last_decision_status": "backoff",
                     "last_reason_code": "workflow_stage_blocked",
-                    "last_next_internal_stage": "month_ingest_worker_lanes",
+                    "last_next_internal_stage": "single_month_work_loop",
                 }) + "\n",
                 encoding="utf-8",
             )

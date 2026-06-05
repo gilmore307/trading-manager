@@ -12,7 +12,7 @@ from trading_manager_tasks.historical_training import (
     prepare_layer_two_historical_training_batch,
     prepare_target_local_historical_training_batch,
 )
-from trading_manager_tasks.monthly_backfill import LAYER_THREE_TARGET_STATE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
+from trading_manager_tasks.monthly_backfill import LAYER_THREE_TARGET_STATE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 from trading_manager_tasks.provider_dispatch import dispatch_layer_one_provider_acquisition, dispatch_layer_provider_acquisition, select_provider_worker_count
 from trading_manager_tasks.request_payloads import ALPACA_BARS_MONTHLY_MAX_PAGES
 
@@ -64,7 +64,7 @@ class ProviderDispatchTests(unittest.TestCase):
                 execute_provider_calls=False,
             )
         self.assertEqual(dispatch.stage_id, "layer_02_sector_context.data_acquisition")
-        self.assertEqual(dispatch.request_count, 25)
+        self.assertEqual(dispatch.request_count, len(load_market_regime_universe(model_layers=(LAYER_TWO_MODEL_LAYER,))))
         self.assertEqual(dispatch.validation_count, 0)
         self.assertEqual(dispatch.provider_calls, 0)
         self.assertFalse(dispatch.dispatch_performed)
