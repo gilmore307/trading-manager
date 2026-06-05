@@ -21,7 +21,7 @@ from trading_manager_tasks.layer_nine_option_expression import (
 
 
 class LayerNineOptionExpressionGateTests(unittest.TestCase):
-    def test_no_trade_layer_seven_rows_accept_no_provider_skip(self) -> None:
+    def test_no_trade_layer_eight_rows_still_prepare_training_snapshots(self) -> None:
         review = build_layer_nine_gate_review(
             start_month="2016-01",
             end_month="2016-01",
@@ -44,15 +44,16 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         )
 
         self.assertEqual(review.stage_id, STAGE_ID)
-        self.assertEqual(review.status, "no_provider_skip_accepted")
-        self.assertEqual(review.reviewed_decision, "accepted_skip_no_active_target_chain")
+        self.assertEqual(review.status, "provider_acquisition_ready")
+        self.assertEqual(review.reviewed_decision, "dense_training_minutes_ready_for_autonomous_option_acquisition")
         self.assertEqual(review.total_layer_8_rows, 2)
-        self.assertEqual(review.active_request_count, 0)
+        self.assertEqual(review.training_request_count, 2)
+        self.assertEqual({preview.underlying for preview in review.request_previews}, {"AAPL", "MSFT"})
         self.assertEqual(review.provider_calls, 0)
         self.assertFalse(review.dispatch_performed)
-        self.assertIn("no option-chain provider call", review.reason)
+        self.assertIn("dense Layer 8 minute rows", review.reason)
 
-    def test_active_layer_seven_rows_preview_thetadata_requests(self) -> None:
+    def test_training_eligible_layer_eight_rows_preview_thetadata_requests(self) -> None:
         rows = [
             {
                 "target_candidate_id": "tcand_active_abc123",
@@ -83,7 +84,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(source_task["params"]["max_dte"], 45)
         self.assertEqual(source_task["params"]["timeout_seconds"], 120)
         self.assertEqual(review.status, "provider_acquisition_ready")
-        self.assertEqual(review.active_request_count, 1)
+        self.assertEqual(review.training_request_count, 1)
         self.assertEqual(review.recommended_next_action, "prepare_option_expression_acquisition")
 
     def test_written_no_provider_skip_receipt_is_safe_and_stage_scoped(self) -> None:
@@ -99,7 +100,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
             self.assertIn('"broker_execution_performed": false', receipt_text)
             self.assertIn('"model_activation_performed": false', receipt_text)
 
-    def test_written_active_provider_ready_receipt_is_successful_gate_completion(self) -> None:
+    def test_written_provider_ready_receipt_is_successful_gate_completion(self) -> None:
         review = build_layer_nine_gate_review(
             start_month="2016-01",
             end_month="2016-01",
@@ -118,7 +119,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
             receipt_text = receipt_path.read_text(encoding="utf-8")
 
             self.assertIn('"status": "succeeded"', receipt_text)
-            self.assertIn('"active_layer_8_request_candidates": 1', receipt_text)
+            self.assertIn('"layer_9_training_request_candidates": 1', receipt_text)
             self.assertIn('"provider_calls": 0', receipt_text)
             self.assertIn('"broker_execution_performed": false', receipt_text)
 
@@ -168,14 +169,14 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(runtime_key["params"]["timeout_seconds"], 120)
         self.assertFalse(runtime_key["params"]["manager_dry_run"])
 
-    def test_active_provider_ready_main_returns_success(self) -> None:
+    def test_provider_ready_main_returns_success_for_training_eligible_no_trade_row(self) -> None:
         rows = [
             {
                 "target_candidate_id": "tcand_active_abc123",
                 "underlying": "AAPL",
                 "available_time": "2016-01-05T09:30:00-05:00",
-                "action_type": "open_long",
-                "action_side": "long",
+                "action_type": "no_trade",
+                "action_side": "none",
             }
         ]
         with tempfile.TemporaryDirectory() as raw_tmp:

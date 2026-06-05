@@ -1,11 +1,10 @@
-"""Layer 9 option-expression gate review helpers.
+"""Layer 9 option-expression training-acquisition review helpers.
 
-This module is deliberately no-provider. It reviews completed Layer 8
-underlying-action rows for option-expression-worthy actions before ThetaData
-option-snapshot acquisition is prepared for the Layer 9 trading-guidance
-boundary. If the month has no active underlying action chain, the correct
-``layer_09_option_expression`` acquisition outcome is a reviewed no-provider skip,
-not an empty provider request.
+This module is deliberately no-provider. It reviews completed dense Layer 8
+underlying-action rows and prepares point-in-time ThetaData option-snapshot
+acquisition for Layer 9 training. Training acquisition is independent from
+runtime/replay action triggers: ``no_trade`` and ``maintain`` rows still need
+option-surface evidence when an underlying and snapshot clock are available.
 """
 
 from __future__ import annotations
@@ -48,22 +47,9 @@ OPTION_SNAPSHOT_PROVIDER_CONTROLS = {
     "retry_policy_ref": "layer_09_option_expression_source_acquisition_retry",
     "rate_limit_policy_ref": "thetadata_terminal_local_rate_limit",
 }
-ACTIVE_ACTION_TYPES = {
-    "increase_long",
-    "decrease_long",
-    "open_long",
-    "open_short",
-    "increase_short",
-    "decrease_short",
-    "bearish_underlying_path_but_no_short_allowed",
-}
-INACTIVE_ACTION_TYPES = {"", "none", "no_trade", "maintain"}
-INACTIVE_ACTION_SIDES = {"", "none", "neutral"}
-
-
 @dataclass(frozen=True)
 class LayerNineRequestPreview:
-    """A bounded preview of a future option-chain snapshot request."""
+    """A bounded preview of a future training option-chain snapshot request."""
 
     request_id: str
     target_candidate_id: str
@@ -103,7 +89,7 @@ class LayerNineRequestPreview:
 
 @dataclass(frozen=True)
 class LayerNineGateReview:
-    """No-provider review of whether Layer 9 needs option-snapshot acquisition."""
+    """No-provider review of whether Layer 9 training needs option snapshots."""
 
     contract_type: str
     stage_id: str
@@ -112,8 +98,8 @@ class LayerNineGateReview:
     status: str
     reviewed_decision: str
     total_layer_8_rows: int
-    active_target_chain_count: int
-    active_request_count: int
+    eligible_minute_count: int
+    training_request_count: int
     request_previews: tuple[LayerNineRequestPreview, ...]
     evidence_refs: tuple[str, ...]
     reason: str
@@ -184,23 +170,21 @@ def _source_output_root_for_request(request_id: str, *, start_month: str, source
     return source_output_root / start_month / request_id
 
 
-def _is_active_layer_8_row(row: Mapping[str, Any]) -> bool:
-    action_type = str(row.get("action_type") or "").strip().lower()
-    action_side = str(row.get("action_side") or "").strip().lower()
-    if action_type in INACTIVE_ACTION_TYPES:
-        return False
-    if action_side in INACTIVE_ACTION_SIDES and action_type not in ACTIVE_ACTION_TYPES:
-        return False
-    return True
+def _training_snapshot_time(row: Mapping[str, Any]) -> str:
+    return str(row.get("snapshot_time") or row.get("tradeable_time") or row.get("available_time") or "")
+
+
+def _is_training_eligible_layer_8_row(row: Mapping[str, Any]) -> bool:
+    return bool(str(row.get("underlying") or "").strip() and _training_snapshot_time(row).strip())
 
 
 def request_previews_from_layer_8_rows(rows: Iterable[Mapping[str, Any]], *, start_month: str) -> tuple[LayerNineRequestPreview, ...]:
-    """Build future ThetaData request previews from active Layer 8 rows only."""
+    """Build ThetaData training request previews from eligible dense Layer 8 rows."""
 
     previews: list[LayerNineRequestPreview] = []
     seen: set[str] = set()
     for row in rows:
-        if not _is_active_layer_8_row(row):
+        if not _is_training_eligible_layer_8_row(row):
             continue
         request_id = _request_id(row, start_month=start_month)
         if request_id in seen:
@@ -211,7 +195,7 @@ def request_previews_from_layer_8_rows(rows: Iterable[Mapping[str, Any]], *, sta
                 request_id=request_id,
                 target_candidate_id=str(row.get("target_candidate_id") or ""),
                 underlying=str(row.get("underlying")) if row.get("underlying") else None,
-                snapshot_time=str(row.get("snapshot_time") or row.get("tradeable_time") or row.get("available_time") or ""),
+                snapshot_time=_training_snapshot_time(row),
                 underlying_action_plan_ref=str(row.get("underlying_action_plan_ref")) if row.get("underlying_action_plan_ref") else None,
                 action_type=str(row.get("action_type") or ""),
                 action_side=str(row.get("action_side") or ""),
@@ -232,13 +216,13 @@ def build_layer_nine_gate_review(
     previews = request_previews_from_layer_8_rows(layer_8_rows, start_month=start_month)
     if previews:
         status = "provider_acquisition_ready"
-        reviewed_decision = "active_target_chain_ready_for_autonomous_option_acquisition"
-        reason = f"{len(previews)} active Layer 8 target-chain rows are ready for autonomous ThetaData option snapshot acquisition before Layer 9 guidance/option-expression review."
+        reviewed_decision = "dense_training_minutes_ready_for_autonomous_option_acquisition"
+        reason = f"{len(previews)} dense Layer 8 minute rows are ready for autonomous ThetaData option snapshot acquisition before Layer 9 training/generation."
         recommended_next_action = "prepare_option_expression_acquisition"
     else:
         status = "no_provider_skip_accepted"
-        reviewed_decision = "accepted_skip_no_active_target_chain"
-        reason = "Layer 8 produced no active underlying-action chain for Layer 9 option-expression review; all rows are no-trade/maintain/neutral, so no option-chain provider call is warranted for this month."
+        reviewed_decision = "accepted_skip_no_training_eligible_underlying_minutes"
+        reason = "Layer 8 produced no rows with both an underlying and point-in-time snapshot clock for Layer 9 training acquisition, so no option-chain provider call is warranted for this month."
         recommended_next_action = "record_layer_09_data_acquisition_no_provider_skip"
     return LayerNineGateReview(
         contract_type="manager_layer_09_option_expression_gate_review",
@@ -248,8 +232,8 @@ def build_layer_nine_gate_review(
         status=status,
         reviewed_decision=reviewed_decision,
         total_layer_8_rows=len(layer_8_rows),
-        active_target_chain_count=len(previews),
-        active_request_count=len(previews),
+        eligible_minute_count=len(previews),
+        training_request_count=len(previews),
         request_previews=previews,
         evidence_refs=tuple(evidence_refs),
         reason=reason,
@@ -332,7 +316,7 @@ def write_gate_review_artifacts(review: LayerNineGateReview, *, output_root: Pat
                 "output_refs": [str(review_path)],
                 "row_counts": {
                     "layer_8_rows_reviewed": review.total_layer_8_rows,
-                    "active_layer_8_request_candidates": review.active_request_count,
+                    "layer_9_training_request_candidates": review.training_request_count,
                 },
             }
         ],

@@ -2,9 +2,9 @@
 
 The Layer 9 option-expression feature stage has two valid paths:
 
-* if the reviewed Layer 8 gate accepted a no-provider/no-active-target skip,
-  feature generation is also a reviewed no-op because no M09 option source rows
-  are required for deterministic no-option model rows;
+* if the reviewed Layer 9 training-acquisition gate accepted a
+  no-provider/no-eligible-minute skip, feature generation is also a reviewed
+  no-op because no M09 option source rows are required;
 * otherwise, after provider acquisition has populated the M09 option-expression
   source for the current fold, the adapter delegates to trading-data's M09
   feature generator.
@@ -103,7 +103,7 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
                 "status": "succeeded",
                 "output_refs": [str(gate_review_path)],
                 "row_counts": {
-                    "active_layer_8_request_candidates": int(gate_review.get("active_request_count") or 0),
+                    "layer_9_training_request_candidates": int(gate_review.get("training_request_count") or 0),
                     "m09_option_expression_data_acquisition_rows_required": 0,
                     "m09_option_expression_feature_generation_rows_required": 0,
                 },
@@ -115,7 +115,7 @@ def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: P
         "broker_execution_performed": False,
         "storage_lifecycle_mutation_performed": False,
         "reason": (
-            "Reviewed Layer 8 gate accepted no-provider/no-active-target skip; "
+            "Reviewed Layer 9 training-acquisition gate accepted no-provider/no-eligible-minute skip; "
             "M09 option-expression source and feature rows are not required before deterministic no-option model generation."
         ),
         "evidence_refs": [str(gate_review_path)],
@@ -143,7 +143,7 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ga
                 "status": "failed",
                 "output_refs": [str(gate_review_path)],
                 "row_counts": {
-                    "active_layer_8_request_candidates": int(gate_review.get("active_request_count") or 0),
+                    "layer_9_training_request_candidates": int(gate_review.get("training_request_count") or 0),
                     "m09_option_expression_data_acquisition_rows_available": 0,
                     "m09_option_expression_feature_generation_rows_generated": 0,
                 },
@@ -155,7 +155,7 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ga
         "broker_execution_performed": False,
         "storage_lifecycle_mutation_performed": False,
         "reason": (
-            "Layer 8 produced active target-chain rows, but the current fold has no "
+            "Layer 8 produced Layer 9 training-eligible minute rows, but the current fold has no "
             "m09_option_expression_data_acquisition rows. Layer 9 feature generation "
             "must wait for reviewed option source acquisition instead of continuing "
             "with optionable_chain_missing fallback."
@@ -231,7 +231,7 @@ def execute_layer_nine_feature_stage(
     review = _read_json(review_path)
     if review.get("contract_type") != "manager_layer_09_option_expression_gate_review":
         raise TaskSystemError(f"unsupported Layer 8 gate review contract_type: {review_path}")
-    if review.get("status") == "no_provider_skip_accepted" and int(review.get("active_request_count") or 0) == 0:
+    if review.get("status") == "no_provider_skip_accepted" and int(review.get("training_request_count") or 0) == 0:
         receipt_path = _write_skip_receipt(
             start_month=start_month,
             end_month=end_month,
@@ -247,7 +247,7 @@ def execute_layer_nine_feature_stage(
             status="succeeded",
             mode="no_provider_no_option_skip",
             receipt_path=str(receipt_path),
-            reason="no active Layer 8 target chain; feature generation is a reviewed no-op",
+            reason="no Layer 9 training-eligible underlying minutes; feature generation is a reviewed no-op",
         )
     if review.get("status") == "provider_acquisition_ready" and option_source_row_count(start_month=start_month, end_month=end_month) <= 0:
         receipt_path = _write_missing_option_source_receipt(

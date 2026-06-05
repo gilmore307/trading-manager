@@ -24,7 +24,7 @@ class LayerNineFeatureStageTests(unittest.TestCase):
                         "start_month": "2016-02",
                         "end_month": "2016-02",
                         "status": "no_provider_skip_accepted",
-                        "active_request_count": 0,
+                        "training_request_count": 0,
                     }
                 )
                 + "\n",
@@ -56,7 +56,7 @@ class LayerNineFeatureStageTests(unittest.TestCase):
                     {
                         "contract_type": "manager_layer_09_option_expression_gate_review",
                         "status": "provider_acquisition_ready",
-                        "active_request_count": 2,
+                        "training_request_count": 2,
                     }
                 )
                 + "\n",
@@ -90,7 +90,7 @@ class LayerNineFeatureStageTests(unittest.TestCase):
                     {
                         "contract_type": "manager_layer_09_option_expression_gate_review",
                         "status": "provider_acquisition_ready",
-                        "active_request_count": 2,
+                        "training_request_count": 2,
                     }
                 )
                 + "\n",

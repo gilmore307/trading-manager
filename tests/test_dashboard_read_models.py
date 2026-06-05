@@ -3430,7 +3430,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer": 8,
                                 "layer_key": "layer_09_option_expression",
                                 "status": "not_applicable",
-                                "last_reason": "no active Layer 8 target chain ready for option-expression expansion",
+                                "last_reason": "no Layer 9 training-eligible underlying minutes ready for option-expression acquisition",
                             },
                         ],
                     }
@@ -3460,7 +3460,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertFalse(any(task["layer"] == 5 and task["stage_type"] == "model_task" for task in task_timeline))
         real_skip = next(task for task in task_timeline if task["task_id"] == "layer_09_option_expression")
         self.assertEqual(real_skip["task_state"], "skipped")
-        self.assertIn("no active Layer 8", real_skip["reason"])
+        self.assertIn("no Layer 9 training-eligible", real_skip["reason"])
 
     def test_planned_task_timeline_uses_service_target_symbol(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
