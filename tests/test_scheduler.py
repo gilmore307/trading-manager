@@ -247,6 +247,47 @@ class SchedulerTests(unittest.TestCase):
         execute_provider_stage.assert_called_once()
         self.assertEqual(execute_provider_stage.call_args.kwargs["selected_target_symbol"], "AAPL")
 
+    def test_fold_provider_stage_uses_post_foundation_workflow_plan(self):
+        fake_summary = {
+            "provider_calls": 0,
+            "dispatch_performed": False,
+            "model_activation_performed": False,
+            "broker_execution_performed": False,
+            "storage_lifecycle_mutation_performed": False,
+        }
+        ready_stage = SimpleNamespace(
+            stage_id="layer_09_option_expression.data_acquisition",
+            status="ready",
+            command=["review-layer-nine"],
+            stage_type="data_acquisition",
+        )
+        state = SimpleNamespace(
+            stages=(ready_stage,),
+            summary_row=lambda: {"stages": [{"stage_id": ready_stage.stage_id, "status": ready_stage.status}]},
+        )
+        plan = SimpleNamespace(
+            summary_row=lambda: {"next_stage": {"stage_id": ready_stage.stage_id}},
+            next_stage=ready_stage,
+            layer_one_task_key_count=99,
+            layer_two_task_key_count=99,
+        )
+        with patch("trading_manager_tasks.scheduler.build_model_training_workflow_plan", return_value=plan), patch(
+            "trading_manager_tasks.scheduler.advance_workflow_state", return_value=state
+        ), patch("trading_manager_tasks.scheduler.next_ready_or_blocked_stage", return_value=ready_stage), patch(
+            "trading_manager_tasks.scheduler.first_blocked_stage", return_value=None
+        ), patch("trading_manager_tasks.scheduler._execute_autonomous_provider_stage", return_value=fake_summary) as execute_provider_stage:
+            decision = run_scheduler_once(
+                now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
+                resource_snapshot=self._healthy_resource_snapshot(),
+                execute_autonomous_provider_stages=True,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        self.assertEqual(decision.decision_status, "executed")
+        self.assertEqual(decision.selected_work, "layer_09_option_expression.data_acquisition")
+        self.assertFalse(execute_provider_stage.call_args.kwargs["foundation_catch_up_only"])
+
     def test_scheduler_reports_first_blocked_stage_instead_of_plan_fallback(self):
         blocked_stage = SimpleNamespace(
             stage_id="layer_03_target_state_vector.data_acquisition",

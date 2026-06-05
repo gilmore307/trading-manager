@@ -282,6 +282,7 @@ def _reconcile_provider_stage_unlocked(
     workflow_state_path: Path | None = None,
     write_workflow_state: bool = False,
     selected_target_symbol: str | None = None,
+    foundation_catch_up_only: bool = True,
 ) -> StageReconcileSummary:
     """Run safe offline receipt/control-plane/coverage reconciliation."""
 
@@ -331,6 +332,7 @@ def _reconcile_provider_stage_unlocked(
             state_path=resolved_workflow_state_path,
             stage_coverage_reports=(output_path,),
             selected_target_symbol=selected_target_symbol,
+            foundation_catch_up_only=foundation_catch_up_only,
             write=write_workflow_state,
         )
 
@@ -378,6 +380,7 @@ def reconcile_provider_stage(
     workflow_state_path: Path | None = None,
     write_workflow_state: bool = False,
     selected_target_symbol: str | None = None,
+    foundation_catch_up_only: bool = True,
     locks_dir: Path = DEFAULT_LOCKS_DIR,
 ) -> StageReconcileSummary:
     """Run safe offline receipt/control-plane/coverage reconciliation under its reconcile lock."""
@@ -401,6 +404,7 @@ def reconcile_provider_stage(
             workflow_state_path=workflow_state_path,
             write_workflow_state=write_workflow_state,
             selected_target_symbol=selected_target_symbol,
+            foundation_catch_up_only=foundation_catch_up_only,
         )
 
 
@@ -428,6 +432,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workflow-state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/02_control_plane/runtime.")
     parser.add_argument("--write-workflow-state", action="store_true")
     parser.add_argument("--target-symbol", help="Optional target symbol for Layer 3+ workflow-state routing.")
+    parser.add_argument(
+        "--allow-post-foundation-model-stages",
+        action="store_true",
+        help="Use the full fold-scoped post-foundation workflow plan when advancing workflow state.",
+    )
     parser.add_argument("--write-summary", action="store_true", help="Write reconcile summary JSON to --summary-output-path.")
     parser.add_argument("--locks-dir", type=Path, default=DEFAULT_LOCKS_DIR)
     parser.add_argument("--summary-output-path", type=Path)
@@ -451,6 +460,7 @@ def main(argv: list[str] | None = None) -> int:
         workflow_state_path=args.workflow_state_path,
         write_workflow_state=args.write_workflow_state,
         selected_target_symbol=args.target_symbol,
+        foundation_catch_up_only=not args.allow_post_foundation_model_stages,
         locks_dir=args.locks_dir,
     )
     if args.write_summary:

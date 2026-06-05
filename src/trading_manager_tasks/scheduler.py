@@ -357,6 +357,7 @@ def _execute_autonomous_provider_stage(
     next_limit: int,
     max_workers: int,
     selected_target_symbol: str | None,
+    foundation_catch_up_only: bool,
 ) -> dict[str, Any]:
     model_layer = PROVIDER_STAGE_MODEL_LAYERS[stage_id]
     state_path = workflow_state_path_for_month(start_month, root=storage_root / "runtime")
@@ -397,6 +398,7 @@ def _execute_autonomous_provider_stage(
             storage_root=storage_root,
             state_path=state_path,
             selected_target_symbol=selected_target_symbol,
+            foundation_catch_up_only=foundation_catch_up_only,
             write=False,
         )
         started_state = mark_stage_started(started_state, stage_id=stage_id, reason="provider acquisition stage started by scheduler")
@@ -426,6 +428,7 @@ def _execute_autonomous_provider_stage(
         advance_workflow=True,
         write_workflow_state=True,
         selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=foundation_catch_up_only,
         locks_dir=locks_dir,
     )
     refreshed_state = advance_workflow_state(
@@ -434,6 +437,7 @@ def _execute_autonomous_provider_stage(
         storage_root=storage_root,
         state_path=state_path,
         selected_target_symbol=selected_target_symbol,
+        foundation_catch_up_only=foundation_catch_up_only,
         write=False,
     )
     return {
@@ -788,6 +792,7 @@ def run_scheduler_once(
             next_limit=provider_stage_next_limit,
             max_workers=provider_stage_max_workers,
             selected_target_symbol=selected_target_symbol,
+            foundation_catch_up_only=foundation_catch_up_only,
         )
         return SchedulerDecision(
             contract_type="manager_scheduler_decision",
