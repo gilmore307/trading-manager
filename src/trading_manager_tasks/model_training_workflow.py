@@ -316,9 +316,9 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "OptionExpressionModel",
         "depends_on_layers": (8,),
         "progression_mode": "optional_trading_guidance_after_underlying_action",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;option_contract_bucket",
-        "candidate_progression_policy": "finish the active base target chain through optional Layer 9 trading guidance / option expression; crypto/direct-underlying-only routes do not require option refs",
-        "data_surface": "agent-reviewed option-expression gate review; provider-backed option-expression sources only when active base Layer 8 target chains require them plus m09_option_expression_feature_generation",
+        "candidate_axis": "target_symbol;six_month_window;minute_timestamp;option_contract_bucket",
+        "candidate_progression_policy": "train dense minute-level option-expression context after Layer 8 underlying-action generation; replay/live routing decides separately which minutes use the guidance",
+        "data_surface": "dense option-expression gate review over Layer 8 training-eligible underlying minutes plus provider-backed m09_option_expression_data_acquisition and m09_option_expression_feature_generation",
         "feature_cli": "trading-data-m09-option-expression-feature-generation",
     },
 )
