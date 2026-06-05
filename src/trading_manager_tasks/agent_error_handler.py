@@ -664,6 +664,32 @@ def build_queued_diagnosis(request: Mapping[str, Any], *, reason: str = "agent r
     return diagnosis
 
 
+def build_agent_call_failed_diagnosis(
+    request: Mapping[str, Any],
+    *,
+    runner_command: str | None,
+    error: Exception,
+) -> dict[str, Any]:
+    completed = _now_utc()
+    stderr = f"{type(error).__name__}: {error}"
+    diagnosis = {
+        "contract_type": AGENT_ERROR_DIAGNOSIS_CONTRACT,
+        "schema_version": "1",
+        "diagnosis_id": _stable_id("errdiag", request["request_id"], runner_command, stderr),
+        "request_ref": request["request_id"],
+        "agent_ref": request["agent_ref"],
+        "runner_command": runner_command,
+        "status": "agent_call_failed",
+        "return_code": None,
+        "stdout": "",
+        "stderr": stderr[-8000:],
+        "started_at_utc": None,
+        "completed_at_utc": completed,
+    }
+    validate_agent_error_diagnosis(diagnosis)
+    return diagnosis
+
+
 def validate_agent_error_diagnosis(diagnosis: Mapping[str, Any]) -> dict[str, Any]:
     normalized = dict(diagnosis)
     required = ("contract_type", "schema_version", "diagnosis_id", "request_ref", "agent_ref", "status", "completed_at_utc")
@@ -793,9 +819,16 @@ def handle_server_error(
     configured_runner = runner_command or os.environ.get("MANAGER_AGENT_ERROR_RUNNER_COMMAND", "").strip()
     effective_call_agent = call_agent or _env_truthy("MANAGER_AGENT_ERROR_AUTOCALL")
     if effective_call_agent and configured_runner:
-        diagnosis = call_agent_runner(request, runner_command=configured_runner)
+        try:
+            diagnosis = call_agent_runner(request, runner_command=configured_runner)
+        except Exception as exc:
+            diagnosis = build_agent_call_failed_diagnosis(request, runner_command=configured_runner, error=exc)
     else:
         diagnosis = build_queued_diagnosis(request, reason="agent runner not configured" if effective_call_agent else "agent call not requested")
+    diagnosis = dict(diagnosis)
+    diagnosis_path = default_diagnosis_path(request, output_root)
+    diagnosis["discord_notification"] = {"status": "pending", "reason": "diagnosis written before notification"}
+    write_json_artifact(diagnosis, path=diagnosis_path)
     should_notify_discord = (
         bool(notify_discord)
         if notify_discord is not None
@@ -809,20 +842,25 @@ def handle_server_error(
             "error_ref": request.get("error_ref"),
         }
     else:
-        discord_notification = (
-            notify_discord_for_error(
-                request,
-                diagnosis,
-                target=discord_target,
-                server_id=discord_server_id,
-                account_id=discord_account_id,
+        try:
+            discord_notification = (
+                notify_discord_for_error(
+                    request,
+                    diagnosis,
+                    target=discord_target,
+                    server_id=discord_server_id,
+                    account_id=discord_account_id,
+                )
+                if should_notify_discord
+                else {"status": "skipped", "reason": "discord notification not requested"}
             )
-            if should_notify_discord
-            else {"status": "skipped", "reason": "discord notification not requested"}
-        )
-    diagnosis = dict(diagnosis)
+        except Exception as exc:
+            discord_notification = {
+                "status": "failed",
+                "reason": f"{type(exc).__name__}: {exc}",
+                "error_ref": request.get("error_ref"),
+            }
     diagnosis["discord_notification"] = discord_notification
-    diagnosis_path = default_diagnosis_path(request, output_root)
     write_json_artifact(diagnosis, path=diagnosis_path)
     result = {
         "contract_type": AGENT_ERROR_HANDLING_RESULT_CONTRACT,

@@ -109,6 +109,50 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertIn("diagnosis_status", diagnosis["stdout"])
             self.assertEqual(diagnosis["discord_notification"]["status"], "skipped")
 
+    def test_handle_server_error_preserves_diagnosis_when_discord_notification_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            with patch(
+                "trading_manager_tasks.agent_error_handler.notify_discord_for_error",
+                side_effect=RuntimeError("discord unavailable"),
+            ):
+                result = handle_server_error(
+                    source_component="server.test",
+                    summary="failure",
+                    output_root=tmp,
+                    call_agent=False,
+                    notify_discord=True,
+                    catalog_storage="jsonl",
+                )
+
+            diagnosis_path = Path(result["diagnosis_path"])
+            self.assertTrue(diagnosis_path.exists())
+            diagnosis = json.loads(diagnosis_path.read_text(encoding="utf-8"))
+            self.assertEqual(diagnosis["status"], "queued")
+            self.assertEqual(diagnosis["discord_notification"]["status"], "failed")
+            self.assertEqual(result["discord_notification"]["status"], "failed")
+
+    def test_handle_server_error_writes_failed_diagnosis_when_runner_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            with patch(
+                "trading_manager_tasks.agent_error_handler.call_agent_runner",
+                side_effect=RuntimeError("runner crashed"),
+            ):
+                result = handle_server_error(
+                    source_component="server.test",
+                    summary="failure",
+                    output_root=tmp,
+                    call_agent=True,
+                    runner_command="python3 runner.py",
+                    catalog_storage="jsonl",
+                )
+
+            diagnosis = json.loads(Path(result["diagnosis_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(diagnosis["status"], "agent_call_failed")
+            self.assertIn("runner crashed", diagnosis["stderr"])
+            self.assertEqual(diagnosis["discord_notification"]["status"], "skipped")
+
     def test_false_autocall_env_does_not_call_runner(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
