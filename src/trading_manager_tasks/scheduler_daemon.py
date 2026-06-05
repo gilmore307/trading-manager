@@ -1382,6 +1382,9 @@ def refresh_dashboard_read_models(
     if not enabled:
         return {"status": "disabled", "service_unit": service_unit}
     refresh_command = command or ("systemctl", "start", service_unit)
+    if os.environ.get("TRADING_MANAGER_DASHBOARD_REFRESH_NO_BLOCK", "").strip().lower() in {"1", "true", "yes", "on"}:
+        if tuple(refresh_command[:2]) == ("systemctl", "start"):
+            refresh_command = ("systemctl", "start", "--no-block", *refresh_command[2:])
     try:
         completed = subprocess.run(
             refresh_command,

@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 from trading_manager_tasks.scheduler import ResourceSnapshot, SchedulerConfig, SchedulerDecision
@@ -27,6 +28,7 @@ from trading_manager_tasks.scheduler_daemon import (
     load_daemon_state,
     model_worker_fold_state_path,
     next_month,
+    refresh_dashboard_read_models,
     release_daemon_lock,
     rolling_fold_months,
     run_daemon_loop,
@@ -1664,6 +1666,17 @@ class SchedulerDaemonTests(unittest.TestCase):
             )
 
             self.assertEqual(marker.read_text(encoding="utf-8"), "refreshed")
+
+    def test_dashboard_refresh_no_block_uses_systemctl_no_block(self):
+        with patch.dict(os.environ, {"TRADING_MANAGER_DASHBOARD_REFRESH_NO_BLOCK": "true"}), patch(
+            "trading_manager_tasks.scheduler_daemon.subprocess.run"
+        ) as run:
+            run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            result = refresh_dashboard_read_models(enabled=True, service_unit="refresh.service")
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(run.call_args.args[0], ("systemctl", "start", "--no-block", "refresh.service"))
 
 
 if __name__ == "__main__":
