@@ -12,6 +12,7 @@ from unittest.mock import patch
 from trading_manager_tasks.dashboard_read_models import (
     _agent_errors_for_task,
     _attach_task_error_context,
+    _close_global_nonblocking_agent_errors,
     _task_error_intervention_status,
     build_historical_task_progress_summary,
 )
@@ -81,6 +82,41 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(detail["agent_error_summary"][0]["dashboard_severity"], "notice")
         self.assertNotIn("repair_intervention_status", detail)
         self.assertEqual(detail.get("blockers", []), [])
+
+    def test_global_agent_errors_close_nonblocking_awaiting_retry(self):
+        agent_errors = [
+            {
+                "error_number": 3,
+                "error_ref": "ERR-000003",
+                "handling_status": "awaiting_retry",
+                "repair_status": "repaired",
+            },
+            {
+                "error_number": 4,
+                "error_ref": "ERR-000004",
+                "handling_status": "open",
+                "repair_status": "unknown",
+            },
+        ]
+        task_timeline = [
+            {
+                "detail": {
+                    "agent_error_summary": [
+                        {
+                            "error_ref": "ERR-000004",
+                            "handling_status": "open",
+                        }
+                    ]
+                }
+            }
+        ]
+
+        updated = _close_global_nonblocking_agent_errors(agent_errors, task_timeline)
+
+        by_ref = {row["error_ref"]: row for row in updated}
+        self.assertEqual(by_ref["ERR-000003"]["handling_status"], "closed")
+        self.assertEqual(by_ref["ERR-000003"]["dashboard_severity"], "notice")
+        self.assertEqual(by_ref["ERR-000004"]["handling_status"], "open")
 
     def _write_service_files(self, root: Path) -> tuple[Path, Path, Path]:
         service = root / "deploy" / "systemd" / "trading-manager-historical-scheduler.service"
@@ -2315,8 +2351,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         agent_errors = payload["chart_payload"]["agent_error_summary"]
         self.assertEqual(agent_errors[0]["runner_command"], "openclaw_agent")
         self.assertEqual(agent_errors[0]["repair_status"], "repaired")
-        self.assertEqual(agent_errors[0]["handling_status"], "awaiting_retry")
-        self.assertEqual(agent_errors[0]["dashboard_severity"], "warning")
+        self.assertEqual(agent_errors[0]["handling_status"], "closed")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
         self.assertEqual(agent_errors[0]["root_cause"], "type mismatch was repaired")
 
     def test_agent_error_summary_closes_repaired_stage_when_retry_is_not_applicable(self):

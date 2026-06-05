@@ -600,6 +600,34 @@ def _close_nonblocking_awaiting_retry_errors(agent_errors: list[dict[str, Any]])
     return updated_rows
 
 
+def _close_global_nonblocking_agent_errors(
+    agent_errors: list[dict[str, Any]],
+    task_timeline: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    blocking_refs: set[str] = set()
+    for task in task_timeline:
+        detail = task.get("detail")
+        if not isinstance(detail, Mapping):
+            continue
+        for row in detail.get("agent_error_summary") or []:
+            if not isinstance(row, Mapping):
+                continue
+            if str(row.get("handling_status") or "") in {"closed", "no_action_required"}:
+                continue
+            error_ref = str(row.get("error_ref") or "")
+            if error_ref:
+                blocking_refs.add(error_ref)
+    if not blocking_refs:
+        return _close_nonblocking_awaiting_retry_errors(agent_errors)
+    return [
+        _close_nonblocking_awaiting_retry_errors([row])[0]
+        if str(row.get("handling_status") or "") == "awaiting_retry"
+        and str(row.get("error_ref") or "") not in blocking_refs
+        else row
+        for row in agent_errors
+    ]
+
+
 def _compact_failure_register(rows: list[dict[str, Any]]) -> dict[str, Any]:
     status_counts: dict[str, int] = {}
     error_counts: dict[str, int] = {}
@@ -4104,6 +4132,7 @@ def build_historical_task_progress_summary(
         agent_errors=agent_error_summary,
         database_url=database_url,
     )
+    agent_error_summary = _close_global_nonblocking_agent_errors(agent_error_summary, task_timeline)
     internal_task_timeline = list(task_timeline)
     task_timeline = _sort_task_timeline(_project_public_task_facts(task_timeline))
     public_active_task = _public_active_task(status, task_timeline)
