@@ -552,6 +552,26 @@ def _failure_rows_for_task(rows: list[dict[str, Any]], task: Mapping[str, Any]) 
     ]
 
 
+def _agent_error_task_sort_key(row: Mapping[str, Any]) -> tuple[int, int]:
+    repair_status = str(row.get("repair_status") or "")
+    handling_status = str(row.get("handling_status") or "")
+    if repair_status == "queued":
+        priority = 0
+    elif handling_status == "open":
+        priority = 1
+    elif handling_status == "awaiting_retry":
+        priority = 2
+    elif handling_status == "closed":
+        priority = 4
+    else:
+        priority = 3
+    try:
+        error_number = int(row.get("error_number") or 0)
+    except (TypeError, ValueError):
+        error_number = 0
+    return priority, -error_number
+
+
 def _agent_errors_for_task(rows: list[dict[str, Any]], task: Mapping[str, Any]) -> list[dict[str, Any]]:
     matches: list[dict[str, Any]] = []
     for row in rows:
@@ -562,7 +582,7 @@ def _agent_errors_for_task(rows: list[dict[str, Any]], task: Mapping[str, Any]) 
         text = " ".join(str(row.get(field) or "") for field in ("summary", "error_scope", "root_cause"))
         if any(stage_id and stage_id in text for stage_id in _task_stage_ids(task)):
             matches.append(row)
-    return matches
+    return sorted(matches, key=_agent_error_task_sort_key)
 
 
 def _compact_failure_register(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -616,7 +636,9 @@ def _task_error_intervention_status(
         if open_errors:
             if any(str(row.get("repair_status") or "") == "queued" for row in open_errors):
                 return "agent_diagnosis_queued"
-            if any(str(row.get("handling_status") or "") == "awaiting_retry" for row in open_errors):
+            if any(str(row.get("handling_status") or "") == "open" for row in open_errors):
+                return "agent_diagnosis_open"
+            if all(str(row.get("handling_status") or "") == "awaiting_retry" for row in open_errors):
                 return "repair_completed_awaiting_retry"
             return "agent_diagnosis_open"
         return "agent_diagnosis_closed"

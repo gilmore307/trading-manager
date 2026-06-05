@@ -9,12 +9,49 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from trading_manager_tasks.dashboard_read_models import build_historical_task_progress_summary
+from trading_manager_tasks.dashboard_read_models import (
+    _agent_errors_for_task,
+    _task_error_intervention_status,
+    build_historical_task_progress_summary,
+)
 from trading_manager_tasks.scheduler_status import collect_historical_scheduler_status
 from trading_manager_tasks.task_progress import write_task_progress_node
 
 
 class DashboardReadModelProducerTests(unittest.TestCase):
+    def test_task_error_intervention_prioritizes_open_diagnosis_over_awaiting_retry(self):
+        status = _task_error_intervention_status(
+            task={},
+            failure_rows=[],
+            agent_errors=[
+                {"handling_status": "awaiting_retry", "repair_status": "repaired"},
+                {"handling_status": "open", "repair_status": "unknown"},
+            ],
+        )
+
+        self.assertEqual(status, "agent_diagnosis_open")
+
+    def test_task_agent_errors_sort_open_before_awaiting_retry(self):
+        rows = [
+            {
+                "error_number": 3,
+                "handling_status": "awaiting_retry",
+                "repair_status": "repaired",
+                "summary": "model training stage layer_09_option_expression.data_acquisition command returned non-zero status",
+            },
+            {
+                "error_number": 6,
+                "handling_status": "open",
+                "repair_status": "unknown",
+                "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests requiring agent review",
+            },
+        ]
+        task = {"task_id": "layer_09_option_expression", "detail": {"active_stage_id": "layer_09_option_expression.data_acquisition"}}
+
+        ordered = _agent_errors_for_task(rows, task)
+
+        self.assertEqual([row["error_number"] for row in ordered], [6, 3])
+
     def _write_service_files(self, root: Path) -> tuple[Path, Path, Path]:
         service = root / "deploy" / "systemd" / "trading-manager-historical-scheduler.service"
         env = root / "deploy" / "systemd" / "trading-manager-historical-scheduler.env"
