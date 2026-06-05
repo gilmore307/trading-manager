@@ -880,6 +880,37 @@ def _public_active_task_summary(task: Mapping[str, Any] | None) -> dict[str, Any
     }
 
 
+def _public_task_identity(task: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        str(task.get("task_id") or ""),
+        str(task.get("month") or ""),
+        str(task.get("target_symbol") or ""),
+        str(task.get("worker_id") or ""),
+    )
+
+
+def _mark_active_task_running(
+    status: HistoricalSchedulerStatus,
+    task_timeline: list[dict[str, Any]],
+    public_active_task: dict[str, Any] | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    if status.lock.status != "active" or public_active_task is None:
+        return task_timeline, public_active_task
+    if status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
+        return task_timeline, public_active_task
+    if str(public_active_task.get("task_state") or "") != "current":
+        return task_timeline, public_active_task
+    if str(public_active_task.get("status") or "") != "ready":
+        return task_timeline, public_active_task
+    active_key = _public_task_identity(public_active_task)
+    running_task = {**public_active_task, "status": "running"}
+    updated_timeline = [
+        {**task, "status": "running"} if _public_task_identity(task) == active_key else task
+        for task in task_timeline
+    ]
+    return updated_timeline, running_task
+
+
 def _public_current_period(status: HistoricalSchedulerStatus, public_active_task: Mapping[str, Any] | None) -> str | None:
     if public_active_task is not None:
         value = public_active_task.get("month")
@@ -4076,6 +4107,7 @@ def build_historical_task_progress_summary(
     internal_task_timeline = list(task_timeline)
     task_timeline = _sort_task_timeline(_project_public_task_facts(task_timeline))
     public_active_task = _public_active_task(status, task_timeline)
+    task_timeline, public_active_task = _mark_active_task_running(status, task_timeline, public_active_task)
     if not stage_counts and task_timeline:
         for task in task_timeline:
             task_status = str(task.get("status") or "unknown")

@@ -854,7 +854,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:21:00Z")
 
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
-        self.assertEqual(replay_task["status"], "ready")
+        self.assertEqual(replay_task["status"], "running")
         self.assertEqual(replay_task["task_state"], "current")
         self.assertEqual(replay_task["detail"]["blockers"], [])
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
