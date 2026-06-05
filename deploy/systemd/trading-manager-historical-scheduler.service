@@ -23,7 +23,7 @@ Environment=TRADING_MANAGER_DASHBOARD_REFRESH_TRIGGER_TIMEOUT_SECONDS=5
 Environment=TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=false
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=-/etc/default/trading-manager-historical-scheduler
-ExecStart=/usr/bin/python3 /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py \
+ExecStart=/root/projects/trading-manager/.venv/bin/python /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py \
   --start-month ${TRADING_MANAGER_HISTORICAL_START_MONTH} \
   --end-month ${TRADING_MANAGER_HISTORICAL_END_MONTH} \
   --interval-seconds ${TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS} \
