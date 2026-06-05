@@ -488,6 +488,38 @@ def _run_id(request_id: str) -> str:
     return f"{request_id}_provider_{stamp}"
 
 
+def _batch_run_id(*, worker_slot: int) -> str:
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return f"layer9_option_batch_w{worker_slot}_{stamp}"
+
+
+def _chunk_rows(rows: Sequence[Mapping[str, Any]], *, chunk_count: int) -> list[list[Mapping[str, Any]]]:
+    if chunk_count <= 1:
+        return [list(rows)] if rows else []
+    chunks: list[list[Mapping[str, Any]]] = [[] for _ in range(chunk_count)]
+    for index, row in enumerate(rows):
+        chunks[index % chunk_count].append(row)
+    return [chunk for chunk in chunks if chunk]
+
+
+def _parse_batch_result(stdout: str) -> dict[str, Any]:
+    text = stdout.strip()
+    if not text:
+        return {}
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end < start:
+            return {}
+        try:
+            payload = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def dispatch_layer_nine_option_acquisition(
     *,
     start_month: str,
@@ -516,7 +548,7 @@ def dispatch_layer_nine_option_acquisition(
         max_workers=max_workers,
     )
 
-    def dispatch_one(row: Mapping[str, Any], *, worker_slot: int) -> ProviderDispatchItem:
+    def prepare_item(row: Mapping[str, Any], *, worker_slot: int) -> tuple[ProviderDispatchItem, Path | None]:
         request_id = str(row["request_id"])
         source_path = storage_root / str(row["parameter_ref"]).removeprefix("storage://trading-manager/")
         if not source_path.exists():
@@ -530,58 +562,121 @@ def dispatch_layer_nine_option_acquisition(
             runtime_task_key.write_text(json.dumps(_runtime_task_key(task_key), indent=2, sort_keys=True) + "\n", encoding="utf-8")
             command_path = runtime_task_key
             runtime_retained = True
-        command = ["python3", "-m", "data_source.m09_option_expression_data_acquisition", str(command_path), "--run-id", _run_id(request_id)]
+        command = [sys.executable, "-m", "data_source.m09_option_expression_data_acquisition", str(command_path), "--run-id", _run_id(request_id)]
         receipt_path = str(Path(str(task_key.get("output_root") or "")) / "completion_receipt.json")
-        status = "validated_not_dispatched"
-        return_code = None
-        error_tail = None
-        if execute_provider_calls:
-            result = subprocess.run(
-                command,
-                cwd=trading_data_root,
-                env={**os.environ, "PYTHONPATH": str(trading_data_root / "src")},
-                check=False,
-                text=True,
-                capture_output=True,
-            )
-            return_code = result.returncode
-            status = "dispatched_succeeded" if result.returncode == 0 else "dispatched_failed"
-            error_tail = "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part) if result.returncode != 0 else None
-            if result.returncode == 0:
-                try:
-                    runtime_task_key.unlink()
-                    runtime_retained = False
-                except FileNotFoundError:
-                    runtime_retained = False
-            if result.returncode != 0 and not continue_on_error:
-                raise TaskSystemError(f"Layer 9 option source dispatch failed for {request_id}: {error_tail}")
-        return ProviderDispatchItem(
+        item = ProviderDispatchItem(
             request_id=request_id,
             task_key_path=str(source_path),
             runtime_task_key_path=str(runtime_task_key) if execute_provider_calls and runtime_retained else None,
             runtime_task_key_retained=runtime_retained,
             command=command,
             receipt_path=receipt_path,
-            status=status,
+            status="validated_not_dispatched",
             worker_id=f"provider-worker-{worker_slot}",
             worker_slot=worker_slot,
-            return_code=return_code,
-            error_summary=error_tail,
         )
+        return item, command_path if execute_provider_calls else None
+
+    def dispatch_batch(batch_rows: Sequence[Mapping[str, Any]], *, worker_slot: int) -> list[ProviderDispatchItem]:
+        prepared = [prepare_item(row, worker_slot=worker_slot) for row in batch_rows]
+        if not execute_provider_calls:
+            return [item for item, _path in prepared]
+        runtime_paths = [path for _item, path in prepared if path is not None]
+        batch_id = _batch_run_id(worker_slot=worker_slot)
+        manifest_path = storage_root / "runtime" / "provider_task_key_batches" / STAGE_ID.replace(".", "__") / f"{batch_id}.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "manager_provider_task_key_batch",
+                    "stage_id": STAGE_ID,
+                    "batch_run_id": batch_id,
+                    "task_key_paths": [str(path) for path in runtime_paths],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        command = [
+            sys.executable,
+            "-m",
+            "data_source.m09_option_expression_data_acquisition",
+            "--task-key-manifest",
+            str(manifest_path),
+            "--batch-run-id",
+            batch_id,
+        ]
+        if continue_on_error:
+            command.append("--continue-on-error")
+        result = subprocess.run(
+            command,
+            cwd=trading_data_root,
+            env={**os.environ, "PYTHONPATH": str(trading_data_root / "src")},
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        batch_result = _parse_batch_result(result.stdout)
+        by_task_id = {
+            str(item.get("task_id") or ""): item
+            for item in batch_result.get("items", [])
+            if isinstance(item, Mapping)
+        }
+        updated: list[ProviderDispatchItem] = []
+        for item, runtime_path in prepared:
+            task_key = json.loads(Path(item.runtime_task_key_path or item.task_key_path).read_text(encoding="utf-8"))
+            task_status = str(by_task_id.get(str(task_key.get("task_id") or ""), {}).get("status") or "")
+            succeeded = task_status == "succeeded"
+            item_status = "dispatched_succeeded" if succeeded else "dispatched_failed"
+            runtime_retained = bool(item.runtime_task_key_retained)
+            runtime_key_path = item.runtime_task_key_path
+            if succeeded and runtime_path is not None:
+                try:
+                    runtime_path.unlink()
+                    runtime_retained = False
+                    runtime_key_path = None
+                except FileNotFoundError:
+                    runtime_retained = False
+                    runtime_key_path = None
+            error_tail = None if succeeded else "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part)
+            updated.append(
+                ProviderDispatchItem(
+                    request_id=item.request_id,
+                    task_key_path=item.task_key_path,
+                    runtime_task_key_path=runtime_key_path,
+                    runtime_task_key_retained=runtime_retained,
+                    command=command,
+                    receipt_path=item.receipt_path,
+                    status=item_status,
+                    worker_id=item.worker_id,
+                    worker_slot=item.worker_slot,
+                    return_code=result.returncode,
+                    error_summary=error_tail,
+                )
+            )
+        if result.returncode != 0 and not continue_on_error:
+            raise TaskSystemError(f"Layer 9 option source batch dispatch failed for worker {worker_slot}: {result.stderr[-500:] or result.stdout[-500:]}")
+        return updated
 
     items: list[ProviderDispatchItem] = []
-    if worker_selection.selected_worker_count > 1:
-        by_id: dict[str, ProviderDispatchItem] = {}
+    worker_count = max(1, worker_selection.selected_worker_count)
+    batches = _chunk_rows(rows, chunk_count=worker_count)
+    if len(batches) > 1:
+        by_id: dict[str, list[ProviderDispatchItem]] = {}
         with ThreadPoolExecutor(max_workers=worker_selection.selected_worker_count) as executor:
             futures = {
-                executor.submit(dispatch_one, row, worker_slot=(index % worker_selection.selected_worker_count) + 1): str(row["request_id"])
-                for index, row in enumerate(rows)
+                executor.submit(dispatch_batch, batch, worker_slot=index + 1): str(index)
+                for index, batch in enumerate(batches)
             }
             for future in as_completed(futures):
                 by_id[futures[future]] = future.result()
-        items.extend(by_id[str(row["request_id"])] for row in rows)
+        for index in range(len(batches)):
+            items.extend(by_id[str(index)])
     else:
-        items.extend(dispatch_one(row, worker_slot=1) for row in rows)
+        for batch in batches:
+            items.extend(dispatch_batch(batch, worker_slot=1))
     dispatch_count = sum(1 for item in items if item.status in {"dispatched_succeeded", "dispatched_failed"})
     return ProviderDispatchSummary(
         contract_type="manager_provider_dispatch_summary",

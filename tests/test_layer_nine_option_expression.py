@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 import inspect
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from trading_manager_tasks.layer_nine_option_expression import (
@@ -13,9 +15,11 @@ from trading_manager_tasks.layer_nine_option_expression import (
     _runtime_task_key,
     build_layer_nine_gate_review,
     fetch_layer_8_rows,
+    dispatch_layer_nine_option_acquisition,
     main,
     manager_requests_from_gate_review,
     request_previews_from_layer_8_rows,
+    write_layer_nine_task_keys,
     write_gate_review_artifacts,
 )
 
@@ -168,6 +172,77 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(controls["allowed_endpoint_families"], ["option_selection_snapshot"])
         self.assertEqual(runtime_key["params"]["timeout_seconds"], 120)
         self.assertFalse(runtime_key["params"]["manager_dry_run"])
+
+    def test_layer_nine_dispatch_batches_task_keys_into_one_worker_process(self) -> None:
+        rows = [
+            {
+                "target_candidate_id": "tcand_001",
+                "underlying": "AAPL",
+                "available_time": "2016-01-05T09:30:00-05:00",
+                "action_type": "no_trade",
+                "action_side": "none",
+            },
+            {
+                "target_candidate_id": "tcand_002",
+                "underlying": "AAPL",
+                "available_time": "2016-01-05T09:31:00-05:00",
+                "action_type": "open_long",
+                "action_side": "long",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            review = build_layer_nine_gate_review(start_month="2016-01", end_month="2016-01", layer_8_rows=rows)
+            requests = manager_requests_from_gate_review(
+                review,
+                storage_root=tmp,
+                source_output_root=tmp / "source",
+            )
+            write_layer_nine_task_keys(requests)
+            persisted_requests = tuple({key: value for key, value in request.items() if not key.startswith("_")} for request in requests)
+            captured_commands = []
+
+            def fake_run(command, **_kwargs):
+                captured_commands.append(command)
+                manifest_path = Path(command[command.index("--task-key-manifest") + 1])
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                items = []
+                for task_key_path in manifest["task_key_paths"]:
+                    task_key = json.loads(Path(task_key_path).read_text(encoding="utf-8"))
+                    items.append({"task_id": task_key["task_id"], "status": "succeeded"})
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=json.dumps(
+                        {
+                            "contract_type": "m09_option_expression_data_acquisition_batch_result",
+                            "batch_run_id": manifest["batch_run_id"],
+                            "task_count": len(items),
+                            "succeeded_count": len(items),
+                            "failed_count": 0,
+                            "items": items,
+                        }
+                    ),
+                    stderr="",
+                )
+
+            with patch("trading_manager_tasks.layer_nine_option_expression.fetch_manager_requests", return_value=persisted_requests):
+                with patch("trading_manager_tasks.layer_nine_option_expression.subprocess.run", side_effect=fake_run):
+                    summary = dispatch_layer_nine_option_acquisition(
+                        start_month="2016-01",
+                        end_month="2016-01",
+                        storage_root=tmp,
+                        trading_data_root=tmp,
+                        execute_provider_calls=True,
+                        dynamic_workers=False,
+                        max_workers=1,
+                    )
+
+        self.assertEqual(len(captured_commands), 1)
+        self.assertIn("--task-key-manifest", captured_commands[0])
+        self.assertEqual(summary.request_count, 2)
+        self.assertEqual(summary.dispatch_count, 2)
+        self.assertTrue(all(item.status == "dispatched_succeeded" for item in summary.items))
+        self.assertTrue(all(item.runtime_task_key_path is None for item in summary.items))
 
     def test_provider_ready_main_returns_success_for_training_eligible_no_trade_row(self) -> None:
         rows = [
