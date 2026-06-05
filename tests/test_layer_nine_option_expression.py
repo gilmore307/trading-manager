@@ -10,9 +10,11 @@ from unittest.mock import patch
 
 from trading_manager_tasks.layer_nine_option_expression import (
     STAGE_ID,
+    _runtime_task_key,
     build_layer_nine_gate_review,
     fetch_layer_8_rows,
     main,
+    manager_requests_from_gate_review,
     request_previews_from_layer_8_rows,
     write_gate_review_artifacts,
 )
@@ -79,6 +81,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(source_task["source"], "m09_option_expression_data_acquisition")
         self.assertEqual(source_task["params"]["strike_range"], 5)
         self.assertEqual(source_task["params"]["max_dte"], 45)
+        self.assertEqual(source_task["params"]["timeout_seconds"], 120)
         self.assertEqual(review.status, "provider_acquisition_ready")
         self.assertEqual(review.active_request_count, 1)
         self.assertEqual(review.recommended_next_action, "prepare_option_expression_acquisition")
@@ -118,6 +121,52 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
             self.assertIn('"active_layer_8_request_candidates": 1', receipt_text)
             self.assertIn('"provider_calls": 0', receipt_text)
             self.assertIn('"broker_execution_performed": false', receipt_text)
+
+    def test_layer_nine_manager_requests_authorize_thetadata_option_snapshot(self) -> None:
+        review = build_layer_nine_gate_review(
+            start_month="2016-01",
+            end_month="2016-01",
+            layer_8_rows=[
+                {
+                    "target_candidate_id": "tcand_active_abc123",
+                    "underlying": "AAPL",
+                    "available_time": "2016-01-05T09:30:00-05:00",
+                    "action_type": "open_long",
+                    "action_side": "long",
+                }
+            ],
+        )
+
+        request = manager_requests_from_gate_review(review)[0]
+        controls = request["_task_key"]["manager_controls"]
+
+        self.assertEqual(controls["allowed_providers"], ["thetadata"])
+        self.assertEqual(controls["allowed_endpoint_families"], ["option_selection_snapshot"])
+        self.assertEqual(controls["max_requests"], 4)
+        self.assertEqual(controls["max_symbols"], 1)
+        self.assertEqual(controls["max_time_window"], "1d")
+        self.assertEqual(controls["timeout_seconds"], 120)
+
+    def test_runtime_task_key_repairs_existing_layer_nine_policy_envelope(self) -> None:
+        runtime_key = _runtime_task_key(
+            {
+                "source": "m09_option_expression_data_acquisition",
+                "manager_controls": {
+                    "allow_live_provider_calls": True,
+                    "autonomous_historical_provider_acquisition": True,
+                    "stage_id": STAGE_ID,
+                    "start_month": "2016-01",
+                    "end_month": "2016-06",
+                },
+                "params": {"underlying": "AAPL", "snapshot_time": "2016-02-23 11:19:00-05:00"},
+            }
+        )
+
+        controls = runtime_key["manager_controls"]
+        self.assertEqual(controls["allowed_providers"], ["thetadata"])
+        self.assertEqual(controls["allowed_endpoint_families"], ["option_selection_snapshot"])
+        self.assertEqual(runtime_key["params"]["timeout_seconds"], 120)
+        self.assertFalse(runtime_key["params"]["manager_dry_run"])
 
     def test_active_provider_ready_main_returns_success(self) -> None:
         rows = [

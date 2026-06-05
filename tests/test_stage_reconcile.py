@@ -35,6 +35,37 @@ def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01", s
     return path
 
 
+def _write_retry_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01") -> Path:
+    path = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "runs": [
+                    {
+                        "run_id": f"run_{symbol.lower()}_{month.replace('-', '_')}_failed",
+                        "status": "failed",
+                        "started_at": "2026-05-10T00:00:00Z",
+                        "completed_at": "2026-05-10T00:00:01Z",
+                        "error": {"type": "ProviderPolicyError", "message": "provider not allowed: thetadata"},
+                    },
+                    {
+                        "run_id": f"run_{symbol.lower()}_{month.replace('-', '_')}_succeeded",
+                        "status": "succeeded",
+                        "started_at": "2026-05-10T00:01:00Z",
+                        "completed_at": "2026-05-10T00:01:01Z",
+                        "outputs": [f"storage/monthly_backfill/alpaca_bars/{symbol}/{month}/runs/run_2/saved/equity_bar.csv"],
+                        "row_counts": {"equity_bar": 10},
+                    },
+                ]
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 def _coverage() -> StageCoverageReport:
     return StageCoverageReport(
         contract_type="manager_stage_coverage",
@@ -139,6 +170,25 @@ class StageReconcileTests(unittest.TestCase):
         self.assertFalse(rows[0]["skip_future_matching"])
         self.assertIsNone(rows[0]["agent_review_ref"])
         self.assertIn("AlpacaBarsError", rows[0]["error_summary"])
+
+    def test_retried_receipt_with_latest_success_does_not_propose_stale_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            _write_retry_receipt(root, symbol="XLK")
+            refs = discover_stage_receipts(
+                stage_id="layer_02_sector_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+                component_storage_root=root,
+            )
+            rows = propose_failure_register_rows(
+                refs,
+                stage_id="layer_02_sector_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+            )
+
+        self.assertEqual(rows, ())
 
     def test_reconcile_can_write_failure_proposal_without_accepting_failure(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch(

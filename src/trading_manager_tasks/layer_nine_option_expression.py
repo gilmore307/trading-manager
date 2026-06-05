@@ -36,6 +36,16 @@ TARGET_COMPONENT_ID = "m09_option_expression_data_acquisition"
 OPTION_BUCKET_POLICY_REF = "LAYER_09_OPTION_BUCKET_STRIKE_POLICY"
 DEFAULT_OPTION_SNAPSHOT_MAX_DTE = 45
 DEFAULT_OPTION_SNAPSHOT_STRIKE_RANGE = 5
+OPTION_SNAPSHOT_PROVIDER_CONTROLS = {
+    "allowed_providers": ["thetadata"],
+    "allowed_endpoint_families": ["option_selection_snapshot"],
+    "max_requests": 4,
+    "max_symbols": 1,
+    "max_time_window": "1d",
+    "timeout_seconds": 120,
+    "retry_policy_ref": "layer_09_option_expression_source_acquisition_retry",
+    "rate_limit_policy_ref": "thetadata_terminal_local_rate_limit",
+}
 ACTIVE_ACTION_TYPES = {
     "increase_long",
     "decrease_long",
@@ -81,6 +91,7 @@ class LayerNineRequestPreview:
                 "max_dte": self.max_dte,
                 "strike_range": self.strike_range,
                 "option_bucket_policy_ref": self.option_bucket_policy_ref,
+                "timeout_seconds": OPTION_SNAPSHOT_PROVIDER_CONTROLS["timeout_seconds"],
             },
         }
         return row
@@ -353,6 +364,7 @@ def manager_requests_from_gate_review(
                     "stage_id": STAGE_ID,
                     "start_month": review.start_month,
                     "end_month": review.end_month,
+                    **OPTION_SNAPSHOT_PROVIDER_CONTROLS,
                 },
                 "policy_refs": ["autonomous_historical_provider_acquisition", "layer_09_option_expression_source_acquisition"],
             }
@@ -471,9 +483,12 @@ def _runtime_task_key(task_key: Mapping[str, Any]) -> dict[str, Any]:
     controls = dict(runtime_key.get("manager_controls") or {})
     controls["allow_live_provider_calls"] = True
     controls["autonomous_historical_provider_acquisition"] = True
+    for key, value in OPTION_SNAPSHOT_PROVIDER_CONTROLS.items():
+        controls.setdefault(key, value)
     runtime_key["manager_controls"] = controls
     params = dict(runtime_key.get("params") or {})
     params["manager_dry_run"] = False
+    params.setdefault("timeout_seconds", OPTION_SNAPSHOT_PROVIDER_CONTROLS["timeout_seconds"])
     runtime_key["params"] = params
     return runtime_key
 
