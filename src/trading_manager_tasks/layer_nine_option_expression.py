@@ -16,9 +16,10 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
+from zoneinfo import ZoneInfo
 
 from .control_plane import TaskSystemError, fetch_manager_requests, persist_manager_requests
 from .provider_dispatch import ProviderDispatchItem, ProviderDispatchSummary, select_provider_worker_count
@@ -35,6 +36,9 @@ TARGET_COMPONENT_ID = "m09_option_expression_data_acquisition"
 OPTION_BUCKET_POLICY_REF = "LAYER_09_OPTION_BUCKET_STRIKE_POLICY"
 DEFAULT_OPTION_SNAPSHOT_MAX_DTE = 45
 DEFAULT_OPTION_SNAPSHOT_STRIKE_RANGE = 5
+DEFAULT_OPTION_SNAPSHOT_WINDOW_MINUTES = 30
+DEFAULT_OPTION_PREFILTER_MIN_MID = 0.01
+ET = ZoneInfo("America/New_York")
 OPTION_SNAPSHOT_PROVIDER_CONTROLS = {
     "allowed_providers": ["thetadata"],
     "allowed_endpoint_families": ["option_selection_snapshot"],
@@ -55,6 +59,9 @@ class LayerNineRequestPreview:
     target_candidate_id: str
     underlying: str | None
     snapshot_time: str
+    window_start: str
+    window_end: str
+    eligible_minute_count: int
     underlying_action_plan_ref: str | None
     action_type: str
     action_side: str
@@ -75,10 +82,15 @@ class LayerNineRequestPreview:
             "params": {
                 "underlying": self.underlying,
                 "snapshot_time": self.snapshot_time,
+                "window_start": self.window_start,
+                "window_end": self.window_end,
                 "snapshot_type": self.snapshot_type,
                 "max_dte": self.max_dte,
                 "strike_range": self.strike_range,
                 "option_bucket_policy_ref": self.option_bucket_policy_ref,
+                "option_prefilter_enabled": True,
+                "option_prefilter_min_mid": DEFAULT_OPTION_PREFILTER_MIN_MID,
+                "include_trade_summary": True,
                 "timeout_seconds": OPTION_SNAPSHOT_PROVIDER_CONTROLS["timeout_seconds"],
                 "retry_attempts": OPTION_SNAPSHOT_PROVIDER_CONTROLS["retry_attempts"],
                 "retry_backoff_seconds": OPTION_SNAPSHOT_PROVIDER_CONTROLS["retry_backoff_seconds"],
@@ -178,24 +190,68 @@ def _is_training_eligible_layer_8_row(row: Mapping[str, Any]) -> bool:
     return bool(str(row.get("underlying") or "").strip() and _training_snapshot_time(row).strip())
 
 
-def request_previews_from_layer_8_rows(rows: Iterable[Mapping[str, Any]], *, start_month: str) -> tuple[LayerNineRequestPreview, ...]:
-    """Build ThetaData training request previews from eligible dense Layer 8 rows."""
+def _parse_training_time(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=ET)
+    return parsed.astimezone(ET)
 
-    previews: list[LayerNineRequestPreview] = []
-    seen: set[str] = set()
+
+def _window_bounds(value: str, *, window_minutes: int = DEFAULT_OPTION_SNAPSHOT_WINDOW_MINUTES) -> tuple[datetime, datetime]:
+    if window_minutes <= 0:
+        raise TaskSystemError("Layer 9 option snapshot window_minutes must be positive")
+    parsed = _parse_training_time(value)
+    minute = parsed.replace(second=0, microsecond=0)
+    slot = (minute.hour * 60 + minute.minute) // window_minutes
+    start_minutes = slot * window_minutes
+    start = minute.replace(hour=start_minutes // 60, minute=start_minutes % 60)
+    end = start + timedelta(minutes=window_minutes) - timedelta(milliseconds=1)
+    return start, end
+
+
+def _window_request_id(row: Mapping[str, Any], *, start_month: str, window_start: datetime, window_end: datetime) -> str:
+    underlying = str(row.get("underlying") or "unknown").lower()
+    start_token = _safe_token(window_start.isoformat())
+    end_token = _safe_token(window_end.isoformat())
+    return f"mgrreq_layer9_option_window_{underlying}_{start_month.replace('-', '_')}_{start_token}_{end_token}"
+
+
+def request_previews_from_layer_8_rows(
+    rows: Iterable[Mapping[str, Any]], *, start_month: str, window_minutes: int = DEFAULT_OPTION_SNAPSHOT_WINDOW_MINUTES
+) -> tuple[LayerNineRequestPreview, ...]:
+    """Build windowed ThetaData training request previews from eligible dense Layer 8 rows."""
+
+    grouped: dict[str, dict[str, Any]] = {}
     for row in rows:
         if not _is_training_eligible_layer_8_row(row):
             continue
-        request_id = _request_id(row, start_month=start_month)
-        if request_id in seen:
-            continue
-        seen.add(request_id)
+        snapshot_time = _training_snapshot_time(row)
+        window_start, window_end = _window_bounds(snapshot_time, window_minutes=window_minutes)
+        request_id = _window_request_id(row, start_month=start_month, window_start=window_start, window_end=window_end)
+        group = grouped.setdefault(
+            request_id,
+            {
+                "row": row,
+                "snapshot_time": window_start.isoformat(),
+                "window_start": window_start.isoformat(),
+                "window_end": window_end.isoformat(),
+                "eligible_minute_count": 0,
+            },
+        )
+        group["eligible_minute_count"] += 1
+
+    previews: list[LayerNineRequestPreview] = []
+    for request_id, group in sorted(grouped.items(), key=lambda item: item[0]):
+        row = group["row"]
         previews.append(
             LayerNineRequestPreview(
                 request_id=request_id,
                 target_candidate_id=str(row.get("target_candidate_id") or ""),
                 underlying=str(row.get("underlying")) if row.get("underlying") else None,
-                snapshot_time=_training_snapshot_time(row),
+                snapshot_time=str(group["snapshot_time"]),
+                window_start=str(group["window_start"]),
+                window_end=str(group["window_end"]),
+                eligible_minute_count=int(group["eligible_minute_count"]),
                 underlying_action_plan_ref=str(row.get("underlying_action_plan_ref")) if row.get("underlying_action_plan_ref") else None,
                 action_type=str(row.get("action_type") or ""),
                 action_side=str(row.get("action_side") or ""),
@@ -213,11 +269,15 @@ def build_layer_nine_gate_review(
     layer_8_rows: Sequence[Mapping[str, Any]],
     evidence_refs: Sequence[str] = (),
 ) -> LayerNineGateReview:
+    eligible_minute_count = sum(1 for row in layer_8_rows if _is_training_eligible_layer_8_row(row))
     previews = request_previews_from_layer_8_rows(layer_8_rows, start_month=start_month)
     if previews:
         status = "provider_acquisition_ready"
         reviewed_decision = "dense_training_minutes_ready_for_autonomous_option_acquisition"
-        reason = f"{len(previews)} dense Layer 8 minute rows are ready for autonomous ThetaData option snapshot acquisition before Layer 9 training/generation."
+        reason = (
+            f"{eligible_minute_count} dense Layer 8 minute rows are covered by {len(previews)} windowed ThetaData "
+            "option snapshot acquisition request(s) before Layer 9 training/generation."
+        )
         recommended_next_action = "prepare_option_expression_acquisition"
     else:
         status = "no_provider_skip_accepted"
@@ -232,7 +292,7 @@ def build_layer_nine_gate_review(
         status=status,
         reviewed_decision=reviewed_decision,
         total_layer_8_rows=len(layer_8_rows),
-        eligible_minute_count=len(previews),
+        eligible_minute_count=eligible_minute_count,
         training_request_count=len(previews),
         request_previews=previews,
         evidence_refs=tuple(evidence_refs),
