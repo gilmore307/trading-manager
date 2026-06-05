@@ -585,6 +585,21 @@ def _agent_errors_for_task(rows: list[dict[str, Any]], task: Mapping[str, Any]) 
     return sorted(matches, key=_agent_error_task_sort_key)
 
 
+def _close_nonblocking_awaiting_retry_errors(agent_errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    updated_rows: list[dict[str, Any]] = []
+    for row in agent_errors:
+        if str(row.get("handling_status") or "") != "awaiting_retry":
+            updated_rows.append(row)
+            continue
+        updated = dict(row)
+        updated["handling_status"] = "closed"
+        updated["dashboard_severity"] = "notice"
+        if not updated.get("retry_recommendation"):
+            updated["retry_recommendation"] = "Current task has no unresolved failures; retry no longer blocks dashboard state."
+        updated_rows.append(updated)
+    return updated_rows
+
+
 def _compact_failure_register(rows: list[dict[str, Any]]) -> dict[str, Any]:
     status_counts: dict[str, int] = {}
     error_counts: dict[str, int] = {}
@@ -663,6 +678,14 @@ def _attach_task_error_context(
         detail = dict(updated.get("detail") or {})
         task_failure_rows = _failure_rows_for_task(failure_rows, updated)
         task_agent_errors = _agent_errors_for_task(agent_errors, updated)
+        progress_failure_count = _task_progress_unreviewed_failures(updated)
+        register_review_count = _failure_register_review_required_count(task_failure_rows)
+        has_open_agent_error = any(
+            str(row.get("handling_status") or "") == "open" or str(row.get("repair_status") or "") == "queued"
+            for row in task_agent_errors
+        )
+        if task_agent_errors and not progress_failure_count and not register_review_count and not has_open_agent_error:
+            task_agent_errors = _close_nonblocking_awaiting_retry_errors(task_agent_errors)
         if task_failure_rows:
             detail["failure_register"] = _compact_failure_register(task_failure_rows)
         if task_agent_errors:
@@ -672,10 +695,10 @@ def _attach_task_error_context(
             failure_rows=task_failure_rows,
             agent_errors=task_agent_errors,
         )
+        if intervention_status == "agent_diagnosis_closed" and not progress_failure_count and not register_review_count:
+            intervention_status = None
         if intervention_status:
             detail["repair_intervention_status"] = intervention_status
-            progress_failure_count = _task_progress_unreviewed_failures(updated)
-            register_review_count = _failure_register_review_required_count(task_failure_rows)
             blockers = list(detail.get("blockers") or [])
             if intervention_status not in blockers and intervention_status != "agent_diagnosis_closed":
                 blockers.append(intervention_status)

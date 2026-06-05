@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from trading_manager_tasks.dashboard_read_models import (
     _agent_errors_for_task,
+    _attach_task_error_context,
     _task_error_intervention_status,
     build_historical_task_progress_summary,
 )
@@ -51,6 +52,35 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         ordered = _agent_errors_for_task(rows, task)
 
         self.assertEqual([row["error_number"] for row in ordered], [6, 3])
+
+    def test_task_error_context_closes_nonblocking_awaiting_retry(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            task = {
+                "task_id": "layer_09_option_expression",
+                "task_state": "current",
+                "status": "ready",
+                "detail": {
+                    "active_stage_id": "layer_09_option_expression.data_acquisition",
+                    "progress": {"failed_count": 0, "accepted_failed_count": 0},
+                },
+            }
+            rows = [
+                {
+                    "error_number": 3,
+                    "error_ref": "ERR-000003",
+                    "handling_status": "awaiting_retry",
+                    "repair_status": "repaired",
+                    "summary": "model training stage layer_09_option_expression.data_acquisition command returned non-zero status",
+                }
+            ]
+
+            updated = _attach_task_error_context([task], storage_root=Path(raw_tmp), agent_errors=rows)
+
+        detail = updated[0]["detail"]
+        self.assertEqual(detail["agent_error_summary"][0]["handling_status"], "closed")
+        self.assertEqual(detail["agent_error_summary"][0]["dashboard_severity"], "notice")
+        self.assertNotIn("repair_intervention_status", detail)
+        self.assertEqual(detail.get("blockers", []), [])
 
     def _write_service_files(self, root: Path) -> tuple[Path, Path, Path]:
         service = root / "deploy" / "systemd" / "trading-manager-historical-scheduler.service"
