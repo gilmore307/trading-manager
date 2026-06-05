@@ -1265,6 +1265,85 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["pending_count"], 6)
         self.assertIn("six-month fold", progress["progress_basis"])
 
+    def test_reset_fold_waits_for_monthly_foundation_instead_of_showing_ready(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_02_sector_context.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 2,
+                                "layer_key": "layer_02_sector_context",
+                                "status": "ready",
+                                "last_reason": (
+                                    "rerun reset from layer_02.data_acquisition: Layer 2 sector-context "
+                                    "contract changed; reset AAPL fold Layer 2 and downstream generated workflow state."
+                                ),
+                                "dataset_unit": {
+                                    "unit_kind": "six_month_panel",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": False,
+                                },
+                            },
+                            {
+                                "stage_id": "layer_02_sector_context.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 2,
+                                "layer_key": "layer_02_sector_context",
+                                "status": "blocked",
+                                "blockers": ["layer_02_sector_context.data_acquisition_complete"],
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T09:15:00Z")
+
+        task = next(
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if task["month"] == "2016-fold1" and task["task_id"] == "layer_02_sector_context"
+        )
+        progress = task["detail"]["progress"]
+        self.assertEqual(task["task_state"], "future")
+        self.assertEqual(task["status"], "blocked")
+        self.assertGreaterEqual(task["blocker_count"], 1)
+        self.assertTrue(
+            any("monthly foundation catch-up" in blocker for blocker in task["detail"]["blockers"]),
+            task["detail"]["blockers"],
+        )
+        self.assertEqual(progress["progress_source"], "monthly_foundation_catch_up")
+        self.assertEqual(progress["unit_label"], "foundation months")
+        self.assertEqual(progress["expected_count"], 6)
+        self.assertEqual(progress["ready_count"], 0)
+        self.assertEqual(progress["pending_count"], 6)
+
     def test_task_timeline_exposes_target_and_instrument_scope(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

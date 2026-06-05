@@ -1549,6 +1549,104 @@ def _is_fold_worker_stage(raw_stage: Mapping[str, Any]) -> bool:
     return str(raw_stage.get("stage_type") or "") in FOLD_MODEL_STAGE_TYPES
 
 
+def _workflow_payload_foundation_catch_up_complete(payload: Mapping[str, Any]) -> bool:
+    stages = payload.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return False
+    required = {
+        (layer, stage_type)
+        for layer in MONTHLY_SUBSTRATE_LAYERS
+        for stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES
+    }
+    satisfied: set[tuple[int, str]] = set()
+    for stage in stages:
+        if not isinstance(stage, Mapping):
+            continue
+        try:
+            layer = int(stage.get("layer"))
+        except (TypeError, ValueError):
+            continue
+        stage_type = str(stage.get("stage_type") or "")
+        if (layer, stage_type) in required and stage.get("status") in {"succeeded", "not_applicable"}:
+            satisfied.add((layer, stage_type))
+    return required <= satisfied
+
+
+def _reset_fold_waits_for_monthly_foundation(raw_stages: list[Any]) -> bool:
+    for raw_stage in raw_stages:
+        if not isinstance(raw_stage, Mapping):
+            continue
+        reason = str(raw_stage.get("last_reason") or "")
+        if reason.startswith("rerun reset from layer_"):
+            return True
+    return False
+
+
+def _fold_foundation_hold_progress(
+    *,
+    storage_root: Path,
+    fold_key: str,
+    raw_stages: list[Any],
+) -> dict[str, Any] | None:
+    if not _reset_fold_waits_for_monthly_foundation(raw_stages):
+        return None
+    months = _child_partitions_for_period(fold_key)
+    if not months:
+        return None
+    ready_months = [
+        month
+        for month in months
+        if (payload := _workflow_state_payload(storage_root, month)) is not None
+        and _workflow_payload_foundation_catch_up_complete(payload)
+    ]
+    if len(ready_months) == len(months):
+        return None
+    missing_months = [month for month in months if month not in set(ready_months)]
+    return {
+        "stage_id": "monthly_foundation_catch_up",
+        "status": "blocked",
+        "unit_label": "foundation months",
+        "expected_count": len(months),
+        "ready_count": len(ready_months),
+        "pending_count": len(missing_months),
+        "failed_count": 0,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": False,
+        "progress_source": "monthly_foundation_catch_up",
+        "progress_basis": "monthly Layer 1/2 foundation must be rebuilt before reset fold workers resume",
+        "ready_months": ready_months,
+        "missing_months": missing_months,
+    }
+
+
+def _apply_fold_foundation_hold(raw_stages: list[Any], progress: Mapping[str, Any] | None) -> list[Any]:
+    if progress is None:
+        return raw_stages
+    missing_months = progress.get("missing_months")
+    if isinstance(missing_months, list) and missing_months:
+        missing_text = ", ".join(str(month) for month in missing_months[:6])
+    else:
+        missing_text = "unknown"
+    held: list[Any] = []
+    for raw_stage in raw_stages:
+        if not isinstance(raw_stage, Mapping) or str(raw_stage.get("status") or "") in {"succeeded", "not_applicable"}:
+            held.append(raw_stage)
+            continue
+        blockers = list(raw_stage.get("blockers") or [])
+        if "monthly_foundation_catch_up_complete" not in blockers:
+            blockers.append("monthly_foundation_catch_up_complete")
+        held.append(
+            {
+                **raw_stage,
+                "status": "blocked",
+                "blockers": blockers,
+                "last_reason": f"waiting for monthly foundation catch-up before fold rerun resumes; missing months: {missing_text}",
+                "dashboard_progress": dict(progress),
+            }
+        )
+    return held
+
+
 def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
     """Expose fold-scoped model-worker stages to Tasks."""
 
@@ -1678,6 +1776,12 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
         dataset_unit = active_stage.get("dataset_unit")
         if not isinstance(dataset_unit, Mapping):
             dataset_unit = first_stage.get("dataset_unit")
+        active_dashboard_progress = (
+            dict(active_stage["dashboard_progress"])
+            if isinstance(active_stage.get("dashboard_progress"), Mapping)
+            and active_stage["dashboard_progress"].get("progress_source") == "monthly_foundation_catch_up"
+            else None
+        )
         row = dict(active_stage)
         row.update(
             {
@@ -1699,7 +1803,7 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
                 "model_name": MODEL_NAME_BY_LAYER_KEY.get(layer_key),
                 "model_display_name": _spaced_model_name(MODEL_NAME_BY_LAYER_KEY.get(layer_key) or ""),
                 "layer_label": f"Layer {layer}" if layer is not None else None,
-                "dashboard_progress": _model_task_progress(layer_key, stages, status),
+                "dashboard_progress": active_dashboard_progress or _model_task_progress(layer_key, stages, status),
                 "internal_stages": [
                     {
                         "stage_id": stage.get("stage_id"),
@@ -1977,6 +2081,12 @@ def _task_timeline(
             fold_key = _fold_period_label(fold_start, fold_end) if fold_start and fold_end else fold_path.stem
             if fold_end and not _month_visible_by_completed_cutoff(fold_end, max_month=max_dashboard_month):
                 continue
+            foundation_hold_progress = _fold_foundation_hold_progress(
+                storage_root=storage_root,
+                fold_key=fold_key,
+                raw_stages=raw_stages,
+            )
+            raw_stages = _apply_fold_foundation_hold(raw_stages, foundation_hold_progress)
             sourced_stages = [
                 {**stage, "__dashboard_period_source": "persisted_fold_state"} if isinstance(stage, Mapping) else stage
                 for stage in raw_stages
@@ -2182,6 +2292,12 @@ def _task_timeline(
                     if isinstance(dashboard_stage.get("dashboard_progress"), Mapping)
                     else None
                 )
+                if (
+                    progress is None
+                    and dashboard_progress is not None
+                    and dashboard_progress.get("progress_source") == "monthly_foundation_catch_up"
+                ):
+                    progress = dashboard_progress
                 if (
                     progress is not None
                     and dashboard_progress is not None
