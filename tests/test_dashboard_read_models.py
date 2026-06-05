@@ -439,6 +439,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertNotIn("layer_03_target_state_vector.model_evaluation", task_ids)
         self.assertIsNone(payload["chart_payload"]["active_stage"])
         self.assertIn("internal_active_stage", payload["chart_payload"])
+        self.assertIn("runtime_active_work", payload["chart_payload"])
 
 
     def test_non_owner_operational_items_are_ready_not_action_required(self):
@@ -1968,11 +1969,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "stage_id": "layer_09_option_expression.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
-                        "status": "failed",
+                        "status": "partial_ready",
                         "expected_count": 10,
                         "ready_count": 0,
-                        "pending_count": 9,
-                        "failed_count": 1,
+                        "pending_count": 10,
+                        "failed_count": 0,
                         "accepted_failed_count": 0,
                         "can_unlock_downstream": False,
                     }
@@ -2063,7 +2064,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
         self.assertEqual(task["status"], "review_required")
         self.assertEqual(task["task_state"], "current")
-        self.assertEqual(task["detail"]["progress"]["failed_count"], 1)
+        self.assertEqual(task["detail"]["progress"]["failed_count"], 0)
         self.assertEqual(task["detail"]["failure_register"]["agent_review_required_count"], 1)
         self.assertEqual(task["detail"]["agent_error_summary"][0]["error_ref"], "ERR-000009")
         self.assertEqual(task["detail"]["repair_intervention_status"], "agent_diagnosis_queued")
@@ -2634,6 +2635,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["severity"], "info")
         self.assertIn("Historical scheduler is running", payload["summary"])
         self.assertFalse(any(ref.get("issue_type") == "historical_workflow_blocked" for ref in payload["issue_refs"]))
+        self.assertEqual(payload["chart_payload"]["runtime_active_work"]["status"], "running")
+        self.assertEqual(
+            payload["chart_payload"]["runtime_active_work"]["stage_id"],
+            "layer_03_target_state_vector.feature_generation",
+        )
 
 
     def test_terminal_task_without_recorded_timing_is_not_backfilled_from_status_update(self):

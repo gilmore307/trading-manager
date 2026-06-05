@@ -601,6 +601,10 @@ def _task_progress_unreviewed_failures(task: Mapping[str, Any]) -> int:
     return max(failed - accepted, 0)
 
 
+def _failure_register_review_required_count(failure_rows: list[dict[str, Any]]) -> int:
+    return sum(1 for row in failure_rows if str(row.get("failure_status") or "") == "agent_review_required")
+
+
 def _task_error_intervention_status(
     *,
     task: Mapping[str, Any],
@@ -648,17 +652,33 @@ def _attach_task_error_context(
         )
         if intervention_status:
             detail["repair_intervention_status"] = intervention_status
+            progress_failure_count = _task_progress_unreviewed_failures(updated)
+            register_review_count = _failure_register_review_required_count(task_failure_rows)
             blockers = list(detail.get("blockers") or [])
             if intervention_status not in blockers and intervention_status != "agent_diagnosis_closed":
                 blockers.append(intervention_status)
+            if register_review_count and "failure_register_agent_review_required" not in blockers:
+                blockers.append("failure_register_agent_review_required")
+            elif progress_failure_count and "unreviewed_stage_failures" not in blockers:
+                blockers.append("unreviewed_stage_failures")
             detail["blockers"] = blockers
             updated["blocker_count"] = len(blockers)
-            if _task_progress_unreviewed_failures(updated) and str(updated.get("task_state") or "") not in {"completed", "skipped", "failed"}:
+            if (progress_failure_count or register_review_count) and str(updated.get("task_state") or "") not in {
+                "completed",
+                "skipped",
+                "failed",
+            }:
                 updated["task_state"] = "current"
                 updated["status"] = "review_required"
                 if not updated.get("reason"):
-                    count = _task_progress_unreviewed_failures(updated)
-                    updated["reason"] = f"{count} failed source-month request(s) require agent review before downstream unlock."
+                    if register_review_count:
+                        updated["reason"] = (
+                            f"{register_review_count} failure-register item(s) require agent review before downstream unlock."
+                        )
+                    else:
+                        updated["reason"] = (
+                            f"{progress_failure_count} failed source-month request(s) require agent review before downstream unlock."
+                        )
         updated["detail"] = detail
         updated_tasks.append(updated)
     return updated_tasks
@@ -702,6 +722,23 @@ def _is_transient_active_scheduler_backoff(status: HistoricalSchedulerStatus) ->
 
 
 def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[dict[str, Any]]) -> dict[str, Any] | None:
+    review_tasks: list[dict[str, Any]] = []
+    for task in task_timeline:
+        task_status = str(task.get("status") or "").lower()
+        detail = task.get("detail", {}) if isinstance(task.get("detail"), Mapping) else {}
+        progress = detail.get("progress", {}) if isinstance(detail, Mapping) else {}
+        failure_register = detail.get("failure_register", {}) if isinstance(detail, Mapping) else {}
+        register_review_count = (
+            int(failure_register.get("agent_review_required_count") or 0) if isinstance(failure_register, Mapping) else 0
+        )
+        if task_status == "review_required" and (progress.get("can_unlock_downstream") is False or register_review_count):
+            review_tasks.append(task)
+    if review_tasks:
+        for task in review_tasks:
+            if str(task.get("layer_key") or "") == "model_group":
+                return task
+        return review_tasks[0]
+
     current_tasks: list[dict[str, Any]] = []
     for task in task_timeline:
         if str(task.get("task_state") or "") == "current":
@@ -731,18 +768,31 @@ def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[d
             if str(task.get("layer_key") or "") != "model_group":
                 return task
         return ready_tasks[0]
-    review_tasks: list[dict[str, Any]] = []
-    for task in task_timeline:
-        task_status = str(task.get("status") or "").lower()
-        progress = task.get("detail", {}).get("progress", {}) if isinstance(task.get("detail"), Mapping) else {}
-        if task_status == "review_required" and progress.get("can_unlock_downstream") is False:
-            review_tasks.append(task)
-    if review_tasks:
-        for task in review_tasks:
-            if str(task.get("layer_key") or "") == "model_group":
-                return task
-        return review_tasks[0]
     return None
+
+
+def _runtime_active_work(status: HistoricalSchedulerStatus) -> dict[str, Any]:
+    latest_decision = status.latest_decision or {}
+    provider_status = status.provider_status or {}
+    selected_work = latest_decision.get("selected_work") or status.current_stage
+    next_internal_stage = latest_decision.get("next_internal_stage") or provider_status.get("next_internal_stage")
+    runtime_status = "ready"
+    if not status.service_runtime_ready:
+        runtime_status = "blocked"
+    elif status.lock.status == "active":
+        runtime_status = "running"
+    elif status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
+        runtime_status = "blocked"
+    return {
+        "month": latest_decision.get("start_month") or status.current_month,
+        "stage_id": selected_work,
+        "status": runtime_status,
+        "decision_status": latest_decision.get("decision_status"),
+        "reason_code": latest_decision.get("reason_code"),
+        "reason": latest_decision.get("reason") or status.blocked_reason,
+        "next_internal_stage": next_internal_stage,
+        "lock_status": status.lock.status,
+    }
 
 
 def _public_active_task_summary(task: Mapping[str, Any] | None) -> dict[str, Any] | None:
@@ -3972,6 +4022,7 @@ def build_historical_task_progress_summary(
         "current_month": _public_current_period(status, public_active_task),
         "active_stage": public_active_task.get("task_id") if public_active_task else None,
         "active_task": _public_active_task_summary(public_active_task),
+        "runtime_active_work": _runtime_active_work(status),
         "selected_target_symbol": selected_target_symbol,
         "target_queue": _target_queue_summary(storage_root),
         "internal_current_month": status.current_month,
