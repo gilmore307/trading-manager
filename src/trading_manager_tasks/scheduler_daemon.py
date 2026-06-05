@@ -843,14 +843,14 @@ def target_has_open_model_worker_fold(
             return False
         if selection.end_month > max_month:
             return False
-        return (
-            _first_missing_workflow_month(
-                storage_root=storage_root,
-                default_start_month="2016-01",
-                limit_month=previous_month(selection.start_month),
-            )
-            is None
-        )
+        if _first_missing_workflow_month(
+            storage_root=storage_root,
+            default_start_month="2016-01",
+            limit_month=previous_month(selection.start_month),
+        ) is None:
+            ready, _ = _model_worker_fold_is_ready(storage_root, selection.start_month)
+            return ready
+        return False
     for symbol in load_model_worker_target_queue(storage_root / "runtime" / "model_training_target_queue.json"):
         selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=symbol)
         if selection is None:
@@ -864,7 +864,7 @@ def target_has_open_model_worker_fold(
                 limit_month=previous_month(selection.start_month),
             )
             is None
-        ):
+        ) and _model_worker_fold_is_ready(storage_root, selection.start_month)[0]:
             return True
     runtime_root = storage_root / "runtime"
     if not runtime_root.exists():
@@ -884,6 +884,8 @@ def target_has_open_model_worker_fold(
                 default_start_month="2016-01",
                 limit_month=previous_month(start_month),
             ):
+                continue
+            if start_month and not _model_worker_fold_is_ready(storage_root, start_month)[0]:
                 continue
             return True
     return False
@@ -927,6 +929,9 @@ def select_model_worker_fold(
             default_start_month=default_start_month,
             limit_month=previous_month(open_selection.start_month),
         ):
+            return None
+        ready, _ = _model_worker_fold_is_ready(storage_root, open_selection.start_month)
+        if not ready:
             return None
         return open_selection
     known_months: set[str] = set()

@@ -811,6 +811,57 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.fold_id, "fold_2016-01_2016-06")
         self.assertEqual(selection.reason_code, "resume_open_model_worker_fold")
 
+    def test_model_worker_open_fold_waits_for_monthly_foundation_after_layer_two_reset(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01")[:-1]:
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            state_path = model_worker_fold_state_path(
+                "2016-01",
+                "2016-06",
+                root=storage_root / "runtime",
+                selected_target_symbol="AAPL",
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_02_sector_context.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 2,
+                                "layer_key": "layer_02_sector_context",
+                                "status": "ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            has_open_fold = select_month_ingest_worker_months(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                worker_count=3,
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertIsNone(selection)
+        self.assertEqual(has_open_fold[:1], ("2016-06",))
+        self.assertGreater(len(has_open_fold), 0)
+
     def test_model_worker_holds_blocked_fold_instead_of_selecting_next_ready_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
