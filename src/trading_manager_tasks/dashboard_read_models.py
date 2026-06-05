@@ -2192,9 +2192,12 @@ def _task_timeline(
                 continue
             current_lane_heads.add((task_month, stage_id))
             seen_ingest_workers.add(worker_id)
-    model_stage_sets = [
-        stage_set for stage_set in public_stage_sets if not active_model_fold_key or stage_set[0] == active_model_fold_key
-    ]
+    if current_lane_heads and not active_model_fold_key:
+        model_stage_sets = []
+    else:
+        model_stage_sets = [
+            stage_set for stage_set in public_stage_sets if not active_model_fold_key or stage_set[0] == active_model_fold_key
+        ]
     if active_model_fold_key and not model_stage_sets:
         model_stage_sets = public_stage_sets
     for timeline_month, raw_stages, _is_active_month in model_stage_sets:
