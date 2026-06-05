@@ -1635,6 +1635,21 @@ def _effective_dashboard_stage_status(raw_stage: Mapping[str, Any], timestamps: 
     return status
 
 
+def _progress_shows_incomplete_active_work(progress: Mapping[str, Any] | None) -> bool:
+    if not isinstance(progress, Mapping):
+        return False
+    status = str(progress.get("status") or "").lower()
+    if status in {"running", "partial_ready"}:
+        return True
+    try:
+        expected = int(progress.get("expected_count") or progress.get("expected_partition_count") or 0)
+        pending = int(progress.get("pending_count") or 0)
+        ready = int(progress.get("ready_count") or 0)
+    except (TypeError, ValueError):
+        return False
+    return expected > 0 and pending > 0 and ready > 0
+
+
 def _unresolved_dashboard_blockers(raw_stage: Mapping[str, Any], *, stage_status: str) -> list[str]:
     """Return operator-facing blockers, not the static dependency list."""
 
@@ -1937,6 +1952,26 @@ def _workflow_payload_foundation_catch_up_complete(payload: Mapping[str, Any]) -
     return required <= satisfied
 
 
+def _fold_payload_foundation_complete(raw_stages: list[Any]) -> bool:
+    required = {
+        (layer, stage_type)
+        for layer in MONTHLY_SUBSTRATE_LAYERS
+        for stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES
+    }
+    satisfied: set[tuple[int, str]] = set()
+    for stage in raw_stages:
+        if not isinstance(stage, Mapping):
+            continue
+        try:
+            layer = int(stage.get("layer"))
+        except (TypeError, ValueError):
+            continue
+        stage_type = str(stage.get("stage_type") or "")
+        if (layer, stage_type) in required and stage.get("status") in {"succeeded", "not_applicable"}:
+            satisfied.add((layer, stage_type))
+    return required <= satisfied
+
+
 def _reset_fold_waits_for_monthly_foundation(raw_stages: list[Any]) -> bool:
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
@@ -1954,6 +1989,8 @@ def _fold_foundation_hold_progress(
     raw_stages: list[Any],
 ) -> dict[str, Any] | None:
     if not _reset_fold_waits_for_monthly_foundation(raw_stages):
+        return None
+    if _fold_payload_foundation_complete(raw_stages):
         return None
     months = _child_partitions_for_period(fold_key)
     if not months:
@@ -2557,12 +2594,9 @@ def _task_timeline(
                 continue
             current_lane_heads.add((task_month, stage_id))
             seen_ingest_workers.add(worker_id)
-    if current_lane_heads and not active_model_fold_key:
-        model_stage_sets = []
-    else:
-        model_stage_sets = [
-            stage_set for stage_set in public_stage_sets if not active_model_fold_key or stage_set[0] == active_model_fold_key
-        ]
+    model_stage_sets = [
+        stage_set for stage_set in public_stage_sets if not active_model_fold_key or stage_set[0] == active_model_fold_key
+    ]
     if active_model_fold_key and not model_stage_sets:
         model_stage_sets = public_stage_sets
     for timeline_month, raw_stages, _is_active_month in model_stage_sets:
@@ -2697,6 +2731,15 @@ def _task_timeline(
                     progress = dashboard_progress
                 if progress is None:
                     progress = _task_status_progress(stage_id, stage_status)
+                display_status = stage_status
+                semantic_stage_type = str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "")
+                if (
+                    display_status == "ready"
+                    and task_state == "current"
+                    and semantic_stage_type == "data_acquisition"
+                    and _progress_shows_incomplete_active_work(progress if isinstance(progress, Mapping) else None)
+                ):
+                    display_status = "running"
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
                     "task_number": None,
@@ -2707,7 +2750,7 @@ def _task_timeline(
                     "task_id": stage_id,
                     "task_label": str(dashboard_stage.get("task_label") or _public_stage_name(stage_id, dashboard_stage.get("stage_type"))),
                     "task_state": task_state,
-                    "status": stage_status,
+                    "status": display_status,
                     "stage_type": dashboard_stage.get("stage_type"),
                     "layer": dashboard_stage.get("layer"),
                     "layer_key": dashboard_stage.get("layer_key"),

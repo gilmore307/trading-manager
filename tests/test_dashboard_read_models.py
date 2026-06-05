@@ -2277,6 +2277,148 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["detail"]["repair_intervention_status"], "provider_retry_required")
         self.assertIn("automatic retry", task["reason"])
 
+    def test_fold_model_task_remains_visible_while_month_lane_has_open_head(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\n"
+                "TRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_workflow_state_2016-01.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-01",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "layer_01_market_regime.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 1,
+                                "layer_key": "layer_01_market_regime",
+                                "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "layer_02_sector_context.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 2,
+                                "layer_key": "layer_02_sector_context",
+                                "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "layer_02_sector_context.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 2,
+                                "layer_key": "layer_02_sector_context",
+                                "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "layer_08_underlying_action.model_generation.test",
+                                "stage_type": "model_generation",
+                                "layer": 8,
+                                "layer_key": "layer_08_underlying_action",
+                                "status": "succeeded",
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": True,
+                                    "target_symbol": "AAPL",
+                                },
+                            },
+                            {
+                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 9,
+                                "layer_key": "layer_09_option_expression",
+                                "status": "ready",
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": True,
+                                    "target_symbol": "AAPL",
+                                },
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            coverage_root = runtime / "stage_coverage"
+            coverage_root.mkdir(parents=True, exist_ok=True)
+            (coverage_root / "layer_09_option_expression_data_acquisition_2016-01.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_stage_coverage",
+                        "stage_id": "layer_09_option_expression.data_acquisition",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "status": "partial_ready",
+                        "expected_count": 77837,
+                        "ready_count": 12,
+                        "pending_count": 77825,
+                        "failed_count": 0,
+                        "accepted_failed_count": 0,
+                        "can_unlock_downstream": False,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T16:55:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
+        self.assertEqual(task["task_state"], "current")
+        self.assertEqual(task["status"], "running")
+        self.assertEqual(task["detail"]["progress"]["progress_source"], "fold_stage_coverage")
+        self.assertEqual(task["detail"]["progress"]["expected_count"], 77837)
+        self.assertEqual(task["detail"]["progress"]["ready_count"], 12)
+
     def test_agent_error_summary_parses_openclaw_agent_final_json(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
