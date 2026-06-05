@@ -2136,6 +2136,110 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["detail"]["agent_error_summary"][0]["error_ref"], "ERR-000009")
         self.assertEqual(task["detail"]["repair_intervention_status"], "agent_diagnosis_queued")
 
+    def test_task_detail_surfaces_retry_required_provider_failures_without_review_required_status(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\n"
+                "TRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "stages": [
+                            {
+                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 9,
+                                "layer_key": "layer_09_option_expression",
+                                "status": "ready",
+                                "dataset_unit": {
+                                    "unit_kind": "six_month_target_fold",
+                                    "unit_months": 6,
+                                    "start_month": "2016-01",
+                                    "end_month": "2016-06",
+                                    "target_required": True,
+                                    "target_symbol": "AAPL",
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            coverage_root = runtime / "stage_coverage"
+            coverage_root.mkdir(parents=True, exist_ok=True)
+            (coverage_root / "layer_09_option_expression_data_acquisition_2016-01.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_stage_coverage",
+                        "stage_id": "layer_09_option_expression.data_acquisition",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "status": "partial_ready",
+                        "expected_count": 10,
+                        "ready_count": 1,
+                        "pending_count": 9,
+                        "failed_count": 0,
+                        "accepted_failed_count": 0,
+                        "can_unlock_downstream": False,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (coverage_root / "layer_09_option_expression_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_failure_register",
+                        "failure_id": "fail_layer9_thetadata_connection_refused",
+                        "request_id": "mgrreq_layer9_option_snapshot_aapl_2016_01",
+                        "run_id": "run_layer9_thetadata_connection_refused",
+                        "stage_id": "layer_09_option_expression.data_acquisition",
+                        "target_component_id": "m09_option_expression_data_acquisition",
+                        "source_id": "m09_option_expression_data_acquisition",
+                        "symbol": "AAPL",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "failure_status": "retry_required",
+                        "failure_kind": "provider_service_unavailable",
+                        "observed_status": "failed",
+                        "error_summary": "ThetaDataOptionSelectionSnapshotError: request failed before HTTP response: URLError: <urlopen error [Errno 111] Connection refused>",
+                        "skip_future_matching": False,
+                        "evidence_refs": ["storage://trading-data/layer_09/receipt.json"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T10:40:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
+        self.assertEqual(task["status"], "running")
+        self.assertEqual(task["task_state"], "current")
+        self.assertEqual(task["detail"]["failure_register"]["retry_required_count"], 1)
+        self.assertEqual(task["detail"]["failure_register"]["agent_review_required_count"], 0)
+        self.assertEqual(task["detail"]["repair_intervention_status"], "provider_retry_required")
+        self.assertIn("automatic retry", task["reason"])
+
     def test_agent_error_summary_parses_openclaw_agent_final_json(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

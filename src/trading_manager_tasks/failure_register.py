@@ -117,6 +117,48 @@ def persist_failure_register_rows(rows: Sequence[Mapping[str, Any]], *, database
         connection.commit()
 
 
+def mark_failure_register_requests_corrected(
+    *,
+    stage_id: str,
+    start_month: str,
+    end_month: str,
+    corrected_request_refs: Mapping[str, str],
+    database_url: str | None = None,
+) -> int:
+    """Mark stale failure-register rows corrected after latest receipts succeed."""
+
+    if not corrected_request_refs:
+        return 0
+    rows = fetch_failure_register_rows(
+        database_url=database_url,
+        stage_id=stage_id,
+        start_month=start_month,
+        end_month=end_month,
+    )
+    mutable_statuses = {"observed", "agent_review_required", "retry_required", "unresolved"}
+    corrected_rows: list[dict[str, Any]] = []
+    for row in rows:
+        request_id = str(row.get("request_id") or "")
+        correction_ref = corrected_request_refs.get(request_id)
+        if not correction_ref or str(row.get("failure_status") or "") not in mutable_statuses:
+            continue
+        evidence_refs = row.get("evidence_refs") or []
+        if isinstance(evidence_refs, str):
+            evidence_refs = [evidence_refs]
+        corrected_rows.append(
+            {
+                **row,
+                "failure_status": "corrected",
+                "agent_review_ref": "manager_provider_stage_reconcile:latest_receipt_succeeded",
+                "correction_ref": correction_ref,
+                "evidence_refs": [*evidence_refs, correction_ref],
+                "note": "Latest provider completion receipt succeeded; previous failure is retained as corrected and no longer blocks current stage progress.",
+            }
+        )
+    persist_failure_register_rows(corrected_rows, database_url=database_url)
+    return len(corrected_rows)
+
+
 def fetch_failure_register_rows(
     *,
     database_url: str | None = None,
@@ -213,6 +255,7 @@ __all__ = [
     "FAILURE_REGISTER_COLUMNS",
     "accepted_failure_request_ids_from_register",
     "fetch_failure_register_rows",
+    "mark_failure_register_requests_corrected",
     "persist_failure_register_rows",
     "validate_failure_register_row",
 ]

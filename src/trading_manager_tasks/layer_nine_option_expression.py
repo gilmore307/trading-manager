@@ -43,6 +43,8 @@ OPTION_SNAPSHOT_PROVIDER_CONTROLS = {
     "max_symbols": 1,
     "max_time_window": "1d",
     "timeout_seconds": 120,
+    "retry_attempts": 3,
+    "retry_backoff_seconds": 1.0,
     "retry_policy_ref": "layer_09_option_expression_source_acquisition_retry",
     "rate_limit_policy_ref": "thetadata_terminal_local_rate_limit",
 }
@@ -92,6 +94,8 @@ class LayerNineRequestPreview:
                 "strike_range": self.strike_range,
                 "option_bucket_policy_ref": self.option_bucket_policy_ref,
                 "timeout_seconds": OPTION_SNAPSHOT_PROVIDER_CONTROLS["timeout_seconds"],
+                "retry_attempts": OPTION_SNAPSHOT_PROVIDER_CONTROLS["retry_attempts"],
+                "retry_backoff_seconds": OPTION_SNAPSHOT_PROVIDER_CONTROLS["retry_backoff_seconds"],
             },
         }
         return row
@@ -489,6 +493,8 @@ def _runtime_task_key(task_key: Mapping[str, Any]) -> dict[str, Any]:
     params = dict(runtime_key.get("params") or {})
     params["manager_dry_run"] = False
     params.setdefault("timeout_seconds", OPTION_SNAPSHOT_PROVIDER_CONTROLS["timeout_seconds"])
+    params.setdefault("retry_attempts", OPTION_SNAPSHOT_PROVIDER_CONTROLS["retry_attempts"])
+    params.setdefault("retry_backoff_seconds", OPTION_SNAPSHOT_PROVIDER_CONTROLS["retry_backoff_seconds"])
     runtime_key["params"] = params
     return runtime_key
 
