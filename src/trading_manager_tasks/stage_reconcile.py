@@ -158,7 +158,7 @@ def discover_stage_receipts(
             if row.get("target_component_id") != OPTION_CHAIN_TARGET_COMPONENT_ID or row.get("request_kind") != OPTION_CHAIN_REQUEST_KIND:
                 continue
             request_id = str(row.get("request_id") or "")
-            if not request_id.startswith("mgrreq_option_chain_day_"):
+            if not request_id.startswith("mgrreq_option_chain_window_"):
                 continue
             text = " ".join(str(row.get(key) or "") for key in ("request_id", "parameter_ref"))
             if start_month not in text and end_month not in text:

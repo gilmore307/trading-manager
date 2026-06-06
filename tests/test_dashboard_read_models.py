@@ -2089,7 +2089,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_failure_register",
                         "failure_id": "fail_option_chain_provider_policy",
-                        "request_id": "mgrreq_option_chain_snapshot_aapl_2016_01",
+                        "request_id": "mgrreq_option_chain_window_aapl_2016_01_2016_01_05_0930",
                         "run_id": "run_option_chain_provider_policy",
                         "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                         "target_component_id": "option_chain_state_source",
@@ -2238,7 +2238,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_failure_register",
                         "failure_id": "fail_option_chain_thetadata_connection_refused",
-                        "request_id": "mgrreq_option_chain_snapshot_aapl_2016_01",
+                        "request_id": "mgrreq_option_chain_window_aapl_2016_01_2016_01_05_0930",
                         "run_id": "run_option_chain_thetadata_connection_refused",
                         "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                         "target_component_id": "option_chain_state_source",

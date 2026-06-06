@@ -244,12 +244,14 @@ class StageCoverageTests(unittest.TestCase):
         self.assertFalse(report.can_unlock_downstream)
         self.assertIn("0 ready + 1 reviewed failed/skip / 2", report.reason)
 
-    def test_option_chain_coverage_uses_shared_daily_requests_not_stale_layer_nine_snapshots(self):
-        day_request = "mgrreq_option_chain_day_aapl_2016_01_2016_01_05"
+    def test_option_chain_coverage_uses_shared_window_requests_not_stale_layer_nine_snapshots(self):
+        window_request = "mgrreq_option_chain_window_aapl_2016_01_2016_01_05_0930"
         stale_snapshot = "mgrreq_layer9_option_snapshot_aapl_2016_01_2016_01_05_09_30_00_05_00_old"
+        stale_day_request = "mgrreq_option_chain_day_aapl_2016_01_2016_01_05"
         rows = [
-            _option_chain_summary_row(day_request, ready=True),
+            _option_chain_summary_row(window_request, ready=True),
             _option_chain_summary_row(stale_snapshot, ready=True),
+            _option_chain_summary_row(stale_day_request, ready=True),
         ]
 
         report = summarize_stage_coverage_from_rows(
@@ -261,7 +263,7 @@ class StageCoverageTests(unittest.TestCase):
         )
 
         self.assertEqual(report.observed_count, 1)
-        self.assertEqual(report.ready_request_ids, (day_request,))
+        self.assertEqual(report.ready_request_ids, (window_request,))
         self.assertEqual(report.status, "ready")
 
     def test_partial_coverage_report_does_not_complete_workflow_stage(self):

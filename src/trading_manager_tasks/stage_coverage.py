@@ -98,7 +98,7 @@ def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, e
         if row.get("request_kind") != OPTION_CHAIN_REQUEST_KIND:
             return False
         request_id = str(row.get("request_id") or "")
-        if not request_id.startswith("mgrreq_option_chain_day_"):
+        if not request_id.startswith("mgrreq_option_chain_window_"):
             return False
         text = _row_text(row)
         return start_month in text or end_month in text

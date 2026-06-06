@@ -32,8 +32,9 @@ TARGET_COMPONENT_ID = SOURCE_ID
 REQUEST_KIND = "option_chain_snapshot"
 DEFAULT_SOURCE_OUTPUT_ROOT = data_storage_root() / "layer_03_target_state_vector" / SOURCE_ID
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
-DEFAULT_DAY_START_HOUR = 4
-DEFAULT_DAY_END_HOUR = 20
+DEFAULT_SESSION_START = time(9, 30)
+DEFAULT_SESSION_END = time(16, 0)
+DEFAULT_WINDOW_MINUTES = 30
 DEFAULT_MAX_DTE = 365
 DEFAULT_STRIKE_RANGE = 10
 DEFAULT_OPTION_BUCKET_POLICY_REF = "TARGET_OPTION_CHAIN_STATE_REDUCTION_POLICY"
@@ -41,7 +42,7 @@ OPTION_CHAIN_PROVIDER_CONTROLS = {
     "allowed_providers": ["thetadata"],
     "allowed_endpoint_families": ["option_selection_snapshot"],
     "max_symbols": 1,
-    "max_time_window": "1d",
+    "max_time_window": "30m",
     "timeout_seconds": 120,
     "retry_attempts": 3,
     "retry_backoff_seconds": 1.0,
@@ -53,7 +54,7 @@ ET = ZoneInfo("America/New_York")
 
 @dataclass(frozen=True)
 class OptionChainRequestPreview:
-    """One target-day shared option-chain source/cache request."""
+    """One bounded target-window shared option-chain source/cache request."""
 
     request_id: str
     underlying: str
@@ -220,8 +221,24 @@ def _safe_symbol(symbol: str | None) -> str:
     return value
 
 
-def _request_id(*, symbol: str, start_month: str, day: date) -> str:
-    return f"mgrreq_option_chain_day_{symbol.lower()}_{start_month.replace('-', '_')}_{day.isoformat().replace('-', '_')}"
+def _window_request_id(*, symbol: str, start_month: str, window_start: datetime) -> str:
+    return (
+        f"mgrreq_option_chain_window_{symbol.lower()}_{start_month.replace('-', '_')}_"
+        f"{window_start.date().isoformat().replace('-', '_')}_{window_start.strftime('%H%M')}"
+    )
+
+
+def iter_regular_session_windows(start_month: str, end_month: str, *, window_minutes: int = DEFAULT_WINDOW_MINUTES) -> Iterable[tuple[datetime, datetime]]:
+    if window_minutes <= 0:
+        raise TaskSystemError("window_minutes must be positive")
+    step = timedelta(minutes=window_minutes)
+    for day in iter_regular_trading_days(start_month, end_month):
+        window_start = datetime.combine(day, DEFAULT_SESSION_START, tzinfo=ET)
+        session_end = datetime.combine(day, DEFAULT_SESSION_END, tzinfo=ET)
+        while window_start < session_end:
+            window_end = min(window_start + step, session_end)
+            yield window_start, window_end
+            window_start = window_end
 
 
 def _task_key_path_for_request(request_id: str, *, start_month: str, storage_root: Path = DEFAULT_STORAGE_ROOT) -> Path:
@@ -239,12 +256,12 @@ def _source_output_root_for_request(request_id: str, *, start_month: str, source
 def request_previews_for_fold(*, start_month: str, end_month: str, target_symbol: str) -> tuple[OptionChainRequestPreview, ...]:
     symbol = _safe_symbol(target_symbol)
     previews: list[OptionChainRequestPreview] = []
-    for day in iter_regular_trading_days(start_month, end_month):
-        window_start = datetime.combine(day, time(DEFAULT_DAY_START_HOUR), tzinfo=ET).isoformat()
-        window_end = datetime.combine(day, time(DEFAULT_DAY_END_HOUR), tzinfo=ET).isoformat()
+    for window_start_dt, window_end_dt in iter_regular_session_windows(start_month, end_month):
+        window_start = window_start_dt.isoformat()
+        window_end = window_end_dt.isoformat()
         previews.append(
             OptionChainRequestPreview(
-                request_id=_request_id(symbol=symbol, start_month=start_month, day=day),
+                request_id=_window_request_id(symbol=symbol, start_month=start_month, window_start=window_start_dt),
                 underlying=symbol,
                 snapshot_time=window_start,
                 window_start=window_start,
@@ -266,7 +283,7 @@ def build_option_chain_source_review(*, start_month: str, end_month: str, target
         request_count=len(previews),
         request_previews=previews,
         evidence_refs=("calendar:manager_us_equity_regular_trading_days",),
-        reason=f"{len(previews)} target trading day(s) require shared ThetaData option-chain source/cache acquisition before Layer 3.",
+        reason=f"{len(previews)} regular-session 30-minute window(s) require shared ThetaData option-chain source/cache acquisition before Layer 3.",
     )
 
 
@@ -355,7 +372,7 @@ def _matches_request(row: Mapping[str, Any], *, start_month: str, end_month: str
     if row.get("target_component_id") != TARGET_COMPONENT_ID or row.get("request_kind") != REQUEST_KIND:
         return False
     request_id = str(row.get("request_id") or "")
-    if not request_id.startswith("mgrreq_option_chain_day_"):
+    if not request_id.startswith("mgrreq_option_chain_window_"):
         return False
     text = " ".join(str(row.get(key) or "") for key in ("request_id", "parameter_ref"))
     return start_month in text or end_month in text
