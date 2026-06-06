@@ -657,6 +657,9 @@ def dispatch_layer_nine_option_acquisition(
             item, command_path = prepared[0]
             if command_path is None:
                 return [item]
+            task_key = json.loads(command_path.read_text(encoding="utf-8"))
+            params = task_key.get("params") if isinstance(task_key.get("params"), Mapping) else {}
+            timeout_seconds = max(180, int(params.get("timeout_seconds") or OPTION_SNAPSHOT_PROVIDER_CONTROLS["timeout_seconds"]) + 60)
             command = [
                 sys.executable,
                 "-m",
@@ -665,15 +668,26 @@ def dispatch_layer_nine_option_acquisition(
                 "--run-id",
                 _run_id(item.request_id),
             ]
-            result = subprocess.run(
-                command,
-                cwd=trading_data_root,
-                env={**os.environ, "PYTHONPATH": str(trading_data_root / "src")},
-                check=False,
-                text=True,
-                capture_output=True,
-            )
-            succeeded = result.returncode == 0
+            try:
+                result = subprocess.run(
+                    command,
+                    cwd=trading_data_root,
+                    env={**os.environ, "PYTHONPATH": str(trading_data_root / "src")},
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                    timeout=timeout_seconds,
+                )
+                stdout = result.stdout
+                stderr = result.stderr
+                return_code = result.returncode
+                timed_out = False
+            except subprocess.TimeoutExpired as exc:
+                stdout = (exc.stdout or "") if isinstance(exc.stdout, str) else ""
+                stderr = (exc.stderr or "") if isinstance(exc.stderr, str) else ""
+                return_code = -1
+                timed_out = True
+            succeeded = return_code == 0
             runtime_retained = bool(item.runtime_task_key_retained)
             runtime_key_path = item.runtime_task_key_path
             if succeeded:
@@ -684,9 +698,17 @@ def dispatch_layer_nine_option_acquisition(
                 except FileNotFoundError:
                     runtime_retained = False
                     runtime_key_path = None
-            error_tail = None if succeeded else "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part)
-            if result.returncode != 0 and not continue_on_error:
-                raise TaskSystemError(f"Layer 9 option source dispatch failed for {item.request_id}: {result.stderr[-500:] or result.stdout[-500:]}")
+            error_tail = None if succeeded else "\n".join(
+                part
+                for part in (
+                    f"provider subprocess timed out after {timeout_seconds}s" if timed_out else "",
+                    stdout[-500:],
+                    stderr[-500:],
+                )
+                if part
+            )
+            if return_code != 0 and not continue_on_error:
+                raise TaskSystemError(f"Layer 9 option source dispatch failed for {item.request_id}: {stderr[-500:] or stdout[-500:] or error_tail}")
             return [
                 ProviderDispatchItem(
                     request_id=item.request_id,
@@ -698,7 +720,7 @@ def dispatch_layer_nine_option_acquisition(
                     status="dispatched_succeeded" if succeeded else "dispatched_failed",
                     worker_id=item.worker_id,
                     worker_slot=item.worker_slot,
-                    return_code=result.returncode,
+                    return_code=return_code,
                     error_summary=error_tail,
                 )
             ]

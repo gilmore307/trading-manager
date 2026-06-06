@@ -224,6 +224,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
 
             def fake_run(command, **_kwargs):
                 captured_commands.append(command)
+                self.assertGreaterEqual(_kwargs.get("timeout", 0), 180)
                 task_key = json.loads(Path(command[3]).read_text(encoding="utf-8"))
                 return SimpleNamespace(
                     returncode=0,
@@ -280,6 +281,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
 
             def fake_run(command, **_kwargs):
                 captured_commands.append(command)
+                self.assertGreaterEqual(_kwargs.get("timeout", 0), 180)
                 task_key = json.loads(Path(command[3]).read_text(encoding="utf-8"))
                 return SimpleNamespace(
                     returncode=0,
