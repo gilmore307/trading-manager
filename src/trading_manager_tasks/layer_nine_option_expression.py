@@ -37,7 +37,8 @@ SHARED_OPTION_CHAIN_SOURCE_ID = "option_chain_state_source"
 OPTION_BUCKET_POLICY_REF = "LAYER_09_OPTION_BUCKET_STRIKE_POLICY"
 DEFAULT_OPTION_SNAPSHOT_MAX_DTE = 45
 DEFAULT_OPTION_SNAPSHOT_STRIKE_RANGE = 5
-DEFAULT_OPTION_SNAPSHOT_WINDOW_MINUTES = 30
+DEFAULT_OPTION_SOURCE_DAY_START_HOUR = 4
+DEFAULT_OPTION_SOURCE_DAY_END_HOUR = 20
 DEFAULT_OPTION_PREFILTER_MIN_MID = 0.01
 ET = ZoneInfo("America/New_York")
 OPTION_SNAPSHOT_PROVIDER_CONTROLS = {
@@ -199,37 +200,29 @@ def _parse_training_time(value: str) -> datetime:
     return parsed.astimezone(ET)
 
 
-def _window_bounds(value: str, *, window_minutes: int = DEFAULT_OPTION_SNAPSHOT_WINDOW_MINUTES) -> tuple[datetime, datetime]:
-    if window_minutes <= 0:
-        raise TaskSystemError("Layer 9 option snapshot window_minutes must be positive")
+def _source_day_bounds(value: str) -> tuple[datetime, datetime]:
     parsed = _parse_training_time(value)
-    minute = parsed.replace(second=0, microsecond=0)
-    slot = (minute.hour * 60 + minute.minute) // window_minutes
-    start_minutes = slot * window_minutes
-    start = minute.replace(hour=start_minutes // 60, minute=start_minutes % 60)
-    end = start + timedelta(minutes=window_minutes) - timedelta(milliseconds=1)
+    start = parsed.replace(hour=DEFAULT_OPTION_SOURCE_DAY_START_HOUR, minute=0, second=0, microsecond=0)
+    end = parsed.replace(hour=DEFAULT_OPTION_SOURCE_DAY_END_HOUR, minute=0, second=0, microsecond=0) - timedelta(milliseconds=1)
     return start, end
 
 
-def _window_request_id(row: Mapping[str, Any], *, start_month: str, window_start: datetime, window_end: datetime) -> str:
+def _source_day_request_id(row: Mapping[str, Any], *, start_month: str, window_start: datetime) -> str:
     underlying = str(row.get("underlying") or "unknown").lower()
-    start_token = _safe_token(window_start.isoformat())
-    end_token = _safe_token(window_end.isoformat())
-    return f"mgrreq_layer9_option_window_{underlying}_{start_month.replace('-', '_')}_{start_token}_{end_token}"
+    day_token = _safe_token(window_start.date().isoformat())
+    return f"mgrreq_layer9_option_day_{underlying}_{start_month.replace('-', '_')}_{day_token}"
 
 
-def request_previews_from_layer_8_rows(
-    rows: Iterable[Mapping[str, Any]], *, start_month: str, window_minutes: int = DEFAULT_OPTION_SNAPSHOT_WINDOW_MINUTES
-) -> tuple[LayerNineRequestPreview, ...]:
-    """Build windowed ThetaData training request previews from eligible dense Layer 8 rows."""
+def request_previews_from_layer_8_rows(rows: Iterable[Mapping[str, Any]], *, start_month: str) -> tuple[LayerNineRequestPreview, ...]:
+    """Build daily ThetaData source-cache request previews from eligible dense Layer 8 rows."""
 
     grouped: dict[str, dict[str, Any]] = {}
     for row in rows:
         if not _is_training_eligible_layer_8_row(row):
             continue
         snapshot_time = _training_snapshot_time(row)
-        window_start, window_end = _window_bounds(snapshot_time, window_minutes=window_minutes)
-        request_id = _window_request_id(row, start_month=start_month, window_start=window_start, window_end=window_end)
+        window_start, window_end = _source_day_bounds(snapshot_time)
+        request_id = _source_day_request_id(row, start_month=start_month, window_start=window_start)
         group = grouped.setdefault(
             request_id,
             {
@@ -277,8 +270,8 @@ def build_layer_nine_gate_review(
         status = "provider_acquisition_ready"
         reviewed_decision = "dense_training_minutes_ready_for_autonomous_option_acquisition"
         reason = (
-            f"{eligible_minute_count} dense Layer 8 minute rows are covered by {len(previews)} windowed ThetaData "
-            "option snapshot acquisition request(s) before Layer 9 training/generation."
+            f"{eligible_minute_count} dense Layer 8 minute rows are covered by {len(previews)} ThetaData "
+            "daily option source-cache acquisition request(s) before Layer 9 training/generation."
         )
         recommended_next_action = "prepare_option_expression_acquisition"
     else:
@@ -603,11 +596,12 @@ def dispatch_layer_nine_option_acquisition(
         if limit <= 0:
             raise TaskSystemError("limit must be positive")
         rows = rows[:limit]
+    provider_max_workers = 1 if execute_provider_calls else max_workers
     worker_selection = select_provider_worker_count(
         request_count=len(rows),
         execute_provider_calls=execute_provider_calls,
         dynamic_workers=dynamic_workers,
-        max_workers=max_workers,
+        max_workers=provider_max_workers,
     )
 
     def prepare_item(row: Mapping[str, Any], *, worker_slot: int) -> tuple[ProviderDispatchItem, Path | None]:

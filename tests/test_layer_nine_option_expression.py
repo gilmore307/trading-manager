@@ -76,12 +76,12 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         review = build_layer_nine_gate_review(start_month="2016-01", end_month="2016-01", layer_8_rows=rows)
 
         self.assertEqual(len(previews), 1)
-        self.assertTrue(previews[0].request_id.startswith("mgrreq_layer9_option_window_aapl_2016_01_"))
+        self.assertTrue(previews[0].request_id.startswith("mgrreq_layer9_option_day_aapl_2016_01_"))
         self.assertEqual(previews[0].provider, "thetadata")
         self.assertEqual(previews[0].target_component_id, "m09_option_expression_data_acquisition")
-        self.assertEqual(previews[0].snapshot_time, "2016-01-05T09:30:00-05:00")
-        self.assertEqual(previews[0].window_start, "2016-01-05T09:30:00-05:00")
-        self.assertEqual(previews[0].window_end, "2016-01-05T09:59:59.999000-05:00")
+        self.assertEqual(previews[0].snapshot_time, "2016-01-05T04:00:00-05:00")
+        self.assertEqual(previews[0].window_start, "2016-01-05T04:00:00-05:00")
+        self.assertEqual(previews[0].window_end, "2016-01-05T19:59:59.999000-05:00")
         self.assertEqual(previews[0].eligible_minute_count, 1)
         self.assertEqual(previews[0].max_dte, 45)
         self.assertEqual(previews[0].strike_range, 5)
@@ -90,8 +90,8 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(source_task["source"], "m09_option_expression_data_acquisition")
         self.assertEqual(source_task["params"]["strike_range"], 5)
         self.assertEqual(source_task["params"]["max_dte"], 45)
-        self.assertEqual(source_task["params"]["window_start"], "2016-01-05T09:30:00-05:00")
-        self.assertEqual(source_task["params"]["window_end"], "2016-01-05T09:59:59.999000-05:00")
+        self.assertEqual(source_task["params"]["window_start"], "2016-01-05T04:00:00-05:00")
+        self.assertEqual(source_task["params"]["window_end"], "2016-01-05T19:59:59.999000-05:00")
         self.assertTrue(source_task["params"]["option_prefilter_enabled"])
         self.assertTrue(source_task["params"]["include_trade_summary"])
         self.assertTrue(source_task["params"]["reuse_option_chain_state_source"])
@@ -256,6 +256,64 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(summary.dispatch_count, 1)
         self.assertTrue(all(item.status == "dispatched_succeeded" for item in summary.items))
         self.assertTrue(all(item.runtime_task_key_path is None for item in summary.items))
+
+    def test_layer_nine_provider_dispatch_forces_single_thetadata_worker(self) -> None:
+        rows = [
+            {
+                "target_candidate_id": f"tcand_{minute}",
+                "underlying": "AAPL",
+                "available_time": f"2016-01-0{day}T09:{minute:02d}:00-05:00",
+                "action_type": "no_trade",
+                "action_side": "none",
+            }
+            for day in (5, 6)
+            for minute in (30, 31)
+        ]
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            review = build_layer_nine_gate_review(start_month="2016-01", end_month="2016-01", layer_8_rows=rows)
+            requests = manager_requests_from_gate_review(review, storage_root=tmp, source_output_root=tmp / "source")
+            write_layer_nine_task_keys(requests)
+            persisted_requests = tuple({key: value for key, value in request.items() if not key.startswith("_")} for request in requests)
+            captured_commands = []
+
+            def fake_run(command, **_kwargs):
+                captured_commands.append(command)
+                manifest_path = Path(command[command.index("--task-key-manifest") + 1])
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=json.dumps(
+                        {
+                            "contract_type": "m09_option_expression_data_acquisition_batch_result",
+                            "batch_run_id": manifest["batch_run_id"],
+                            "task_count": len(manifest["task_key_paths"]),
+                            "succeeded_count": len(manifest["task_key_paths"]),
+                            "failed_count": 0,
+                            "items": [
+                                {"task_id": json.loads(Path(path).read_text(encoding="utf-8"))["task_id"], "status": "succeeded"}
+                                for path in manifest["task_key_paths"]
+                            ],
+                        }
+                    ),
+                    stderr="",
+                )
+
+            with patch("trading_manager_tasks.layer_nine_option_expression.fetch_manager_requests", return_value=persisted_requests):
+                with patch("trading_manager_tasks.layer_nine_option_expression.subprocess.run", side_effect=fake_run):
+                    summary = dispatch_layer_nine_option_acquisition(
+                        start_month="2016-01",
+                        end_month="2016-01",
+                        storage_root=tmp,
+                        trading_data_root=tmp,
+                        execute_provider_calls=True,
+                        dynamic_workers=False,
+                        max_workers=4,
+                    )
+
+        self.assertEqual(review.training_request_count, 2)
+        self.assertEqual(summary.worker_selection.selected_worker_count, 1)
+        self.assertEqual(len(captured_commands), 1)
 
     def test_provider_ready_main_returns_success_for_training_eligible_no_trade_row(self) -> None:
         rows = [
