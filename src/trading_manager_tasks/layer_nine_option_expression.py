@@ -50,7 +50,7 @@ OPTION_SNAPSHOT_PROVIDER_CONTROLS = {
     "retry_attempts": 3,
     "retry_backoff_seconds": 1.0,
     "retry_policy_ref": "layer_09_option_expression_source_acquisition_retry",
-    "rate_limit_policy_ref": "thetadata_terminal_local_rate_limit",
+    "rate_limit_policy_ref": "thetadata_python_library_direct_rate_limit",
 }
 @dataclass(frozen=True)
 class LayerNineRequestPreview:
