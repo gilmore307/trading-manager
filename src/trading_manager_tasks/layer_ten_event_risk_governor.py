@@ -1,7 +1,7 @@
 """Safe Layer 10 event-risk input materialization.
 
 This module builds ``m10_event_risk_governor_data_acquisition`` rows only from already-saved local
-Layer 2 bar artifacts. It may run the trading-data equity abnormal activity
+Layer 2 bar SQL receipts. It may run the trading-data equity abnormal activity
 source-detector, but it performs no provider calls, no model activation, no
 broker execution, and no storage lifecycle mutation.
 """
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
-from .layer_three_target_state import FeedArtifactRef, _latest_successful_run, _read_layer_two_symbols, _resolve_component_path, discover_layer_two_feed_artifacts
+from .layer_three_target_state import BAR_SOURCE_TABLE, FeedArtifactRef, _bar_source_ref, _latest_successful_run, _month_bounds, _read_layer_two_symbols, discover_layer_two_feed_artifacts
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root
 
@@ -171,23 +171,13 @@ def _discover_layer_two_feed_artifacts_including_zero_rows(
         run = _latest_successful_run(receipt)
         if run is None:
             continue
-        steps = run.get("steps") if isinstance(run.get("steps"), Mapping) else {}
-        clean_step = steps.get("clean") if isinstance(steps.get("clean"), Mapping) else {}
-        cleaned_refs = [ref for ref in clean_step.get("references") or [] if isinstance(ref, str) and ref.endswith("equity_bar.jsonl")]
-        if not cleaned_refs and run.get("output_dir"):
-            cleaned_refs.append(str(Path(str(run.get("output_dir"))) / "cleaned" / "equity_bar.jsonl"))
-        if not cleaned_refs:
-            continue
-        cleaned_path = _resolve_component_path(cleaned_refs[-1], trading_data_root=trading_data_root, trading_storage_root=trading_storage_root)
-        if not cleaned_path.exists():
-            continue
         row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
         zero_refs.append(
             FeedArtifactRef(
                 symbol=symbol,
                 month=start_month,
                 receipt_path=str(receipt_path),
-                cleaned_bar_path=str(cleaned_path),
+                bar_source_ref=_bar_source_ref(run),
                 run_id=str(run.get("run_id") or ""),
                 row_count=int(row_counts.get("equity_bar") or 0),
             )
@@ -195,13 +185,22 @@ def _discover_layer_two_feed_artifacts_including_zero_rows(
     return tuple(zero_refs)
 
 
-def _saved_bar_path(ref: FeedArtifactRef) -> Path:
-    path = Path(ref.cleaned_bar_path)
-    run_dir = path.parents[1]
-    saved = run_dir / "saved" / "equity_bar.csv"
-    if saved.exists():
-        return saved
-    raise TaskSystemError(f"saved equity_bar.csv not found for {ref.symbol}: {saved}")
+def _bar_sql_source(ref: FeedArtifactRef) -> dict[str, Any]:
+    month = _ref_month(ref)
+    start, end = _month_bounds(month) if month != "unknown_month" else (None, None)
+    return {
+        "table": BAR_SOURCE_TABLE,
+        "source_ref": ref.bar_source_ref,
+        "source_symbol": ref.evidence_symbol or ref.symbol,
+        "target_symbol": ref.symbol,
+        "month": month,
+        "start": start,
+        "end": end,
+        "timeframe": "30Min",
+        "receipt_path": ref.receipt_path,
+        "run_id": ref.run_id,
+        "row_count": ref.row_count,
+    }
 
 
 def _run_detector(
@@ -232,11 +231,11 @@ def _run_detector(
         "task_id": f"layer_10_event_risk_governor_detector_{symbol}_{ref_month.replace('-', '_')}_{output_dir.name.replace('-', '_')}",
         "source": DETECTOR_SOURCE,
         "params": {
-            "bars_csv_path": str(_saved_bar_path(ref)),
+            "bars_sql_source": _bar_sql_source(ref),
         },
         "output_root": str(detector_output_root),
         "manager_stage_id": "layer_10_event_risk_governor.data_acquisition",
-        "source_policy": "local_source_detector_over_reviewed_layer_02_alpaca_bar_artifacts_no_provider_calls",
+        "source_policy": "local_source_detector_over_reviewed_layer_02_alpaca_bar_sql_receipts_no_provider_calls",
     }
     task_key_path.parent.mkdir(parents=True, exist_ok=True)
     task_key_path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")

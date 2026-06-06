@@ -40,12 +40,6 @@ def _write_event_feed_artifacts(root: Path, *, month: str = "2016-01") -> None:
 
 
 def _write_layer_three_feed_artifact(root: Path, *, symbol: str = "AAPL", month: str = "2016-01") -> None:
-    run_dir = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "runs" / "run_001"
-    (run_dir / "cleaned").mkdir(parents=True)
-    (run_dir / "cleaned" / "equity_bar.jsonl").write_text(
-        f'{{"symbol":"{symbol}","timestamp":"{month}-04T09:30:00-05:00"}}\n',
-        encoding="utf-8",
-    )
     receipt_path = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(
@@ -55,14 +49,9 @@ def _write_layer_three_feed_artifact(root: Path, *, symbol: str = "AAPL", month:
                     {
                         "run_id": "run_001",
                         "status": "succeeded",
+                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": 1},
-                        "steps": {
-                            "clean": {
-                                "references": [
-                                    f"storage/monthly_backfill/alpaca_bars/{symbol}/{month}/runs/run_001/cleaned/equity_bar.jsonl"
-                                ]
-                            }
-                        },
+                        "steps": {"save": {"references": ["trading_data.m01_market_regime_data_acquisition"]}},
                     }
                 ]
             }
@@ -505,7 +494,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertTrue(all(plan.layers[index].progression_mode == "target_major_serial_chain" for index in range(2, 8)))
         self.assertEqual(plan.layers[8].progression_mode, "optional_trading_guidance_after_underlying_action")
         self.assertEqual(plan.layers[8].depends_on_layers, (8,))
-        self.assertIn("crypto/direct-underlying-only routes do not require option refs", plan.layers[8].candidate_progression_policy)
+        self.assertIn("replay/live routing decides separately which minutes use the guidance", plan.layers[8].candidate_progression_policy)
         self.assertIn("upstream_layer_08_model_generation_complete", plan.layers[8].stages[0].blockers)
 
     def test_layer_four_event_observation_data_acquisition_waits_for_foundation_not_event_feeds(self):

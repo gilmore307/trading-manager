@@ -10,19 +10,7 @@ from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.layer_ten_event_risk_governor import _discover_event_feed_artifacts, materialize_layer_ten_event_risk_governor_inputs
 
 
-def _write_layer_two_bar_artifact(storage_root: Path, symbol: str, month: str, row_count: int = 1) -> None:
-    run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / symbol / month / "runs" / "run_001"
-    (run_dir / "cleaned").mkdir(parents=True)
-    (run_dir / "saved").mkdir(parents=True)
-    (run_dir / "cleaned" / "equity_bar.jsonl").write_text(
-        "" if row_count <= 0 else f'{{"symbol":"{symbol}","timestamp":"{month}-04T09:30:00-05:00"}}\n',
-        encoding="utf-8",
-    )
-    (run_dir / "saved" / "equity_bar.csv").write_text(
-        "symbol,timestamp,bar_open,bar_high,bar_low,bar_close,bar_volume,timeframe\n"
-        + ("" if row_count <= 0 else f"{symbol},{month}-04T09:30:00-05:00,1,2,1,2,100,30Min\n"),
-        encoding="utf-8",
-    )
+def _write_layer_two_bar_receipt(storage_root: Path, symbol: str, month: str, row_count: int = 1) -> None:
     receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(
@@ -32,8 +20,9 @@ def _write_layer_two_bar_artifact(storage_root: Path, symbol: str, month: str, r
                     {
                         "run_id": "run_001",
                         "status": "succeeded",
+                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": row_count},
-                        "steps": {"clean": {"references": [f"storage/monthly_backfill/alpaca_bars/{symbol}/{month}/runs/run_001/cleaned/equity_bar.jsonl"]}},
+                        "steps": {"save": {"references": ["trading_data.m01_market_regime_data_acquisition"]}},
                     }
                 ]
             }
@@ -50,28 +39,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
             universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
-            run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-01" / "runs" / "run_001"
-            (run_dir / "cleaned").mkdir(parents=True)
-            (run_dir / "saved").mkdir(parents=True)
-            (run_dir / "cleaned" / "equity_bar.jsonl").write_text('{"symbol":"XLF","timestamp":"2016-01-04T09:30:00-05:00"}\n', encoding="utf-8")
-            (run_dir / "saved" / "equity_bar.csv").write_text("symbol,timestamp,bar_open,bar_high,bar_low,bar_close,bar_volume,timeframe\nXLF,2016-01-04T09:30:00-05:00,1,2,1,2,100,30Min\n", encoding="utf-8")
-            receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-01" / "completion_receipt.json"
-            receipt_path.parent.mkdir(parents=True, exist_ok=True)
-            receipt_path.write_text(
-                json.dumps(
-                    {
-                        "runs": [
-                            {
-                                "run_id": "run_001",
-                                "status": "succeeded",
-                                "row_counts": {"equity_bar": 1},
-                                "steps": {"clean": {"references": ["storage/monthly_backfill/alpaca_bars/XLF/2016-01/runs/run_001/cleaned/equity_bar.jsonl"]}},
-                            }
-                        ]
-                    }
-                ),
-                encoding="utf-8",
-            )
+            _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
 
             summary = materialize_layer_ten_event_risk_governor_inputs(
                 start_month="2016-01",
@@ -93,36 +61,17 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             self.assertTrue(Path(source_task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
             detector_task_key = json.loads(Path(summary.detector_runs[0].task_key_path).read_text(encoding="utf-8"))
             self.assertTrue(Path(detector_task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
+            self.assertIn("bars_sql_source", detector_task_key["params"])
+            self.assertNotIn("bars_csv_path", detector_task_key["params"])
 
-    def test_zero_row_feed_artifacts_are_skipped_before_detector_execution(self) -> None:
+    def test_zero_row_feed_receipts_are_skipped_before_detector_execution(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             trading_data_root = tmp / "trading-data"
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
             universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
-            run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-02" / "runs" / "run_001"
-            (run_dir / "cleaned").mkdir(parents=True)
-            (run_dir / "saved").mkdir(parents=True)
-            (run_dir / "cleaned" / "equity_bar.jsonl").write_text("", encoding="utf-8")
-            (run_dir / "saved" / "equity_bar.csv").write_text("symbol,timestamp,bar_open,bar_high,bar_low,bar_close,bar_volume,timeframe\n", encoding="utf-8")
-            receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / "2016-02" / "completion_receipt.json"
-            receipt_path.parent.mkdir(parents=True, exist_ok=True)
-            receipt_path.write_text(
-                json.dumps(
-                    {
-                        "runs": [
-                            {
-                                "run_id": "run_001",
-                                "status": "succeeded",
-                                "row_counts": {"equity_bar": 0},
-                                "steps": {"clean": {"references": ["storage/monthly_backfill/alpaca_bars/XLF/2016-02/runs/run_001/cleaned/equity_bar.jsonl"]}},
-                            }
-                        ]
-                    }
-                ),
-                encoding="utf-8",
-            )
+            _write_layer_two_bar_receipt(storage_root, "XLF", "2016-02", row_count=0)
 
             summary = materialize_layer_ten_event_risk_governor_inputs(
                 start_month="2016-02",
@@ -147,28 +96,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             universe_path = tmp / "universe.csv"
             universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
             for month in ("2016-01", "2016-02"):
-                run_dir = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / month / "runs" / "run_001"
-                (run_dir / "cleaned").mkdir(parents=True)
-                (run_dir / "saved").mkdir(parents=True)
-                (run_dir / "cleaned" / "equity_bar.jsonl").write_text(f'{{"symbol":"XLF","timestamp":"{month}-04T09:30:00-05:00"}}\n', encoding="utf-8")
-                (run_dir / "saved" / "equity_bar.csv").write_text("symbol,timestamp,bar_open,bar_high,bar_low,bar_close,bar_volume,timeframe\nXLF,2016-01-04T09:30:00-05:00,1,2,1,2,100,30Min\n", encoding="utf-8")
-                receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / "XLF" / month / "completion_receipt.json"
-                receipt_path.parent.mkdir(parents=True, exist_ok=True)
-                receipt_path.write_text(
-                    json.dumps(
-                        {
-                            "runs": [
-                                {
-                                    "run_id": "run_001",
-                                    "status": "succeeded",
-                                    "row_counts": {"equity_bar": 1},
-                                    "steps": {"clean": {"references": [f"storage/monthly_backfill/alpaca_bars/XLF/{month}/runs/run_001/cleaned/equity_bar.jsonl"]}},
-                                }
-                            ]
-                        }
-                    ),
-                    encoding="utf-8",
-                )
+                _write_layer_two_bar_receipt(storage_root, "XLF", month)
 
             summary = materialize_layer_ten_event_risk_governor_inputs(
                 start_month="2016-01",
@@ -195,7 +123,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
             universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
-            _write_layer_two_bar_artifact(storage_root, "XLF", "2016-01")
+            _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
             feed_root = trading_data_root / "storage" / "monthly_backfill"
             artifacts = {
                 "alpaca_news": ("equity_news.csv", "id,timeline_headline,created_at,updated_at,symbols,summary,event_link_url\nn1,Headline,2016-01-04T10:00:00-05:00,2016-01-04T10:01:00-05:00,XLF,Summary,https://example.com/news\n"),
@@ -253,7 +181,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
             universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
-            _write_layer_two_bar_artifact(storage_root, "XLF", "2016-01")
+            _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
             feed_root = trading_data_root / "storage" / "monthly_backfill"
             artifacts = {
                 "alpaca_news": ("equity_news.csv", "id,timeline_headline,created_at,updated_at,symbols,summary,event_link_url\nn1,Headline,2016-01-04T10:00:00-05:00,2016-01-04T10:01:00-05:00,XLF,Summary,https://example.com/news\n"),
@@ -283,7 +211,7 @@ class LayerNineEventRiskGovernorTests(unittest.TestCase):
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
             universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
-            _write_layer_two_bar_artifact(storage_root, "XLF", "2016-01")
+            _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
 
             with self.assertRaisesRegex(TaskSystemError, "event-risk coverage is incomplete"):
                 materialize_layer_ten_event_risk_governor_inputs(

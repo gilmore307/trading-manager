@@ -27,7 +27,7 @@ def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01", s
                         "status": status,
                         "started_at": "2026-05-10T00:00:00Z",
                         "completed_at": "2026-05-10T00:00:01Z",
-                        "outputs": [f"storage/monthly_backfill/alpaca_bars/{symbol}/{month}/runs/run_1/saved/equity_bar.csv"],
+                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": 10},
                         "error": {"type": "AlpacaBarsError", "message": "bars unavailable"} if status != "succeeded" else None,
                     }
@@ -59,7 +59,7 @@ def _write_retry_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-
                         "status": "succeeded",
                         "started_at": "2026-05-10T00:01:00Z",
                         "completed_at": "2026-05-10T00:01:01Z",
-                        "outputs": [f"storage/monthly_backfill/alpaca_bars/{symbol}/{month}/runs/run_2/saved/equity_bar.csv"],
+                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": 10},
                     },
                 ]
