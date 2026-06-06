@@ -288,6 +288,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
                 captured_commands.append(command)
                 manifest_path = Path(command[command.index("--task-key-manifest") + 1])
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                self.assertEqual(len(manifest["task_key_paths"]), 1)
                 return SimpleNamespace(
                     returncode=0,
                     stdout=json.dumps(
@@ -320,7 +321,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
 
         self.assertEqual(review.training_request_count, 2)
         self.assertEqual(summary.worker_selection.selected_worker_count, 1)
-        self.assertEqual(len(captured_commands), 1)
+        self.assertEqual(len(captured_commands), 2)
 
     def test_provider_ready_main_returns_success_for_training_eligible_no_trade_row(self) -> None:
         rows = [

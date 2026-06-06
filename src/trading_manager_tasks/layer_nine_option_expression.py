@@ -734,7 +734,7 @@ def dispatch_layer_nine_option_acquisition(
 
     items: list[ProviderDispatchItem] = []
     worker_count = max(1, worker_selection.selected_worker_count)
-    batches = _chunk_rows(rows, chunk_count=worker_count)
+    batches = [[row] for row in rows] if execute_provider_calls else _chunk_rows(rows, chunk_count=worker_count)
     if len(batches) > 1:
         by_id: dict[str, list[ProviderDispatchItem]] = {}
         with ThreadPoolExecutor(max_workers=worker_selection.selected_worker_count) as executor:
