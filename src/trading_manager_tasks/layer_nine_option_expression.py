@@ -296,7 +296,13 @@ def build_layer_nine_gate_review(
     )
 
 
-def fetch_layer_8_rows(*, database_url: str, start_month: str, end_month: str) -> list[dict[str, Any]]:
+def fetch_layer_8_rows(
+    *,
+    database_url: str,
+    start_month: str,
+    end_month: str,
+    target_symbol: str | None = None,
+) -> list[dict[str, Any]]:
     import psycopg  # type: ignore
     from psycopg.rows import dict_row  # type: ignore
 
@@ -339,12 +345,13 @@ def fetch_layer_8_rows(*, database_url: str, start_month: str, end_month: str) -
           l8_rows.action_confidence_score
         FROM l8_rows
         LEFT JOIN target_symbols ts USING (target_candidate_id)
+        WHERE (%s::text IS NULL OR upper(ts.underlying) = upper(%s::text))
         ORDER BY l8_rows.available_time::timestamptz ASC, l8_rows.target_candidate_id ASC
     """
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
         with conn.cursor() as cursor:
             cursor.execute("SET LOCAL statement_timeout = '5min'")
-            cursor.execute(query, (start, end))
+            cursor.execute(query, (start, end, target_symbol, target_symbol))
             return [dict(row) for row in cursor.fetchall()]
 
 
@@ -458,10 +465,16 @@ def prepare_layer_nine_option_acquisition(
     write: bool = False,
     persist_sql: bool = False,
     database_url: str | None = None,
+    target_symbol: str | None = None,
 ) -> tuple[LayerNineGateReview, tuple[dict[str, Any], ...], tuple[Path, ...]]:
     """Review Layer 8 rows and prepare current Layer 9 source acquisition requests."""
 
-    rows = fetch_layer_8_rows(database_url=_database_url(database_url), start_month=start_month, end_month=end_month)
+    rows = fetch_layer_8_rows(
+        database_url=_database_url(database_url),
+        start_month=start_month,
+        end_month=end_month,
+        target_symbol=target_symbol,
+    )
     review = build_layer_nine_gate_review(
         start_month=start_month,
         end_month=end_month,
@@ -765,6 +778,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--source-output-root", type=Path, default=DEFAULT_SOURCE_OUTPUT_ROOT)
+    parser.add_argument("--target-symbol", help="Limit reviewed Layer 8 rows to one underlying symbol.")
     parser.add_argument("--write", action="store_true", help="Write review and receipt artifacts under --output-root.")
     parser.add_argument("--persist-sql", action="store_true", help="Persist reviewed Layer 9 option manager_request rows.")
     args = parser.parse_args(argv)
@@ -777,6 +791,7 @@ def main(argv: list[str] | None = None) -> int:
         write=args.write,
         persist_sql=args.persist_sql,
         database_url=args.database_url,
+        target_symbol=args.target_symbol,
     )
     write_gate_review(review, output=sys.stdout)
     return 0 if review.status in {"no_provider_skip_accepted", "provider_acquisition_ready"} else 2

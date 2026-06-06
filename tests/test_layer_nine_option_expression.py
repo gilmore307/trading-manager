@@ -333,7 +333,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
             }
         ]
         with tempfile.TemporaryDirectory() as raw_tmp:
-            with patch("trading_manager_tasks.layer_nine_option_expression.fetch_layer_8_rows", return_value=rows):
+            with patch("trading_manager_tasks.layer_nine_option_expression.fetch_layer_8_rows", return_value=rows) as fetch_mock:
                 with redirect_stdout(StringIO()):
                     exit_code = main(
                         [
@@ -345,17 +345,21 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
                             "postgresql://redacted",
                             "--output-root",
                             raw_tmp,
+                            "--target-symbol",
+                            "AAPL",
                             "--write",
                         ]
                     )
 
         self.assertEqual(exit_code, 0)
+        self.assertEqual(fetch_mock.call_args.kwargs["target_symbol"], "AAPL")
 
     def test_layer_8_fetch_limits_symbol_lookup_to_fold_targets(self) -> None:
         source = inspect.getsource(fetch_layer_8_rows)
 
         self.assertIn("WITH l8_rows AS MATERIALIZED", source)
         self.assertIn("JOIN (SELECT DISTINCT target_candidate_id FROM l8_rows)", source)
+        self.assertIn("upper(ts.underlying)", source)
         self.assertIn("statement_timeout", source)
 
 
