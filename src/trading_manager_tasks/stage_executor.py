@@ -111,8 +111,8 @@ def _stage_progress_worker_id(*, start_month: str, end_month: str) -> str:
 def _stage_progress_unit_label(stage: StageProgress) -> str:
     if stage.stage_id == "layer_04_event_failure_risk.data_acquisition":
         return "event substrate"
-    if stage.stage_id == "layer_09_option_expression.data_acquisition":
-        return "option gate"
+    if stage.stage_id == "layer_03_target_state_vector.option_chain_data_acquisition":
+        return "option source"
     return progress_contract_for_stage(stage.stage_id, fallback_unit_label="stage step")["unit_label"]
 
 

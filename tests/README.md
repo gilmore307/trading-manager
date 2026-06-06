@@ -30,7 +30,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_information_pass.py`
 - `test_layer_four_event_failure_features.py`
 - `test_layer_nine_feature_stage.py`
-- `test_layer_nine_option_expression.py`
+- `test_layer_nine_feature_stage.py`
 - `test_layer_ten_event_risk_governor.py`
 - `test_layer_three_target_state.py`
 - `test_model_group_attribution.py`

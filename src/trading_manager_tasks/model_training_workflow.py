@@ -24,7 +24,7 @@ from .storage_paths import data_storage_root, model_runtime_root
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
 BASE_STACK_LAYER_COUNT = 9
-BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 4, 9)
+BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 4)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 12
 DATASET_UNIT_MONTHS = 6
@@ -51,6 +51,8 @@ MODEL_RUNTIME_ROOT = model_runtime_root()
 LAYER_FOUR_EVENT_OBSERVATION_COVERAGE_BLOCKER = "layer_04_event_observation_pool_ready"
 LAYER_TEN_EVENT_FEED_COVERAGE_BLOCKER = "layer_10_event_feed_coverage_ready"
 LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER = "layer_03_target_local_feed_artifacts_ready"
+LAYER_THREE_OPTION_CHAIN_SOURCE_STAGE_ID = "layer_03_target_state_vector.option_chain_data_acquisition"
+LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER = f"{LAYER_THREE_OPTION_CHAIN_SOURCE_STAGE_ID}_complete"
 LAYER_FIVE_AFTER_COST_ALPHA_ARTIFACT_BLOCKER = "layer_05_after_cost_alpha_artifact_ready"
 LAYER_FIVE_AFTER_COST_ALPHA_TRAINING_STAGE_TYPE = "model_training"
 
@@ -251,7 +253,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "target_major_serial_chain",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id",
         "candidate_progression_policy": "target-major task execution is allowed because routing symbols contribute anonymous target-state samples; evaluation and promotion must aggregate by fold and fixed candidate-universe policy batch",
-        "data_surface": "Layer 3 candidate policy plus target candidate/source_03 inputs, m03_target_state_vector_feature_generation, and anonymous target handoff ranking evidence",
+        "data_surface": "shared option_chain_state_source cache plus Layer 3 candidate policy, target candidate/source_03 inputs, m03_target_state_vector_feature_generation, and anonymous target handoff ranking evidence",
         "feature_cli": "trading-data-m03-target-state-vector-feature-generation",
     },
     {
@@ -318,7 +320,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "optional_trading_guidance_after_underlying_action",
         "candidate_axis": "target_symbol;six_month_window;minute_timestamp;option_contract_bucket",
         "candidate_progression_policy": "train dense minute-level option-expression context after Layer 8 underlying-action generation; replay/live routing decides separately which minutes use the guidance",
-        "data_surface": "dense option-expression gate review over Layer 8 training-eligible underlying minutes plus provider-backed m09_option_expression_data_acquisition and m09_option_expression_feature_generation",
+        "data_surface": "m09_option_expression_feature_generation derived from shared option_chain_state_source after Layer 8; no Layer 9-owned provider acquisition route",
         "feature_cli": "trading-data-m09-option-expression-feature-generation",
     },
 )
@@ -865,7 +867,10 @@ def _build_layer_workflow(
         acquisition_blockers, acquisition_gate = layer_four_event_observation_blockers, None
     elif layer == 3 and layer_three_target_local_feed_blockers:
         acquisition_status = "blocked"
-        acquisition_blockers, acquisition_gate = layer_three_target_local_feed_blockers, None
+        acquisition_blockers, acquisition_gate = (LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER, *layer_three_target_local_feed_blockers), None
+    elif layer == 3:
+        acquisition_status = "blocked"
+        acquisition_blockers, acquisition_gate = (LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER,), None
     else:
         acquisition_status, acquisition_blockers, acquisition_gate = "blocked", _upstream_layer_ready_blockers(
             tuple(meta["depends_on_layers"]),
@@ -912,20 +917,6 @@ def _build_layer_workflow(
             "${END_MONTH}",
             "--write",
         ]
-    elif layer == 9:
-        acquisition_command = [
-            "PYTHONPATH=src",
-            "python3",
-            "scripts/tasks/review_layer_nine_option_expression_gate.py",
-            "--start-month",
-            "${START_MONTH}",
-            "--end-month",
-            "${END_MONTH}",
-            "--write",
-            "--persist-sql",
-        ]
-        if selected_target_symbol:
-            acquisition_command.extend(["--target-symbol", selected_target_symbol])
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
 
@@ -939,6 +930,41 @@ def _build_layer_workflow(
     stages: list[WorkflowStage] = []
     has_monthly_input_stage = layer in BASE_INPUT_STAGE_LAYERS
     include_input_stage = has_monthly_input_stage and (not foundation_catch_up_only or layer in FOUNDATION_CATCH_UP_LAYERS)
+    if layer == 3 and include_input_stage:
+        option_source_command = [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/prepare_option_chain_source_acquisition.py",
+            "--start-month",
+            "${START_MONTH}",
+            "--end-month",
+            "${END_MONTH}",
+            "--write",
+            "--persist-sql",
+        ]
+        if selected_target_symbol:
+            option_source_command.extend(["--target-symbol", selected_target_symbol])
+        option_source_blockers = _with_target_blocker(
+            _upstream_layer_ready_blockers(tuple(meta["depends_on_layers"]), foundation_catch_up_only=foundation_catch_up_only),
+            layer=layer,
+            selected_target_symbol=selected_target_symbol,
+            stage_type="data_acquisition",
+        )
+        stages.append(
+            WorkflowStage(
+                stage_id=LAYER_THREE_OPTION_CHAIN_SOURCE_STAGE_ID,
+                layer=layer,
+                layer_key=key,
+                stage_type="data_acquisition",
+                description="Prepare shared ThetaData option_chain_state_source rows before Layer 3 target-state reduction.",
+                status="blocked",
+                command=option_source_command,
+                dataset_unit=input_dataset_unit,
+                blockers=option_source_blockers,
+                safe_without_provider_calls=False,
+                provider_calls_allowed=True,
+            )
+        )
     if include_input_stage:
         stages.append(
             WorkflowStage(
@@ -977,6 +1003,30 @@ def _build_layer_workflow(
                     provider_calls_allowed=False,
                 )
             )
+    elif layer == 9 and meta.get("feature_cli") is not None and not foundation_catch_up_only:
+        stages.append(
+            WorkflowStage(
+                stage_id=f"{key}.feature_generation",
+                layer=layer,
+                layer_key=key,
+                stage_type="feature_generation",
+                description="Generate Layer 9 option-expression features from shared option_chain_state_source after Layer 8.",
+                status="blocked",
+                command=feature,
+                dataset_unit=dataset_unit,
+                blockers=_with_target_blocker(
+                    (
+                        LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER,
+                        *_upstream_layer_ready_blockers(tuple(meta["depends_on_layers"]), foundation_catch_up_only=foundation_catch_up_only),
+                    ),
+                    layer=layer,
+                    selected_target_symbol=selected_target_symbol,
+                    stage_type="feature_generation",
+                ),
+                safe_without_provider_calls=True,
+                provider_calls_allowed=False,
+            )
+        )
     if foundation_catch_up_only:
         return LayerWorkflow(
             layer=layer,

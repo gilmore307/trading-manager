@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from .control_plane import TaskSystemError
-from .layer_nine_option_expression import dispatch_layer_nine_option_acquisition
+from .option_chain_source_acquisition import STAGE_ID as OPTION_CHAIN_SOURCE_STAGE_ID, dispatch_option_chain_source_acquisition
 from .provider_dispatch import dispatch_layer_provider_acquisition
 from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, provider_partition_lock_ref
 from .stage_run_dashboard import (
@@ -62,8 +62,8 @@ def _model_layer_for_stage(stage_id: str) -> str:
         return "layer_01_market_regime"
     if stage_id == "layer_02_sector_context.data_acquisition":
         return "layer_02_sector_context"
-    if stage_id == "layer_09_option_expression.data_acquisition":
-        return "layer_09_option_expression"
+    if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
+        return OPTION_CHAIN_SOURCE_STAGE_ID
     raise TaskSystemError(f"unsupported stage controller: {stage_id}")
 
 
@@ -121,14 +121,14 @@ def run_stage_controller_step(
                             provider_partition_lock_ref(
                                 start_month,
                                 stage_id,
-                                "option_snapshot" if stage_id == "layer_09_option_expression.data_acquisition" else "alpaca_bars",
+                                "option_chain_snapshot" if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID else "alpaca_bars",
                                 request_id,
                                 locks_dir=locks_dir,
                             )
                         )
                     )
-                if stage_id == "layer_09_option_expression.data_acquisition":
-                    summary = dispatch_layer_nine_option_acquisition(
+                if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
+                    summary = dispatch_option_chain_source_acquisition(
                         start_month=start_month,
                         end_month=end_month,
                         storage_root=packet_storage_root,

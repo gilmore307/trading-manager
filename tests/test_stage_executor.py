@@ -224,14 +224,14 @@ class StageExecutorTests(unittest.TestCase):
                 with self.assertRaises(TaskSystemError):
                     execute_stage_process(stage)
 
-    def test_refuses_layer_nine_gate_as_safe_offline_stage(self):
+    def test_refuses_option_chain_source_preparation_as_safe_offline_stage(self):
         stage = StageProgress(
-            stage_id="layer_09_option_expression.data_acquisition",
-            layer=9,
-            layer_key="layer_09_option_expression",
+            stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+            layer=3,
+            layer_key="layer_03_target_state_vector",
             stage_type="data_acquisition",
             status="ready",
-            command=["python3", "scripts/tasks/review_layer_nine_option_expression_gate.py", "--write", "--persist-sql"],
+            command=["python3", "scripts/tasks/prepare_option_chain_source_acquisition.py", "--write", "--persist-sql"],
             blockers=(),
         )
 

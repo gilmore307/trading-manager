@@ -1,13 +1,8 @@
 """Layer 9 option-expression feature-stage adapter.
 
-The Layer 9 option-expression feature stage has two valid paths:
-
-* if the reviewed Layer 9 training-acquisition gate accepted a
-  no-provider/no-eligible-minute skip, feature generation is also a reviewed
-  no-op because no M09 option source rows are required;
-* otherwise, after provider acquisition has populated the M09 option-expression
-  source for the current fold, the adapter delegates to trading-data's M09
-  feature generator.
+Layer 9 no longer owns provider acquisition. It derives option-expression
+features from the shared ``option_chain_state_source`` cache that is prepared
+before Layer 3.
 """
 
 from __future__ import annotations
@@ -25,12 +20,12 @@ from typing import Any, Mapping, TextIO
 from .control_plane import TaskSystemError
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
-DEFAULT_GATE_REVIEW_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_09_option_expression" / "gate_review"
+DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_09_option_expression" / "feature_generation"
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = Path("/root/projects/trading-manager/.venv/bin/python")
 FEATURE_STAGE_ID = "layer_09_option_expression.feature_generation"
-DATA_ACQUISITION_STAGE_ID = "layer_09_option_expression.data_acquisition"
+SOURCE_TABLE = "option_chain_state_source"
 
 
 @dataclass(frozen=True)
@@ -74,60 +69,7 @@ def _exclusive_month_start(month: str) -> str:
     return f"{year:04d}-{month_number:02d}-01T00:00:00-05:00"
 
 
-def _read_json(path: Path) -> Mapping[str, Any]:
-    if not path.exists():
-        raise TaskSystemError(f"required Layer 8 gate review artifact is missing: {path}")
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, Mapping):
-        raise TaskSystemError(f"Layer 8 gate review artifact must be a JSON object: {path}")
-    return payload
-
-
-def _gate_review_path(start_month: str, *, gate_review_root: Path) -> Path:
-    return gate_review_root / f"layer_09_option_expression_gate_review_{start_month}.json"
-
-
-def _write_skip_receipt(*, start_month: str, end_month: str, gate_review_path: Path, gate_review: Mapping[str, Any], output_root: Path) -> Path:
-    output_root.mkdir(parents=True, exist_ok=True)
-    receipt_path = output_root / f"layer_09_option_expression_feature_generation_no_provider_skip_receipt_{start_month}.json"
-    now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    receipt = {
-        "contract_type": "component_completion_receipt",
-        "manager_stage_id": FEATURE_STAGE_ID,
-        "stage_type": "feature_generation",
-        "status": "succeeded",
-        "started_at": now,
-        "completed_at": now,
-        "runs": [
-            {
-                "run_id": f"layer_09_option_expression_feature_generation_no_provider_skip_{start_month}",
-                "status": "succeeded",
-                "output_refs": [str(gate_review_path)],
-                "row_counts": {
-                    "layer_9_training_request_candidates": int(gate_review.get("training_request_count") or 0),
-                    "m09_option_expression_data_acquisition_rows_required": 0,
-                    "m09_option_expression_feature_generation_rows_required": 0,
-                },
-            }
-        ],
-        "provider_calls": 0,
-        "dispatch_performed": False,
-        "model_activation_performed": False,
-        "broker_execution_performed": False,
-        "storage_lifecycle_mutation_performed": False,
-        "reason": (
-            "Reviewed Layer 9 training-acquisition gate accepted no-provider/no-eligible-minute skip; "
-            "M09 option-expression source and feature rows are not required before deterministic no-option model generation."
-        ),
-        "evidence_refs": [str(gate_review_path)],
-        "start_month": start_month,
-        "end_month": end_month,
-    }
-    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return receipt_path
-
-
-def _write_missing_option_source_receipt(*, start_month: str, end_month: str, gate_review_path: Path, gate_review: Mapping[str, Any], output_root: Path) -> Path:
+def _write_missing_option_source_receipt(*, start_month: str, end_month: str, output_root: Path) -> Path:
     output_root.mkdir(parents=True, exist_ok=True)
     receipt_path = output_root / f"layer_09_option_expression_feature_generation_option_source_unavailable_receipt_{start_month}.json"
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -142,10 +84,9 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ga
             {
                 "run_id": f"layer_09_option_expression_feature_generation_option_source_unavailable_{start_month}",
                 "status": "failed",
-                "output_refs": [str(gate_review_path)],
+                "output_refs": ["sql:trading_data.option_chain_state_source:coverage_missing"],
                 "row_counts": {
-                    "layer_9_training_request_candidates": int(gate_review.get("training_request_count") or 0),
-                    "m09_option_expression_data_acquisition_rows_available": 0,
+                    "option_chain_state_source_rows_available": 0,
                     "m09_option_expression_feature_generation_rows_generated": 0,
                 },
             }
@@ -156,12 +97,10 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ga
         "broker_execution_performed": False,
         "storage_lifecycle_mutation_performed": False,
         "reason": (
-            "Layer 8 produced Layer 9 training-eligible minute rows, but the current fold has no "
-            "m09_option_expression_data_acquisition rows. Layer 9 feature generation "
-            "must wait for reviewed option source acquisition instead of continuing "
-            "with optionable_chain_missing fallback."
+            "The current fold has no option_chain_state_source rows. Layer 9 feature generation "
+            "must wait for shared option-chain source acquisition instead of continuing with fallback rows."
         ),
-        "evidence_refs": [str(gate_review_path), "sql:trading_data.m09_option_expression_data_acquisition:coverage_missing"],
+        "evidence_refs": ["sql:trading_data.option_chain_state_source:coverage_missing"],
         "start_month": start_month,
         "end_month": end_month,
     }
@@ -179,7 +118,7 @@ def _database_url(explicit: str | None = None) -> str:
     raise TaskSystemError(f"database URL not supplied and {DEFAULT_DB_URL_FILE} does not exist")
 
 
-def option_source_table_exists(*, database_url: str | None = None, source_schema: str = "trading_data", source_table: str = "m09_option_expression_data_acquisition") -> bool:
+def option_source_table_exists(*, database_url: str | None = None, source_schema: str = "trading_data", source_table: str = SOURCE_TABLE) -> bool:
     import psycopg  # type: ignore
     from psycopg.rows import dict_row  # type: ignore
 
@@ -196,7 +135,7 @@ def option_source_row_count(
     end_month: str,
     database_url: str | None = None,
     source_schema: str = "trading_data",
-    source_table: str = "m09_option_expression_data_acquisition",
+    source_table: str = SOURCE_TABLE,
 ) -> int:
     import psycopg  # type: ignore
     from psycopg.rows import dict_row  # type: ignore
@@ -222,40 +161,15 @@ def execute_layer_nine_feature_stage(
     *,
     start_month: str,
     end_month: str,
-    gate_review_root: Path = DEFAULT_GATE_REVIEW_ROOT,
-    output_root: Path = DEFAULT_GATE_REVIEW_ROOT,
+    output_root: Path = DEFAULT_RECEIPT_ROOT,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
 ) -> LayerNineFeatureStageSummary:
     """Execute Layer 9 option-expression feature generation through the correct reviewed path."""
 
-    review_path = _gate_review_path(start_month, gate_review_root=gate_review_root)
-    review = _read_json(review_path)
-    if review.get("contract_type") != "manager_layer_09_option_expression_gate_review":
-        raise TaskSystemError(f"unsupported Layer 8 gate review contract_type: {review_path}")
-    if review.get("status") == "no_provider_skip_accepted" and int(review.get("training_request_count") or 0) == 0:
-        receipt_path = _write_skip_receipt(
-            start_month=start_month,
-            end_month=end_month,
-            gate_review_path=review_path,
-            gate_review=review,
-            output_root=output_root,
-        )
-        return LayerNineFeatureStageSummary(
-            contract_type="manager_layer_09_option_expression_feature_generation_stage",
-            stage_id=FEATURE_STAGE_ID,
-            start_month=start_month,
-            end_month=end_month,
-            status="succeeded",
-            mode="no_provider_no_option_skip",
-            receipt_path=str(receipt_path),
-            reason="no Layer 9 training-eligible underlying minutes; feature generation is a reviewed no-op",
-        )
-    if review.get("status") == "provider_acquisition_ready" and option_source_row_count(start_month=start_month, end_month=end_month) <= 0:
+    if option_source_row_count(start_month=start_month, end_month=end_month) <= 0:
         receipt_path = _write_missing_option_source_receipt(
             start_month=start_month,
             end_month=end_month,
-            gate_review_path=review_path,
-            gate_review=review,
             output_root=output_root,
         )
         return LayerNineFeatureStageSummary(
@@ -266,7 +180,7 @@ def execute_layer_nine_feature_stage(
             status="failed",
             mode="option_source_coverage_missing",
             receipt_path=str(receipt_path),
-            reason="current fold option source coverage is missing; run Layer 9 source acquisition before feature generation",
+            reason="current fold option source coverage is missing; run shared option-chain source acquisition before feature generation",
         )
 
     python_executable = str(DEFAULT_PYTHON_EXECUTABLE if DEFAULT_PYTHON_EXECUTABLE.exists() else Path(sys.executable))
@@ -274,6 +188,8 @@ def execute_layer_nine_feature_stage(
         python_executable,
         "-m",
         "data_feature.m09_option_expression_feature_generation",
+        "--source-table",
+        SOURCE_TABLE,
         "--source-start",
         _month_start(start_month),
         "--source-end",
@@ -300,11 +216,11 @@ def execute_layer_nine_feature_stage(
         start_month=start_month,
         end_month=end_month,
         status=status,
-        mode="trading_data_feature_08_sql_generation",
+        mode="trading_data_m09_sql_generation_from_shared_option_source",
         receipt_path=None,
         command=command,
         return_code=result.returncode,
-        reason=None if result.returncode == 0 else "trading-data feature_08 generator returned non-zero status",
+        reason=None if result.returncode == 0 else "trading-data m09 feature generator returned non-zero status",
     )
 
 
@@ -317,14 +233,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Execute Layer 9 option-expression feature generation with reviewed no-provider skip support.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
-    parser.add_argument("--gate-review-root", type=Path, default=DEFAULT_GATE_REVIEW_ROOT)
-    parser.add_argument("--output-root", type=Path, default=DEFAULT_GATE_REVIEW_ROOT)
+    parser.add_argument("--output-root", type=Path, default=DEFAULT_RECEIPT_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
     args = parser.parse_args(argv)
     summary = execute_layer_nine_feature_stage(
         start_month=args.start_month,
         end_month=args.end_month,
-        gate_review_root=args.gate_review_root,
         output_root=args.output_root,
         trading_data_root=args.trading_data_root,
     )

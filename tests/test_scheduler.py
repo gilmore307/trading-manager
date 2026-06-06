@@ -256,9 +256,9 @@ class SchedulerTests(unittest.TestCase):
             "storage_lifecycle_mutation_performed": False,
         }
         ready_stage = SimpleNamespace(
-            stage_id="layer_09_option_expression.data_acquisition",
+            stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
             status="ready",
-            command=["review-layer-nine"],
+            command=["prepare-option-chain-source"],
             stage_type="data_acquisition",
         )
         state = SimpleNamespace(
@@ -285,7 +285,7 @@ class SchedulerTests(unittest.TestCase):
             )
 
         self.assertEqual(decision.decision_status, "executed")
-        self.assertEqual(decision.selected_work, "layer_09_option_expression.data_acquisition")
+        self.assertEqual(decision.selected_work, "layer_03_target_state_vector.option_chain_data_acquisition")
         self.assertFalse(execute_provider_stage.call_args.kwargs["foundation_catch_up_only"])
 
     def test_scheduler_reports_first_blocked_stage_instead_of_plan_fallback(self):

@@ -75,8 +75,12 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layer_count, BASE_STACK_LAYER_COUNT)
         self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 10)))
         for layer in plan.layers:
-            if layer.layer in {1, 2, 3, 4, 9}:
+            if layer.layer == 3:
+                expected_stage_types = ["data_acquisition", "data_acquisition", "feature_generation", "model_generation", "model_generation", "model_generation"]
+            elif layer.layer in {1, 2, 4}:
                 expected_stage_types = ["data_acquisition", "feature_generation", "model_generation", "model_generation", "model_generation"]
+            elif layer.layer == 9:
+                expected_stage_types = ["feature_generation", "model_generation", "model_generation", "model_generation"]
             elif layer.layer == 5:
                 expected_stage_types = ["model_training", "model_generation", "model_generation", "model_generation"]
             else:
@@ -195,15 +199,18 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        command = plan.layers[2].stages[0].command
+        stages = {stage.stage_id: stage for stage in plan.layers[2].stages}
+        stage = stages["layer_03_target_state_vector.data_acquisition"]
+        command = stage.command
         self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", command)
         self.assertIn("--write", command)
         self.assertIn("--target-symbol", command)
         self.assertIn("AAPL", command)
-        self.assertIsNone(plan.layers[2].stages[0].approval_gate_required)
-        self.assertFalse(plan.layers[2].stages[0].provider_calls_allowed)
-        self.assertTrue(plan.layers[2].stages[0].safe_without_provider_calls)
-        self.assertEqual(plan.layers[2].stages[0].status, "blocked")
+        self.assertIsNone(stage.approval_gate_required)
+        self.assertFalse(stage.provider_calls_allowed)
+        self.assertTrue(stage.safe_without_provider_calls)
+        self.assertEqual(stage.status, "blocked")
+        self.assertIn("layer_03_target_state_vector.option_chain_data_acquisition_complete", stage.blockers)
 
     def test_layer_three_data_acquisition_blocks_without_target_local_feed_artifacts(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -216,9 +223,9 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        stage = plan.layers[2].stages[0]
+        stage = {stage.stage_id: stage for stage in plan.layers[2].stages}["layer_03_target_state_vector.data_acquisition"]
         self.assertEqual(stage.status, "blocked")
-        self.assertEqual(stage.blockers, ("layer_03_target_local_feed_artifacts_ready",))
+        self.assertEqual(stage.blockers, ("layer_03_target_state_vector.option_chain_data_acquisition_complete", "layer_03_target_local_feed_artifacts_ready"))
 
     def test_layer_three_data_acquisition_blocks_crypto_target_when_context_proxy_rows_are_empty(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -245,9 +252,9 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                     foundation_catch_up_only=False,
                 )
 
-        stage = plan.layers[2].stages[0]
+        stage = {stage.stage_id: stage for stage in plan.layers[2].stages}["layer_03_target_state_vector.data_acquisition"]
         self.assertEqual(stage.status, "blocked")
-        self.assertEqual(stage.blockers, ("layer_03_target_local_feed_artifacts_ready",))
+        self.assertEqual(stage.blockers, ("layer_03_target_state_vector.option_chain_data_acquisition_complete", "layer_03_target_local_feed_artifacts_ready"))
 
     def test_foundation_catch_up_omits_monthly_post_feature_model_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -289,9 +296,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             self.assertIn("--end-month", acquisition_stage.command)
             self.assertEqual(acquisition_stage.command[acquisition_stage.command.index("--start-month") + 1], "${START_MONTH}")
             self.assertEqual(acquisition_stage.command[acquisition_stage.command.index("--end-month") + 1], "${END_MONTH}")
-        self.assertEqual(fold_plan.layers[2].stages[2].stage_type, "model_generation")
+        layer_three_model_stages = [stage for stage in fold_plan.layers[2].stages if stage.stage_type == "model_generation"]
+        self.assertEqual(layer_three_model_stages[0].stage_type, "model_generation")
         self.assertEqual(fold_plan.end_month, "2016-12")
-        self.assertIn("2016-11-01T00:00:00-05:00", fold_plan.layers[2].stages[2].command)
+        self.assertIn("2016-07-01T00:00:00-05:00", layer_three_model_stages[0].command)
 
     def test_post_foundation_model_stages_can_be_reenabled_after_catch_up_acceptance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -369,7 +377,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("${START_MONTH}", command)
         self.assertIn("--end-month", command)
 
-    def test_layer_nine_option_expression_data_acquisition_runs_gate_review_without_provider_approval(self):
+    def test_layer_nine_option_expression_starts_with_feature_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -379,12 +387,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        stage = plan.layers[8].stages[0]
+        stage_ids = [stage.stage_id for stage in plan.layers[8].stages]
 
-        self.assertIsNone(stage.approval_gate_required)
-        self.assertIn("scripts/tasks/review_layer_nine_option_expression_gate.py", stage.command)
-        self.assertIn("--write", stage.command)
-        self.assertIn("--persist-sql", stage.command)
+        self.assertFalse(any(stage_id.startswith("layer_09_option_expression.") and stage_id.endswith(".data_acquisition") for stage_id in stage_ids))
+        self.assertEqual(plan.layers[8].stages[0].stage_id, "layer_09_option_expression.feature_generation")
+        self.assertIn("layer_03_target_state_vector.option_chain_data_acquisition_complete", plan.layers[8].stages[0].blockers)
 
     def test_layer_three_feature_generation_reads_month_scoped_source_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

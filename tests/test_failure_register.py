@@ -62,9 +62,9 @@ class FailureRegisterTests(unittest.TestCase):
                 "failure_id": "fail_a",
                 "request_id": "request_a",
                 "run_id": "run_failed",
-                "stage_id": "layer_09_option_expression.data_acquisition",
-                "target_component_id": "m09_option_expression_data_acquisition",
-                "source_id": "m09_option_expression_data_acquisition",
+                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                "target_component_id": "option_chain_state_source",
+                "source_id": "option_chain_state_source",
                 "symbol": "AAPL",
                 "start_month": "2016-01",
                 "end_month": "2016-06",
@@ -78,8 +78,8 @@ class FailureRegisterTests(unittest.TestCase):
                 "failure_id": "fail_b",
                 "request_id": "request_b",
                 "run_id": "run_failed",
-                "stage_id": "layer_09_option_expression.data_acquisition",
-                "target_component_id": "m09_option_expression_data_acquisition",
+                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                "target_component_id": "option_chain_state_source",
                 "failure_status": "accepted_skip",
                 "failure_kind": "no_data",
                 "agent_review_ref": "review://skip",
@@ -90,7 +90,7 @@ class FailureRegisterTests(unittest.TestCase):
             "trading_manager_tasks.failure_register.persist_failure_register_rows"
         ) as persist_mock:
             count = mark_failure_register_requests_corrected(
-                stage_id="layer_09_option_expression.data_acquisition",
+                stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
                 start_month="2016-01",
                 end_month="2016-06",
                 corrected_request_refs={"request_a": "storage://new-success.json", "request_b": "storage://new-success.json"},

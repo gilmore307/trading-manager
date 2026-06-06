@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Any, Sequence, TextIO
 
 from .control_plane import TaskSystemError
-from .layer_nine_option_expression import dispatch_layer_nine_option_acquisition
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
+from .option_chain_source_acquisition import STAGE_ID as OPTION_CHAIN_SOURCE_STAGE_ID, dispatch_option_chain_source_acquisition
 from .provider_dispatch import dispatch_layer_provider_acquisition
 from .stage_coverage import StageCoverageReport, collect_stage_coverage
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -30,7 +30,7 @@ DEFAULT_COMPONENT_STORAGE_ROOT = data_storage_root()
 SUPPORTED_DASHBOARD_STAGE_IDS = (
     "layer_01_market_regime.data_acquisition",
     "layer_02_sector_context.data_acquisition",
-    "layer_09_option_expression.data_acquisition",
+    OPTION_CHAIN_SOURCE_STAGE_ID,
 )
 
 
@@ -89,8 +89,8 @@ def _model_layer_for_stage(stage_id: str) -> str:
         return LAYER_ONE_MODEL_LAYER
     if stage_id == "layer_02_sector_context.data_acquisition":
         return LAYER_TWO_MODEL_LAYER
-    if stage_id == "layer_09_option_expression.data_acquisition":
-        return "layer_09_option_expression"
+    if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
+        return OPTION_CHAIN_SOURCE_STAGE_ID
     raise TaskSystemError(f"unsupported stage dashboard: {stage_id}")
 
 
@@ -110,11 +110,11 @@ def _execute_command(
     request_ids: Sequence[str],
     reject_terminal_coverage: bool = True,
 ) -> tuple[str, ...]:
-    if stage_id == "layer_09_option_expression.data_acquisition":
+    if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
         command = [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/dispatch_layer_nine_option_acquisition.py",
+            "scripts/tasks/dispatch_option_chain_source_acquisition.py",
             "--start-month",
             start_month,
             "--end-month",
@@ -235,8 +235,8 @@ def preview_next_provider_dispatch(
             ),
         )
     try:
-        if stage_id == "layer_09_option_expression.data_acquisition":
-            summary = dispatch_layer_nine_option_acquisition(
+        if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
+            summary = dispatch_option_chain_source_acquisition(
                 start_month=start_month,
                 end_month=end_month,
                 storage_root=storage_root,

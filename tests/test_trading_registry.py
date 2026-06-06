@@ -695,7 +695,6 @@ class RegistryHelperTests(unittest.TestCase):
             "M03_TARGET_STATE_VECTOR_DATA_ACQUISITION": "m03_target_state_vector_data_acquisition",
             "OPTION_CHAIN_STATE_SOURCE": "option_chain_state_source",
             "M10_EVENT_RISK_GOVERNOR_DATA_ACQUISITION": "m10_event_risk_governor_data_acquisition",
-            "M09_OPTION_EXPRESSION_DATA_ACQUISITION": "m09_option_expression_data_acquisition",
             "M09_OPTION_EXPRESSION_DATA_ACQUISITION_CONTRACT_PATH": "m09_option_expression_data_acquisition_contract_path",
         }
         expected_feeds = {
@@ -1263,7 +1262,7 @@ class RegistryHelperTests(unittest.TestCase):
             "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "m03_target_state_vector_data_acquisition"),
             "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "m03_target_state_vector_data_acquisition"),
             "QUOTE_SPREAD_BPS": ("field", "spread_bps", "m03_target_state_vector_data_acquisition"),
-            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "m09_option_expression_data_acquisition"),
+            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "m09_option_expression_feature_generation"),
             "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "m10_event_risk_governor_data_acquisition"),
             "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "m10_event_risk_governor_data_acquisition"),
             "SCOPE_TYPE": ("classification_field", "scope_type", "m10_event_risk_governor_data_acquisition"),
@@ -1274,10 +1273,10 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_SOURCE_PRIORITY": ("field", "source_priority", "m10_event_risk_governor_data_acquisition"),
             "EVENT_COVERAGE_REASON": ("text_field", "coverage_reason", "m10_event_risk_governor_data_acquisition"),
             "EVENT_COVERED_BY_EVENT_ID": ("identity_field", "covered_by_event_id", "m10_event_risk_governor_data_acquisition"),
-            "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "m09_option_expression_data_acquisition"),
-            "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "m09_option_expression_data_acquisition"),
-            "QUOTE_BID_CONDITION": ("field", "bid_condition", "m09_option_expression_data_acquisition"),
-            "QUOTE_ASK_CONDITION": ("field", "ask_condition", "m09_option_expression_data_acquisition"),
+            "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "option_chain_state_source"),
+            "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "option_chain_state_source"),
+            "QUOTE_BID_CONDITION": ("field", "bid_condition", "option_chain_state_source"),
+            "QUOTE_ASK_CONDITION": ("field", "ask_condition", "option_chain_state_source"),
         }
         for key, (kind, payload, applies_to) in expected.items():
             self.assertEqual(rows[key]["kind"], kind)
@@ -1341,7 +1340,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("target_state_vector_model", data_features["M03_TARGET_STATE_VECTOR_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("m10_event_risk_governor_data_acquisition", data_features["M10_EVENT_RISK_GOVERNOR_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("event_risk_governor", data_features["M10_EVENT_RISK_GOVERNOR_FEATURE_GENERATION"]["applies_to"])
-        self.assertIn("m09_option_expression_data_acquisition", data_features["M09_OPTION_EXPRESSION_FEATURE_GENERATION"]["applies_to"])
+        self.assertIn("option_chain_state_source", data_features["M09_OPTION_EXPRESSION_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("option_expression_model", data_features["M09_OPTION_EXPRESSION_FEATURE_GENERATION"]["applies_to"])
         self.assertNotIn("feature_snapshots", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
         for row in rows:

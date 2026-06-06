@@ -39,16 +39,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "error_number": 3,
                 "handling_status": "awaiting_retry",
                 "repair_status": "repaired",
-                "summary": "model training stage layer_09_option_expression.data_acquisition command returned non-zero status",
+                "summary": "model training stage layer_03_target_state_vector.option_chain_data_acquisition command returned non-zero status",
             },
             {
                 "error_number": 6,
                 "handling_status": "open",
                 "repair_status": "unknown",
-                "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests requiring automatic repair",
+                "summary": "provider stage layer_03_target_state_vector.option_chain_data_acquisition has failed requests requiring automatic repair",
             },
         ]
-        task = {"task_id": "layer_09_option_expression", "detail": {"active_stage_id": "layer_09_option_expression.data_acquisition"}}
+        task = {"task_id": "layer_03_target_state_vector", "detail": {"active_stage_id": "layer_03_target_state_vector.option_chain_data_acquisition"}}
 
         ordered = _agent_errors_for_task(rows, task)
 
@@ -57,11 +57,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
     def test_task_error_context_closes_nonblocking_awaiting_retry(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             task = {
-                "task_id": "layer_09_option_expression",
+                "task_id": "layer_03_target_state_vector",
                 "task_state": "current",
                 "status": "ready",
                 "detail": {
-                    "active_stage_id": "layer_09_option_expression.data_acquisition",
+                    "active_stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                     "progress": {"failed_count": 0, "accepted_failed_count": 0},
                 },
             }
@@ -71,7 +71,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "error_ref": "ERR-000003",
                     "handling_status": "awaiting_retry",
                     "repair_status": "repaired",
-                    "summary": "model training stage layer_09_option_expression.data_acquisition command returned non-zero status",
+                    "summary": "model training stage layer_03_target_state_vector.option_chain_data_acquisition command returned non-zero status",
                 }
             ]
 
@@ -406,10 +406,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2020-07",
                         "stages": [
                             {
-                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 9,
-                                "layer_key": "layer_09_option_expression",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
                                 "status": "ready",
                                 "blockers": ["upstream_layer_08_model_evaluation_complete"],
                                 "last_reason": "stage execution started by manager stage executor",
@@ -424,8 +424,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             write_task_progress_node(
                 progress_root=runtime / "task_progress",
                 worker_id="month_ingest_worker_1",
-                task_uid="2020-07..2020-12:layer_09_option_expression.data_acquisition",
-                stage_id="layer_09_option_expression.data_acquisition",
+                task_uid="2020-07..2020-12:layer_03_target_state_vector.option_chain_data_acquisition",
+                stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
                 node_id="stage_started",
                 node_label="Stage process started",
             )
@@ -441,7 +441,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T13:00:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["blocker_count"], 0)
@@ -449,7 +449,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["detail"]["progress"]["expected_count"], 1)
         self.assertEqual(task["detail"]["progress"]["ready_count"], 0)
         self.assertEqual(task["detail"]["progress"]["pending_count"], 1)
-        self.assertEqual(task["detail"]["progress"]["unit_label"], "option gate")
+        self.assertEqual(task["detail"]["progress"]["unit_label"], "option source")
 
     def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -465,10 +465,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2020-07",
                         "stages": [
                             {
-                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 9,
-                                "layer_key": "layer_09_option_expression",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
                                 "status": "blocked",
                                 "blockers": ["upstream_layer_08_model_evaluation_complete", "other_static_dependency"],
                                 "last_reason": "waiting for upstream_layer_08_model_evaluation_complete",
@@ -492,7 +492,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T13:00:00Z")
 
         self.assertFalse(
-            any(task["task_id"] == "layer_09_option_expression" for task in payload["chart_payload"]["task_timeline"])
+            any(task["task_id"] == "layer_03_target_state_vector" for task in payload["chart_payload"]["task_timeline"])
         )
 
     def test_layer_model_evaluation_is_hidden_from_public_timeline(self):
@@ -1433,8 +1433,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_09_option_expression.model_task",
-                                "stage_type": "model_task",
+                                "stage_id": "layer_09_option_expression.feature_generation",
+                                "stage_type": "feature_generation",
                                 "layer": 9,
                                 "layer_key": "layer_09_option_expression",
                                 "status": "succeeded",
@@ -2043,10 +2043,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 9,
-                                "layer_key": "layer_09_option_expression",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "six_month_target_fold",
@@ -2065,11 +2065,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             coverage_root = runtime / "stage_coverage"
             coverage_root.mkdir(parents=True, exist_ok=True)
-            (coverage_root / "layer_09_option_expression_data_acquisition_2016-01.json").write_text(
+            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_09_option_expression.data_acquisition",
+                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
                         "status": "partial_ready",
@@ -2084,16 +2084,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (coverage_root / "layer_09_option_expression_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
+            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_failure_register",
-                        "failure_id": "fail_layer9_provider_policy",
-                        "request_id": "mgrreq_layer9_option_snapshot_aapl_2016_01",
-                        "run_id": "run_layer9_provider_policy",
-                        "stage_id": "layer_09_option_expression.data_acquisition",
-                        "target_component_id": "m09_option_expression_data_acquisition",
-                        "source_id": "m09_option_expression_data_acquisition",
+                        "failure_id": "fail_option_chain_provider_policy",
+                        "request_id": "mgrreq_option_chain_snapshot_aapl_2016_01",
+                        "run_id": "run_option_chain_provider_policy",
+                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                        "target_component_id": "option_chain_state_source",
+                        "source_id": "option_chain_state_source",
                         "symbol": "AAPL",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
@@ -2102,22 +2102,22 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "observed_status": "failed",
                         "error_summary": "ProviderPolicyError: provider not allowed: thetadata",
                         "skip_future_matching": False,
-                        "evidence_refs": ["storage://trading-data/layer_09/receipt.json"],
+                        "evidence_refs": ["storage://trading-data/option_chain_state_source/receipt.json"],
                     }
                 )
                 + "\n",
                 encoding="utf-8",
             )
             agent_root = runtime / "agent_error_handling"
-            request_root = agent_root / "erragent_layer9_provider_policy"
+            request_root = agent_root / "erragent_option_chain_provider_policy"
             request_root.mkdir(parents=True, exist_ok=True)
             (request_root / "agent_error_diagnosis.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "agent_error_diagnosis",
                         "schema_version": "1",
-                        "diagnosis_id": "errdiag_layer9_provider_policy",
-                        "request_ref": "erragent_layer9_provider_policy",
+                        "diagnosis_id": "errdiag_option_chain_provider_policy",
+                        "request_ref": "erragent_option_chain_provider_policy",
                         "agent_ref": "trader",
                         "status": "queued",
                         "return_code": None,
@@ -2135,16 +2135,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "schema_version": "1",
                         "error_number": 9,
                         "error_ref": "ERR-000009",
-                        "error_fingerprint": "errfp_layer9_provider_policy",
-                        "request_id": "erragent_layer9_provider_policy",
-                        "request_path": "storage/runtime/agent_error_handling/erragent_layer9_provider_policy/server_error_agent_request.json",
-                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_layer9_provider_policy/agent_error_diagnosis.json",
+                        "error_fingerprint": "errfp_option_chain_provider_policy",
+                        "request_id": "erragent_option_chain_provider_policy",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_option_chain_provider_policy/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_option_chain_provider_policy/agent_error_diagnosis.json",
                         "source_component": "trading-manager.stage_reconcile",
                         "source_repo": "trading-manager",
                         "error_scope": "server.provider_stage_failure_register",
                         "error_kind": "provider_stage_requests_failed",
                         "severity": "warning",
-                        "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests requiring automatic repair",
+                        "summary": "provider stage layer_03_target_state_vector.option_chain_data_acquisition has failed requests requiring automatic repair",
                         "occurred_at_utc": "2026-06-05T10:33:32Z",
                         "created_at_utc": "2026-06-05T10:33:32Z",
                     }
@@ -2164,7 +2164,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T10:40:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["detail"]["progress"]["failed_count"], 0)
@@ -2192,10 +2192,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 9,
-                                "layer_key": "layer_09_option_expression",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "six_month_target_fold",
@@ -2214,11 +2214,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             coverage_root = runtime / "stage_coverage"
             coverage_root.mkdir(parents=True, exist_ok=True)
-            (coverage_root / "layer_09_option_expression_data_acquisition_2016-01.json").write_text(
+            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_09_option_expression.data_acquisition",
+                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
                         "status": "partial_ready",
@@ -2233,16 +2233,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (coverage_root / "layer_09_option_expression_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
+            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_failure_register",
-                        "failure_id": "fail_layer9_thetadata_connection_refused",
-                        "request_id": "mgrreq_layer9_option_snapshot_aapl_2016_01",
-                        "run_id": "run_layer9_thetadata_connection_refused",
-                        "stage_id": "layer_09_option_expression.data_acquisition",
-                        "target_component_id": "m09_option_expression_data_acquisition",
-                        "source_id": "m09_option_expression_data_acquisition",
+                        "failure_id": "fail_option_chain_thetadata_connection_refused",
+                        "request_id": "mgrreq_option_chain_snapshot_aapl_2016_01",
+                        "run_id": "run_option_chain_thetadata_connection_refused",
+                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                        "target_component_id": "option_chain_state_source",
+                        "source_id": "option_chain_state_source",
                         "symbol": "AAPL",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
@@ -2251,7 +2251,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "observed_status": "failed",
                         "error_summary": "ThetaDataOptionSelectionSnapshotError: request failed before HTTP response: URLError: <urlopen error [Errno 111] Connection refused>",
                         "skip_future_matching": False,
-                        "evidence_refs": ["storage://trading-data/layer_09/receipt.json"],
+                        "evidence_refs": ["storage://trading-data/option_chain_state_source/receipt.json"],
                     }
                 )
                 + "\n",
@@ -2269,7 +2269,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T10:40:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["detail"]["failure_register"]["retry_required_count"], 1)
@@ -2359,10 +2359,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 9,
-                                "layer_key": "layer_09_option_expression",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "target_symbol_six_month",
@@ -2381,11 +2381,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             coverage_root = runtime / "stage_coverage"
             coverage_root.mkdir(parents=True, exist_ok=True)
-            (coverage_root / "layer_09_option_expression_data_acquisition_2016-01.json").write_text(
+            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_09_option_expression.data_acquisition",
+                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
                         "status": "partial_ready",
@@ -2412,7 +2412,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T16:55:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_09_option_expression")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["detail"]["progress"]["progress_source"], "fold_stage_coverage")
@@ -3567,10 +3567,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "blocked",
                             },
                             {
-                                "stage_id": "layer_09_option_expression.data_acquisition",
+                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 8,
-                                "layer_key": "layer_09_option_expression",
+                                "layer_key": "layer_03_target_state_vector",
                                 "status": "not_applicable",
                                 "last_reason": "no Layer 9 training-eligible underlying minutes ready for option-expression acquisition",
                             },
@@ -3600,7 +3600,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             any(task["layer"] == 5 and task["stage_type"] in {"data_acquisition", "feature_generation"} for task in task_timeline)
         )
         self.assertFalse(any(task["layer"] == 5 and task["stage_type"] == "model_task" for task in task_timeline))
-        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_09_option_expression")
+        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_03_target_state_vector")
         self.assertEqual(real_skip["task_state"], "skipped")
         self.assertIn("no Layer 9 training-eligible", real_skip["reason"])
 
@@ -3817,7 +3817,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             {
                                 "stage_id": "layer_10_event_risk_governor.model_generation",
                                 "stage_type": "model_generation",
-                                "layer": 9,
+                                "layer": 3,
                                 "layer_key": "layer_10_event_risk_governor",
                                 "status": "blocked",
                                 "last_reason": "waiting for layer_10_event_risk_governor.feature_or_input_ready",
@@ -4087,10 +4087,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_09_option_expression.feature_generation",
+                                "stage_id": "layer_03_target_state_vector.feature_generation",
                                 "stage_type": "feature_generation",
-                                "layer": 9,
-                                "layer_key": "layer_09_option_expression",
+                                "layer": 3,
+                                "layer_key": "layer_03_target_state_vector",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
@@ -4169,7 +4169,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertNotIn(
-            ("2016-fold1", "layer_09_option_expression.feature_generation"),
+            ("2016-fold1", "layer_03_target_state_vector.feature_generation"),
             [(task["month"], task["task_id"]) for task in current_tasks],
         )
 

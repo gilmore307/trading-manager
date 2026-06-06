@@ -276,12 +276,12 @@ def run_model_group_replay_if_ready(
                     "runner_stdout": exc.stdout,
                     "runner_stderr": exc.stderr,
                     "required_next_step": (
-                        "run Layer 9 ThetaData option acquisition with source_end no later than each missing replay decision timestamp, generate M09 option features, then retry model_group.replay"
+                        "run shared option_chain_state_source acquisition before Layer 3 with source_end no later than each missing replay decision timestamp, generate Layer 9 option features from that shared source, then retry model_group.replay"
                         if option_feature_acquisition_required
                         else None
                     ),
                     "blocked_stage_id": (
-                        "layer_09_option_expression.data_acquisition"
+                        "layer_03_target_state_vector.option_chain_data_acquisition"
                         if option_feature_acquisition_required
                         else None
                     ),

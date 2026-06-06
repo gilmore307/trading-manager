@@ -455,7 +455,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_option_feature_acquisition_required")
-            self.assertEqual(decision.execution_summary["blocked_stage_id"], "layer_09_option_expression.data_acquisition")
+            self.assertEqual(decision.execution_summary["blocked_stage_id"], "layer_03_target_state_vector.option_chain_data_acquisition")
             self.assertEqual(decision.execution_summary["resume_stage_id"], "model_group.replay")
 
     def test_legacy_equity_replay_without_candidate_handoff_does_not_unlock_replay(self):

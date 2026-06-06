@@ -350,7 +350,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertEqual(state.provider_calls_observed, 2)
             self.assertEqual(state.summary_row()["provider_calls_observed"], 2)
 
-    def test_layer_nine_option_expression_gate_review_is_ready_after_complete_upstream_base_chain(self):
+    def test_layer_nine_option_feature_generation_is_ready_after_shared_option_source_and_upstream_chain(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             state_path = tmp / "workflow_state.json"
@@ -376,15 +376,19 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 end_month="2016-06",
                 storage_root=tmp,
                 state_path=state_path,
-                completed_stage_ids=completions + ["layer_04_event_failure_risk.data_acquisition"],
+                completed_stage_ids=completions
+                + [
+                    "layer_03_target_state_vector.option_chain_data_acquisition",
+                    "layer_04_event_failure_risk.data_acquisition",
+                ],
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
                 write=False,
             )
-            layer_nine_acquisition = {stage.stage_id: stage for stage in state.stages}["layer_09_option_expression.data_acquisition"]
-            self.assertEqual(layer_nine_acquisition.status, "ready")
-            self.assertIsNone(layer_nine_acquisition.approval_gate_required)
-            self.assertTrue(any(token.endswith("review_layer_nine_option_expression_gate.py") for token in layer_nine_acquisition.command))
+            layer_nine_feature = {stage.stage_id: stage for stage in state.stages}["layer_09_option_expression.feature_generation"]
+            self.assertEqual(layer_nine_feature.status, "ready")
+            self.assertIsNone(layer_nine_feature.approval_gate_required)
+            self.assertTrue(any(token.endswith("execute_layer_nine_option_feature_generation.py") for token in layer_nine_feature.command))
 
     def test_layer_workflow_state_has_no_layer_local_post_generation_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

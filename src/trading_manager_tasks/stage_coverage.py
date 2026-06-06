@@ -22,6 +22,9 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageCoverageStatus = Literal["blocked", "partial_ready", "ready", "failed"]
 DEFAULT_STAGE_COVERAGE_PATH = DEFAULT_STORAGE_ROOT / "runtime" / "stage_coverage" / "layer_01_market_regime_data_acquisition_2016-01.json"
+OPTION_CHAIN_SOURCE_STAGE_ID = "layer_03_target_state_vector.option_chain_data_acquisition"
+OPTION_CHAIN_TARGET_COMPONENT_ID = "option_chain_state_source"
+OPTION_CHAIN_REQUEST_KIND = "option_chain_snapshot"
 
 
 @dataclass(frozen=True)
@@ -73,13 +76,13 @@ def _model_layer_for_stage(stage_id: str) -> str:
         return LAYER_ONE_MODEL_LAYER
     if stage_id == "layer_02_sector_context.data_acquisition":
         return LAYER_TWO_MODEL_LAYER
-    if stage_id == "layer_09_option_expression.data_acquisition":
-        return "layer_09_option_expression"
+    if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
+        return OPTION_CHAIN_SOURCE_STAGE_ID
     raise TaskSystemError(f"unsupported stage coverage gate: {stage_id}")
 
 
 def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
-    if stage_id == "layer_09_option_expression.data_acquisition":
+    if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
         return set()
     model_layer = _model_layer_for_stage(stage_id)
     return {
@@ -89,13 +92,13 @@ def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
 
 
 def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str) -> bool:
-    if stage_id == "layer_09_option_expression.data_acquisition":
-        if row.get("target_component_id") != "m09_option_expression_data_acquisition":
+    if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
+        if row.get("target_component_id") != OPTION_CHAIN_TARGET_COMPONENT_ID:
             return False
-        if row.get("request_kind") != "option_snapshot":
+        if row.get("request_kind") != OPTION_CHAIN_REQUEST_KIND:
             return False
         request_id = str(row.get("request_id") or "")
-        if not request_id.startswith("mgrreq_layer9_option_day_"):
+        if not request_id.startswith("mgrreq_option_chain_day_"):
             return False
         text = _row_text(row)
         return start_month in text or end_month in text
