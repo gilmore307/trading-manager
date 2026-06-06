@@ -22,3 +22,7 @@ jsonschema>=4.10,<5
 # LightGBM model training/inference used by trading-model layers through the
 # shared trading-manager environment anchor.
 lightgbm>=4,<5
+
+# ThetaData Python library for direct historical option data acquisition through
+# the shared trading-manager environment.
+thetadata>=1,<2
