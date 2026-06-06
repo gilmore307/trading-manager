@@ -33,6 +33,7 @@ DEFAULT_EVALUATION_RUNNER_PATH = DEFAULT_EVALUATION_REPO_ROOT / "scripts" / "eva
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = projects_root() / "trading-manager" / ".venv" / "bin" / "python"
 DEFAULT_REPLAY_INITIAL_CAPITAL_USD = 25_000.0
+REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED = "replay_option_feature_acquisition_required"
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 CANDIDATE_UNIVERSE_SOURCE_POLICY = "fixed_current_snapshot_historical_candidate_universe"
@@ -245,11 +246,17 @@ def run_model_group_replay_if_ready(
                 text=True,
             )
         except subprocess.CalledProcessError as exc:
+            runner_error = (exc.stderr or exc.stdout or str(exc)).strip()
+            option_feature_acquisition_required = REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED in runner_error
             return _decision(
                 now=now,
                 decision_status="backoff",
-                reason_code="model_group_replay_execution_failed",
-                reason=(exc.stderr or exc.stdout or str(exc)).strip(),
+                reason_code=(
+                    "model_group_replay_option_feature_acquisition_required"
+                    if option_feature_acquisition_required
+                    else "model_group_replay_execution_failed"
+                ),
+                reason=runner_error,
                 selected_work="model_group.replay",
                 command=command,
                 execution_summary={
@@ -268,6 +275,17 @@ def run_model_group_replay_if_ready(
                     "runner_returncode": exc.returncode,
                     "runner_stdout": exc.stdout,
                     "runner_stderr": exc.stderr,
+                    "required_next_step": (
+                        "run Layer 9 ThetaData option acquisition and M09 option feature generation for the missing replay decision timestamps, then retry model_group.replay"
+                        if option_feature_acquisition_required
+                        else None
+                    ),
+                    "blocked_stage_id": (
+                        "layer_09_option_expression.data_acquisition"
+                        if option_feature_acquisition_required
+                        else None
+                    ),
+                    "resume_stage_id": "model_group.replay" if option_feature_acquisition_required else None,
                 },
             )
     receipt = json.loads(completed.stdout)

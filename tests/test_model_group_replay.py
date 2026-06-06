@@ -422,6 +422,42 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertIn("missing fixed historical candidate universe evidence", decision.reason)
             self.assertEqual(decision.execution_summary["runner_returncode"], 2)
 
+    def test_option_feature_acquisition_requirement_returns_specific_backoff(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            runner = tmp / "run_replay_execution.py"
+            runner.write_text(
+                textwrap.dedent(
+                    """
+                    import sys
+                    print("replay_option_feature_acquisition_required: missing AAPL 2021-01-04T16:00:00-05:00", file=sys.stderr)
+                    raise SystemExit(2)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=runner,
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_option_feature_acquisition_required")
+            self.assertEqual(decision.execution_summary["blocked_stage_id"], "layer_09_option_expression.data_acquisition")
+            self.assertEqual(decision.execution_summary["resume_stage_id"], "model_group.replay")
+
     def test_legacy_equity_replay_without_candidate_handoff_does_not_unlock_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

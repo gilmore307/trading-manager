@@ -28,6 +28,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 DEFAULT_GATE_REVIEW_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_09_option_expression" / "gate_review"
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
+DEFAULT_PYTHON_EXECUTABLE = Path("/root/projects/trading-manager/.venv/bin/python")
 FEATURE_STAGE_ID = "layer_09_option_expression.feature_generation"
 DATA_ACQUISITION_STAGE_ID = "layer_09_option_expression.data_acquisition"
 
@@ -268,8 +269,9 @@ def execute_layer_nine_feature_stage(
             reason="current fold option source coverage is missing; run Layer 9 source acquisition before feature generation",
         )
 
+    python_executable = str(DEFAULT_PYTHON_EXECUTABLE if DEFAULT_PYTHON_EXECUTABLE.exists() else Path(sys.executable))
     command = (
-        "python3",
+        python_executable,
         "-m",
         "data_feature.m09_option_expression_feature_generation",
         "--source-start",
