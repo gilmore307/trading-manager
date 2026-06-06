@@ -276,7 +276,7 @@ def run_model_group_replay_if_ready(
                     "runner_stdout": exc.stdout,
                     "runner_stderr": exc.stderr,
                     "required_next_step": (
-                        "run Layer 9 ThetaData option acquisition and M09 option feature generation for the missing replay decision timestamps, then retry model_group.replay"
+                        "run Layer 9 ThetaData option acquisition with source_end no later than each missing replay decision timestamp, generate M09 option features, then retry model_group.replay"
                         if option_feature_acquisition_required
                         else None
                     ),
