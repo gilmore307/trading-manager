@@ -33,6 +33,7 @@ DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 STAGE_ID = "layer_09_option_expression.data_acquisition"
 SOURCE_ID = "m09_option_expression_data_acquisition"
 TARGET_COMPONENT_ID = "m09_option_expression_data_acquisition"
+SHARED_OPTION_CHAIN_SOURCE_ID = "option_chain_state_source"
 OPTION_BUCKET_POLICY_REF = "LAYER_09_OPTION_BUCKET_STRIKE_POLICY"
 DEFAULT_OPTION_SNAPSHOT_MAX_DTE = 45
 DEFAULT_OPTION_SNAPSHOT_STRIKE_RANGE = 5
@@ -91,6 +92,7 @@ class LayerNineRequestPreview:
                 "option_prefilter_enabled": True,
                 "option_prefilter_min_mid": DEFAULT_OPTION_PREFILTER_MIN_MID,
                 "include_trade_summary": True,
+                "reuse_option_chain_state_source": True,
                 "timeout_seconds": OPTION_SNAPSHOT_PROVIDER_CONTROLS["timeout_seconds"],
                 "retry_attempts": OPTION_SNAPSHOT_PROVIDER_CONTROLS["retry_attempts"],
                 "retry_backoff_seconds": OPTION_SNAPSHOT_PROVIDER_CONTROLS["retry_backoff_seconds"],
@@ -427,7 +429,7 @@ def manager_requests_from_gate_review(
                 "target_component_id": TARGET_COMPONENT_ID,
                 "target_component_kind": "data_source",
                 "target_repo_id": "trading-data",
-                "expected_outputs": ["trading_data.m09_option_expression_data_acquisition"],
+                "expected_outputs": [f"trading_data.{SHARED_OPTION_CHAIN_SOURCE_ID}", f"trading_data.{SOURCE_ID}"],
                 "policy_refs": ["autonomous_historical_provider_acquisition", "layer_09_option_expression_source_acquisition"],
                 "priority": "normal",
                 "deadline_at_utc": None,

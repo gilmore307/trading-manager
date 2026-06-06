@@ -94,6 +94,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(source_task["params"]["window_end"], "2016-01-05T09:59:59.999000-05:00")
         self.assertTrue(source_task["params"]["option_prefilter_enabled"])
         self.assertTrue(source_task["params"]["include_trade_summary"])
+        self.assertTrue(source_task["params"]["reuse_option_chain_state_source"])
         self.assertEqual(source_task["params"]["timeout_seconds"], 120)
         self.assertEqual(review.status, "provider_acquisition_ready")
         self.assertEqual(review.training_request_count, 1)
@@ -153,6 +154,10 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         request = manager_requests_from_gate_review(review)[0]
         controls = request["_task_key"]["manager_controls"]
 
+        self.assertEqual(
+            request["expected_outputs"],
+            ["trading_data.option_chain_state_source", "trading_data.m09_option_expression_data_acquisition"],
+        )
         self.assertEqual(controls["allowed_providers"], ["thetadata"])
         self.assertEqual(controls["allowed_endpoint_families"], ["option_selection_snapshot"])
         self.assertEqual(controls["max_requests"], 4)

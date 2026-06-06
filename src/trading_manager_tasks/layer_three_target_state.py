@@ -31,6 +31,8 @@ DEFAULT_TARGET_CONTEXT_MAPPING = Path("/root/projects/trading-storage/main/share
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_03_target_state_vector" / "input_materialization"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SOURCE = "m03_target_state_vector_data_acquisition"
+OPTION_CHAIN_SOURCE_TABLE = "option_chain_state_source"
+OPTION_CHAIN_SOURCE_POLICY_REF = "TARGET_OPTION_CHAIN_STATE_REDUCTION_POLICY"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
 BAR_SOURCE_TABLE = "m01_market_regime_data_acquisition"
 
@@ -67,6 +69,9 @@ class LayerThreeTargetStateMaterialization:
     bar_sources_path: str
     trading_data_receipt_path: str | None
     feed_artifacts: tuple[FeedArtifactRef, ...]
+    option_chain_source_table: str = OPTION_CHAIN_SOURCE_TABLE
+    option_chain_source_policy_ref: str = OPTION_CHAIN_SOURCE_POLICY_REF
+    option_chain_source_usage: str = "optional_sql_overlay_for_layer_3_target_level_reduction"
     provider_calls: int = 0
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
@@ -85,6 +90,9 @@ class LayerThreeTargetStateMaterialization:
             "bar_sources_path": self.bar_sources_path,
             "trading_data_receipt_path": self.trading_data_receipt_path,
             "feed_artifacts": [item.summary_row() for item in self.feed_artifacts],
+            "option_chain_source_table": self.option_chain_source_table,
+            "option_chain_source_policy_ref": self.option_chain_source_policy_ref,
+            "option_chain_source_usage": self.option_chain_source_usage,
             "provider_calls": self.provider_calls,
             "model_activation_performed": self.model_activation_performed,
             "broker_execution_performed": self.broker_execution_performed,
@@ -329,6 +337,11 @@ def build_source_task_key(
         "output_root": str(trading_data_output_root),
         "manager_stage_id": "layer_03_target_state_vector.data_acquisition",
         "source_policy": "local_reuse_of_reviewed_layer_02_alpaca_bar_sql_receipts_no_provider_calls",
+        "downstream_feature_inputs": {
+            "shared_option_chain_source_table": f"trading_data.{OPTION_CHAIN_SOURCE_TABLE}",
+            "shared_option_chain_source_policy_ref": OPTION_CHAIN_SOURCE_POLICY_REF,
+            "layer_3_usage": "target_level_option_chain_state_reduction_only",
+        },
     }
     task_key_path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return task_key, task_key_path, candidate_path, bar_sources_path, bar_count

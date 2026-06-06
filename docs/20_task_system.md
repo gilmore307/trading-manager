@@ -71,7 +71,12 @@ coverage remains child partition evidence under that one task.
    artifacts for a fold, manager prepares bounded `01_feed_alpaca_bars` requests
    for that target and dispatches them through the autonomous provider gate; the
    Layer 3 `m03_target_state_vector_data_acquisition` materializer then consumes those local
-   artifacts without direct provider access. These tasks prepare what the live
+   artifacts without direct provider access. Its task evidence also declares
+   `trading_data.option_chain_state_source` as the optional shared SQL overlay
+   consumed later by Layer 3 feature generation for target-level option-chain
+   state. Layer 9 option-expression acquisition derives from the same shared
+   source/cache before writing `m09_option_expression_data_acquisition`; it does
+   not own a second independent option-chain download route. These tasks prepare what the live
    components would have been able to inspect, but they do not select a fixed
    trade target for replay.
 3. Live-flow replay. Replay simulates the real system under a historical

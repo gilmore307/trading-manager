@@ -85,6 +85,14 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertTrue(candidate_path.exists())
             self.assertTrue(bar_sources_path.exists())
             self.assertIn("bar_sql_sources", task_key["params"])
+            self.assertEqual(
+                task_key["downstream_feature_inputs"]["shared_option_chain_source_table"],
+                "trading_data.option_chain_state_source",
+            )
+            self.assertEqual(
+                task_key["downstream_feature_inputs"]["layer_3_usage"],
+                "target_level_option_chain_state_reduction_only",
+            )
             self.assertNotIn("bar_rows_path", task_key["params"])
             source = task_key["params"]["bar_sql_sources"][0]
             self.assertEqual(source["source_symbol"], "XLF")
@@ -118,6 +126,8 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             task_key = json.loads(Path(summary.task_key_path).read_text(encoding="utf-8"))
             self.assertTrue(Path(task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
             self.assertIn("bar_sql_sources", task_key["params"])
+            self.assertEqual(summary.option_chain_source_table, "option_chain_state_source")
+            self.assertEqual(summary.option_chain_source_usage, "optional_sql_overlay_for_layer_3_target_level_reduction")
 
     def test_selected_target_symbol_limits_materialization_to_that_target(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

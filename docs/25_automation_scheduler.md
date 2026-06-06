@@ -79,6 +79,12 @@ target through the same autonomous provider controls used by Layer 1/2. Once
 those feed artifacts exist, the normal safe offline L3 materialization stage
 continues.
 
+Layer 3 option context is not a separate contract route. The shared
+`trading_data.option_chain_state_source` table owns contract-level ThetaData
+option-chain rows. Layer 3 feature generation reads it only as an optional
+target-level option-chain reducer input, while Layer 9 reuses the same source to
+derive option-expression candidate rows.
+
 Source-existing bootstrap may seed Layer 3 data acquisition from durable
 `m03_target_state_vector_data_acquisition` rows for the selected target. That prevents a clean
 control-plane reset from redownloading target-local bars when the accepted source

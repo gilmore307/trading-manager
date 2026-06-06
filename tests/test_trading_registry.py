@@ -693,6 +693,7 @@ class RegistryHelperTests(unittest.TestCase):
             "M01_MARKET_REGIME_DATA_ACQUISITION": "m01_market_regime_data_acquisition",
             "M02_SECTOR_CONTEXT_DATA_ACQUISITION": "m02_sector_context_data_acquisition",
             "M03_TARGET_STATE_VECTOR_DATA_ACQUISITION": "m03_target_state_vector_data_acquisition",
+            "OPTION_CHAIN_STATE_SOURCE": "option_chain_state_source",
             "M10_EVENT_RISK_GOVERNOR_DATA_ACQUISITION": "m10_event_risk_governor_data_acquisition",
             "M09_OPTION_EXPRESSION_DATA_ACQUISITION": "m09_option_expression_data_acquisition",
             "M09_OPTION_EXPRESSION_DATA_ACQUISITION_CONTRACT_PATH": "m09_option_expression_data_acquisition_contract_path",
@@ -906,6 +907,7 @@ class RegistryHelperTests(unittest.TestCase):
             "M01_MARKET_REGIME_FEATURE_GENERATION_GENERATE": "src/data_feature/m01_market_regime_feature_generation/__main__.py",
             "M02_SECTOR_CONTEXT_FEATURE_GENERATION_GENERATE": "src/data_feature/m02_sector_context_feature_generation/__main__.py",
             "M03_TARGET_STATE_VECTOR_FEATURE_GENERATION_GENERATE": "src/data_feature/m03_target_state_vector_feature_generation/__main__.py",
+            "OPTION_CHAIN_STATE_SOURCE_RUN": "src/data_source/option_chain_state_source/__main__.py",
             "M10_EVENT_RISK_GOVERNOR_FEATURE_GENERATION_GENERATE": "src/data_feature/m10_event_risk_governor_feature_generation/__main__.py",
             "M09_OPTION_EXPRESSION_FEATURE_GENERATION_GENERATE": "src/data_feature/m09_option_expression_feature_generation/__main__.py",
         }
@@ -1256,7 +1258,7 @@ class RegistryHelperTests(unittest.TestCase):
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         expected = {
-            "OPTION_SYMBOL": ("identity_field", "option_symbol", "m09_option_expression_data_acquisition_contract_path"),
+            "OPTION_SYMBOL": ("identity_field", "option_symbol", "option_chain_state_source"),
             "DOLLAR_VOLUME": ("field", "dollar_volume", "m03_target_state_vector_data_acquisition"),
             "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "m03_target_state_vector_data_acquisition"),
             "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "m03_target_state_vector_data_acquisition"),
@@ -1392,6 +1394,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(by_key["SNAPSHOT_TIME"]["kind"], "temporal_field")
         self.assertEqual(by_key["SNAPSHOT_TIME"]["payload"], "snapshot_time")
+        self.assertIn("option_chain_state_source", by_key["SNAPSHOT_TIME"]["applies_to"])
         self.assertIn("m01_market_regime_feature_generation", by_key["SNAPSHOT_TIME"]["applies_to"])
         self.assertNotIn("feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
         payloads = {row["payload"] for row in rows}
