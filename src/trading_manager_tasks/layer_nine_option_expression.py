@@ -653,6 +653,55 @@ def dispatch_layer_nine_option_acquisition(
         prepared = [prepare_item(row, worker_slot=worker_slot) for row in batch_rows]
         if not execute_provider_calls:
             return [item for item, _path in prepared]
+        if len(prepared) == 1:
+            item, command_path = prepared[0]
+            if command_path is None:
+                return [item]
+            command = [
+                sys.executable,
+                "-m",
+                "data_source.m09_option_expression_data_acquisition",
+                str(command_path),
+                "--run-id",
+                _run_id(item.request_id),
+            ]
+            result = subprocess.run(
+                command,
+                cwd=trading_data_root,
+                env={**os.environ, "PYTHONPATH": str(trading_data_root / "src")},
+                check=False,
+                text=True,
+                capture_output=True,
+            )
+            succeeded = result.returncode == 0
+            runtime_retained = bool(item.runtime_task_key_retained)
+            runtime_key_path = item.runtime_task_key_path
+            if succeeded:
+                try:
+                    command_path.unlink()
+                    runtime_retained = False
+                    runtime_key_path = None
+                except FileNotFoundError:
+                    runtime_retained = False
+                    runtime_key_path = None
+            error_tail = None if succeeded else "\n".join(part for part in (result.stdout[-500:], result.stderr[-500:]) if part)
+            if result.returncode != 0 and not continue_on_error:
+                raise TaskSystemError(f"Layer 9 option source dispatch failed for {item.request_id}: {result.stderr[-500:] or result.stdout[-500:]}")
+            return [
+                ProviderDispatchItem(
+                    request_id=item.request_id,
+                    task_key_path=item.task_key_path,
+                    runtime_task_key_path=runtime_key_path,
+                    runtime_task_key_retained=runtime_retained,
+                    command=command,
+                    receipt_path=item.receipt_path,
+                    status="dispatched_succeeded" if succeeded else "dispatched_failed",
+                    worker_id=item.worker_id,
+                    worker_slot=item.worker_slot,
+                    return_code=result.returncode,
+                    error_summary=error_tail,
+                )
+            ]
         runtime_paths = [path for _item, path in prepared if path is not None]
         batch_id = _batch_run_id(worker_slot=worker_slot)
         manifest_path = storage_root / "runtime" / "provider_task_key_batches" / STAGE_ID.replace(".", "__") / f"{batch_id}.json"

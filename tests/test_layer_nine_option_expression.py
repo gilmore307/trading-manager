@@ -224,22 +224,15 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
 
             def fake_run(command, **_kwargs):
                 captured_commands.append(command)
-                manifest_path = Path(command[command.index("--task-key-manifest") + 1])
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                items = []
-                for task_key_path in manifest["task_key_paths"]:
-                    task_key = json.loads(Path(task_key_path).read_text(encoding="utf-8"))
-                    items.append({"task_id": task_key["task_id"], "status": "succeeded"})
+                task_key = json.loads(Path(command[3]).read_text(encoding="utf-8"))
                 return SimpleNamespace(
                     returncode=0,
                     stdout=json.dumps(
                         {
-                            "contract_type": "m09_option_expression_data_acquisition_batch_result",
-                            "batch_run_id": manifest["batch_run_id"],
-                            "task_count": len(items),
-                            "succeeded_count": len(items),
-                            "failed_count": 0,
-                            "items": items,
+                            "status": "succeeded",
+                            "details": {"run_id": command[command.index("--run-id") + 1]},
+                            "row_counts": {"m09_option_expression_data_acquisition": 1},
+                            "references": [task_key["output_root"]],
                         }
                     ),
                     stderr="",
@@ -258,7 +251,8 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
                     )
 
         self.assertEqual(len(captured_commands), 1)
-        self.assertIn("--task-key-manifest", captured_commands[0])
+        self.assertNotIn("--task-key-manifest", captured_commands[0])
+        self.assertIn("--run-id", captured_commands[0])
         self.assertEqual(summary.request_count, 1)
         self.assertEqual(summary.dispatch_count, 1)
         self.assertTrue(all(item.status == "dispatched_succeeded" for item in summary.items))
@@ -286,22 +280,15 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
 
             def fake_run(command, **_kwargs):
                 captured_commands.append(command)
-                manifest_path = Path(command[command.index("--task-key-manifest") + 1])
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                self.assertEqual(len(manifest["task_key_paths"]), 1)
+                task_key = json.loads(Path(command[3]).read_text(encoding="utf-8"))
                 return SimpleNamespace(
                     returncode=0,
                     stdout=json.dumps(
                         {
-                            "contract_type": "m09_option_expression_data_acquisition_batch_result",
-                            "batch_run_id": manifest["batch_run_id"],
-                            "task_count": len(manifest["task_key_paths"]),
-                            "succeeded_count": len(manifest["task_key_paths"]),
-                            "failed_count": 0,
-                            "items": [
-                                {"task_id": json.loads(Path(path).read_text(encoding="utf-8"))["task_id"], "status": "succeeded"}
-                                for path in manifest["task_key_paths"]
-                            ],
+                            "status": "succeeded",
+                            "details": {"run_id": command[command.index("--run-id") + 1]},
+                            "row_counts": {"m09_option_expression_data_acquisition": 1},
+                            "references": [task_key["output_root"]],
                         }
                     ),
                     stderr="",
@@ -322,6 +309,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
         self.assertEqual(review.training_request_count, 2)
         self.assertEqual(summary.worker_selection.selected_worker_count, 1)
         self.assertEqual(len(captured_commands), 2)
+        self.assertTrue(all("--task-key-manifest" not in command for command in captured_commands))
 
     def test_provider_ready_main_returns_success_for_training_eligible_no_trade_row(self) -> None:
         rows = [
