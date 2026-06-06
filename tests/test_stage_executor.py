@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -49,6 +50,33 @@ class StageExecutorTests(unittest.TestCase):
             stdout = Path(summary.stdout_path or "").read_text(encoding="utf-8")
             self.assertIn("offline ok True 2016-01:layer_01_market_regime.feature_generation", stdout)
             self.assertFalse(list(progress_root.glob("*.json")))
+
+    def test_executes_python_stage_with_manager_interpreter(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            stage = StageProgress(
+                stage_id="layer_01_market_regime.feature_generation",
+                layer=1,
+                layer_key="layer_01_market_regime",
+                stage_type="feature_generation",
+                status="ready",
+                command=["python3", "-c", "import sys; print(sys.executable)"],
+                blockers=(),
+            )
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
+
+            self.assertEqual(summary.status, "succeeded")
+            self.assertEqual(summary.command[0], sys.executable)
+            stdout = Path(summary.stdout_path or "").read_text(encoding="utf-8").strip()
+            self.assertEqual(stdout, sys.executable)
 
     def test_stage_process_timeout_fails_and_writes_diagnostics(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

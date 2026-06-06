@@ -129,6 +129,12 @@ def _split_env(command: list[str]) -> tuple[dict[str, str], list[str]]:
     return env, argv
 
 
+def _resolve_python_argv(argv: list[str]) -> list[str]:
+    if argv and argv[0] in {"python", "python3"}:
+        return [sys.executable, *argv[1:]]
+    return argv
+
+
 def _cwd_for_stage(stage: StageProgress, *, manager_root: Path, trading_data_root: Path, trading_model_root: Path) -> Path:
     command_text = " ".join(stage.command)
     argv = _split_env(stage.command)[1]
@@ -255,6 +261,8 @@ def execute_stage_process(
     env_assignments, argv = _split_env(stage.command)
     if not argv:
         raise TaskSystemError(f"stage command has no argv after env parsing: {stage.stage_id}")
+    argv = _resolve_python_argv(argv)
+    execution_command = [f"{key}={value}" for key, value in env_assignments.items()] + argv
     cwd = _cwd_for_stage(stage, manager_root=manager_root, trading_data_root=trading_data_root, trading_model_root=trading_model_root)
     progress_root = progress_root or DEFAULT_TASK_PROGRESS_ROOT
     task_uid = task_uid or f"{stage.dataset_unit.start_month if stage.dataset_unit else 'unscheduled'}:{stage.stage_id}"
@@ -334,7 +342,7 @@ def execute_stage_process(
             error_kind="stage_command_failed",
             severity="error",
             summary=f"model training stage {stage.stage_id} command returned non-zero status",
-            command=stage.command,
+            command=execution_command,
             exit_code=return_code,
             stdout_path=str(stdout_path),
             stderr_path=str(stderr_path),
@@ -348,7 +356,7 @@ def execute_stage_process(
         contract_type="manager_stage_execution_summary",
         stage_id=stage.stage_id,
         status=status,
-        command=stage.command,
+        command=execution_command,
         return_code=return_code,
         receipt_path=str(receipt_path),
         stdout_path=str(stdout_path),

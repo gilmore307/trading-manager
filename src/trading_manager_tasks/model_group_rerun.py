@@ -24,6 +24,7 @@ from .scheduler_daemon import model_worker_fold_state_path
 RerunStage = Literal[
     "data_acquisition",
     "feature_generation",
+    "model_training",
     "model_generation",
     "model_evaluation",
     "replay_execution",
@@ -97,6 +98,8 @@ def _artifact_class_for_stage(stage: StageProgress) -> str:
         return "runtime_state"
     if stage.stage_type == "feature_generation":
         return "feature_data"
+    if stage.stage_type == "model_training":
+        return "model_artifact"
     if stage.stage_type == "model_generation":
         return "model_output"
     if stage.stage_type == "model_evaluation":

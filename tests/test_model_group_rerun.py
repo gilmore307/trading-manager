@@ -155,6 +155,52 @@ class ModelGroupRerunTests(unittest.TestCase):
             "waiting for layer_03_target_state_vector.data_acquisition_complete",
         )
 
+    def test_execute_resets_model_training_cutpoint(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-07_2016-12.json"
+            plan = build_model_training_workflow_plan(
+                start_month="2016-07",
+                end_month="2016-12",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            completed = [
+                stage.stage_id
+                for layer in plan.layers
+                for stage in layer.stages
+                if stage.layer <= 5
+            ]
+            advance_workflow_state(
+                start_month="2016-07",
+                end_month="2016-12",
+                storage_root=storage_root,
+                state_path=state_path,
+                completed_stage_ids=completed,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+
+            result = execute_model_group_rerun_reset(
+                storage_root=storage_root,
+                start_month="2016-07",
+                end_month="2016-12",
+                target_symbol="AAPL",
+                layer_id=5,
+                stage="model_training",
+                reason="Layer 5 training environment changed.",
+                write=True,
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+            by_stage = {stage["stage_id"]: stage for stage in payload["stages"]}
+
+        self.assertEqual(result.cutpoint_stage_id, "layer_05_alpha_confidence.model_training.train")
+        self.assertEqual(by_stage["layer_04_event_failure_risk.model_generation.test"]["status"], "succeeded")
+        self.assertEqual(by_stage["layer_05_alpha_confidence.model_training.train"]["status"], "ready")
+        self.assertEqual(by_stage["layer_05_alpha_confidence.model_generation.train"]["status"], "blocked")
+
     def test_batch_receipt_summarizes_per_state_reset_receipts(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
