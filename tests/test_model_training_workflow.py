@@ -384,6 +384,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIsNone(stage.approval_gate_required)
         self.assertIn("scripts/tasks/review_layer_nine_option_expression_gate.py", stage.command)
         self.assertIn("--write", stage.command)
+        self.assertIn("--persist-sql", stage.command)
 
     def test_layer_three_feature_generation_reads_month_scoped_source_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

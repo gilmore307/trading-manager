@@ -897,6 +897,7 @@ def _build_layer_workflow(
             "--end-month",
             "${END_MONTH}",
             "--write",
+            "--persist-sql",
         ]
         if selected_target_symbol:
             acquisition_command.extend(["--target-symbol", selected_target_symbol])
@@ -921,7 +922,10 @@ def _build_layer_workflow(
             "--end-month",
             "${END_MONTH}",
             "--write",
+            "--persist-sql",
         ]
+        if selected_target_symbol:
+            acquisition_command.extend(["--target-symbol", selected_target_symbol])
     elif acquisition_gate:
         acquisition_command = ["manager", "dispatch-approved-component-acquisition", key]
 

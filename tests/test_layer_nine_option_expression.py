@@ -212,7 +212,14 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
                 source_output_root=tmp / "source",
             )
             write_layer_nine_task_keys(requests)
-            persisted_requests = tuple({key: value for key, value in request.items() if not key.startswith("_")} for request in requests)
+            stale_minute_request = {
+                key: value for key, value in requests[0].items() if not key.startswith("_")
+            }
+            stale_minute_request["request_id"] = "mgrreq_layer9_option_snapshot_aapl_2016_01_2016_01_05_09_30_00_05_00_old"
+            persisted_requests = (
+                stale_minute_request,
+                *tuple({key: value for key, value in request.items() if not key.startswith("_")} for request in requests),
+            )
             captured_commands = []
 
             def fake_run(command, **_kwargs):

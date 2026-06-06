@@ -492,6 +492,9 @@ def _matches_layer_nine_request(row: Mapping[str, Any], *, start_month: str, end
         return False
     if row.get("request_kind") != "option_snapshot":
         return False
+    request_id = str(row.get("request_id") or "")
+    if not request_id.startswith(f"mgrreq_layer9_option_day_"):
+        return False
     text = " ".join(str(row.get(key) or "") for key in ("request_id", "parameter_ref"))
     return start_month in text or end_month in text
 
