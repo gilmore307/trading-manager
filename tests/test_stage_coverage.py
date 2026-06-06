@@ -47,6 +47,20 @@ def _summary_row(symbol: str, *, ready: bool = False, failed: bool = False) -> d
     }
 
 
+def _layer_nine_summary_row(request_id: str, *, ready: bool = False, failed: bool = False) -> dict[str, object]:
+    status = "failed" if failed else ("ready" if ready else "requested")
+    return {
+        "request_id": request_id,
+        "request_kind": "option_snapshot",
+        "target_component_id": "m09_option_expression_data_acquisition",
+        "parameter_ref": f"storage://trading-manager/runtime/layer_09_option_expression/m09_option_expression_data_acquisition/2016-01/{request_id}/task_key.json",
+        "expected_outputs": ["trading_data.option_chain_state_source", "trading_data.m09_option_expression_data_acquisition"],
+        "task_status": status,
+        "latest_run_status": "failed" if failed else ("succeeded" if ready else None),
+        "latest_ready_signal_status": "ready" if ready else None,
+    }
+
+
 class StageCoverageTests(unittest.TestCase):
     def test_three_ready_of_nineteen_is_partial_and_cannot_unlock(self):
         layer_one_symbols = _symbols(LAYER_ONE_MODEL_LAYER)
@@ -229,6 +243,26 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.pending_count, 1)
         self.assertFalse(report.can_unlock_downstream)
         self.assertIn("0 ready + 1 reviewed failed/skip / 2", report.reason)
+
+    def test_layer_nine_coverage_uses_daily_requests_not_stale_minute_snapshots(self):
+        day_request = "mgrreq_layer9_option_day_aapl_2016_01_2016_01_05"
+        stale_snapshot = "mgrreq_layer9_option_snapshot_aapl_2016_01_2016_01_05_09_30_00_05_00_old"
+        rows = [
+            _layer_nine_summary_row(day_request, ready=True),
+            _layer_nine_summary_row(stale_snapshot, ready=True),
+        ]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="layer_09_option_expression.data_acquisition",
+            start_month="2016-01",
+            end_month="2016-06",
+            expected_count=1,
+        )
+
+        self.assertEqual(report.observed_count, 1)
+        self.assertEqual(report.ready_request_ids, (day_request,))
+        self.assertEqual(report.status, "ready")
 
     def test_partial_coverage_report_does_not_complete_workflow_stage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

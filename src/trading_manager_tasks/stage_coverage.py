@@ -94,6 +94,9 @@ def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, e
             return False
         if row.get("request_kind") != "option_snapshot":
             return False
+        request_id = str(row.get("request_id") or "")
+        if not request_id.startswith("mgrreq_layer9_option_day_"):
+            return False
         text = _row_text(row)
         return start_month in text or end_month in text
     if row.get("target_component_id") != "01_feed_alpaca_bars":

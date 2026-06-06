@@ -224,6 +224,20 @@ class StageExecutorTests(unittest.TestCase):
                 with self.assertRaises(TaskSystemError):
                     execute_stage_process(stage)
 
+    def test_refuses_layer_nine_gate_as_safe_offline_stage(self):
+        stage = StageProgress(
+            stage_id="layer_09_option_expression.data_acquisition",
+            layer=9,
+            layer_key="layer_09_option_expression",
+            stage_type="data_acquisition",
+            status="ready",
+            command=["python3", "scripts/tasks/review_layer_nine_option_expression_gate.py", "--write", "--persist-sql"],
+            blockers=(),
+        )
+
+        with self.assertRaisesRegex(TaskSystemError, "not an allowed materialization/review command"):
+            execute_stage_process(stage)
+
     def test_refuses_unapproved_local_data_acquisition_command(self):
         stage = StageProgress(
             stage_id="layer_03_target_state_vector.data_acquisition",

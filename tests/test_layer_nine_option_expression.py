@@ -113,7 +113,7 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
             self.assertIn('"broker_execution_performed": false', receipt_text)
             self.assertIn('"model_activation_performed": false', receipt_text)
 
-    def test_written_provider_ready_receipt_is_successful_gate_completion(self) -> None:
+    def test_written_provider_ready_receipt_blocks_until_provider_coverage(self) -> None:
         review = build_layer_nine_gate_review(
             start_month="2016-01",
             end_month="2016-01",
@@ -131,10 +131,11 @@ class LayerNineOptionExpressionGateTests(unittest.TestCase):
             _review_path, receipt_path = write_gate_review_artifacts(review, output_root=Path(raw_tmp))
             receipt_text = receipt_path.read_text(encoding="utf-8")
 
-            self.assertIn('"status": "succeeded"', receipt_text)
+            self.assertIn('"status": "blocked"', receipt_text)
             self.assertIn('"layer_9_training_request_candidates": 1', receipt_text)
             self.assertIn('"provider_calls": 0', receipt_text)
             self.assertIn('"broker_execution_performed": false', receipt_text)
+            self.assertIn('"recommended_next_action": "prepare_option_expression_acquisition"', receipt_text)
 
     def test_layer_nine_manager_requests_authorize_thetadata_option_snapshot(self) -> None:
         review = build_layer_nine_gate_review(

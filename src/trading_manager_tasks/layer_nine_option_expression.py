@@ -362,7 +362,7 @@ def write_gate_review_artifacts(review: LayerNineGateReview, *, output_root: Pat
     review_payload = review.summary_row()
     review_payload["evidence_refs"] = [*review_payload["evidence_refs"], str(review_path), str(receipt_path)]
     review_path.write_text(json.dumps(review_payload, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
-    receipt_status = "succeeded" if review.status in {"no_provider_skip_accepted", "provider_acquisition_ready"} else "blocked"
+    receipt_status = "succeeded" if review.status == "no_provider_skip_accepted" else "blocked"
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     receipt = {
         "contract_type": "component_completion_receipt",
@@ -388,6 +388,7 @@ def write_gate_review_artifacts(review: LayerNineGateReview, *, output_root: Pat
         "broker_execution_performed": False,
         "storage_lifecycle_mutation_performed": False,
         "reason": review.reason,
+        "recommended_next_action": review.recommended_next_action,
     }
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return review_path, receipt_path

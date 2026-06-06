@@ -153,6 +153,9 @@ def discover_stage_receipts(
         for row in fetch_manager_requests(database_url=database_url):
             if row.get("target_component_id") != "m09_option_expression_data_acquisition" or row.get("request_kind") != "option_snapshot":
                 continue
+            request_id = str(row.get("request_id") or "")
+            if not request_id.startswith("mgrreq_layer9_option_day_"):
+                continue
             text = " ".join(str(row.get(key) or "") for key in ("request_id", "parameter_ref"))
             if start_month not in text and end_month not in text:
                 continue
@@ -166,7 +169,7 @@ def discover_stage_receipts(
                 continue
             refs.append(
                 StageReceiptRef(
-                    request_id=str(row["request_id"]),
+                    request_id=request_id,
                     symbol=str((task_key.get("params") or {}).get("underlying") or ""),
                     receipt_path=receipt_path,
                     receipt_uri=_storage_uri(receipt_path, storage_root=component_storage_root, repo_id="trading-data"),
