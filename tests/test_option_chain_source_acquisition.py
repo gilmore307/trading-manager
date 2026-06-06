@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from trading_manager_tasks.option_chain_source_acquisition import request_previews_for_fold
+from trading_manager_tasks.option_chain_source_acquisition import (
+    _runtime_task_key,
+    build_option_chain_source_review,
+    manager_requests_from_review,
+    request_previews_for_fold,
+)
 
 
 class OptionChainSourceAcquisitionTests(unittest.TestCase):
@@ -16,6 +21,26 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertEqual(previews[0].window_end, "2016-01-04T10:00:00-05:00")
         self.assertEqual(previews[-1].request_id, "mgrreq_option_chain_window_aapl_2016_01_2016_01_29_1530")
         self.assertEqual(previews[-1].window_end, "2016-01-29T16:00:00-05:00")
+
+    def test_manager_controls_use_provider_supported_time_window(self) -> None:
+        review = build_option_chain_source_review(start_month="2016-01", end_month="2016-01", target_symbol="AAPL")
+        request = manager_requests_from_review(review)[0]
+
+        self.assertEqual(request["_task_key"]["manager_controls"]["max_time_window"], "1d")
+
+    def test_runtime_task_key_repairs_stale_time_window_controls(self) -> None:
+        task_key = {
+            "manager_controls": {
+                "allow_live_provider_calls": True,
+                "autonomous_historical_provider_acquisition": True,
+                "max_time_window": "30m",
+            },
+            "params": {},
+        }
+
+        runtime_key = _runtime_task_key(task_key)
+
+        self.assertEqual(runtime_key["manager_controls"]["max_time_window"], "1d")
 
 
 if __name__ == "__main__":  # pragma: no cover

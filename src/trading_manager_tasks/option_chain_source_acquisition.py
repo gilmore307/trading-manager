@@ -42,7 +42,7 @@ OPTION_CHAIN_PROVIDER_CONTROLS = {
     "allowed_providers": ["thetadata"],
     "allowed_endpoint_families": ["option_selection_snapshot"],
     "max_symbols": 1,
-    "max_time_window": "30m",
+    "max_time_window": "1d",
     "timeout_seconds": 120,
     "retry_attempts": 3,
     "retry_backoff_seconds": 1.0,
@@ -398,8 +398,7 @@ def _runtime_task_key(task_key: Mapping[str, Any]) -> dict[str, Any]:
     controls = dict(runtime_key.get("manager_controls") or {})
     controls["allow_live_provider_calls"] = True
     controls["autonomous_historical_provider_acquisition"] = True
-    for key, value in OPTION_CHAIN_PROVIDER_CONTROLS.items():
-        controls.setdefault(key, value)
+    controls.update(OPTION_CHAIN_PROVIDER_CONTROLS)
     runtime_key["manager_controls"] = controls
     params = dict(runtime_key.get("params") or {})
     params["manager_dry_run"] = False
