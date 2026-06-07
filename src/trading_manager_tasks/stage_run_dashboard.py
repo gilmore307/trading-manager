@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Sequence, TextIO
 
 from .control_plane import TaskSystemError
+from .failure_register import fetch_failure_register_rows
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .option_chain_source_acquisition import STAGE_ID as OPTION_CHAIN_SOURCE_STAGE_ID, dispatch_option_chain_source_acquisition
 from .provider_dispatch import dispatch_layer_provider_acquisition
@@ -190,6 +191,30 @@ def _retryable_provider_policy_failures(
     return tuple(retryable)
 
 
+def _retryable_failure_register_requests(
+    *,
+    stage_id: str,
+    failed_request_ids: Sequence[str],
+    start_month: str,
+    end_month: str,
+    database_url: str | None = None,
+) -> tuple[str, ...]:
+    failed = {str(request_id) for request_id in failed_request_ids}
+    if not failed:
+        return ()
+    try:
+        rows = fetch_failure_register_rows(
+            database_url=database_url,
+            stage_id=stage_id,
+            start_month=start_month,
+            end_month=end_month,
+            failure_status="retry_required",
+        )
+    except Exception:
+        return ()
+    return tuple(str(row["request_id"]) for row in rows if str(row.get("request_id") or "") in failed)
+
+
 def preview_next_provider_dispatch(
     *,
     stage_id: str,
@@ -205,11 +230,19 @@ def preview_next_provider_dispatch(
 
     retry_failed_policy = False
     if coverage.status == "failed":
-        request_ids = _retryable_provider_policy_failures(
+        registered_retryable = _retryable_failure_register_requests(
+            stage_id=stage_id,
+            failed_request_ids=coverage.failed_request_ids,
+            start_month=start_month,
+            end_month=end_month,
+            database_url=database_url,
+        )
+        policy_retryable = _retryable_provider_policy_failures(
             failed_request_ids=coverage.failed_request_ids,
             start_month=start_month,
             component_storage_root=component_storage_root,
-        )[:limit]
+        )
+        request_ids = tuple(dict.fromkeys((*registered_retryable, *policy_retryable)))[:limit]
         retry_failed_policy = bool(request_ids)
     else:
         request_ids = tuple(str(item) for item in coverage.pending_request_ids[:limit])
@@ -277,7 +310,7 @@ def preview_next_provider_dispatch(
     return StageRunProviderDispatchPreview(
         available=bool(runnable),
         reason=(
-            "retryable provider policy failures available for autonomous retry"
+            "retryable provider/runtime failures available for autonomous retry"
             if retry_failed_policy and runnable
             else "autonomous provider dispatch preview available"
             if runnable
@@ -329,7 +362,7 @@ def _coverage_payload(report: StageCoverageReport) -> dict[str, Any]:
 
 def _next_action(*, coverage: StageCoverageReport, preview: StageRunProviderDispatchPreview) -> tuple[str, str]:
     if coverage.status == "failed":
-        if preview.available and "retryable provider policy" in preview.reason:
+        if preview.available and "autonomous retry" in preview.reason:
             return ("autonomous_provider_failure_retry_ready", f"{coverage.reason}; {preview.reason}")
         return ("automatic_repair_required", coverage.reason)
     if coverage.can_unlock_downstream:

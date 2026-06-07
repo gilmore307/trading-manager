@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from trading_manager_tasks.stage_coverage import StageCoverageReport
@@ -10,6 +11,7 @@ from trading_manager_tasks.stage_run_dashboard import (
     StageRunProviderDispatchPreview,
     build_stage_run_dashboard,
     default_dashboard_path,
+    preview_next_provider_dispatch,
 )
 
 
@@ -131,6 +133,59 @@ class StageRunDashboardTests(unittest.TestCase):
 
         self.assertEqual(dashboard.next_action, "autonomous_provider_failure_retry_ready")
         self.assertEqual(dashboard.next_provider_dispatch.request_ids, ("mgrreq_backfill_alpaca_bars_xop_2016_01",))
+
+    def test_failed_option_chain_retry_required_register_rows_can_retry_autonomously(self) -> None:
+        request_id = "mgrreq_option_chain_window_aapl_2016_01_2016_04_20_0930"
+        coverage = StageCoverageReport(
+            contract_type="manager_stage_coverage",
+            stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+            start_month="2016-01",
+            end_month="2016-06",
+            expected_count=1625,
+            observed_count=968,
+            ready_count=967,
+            failed_count=1,
+            pending_count=657,
+            accepted_failed_count=0,
+            status="failed",
+            can_unlock_downstream=False,
+            ready_request_ids=(),
+            failed_request_ids=(request_id,),
+            accepted_failed_request_ids=(),
+            pending_request_ids=(),
+            accepted_failure_refs=(),
+            reason="1/1625 requests failed without accepted review; downstream remains blocked",
+        )
+        dispatch_summary = SimpleNamespace(
+            items=(
+                SimpleNamespace(
+                    request_id=request_id,
+                    status="validated_not_dispatched",
+                    command=("python3", "-m", "data_source.option_chain_state_source", "task_key.json"),
+                    worker_id="provider-worker-1",
+                    worker_slot=1,
+                ),
+            )
+        )
+        with patch(
+            "trading_manager_tasks.stage_run_dashboard.fetch_failure_register_rows",
+            return_value=[{"request_id": request_id, "failure_status": "retry_required"}],
+        ), patch(
+            "trading_manager_tasks.stage_run_dashboard.dispatch_option_chain_source_acquisition",
+            return_value=dispatch_summary,
+        ):
+            preview = preview_next_provider_dispatch(
+                stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+                start_month="2016-01",
+                end_month="2016-06",
+                limit=4,
+                storage_root=Path("/tmp/does-not-exist"),
+                coverage=coverage,
+            )
+
+        self.assertTrue(preview.available)
+        self.assertEqual(preview.request_ids, (request_id,))
+        self.assertIn("provider/runtime", preview.reason)
 
     def test_default_dashboard_path_is_stable(self) -> None:
         self.assertEqual(
