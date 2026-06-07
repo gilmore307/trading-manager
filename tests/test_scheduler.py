@@ -277,17 +277,20 @@ class SchedulerTests(unittest.TestCase):
         ), patch("trading_manager_tasks.scheduler.next_ready_or_blocked_stage", return_value=ready_stage), patch(
             "trading_manager_tasks.scheduler.first_blocked_stage", return_value=None
         ), patch("trading_manager_tasks.scheduler._execute_autonomous_provider_stage", return_value=fake_summary) as execute_provider_stage:
+            state_path = Path("/tmp/model_training_fold_state_aapl_2016-01_2016-06.json")
             decision = run_scheduler_once(
                 now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
                 resource_snapshot=self._healthy_resource_snapshot(),
                 execute_autonomous_provider_stages=True,
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
+                state_path=state_path,
             )
 
         self.assertEqual(decision.decision_status, "executed")
         self.assertEqual(decision.selected_work, "layer_03_target_state_vector.option_chain_data_acquisition")
         self.assertFalse(execute_provider_stage.call_args.kwargs["foundation_catch_up_only"])
+        self.assertEqual(execute_provider_stage.call_args.kwargs["state_path"], state_path)
 
     def test_option_chain_provider_execution_advances_full_target_workflow(self):
         state = SimpleNamespace(
@@ -331,12 +334,14 @@ class SchedulerTests(unittest.TestCase):
             "trading_manager_tasks.scheduler.reconcile_provider_stage",
             return_value=reconcile_summary,
         ) as reconcile_mock:
+            target_state_path = Path(raw_tmp) / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
             _execute_autonomous_provider_stage(
                 stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
                 start_month="2016-01",
                 end_month="2016-06",
                 storage_root=Path(raw_tmp),
                 component_src_root=Path(raw_tmp) / "trading-data",
+                state_path=target_state_path,
                 next_limit=5,
                 max_workers=1,
                 selected_target_symbol="AAPL",
@@ -345,8 +350,10 @@ class SchedulerTests(unittest.TestCase):
 
         self.assertEqual(len(advance_mock.call_args_list), 2)
         self.assertTrue(all(not call.kwargs["foundation_catch_up_only"] for call in advance_mock.call_args_list))
+        self.assertTrue(all(call.kwargs["state_path"] == target_state_path for call in advance_mock.call_args_list))
         reconcile_mock.assert_called_once()
         self.assertFalse(reconcile_mock.call_args.kwargs["foundation_catch_up_only"])
+        self.assertEqual(reconcile_mock.call_args.kwargs["workflow_state_path"], target_state_path)
 
     def test_scheduler_reports_first_blocked_stage_instead_of_plan_fallback(self):
         blocked_stage = SimpleNamespace(

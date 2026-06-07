@@ -358,13 +358,14 @@ def _execute_autonomous_provider_stage(
     end_month: str,
     storage_root: Path,
     component_src_root: Path,
+    state_path: Path | None,
     next_limit: int,
     max_workers: int,
     selected_target_symbol: str | None,
     foundation_catch_up_only: bool,
 ) -> dict[str, Any]:
     model_layer = PROVIDER_STAGE_MODEL_LAYERS[stage_id]
-    state_path = workflow_state_path_for_month(start_month, root=storage_root / "runtime")
+    resolved_state_path = state_path or workflow_state_path_for_month(start_month, root=storage_root / "runtime")
     locks_dir = storage_root / "runtime" / "locks"
     effective_foundation_catch_up_only = workflow_foundation_catch_up_only_for_stage(stage_id, foundation_catch_up_only)
     with acquire_scheduler_lock(month_stage_lock_ref(start_month, stage_id, locks_dir=locks_dir)):
@@ -403,13 +404,13 @@ def _execute_autonomous_provider_stage(
             start_month=start_month,
             end_month=end_month,
             storage_root=storage_root,
-            state_path=state_path,
+            state_path=resolved_state_path,
             selected_target_symbol=selected_target_symbol,
             foundation_catch_up_only=effective_foundation_catch_up_only,
             write=False,
         )
         started_state = mark_stage_started(started_state, stage_id=stage_id, reason="provider acquisition stage started by scheduler")
-        write_workflow_state(state_path, started_state)
+        write_workflow_state(resolved_state_path, started_state)
     controller_receipt, dashboard = run_stage_controller_step(
         stage_id=stage_id,
         start_month=start_month,
@@ -433,6 +434,7 @@ def _execute_autonomous_provider_stage(
         collect_coverage=True,
         write_coverage_report=True,
         advance_workflow=True,
+        workflow_state_path=resolved_state_path,
         write_workflow_state=True,
         selected_target_symbol=selected_target_symbol,
         foundation_catch_up_only=effective_foundation_catch_up_only,
@@ -442,7 +444,7 @@ def _execute_autonomous_provider_stage(
         start_month=start_month,
         end_month=end_month,
         storage_root=storage_root,
-        state_path=state_path,
+        state_path=resolved_state_path,
         selected_target_symbol=selected_target_symbol,
         foundation_catch_up_only=effective_foundation_catch_up_only,
         write=False,
@@ -796,6 +798,7 @@ def run_scheduler_once(
             end_month=end_month,
             storage_root=storage_root,
             component_src_root=component_src_root,
+            state_path=resolved_state_path,
             next_limit=provider_stage_next_limit,
             max_workers=provider_stage_max_workers,
             selected_target_symbol=selected_target_symbol,
