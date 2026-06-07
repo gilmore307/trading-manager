@@ -13,6 +13,7 @@ from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_m
 from trading_manager_tasks.scheduler import (
     ResourceSnapshot,
     SchedulerConfig,
+    _execute_autonomous_provider_stage,
     is_regular_us_equity_trading_day,
     live_runtime_historical_task_gate,
     market_hours_gate,
@@ -287,6 +288,65 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, "executed")
         self.assertEqual(decision.selected_work, "layer_03_target_state_vector.option_chain_data_acquisition")
         self.assertFalse(execute_provider_stage.call_args.kwargs["foundation_catch_up_only"])
+
+    def test_option_chain_provider_execution_advances_full_target_workflow(self):
+        state = SimpleNamespace(
+            stages=(),
+            summary_row=lambda: {"stages": []},
+        )
+        controller_receipt = SimpleNamespace(
+            provider_calls=0,
+            dispatch_performed=False,
+            model_activation_performed=False,
+            broker_execution_performed=False,
+            storage_lifecycle_mutation_performed=False,
+            summary_row=lambda: {"provider_calls": 0},
+        )
+        dashboard = SimpleNamespace(summary_row=lambda: {"status": "partial_ready"})
+        reconcile_summary = SimpleNamespace(
+            summary_row=lambda: {
+                "workflow_advanced": True,
+                "provider_calls": 0,
+                "dispatch_performed": False,
+                "model_activation_performed": False,
+                "broker_execution_performed": False,
+                "storage_lifecycle_mutation_performed": False,
+            }
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.scheduler.prepare_option_chain_source_acquisition",
+            return_value=(SimpleNamespace(status="ready"), (), ()),
+        ), patch(
+            "trading_manager_tasks.scheduler.advance_workflow_state",
+            return_value=state,
+        ) as advance_mock, patch(
+            "trading_manager_tasks.scheduler.mark_stage_started",
+            return_value=state,
+        ), patch(
+            "trading_manager_tasks.scheduler.write_workflow_state",
+        ), patch(
+            "trading_manager_tasks.scheduler.run_stage_controller_step",
+            return_value=(controller_receipt, dashboard),
+        ), patch(
+            "trading_manager_tasks.scheduler.reconcile_provider_stage",
+            return_value=reconcile_summary,
+        ) as reconcile_mock:
+            _execute_autonomous_provider_stage(
+                stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=Path(raw_tmp),
+                component_src_root=Path(raw_tmp) / "trading-data",
+                next_limit=5,
+                max_workers=1,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=True,
+            )
+
+        self.assertEqual(len(advance_mock.call_args_list), 2)
+        self.assertTrue(all(not call.kwargs["foundation_catch_up_only"] for call in advance_mock.call_args_list))
+        reconcile_mock.assert_called_once()
+        self.assertFalse(reconcile_mock.call_args.kwargs["foundation_catch_up_only"])
 
     def test_scheduler_reports_first_blocked_stage_instead_of_plan_fallback(self):
         blocked_stage = SimpleNamespace(

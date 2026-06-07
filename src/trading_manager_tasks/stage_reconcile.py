@@ -412,6 +412,14 @@ def default_coverage_report_path(*, stage_id: str, start_month: str) -> Path:
     return DEFAULT_COVERAGE_OUTPUT_ROOT / f"{safe_stage}_{start_month}.json"
 
 
+def workflow_foundation_catch_up_only_for_stage(stage_id: str, requested: bool) -> bool:
+    """Return the workflow scope needed to ingest coverage for a provider stage."""
+
+    if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
+        return False
+    return requested
+
+
 def _reconcile_provider_stage_unlocked(
     *,
     stage_id: str,
@@ -496,6 +504,7 @@ def _reconcile_provider_stage_unlocked(
     if advance_workflow:
         if output_path is None or not output_path.exists():
             raise TaskSystemError("advance_workflow requires a written stage coverage report")
+        effective_foundation_catch_up_only = workflow_foundation_catch_up_only_for_stage(stage_id, foundation_catch_up_only)
         advance_workflow_state(
             start_month=start_month,
             end_month=end_month,
@@ -503,7 +512,7 @@ def _reconcile_provider_stage_unlocked(
             state_path=resolved_workflow_state_path,
             stage_coverage_reports=(output_path,),
             selected_target_symbol=selected_target_symbol,
-            foundation_catch_up_only=foundation_catch_up_only,
+            foundation_catch_up_only=effective_foundation_catch_up_only,
             write=write_workflow_state,
         )
 
@@ -658,6 +667,7 @@ __all__ = [
     "normalize_stage_receipts",
     "propose_failure_register_rows",
     "reconcile_provider_stage",
+    "workflow_foundation_catch_up_only_for_stage",
     "write_stage_reconcile_summary",
 ]
 

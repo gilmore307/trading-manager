@@ -97,10 +97,10 @@ def _write_connection_refused_receipt(root: Path, *, symbol: str = "XLK", month:
     return path
 
 
-def _coverage() -> StageCoverageReport:
+def _coverage(stage_id: str = "layer_02_sector_context.data_acquisition") -> StageCoverageReport:
     return StageCoverageReport(
         contract_type="manager_stage_coverage",
-        stage_id="layer_02_sector_context.data_acquisition",
+        stage_id=stage_id,
         start_month="2016-01",
         end_month="2016-01",
         expected_count=25,
@@ -351,6 +351,38 @@ class StageReconcileTests(unittest.TestCase):
             self.assertTrue(summary.workflow_advanced)
             persist_mock.assert_called_once()
             advance_mock.assert_called_once()
+
+    def test_option_chain_reconcile_advances_full_target_workflow_by_default(self) -> None:
+        stage_id = "layer_03_target_state_vector.option_chain_data_acquisition"
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.stage_reconcile.discover_stage_receipts",
+            return_value=(),
+        ), patch(
+            "trading_manager_tasks.stage_reconcile.collect_stage_coverage",
+            return_value=_coverage(stage_id),
+        ), patch(
+            "trading_manager_tasks.stage_reconcile.advance_workflow_state",
+        ) as advance_mock:
+            root = Path(raw_tmp)
+            coverage_path = root / "coverage.json"
+            summary = reconcile_provider_stage(
+                stage_id=stage_id,
+                start_month="2016-01",
+                end_month="2016-06",
+                manager_storage_root=root,
+                coverage_report_path=coverage_path,
+                write_coverage_report=True,
+                advance_workflow=True,
+                workflow_state_path=root / "workflow.json",
+                write_workflow_state=True,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=True,
+                locks_dir=root / "locks",
+            )
+
+            self.assertTrue(summary.workflow_advanced)
+            advance_mock.assert_called_once()
+            self.assertFalse(advance_mock.call_args.kwargs["foundation_catch_up_only"])
 
 
 if __name__ == "__main__":

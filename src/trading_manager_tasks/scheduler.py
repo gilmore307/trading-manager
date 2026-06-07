@@ -48,7 +48,7 @@ from .model_training_workflow import (
 from .provider_dispatch import dispatch_layer_provider_acquisition
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .stage_executor import execute_next_ready_stage
-from .stage_reconcile import DEFAULT_COMPONENT_STORAGE_ROOT, reconcile_provider_stage
+from .stage_reconcile import DEFAULT_COMPONENT_STORAGE_ROOT, reconcile_provider_stage, workflow_foundation_catch_up_only_for_stage
 from .stage_run_controller import run_stage_controller_step
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_locks import acquire_scheduler_lock, month_stage_lock_ref, scheduler_lock_plan
@@ -366,6 +366,7 @@ def _execute_autonomous_provider_stage(
     model_layer = PROVIDER_STAGE_MODEL_LAYERS[stage_id]
     state_path = workflow_state_path_for_month(start_month, root=storage_root / "runtime")
     locks_dir = storage_root / "runtime" / "locks"
+    effective_foundation_catch_up_only = workflow_foundation_catch_up_only_for_stage(stage_id, foundation_catch_up_only)
     with acquire_scheduler_lock(month_stage_lock_ref(start_month, stage_id, locks_dir=locks_dir)):
         if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
             if not selected_target_symbol:
@@ -404,7 +405,7 @@ def _execute_autonomous_provider_stage(
             storage_root=storage_root,
             state_path=state_path,
             selected_target_symbol=selected_target_symbol,
-            foundation_catch_up_only=foundation_catch_up_only,
+            foundation_catch_up_only=effective_foundation_catch_up_only,
             write=False,
         )
         started_state = mark_stage_started(started_state, stage_id=stage_id, reason="provider acquisition stage started by scheduler")
@@ -434,7 +435,7 @@ def _execute_autonomous_provider_stage(
         advance_workflow=True,
         write_workflow_state=True,
         selected_target_symbol=selected_target_symbol,
-        foundation_catch_up_only=foundation_catch_up_only,
+        foundation_catch_up_only=effective_foundation_catch_up_only,
         locks_dir=locks_dir,
     )
     refreshed_state = advance_workflow_state(
@@ -443,7 +444,7 @@ def _execute_autonomous_provider_stage(
         storage_root=storage_root,
         state_path=state_path,
         selected_target_symbol=selected_target_symbol,
-        foundation_catch_up_only=foundation_catch_up_only,
+        foundation_catch_up_only=effective_foundation_catch_up_only,
         write=False,
     )
     return {
