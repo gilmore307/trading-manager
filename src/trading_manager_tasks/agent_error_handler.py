@@ -110,6 +110,14 @@ def _env_int(name: str, default: int) -> int:
     return parsed
 
 
+def _agent_runner_timeout_seconds(default: int = DEFAULT_AGENT_RUNNER_TIMEOUT_SECONDS) -> int:
+    if os.environ.get("MANAGER_AGENT_ERROR_RUNNER_TIMEOUT_SECONDS"):
+        return _env_int("MANAGER_AGENT_ERROR_RUNNER_TIMEOUT_SECONDS", default)
+    if os.environ.get("MANAGER_AGENT_ERROR_AGENT_TIMEOUT_SECONDS"):
+        return _env_int("MANAGER_AGENT_ERROR_AGENT_TIMEOUT_SECONDS", default) + 120
+    return default
+
+
 def _stable_id(prefix: str, *parts: object) -> str:
     payload = json.dumps(parts, sort_keys=True, separators=(",", ":"), default=str)
     return f"{prefix}_{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:16]}"
@@ -816,22 +824,25 @@ def handle_server_error(
         catalog_storage=catalog_storage,
     )
     request_path = default_request_path(request, output_root)
+    diagnosis_path = default_diagnosis_path(request, output_root)
     write_json_artifact(request, path=request_path)
     configured_runner = runner_command or os.environ.get("MANAGER_AGENT_ERROR_RUNNER_COMMAND", "").strip()
     effective_call_agent = call_agent or _env_truthy("MANAGER_AGENT_ERROR_AUTOCALL")
     if effective_call_agent and configured_runner:
+        diagnosis = build_queued_diagnosis(request, reason="agent runner call pending")
+        diagnosis["discord_notification"] = {"status": "pending", "reason": "agent runner still executing"}
+        write_json_artifact(diagnosis, path=diagnosis_path)
         try:
             diagnosis = call_agent_runner(
                 request,
                 runner_command=configured_runner,
-                timeout_seconds=_env_int("MANAGER_AGENT_ERROR_RUNNER_TIMEOUT_SECONDS", DEFAULT_AGENT_RUNNER_TIMEOUT_SECONDS),
+                timeout_seconds=_agent_runner_timeout_seconds(),
             )
         except Exception as exc:
             diagnosis = build_agent_call_failed_diagnosis(request, runner_command=configured_runner, error=exc)
     else:
         diagnosis = build_queued_diagnosis(request, reason="agent runner not configured" if effective_call_agent else "agent call not requested")
     diagnosis = dict(diagnosis)
-    diagnosis_path = default_diagnosis_path(request, output_root)
     diagnosis["discord_notification"] = {"status": "pending", "reason": "diagnosis written before notification"}
     write_json_artifact(diagnosis, path=diagnosis_path)
     should_notify_discord = (

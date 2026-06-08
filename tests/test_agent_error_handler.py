@@ -180,6 +180,33 @@ class AgentErrorHandlerTests(unittest.TestCase):
 
         self.assertEqual(runner.call_args.kwargs["timeout_seconds"], 7)
 
+    def test_handle_server_error_uses_agent_timeout_as_runner_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            runner_diagnosis = {
+                "contract_type": "agent_error_diagnosis",
+                "schema_version": "1",
+                "diagnosis_id": "errdiag_timeout_alias",
+                "request_ref": "placeholder",
+                "agent_ref": "codex_cli_gpt_5_5",
+                "status": "completed",
+                "completed_at_utc": "2026-06-08T05:00:00Z",
+            }
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_AGENT_TIMEOUT_SECONDS": "1800"}, clear=False), patch(
+                "trading_manager_tasks.agent_error_handler.call_agent_runner",
+                return_value=runner_diagnosis,
+            ) as runner:
+                handle_server_error(
+                    source_component="server.test",
+                    summary="failure",
+                    output_root=tmp,
+                    call_agent=True,
+                    runner_command="python3 runner.py",
+                    catalog_storage="jsonl",
+                )
+
+        self.assertEqual(runner.call_args.kwargs["timeout_seconds"], 1920)
+
     def test_false_autocall_env_does_not_call_runner(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

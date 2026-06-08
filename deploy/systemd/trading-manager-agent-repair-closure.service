@@ -9,7 +9,7 @@ Type=oneshot
 WorkingDirectory=/root/projects/trading-manager
 Environment=PYTHONPATH=/root/projects/trading-manager/src:/root/projects/trading-data/src:/root/projects/trading-storage/src:/root/projects/trading-model/src:/root/projects/trading-evaluation/src:/root/projects/trading-execution/src
 Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=-/etc/default/trading-manager-historical-scheduler
 ExecStart=/root/projects/trading-manager/.venv/bin/python /root/projects/trading-manager/scripts/tasks/close_agent_repairs.py --limit 20
 NoNewPrivileges=true
 PrivateTmp=true
-

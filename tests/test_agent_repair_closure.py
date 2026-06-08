@@ -10,7 +10,9 @@ from trading_manager_tasks.agent_repair_closure import (
     ClosureCandidate,
     close_agent_repair,
     close_pending_agent_repairs,
+    discover_agent_diagnosis_candidates,
     discover_closure_candidates,
+    run_pending_agent_diagnoses,
 )
 
 
@@ -33,6 +35,7 @@ class AgentRepairClosureTests(unittest.TestCase):
             "error_scope": "server.scheduler_progress",
             "error_kind": "scheduler_progress_stalled",
             "summary": "scheduler stalled",
+            "agent_ref": "codex_cli_gpt_5_5",
         }
         request.update(request_overrides or {})
         payload = stdout_payload or {
@@ -139,6 +142,21 @@ class AgentRepairClosureTests(unittest.TestCase):
             self.assertTrue(receipts[0]["dry_run"])
             self.assertFalse(candidate.receipt_path.exists())
 
+    def test_plan_only_does_not_run_agent_diagnosis_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            candidate = self._write_candidate(root)
+            diagnosis = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
+            diagnosis["status"] = "queued"
+            candidate.diagnosis_path.write_text(json.dumps(diagnosis), encoding="utf-8")
+
+            with unittest.mock.patch("trading_manager_tasks.agent_repair_closure.call_agent_runner") as runner:
+                receipts = close_pending_agent_repairs(output_root=root, execute_actions=False)
+
+        self.assertEqual(len(receipts), 1)
+        self.assertFalse(runner.called)
+        self.assertEqual(receipts[0]["closure_status"], "pending")
+
     def test_incomplete_diagnosis_remains_pending_without_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
@@ -151,6 +169,73 @@ class AgentRepairClosureTests(unittest.TestCase):
 
             self.assertEqual(receipt["closure_status"], "pending")
             self.assertFalse(candidate.receipt_path.exists())
+
+    def test_discovers_request_without_diagnosis_for_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            request_dir = root / "erragent_missing_diagnosis"
+            request_dir.mkdir()
+            (request_dir / "server_error_agent_request.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_agent_request",
+                        "schema_version": "1",
+                        "request_id": "erragent_missing_diagnosis",
+                        "agent_ref": "codex_cli_gpt_5_5",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            candidates = discover_agent_diagnosis_candidates(root)
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].request_dir.name, "erragent_missing_diagnosis")
+
+    def test_recovery_runs_agent_for_queued_diagnosis(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            candidate = self._write_candidate(root)
+            diagnosis = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
+            diagnosis["status"] = "queued"
+            diagnosis["stderr"] = "agent runner call pending"
+            candidate.diagnosis_path.write_text(json.dumps(diagnosis), encoding="utf-8")
+
+            with unittest.mock.patch(
+                "trading_manager_tasks.agent_repair_closure.call_agent_runner",
+                return_value={
+                    "contract_type": "agent_error_diagnosis",
+                    "schema_version": "1",
+                    "diagnosis_id": "errdiag_recovered",
+                    "request_ref": "erragent_fixture",
+                    "agent_ref": "codex_cli_gpt_5_5",
+                    "runner_command": "codex",
+                    "status": "completed",
+                    "return_code": 0,
+                    "stdout": json.dumps(
+                        {
+                            "diagnosis_status": "repaired_verified",
+                            "repair": {"repair_status": "repaired", "files_changed": []},
+                            "retry_recommendation": "retry",
+                            "blockers": [],
+                        }
+                    ),
+                    "stderr": "",
+                    "completed_at_utc": "2026-06-08T05:10:00Z",
+                },
+            ) as runner, unittest.mock.patch.dict(
+                "os.environ",
+                {"MANAGER_AGENT_ERROR_RUNNER_COMMAND": "codex repair"},
+                clear=False,
+            ):
+                diagnoses = run_pending_agent_diagnoses(output_root=root)
+
+            recovered = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(len(diagnoses), 1)
+        self.assertEqual(recovered["status"], "completed")
+        self.assertEqual(recovered["diagnosis_id"], "errdiag_recovered")
+        self.assertEqual(runner.call_args.kwargs["runner_command"], "codex repair")
 
 
 if __name__ == "__main__":

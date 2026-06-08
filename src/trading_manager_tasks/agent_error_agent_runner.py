@@ -81,7 +81,10 @@ def _codex_sandbox() -> str:
 def run_codex_cli_for_error(request: Mapping[str, Any]) -> dict[str, Any]:
     started = _now_utc()
     model = os.environ.get("MANAGER_AGENT_ERROR_CODEX_MODEL", DEFAULT_CODEX_MODEL).strip() or DEFAULT_CODEX_MODEL
-    timeout_seconds = _env_int("MANAGER_AGENT_ERROR_CODEX_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+    timeout_seconds = _env_int(
+        "MANAGER_AGENT_ERROR_CODEX_TIMEOUT_SECONDS",
+        _env_int("MANAGER_AGENT_ERROR_AGENT_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS),
+    )
     workdir = _codex_workdir(request)
     with tempfile.NamedTemporaryFile(prefix="codex-agent-error-", suffix=".json", delete=False) as final_file:
         final_output_path = final_file.name

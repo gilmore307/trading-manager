@@ -11,7 +11,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
-from .agent_error_handler import DEFAULT_OUTPUT_ROOT, _stable_id
+from .agent_error_handler import (
+    DEFAULT_AGENT_RUNNER_TIMEOUT_SECONDS,
+    DEFAULT_OUTPUT_ROOT,
+    _stable_id,
+    build_agent_call_failed_diagnosis,
+    build_queued_diagnosis,
+    call_agent_runner,
+    write_json_artifact,
+)
 
 AGENT_REPAIR_CLOSURE_RECEIPT_CONTRACT = "agent_repair_closure_receipt"
 DEFAULT_MANAGER_REPO_ROOT = Path("/root/projects/trading-manager")
@@ -48,8 +56,31 @@ class ClosureCandidate:
     receipt_path: Path
 
 
+@dataclass(frozen=True)
+class AgentDiagnosisCandidate:
+    request_dir: Path
+    request_path: Path
+    diagnosis_path: Path
+    receipt_path: Path
+
+
 def _now_utc() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    return max(1, int(value))
+
+
+def _agent_runner_timeout_seconds(default: int = DEFAULT_AGENT_RUNNER_TIMEOUT_SECONDS) -> int:
+    if os.environ.get("MANAGER_AGENT_ERROR_RUNNER_TIMEOUT_SECONDS"):
+        return _env_int("MANAGER_AGENT_ERROR_RUNNER_TIMEOUT_SECONDS", default)
+    if os.environ.get("MANAGER_AGENT_ERROR_AGENT_TIMEOUT_SECONDS"):
+        return _env_int("MANAGER_AGENT_ERROR_AGENT_TIMEOUT_SECONDS", default) + 120
+    return default
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -244,6 +275,90 @@ def discover_closure_candidates(output_root: Path = DEFAULT_OUTPUT_ROOT) -> tupl
     return tuple(candidates)
 
 
+def discover_agent_diagnosis_candidates(output_root: Path = DEFAULT_OUTPUT_ROOT) -> tuple[AgentDiagnosisCandidate, ...]:
+    if not output_root.exists():
+        return ()
+    candidates: list[AgentDiagnosisCandidate] = []
+    for request_dir in sorted(output_root.iterdir()):
+        if not request_dir.is_dir():
+            continue
+        request_path = request_dir / "server_error_agent_request.json"
+        diagnosis_path = request_dir / "agent_error_diagnosis.json"
+        receipt_path = request_dir / "agent_repair_closure_receipt.json"
+        if not request_path.exists() or receipt_path.exists():
+            continue
+        if not diagnosis_path.exists():
+            candidates.append(AgentDiagnosisCandidate(request_dir, request_path, diagnosis_path, receipt_path))
+            continue
+        diagnosis = _load_json(diagnosis_path)
+        stderr = str(diagnosis.get("stderr") or "")
+        if diagnosis.get("status") == "queued" and (
+            "runner call pending" in stderr
+            or "runner recovery call pending" in stderr
+            or "runner not configured for closure recovery" in stderr
+        ):
+            candidates.append(AgentDiagnosisCandidate(request_dir, request_path, diagnosis_path, receipt_path))
+    return tuple(sorted(candidates, key=lambda candidate: candidate.request_path.stat().st_mtime, reverse=True))
+
+
+def run_agent_diagnosis(
+    candidate: AgentDiagnosisCandidate,
+    *,
+    runner_command: str | None = None,
+    write_diagnosis: bool = True,
+) -> dict[str, Any]:
+    request = _load_json(candidate.request_path)
+    configured_runner = runner_command or os.environ.get("MANAGER_AGENT_ERROR_RUNNER_COMMAND", "").strip()
+    if not request:
+        diagnosis = {
+            "contract_type": "agent_error_diagnosis",
+            "schema_version": "1",
+            "diagnosis_id": _stable_id("errdiag", candidate.request_path, "invalid_request"),
+            "request_ref": candidate.request_dir.name,
+            "agent_ref": "unknown",
+            "runner_command": configured_runner or None,
+            "status": "agent_call_failed",
+            "return_code": None,
+            "stdout": "",
+            "stderr": "server_error_agent_request.json is missing or invalid",
+            "started_at_utc": None,
+            "completed_at_utc": _now_utc(),
+        }
+    elif configured_runner:
+        pending = build_queued_diagnosis(request, reason="agent runner recovery call pending")
+        pending["discord_notification"] = {"status": "skipped", "reason": "closure recovery diagnosis in progress"}
+        if write_diagnosis:
+            write_json_artifact(pending, path=candidate.diagnosis_path)
+        try:
+            diagnosis = call_agent_runner(
+                request,
+                runner_command=configured_runner,
+                timeout_seconds=_agent_runner_timeout_seconds(),
+            )
+        except Exception as exc:
+            diagnosis = build_agent_call_failed_diagnosis(request, runner_command=configured_runner, error=exc)
+    else:
+        diagnosis = build_queued_diagnosis(request, reason="agent runner not configured for closure recovery")
+    diagnosis = dict(diagnosis)
+    diagnosis.setdefault("discord_notification", {"status": "skipped", "reason": "closure recovery does not send Discord notifications"})
+    if write_diagnosis:
+        write_json_artifact(diagnosis, path=candidate.diagnosis_path)
+    return diagnosis
+
+
+def run_pending_agent_diagnoses(
+    *,
+    output_root: Path = DEFAULT_OUTPUT_ROOT,
+    runner_command: str | None = None,
+    limit: int | None = None,
+    write_diagnosis: bool = True,
+) -> list[dict[str, Any]]:
+    diagnoses: list[dict[str, Any]] = []
+    for candidate in discover_agent_diagnosis_candidates(output_root)[:limit]:
+        diagnoses.append(run_agent_diagnosis(candidate, runner_command=runner_command, write_diagnosis=write_diagnosis))
+    return diagnoses
+
+
 def close_agent_repair(
     candidate: ClosureCandidate,
     *,
@@ -323,7 +438,10 @@ def close_pending_agent_repairs(
     repo_roots: Iterable[Path] = DEFAULT_REPO_ROOTS,
     execute_actions: bool = True,
     limit: int | None = None,
+    recover_agent_diagnoses: bool = True,
 ) -> list[dict[str, Any]]:
+    if recover_agent_diagnoses and execute_actions:
+        run_pending_agent_diagnoses(output_root=output_root, limit=limit, write_diagnosis=execute_actions)
     receipts: list[dict[str, Any]] = []
     for candidate in discover_closure_candidates(output_root)[:limit]:
         receipts.append(
@@ -343,11 +461,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--plan-only", action="store_true")
+    parser.add_argument("--skip-agent-diagnosis-recovery", action="store_true")
     args = parser.parse_args(argv)
     receipts = close_pending_agent_repairs(
         output_root=args.output_root,
         execute_actions=not args.plan_only,
         limit=args.limit,
+        recover_agent_diagnoses=not args.skip_agent_diagnosis_recovery,
     )
     print(json.dumps({"contract_type": "agent_repair_closure_run", "receipt_count": len(receipts), "receipts": receipts}, indent=2, sort_keys=True))
     return 0
