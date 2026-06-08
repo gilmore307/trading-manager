@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -236,6 +237,34 @@ class AgentRepairClosureTests(unittest.TestCase):
         self.assertEqual(recovered["status"], "completed")
         self.assertEqual(recovered["diagnosis_id"], "errdiag_recovered")
         self.assertEqual(runner.call_args.kwargs["runner_command"], "codex repair")
+
+    def test_runner_not_configured_queue_is_not_auto_recovered(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            candidate = self._write_candidate(root)
+            diagnosis = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
+            diagnosis["status"] = "queued"
+            diagnosis["stderr"] = "agent runner not configured for closure recovery"
+            candidate.diagnosis_path.write_text(json.dumps(diagnosis), encoding="utf-8")
+
+            candidates = discover_agent_diagnosis_candidates(root)
+
+        self.assertEqual(candidates, ())
+
+    def test_stale_recovery_candidate_is_not_auto_recovered(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            candidate = self._write_candidate(root)
+            diagnosis = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
+            diagnosis["status"] = "queued"
+            diagnosis["stderr"] = "agent runner recovery call pending"
+            candidate.diagnosis_path.write_text(json.dumps(diagnosis), encoding="utf-8")
+            stale_time = 1_700_000_000
+            os.utime(candidate.request_path, (stale_time, stale_time))
+
+            candidates = discover_agent_diagnosis_candidates(root)
+
+        self.assertEqual(candidates, ())
 
 
 if __name__ == "__main__":

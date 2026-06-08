@@ -83,6 +83,14 @@ def _agent_runner_timeout_seconds(default: int = DEFAULT_AGENT_RUNNER_TIMEOUT_SE
     return default
 
 
+def _recovery_max_age_seconds() -> int:
+    return _env_int("MANAGER_AGENT_ERROR_RECOVERY_MAX_AGE_SECONDS", 12 * 60 * 60)
+
+
+def _candidate_age_seconds(path: Path) -> float:
+    return max(0.0, datetime.now(UTC).timestamp() - path.stat().st_mtime)
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     try:
         parsed = json.loads(path.read_text(encoding="utf-8"))
@@ -287,6 +295,8 @@ def discover_agent_diagnosis_candidates(output_root: Path = DEFAULT_OUTPUT_ROOT)
         receipt_path = request_dir / "agent_repair_closure_receipt.json"
         if not request_path.exists() or receipt_path.exists():
             continue
+        if _candidate_age_seconds(request_path) > _recovery_max_age_seconds():
+            continue
         if not diagnosis_path.exists():
             candidates.append(AgentDiagnosisCandidate(request_dir, request_path, diagnosis_path, receipt_path))
             continue
@@ -295,7 +305,6 @@ def discover_agent_diagnosis_candidates(output_root: Path = DEFAULT_OUTPUT_ROOT)
         if diagnosis.get("status") == "queued" and (
             "runner call pending" in stderr
             or "runner recovery call pending" in stderr
-            or "runner not configured for closure recovery" in stderr
         ):
             candidates.append(AgentDiagnosisCandidate(request_dir, request_path, diagnosis_path, receipt_path))
     return tuple(sorted(candidates, key=lambda candidate: candidate.request_path.stat().st_mtime, reverse=True))
