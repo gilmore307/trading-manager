@@ -75,7 +75,10 @@ coverage remains child partition evidence under that one task.
    `trading_data.option_chain_state_source`, the shared SQL source/cache that is
    acquired before Layer 3 because target-level option-chain state consumes it.
    Layer 9 option-expression feature generation reuses that same shared source
-   later and does not own an independent option-chain download route. These tasks prepare what the live
+   later and does not own an independent option-chain download route. Replay
+   option-feature preparation uses the same source/table contract and prepares
+   only the missing point-in-time decision windows from the frozen replay plan.
+   These tasks prepare what the live
    components would have been able to inspect, but they do not select a fixed
    trade target for replay.
 3. Live-flow replay. Replay simulates the real system under a historical

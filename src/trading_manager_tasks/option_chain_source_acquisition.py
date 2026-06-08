@@ -271,6 +271,53 @@ def request_previews_for_fold(*, start_month: str, end_month: str, target_symbol
     return tuple(previews)
 
 
+def _parse_replay_decision_time(value: str) -> datetime:
+    text = str(value or "").strip()
+    if not text:
+        raise TaskSystemError("replay decision timestamp is required")
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise TaskSystemError(f"invalid replay decision timestamp: {value}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=ET)
+    return parsed.astimezone(ET).replace(second=0, microsecond=0)
+
+
+def request_previews_for_replay_decision_times(
+    *,
+    target_symbol: str,
+    decision_timestamps: Sequence[str],
+    window_minutes: int = DEFAULT_WINDOW_MINUTES,
+) -> tuple[OptionChainRequestPreview, ...]:
+    """Build bounded option-chain requests for replay decision timestamps.
+
+    Replay only needs point-in-time option context available no later than each
+    decision timestamp. The request window therefore ends at the decision time
+    and starts one provider window earlier.
+    """
+
+    symbol = _safe_symbol(target_symbol)
+    if window_minutes <= 0:
+        raise TaskSystemError("window_minutes must be positive")
+    previews_by_id: dict[str, OptionChainRequestPreview] = {}
+    for raw_timestamp in decision_timestamps:
+        decision_time = _parse_replay_decision_time(raw_timestamp)
+        window_start_dt = decision_time - timedelta(minutes=window_minutes)
+        if window_start_dt.date() != decision_time.date():
+            raise TaskSystemError(f"replay decision window crosses date boundary: {raw_timestamp}")
+        start_month = decision_time.strftime("%Y-%m")
+        request_id = _window_request_id(symbol=symbol, start_month=start_month, window_start=decision_time)
+        previews_by_id[request_id] = OptionChainRequestPreview(
+            request_id=request_id,
+            underlying=symbol,
+            snapshot_time=decision_time.isoformat(),
+            window_start=window_start_dt.isoformat(),
+            window_end=decision_time.isoformat(),
+        )
+    return tuple(previews_by_id[request_id] for request_id in sorted(previews_by_id))
+
+
 def build_option_chain_source_review(*, start_month: str, end_month: str, target_symbol: str) -> OptionChainSourceReview:
     previews = request_previews_for_fold(start_month=start_month, end_month=end_month, target_symbol=target_symbol)
     return OptionChainSourceReview(
@@ -594,6 +641,7 @@ __all__ = [
     "iter_regular_trading_days",
     "manager_requests_from_review",
     "prepare_option_chain_source_acquisition",
+    "request_previews_for_replay_decision_times",
     "request_previews_for_fold",
 ]
 

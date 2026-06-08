@@ -12,7 +12,7 @@ The service may supervise:
 - safe offline model/evaluation stages;
 - reusable foundation substrate preparation;
 - target-specific substrate preparation;
-- live-flow replay dataset preparation, one-shot replay acquisition under provider controls, dataset freeze, and replay dispatch;
+- live-flow replay dataset preparation, one-shot replay acquisition under provider controls, dataset freeze, replay option-feature preparation, and replay dispatch;
 - post-replay failure-attribution request preparation;
 - promotion-review packet preparation;
 - status and dashboard payload generation.
@@ -40,6 +40,8 @@ Progress stall guard: the daemon uses `TRADING_MANAGER_SCHEDULER_PROGRESS_STALL_
 Agent repair closure is a separate internal service. `trading-manager-agent-repair-closure.timer` runs `scripts/tasks/close_agent_repairs.py` every minute. The closure controller scans completed server-error diagnoses, refuses broker/account/order/fill/position/buying-power/funds scopes, pushes already-committed internal repo repairs, restarts internal services when the diagnosis requires it, triggers dashboard refresh, and writes `agent_repair_closure_receipt.json`. This controller is the manager-owned handoff after agent repair; agent diagnosis alone is not considered closed-loop completion.
 
 Replay dataset closure is part of the daemon lifecycle, not a manual side path. After a fold completes Layer 1-9 model generation, the daemon runs `model_group.replay_dataset` before `model_group.replay`. That worker writes the fold-bound Layer 1/2 base context when missing, calls the evaluation-owned dataset preparation script, runs bounded one-shot replay acquisition only when `--execute-autonomous-provider-stages` is enabled, refreshes coverage, and freezes the dataset once local coverage is complete. It must report safety flags for provider calls, SQL mutation, model training, model activation, broker execution, and account mutation on every decision.
+
+Replay option-feature closure is also part of the daemon lifecycle. Before `model_group.replay`, the daemon runs `model_group.replay_option_features` when the frozen replay dataset has equity decision timestamps without visible Layer 9 option-expression features. That worker derives the missing timestamps from the frozen replay plan and SQL-retained equity bars, prepares only the required point-in-time option-chain source windows, dispatches bounded historical ThetaData calls only when `--execute-autonomous-provider-stages` is enabled, generates Layer 9 features from `trading_data.option_chain_state_source`, and lets replay retry after the missing count reaches zero. It must not perform broker/order/fill/account mutation, production model activation, or promoted-roster changes.
 
 ## Lock Contract
 

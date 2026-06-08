@@ -6,6 +6,7 @@ from trading_manager_tasks.option_chain_source_acquisition import (
     _runtime_task_key,
     build_option_chain_source_review,
     manager_requests_from_review,
+    request_previews_for_replay_decision_times,
     request_previews_for_fold,
 )
 
@@ -41,6 +42,18 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         runtime_key = _runtime_task_key(task_key)
 
         self.assertEqual(runtime_key["manager_controls"]["max_time_window"], "1d")
+
+    def test_replay_decision_requests_end_at_decision_time(self) -> None:
+        previews = request_previews_for_replay_decision_times(
+            target_symbol="AAPL",
+            decision_timestamps=["2021-01-04T16:00:00-05:00"],
+        )
+
+        self.assertEqual(len(previews), 1)
+        self.assertEqual(previews[0].request_id, "mgrreq_option_chain_window_aapl_2021_01_2021_01_04_1600")
+        self.assertEqual(previews[0].snapshot_time, "2021-01-04T16:00:00-05:00")
+        self.assertEqual(previews[0].window_start, "2021-01-04T15:30:00-05:00")
+        self.assertEqual(previews[0].window_end, "2021-01-04T16:00:00-05:00")
 
 
 if __name__ == "__main__":  # pragma: no cover

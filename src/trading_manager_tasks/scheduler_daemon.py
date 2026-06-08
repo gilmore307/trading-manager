@@ -25,6 +25,7 @@ from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 from .model_group_attribution import run_model_group_post_replay_attribution_if_ready
 from .model_group_evaluation import run_model_group_evaluation_if_ready
+from .model_group_replay_option_features import run_model_group_replay_option_features_if_required
 from .model_group_replay_dataset import run_model_group_replay_dataset_if_ready
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_replay_if_ready
 from .model_training_state import advance_workflow_state
@@ -1708,6 +1709,11 @@ def run_daemon_loop(
                             selected_target_symbol=selected_target_symbol,
                             execute=False,
                         )
+                        replay_option_feature_probe = run_model_group_replay_option_features_if_required(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                            execute=False,
+                        )
                         replay_probe = run_model_group_replay_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -1725,6 +1731,7 @@ def run_daemon_loop(
                         lifecycle_holds_target_lane = (
                             lifecycle_block is not None
                             or replay_dataset_probe is not None
+                            or replay_option_feature_probe is not None
                             or replay_probe is not None
                             or attribution_probe is not None
                             or evaluation_probe is not None
@@ -1849,11 +1856,40 @@ def run_daemon_loop(
                                 row["worker_id"] = "replay_dataset_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                        replay_decision = run_model_group_replay_if_ready(
+                        replay_option_feature_decision = run_model_group_replay_option_features_if_required(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
                             execute=execute_model_group_replay,
+                            execute_provider_acquisition=execute_autonomous_provider_stages,
+                            provider_acquisition_limit=provider_stage_next_limit,
                         )
+                        if replay_option_feature_decision is not None:
+                            append_decision_log(decision_log_path, replay_option_feature_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_option_feature_decision)
+                            state = replace(
+                                state,
+                                start_month=active_start_month,
+                                end_month=active_end_month,
+                                last_next_internal_stage="model_group_replay_option_features",
+                                last_work_selection_reason="model_group_replay_option_features_ready",
+                                updated_utc=completed,
+                            )
+                            refresh_needed = refresh_needed or replay_option_feature_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_option_feature_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = replay_option_feature_decision.summary_row()
+                                row["worker_id"] = "replay_option_feature_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
+                        replay_decision = None
+                        if replay_option_feature_decision is None:
+                            replay_decision = run_model_group_replay_if_ready(
+                                storage_root=storage_root,
+                                selected_target_symbol=selected_target_symbol,
+                                execute=execute_model_group_replay,
+                            )
                         if replay_decision is not None:
                             append_decision_log(decision_log_path, replay_decision)
                             completed = utc_now_iso()
@@ -2022,11 +2058,32 @@ def run_daemon_loop(
                                 row["worker_id"] = "replay_dataset_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                        replay_decision = run_model_group_replay_if_ready(
+                        replay_option_feature_decision = run_model_group_replay_option_features_if_required(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
                             execute=execute_model_group_replay,
+                            execute_provider_acquisition=execute_autonomous_provider_stages,
+                            provider_acquisition_limit=provider_stage_next_limit,
                         )
+                        if replay_option_feature_decision is not None:
+                            append_decision_log(decision_log_path, replay_option_feature_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_option_feature_decision)
+                            refresh_needed = refresh_needed or replay_option_feature_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_option_feature_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = replay_option_feature_decision.summary_row()
+                                row["worker_id"] = "replay_option_feature_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
+                        replay_decision = None
+                        if replay_option_feature_decision is None:
+                            replay_decision = run_model_group_replay_if_ready(
+                                storage_root=storage_root,
+                                selected_target_symbol=selected_target_symbol,
+                                execute=execute_model_group_replay,
+                            )
                         if replay_decision is not None:
                             append_decision_log(decision_log_path, replay_decision)
                             completed = utc_now_iso()
