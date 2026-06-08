@@ -25,6 +25,7 @@ from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 from .model_group_attribution import run_model_group_post_replay_attribution_if_ready
 from .model_group_evaluation import run_model_group_evaluation_if_ready
+from .model_group_replay_dataset import run_model_group_replay_dataset_if_ready
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_replay_if_ready
 from .model_training_state import advance_workflow_state
 from .model_training_workflow import (
@@ -1643,6 +1644,7 @@ def run_daemon_loop(
     dashboard_refresh_service_unit: str = DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT,
     dashboard_refresh_command: tuple[str, ...] | None = None,
     execute_model_group_replay: bool = True,
+    execute_model_group_replay_dataset: bool = True,
     execute_model_group_attribution: bool = True,
     execute_model_group_evaluation: bool = True,
     source_existing_bootstrap: bool = True,
@@ -1701,6 +1703,11 @@ def run_daemon_loop(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
                         )
+                        replay_dataset_probe = run_model_group_replay_dataset_if_ready(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                            execute=False,
+                        )
                         replay_probe = run_model_group_replay_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -1717,6 +1724,7 @@ def run_daemon_loop(
                         )
                         lifecycle_holds_target_lane = (
                             lifecycle_block is not None
+                            or replay_dataset_probe is not None
                             or replay_probe is not None
                             or attribution_probe is not None
                             or evaluation_probe is not None
@@ -1812,6 +1820,33 @@ def run_daemon_loop(
                                 row["selected_target_symbol"] = target_selection.selected_target_symbol
                                 row["fold_id"] = model_selection.fold_id
                                 row["fold_months"] = list(model_selection.fold_months)
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
+                        replay_dataset_decision = run_model_group_replay_dataset_if_ready(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                            execute=execute_model_group_replay_dataset,
+                            execute_provider_acquisition=execute_autonomous_provider_stages,
+                            provider_acquisition_limit=provider_stage_next_limit,
+                        )
+                        if replay_dataset_decision is not None:
+                            append_decision_log(decision_log_path, replay_dataset_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_dataset_decision)
+                            state = replace(
+                                state,
+                                start_month=active_start_month,
+                                end_month=active_end_month,
+                                last_next_internal_stage="model_group_replay_dataset",
+                                last_work_selection_reason="model_group_replay_dataset_ready",
+                                updated_utc=completed,
+                            )
+                            refresh_needed = refresh_needed or replay_dataset_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_dataset_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = replay_dataset_decision.summary_row()
+                                row["worker_id"] = "replay_dataset_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
                         replay_decision = run_model_group_replay_if_ready(
@@ -1968,6 +2003,25 @@ def run_daemon_loop(
                         if output is not None:
                             output.write(json.dumps(decision.summary_row(), sort_keys=True) + "\n")
                             output.flush()
+                        replay_dataset_decision = run_model_group_replay_dataset_if_ready(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                            execute=execute_model_group_replay_dataset,
+                            execute_provider_acquisition=execute_autonomous_provider_stages,
+                            provider_acquisition_limit=provider_stage_next_limit,
+                        )
+                        if replay_dataset_decision is not None:
+                            append_decision_log(decision_log_path, replay_dataset_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_dataset_decision)
+                            refresh_needed = refresh_needed or replay_dataset_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_dataset_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = replay_dataset_decision.summary_row()
+                                row["worker_id"] = "replay_dataset_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
                         replay_decision = run_model_group_replay_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -2087,6 +2141,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--drain-max-seconds", type=float, default=DEFAULT_DRAIN_MAX_SECONDS, help="Maximum wall-clock seconds for one back-to-back drain cycle.")
     parser.add_argument("--refresh-dashboard-on-decision", action="store_true", help="Trigger the storage-owned dashboard read-model refresh service after each executed scheduler decision.")
     parser.add_argument("--dashboard-refresh-service-unit", default=DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT, help="systemd service unit to start for event-driven dashboard read-model refresh.")
+    parser.add_argument("--disable-model-group-replay-dataset", action="store_true", help="Disable automatic model-group replay dataset preparation, acquisition, and freeze admission.")
     parser.add_argument("--disable-model-group-replay", action="store_true", help="Disable automatic side-effect-free model-group replay dispatch.")
     parser.add_argument("--disable-model-group-attribution", action="store_true", help="Disable automatic side-effect-free post-replay Layer 10 attribution dispatch.")
     parser.add_argument("--disable-model-group-evaluation", action="store_true", help="Disable automatic side-effect-free model-group evaluation evidence build.")
@@ -2131,6 +2186,7 @@ def main(argv: list[str] | None = None) -> int:
         drain_max_seconds=args.drain_max_seconds,
         refresh_dashboard_on_decision=args.refresh_dashboard_on_decision,
         dashboard_refresh_service_unit=args.dashboard_refresh_service_unit,
+        execute_model_group_replay_dataset=not args.disable_model_group_replay_dataset,
         execute_model_group_replay=not args.disable_model_group_replay,
         execute_model_group_attribution=not args.disable_model_group_attribution,
         execute_model_group_evaluation=not args.disable_model_group_evaluation,
