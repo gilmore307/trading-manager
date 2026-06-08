@@ -50,6 +50,8 @@ DEFAULT_OPTION_FEATURE_SCHEMA = "trading_data"
 DEFAULT_OPTION_FEATURE_TABLE = "m09_option_expression_feature_generation"
 REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED = "replay_option_feature_acquisition_required"
 REPLAY_OPTION_FEATURE_BACKOFF_REASON = "model_group_replay_option_feature_acquisition_required"
+OPTION_SOURCE_UNAVAILABLE_SNAPSHOT_TYPE = "source_unavailable"
+OPTION_SOURCE_UNAVAILABLE_SYMBOL = "__OPTION_SOURCE_UNAVAILABLE__"
 NEW_YORK = ZoneInfo("America/New_York")
 
 
@@ -175,10 +177,43 @@ def run_model_group_replay_option_features_for_replay_backoff(
                     dispatch_summary = dispatch.summary_row()
                     months_to_generate.add(month)
             except Exception as exc:
+                provider_error = f"{type(exc).__name__}: {exc}"
+                if _provider_error_means_source_unavailable(provider_error):
+                    unavailable_count = _persist_option_source_unavailable_markers(
+                        source_missing,
+                        database_url=db_url,
+                        provider_error=provider_error,
+                    )
+                    return _decision(
+                        decision_status="executed",
+                        reason_code="model_group_replay_option_source_unavailable_recorded",
+                        reason=(
+                            "recorded replay signal option-source unavailable marker(s); "
+                            "scheduler can retry replay from the same clock without repeating provider acquisition"
+                        ),
+                        selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
+                        provider_calls=provider_calls or sum(len(items) for items in source_request_ids_by_month.values()),
+                        dispatch_performed=True,
+                        execution_summary=_summary(
+                            contract_id=contract_id,
+                            dataset_root=dataset_root,
+                            training_fold=training_fold,
+                            missing=requirements,
+                            batch=batch,
+                            source_missing=source_missing,
+                            source_ready=source_ready,
+                            required_next_step="retry model_group.replay from the same replay clock; replay will use option_source_unavailable state",
+                            dispatch_summary=dispatch_summary,
+                            generated_summaries=generated_summaries,
+                            source_request_ids_by_month=source_request_ids_by_month,
+                            provider_acquisition_error=provider_error,
+                            option_source_unavailable_count=unavailable_count,
+                        ),
+                    )
                 return _decision(
                     decision_status="backoff",
                     reason_code="model_group_replay_option_source_acquisition_failed",
-                    reason=f"{type(exc).__name__}: {exc}",
+                    reason=provider_error,
                     selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
                     provider_calls=provider_calls,
                     dispatch_performed=True,
@@ -197,7 +232,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
                         dispatch_summary=dispatch_summary,
                         generated_summaries=generated_summaries,
                         source_request_ids_by_month=source_request_ids_by_month,
-                        provider_acquisition_error=f"{type(exc).__name__}: {exc}",
+                        provider_acquisition_error=provider_error,
                     ),
                 )
 
@@ -365,6 +400,108 @@ def _persist_replay_option_source_requests(
     return request_ids_by_month
 
 
+def _provider_error_means_source_unavailable(error_text: str) -> bool:
+    text = error_text.lower()
+    unavailable_markers = (
+        "http 478",
+        "http error 478",
+        "status 478",
+        "response 478",
+        "no data",
+        "no_data",
+        "data unavailable",
+        "source unavailable",
+        "option source unavailable",
+    )
+    return any(marker in text for marker in unavailable_markers)
+
+
+def _persist_option_source_unavailable_markers(
+    requirements: Sequence[ReplayOptionFeatureRequirement],
+    *,
+    database_url: str,
+    provider_error: str,
+) -> int:
+    if not requirements:
+        return 0
+    import psycopg  # type: ignore
+
+    run_id = "model_group_replay_option_source_unavailable_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    rows = [
+        {
+            "run_id": run_id,
+            "source_run_ref": "model_group.replay_option_features",
+            "underlying": item.target_ref,
+            "snapshot_time": item.timestamp,
+            "snapshot_type": OPTION_SOURCE_UNAVAILABLE_SNAPSHOT_TYPE,
+            "option_symbol": OPTION_SOURCE_UNAVAILABLE_SYMBOL,
+            "feature_payload_json": {
+                "option_surface_status": "option_source_unavailable",
+                "asset_expression_route": "option_expression_unfilled",
+                "provider_error": provider_error,
+                "signal_source": "layer_08_underlying_action.handoff_to_layer_9",
+            },
+            "feature_quality_diagnostics": {
+                "has_required_fields": False,
+                "source_unavailable": True,
+                "point_in_time_clock": "snapshot_time",
+                "source_table": DEFAULT_OPTION_SOURCE_TABLE,
+            },
+        }
+        for item in requirements
+    ]
+    with psycopg.connect(database_url) as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{DEFAULT_OPTION_FEATURE_SCHEMA}"')
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS "{DEFAULT_OPTION_FEATURE_SCHEMA}"."{DEFAULT_OPTION_FEATURE_TABLE}" (
+                  "run_id" TEXT NOT NULL,
+                  "source_run_ref" TEXT NOT NULL,
+                  "underlying" TEXT NOT NULL,
+                  "snapshot_time" TIMESTAMPTZ NOT NULL,
+                  "snapshot_type" TEXT NOT NULL,
+                  "option_symbol" TEXT NOT NULL,
+                  "feature_payload_json" JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                  "feature_quality_diagnostics" JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                  PRIMARY KEY ("underlying", "snapshot_time", "snapshot_type", "option_symbol")
+                )
+                """
+            )
+            for row in rows:
+                cursor.execute(
+                    f"""
+                    INSERT INTO "{DEFAULT_OPTION_FEATURE_SCHEMA}"."{DEFAULT_OPTION_FEATURE_TABLE}" (
+                      "run_id",
+                      "source_run_ref",
+                      "underlying",
+                      "snapshot_time",
+                      "snapshot_type",
+                      "option_symbol",
+                      "feature_payload_json",
+                      "feature_quality_diagnostics"
+                    )
+                    VALUES (%s, %s, %s, %s::timestamptz, %s, %s, %s::jsonb, %s::jsonb)
+                    ON CONFLICT ("underlying", "snapshot_time", "snapshot_type", "option_symbol") DO UPDATE SET
+                      "run_id" = EXCLUDED."run_id",
+                      "source_run_ref" = EXCLUDED."source_run_ref",
+                      "feature_payload_json" = EXCLUDED."feature_payload_json",
+                      "feature_quality_diagnostics" = EXCLUDED."feature_quality_diagnostics"
+                    """,
+                    (
+                        row["run_id"],
+                        row["source_run_ref"],
+                        row["underlying"],
+                        row["snapshot_time"],
+                        row["snapshot_type"],
+                        row["option_symbol"],
+                        json.dumps(row["feature_payload_json"], sort_keys=True),
+                        json.dumps(row["feature_quality_diagnostics"], sort_keys=True),
+                    ),
+                )
+    return len(rows)
+
+
 def _time_key(value: Any) -> str:
     if isinstance(value, datetime):
         parsed = value
@@ -421,6 +558,7 @@ def _summary(
     generated_summaries: Sequence[Mapping[str, Any]] = (),
     source_request_ids_by_month: Mapping[str, Sequence[str]] | None = None,
     provider_acquisition_error: str | None = None,
+    option_source_unavailable_count: int = 0,
 ) -> dict[str, Any]:
     return {
         "contract_id": contract_id,
@@ -443,6 +581,7 @@ def _summary(
             else {}
         ),
         "provider_acquisition_error": provider_acquisition_error,
+        "option_source_unavailable_count": option_source_unavailable_count,
     }
 
 

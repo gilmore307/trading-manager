@@ -222,6 +222,46 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             {"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600"]},
         )
 
+    def test_provider_unavailable_records_replay_sentinel(self) -> None:
+        requirement = ReplayOptionFeatureRequirement("AAPL", "2021-03-05T16:00:00-05:00", "2021-03")
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True, exist_ok=True)
+            self._write_completed_fold(storage_root)
+            self._write_frozen_dataset(storage_root)
+
+            with (
+                patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
+                    return_value={"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600"]},
+                ),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features.dispatch_option_chain_source_acquisition",
+                    side_effect=RuntimeError("ThetaData Terminal REST HTTP 478"),
+                ),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._persist_option_source_unavailable_markers",
+                    return_value=1,
+                ) as persist_unavailable,
+            ):
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    self._replay_backoff(requirement),
+                    storage_root=storage_root,
+                    selected_target_symbol="AAPL",
+                    execute=True,
+                    execute_provider_acquisition=True,
+                )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "executed")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_source_unavailable_recorded")
+        self.assertTrue(decision.dispatch_performed)
+        self.assertEqual(decision.execution_summary["option_source_unavailable_count"], 1)
+        persist_unavailable.assert_called_once()
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
