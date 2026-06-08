@@ -47,9 +47,9 @@ OPTION_CHAIN_PROVIDER_CONTROLS = {
     "retry_attempts": 3,
     "retry_backoff_seconds": 1.0,
     "retry_policy_ref": "target_option_chain_state_source_retry",
-    "rate_limit_policy_ref": "thetadata_terminal_rest_rate_limit",
+    "rate_limit_policy_ref": "thetadata_python_library_serial_session",
 }
-DEFAULT_THETADATA_TRANSPORT = "terminal_rest"
+DEFAULT_THETADATA_TRANSPORT = "python_library"
 ET = ZoneInfo("America/New_York")
 
 
