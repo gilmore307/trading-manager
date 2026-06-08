@@ -242,6 +242,43 @@ def _receipt_payload(
     }
 
 
+def _parse_json_object(text: str | None) -> Mapping[str, Any]:
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text.strip())
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
+
+
+def _load_agent_diagnosis(agent_error_result: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if not agent_error_result:
+        return {}
+    diagnosis_path = agent_error_result.get("diagnosis_path")
+    if not diagnosis_path:
+        return {}
+    try:
+        parsed = json.loads(Path(str(diagnosis_path)).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
+
+
+def _agent_diagnosis_recommends_retry(agent_error_result: Mapping[str, Any] | None) -> bool:
+    diagnosis = _load_agent_diagnosis(agent_error_result)
+    if diagnosis.get("status") != "completed":
+        return False
+    payload = _parse_json_object(str(diagnosis.get("stdout") or ""))
+    diagnosis_status = str(payload.get("diagnosis_status") or "").lower()
+    retry_recommendation = str(payload.get("retry_recommendation") or "").lower()
+    if not diagnosis_status.startswith(("fixed", "repaired")):
+        return False
+    if "do_not_retry" in retry_recommendation or "manual_review" in retry_recommendation or "blocked" in retry_recommendation:
+        return False
+    return "retry" in retry_recommendation
+
+
 def execute_stage_process(
     stage: StageProgress,
     *,
@@ -253,6 +290,7 @@ def execute_stage_process(
     progress_root: Path | None = None,
     task_uid: str | None = None,
     worker_id: str = "stage_executor",
+    repair_retry_attempted: bool = False,
 ) -> StageExecutionSummary:
     """Execute one already-ready safe offline stage and write a receipt."""
 
@@ -333,7 +371,7 @@ def execute_stage_process(
     receipt_path = stage_receipt_root / f"{stamp}.receipt.json"
     provider_calls = _provider_call_count_from_stdout(stdout) if return_code == 0 else 0
     agent_error_result: Mapping[str, Any] | None = None
-    if return_code != 0:
+    if return_code != 0 and not repair_retry_attempted:
         agent_error_result = handle_server_error(
             source_component="trading-manager.stage_executor",
             source_repo="trading-manager",
@@ -351,6 +389,28 @@ def execute_stage_process(
             call_agent=_env_truthy("MANAGER_AGENT_ERROR_AUTOCALL"),
             catalog_storage=os.environ.get("MANAGER_AGENT_ERROR_CATALOG_STORAGE", "sql"),
         )
+        if _agent_diagnosis_recommends_retry(agent_error_result):
+            retry_summary = execute_stage_process(
+                stage,
+                manager_root=manager_root,
+                trading_data_root=trading_data_root,
+                trading_model_root=trading_model_root,
+                receipt_root=receipt_root,
+                log_root=log_root,
+                progress_root=progress_root,
+                task_uid=task_uid,
+                worker_id=worker_id,
+                repair_retry_attempted=True,
+            )
+            if retry_summary.status == "succeeded":
+                return replace(
+                    retry_summary,
+                    reason="stage completed after automatic repair retry",
+                    agent_error_request_path=str(agent_error_result.get("request_path")),
+                    agent_error_diagnosis_path=str(agent_error_result.get("diagnosis_path")),
+                    agent_error_number=int(agent_error_result["error_number"]) if agent_error_result.get("error_number") else None,
+                    agent_error_ref=str(agent_error_result.get("error_ref")) if agent_error_result.get("error_ref") else None,
+                )
     summary = StageExecutionSummary(
         contract_type="manager_stage_execution_summary",
         stage_id=stage.stage_id,

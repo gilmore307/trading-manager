@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import sys
 import unittest
@@ -111,6 +112,77 @@ class StageExecutorTests(unittest.TestCase):
             self.assertIsNone(summary.return_code)
             self.assertIn("timeout_seconds=1", summary.reason or "")
             self.assertIn("timeout_seconds=1", Path(summary.stderr_path or "").read_text(encoding="utf-8"))
+
+    def test_stage_process_retries_once_after_completed_agent_repair(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            marker = tmp / "first_failed"
+            diagnosis_path = tmp / "agent" / "agent_error_diagnosis.json"
+            request_path = tmp / "agent" / "server_error_agent_request.json"
+            command = (
+                "import pathlib, sys; "
+                f"marker=pathlib.Path({str(marker)!r}); "
+                "print('retry ok') if marker.exists() else (marker.write_text('1'), sys.exit(1))"
+            )
+            stage = StageProgress(
+                stage_id="layer_01_market_regime.feature_generation",
+                layer=1,
+                layer_key="layer_01_market_regime",
+                stage_type="feature_generation",
+                status="ready",
+                command=["python3", "-c", command],
+                blockers=(),
+            )
+
+            def fake_handle_server_error(**_: object) -> dict[str, object]:
+                diagnosis_path.parent.mkdir(parents=True, exist_ok=True)
+                diagnosis_path.write_text(
+                    json.dumps(
+                        {
+                            "contract_type": "agent_error_diagnosis",
+                            "schema_version": "1",
+                            "diagnosis_id": "errdiag_test",
+                            "request_ref": "erragent_test",
+                            "agent_ref": "codex_cli_gpt_5_5",
+                            "runner_command": "codex_cli",
+                            "status": "completed",
+                            "return_code": 0,
+                            "stdout": json.dumps(
+                                {
+                                    "diagnosis_status": "repaired_verified",
+                                    "retry_recommendation": "retry_original_stage",
+                                }
+                            ),
+                            "stderr": "",
+                            "started_at_utc": "2026-06-08T00:00:00Z",
+                            "completed_at_utc": "2026-06-08T00:01:00Z",
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                request_path.write_text("{}", encoding="utf-8")
+                return {
+                    "request_path": str(request_path),
+                    "diagnosis_path": str(diagnosis_path),
+                    "error_number": 99,
+                    "error_ref": "ERR-000099",
+                }
+
+            with patch("trading_manager_tasks.stage_executor.handle_server_error", side_effect=fake_handle_server_error) as error_mock:
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
+
+            self.assertEqual(summary.status, "succeeded")
+            self.assertEqual(summary.reason, "stage completed after automatic repair retry")
+            self.assertEqual(summary.agent_error_ref, "ERR-000099")
+            self.assertIn("retry ok", Path(summary.stdout_path or "").read_text(encoding="utf-8"))
+            self.assertEqual(error_mock.call_count, 1)
 
     def test_resolves_runtime_month_placeholders_before_execution(self):
         command = _resolve_command_placeholders(["runner", "--month", "${START_MONTH}", "--path", "summary_${END_MONTH}.json"], start_month="2016-01", end_month="2016-02")
