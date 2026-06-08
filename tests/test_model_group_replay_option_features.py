@@ -9,11 +9,40 @@ from unittest.mock import patch
 from trading_manager_tasks.layer_nine_feature_stage import LayerNineFeatureStageSummary
 from trading_manager_tasks.model_group_replay_option_features import (
     ReplayOptionFeatureRequirement,
-    run_model_group_replay_option_features_if_required,
+    replay_option_feature_requirements_from_replay_decision,
+    run_model_group_replay_option_features_for_replay_backoff,
 )
+from trading_manager_tasks.scheduler import SchedulerDecision
 
 
 class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
+    def _replay_backoff(self, requirement: ReplayOptionFeatureRequirement) -> SchedulerDecision:
+        payload = {
+            "missing_count": 1,
+            "sample": [
+                {
+                    "target_ref": requirement.target_ref,
+                    "timestamp": requirement.timestamp,
+                    "maximum_permitted_source_end": requirement.timestamp,
+                    "signal_source": "layer_08_underlying_action.handoff_to_layer_9",
+                }
+            ],
+        }
+        reason = "ValueError: replay_option_feature_acquisition_required: " + json.dumps(payload, sort_keys=True)
+        return SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-01-01T00:00:00+00:00",
+            now_et="2025-12-31T19:00:00-05:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_option_feature_acquisition_required",
+            reason=reason,
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay",
+            command=[],
+            execution_summary={"runner_stderr": reason},
+        )
+
     def _write_completed_fold(self, storage_root: Path) -> None:
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -94,7 +123,6 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
-                patch("trading_manager_tasks.model_group_replay_option_features._missing_option_feature_requirements", return_value=(requirement,)),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=True),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features.execute_layer_nine_feature_stage",
@@ -109,7 +137,8 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                     ),
                 ) as generate,
             ):
-                decision = run_model_group_replay_option_features_if_required(
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    self._replay_backoff(requirement),
                     storage_root=storage_root,
                     selected_target_symbol="AAPL",
                     execute=True,
@@ -119,9 +148,14 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         self.assertIsNotNone(decision)
         assert decision is not None
         self.assertEqual(decision.decision_status, "executed")
-        self.assertEqual(decision.reason_code, "model_group_replay_option_feature_preparation_executed")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_feature_repair_executed")
         self.assertEqual(decision.provider_calls, 0)
         generate.assert_called_once_with(start_month="2021-01", end_month="2021-01")
+
+    def test_extracts_requirements_from_replay_backoff_sample(self) -> None:
+        requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")
+        parsed = replay_option_feature_requirements_from_replay_decision(self._replay_backoff(requirement))
+        self.assertEqual(parsed, (requirement,))
 
     def test_requires_provider_gate_when_source_rows_are_missing(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")
@@ -133,10 +167,10 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
-                patch("trading_manager_tasks.model_group_replay_option_features._missing_option_feature_requirements", return_value=(requirement,)),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
             ):
-                decision = run_model_group_replay_option_features_if_required(
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    self._replay_backoff(requirement),
                     storage_root=storage_root,
                     selected_target_symbol="AAPL",
                     execute=True,

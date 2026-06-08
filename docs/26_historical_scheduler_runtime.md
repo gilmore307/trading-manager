@@ -12,7 +12,7 @@ The service may supervise:
 - safe offline model/evaluation stages;
 - reusable foundation substrate preparation;
 - target-specific substrate preparation;
-- live-flow replay dataset preparation, one-shot replay acquisition under provider controls, dataset freeze, replay option-feature preparation, and replay dispatch;
+- live-flow replay dataset preparation, one-shot replay acquisition under provider controls, dataset freeze, signal-triggered replay option-feature repair, and replay dispatch;
 - post-replay failure-attribution request preparation;
 - promotion-review packet preparation;
 - status and dashboard payload generation.
@@ -41,7 +41,7 @@ Agent repair closure is a separate internal service. `trading-manager-agent-repa
 
 Replay dataset closure is part of the daemon lifecycle, not a manual side path. After a fold completes Layer 1-9 model generation, the daemon runs `model_group.replay_dataset` before `model_group.replay`. That worker writes the fold-bound Layer 1/2 base context when missing, calls the evaluation-owned dataset preparation script, runs bounded one-shot replay acquisition only when `--execute-autonomous-provider-stages` is enabled, refreshes coverage, and freezes the dataset once local coverage is complete. It must report safety flags for provider calls, SQL mutation, model training, model activation, broker execution, and account mutation on every decision.
 
-Replay option-feature closure is also part of the daemon lifecycle. Before `model_group.replay`, the daemon runs `model_group.replay_option_features` when the frozen replay dataset has equity decision timestamps without visible Layer 9 option-expression features. That worker derives the missing timestamps from the frozen replay plan and SQL-retained equity bars, prepares only the required point-in-time option-chain source windows, dispatches bounded historical ThetaData calls only when `--execute-autonomous-provider-stages` is enabled, generates Layer 9 features from `trading_data.option_chain_state_source`, and lets replay retry after the missing count reaches zero. It must not perform broker/order/fill/account mutation, production model activation, or promoted-roster changes.
+Replay option-feature closure is also part of the daemon lifecycle, but it is not a pre-replay scan. The daemon runs `model_group.replay` first so the replay clock advances through Layers 1-8 using only point-in-time evidence. If Layer 8 emits an option-expression signal and Layer 9 lacks the matching point-in-time candidates, replay backs off with `model_group_replay_option_feature_acquisition_required`; the daemon then runs `model_group.replay_option_features` only for the emitted sample timestamps, prepares the matching option-chain source windows, dispatches bounded historical ThetaData calls only when `--execute-autonomous-provider-stages` is enabled, generates Layer 9 features from `trading_data.option_chain_state_source`, and retries replay from the same lifecycle. It must not derive option downloads from all equity bars, and it must not perform broker/order/fill/account mutation, production model activation, or promoted-roster changes.
 
 ## Lock Contract
 

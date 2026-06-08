@@ -76,9 +76,10 @@ coverage remains child partition evidence under that one task.
    acquired before Layer 3 because target-level option-chain state consumes it.
    Layer 9 option-expression feature generation reuses that same shared source
    later and does not own an independent option-chain download route. Replay
-   option-feature preparation uses the same source/table contract and prepares
-   only the missing point-in-time decision windows from the frozen replay plan.
-   These tasks prepare what the live
+   option-feature repair uses the same source/table contract, but only after
+   replay advances through Layer 8 and emits an option-expression signal whose
+   exact timestamp lacks Layer 9 candidates. It must not precompute option
+   downloads for every frozen equity bar. These tasks prepare what the live
    components would have been able to inspect, but they do not select a fixed
    trade target for replay.
 3. Live-flow replay. Replay simulates the real system under a historical

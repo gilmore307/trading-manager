@@ -1,22 +1,23 @@
-"""Manager lifecycle for replay option-feature prerequisites.
+"""Manager lifecycle for replay option-feature repair.
 
-Replay execution consumes Layer 9 option-expression candidates at each equity
-decision timestamp. This controller keeps that prerequisite automatic: detect
-missing replay option features, acquire the minimal historical option source
-windows, generate Layer 9 features from the shared cache, and let scheduler
-retry replay on the next drain step.
+Replay must advance like live operation: first run the replay clock through
+Layers 1-8, then request option data only when Layer 8 emits a Layer 9
+option-expression signal. This controller consumes that replay backoff, acquires
+the minimal historical option source windows for the emitted signal timestamps,
+generates Layer 9 features from the shared cache, and lets scheduler retry
+replay on the next drain step.
 """
 
 from __future__ import annotations
 
-import csv
 import json
 import os
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from .control_plane import persist_manager_requests
@@ -47,8 +48,8 @@ DEFAULT_OPTION_SOURCE_SCHEMA = "trading_data"
 DEFAULT_OPTION_SOURCE_TABLE = "option_chain_state_source"
 DEFAULT_OPTION_FEATURE_SCHEMA = "trading_data"
 DEFAULT_OPTION_FEATURE_TABLE = "m09_option_expression_feature_generation"
-DEFAULT_BAR_SCHEMA = "trading_data"
-DEFAULT_BAR_TABLE = "m01_market_regime_data_acquisition"
+REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED = "replay_option_feature_acquisition_required"
+REPLAY_OPTION_FEATURE_BACKOFF_REASON = "model_group_replay_option_feature_acquisition_required"
 NEW_YORK = ZoneInfo("America/New_York")
 
 
@@ -59,7 +60,8 @@ class ReplayOptionFeatureRequirement:
     month: str
 
 
-def run_model_group_replay_option_features_if_required(
+def run_model_group_replay_option_features_for_replay_backoff(
+    replay_decision: SchedulerDecision,
     *,
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     contract_id: str = DEFAULT_REPLAY_CONTRACT_ID,
@@ -70,8 +72,11 @@ def run_model_group_replay_option_features_if_required(
     database_url: str | None = None,
     lock_root: Path = DEFAULT_LOCK_ROOT,
 ) -> SchedulerDecision | None:
-    """Prepare missing option features for a frozen model-group replay dataset."""
+    """Prepare only the option features requested by a replay signal backoff."""
 
+    requirements = replay_option_feature_requirements_from_replay_decision(replay_decision)
+    if not requirements:
+        return None
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     manifest_path = dataset_root / "dataset_manifest.json"
     freeze_receipt_path = dataset_root / "replay_freeze_receipt.json"
@@ -90,14 +95,10 @@ def run_model_group_replay_option_features_if_required(
         return _decision(
             decision_status="backoff",
             reason_code="model_group_replay_option_feature_database_missing",
-            reason="replay option-feature preparation requires the shared SQL database URL",
+            reason="replay option-feature repair requires the shared SQL database URL",
             selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
             execution_summary={"contract_id": contract_id, "dataset_root": str(dataset_root), "training_fold": training_fold},
         )
-
-    requirements = _missing_option_feature_requirements(dataset_root=dataset_root, database_url=db_url)
-    if not requirements:
-        return None
 
     limit = len(requirements) if provider_acquisition_limit is None else max(1, provider_acquisition_limit)
     batch = requirements[:limit]
@@ -111,8 +112,8 @@ def run_model_group_replay_option_features_if_required(
     if not execute:
         return _decision(
             decision_status="ready",
-            reason_code="model_group_replay_option_feature_preparation_ready",
-            reason="model-group replay has missing option features that can be prepared automatically",
+            reason_code="model_group_replay_option_feature_repair_ready",
+            reason="model-group replay emitted option-expression signal timestamps that can be prepared automatically",
             selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
             execution_summary=_summary(
                 contract_id=contract_id,
@@ -198,8 +199,8 @@ def run_model_group_replay_option_features_if_required(
 
     return _decision(
         decision_status="executed",
-        reason_code="model_group_replay_option_feature_preparation_executed",
-        reason="prepared a bounded batch of replay option source/features; scheduler can retry replay after missing count reaches zero",
+        reason_code="model_group_replay_option_feature_repair_executed",
+        reason="prepared replay option source/features for emitted Layer 8 signal timestamps; scheduler can retry replay from the same clock",
         selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
         provider_calls=provider_calls,
         dispatch_performed=provider_calls > 0,
@@ -217,6 +218,59 @@ def run_model_group_replay_option_features_if_required(
     )
 
 
+def replay_option_feature_requirements_from_replay_decision(
+    replay_decision: SchedulerDecision,
+) -> tuple[ReplayOptionFeatureRequirement, ...]:
+    if replay_decision.reason_code != REPLAY_OPTION_FEATURE_BACKOFF_REASON:
+        return ()
+    payload = _option_feature_payload_from_replay_decision(replay_decision)
+    sample = payload.get("sample") if isinstance(payload, Mapping) else None
+    if not isinstance(sample, Sequence):
+        return ()
+    requirements: list[ReplayOptionFeatureRequirement] = []
+    seen: set[tuple[str, str]] = set()
+    for item in sample:
+        if not isinstance(item, Mapping):
+            continue
+        target = str(item.get("target_ref") or item.get("underlying") or "").upper()
+        raw_timestamp = item.get("timestamp") or item.get("maximum_permitted_source_end")
+        if not raw_timestamp:
+            continue
+        timestamp = _time_key(raw_timestamp)
+        if not target or not timestamp:
+            continue
+        key = (target, timestamp)
+        if key in seen:
+            continue
+        seen.add(key)
+        requirements.append(ReplayOptionFeatureRequirement(target_ref=target, timestamp=timestamp, month=timestamp[:7]))
+    return tuple(requirements)
+
+
+def _option_feature_payload_from_replay_decision(replay_decision: SchedulerDecision) -> dict[str, Any]:
+    summary = replay_decision.execution_summary if isinstance(replay_decision.execution_summary, Mapping) else {}
+    texts = [
+        str(summary.get("runner_stderr") or ""),
+        str(summary.get("runner_stdout") or ""),
+        replay_decision.reason,
+    ]
+    decoder = json.JSONDecoder()
+    for text in texts:
+        token_index = text.find(REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED)
+        if token_index < 0:
+            continue
+        payload_start = text.find("{", token_index)
+        if payload_start < 0:
+            continue
+        try:
+            payload, _ = decoder.raw_decode(text[payload_start:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return {}
+
+
 def _database_url(explicit: str | None = None) -> str | None:
     if explicit:
         return explicit
@@ -225,135 +279,6 @@ def _database_url(explicit: str | None = None) -> str | None:
     if DEFAULT_DB_URL_FILE.exists():
         return DEFAULT_DB_URL_FILE.read_text(encoding="utf-8").strip()
     return None
-
-
-def _missing_option_feature_requirements(*, dataset_root: Path, database_url: str) -> tuple[ReplayOptionFeatureRequirement, ...]:
-    plan_path = _feed_acquisition_plan_path(dataset_root)
-    bars = _equity_replay_decision_bars(plan_path=plan_path, database_url=database_url)
-    available = _available_option_feature_keys(database_url=database_url, targets=bars.keys())
-    missing: list[ReplayOptionFeatureRequirement] = []
-    for target, rows in sorted(bars.items()):
-        for row in rows[:-1]:
-            timestamp = str(row.get("timestamp") or "")
-            if not timestamp:
-                continue
-            key = (target, _time_key(timestamp))
-            if key in available:
-                continue
-            missing.append(
-                ReplayOptionFeatureRequirement(
-                    target_ref=target,
-                    timestamp=_time_key(timestamp),
-                    month=_time_key(timestamp)[:7],
-                )
-            )
-    return tuple(missing)
-
-
-def _feed_acquisition_plan_path(dataset_root: Path) -> Path:
-    manifest = _load_json_object(dataset_root / "dataset_manifest.json")
-    return Path(str(manifest["feed_acquisition_plan_ref"]))
-
-
-def _equity_replay_decision_bars(*, plan_path: Path, database_url: str) -> dict[str, list[dict[str, Any]]]:
-    rows_by_target: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    with plan_path.open(newline="", encoding="utf-8") as handle:
-        for plan_row in csv.DictReader(handle):
-            if plan_row.get("source_id") != "alpaca_bars" or plan_row.get("coverage_status") != "available":
-                continue
-            symbol = str(plan_row.get("target_ref") or "").upper()
-            start_date = str(plan_row.get("start_date") or "")
-            end_date_exclusive = str(plan_row.get("end_date_exclusive") or "")
-            if not symbol or not start_date or not end_date_exclusive:
-                continue
-            rows_by_target[symbol].extend(
-                _load_equity_bars_from_sql(
-                    database_url=database_url,
-                    symbol=symbol,
-                    start_date=start_date,
-                    end_date_exclusive=end_date_exclusive,
-                )
-            )
-    deduped: dict[str, list[dict[str, Any]]] = {}
-    for target, rows in rows_by_target.items():
-        by_timestamp = {str(row["timestamp"]): row for row in rows}
-        deduped[target] = sorted(by_timestamp.values(), key=lambda row: str(row["timestamp"]))
-    return deduped
-
-
-def _load_equity_bars_from_sql(*, database_url: str, symbol: str, start_date: str, end_date_exclusive: str) -> list[dict[str, Any]]:
-    import psycopg  # type: ignore
-    from psycopg.rows import dict_row  # type: ignore
-
-    with psycopg.connect(database_url, row_factory=dict_row) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT to_regclass(%s) AS table_ref", (f"{DEFAULT_BAR_SCHEMA}.{DEFAULT_BAR_TABLE}",))
-            exists = cursor.fetchone()
-            if not exists or exists.get("table_ref") is None:
-                return []
-            cursor.execute(
-                f"""
-                SELECT "symbol", "timeframe", "timestamp", "bar_open", "bar_high", "bar_low", "bar_close", "bar_volume"
-                FROM "{DEFAULT_BAR_SCHEMA}"."{DEFAULT_BAR_TABLE}"
-                WHERE "symbol" = %s
-                  AND "timestamp" >= %s::timestamptz
-                  AND "timestamp" < %s::timestamptz
-                  AND "bar_close" IS NOT NULL
-                ORDER BY "timestamp" ASC
-                """,
-                (symbol, start_date, end_date_exclusive),
-            )
-            rows = [dict(row) for row in cursor.fetchall()]
-    parsed: list[dict[str, Any]] = []
-    for row in rows:
-        timestamp_value = row.get("timestamp")
-        if hasattr(timestamp_value, "date"):
-            date_text = timestamp_value.date().isoformat()
-        else:
-            date_text = str(timestamp_value or "").split("T", 1)[0]
-        if not date_text:
-            continue
-        parsed.append(
-            {
-                "symbol": str(row.get("symbol") or symbol).upper(),
-                "asset_class": "us_equity",
-                "source_id": "alpaca_bars",
-                "timeframe": str(row.get("timeframe") or "1Day"),
-                "timestamp": f"{date_text}T16:00:00-05:00",
-                "date": date_text,
-                "bar_open": float(row["bar_open"]),
-                "bar_high": float(row["bar_high"]),
-                "bar_low": float(row["bar_low"]),
-                "bar_close": float(row["bar_close"]),
-                "bar_volume": float(row.get("bar_volume") or 0.0),
-            }
-        )
-    return parsed
-
-
-def _available_option_feature_keys(*, database_url: str, targets: Sequence[str] | Any) -> set[tuple[str, str]]:
-    target_filter = sorted({str(target).upper() for target in targets if str(target).strip()})
-    if not target_filter:
-        return set()
-    import psycopg  # type: ignore
-    from psycopg.rows import dict_row  # type: ignore
-
-    with psycopg.connect(database_url, row_factory=dict_row) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT to_regclass(%s) AS table_ref", (f"{DEFAULT_OPTION_FEATURE_SCHEMA}.{DEFAULT_OPTION_FEATURE_TABLE}",))
-            exists = cursor.fetchone()
-            if not exists or exists.get("table_ref") is None:
-                return set()
-            cursor.execute(
-                f"""
-                SELECT DISTINCT "underlying", "snapshot_time"
-                FROM "{DEFAULT_OPTION_FEATURE_SCHEMA}"."{DEFAULT_OPTION_FEATURE_TABLE}"
-                WHERE "underlying" = ANY(%s)
-                  AND COALESCE("snapshot_type", 'entry') IN ('entry', 'source_cache')
-                """,
-                (target_filter,),
-            )
-            return {(str(row["underlying"]).upper(), _time_key(row["snapshot_time"])) for row in cursor.fetchall()}
 
 
 def _source_rows_available(*, database_url: str, requirement: ReplayOptionFeatureRequirement) -> bool:
@@ -384,13 +309,13 @@ def _persist_replay_option_source_requests(
     *,
     storage_root: Path,
 ) -> dict[str, list[str]]:
-    grouped: dict[str, list[ReplayOptionFeatureRequirement]] = defaultdict(list)
+    grouped: dict[tuple[str, str], list[ReplayOptionFeatureRequirement]] = defaultdict(list)
     for requirement in requirements:
-        grouped[requirement.month].append(requirement)
+        grouped[(requirement.month, requirement.target_ref)].append(requirement)
     request_ids_by_month: dict[str, list[str]] = {}
-    for month, items in grouped.items():
+    for (month, target_ref), items in grouped.items():
         previews = request_previews_for_replay_decision_times(
-            target_symbol=items[0].target_ref,
+            target_symbol=target_ref,
             decision_timestamps=[item.timestamp for item in items],
         )
         review = OptionChainSourceReview(
@@ -399,16 +324,16 @@ def _persist_replay_option_source_requests(
             start_month=month,
             end_month=month,
             status="provider_acquisition_ready" if previews else "no_provider_skip_accepted",
-            target_symbol=items[0].target_ref,
+            target_symbol=target_ref,
             request_count=len(previews),
             request_previews=previews,
             evidence_refs=("replay_dataset:feed_acquisition_plan",),
-            reason=f"{len(previews)} replay decision option-chain source request(s) require ThetaData acquisition before replay retry.",
+            reason=f"{len(previews)} replay signal option-chain source request(s) require ThetaData acquisition before replay retry.",
         )
         requests = manager_requests_from_review(review, storage_root=storage_root)
         write_option_chain_task_keys(requests)
         persist_manager_requests([{key: value for key, value in request.items() if not key.startswith("_")} for request in requests])
-        request_ids_by_month[month] = [str(request["request_id"]) for request in requests]
+        request_ids_by_month.setdefault(month, []).extend(str(request["request_id"]) for request in requests)
     return request_ids_by_month
 
 
@@ -488,5 +413,6 @@ def _summary(
 __all__ = [
     "REPLAY_OPTION_FEATURE_STAGE_ID",
     "ReplayOptionFeatureRequirement",
-    "run_model_group_replay_option_features_if_required",
+    "replay_option_feature_requirements_from_replay_decision",
+    "run_model_group_replay_option_features_for_replay_backoff",
 ]
