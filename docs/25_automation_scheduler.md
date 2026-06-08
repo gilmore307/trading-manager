@@ -131,3 +131,7 @@ Layer 10 is part of the historical-modeling service boundary, but it starts afte
 ## Dashboard Refresh Events
 
 The resident service triggers the storage-owned dashboard read-model refresh whenever it writes workflow-state progress, including stage-start transitions. The storage refresh timer remains a fallback calibration route; it is not the primary dashboard progress path.
+
+## Progress Stall Guard
+
+Historical automation must not sit in an apparently running but non-advancing state. The resident daemon treats ten minutes without executed scheduler progress as `scheduler_progress_stalled` and opens a server-wide agent error handoff for diagnosis/repair. Stage execution has the same ten-minute active-progress guard: if a running child process stops updating its task-progress file, the executor terminates the stage, records `stage_progress_stalled`, and routes it through the agent repair path. Waiting for a future incomplete calendar fold is the only normal no-progress exception.

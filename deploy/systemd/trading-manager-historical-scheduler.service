@@ -21,6 +21,7 @@ Environment=TRADING_MANAGER_DASHBOARD_REFRESH_ON_WORKFLOW_STATE_WRITE=true
 Environment=TRADING_MANAGER_DASHBOARD_REFRESH_NO_BLOCK=true
 Environment=TRADING_MANAGER_DASHBOARD_REFRESH_TRIGGER_TIMEOUT_SECONDS=5
 Environment=TRADING_MANAGER_MARKET_HOURS_PROTECTION_ENABLED=false
+Environment=TRADING_MANAGER_SCHEDULER_PROGRESS_STALL_SECONDS=600
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=-/etc/default/trading-manager-historical-scheduler
 ExecStart=/root/projects/trading-manager/.venv/bin/python /root/projects/trading-manager/scripts/tasks/run_automation_scheduler_daemon.py \
@@ -39,7 +40,8 @@ ExecStart=/root/projects/trading-manager/.venv/bin/python /root/projects/trading
   --drain-max-steps ${TRADING_MANAGER_DRAIN_MAX_STEPS} \
   --drain-max-seconds ${TRADING_MANAGER_DRAIN_MAX_SECONDS} \
   --refresh-dashboard-on-decision \
-  --dashboard-refresh-service-unit ${TRADING_MANAGER_DASHBOARD_REFRESH_SERVICE_UNIT}
+  --dashboard-refresh-service-unit ${TRADING_MANAGER_DASHBOARD_REFRESH_SERVICE_UNIT} \
+  --progress-stall-seconds ${TRADING_MANAGER_SCHEDULER_PROGRESS_STALL_SECONDS}
 Restart=always
 RestartSec=30
 KillSignal=SIGTERM

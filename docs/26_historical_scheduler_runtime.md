@@ -35,6 +35,8 @@ Default runtime files:
 
 Workflow-state writes emit a dashboard refresh event when `TRADING_MANAGER_DASHBOARD_REFRESH_ON_WORKFLOW_STATE_WRITE=true`. The event starts the storage-owned read-model refresh service with `--no-block`, so WebSocket subscribers see newly materialized dashboard snapshots immediately after state transitions while the 5-second storage timer remains a fallback.
 
+Progress stall guard: the daemon uses `TRADING_MANAGER_SCHEDULER_PROGRESS_STALL_SECONDS=600` by default. If no executed progress is observed for that window, it writes a `scheduler_progress_stalled` server-error handoff and invokes the configured agent repair runner. Stage subprocesses also use `TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS=600` by default and must keep their active task-progress file fresh while running.
+
 ## Lock Contract
 
 Schema: `schemas/scheduler_lock.schema.json`.

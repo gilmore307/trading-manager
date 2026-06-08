@@ -26,6 +26,7 @@ from trading_manager_tasks.scheduler_daemon import (
     completed_historical_month_cutoff,
     load_model_worker_target_queue,
     load_daemon_state,
+    handle_scheduler_progress_stall,
     model_worker_fold_state_path,
     next_month,
     refresh_dashboard_read_models,
@@ -230,6 +231,60 @@ class SchedulerDaemonTests(unittest.TestCase):
             self.assertEqual(resumed_cursor.total_ticks, 3)
             self.assertEqual(resumed_cursor.start_month, "2016-01")
             self.assertEqual(resumed_cursor.end_month, "2016-01")
+
+    def test_scheduler_progress_stall_opens_agent_error_once_per_window(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state = SchedulerDaemonState(
+                start_month="2016-01",
+                end_month="2016-01",
+                last_decision_status="backoff",
+                last_reason_code="workflow_stage_blocked",
+                last_progress_utc="2026-01-01T00:00:00+00:00",
+            )
+            with patch("trading_manager_tasks.scheduler_daemon.handle_server_error") as handler:
+                handler.return_value = {"error_ref": "ERR-STALL"}
+                updated = handle_scheduler_progress_stall(
+                    state,
+                    storage_root=tmp / "storage",
+                    state_path=tmp / "runtime" / "state.json",
+                    decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                    stall_seconds=600,
+                )
+                repeated = handle_scheduler_progress_stall(
+                    updated,
+                    storage_root=tmp / "storage",
+                    state_path=tmp / "runtime" / "state.json",
+                    decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                    stall_seconds=600,
+                )
+
+        self.assertEqual(handler.call_count, 1)
+        self.assertEqual(updated.last_stall_agent_error_ref, "ERR-STALL")
+        self.assertEqual(repeated.last_stall_agent_error_ref, "ERR-STALL")
+        call = handler.call_args.kwargs
+        self.assertEqual(call["error_kind"], "scheduler_progress_stalled")
+        self.assertIn("historical scheduler made no progress", call["summary"])
+
+    def test_scheduler_progress_stall_ignores_future_fold_wait(self):
+        state = SchedulerDaemonState(
+            start_month="2026-06",
+            end_month="2026-06",
+            last_work_selection_reason="waiting_for_next_training_fold_to_complete",
+            last_progress_utc="2026-01-01T00:00:00+00:00",
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.scheduler_daemon.handle_server_error") as handler:
+            tmp = Path(raw_tmp)
+            updated = handle_scheduler_progress_stall(
+                state,
+                storage_root=tmp / "storage",
+                state_path=tmp / "runtime" / "state.json",
+                decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                stall_seconds=600,
+            )
+
+        self.assertIsNone(updated.last_stall_agent_error_ref)
+        handler.assert_not_called()
 
     def test_lock_prevents_duplicate_daemon_instance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

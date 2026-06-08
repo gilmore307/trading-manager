@@ -45,6 +45,7 @@ from .scheduler import (
     SchedulerDecision,
     run_scheduler_once,
 )
+from .agent_error_handler import _env_truthy, handle_server_error
 
 DEFAULT_RUNTIME_DIR = manager_storage_root() / "runtime"
 DEFAULT_STATE_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_state.json"
@@ -55,6 +56,7 @@ DEFAULT_STALE_LOCK_SECONDS = 6 * 60 * 60
 DEFAULT_DRAIN_MAX_STEPS = 50
 DEFAULT_DRAIN_MAX_SECONDS = 300.0
 DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-refresh.service"
+DEFAULT_SCHEDULER_PROGRESS_STALL_SECONDS = 60 * 10
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
 DEFAULT_MONTH_INGEST_WORKERS = 1
 DEFAULT_TARGET_QUEUE_PATH = DEFAULT_RUNTIME_DIR / "model_training_target_queue.json"
@@ -1179,6 +1181,9 @@ class SchedulerDaemonState:
     last_work_selection_reason: str | None = None
     last_completed_months: tuple[str, ...] = ()
     last_open_months: tuple[str, ...] = ()
+    last_progress_utc: str | None = None
+    last_stall_agent_call_utc: str | None = None
+    last_stall_agent_error_ref: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
@@ -1189,6 +1194,27 @@ class SchedulerDaemonState:
 
 def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _parse_utc_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _decision_advances_progress(decision: SchedulerDecision) -> bool:
+    return decision.decision_status == "executed"
 
 
 def load_daemon_state(
@@ -1206,7 +1232,8 @@ def load_daemon_state(
     """
 
     if not path.exists():
-        return SchedulerDaemonState(start_month=start_month, end_month=end_month, updated_utc=utc_now_iso())
+        now = utc_now_iso()
+        return SchedulerDaemonState(start_month=start_month, end_month=end_month, updated_utc=now, last_progress_utc=now)
     payload = json.loads(path.read_text(encoding="utf-8"))
     state = SchedulerDaemonState(**payload)
     state = replace(
@@ -1214,6 +1241,8 @@ def load_daemon_state(
         last_completed_months=tuple(state.last_completed_months),
         last_open_months=tuple(state.last_open_months),
     )
+    if state.last_progress_utc is None:
+        state = replace(state, last_progress_utc=state.updated_utc or utc_now_iso())
     if resume_month_cursor:
         return state
     if state.start_month != start_month or state.end_month != end_month:
@@ -1348,6 +1377,7 @@ def update_state_from_decision(
     completed_utc: str,
     decision: SchedulerDecision,
 ) -> SchedulerDaemonState:
+    progress_utc = completed_utc if _decision_advances_progress(decision) else state.last_progress_utc
     return replace(
         state,
         total_ticks=state.total_ticks + 1,
@@ -1360,7 +1390,63 @@ def update_state_from_decision(
         last_reason_code=decision.reason_code,
         last_next_internal_stage=decision.next_internal_stage,
         last_error=None,
+        last_progress_utc=progress_utc,
         updated_utc=completed_utc,
+    )
+
+
+def _scheduler_waiting_for_future_fold(state: SchedulerDaemonState) -> bool:
+    return state.last_work_selection_reason == "waiting_for_next_training_fold_to_complete"
+
+
+def handle_scheduler_progress_stall(
+    state: SchedulerDaemonState,
+    *,
+    storage_root: Path,
+    state_path: Path,
+    decision_log_path: Path,
+    stall_seconds: float = DEFAULT_SCHEDULER_PROGRESS_STALL_SECONDS,
+) -> SchedulerDaemonState:
+    """Open a server-error agent handoff when the resident scheduler stops progressing."""
+
+    if stall_seconds <= 0 or _scheduler_waiting_for_future_fold(state):
+        return state
+    now_text = utc_now_iso()
+    now = _parse_utc_iso(now_text) or datetime.now(UTC)
+    last_progress = _parse_utc_iso(state.last_progress_utc or state.updated_utc)
+    if last_progress is None:
+        return replace(state, last_progress_utc=now_text)
+    stalled_for_seconds = (now - last_progress).total_seconds()
+    if stalled_for_seconds < stall_seconds:
+        return state
+    last_alert = _parse_utc_iso(state.last_stall_agent_call_utc)
+    if last_alert is not None and (now - last_alert).total_seconds() < stall_seconds:
+        return state
+    result = handle_server_error(
+        source_component="trading-manager.scheduler_daemon",
+        source_repo="trading-manager",
+        error_scope="server.scheduler_progress",
+        error_kind="scheduler_progress_stalled",
+        severity="warning",
+        summary=(
+            f"historical scheduler made no progress for {int(stalled_for_seconds)} seconds; "
+            f"last_decision_status={state.last_decision_status} reason={state.last_reason_code}"
+        ),
+        command=[],
+        exit_code=None,
+        stdout_path=None,
+        stderr_path=None,
+        working_directory=str(Path("/root/projects/trading-manager")),
+        evidence_refs=[str(state_path), str(decision_log_path)],
+        output_root=storage_root / "runtime" / "agent_error_handling",
+        call_agent=_env_truthy("MANAGER_AGENT_ERROR_AUTOCALL"),
+        catalog_storage=os.environ.get("MANAGER_AGENT_ERROR_CATALOG_STORAGE", "sql"),
+    )
+    return replace(
+        state,
+        last_stall_agent_call_utc=now_text,
+        last_stall_agent_error_ref=str(result.get("error_ref") or "") or None,
+        updated_utc=now_text,
     )
 
 
@@ -1554,6 +1640,7 @@ def run_daemon_loop(
     execute_model_group_evaluation: bool = True,
     source_existing_bootstrap: bool = True,
     source_bootstrap_database_url: str | None = None,
+    progress_stall_seconds: float = DEFAULT_SCHEDULER_PROGRESS_STALL_SECONDS,
     config: SchedulerConfig = SchedulerConfig(),
     output: TextIO | None = None,
 ) -> SchedulerDaemonState:
@@ -1910,6 +1997,13 @@ def run_daemon_loop(
                     if output is not None:
                         output.write(json.dumps(state.summary_row(), sort_keys=True) + "\n")
                         output.flush()
+                state = handle_scheduler_progress_stall(
+                    state,
+                    storage_root=storage_root,
+                    state_path=state_path,
+                    decision_log_path=decision_log_path,
+                    stall_seconds=progress_stall_seconds,
+                )
                 write_daemon_state(state_path, state)
                 iterations += max(1, decisions_this_cycle)
                 drain_steps += 1
@@ -1964,6 +2058,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--disable-model-group-evaluation", action="store_true", help="Disable automatic side-effect-free model-group evaluation evidence build.")
     parser.add_argument("--disable-source-existing-bootstrap", action="store_true", help="Disable startup source-existing bootstrap. Default service startup inspects source tables and seeds workflow acquisition state so existing source data is reused.")
     parser.add_argument("--source-bootstrap-database-url", help="Database URL for startup source-existing bootstrap; defaults to OpenClaw database resolution.")
+    parser.add_argument("--progress-stall-seconds", type=float, default=DEFAULT_SCHEDULER_PROGRESS_STALL_SECONDS, help="Trigger server-error agent diagnosis when scheduler progress does not advance for this many seconds. Set <=0 to disable.")
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
     parser.add_argument("--min-free-disk-gb", type=float, default=DEFAULT_MIN_FREE_DISK_GB)
@@ -2007,6 +2102,7 @@ def main(argv: list[str] | None = None) -> int:
         execute_model_group_evaluation=not args.disable_model_group_evaluation,
         source_existing_bootstrap=not args.disable_source_existing_bootstrap,
         source_bootstrap_database_url=args.source_bootstrap_database_url,
+        progress_stall_seconds=args.progress_stall_seconds,
         config=config,
         output=sys.stdout,
     )
@@ -2022,6 +2118,7 @@ __all__ = [
     "DEFAULT_INTERVAL_SECONDS",
     "DEFAULT_LOCK_PATH",
     "DEFAULT_RUNTIME_DIR",
+    "DEFAULT_SCHEDULER_PROGRESS_STALL_SECONDS",
     "DEFAULT_STATE_PATH",
     "DEFAULT_TARGET_QUEUE_PATH",
     "HistoricalWorkSelection",
@@ -2033,6 +2130,7 @@ __all__ = [
     "compact_decision_log_tail",
     "completed_historical_fold_cutoff",
     "completed_historical_fold_cutoff_month",
+    "handle_scheduler_progress_stall",
     "load_daemon_state",
     "release_daemon_lock",
     "load_model_worker_target_queue",

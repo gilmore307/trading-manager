@@ -30,7 +30,7 @@ class StageExecutorTests(unittest.TestCase):
                 blockers=(),
             )
             progress_root = tmp / "progress"
-            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_AUTOCALL": "false", "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
                 summary = execute_stage_process(
                     stage,
                     manager_root=tmp,
@@ -64,7 +64,7 @@ class StageExecutorTests(unittest.TestCase):
                 command=["python3", "-c", "import sys; print(sys.executable)"],
                 blockers=(),
             )
-            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_AUTOCALL": "false", "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
                 summary = execute_stage_process(
                     stage,
                     manager_root=tmp,
@@ -95,6 +95,7 @@ class StageExecutorTests(unittest.TestCase):
                 "os.environ",
                 {
                     "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl",
+                    "MANAGER_AGENT_ERROR_AUTOCALL": "false",
                     "TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "1",
                 },
                 clear=False,
@@ -112,6 +113,45 @@ class StageExecutorTests(unittest.TestCase):
             self.assertIsNone(summary.return_code)
             self.assertIn("timeout_seconds=1", summary.reason or "")
             self.assertIn("timeout_seconds=1", Path(summary.stderr_path or "").read_text(encoding="utf-8"))
+
+    def test_stage_process_stall_triggers_agent_error_before_total_timeout(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            stage = StageProgress(
+                stage_id="layer_01_market_regime.feature_generation",
+                layer=1,
+                layer_key="layer_01_market_regime",
+                stage_type="feature_generation",
+                status="ready",
+                command=["python3", "-c", "import time; time.sleep(2)"],
+                blockers=(),
+            )
+            with patch.dict(
+                "os.environ",
+                {
+                    "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl",
+                    "MANAGER_AGENT_ERROR_AUTOCALL": "false",
+                    "TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "5",
+                    "TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS": "0.2",
+                    "TRADING_MANAGER_STAGE_PROGRESS_POLL_SECONDS": "0.05",
+                },
+                clear=False,
+            ):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
+
+            self.assertEqual(summary.status, "failed")
+            self.assertIsNone(summary.return_code)
+            self.assertIn("progress stalled", summary.reason or "")
+            self.assertTrue(Path(summary.agent_error_request_path or "").exists())
+            self.assertTrue(Path(summary.agent_error_diagnosis_path or "").exists())
+            self.assertIn("progress stalled", Path(summary.stderr_path or "").read_text(encoding="utf-8"))
 
     def test_stage_process_retries_once_after_completed_agent_repair(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -243,7 +283,7 @@ class StageExecutorTests(unittest.TestCase):
                 command=["python3", "materialize_layer_three_target_state_inputs.py"],
                 blockers=(),
             )
-            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_AUTOCALL": "false", "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
                 summary = execute_stage_process(
                     stage,
                     manager_root=tmp,
@@ -269,7 +309,7 @@ class StageExecutorTests(unittest.TestCase):
                 command=["python3", "materialize_layer_four_event_observation_inputs.py"],
                 blockers=(),
             )
-            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_AUTOCALL": "false", "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl"}, clear=False):
                 summary = execute_stage_process(
                     stage,
                     manager_root=tmp,

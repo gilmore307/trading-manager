@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,6 +35,8 @@ from .task_progress import DEFAULT_TASK_PROGRESS_ROOT, clear_worker_task_progres
 DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_receipts"
 DEFAULT_LOG_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_logs"
 DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 30
+DEFAULT_STAGE_PROGRESS_STALL_SECONDS = 60 * 10
+DEFAULT_STAGE_PROGRESS_POLL_SECONDS = 5.0
 SAFE_OFFLINE_STAGE_TYPES = {
     "data_acquisition",
     "feature_generation",
@@ -279,6 +282,85 @@ def _agent_diagnosis_recommends_retry(agent_error_result: Mapping[str, Any] | No
     return "retry" in retry_recommendation
 
 
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _progress_marker(path: Path) -> tuple[int, int] | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return stat.st_mtime_ns, stat.st_size
+
+
+def _stop_stage_process(process: subprocess.Popen[Any]) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
+def _run_stage_subprocess_with_progress_guard(
+    argv: list[str],
+    *,
+    cwd: Path,
+    env: Mapping[str, str],
+    stdout_path: Path,
+    stderr_path: Path,
+    progress_path: Path,
+    timeout_seconds: int,
+) -> tuple[int | None, str | None]:
+    """Run a stage command while enforcing timeout and active-progress freshness."""
+
+    stall_seconds = _env_float("TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS", DEFAULT_STAGE_PROGRESS_STALL_SECONDS)
+    poll_seconds = _env_float("TRADING_MANAGER_STAGE_PROGRESS_POLL_SECONDS", DEFAULT_STAGE_PROGRESS_POLL_SECONDS)
+    poll_seconds = max(0.05, poll_seconds)
+    started_monotonic = time.monotonic()
+    last_progress_monotonic = started_monotonic
+    last_marker = _progress_marker(progress_path)
+    with stdout_path.open("w", encoding="utf-8") as stdout_handle, stderr_path.open("w", encoding="utf-8") as stderr_handle:
+        process = subprocess.Popen(
+            argv,
+            cwd=cwd,
+            env=dict(env),
+            text=True,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+        )
+        while True:
+            return_code = process.poll()
+            if return_code is not None:
+                return return_code, None
+            now = time.monotonic()
+            marker = _progress_marker(progress_path)
+            if marker is not None and marker != last_marker:
+                last_marker = marker
+                last_progress_monotonic = now
+            if timeout_seconds > 0 and now - started_monotonic >= timeout_seconds:
+                _stop_stage_process(process)
+                return None, f"stage command exceeded timeout_seconds={timeout_seconds}"
+            if stall_seconds > 0 and now - last_progress_monotonic >= stall_seconds:
+                _stop_stage_process(process)
+                return None, f"stage progress stalled for timeout_seconds={stall_seconds:g}"
+            sleep_for = poll_seconds
+            if timeout_seconds > 0:
+                sleep_for = min(sleep_for, max(0.05, timeout_seconds - (now - started_monotonic)))
+            if stall_seconds > 0:
+                sleep_for = min(sleep_for, max(0.05, stall_seconds - (now - last_progress_monotonic)))
+            time.sleep(sleep_for)
+
+
 def execute_stage_process(
     stage: StageProgress,
     *,
@@ -344,29 +426,22 @@ def execute_stage_process(
             else {}
         ),
     }
-    try:
-        result = subprocess.run(
-            argv,
-            cwd=cwd,
-            env=run_env,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=timeout_seconds if timeout_seconds > 0 else None,
-        )
-        return_code: int | None = result.returncode
-        stdout = result.stdout
-        stderr = result.stderr
-        failure_reason = "stage command returned non-zero status"
-    except subprocess.TimeoutExpired as exc:
-        return_code = None
-        stdout = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace")
-        stderr = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode(errors="replace")
-        stderr = f"{stderr}\nstage command exceeded timeout_seconds={timeout_seconds}\n"
-        failure_reason = f"stage command exceeded timeout_seconds={timeout_seconds}"
+    return_code, guard_failure_reason = _run_stage_subprocess_with_progress_guard(
+        argv,
+        cwd=cwd,
+        env=run_env,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        progress_path=progress_path,
+        timeout_seconds=timeout_seconds,
+    )
     completed = datetime.now(UTC).isoformat()
-    stdout_path.write_text(stdout, encoding="utf-8")
-    stderr_path.write_text(stderr, encoding="utf-8")
+    stdout = stdout_path.read_text(encoding="utf-8") if stdout_path.exists() else ""
+    stderr = stderr_path.read_text(encoding="utf-8") if stderr_path.exists() else ""
+    failure_reason = guard_failure_reason or "stage command returned non-zero status"
+    if guard_failure_reason:
+        stderr = f"{stderr}\n{guard_failure_reason}\n"
+        stderr_path.write_text(stderr, encoding="utf-8")
     status = "succeeded" if return_code == 0 else "failed"
     receipt_path = stage_receipt_root / f"{stamp}.receipt.json"
     provider_calls = _provider_call_count_from_stdout(stdout) if return_code == 0 else 0
@@ -376,15 +451,15 @@ def execute_stage_process(
             source_component="trading-manager.stage_executor",
             source_repo="trading-manager",
             error_scope="server.model_training_stage",
-            error_kind="stage_command_failed",
+            error_kind="stage_progress_stalled" if guard_failure_reason and "progress stalled" in guard_failure_reason else "stage_command_failed",
             severity="error",
-            summary=f"model training stage {stage.stage_id} command returned non-zero status",
+            summary=f"model training stage {stage.stage_id} {failure_reason}",
             command=execution_command,
             exit_code=return_code,
             stdout_path=str(stdout_path),
             stderr_path=str(stderr_path),
             working_directory=str(cwd),
-            evidence_refs=[f"manager_stage:{stage.stage_id}"],
+            evidence_refs=[f"manager_stage:{stage.stage_id}", f"task_progress:{progress_path}"],
             output_root=log_root.parent / "agent_error_handling",
             call_agent=_env_truthy("MANAGER_AGENT_ERROR_AUTOCALL"),
             catalog_storage=os.environ.get("MANAGER_AGENT_ERROR_CATALOG_STORAGE", "sql"),
