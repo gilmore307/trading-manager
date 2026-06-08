@@ -83,7 +83,11 @@ Layer 3 option context is not a separate contract route. The shared
 `trading_data.option_chain_state_source` table owns contract-level ThetaData
 option-chain rows. Layer 3 feature generation reads it only as an optional
 target-level option-chain reducer input, while Layer 9 reuses the same source to
-derive option-expression candidate rows.
+derive option-expression candidate rows. Scheduler adds this source stage only
+when the selected target's metadata leaves listed options applicable. Targets
+marked as `crypto_spot` or confirmed no-listed-options do not get a Layer 3
+option-chain stage, Layer 3 option payload fields, or Layer 9 option-expression
+stages.
 
 Source-existing bootstrap may seed Layer 3 data acquisition from durable
 `m03_target_state_vector_data_acquisition` rows for the selected target. That prevents a clean

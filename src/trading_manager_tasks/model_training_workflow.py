@@ -10,6 +10,7 @@ settles failures, residuals, misses, or path deviations.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from collections.abc import Mapping as MappingABC
@@ -55,6 +56,8 @@ LAYER_THREE_OPTION_CHAIN_SOURCE_STAGE_ID = "layer_03_target_state_vector.option_
 LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER = f"{LAYER_THREE_OPTION_CHAIN_SOURCE_STAGE_ID}_complete"
 LAYER_FIVE_AFTER_COST_ALPHA_ARTIFACT_BLOCKER = "layer_05_after_cost_alpha_artifact_ready"
 LAYER_FIVE_AFTER_COST_ALPHA_TRAINING_STAGE_TYPE = "model_training"
+NO_LISTED_OPTION_STATUSES = {"confirmed_no_listed_options", "no_listed_options", "no_listed_options_or_unverified"}
+NO_OPTION_ASSET_CLASSES = {"crypto_spot", "spot_crypto", "crypto"}
 
 
 @dataclass(frozen=True)
@@ -676,6 +679,48 @@ def _normalize_selected_target_symbol(selected_target_symbol: str | None) -> str
     return symbol
 
 
+def _read_csv_rows_if_exists(path: Path) -> tuple[dict[str, str], ...]:
+    if not path.exists():
+        return ()
+    with path.open(newline="", encoding="utf-8") as handle:
+        return tuple({str(key): str(value or "").strip() for key, value in row.items()} for row in csv.DictReader(handle))
+
+
+def _target_option_overlay_required(*, selected_target_symbol: str | None, trading_storage_root: Path) -> bool:
+    target = _normalize_selected_target_symbol(selected_target_symbol)
+    if target is None:
+        return True
+
+    from . import layer_three_target_state
+
+    mapping_rows = _read_csv_rows_if_exists(layer_three_target_state.DEFAULT_TARGET_CONTEXT_MAPPING)
+    for row in mapping_rows:
+        if row.get("target_symbol", "").upper() != target:
+            continue
+        if row.get("review_status", "").lower() != "accepted":
+            continue
+        asset_class = row.get("target_asset_class", "").lower()
+        option_status = row.get("optionable_proxy_status", "").lower()
+        if asset_class in NO_OPTION_ASSET_CLASSES or option_status in NO_LISTED_OPTION_STATUSES:
+            return False
+
+    shared_root = trading_storage_root / "main" / "shared"
+    for path in (shared_root / "historical_candidate_universe.csv", shared_root / "equity_total_symbol_pool.csv"):
+        for row in _read_csv_rows_if_exists(path):
+            if row.get("symbol", "").upper() != target:
+                continue
+            asset_class = (row.get("target_asset_class") or row.get("asset_class") or row.get("instrument_type") or "").lower()
+            option_status = (
+                row.get("optionable_underlying_status")
+                or row.get("optionable_proxy_status")
+                or row.get("listed_option_status")
+                or ""
+            ).lower()
+            if asset_class in NO_OPTION_ASSET_CLASSES or option_status in NO_LISTED_OPTION_STATUSES:
+                return False
+    return True
+
+
 def _upstream_layer_ready_blockers(depends_on_layers: tuple[int, ...], *, foundation_catch_up_only: bool) -> tuple[str, ...]:
     suffix = "complete" if foundation_catch_up_only else "model_generation_complete"
     return tuple(f"upstream_layer_{dep:02d}_{suffix}" for dep in depends_on_layers)
@@ -818,6 +863,7 @@ def _build_layer_workflow(
     foundation_catch_up_only: bool,
     layer_four_event_observation_blockers: tuple[str, ...],
     layer_three_target_local_feed_blockers: tuple[str, ...],
+    target_option_overlay_required: bool,
 ) -> LayerWorkflow:
     layer = int(meta["layer"])
     slug = str(meta["slug"])
@@ -867,10 +913,12 @@ def _build_layer_workflow(
         acquisition_blockers, acquisition_gate = layer_four_event_observation_blockers, None
     elif layer == 3 and layer_three_target_local_feed_blockers:
         acquisition_status = "blocked"
-        acquisition_blockers, acquisition_gate = (LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER, *layer_three_target_local_feed_blockers), None
+        option_blockers = (LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER,) if target_option_overlay_required else ()
+        acquisition_blockers, acquisition_gate = (*option_blockers, *layer_three_target_local_feed_blockers), None
     elif layer == 3:
-        acquisition_status = "blocked"
-        acquisition_blockers, acquisition_gate = (LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER,), None
+        acquisition_blockers = (LAYER_THREE_OPTION_CHAIN_SOURCE_BLOCKER,) if target_option_overlay_required else ()
+        acquisition_status = "blocked" if acquisition_blockers else "ready"
+        acquisition_gate = None
     else:
         acquisition_status, acquisition_blockers, acquisition_gate = "blocked", _upstream_layer_ready_blockers(
             tuple(meta["depends_on_layers"]),
@@ -930,7 +978,7 @@ def _build_layer_workflow(
     stages: list[WorkflowStage] = []
     has_monthly_input_stage = layer in BASE_INPUT_STAGE_LAYERS
     include_input_stage = has_monthly_input_stage and (not foundation_catch_up_only or layer in FOUNDATION_CATCH_UP_LAYERS)
-    if layer == 3 and include_input_stage:
+    if layer == 3 and include_input_stage and target_option_overlay_required:
         option_source_command = [
             "PYTHONPATH=src",
             "python3",
@@ -1003,7 +1051,7 @@ def _build_layer_workflow(
                     provider_calls_allowed=False,
                 )
             )
-    elif layer == 9 and meta.get("feature_cli") is not None and not foundation_catch_up_only:
+    elif layer == 9 and meta.get("feature_cli") is not None and not foundation_catch_up_only and target_option_overlay_required:
         stages.append(
             WorkflowStage(
                 stage_id=f"{key}.feature_generation",
@@ -1026,6 +1074,24 @@ def _build_layer_workflow(
                 safe_without_provider_calls=True,
                 provider_calls_allowed=False,
             )
+        )
+    if layer == 9 and not target_option_overlay_required:
+        return LayerWorkflow(
+            layer=layer,
+            layer_key=key,
+            model_name=str(meta["model_name"]),
+            depends_on_layers=tuple(meta["depends_on_layers"]),
+            progression_mode=str(meta["progression_mode"]),
+            candidate_axis=str(meta["candidate_axis"]),
+            candidate_progression_policy=str(meta["candidate_progression_policy"]),
+            dataset_unit=dataset_unit,
+            data_surface=str(meta["data_surface"]),
+            feature_command=feature,
+            model_generate_command=generate,
+            model_evaluate_command=evaluate,
+            promotion_review_command=review,
+            maintenance_command=maintenance,
+            stages=tuple(stages),
         )
     if foundation_catch_up_only:
         return LayerWorkflow(
@@ -1155,6 +1221,10 @@ def build_model_training_workflow_plan(
     layer_two_task_key_count = count_layer_two_task_keys(storage_root, start_month=start_month)
     normalized_target_symbol = _normalize_selected_target_symbol(selected_target_symbol)
     resolved_trading_storage_root = _resolve_event_feed_storage_root(storage_root, trading_storage_root)
+    target_option_overlay_required = _target_option_overlay_required(
+        selected_target_symbol=normalized_target_symbol,
+        trading_storage_root=resolved_trading_storage_root,
+    )
     layer_four_event_observation_blockers = _layer_four_event_observation_blockers(
         start_month=start_month,
         end_month=end_month,
@@ -1177,6 +1247,7 @@ def build_model_training_workflow_plan(
             foundation_catch_up_only=foundation_catch_up_only,
             layer_four_event_observation_blockers=layer_four_event_observation_blockers,
             layer_three_target_local_feed_blockers=layer_three_target_local_feed_blockers,
+            target_option_overlay_required=target_option_overlay_required,
         )
         for meta in LAYER_METADATA
     )

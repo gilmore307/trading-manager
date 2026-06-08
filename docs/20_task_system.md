@@ -71,11 +71,13 @@ coverage remains child partition evidence under that one task.
    artifacts for a fold, manager prepares bounded `01_feed_alpaca_bars` requests
    for that target and dispatches them through the autonomous provider gate; the
    Layer 3 `m03_target_state_vector_data_acquisition` materializer then consumes those local
-   artifacts without direct provider access. Its task evidence also includes
-   `trading_data.option_chain_state_source`, the shared SQL source/cache that is
-   acquired before Layer 3 because target-level option-chain state consumes it.
-   Layer 9 option-expression feature generation reuses that same shared source
-   later and does not own an independent option-chain download route. Replay
+   artifacts without direct provider access. For targets whose metadata leaves
+   listed options applicable, manager also prepares `trading_data.option_chain_state_source`,
+   the shared SQL source/cache that Layer 3 can reduce into target-level
+   option-chain state. Crypto and confirmed no-listed-options targets skip that
+   source and carry no Layer 3+ option stages or payload items. Layer 9
+   option-expression feature generation reuses the same shared source later when
+   it exists and does not own an independent option-chain download route. Replay
    option-feature repair uses the same source/table contract, but only after
    replay advances through Layer 8 and emits an option-expression signal whose
    exact timestamp lacks Layer 9 candidates. It must not precompute option

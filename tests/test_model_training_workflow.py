@@ -252,9 +252,36 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                     foundation_catch_up_only=False,
                 )
 
-        stage = {stage.stage_id: stage for stage in plan.layers[2].stages}["layer_03_target_state_vector.data_acquisition"]
+        layer_three_stages = {stage.stage_id: stage for stage in plan.layers[2].stages}
+        self.assertNotIn("layer_03_target_state_vector.option_chain_data_acquisition", layer_three_stages)
+        stage = layer_three_stages["layer_03_target_state_vector.data_acquisition"]
         self.assertEqual(stage.status, "blocked")
-        self.assertEqual(stage.blockers, ("layer_03_target_state_vector.option_chain_data_acquisition_complete", "layer_03_target_local_feed_artifacts_ready"))
+        self.assertEqual(stage.blockers, ("layer_03_target_local_feed_artifacts_ready",))
+        self.assertEqual(plan.layers[8].stages, ())
+
+    def test_confirmed_no_options_total_pool_target_skips_option_stages(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            pool_path = tmp / "main" / "shared" / "equity_total_symbol_pool.csv"
+            pool_path.parent.mkdir(parents=True, exist_ok=True)
+            pool_path.write_text(
+                "symbol,name,sector,optionable_underlying_status,pool_membership_status,pool_membership_reason\n"
+                "XYZ,No Options Inc.,Industrials,confirmed_no_listed_options,inactive,inactive_confirmed_no_listed_options\n",
+                encoding="utf-8",
+            )
+            plan = build_model_training_workflow_plan(
+                storage_root=tmp,
+                trading_storage_root=tmp,
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="XYZ",
+                foundation_catch_up_only=False,
+            )
+
+        layer_three_stages = {stage.stage_id: stage for stage in plan.layers[2].stages}
+        self.assertNotIn("layer_03_target_state_vector.option_chain_data_acquisition", layer_three_stages)
+        self.assertEqual(layer_three_stages["layer_03_target_state_vector.data_acquisition"].blockers, ("layer_03_target_local_feed_artifacts_ready",))
+        self.assertEqual(plan.layers[8].stages, ())
 
     def test_foundation_catch_up_omits_monthly_post_feature_model_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

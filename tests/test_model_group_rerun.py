@@ -61,7 +61,7 @@ class ModelGroupRerunTests(unittest.TestCase):
         self.assertFalse(result.reset_receipt_written)
         self.assertIsNone(result.reset_receipt_path)
         self.assertEqual(before, after)
-        self.assertEqual(result.cutpoint_stage_id, "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(result.cutpoint_stage_id, "layer_03_target_state_vector.option_chain_data_acquisition")
         self.assertFalse(result.source_data_delete_required)
         protected_refs = {row["ref"] for row in result.plan["protected_set"]}
         self.assertIn("storage://01_source_data/monthly_backfill/trading_economics_calendar_web/", protected_refs)
@@ -136,7 +136,7 @@ class ModelGroupRerunTests(unittest.TestCase):
         self.assertIsNotNone(result.reset_receipt_path)
         self.assertEqual(receipt_payload["contract_type"], "manager_model_group_rerun_reset_receipt")
         self.assertEqual(receipt_payload["rerun_id"], result.rerun_id)
-        self.assertEqual(receipt_payload["cutpoint_stage_id"], "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(receipt_payload["cutpoint_stage_id"], "layer_03_target_state_vector.option_chain_data_acquisition")
         receipt_root_classes = {row["root_class"] for row in receipt_payload["controlled_artifact_roots"]}
         self.assertIn("rerun_reset_receipts", receipt_root_classes)
         self.assertIn("protected_source_data", receipt_root_classes)
@@ -145,7 +145,7 @@ class ModelGroupRerunTests(unittest.TestCase):
         self.assertEqual(by_stage["layer_03_target_state_vector.data_acquisition"]["status"], "blocked")
         self.assertEqual(
             by_stage["layer_03_target_state_vector.data_acquisition"]["last_reason"],
-            "waiting for layer_03_target_local_feed_artifacts_ready",
+            "waiting for layer_03_target_state_vector.option_chain_data_acquisition_complete,layer_03_target_local_feed_artifacts_ready",
         )
         self.assertEqual(by_stage["layer_03_target_state_vector.feature_generation"]["status"], "blocked")
         self.assertEqual(by_stage["layer_04_event_failure_risk.model_generation.train"]["status"], "blocked")
