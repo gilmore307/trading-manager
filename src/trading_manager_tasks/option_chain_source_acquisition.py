@@ -47,8 +47,9 @@ OPTION_CHAIN_PROVIDER_CONTROLS = {
     "retry_attempts": 3,
     "retry_backoff_seconds": 1.0,
     "retry_policy_ref": "target_option_chain_state_source_retry",
-    "rate_limit_policy_ref": "thetadata_python_library_direct_rate_limit",
+    "rate_limit_policy_ref": "thetadata_terminal_rest_rate_limit",
 }
+DEFAULT_THETADATA_TRANSPORT = "terminal_rest"
 ET = ZoneInfo("America/New_York")
 
 
@@ -80,6 +81,7 @@ class OptionChainRequestPreview:
                 "max_dte": self.max_dte,
                 "strike_range": self.strike_range,
                 "option_bucket_policy_ref": self.option_bucket_policy_ref,
+                "thetadata_transport": DEFAULT_THETADATA_TRANSPORT,
                 "timeout_seconds": OPTION_CHAIN_PROVIDER_CONTROLS["timeout_seconds"],
                 "retry_attempts": OPTION_CHAIN_PROVIDER_CONTROLS["retry_attempts"],
                 "retry_backoff_seconds": OPTION_CHAIN_PROVIDER_CONTROLS["retry_backoff_seconds"],
@@ -449,6 +451,7 @@ def _runtime_task_key(task_key: Mapping[str, Any]) -> dict[str, Any]:
     runtime_key["manager_controls"] = controls
     params = dict(runtime_key.get("params") or {})
     params["manager_dry_run"] = False
+    params.setdefault("thetadata_transport", DEFAULT_THETADATA_TRANSPORT)
     params.setdefault("timeout_seconds", OPTION_CHAIN_PROVIDER_CONTROLS["timeout_seconds"])
     params.setdefault("retry_attempts", OPTION_CHAIN_PROVIDER_CONTROLS["retry_attempts"])
     params.setdefault("retry_backoff_seconds", OPTION_CHAIN_PROVIDER_CONTROLS["retry_backoff_seconds"])

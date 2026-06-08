@@ -36,6 +36,7 @@ DEFAULT_ERROR_CATALOG_NAME = "server_error_catalog.jsonl"
 DEFAULT_ERROR_CATALOG_LOCK_NAME = ".server_error_catalog.lock"
 SERVER_ERROR_CATALOG_TABLE = "trading_manager.server_error_catalog"
 DEFAULT_DEDUP_WINDOW_SECONDS = 60 * 60
+DEFAULT_AGENT_RUNNER_TIMEOUT_SECONDS = 360
 DEFAULT_DISCORD_TARGET = "channel:1504100135200620665"
 DEFAULT_DISCORD_SERVER_ID = "1480186849241731084"
 ALLOWED_SEVERITIES = {"info", "warning", "error", "critical"}
@@ -593,7 +594,7 @@ def call_agent_runner(
     request: Mapping[str, Any],
     *,
     runner_command: str,
-    timeout_seconds: int = 1800,
+    timeout_seconds: int = DEFAULT_AGENT_RUNNER_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     """Call the configured agent runner with the request JSON on stdin."""
 
@@ -820,7 +821,11 @@ def handle_server_error(
     effective_call_agent = call_agent or _env_truthy("MANAGER_AGENT_ERROR_AUTOCALL")
     if effective_call_agent and configured_runner:
         try:
-            diagnosis = call_agent_runner(request, runner_command=configured_runner)
+            diagnosis = call_agent_runner(
+                request,
+                runner_command=configured_runner,
+                timeout_seconds=_env_int("MANAGER_AGENT_ERROR_RUNNER_TIMEOUT_SECONDS", DEFAULT_AGENT_RUNNER_TIMEOUT_SECONDS),
+            )
         except Exception as exc:
             diagnosis = build_agent_call_failed_diagnosis(request, runner_command=configured_runner, error=exc)
     else:

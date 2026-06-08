@@ -26,7 +26,7 @@ DEFAULT_CODEX_WORKDIR = "/root/.openclaw/workspace"
 DEFAULT_CODEX_ADD_DIR = "/root/projects"
 DEFAULT_CODEX_SANDBOX = "danger-full-access"
 CODEX_SANDBOXES = {"read-only", "workspace-write", "danger-full-access"}
-DEFAULT_TIMEOUT_SECONDS = 1800
+DEFAULT_TIMEOUT_SECONDS = 300
 
 
 def _now_utc() -> str:
@@ -103,7 +103,15 @@ def run_codex_cli_for_error(request: Mapping[str, Any]) -> dict[str, Any]:
     for directory in _codex_add_dirs():
         cmd.extend(["--add-dir", directory])
     cmd.append(_codex_prompt(request))
-    result = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout_seconds + 30, check=False)
+    try:
+        result = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout_seconds + 30, check=False)
+        return_code = result.returncode
+        result_stdout = result.stdout
+        result_stderr = result.stderr
+    except subprocess.TimeoutExpired as exc:
+        return_code = None
+        result_stdout = str(exc.stdout or "")
+        result_stderr = f"codex repair runner timed out after {timeout_seconds} seconds\n{exc.stderr or ''}"
     try:
         final_output = Path(final_output_path).read_text(encoding="utf-8", errors="replace").strip()
     except OSError:
@@ -113,19 +121,19 @@ def run_codex_cli_for_error(request: Mapping[str, Any]) -> dict[str, Any]:
     except OSError:
         pass
     completed = _now_utc()
-    status = "completed" if result.returncode == 0 else "agent_call_failed"
-    stdout = final_output or result.stdout
+    status = "completed" if return_code == 0 else "agent_call_failed"
+    stdout = final_output or result_stdout
     diagnosis = {
         "contract_type": AGENT_ERROR_DIAGNOSIS_CONTRACT,
         "schema_version": "1",
-        "diagnosis_id": _stable_id("errdiag", request.get("request_id"), started, result.returncode, stdout, result.stderr),
+        "diagnosis_id": _stable_id("errdiag", request.get("request_id"), started, return_code, stdout, result_stderr),
         "request_ref": request.get("request_id"),
         "agent_ref": request.get("agent_ref") or f"codex_cli:{model}",
         "runner_command": "codex_cli",
         "status": status,
-        "return_code": result.returncode,
+        "return_code": return_code,
         "stdout": stdout[-20000:],
-        "stderr": (result.stderr or result.stdout)[-8000:],
+        "stderr": (result_stderr or result_stdout)[-8000:],
         "started_at_utc": started,
         "completed_at_utc": completed,
     }

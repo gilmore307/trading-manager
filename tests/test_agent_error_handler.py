@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -152,6 +153,32 @@ class AgentErrorHandlerTests(unittest.TestCase):
             self.assertEqual(diagnosis["status"], "agent_call_failed")
             self.assertIn("runner crashed", diagnosis["stderr"])
             self.assertEqual(diagnosis["discord_notification"]["status"], "skipped")
+
+    def test_handle_server_error_passes_configured_runner_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            runner_diagnosis = {
+                "contract_type": "agent_error_diagnosis",
+                "schema_version": "1",
+                "diagnosis_id": "errdiag_timeout",
+                "request_ref": "placeholder",
+                "agent_ref": "codex_cli_gpt_5_5",
+                "status": "completed",
+            }
+            with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_RUNNER_TIMEOUT_SECONDS": "7"}, clear=False), patch(
+                "trading_manager_tasks.agent_error_handler.call_agent_runner",
+                return_value=runner_diagnosis,
+            ) as runner:
+                handle_server_error(
+                    source_component="server.test",
+                    summary="failure",
+                    output_root=tmp,
+                    call_agent=True,
+                    runner_command="python3 runner.py",
+                    catalog_storage="jsonl",
+                )
+
+        self.assertEqual(runner.call_args.kwargs["timeout_seconds"], 7)
 
     def test_false_autocall_env_does_not_call_runner(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -337,6 +364,25 @@ class AgentErrorHandlerTests(unittest.TestCase):
         self.assertIn("provider/source calls", message)
         self.assertIn("Never mutate broker/account/order/fill/position state", message)
         self.assertIn("Never print, copy, or persist secrets", message)
+
+    def test_codex_cli_runner_returns_failed_diagnosis_on_timeout(self) -> None:
+        request = build_server_error_agent_request(
+            source_component="server.test",
+            source_repo="trading-manager",
+            summary="failure",
+            request_id="erragent_timeout",
+        )
+
+        with patch.dict("os.environ", {"MANAGER_AGENT_ERROR_CODEX_TIMEOUT_SECONDS": "5"}, clear=False), patch(
+            "trading_manager_tasks.agent_error_agent_runner.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd=["codex"], timeout=35, output="partial", stderr="late"),
+        ):
+            diagnosis = run_codex_cli_for_error(request)
+
+        self.assertEqual(diagnosis["contract_type"], "agent_error_diagnosis")
+        self.assertEqual(diagnosis["status"], "agent_call_failed")
+        self.assertIsNone(diagnosis["return_code"])
+        self.assertIn("timed out after 5 seconds", diagnosis["stderr"])
 
 
 if __name__ == "__main__":

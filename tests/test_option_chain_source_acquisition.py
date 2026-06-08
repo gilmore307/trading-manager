@@ -28,6 +28,8 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         request = manager_requests_from_review(review)[0]
 
         self.assertEqual(request["_task_key"]["manager_controls"]["max_time_window"], "1d")
+        self.assertEqual(request["_task_key"]["manager_controls"]["rate_limit_policy_ref"], "thetadata_terminal_rest_rate_limit")
+        self.assertEqual(request["_task_key"]["params"]["thetadata_transport"], "terminal_rest")
 
     def test_runtime_task_key_repairs_stale_time_window_controls(self) -> None:
         task_key = {
@@ -42,6 +44,8 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         runtime_key = _runtime_task_key(task_key)
 
         self.assertEqual(runtime_key["manager_controls"]["max_time_window"], "1d")
+        self.assertEqual(runtime_key["manager_controls"]["rate_limit_policy_ref"], "thetadata_terminal_rest_rate_limit")
+        self.assertEqual(runtime_key["params"]["thetadata_transport"], "terminal_rest")
 
     def test_replay_decision_requests_end_at_decision_time(self) -> None:
         previews = request_previews_for_replay_decision_times(
