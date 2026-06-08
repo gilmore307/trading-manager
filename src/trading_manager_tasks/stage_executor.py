@@ -37,6 +37,9 @@ DEFAULT_LOG_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_logs
 DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 30
 DEFAULT_STAGE_PROGRESS_STALL_SECONDS = 60 * 10
 DEFAULT_STAGE_PROGRESS_POLL_SECONDS = 5.0
+LONG_DATABASE_STAGE_IDS = {
+    "layer_09_option_expression.feature_generation",
+}
 SAFE_OFFLINE_STAGE_TYPES = {
     "data_acquisition",
     "feature_generation",
@@ -320,10 +323,12 @@ def _run_stage_subprocess_with_progress_guard(
     stderr_path: Path,
     progress_path: Path,
     timeout_seconds: int,
+    stall_seconds: float | None = None,
 ) -> tuple[int | None, str | None]:
     """Run a stage command while enforcing timeout and active-progress freshness."""
 
-    stall_seconds = _env_float("TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS", DEFAULT_STAGE_PROGRESS_STALL_SECONDS)
+    if stall_seconds is None:
+        stall_seconds = _env_float("TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS", DEFAULT_STAGE_PROGRESS_STALL_SECONDS)
     poll_seconds = _env_float("TRADING_MANAGER_STAGE_PROGRESS_POLL_SECONDS", DEFAULT_STAGE_PROGRESS_POLL_SECONDS)
     poll_seconds = max(0.05, poll_seconds)
     started_monotonic = time.monotonic()
@@ -359,6 +364,12 @@ def _run_stage_subprocess_with_progress_guard(
             if stall_seconds > 0:
                 sleep_for = min(sleep_for, max(0.05, stall_seconds - (now - last_progress_monotonic)))
             time.sleep(sleep_for)
+
+
+def _stage_progress_stall_seconds(stage: StageProgress) -> float:
+    if stage.stage_id in LONG_DATABASE_STAGE_IDS:
+        return 0.0
+    return _env_float("TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS", DEFAULT_STAGE_PROGRESS_STALL_SECONDS)
 
 
 def execute_stage_process(
@@ -434,6 +445,7 @@ def execute_stage_process(
         stderr_path=stderr_path,
         progress_path=progress_path,
         timeout_seconds=timeout_seconds,
+        stall_seconds=_stage_progress_stall_seconds(stage),
     )
     completed = datetime.now(UTC).isoformat()
     stdout = stdout_path.read_text(encoding="utf-8") if stdout_path.exists() else ""

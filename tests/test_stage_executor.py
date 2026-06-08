@@ -153,6 +153,42 @@ class StageExecutorTests(unittest.TestCase):
             self.assertTrue(Path(summary.agent_error_diagnosis_path or "").exists())
             self.assertIn("progress stalled", Path(summary.stderr_path or "").read_text(encoding="utf-8"))
 
+    def test_layer_nine_feature_generation_uses_total_timeout_not_progress_stall(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            stage = StageProgress(
+                stage_id="layer_09_option_expression.feature_generation",
+                layer=9,
+                layer_key="layer_09_option_expression",
+                stage_type="feature_generation",
+                status="ready",
+                command=["python3", "-c", "import time; time.sleep(0.4); print('long sql complete')"],
+                blockers=(),
+            )
+            with patch.dict(
+                "os.environ",
+                {
+                    "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl",
+                    "MANAGER_AGENT_ERROR_AUTOCALL": "false",
+                    "TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "5",
+                    "TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS": "0.1",
+                    "TRADING_MANAGER_STAGE_PROGRESS_POLL_SECONDS": "0.05",
+                },
+                clear=False,
+            ):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
+
+            self.assertEqual(summary.status, "succeeded")
+            self.assertEqual(summary.return_code, 0)
+            self.assertIn("long sql complete", Path(summary.stdout_path or "").read_text(encoding="utf-8"))
+
     def test_stage_process_retries_once_after_completed_agent_repair(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
