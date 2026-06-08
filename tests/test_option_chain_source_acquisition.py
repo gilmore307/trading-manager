@@ -30,8 +30,8 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         request = manager_requests_from_review(review)[0]
 
         self.assertEqual(request["_task_key"]["manager_controls"]["max_time_window"], "1d")
-        self.assertEqual(request["_task_key"]["manager_controls"]["rate_limit_policy_ref"], "thetadata_terminal_rest_rate_limit")
-        self.assertEqual(request["_task_key"]["params"]["thetadata_transport"], "terminal_rest")
+        self.assertEqual(request["_task_key"]["manager_controls"]["rate_limit_policy_ref"], "thetadata_python_library_serial_session")
+        self.assertEqual(request["_task_key"]["params"]["thetadata_transport"], "python_library")
         self.assertEqual(request["_task_key"]["params"]["max_dte"], 180)
         self.assertEqual(request["_task_key"]["params"]["strike_range"], 5)
 
@@ -48,8 +48,8 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         runtime_key = _runtime_task_key(task_key)
 
         self.assertEqual(runtime_key["manager_controls"]["max_time_window"], "1d")
-        self.assertEqual(runtime_key["manager_controls"]["rate_limit_policy_ref"], "thetadata_terminal_rest_rate_limit")
-        self.assertEqual(runtime_key["params"]["thetadata_transport"], "terminal_rest")
+        self.assertEqual(runtime_key["manager_controls"]["rate_limit_policy_ref"], "thetadata_python_library_serial_session")
+        self.assertEqual(runtime_key["params"]["thetadata_transport"], "python_library")
 
     def test_replay_decision_requests_end_at_decision_time(self) -> None:
         previews = request_previews_for_replay_decision_times(

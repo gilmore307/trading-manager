@@ -1,10 +1,10 @@
 """Shared option-chain source/cache acquisition for target-state folds.
 
-The manager prepares one ThetaData option-chain source request per target trading
-day before Layer 3 feature generation. The source rows are contract-level SQL
-cache evidence in ``trading_data.option_chain_state_source``; Layer 3 reduces
-them to target-level option state, and Layer 9 derives option-expression context
-from the same cache.
+The manager prepares ThetaData option-chain source requests before Layer 3
+feature generation. The source plans a selected contract universe, then writes
+exact-contract SQL cache evidence in ``trading_data.option_chain_state_source``;
+Layer 3 reduces those rows to target-level option state, and Layer 9 derives
+option-expression context from the same cache.
 """
 
 from __future__ import annotations
@@ -47,9 +47,9 @@ OPTION_CHAIN_PROVIDER_CONTROLS = {
     "retry_attempts": 3,
     "retry_backoff_seconds": 1.0,
     "retry_policy_ref": "target_option_chain_state_source_retry",
-    "rate_limit_policy_ref": "thetadata_terminal_rest_rate_limit",
+    "rate_limit_policy_ref": "thetadata_python_library_serial_session",
 }
-DEFAULT_THETADATA_TRANSPORT = "terminal_rest"
+DEFAULT_THETADATA_TRANSPORT = "python_library"
 ET = ZoneInfo("America/New_York")
 
 
