@@ -18,6 +18,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 ## Test Files
 
 - `test_agent_error_handler.py`
+- `test_agent_repair_closure.py`
 - `test_dashboard_read_models.py`
 - `test_dataset_evidence.py`
 - `test_dataset_expansion.py`
@@ -36,6 +37,8 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_model_group_attribution.py`
 - `test_model_group_evaluation.py`
 - `test_model_group_replay.py`
+- `test_model_group_replay_dataset.py`
+- `test_model_group_replay_option_features.py`
 - `test_model_group_rerun.py`
 - `test_model_promotion.py`
 - `test_model_worker_target_queue.py`
@@ -44,6 +47,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_model_training_workflow.py`
 - `test_monthly_backfill.py`
 - `test_nasdaq_earnings_baseline.py`
+- `test_option_chain_source_acquisition.py`
 - `test_provider_dispatch.py`
 - `test_realtime_shadow_handoff.py`
 - `test_request_handoff.py`
