@@ -1399,6 +1399,13 @@ def _scheduler_waiting_for_future_fold(state: SchedulerDaemonState) -> bool:
     return state.last_work_selection_reason == "waiting_for_next_training_fold_to_complete"
 
 
+def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonState) -> bool:
+    return state.last_work_selection_reason in {
+        "waiting_for_next_training_fold_to_complete",
+        "model_group_lifecycle_holds_fold_lane",
+    }
+
+
 def handle_scheduler_progress_stall(
     state: SchedulerDaemonState,
     *,
@@ -1409,7 +1416,7 @@ def handle_scheduler_progress_stall(
 ) -> SchedulerDaemonState:
     """Open a server-error agent handoff when the resident scheduler stops progressing."""
 
-    if stall_seconds <= 0 or _scheduler_waiting_for_future_fold(state):
+    if stall_seconds <= 0 or _scheduler_waiting_for_known_nonprogress_boundary(state):
         return state
     now_text = utc_now_iso()
     now = _parse_utc_iso(now_text) or datetime.now(UTC)
@@ -1690,6 +1697,10 @@ def run_daemon_loop(
                 try:
                     use_single_month_work_loop = auto_select_next_work
                     if use_single_month_work_loop:
+                        lifecycle_block = _first_incomplete_model_group_lifecycle_fold(
+                            storage_root=storage_root,
+                            selected_target_symbol=selected_target_symbol,
+                        )
                         replay_probe = run_model_group_replay_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -1704,7 +1715,12 @@ def run_daemon_loop(
                             selected_target_symbol=selected_target_symbol,
                             execute=False,
                         )
-                        lifecycle_holds_target_lane = replay_probe is not None or attribution_probe is not None or evaluation_probe is not None
+                        lifecycle_holds_target_lane = (
+                            lifecycle_block is not None
+                            or replay_probe is not None
+                            or attribution_probe is not None
+                            or evaluation_probe is not None
+                        )
                         lane_limit = 1
                         if lifecycle_holds_target_lane:
                             months = ()
@@ -1872,6 +1888,24 @@ def run_daemon_loop(
                                 row["worker_id"] = "evaluation_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                        if lifecycle_holds_target_lane and decisions_this_cycle == 0:
+                            completed = utc_now_iso()
+                            state = replace(
+                                state,
+                                start_month=(
+                                    str(lifecycle_block.get("start_month"))
+                                    if lifecycle_block is not None
+                                    else active_start_month
+                                ),
+                                end_month=(
+                                    str(lifecycle_block.get("end_month"))
+                                    if lifecycle_block is not None
+                                    else active_end_month
+                                ),
+                                last_next_internal_stage="model_group_lifecycle",
+                                last_work_selection_reason="model_group_lifecycle_holds_fold_lane",
+                                updated_utc=completed,
+                            )
                         if refresh_needed:
                             refresh_dashboard_read_models(
                                 enabled=refresh_dashboard_on_decision,

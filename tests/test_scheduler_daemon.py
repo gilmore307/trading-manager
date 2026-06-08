@@ -286,6 +286,26 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertIsNone(updated.last_stall_agent_error_ref)
         handler.assert_not_called()
 
+    def test_scheduler_progress_stall_ignores_model_group_lifecycle_hold(self):
+        state = SchedulerDaemonState(
+            start_month="2016-01",
+            end_month="2016-06",
+            last_work_selection_reason="model_group_lifecycle_holds_fold_lane",
+            last_progress_utc="2026-01-01T00:00:00+00:00",
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.scheduler_daemon.handle_server_error") as handler:
+            tmp = Path(raw_tmp)
+            updated = handle_scheduler_progress_stall(
+                state,
+                storage_root=tmp / "storage",
+                state_path=tmp / "runtime" / "state.json",
+                decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                stall_seconds=600,
+            )
+
+        self.assertIsNone(updated.last_stall_agent_error_ref)
+        handler.assert_not_called()
+
     def test_lock_prevents_duplicate_daemon_instance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             lock_path = Path(raw_tmp) / "scheduler.lock"
@@ -1292,6 +1312,75 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(state.last_work_selection_reason, "model_group_lifecycle_holds_fold_lane")
         self.assertEqual(unblocked.reason_code, "advance_after_latest_completed_workflow_state")
         self.assertEqual(unblocked.start_month, "2017-01")
+
+    def test_daemon_records_model_group_lifecycle_hold_without_stall_handoff(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "manager-storage"
+            state_path = tmp / "runtime" / "state.json"
+            lock_path = tmp / "runtime" / "scheduler.lock"
+            decision_log = tmp / "runtime" / "decisions.jsonl"
+            for month in rolling_fold_months("2016-01"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            fold_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-06",
+                selected_target_symbol="AAPL",
+            )
+            self.assertIsNotNone(fold_selection)
+            assert fold_selection is not None
+            fold_state_path = seed_model_worker_fold_state(
+                storage_root=storage_root,
+                selection=fold_selection,
+                selected_target_symbol="AAPL",
+            )
+            fold_plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                state_path=fold_state_path,
+                completed_stage_ids=[stage.stage_id for layer in fold_plan.layers for stage in layer.stages],
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+            stale_state = SchedulerDaemonState(
+                start_month="2016-01",
+                end_month="2016-06",
+                last_progress_utc="2026-01-01T00:00:00+00:00",
+            )
+            write_daemon_state(state_path, stale_state)
+
+            with patch("trading_manager_tasks.scheduler_daemon.handle_server_error") as handler:
+                state = run_daemon_loop(
+                    start_month="2016-01",
+                    end_month="2016-06",
+                    storage_root=storage_root,
+                    component_src_root=self._fake_data_src(tmp),
+                    state_path=state_path,
+                    lock_path=lock_path,
+                    decision_log_path=decision_log,
+                    interval_seconds=0,
+                    max_iterations=1,
+                    auto_select_next_work=True,
+                    source_existing_bootstrap=False,
+                    progress_stall_seconds=600,
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                )
+
+        self.assertEqual(state.last_work_selection_reason, "model_group_lifecycle_holds_fold_lane")
+        self.assertEqual(state.last_next_internal_stage, "model_group_lifecycle")
+        self.assertEqual(state.start_month, "2016-01")
+        self.assertEqual(state.end_month, "2016-06")
+        handler.assert_not_called()
 
     def test_month_ingest_workers_pause_when_target_has_open_model_worker_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
