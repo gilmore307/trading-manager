@@ -20,6 +20,8 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertEqual(previews[0].snapshot_time, "2016-01-04T09:30:00-05:00")
         self.assertEqual(previews[0].window_start, "2016-01-04T09:30:00-05:00")
         self.assertEqual(previews[0].window_end, "2016-01-04T10:00:00-05:00")
+        self.assertEqual(previews[0].max_dte, 180)
+        self.assertEqual(previews[0].strike_range, 5)
         self.assertEqual(previews[-1].request_id, "mgrreq_option_chain_window_aapl_2016_01_2016_01_29_1530")
         self.assertEqual(previews[-1].window_end, "2016-01-29T16:00:00-05:00")
 
@@ -30,6 +32,8 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertEqual(request["_task_key"]["manager_controls"]["max_time_window"], "1d")
         self.assertEqual(request["_task_key"]["manager_controls"]["rate_limit_policy_ref"], "thetadata_terminal_rest_rate_limit")
         self.assertEqual(request["_task_key"]["params"]["thetadata_transport"], "terminal_rest")
+        self.assertEqual(request["_task_key"]["params"]["max_dte"], 180)
+        self.assertEqual(request["_task_key"]["params"]["strike_range"], 5)
 
     def test_runtime_task_key_repairs_stale_time_window_controls(self) -> None:
         task_key = {
