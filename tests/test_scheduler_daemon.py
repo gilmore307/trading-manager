@@ -27,6 +27,7 @@ from trading_manager_tasks.scheduler_daemon import (
     load_model_worker_target_queue,
     load_daemon_state,
     handle_scheduler_progress_stall,
+    handle_replay_option_feature_failure,
     model_worker_fold_state_path,
     next_month,
     refresh_dashboard_read_models,
@@ -305,6 +306,43 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNone(updated.last_stall_agent_error_ref)
         handler.assert_not_called()
+
+    def test_replay_option_feature_failure_routes_server_error_agent(self):
+        decision = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-06-08T07:34:00+00:00",
+            now_et="2026-06-08T03:34:00-04:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_option_source_acquisition_failed",
+            reason="RuntimeError: ThetaData INTERNAL",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay_option_features",
+            command=[],
+            execution_summary={
+                "batch": [{"target_ref": "AAPL", "timestamp": "2021-03-05T16:00:00-05:00"}],
+                "source_request_ids_by_month": {
+                    "2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600"]
+                },
+            },
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.scheduler_daemon.handle_server_error") as handler:
+            tmp = Path(raw_tmp)
+            handler.return_value = {"error_ref": "ERR-REPLAY"}
+            result = handle_replay_option_feature_failure(
+                decision,
+                storage_root=tmp / "storage",
+                decision_log_path=tmp / "runtime" / "decisions.jsonl",
+            )
+
+        self.assertEqual(result, {"error_ref": "ERR-REPLAY"})
+        call = handler.call_args.kwargs
+        self.assertEqual(call["error_kind"], "model_group_replay_option_source_acquisition_failed")
+        self.assertEqual(
+            call["summary"],
+            "replay option source/feature repair failed for emitted signal AAPL 2021-03-05T16:00:00-05:00",
+        )
+        self.assertIn("manager_request:mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600", call["evidence_refs"])
 
     def test_lock_prevents_duplicate_daemon_instance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

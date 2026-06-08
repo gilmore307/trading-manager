@@ -108,6 +108,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
     provider_calls = 0
     dispatch_summary: dict[str, Any] | None = None
     generated_summaries: list[dict[str, Any]] = []
+    source_request_ids_by_month: dict[str, list[str]] = {}
 
     if not execute:
         return _decision(
@@ -153,25 +154,52 @@ def run_model_group_replay_option_features_for_replay_backoff(
                         required_next_step="enable autonomous provider acquisition for replay option source preparation",
                     ),
                 )
-            grouped = _persist_replay_option_source_requests(
+            source_request_ids_by_month = _persist_replay_option_source_requests(
                 source_missing,
                 storage_root=storage_root,
             )
-            for month, request_ids in grouped.items():
-                dispatch = dispatch_option_chain_source_acquisition(
-                    start_month=month,
-                    end_month=month,
-                    storage_root=storage_root,
-                    request_ids=tuple(request_ids),
-                    execute_provider_calls=True,
-                    continue_on_error=False,
-                    database_url=db_url,
-                    dynamic_workers=False,
-                    max_workers=1,
+            try:
+                for month, request_ids in source_request_ids_by_month.items():
+                    dispatch = dispatch_option_chain_source_acquisition(
+                        start_month=month,
+                        end_month=month,
+                        storage_root=storage_root,
+                        request_ids=tuple(request_ids),
+                        execute_provider_calls=True,
+                        continue_on_error=False,
+                        database_url=db_url,
+                        dynamic_workers=False,
+                        max_workers=1,
+                    )
+                    provider_calls += dispatch.provider_calls
+                    dispatch_summary = dispatch.summary_row()
+                    months_to_generate.add(month)
+            except Exception as exc:
+                return _decision(
+                    decision_status="backoff",
+                    reason_code="model_group_replay_option_source_acquisition_failed",
+                    reason=f"{type(exc).__name__}: {exc}",
+                    selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
+                    provider_calls=provider_calls,
+                    dispatch_performed=True,
+                    execution_summary=_summary(
+                        contract_id=contract_id,
+                        dataset_root=dataset_root,
+                        training_fold=training_fold,
+                        missing=requirements,
+                        batch=batch,
+                        source_missing=source_missing,
+                        source_ready=source_ready,
+                        required_next_step=(
+                            "route replay option source provider failure to server-error agent repair, "
+                            "then retry model_group.replay from the same replay clock"
+                        ),
+                        dispatch_summary=dispatch_summary,
+                        generated_summaries=generated_summaries,
+                        source_request_ids_by_month=source_request_ids_by_month,
+                        provider_acquisition_error=f"{type(exc).__name__}: {exc}",
+                    ),
                 )
-                provider_calls += dispatch.provider_calls
-                dispatch_summary = dispatch.summary_row()
-                months_to_generate.add(month)
 
         for month in sorted(months_to_generate):
             generated = execute_layer_nine_feature_stage(start_month=month, end_month=month)
@@ -391,6 +419,8 @@ def _summary(
     required_next_step: str | None = None,
     dispatch_summary: Mapping[str, Any] | None = None,
     generated_summaries: Sequence[Mapping[str, Any]] = (),
+    source_request_ids_by_month: Mapping[str, Sequence[str]] | None = None,
+    provider_acquisition_error: str | None = None,
 ) -> dict[str, Any]:
     return {
         "contract_id": contract_id,
@@ -407,6 +437,12 @@ def _summary(
         "required_next_step": required_next_step,
         "dispatch": dict(dispatch_summary) if dispatch_summary else None,
         "feature_generation": [dict(item) for item in generated_summaries],
+        "source_request_ids_by_month": (
+            {month: list(request_ids) for month, request_ids in source_request_ids_by_month.items()}
+            if source_request_ids_by_month
+            else {}
+        ),
+        "provider_acquisition_error": provider_acquisition_error,
     }
 
 

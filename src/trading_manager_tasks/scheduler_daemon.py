@@ -66,6 +66,10 @@ DEFAULT_DECISION_LOG_MAX_BYTES = 8 * 1024 * 1024
 COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
 MODEL_WORKER_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
 MODEL_WORKER_PREP_STAGE_TYPES = {"data_acquisition", "feature_generation"}
+REPLAY_OPTION_FEATURE_FAILURE_AGENT_REASONS = {
+    "model_group_replay_option_source_acquisition_failed",
+    "model_group_replay_option_feature_generation_failed",
+}
 
 
 def previous_month(month: str) -> str:
@@ -1459,6 +1463,46 @@ def handle_scheduler_progress_stall(
     )
 
 
+def handle_replay_option_feature_failure(
+    decision: SchedulerDecision,
+    *,
+    storage_root: Path,
+    decision_log_path: Path,
+) -> dict[str, Any] | None:
+    """Route signal-triggered replay option repair failures to the repair agent."""
+
+    if decision.reason_code not in REPLAY_OPTION_FEATURE_FAILURE_AGENT_REASONS:
+        return None
+    summary = decision.execution_summary if isinstance(decision.execution_summary, dict) else {}
+    sample = summary.get("batch") or summary.get("sample") or []
+    first_sample = sample[0] if isinstance(sample, list) and sample and isinstance(sample[0], dict) else {}
+    target_ref = str(first_sample.get("target_ref") or "unknown").upper()
+    timestamp = str(first_sample.get("timestamp") or "unknown")
+    request_ids_by_month = summary.get("source_request_ids_by_month") or {}
+    request_refs: list[str] = []
+    if isinstance(request_ids_by_month, dict):
+        for request_ids in request_ids_by_month.values():
+            if isinstance(request_ids, list):
+                request_refs.extend(f"manager_request:{request_id}" for request_id in request_ids)
+    return handle_server_error(
+        source_component="trading-manager.model_group_replay_option_features",
+        source_repo="trading-manager",
+        error_scope="server.replay_option_feature_repair",
+        error_kind=decision.reason_code,
+        severity="error",
+        summary=f"replay option source/feature repair failed for emitted signal {target_ref} {timestamp}",
+        command=decision.command,
+        exit_code=None,
+        stdout_path=None,
+        stderr_path=None,
+        working_directory=str(Path("/root/projects/trading-manager")),
+        evidence_refs=[str(decision_log_path), *request_refs],
+        output_root=storage_root / "runtime" / "agent_error_handling",
+        call_agent=_env_truthy("MANAGER_AGENT_ERROR_AUTOCALL"),
+        catalog_storage=os.environ.get("MANAGER_AGENT_ERROR_CATALOG_STORAGE", "sql"),
+    )
+
+
 def refresh_dashboard_read_models(
     *,
     enabled: bool,
@@ -1903,6 +1947,11 @@ def run_daemon_loop(
                                     row["worker_id"] = "replay_option_feature_worker_1"
                                     output.write(json.dumps(row, sort_keys=True) + "\n")
                                     output.flush()
+                                handle_replay_option_feature_failure(
+                                    replay_option_feature_decision,
+                                    storage_root=storage_root,
+                                    decision_log_path=decision_log_path,
+                                )
                         attribution_decision = run_model_group_post_replay_attribution_if_ready(
                             storage_root=storage_root,
                             execute=execute_model_group_attribution,
@@ -2088,6 +2137,11 @@ def run_daemon_loop(
                                     row["worker_id"] = "replay_option_feature_worker_1"
                                     output.write(json.dumps(row, sort_keys=True) + "\n")
                                     output.flush()
+                                handle_replay_option_feature_failure(
+                                    replay_option_feature_decision,
+                                    storage_root=storage_root,
+                                    decision_log_path=decision_log_path,
+                                )
                         attribution_decision = run_model_group_post_replay_attribution_if_ready(
                             storage_root=storage_root,
                             execute=execute_model_group_attribution,
