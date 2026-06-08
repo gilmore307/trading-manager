@@ -37,6 +37,8 @@ Workflow-state writes emit a dashboard refresh event when `TRADING_MANAGER_DASHB
 
 Progress stall guard: the daemon uses `TRADING_MANAGER_SCHEDULER_PROGRESS_STALL_SECONDS=600` by default. If no executed progress is observed for that window, it writes a `scheduler_progress_stalled` server-error handoff and invokes the configured agent repair runner. Stage subprocesses also use `TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS=600` by default and must keep their active task-progress file fresh while running.
 
+Agent repair closure is a separate internal service. `trading-manager-agent-repair-closure.timer` runs `scripts/tasks/close_agent_repairs.py` every minute. The closure controller scans completed server-error diagnoses, refuses broker/account/order/fill/position/buying-power/funds scopes, pushes already-committed internal repo repairs, restarts internal services when the diagnosis requires it, triggers dashboard refresh, and writes `agent_repair_closure_receipt.json`. This controller is the manager-owned handoff after agent repair; agent diagnosis alone is not considered closed-loop completion.
+
 ## Lock Contract
 
 Schema: `schemas/scheduler_lock.schema.json`.

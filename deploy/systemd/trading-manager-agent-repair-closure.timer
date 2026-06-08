@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Trading Manager Agent Repair Closure
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Unit=trading-manager-agent-repair-closure.service
+
+[Install]
+WantedBy=timers.target
