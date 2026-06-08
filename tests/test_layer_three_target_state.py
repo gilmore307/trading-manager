@@ -10,6 +10,7 @@ from trading_manager_tasks.layer_three_target_state import (
     FeedArtifactRef,
     build_source_task_key,
     discover_layer_two_feed_artifacts,
+    main,
     materialize_layer_three_target_state_inputs,
 )
 
@@ -17,6 +18,10 @@ from trading_manager_tasks.layer_three_target_state import (
 def _write_bar_receipt(storage_root: Path, symbol: str, month: str, *, row_count: int = 1) -> Path:
     receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    (receipt_path.parent / "task_key.json").write_text(
+        json.dumps({"params": {"timeframe": "1Min"}}),
+        encoding="utf-8",
+    )
     receipt_path.write_text(
         json.dumps(
             {
@@ -37,6 +42,28 @@ def _write_bar_receipt(storage_root: Path, symbol: str, month: str, *, row_count
 
 
 class LayerThreeTargetStateTests(unittest.TestCase):
+    def test_cli_accepts_persist_sql_stage_command_alias(self) -> None:
+        with (
+            patch("trading_manager_tasks.layer_three_target_state.materialize_layer_three_target_state_inputs") as materialize,
+            patch("trading_manager_tasks.layer_three_target_state.write_summary"),
+        ):
+            materialize.return_value = object()
+
+            result = main(
+                [
+                    "--start-month",
+                    "2016-01",
+                    "--end-month",
+                    "2016-06",
+                    "--target-symbol",
+                    "AAPL",
+                    "--persist-sql",
+                ]
+            )
+
+            self.assertEqual(result, 0)
+            self.assertTrue(materialize.call_args.kwargs["write"])
+
     def test_discovers_successful_layer_two_feed_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -56,6 +83,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(refs[0].symbol, "XLF")
             self.assertEqual(refs[0].row_count, 1)
             self.assertEqual(refs[0].bar_source_ref, "trading_data.m01_market_regime_data_acquisition")
+            self.assertEqual(refs[0].timeframe, "1Min")
 
     def test_builds_source_task_key_with_sql_bar_sources(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -68,6 +96,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
                     bar_source_ref="trading_data.m01_market_regime_data_acquisition",
                     run_id="run_001",
                     row_count=17,
+                    timeframe="1Min",
                 )
             ]
 
@@ -98,6 +127,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(source["source_symbol"], "XLF")
             self.assertEqual(source["target_symbol"], "XLF")
             self.assertEqual(source["table"], "m01_market_regime_data_acquisition")
+            self.assertEqual(source["timeframe"], "1Min")
 
     def test_dry_run_writes_task_evidence_but_does_not_call_provider(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -213,6 +243,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(summary.target_candidate_count, 1)
             self.assertEqual(task_key["params"]["start"], "2016-01-01T00:00:00-05:00")
             self.assertEqual(task_key["params"]["end"], "2016-03-01T00:00:00-05:00")
+            self.assertEqual(task_key["params"]["timeframe"], "1Min")
             self.assertEqual(candidates[0]["fold_id"], "fold_2016-01_2016-02")
             self.assertEqual(candidates[0]["fold_months"], "2016-01;2016-02")
             self.assertEqual(len(sources), 2)

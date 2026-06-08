@@ -35,6 +35,7 @@ OPTION_CHAIN_SOURCE_TABLE = "option_chain_state_source"
 OPTION_CHAIN_SOURCE_POLICY_REF = "TARGET_OPTION_CHAIN_STATE_REDUCTION_POLICY"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
 BAR_SOURCE_TABLE = "m01_market_regime_data_acquisition"
+DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME = "1Min"
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class FeedArtifactRef:
     run_id: str
     row_count: int
     evidence_symbol: str | None = None
+    timeframe: str = DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME
 
     def summary_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -193,6 +195,16 @@ def _bar_source_ref(run: Mapping[str, Any]) -> str:
     return table_refs[-1] if table_refs else f"trading_data.{BAR_SOURCE_TABLE}"
 
 
+def _source_timeframe(receipt_path: Path) -> str:
+    task_key_path = receipt_path.parent / "task_key.json"
+    if not task_key_path.exists():
+        return DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME
+    task_key = json.loads(task_key_path.read_text(encoding="utf-8"))
+    params = task_key.get("params") if isinstance(task_key.get("params"), Mapping) else {}
+    timeframe = str(params.get("timeframe") or "").strip()
+    return timeframe or DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME
+
+
 def discover_layer_two_feed_artifacts(
     *,
     start_month: str,
@@ -228,6 +240,7 @@ def discover_layer_two_feed_artifacts(
                     run_id=str(run.get("run_id") or ""),
                     row_count=row_count,
                     evidence_symbol=evidence_symbol,
+                    timeframe=_source_timeframe(receipt_path),
                 )
             )
             break
@@ -294,7 +307,7 @@ def _bar_sql_sources(refs: Sequence[FeedArtifactRef]) -> list[dict[str, Any]]:
                 "month": month,
                 "start": start,
                 "end": end,
-                "timeframe": "30Min",
+                "timeframe": ref.timeframe,
                 "receipt_path": ref.receipt_path,
                 "run_id": ref.run_id,
                 "row_count": ref.row_count,
@@ -330,7 +343,7 @@ def build_source_task_key(
         "params": {
             "start": source_start,
             "end": source_end,
-            "timeframe": "30Min",
+            "timeframe": refs[0].timeframe,
             "target_candidates_path": str(candidate_path),
             "bar_sql_sources": bar_sources,
         },
@@ -447,6 +460,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target-symbol", help="Selected Layer 3+ target symbol. When supplied, only that target's local bar artifacts are materialized.")
     parser.add_argument("--run-id")
     parser.add_argument("--write", action="store_true", help="Run the trading-data source_03 normalizer and write SQL rows.")
+    parser.add_argument("--persist-sql", action="store_true", help="Alias for --write retained for stage command compatibility.")
     args = parser.parse_args(argv)
     summary = materialize_layer_three_target_state_inputs(
         start_month=args.start_month,
@@ -458,7 +472,7 @@ def main(argv: list[str] | None = None) -> int:
         output_root=args.output_root,
         target_symbol=args.target_symbol,
         run_id=args.run_id,
-        write=args.write,
+        write=args.write or args.persist_sql,
     )
     write_summary(summary, output=sys.stdout)
     return 0
