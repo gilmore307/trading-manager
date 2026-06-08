@@ -124,8 +124,8 @@ def _diagnosis_repaired(payload: Mapping[str, Any]) -> bool:
 
 
 def _automatic_retry_forbidden(payload: Mapping[str, Any]) -> bool:
-    text = _payload_text(payload.get("retry_recommendation"), payload.get("blockers"))
-    return any(marker in text for marker in ("manual_review", "manual review", "do_not_retry", "do not retry", "blocked"))
+    text = _payload_text(payload.get("diagnosis_status"), payload.get("retry_recommendation"), payload.get("blockers"))
+    return any(marker in text for marker in ("manual_review", "manual review", "do_not_retry", "do not retry", "blocked", "push_blocked", "push blocked"))
 
 
 def _forbidden_runtime_scope(request: Mapping[str, Any], payload: Mapping[str, Any]) -> bool:

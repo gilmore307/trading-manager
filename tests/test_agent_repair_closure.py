@@ -120,6 +120,22 @@ class AgentRepairClosureTests(unittest.TestCase):
         self.assertEqual(receipt["closure_status"], "blocked")
         self.assertIn("broker/account/order", receipt["blockers"][0])
 
+    def test_push_blocked_diagnosis_blocks_automatic_closure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            candidate = self._write_candidate(
+                Path(raw_tmp),
+                stdout_payload={
+                    "diagnosis_status": "repaired_with_push_blocked",
+                    "files_changed": ["/repo/trading-manager/src/trading_manager_tasks/option_chain_source_acquisition.py"],
+                    "retry_recommendation": "manual_review",
+                    "blockers": ["push blocked"],
+                },
+            )
+            receipt = close_agent_repair(candidate, runner=lambda argv, **kwargs: subprocess.CompletedProcess(argv, 0, "", ""))
+
+        self.assertEqual(receipt["closure_status"], "blocked")
+        self.assertIn("automatic retry", receipt["blockers"][0])
+
     def test_discovery_skips_requests_with_existing_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
