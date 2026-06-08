@@ -196,7 +196,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
-                    return_value={"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600"]},
+                    return_value={"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930"]},
                 ),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features.dispatch_option_chain_source_acquisition",
@@ -219,7 +219,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         self.assertIn("ThetaData INTERNAL", decision.execution_summary["provider_acquisition_error"])
         self.assertEqual(
             decision.execution_summary["source_request_ids_by_month"],
-            {"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600"]},
+            {"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930"]},
         )
 
     def test_provider_unavailable_records_replay_sentinel(self) -> None:
@@ -235,7 +235,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
-                    return_value={"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600"]},
+                    return_value={"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930"]},
                 ),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features.dispatch_option_chain_source_acquisition",

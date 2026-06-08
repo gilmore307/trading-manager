@@ -3,7 +3,7 @@
 Replay must advance like live operation: first run the replay clock through
 Layers 1-8, then request option data only when Layer 8 emits a Layer 9
 option-expression signal. This controller consumes that replay backoff, acquires
-the minimal historical option source windows for the emitted signal timestamps,
+the regular-session historical option source day windows for emitted signal dates,
 generates Layer 9 features from the shared cache, and lets scheduler retry
 replay on the next drain step.
 """

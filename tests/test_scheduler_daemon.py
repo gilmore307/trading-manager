@@ -322,7 +322,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             execution_summary={
                 "batch": [{"target_ref": "AAPL", "timestamp": "2021-03-05T16:00:00-05:00"}],
                 "source_request_ids_by_month": {
-                    "2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600"]
+                    "2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930"]
                 },
             },
         )
@@ -342,7 +342,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             call["summary"],
             "replay option source/feature repair failed for emitted signal AAPL 2021-03-05T16:00:00-05:00",
         )
-        self.assertIn("manager_request:mgrreq_option_chain_window_aapl_2021_03_2021_03_05_1600", call["evidence_refs"])
+        self.assertIn("manager_request:mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930", call["evidence_refs"])
 
     def test_lock_prevents_duplicate_daemon_instance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

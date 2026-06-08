@@ -141,11 +141,11 @@ class StageRunDashboardTests(unittest.TestCase):
             stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
             start_month="2016-01",
             end_month="2016-06",
-            expected_count=1625,
-            observed_count=968,
-            ready_count=967,
+            expected_count=125,
+            observed_count=76,
+            ready_count=75,
             failed_count=1,
-            pending_count=657,
+            pending_count=49,
             accepted_failed_count=0,
             status="failed",
             can_unlock_downstream=False,
@@ -154,7 +154,7 @@ class StageRunDashboardTests(unittest.TestCase):
             accepted_failed_request_ids=(),
             pending_request_ids=(),
             accepted_failure_refs=(),
-            reason="1/1625 requests failed without accepted review; downstream remains blocked",
+            reason="1/125 requests failed without accepted review; downstream remains blocked",
         )
         dispatch_summary = SimpleNamespace(
             items=(

@@ -243,6 +243,11 @@ def iter_regular_session_windows(start_month: str, end_month: str, *, window_min
             window_start = window_end
 
 
+def iter_regular_session_day_windows(start_month: str, end_month: str) -> Iterable[tuple[datetime, datetime]]:
+    for day in iter_regular_trading_days(start_month, end_month):
+        yield datetime.combine(day, DEFAULT_SESSION_START, tzinfo=ET), datetime.combine(day, DEFAULT_SESSION_END, tzinfo=ET)
+
+
 def _task_key_path_for_request(request_id: str, *, start_month: str, storage_root: Path = DEFAULT_STORAGE_ROOT) -> Path:
     return storage_root / "runtime" / "layer_03_target_state_vector" / SOURCE_ID / start_month / request_id / "task_key.json"
 
@@ -258,7 +263,7 @@ def _source_output_root_for_request(request_id: str, *, start_month: str, source
 def request_previews_for_fold(*, start_month: str, end_month: str, target_symbol: str) -> tuple[OptionChainRequestPreview, ...]:
     symbol = _safe_symbol(target_symbol)
     previews: list[OptionChainRequestPreview] = []
-    for window_start_dt, window_end_dt in iter_regular_session_windows(start_month, end_month):
+    for window_start_dt, window_end_dt in iter_regular_session_day_windows(start_month, end_month):
         window_start = window_start_dt.isoformat()
         window_end = window_end_dt.isoformat()
         previews.append(
@@ -294,9 +299,9 @@ def request_previews_for_replay_decision_times(
 ) -> tuple[OptionChainRequestPreview, ...]:
     """Build bounded option-chain requests for replay decision timestamps.
 
-    Replay only needs point-in-time option context available no later than each
-    decision timestamp. The request window therefore ends at the decision time
-    and starts one provider window earlier.
+    Replay repair fetches one selected-contract regular-session source/cache
+    window for each emitted decision day. Downstream feature generation must
+    still filter source rows by each decision timestamp.
     """
 
     symbol = _safe_symbol(target_symbol)
@@ -305,17 +310,16 @@ def request_previews_for_replay_decision_times(
     previews_by_id: dict[str, OptionChainRequestPreview] = {}
     for raw_timestamp in decision_timestamps:
         decision_time = _parse_replay_decision_time(raw_timestamp)
-        window_start_dt = decision_time - timedelta(minutes=window_minutes)
-        if window_start_dt.date() != decision_time.date():
-            raise TaskSystemError(f"replay decision window crosses date boundary: {raw_timestamp}")
+        window_start_dt = datetime.combine(decision_time.date(), DEFAULT_SESSION_START, tzinfo=ET)
+        window_end_dt = datetime.combine(decision_time.date(), DEFAULT_SESSION_END, tzinfo=ET)
         start_month = decision_time.strftime("%Y-%m")
-        request_id = _window_request_id(symbol=symbol, start_month=start_month, window_start=decision_time)
+        request_id = _window_request_id(symbol=symbol, start_month=start_month, window_start=window_start_dt)
         previews_by_id[request_id] = OptionChainRequestPreview(
             request_id=request_id,
             underlying=symbol,
-            snapshot_time=decision_time.isoformat(),
+            snapshot_time=window_start_dt.isoformat(),
             window_start=window_start_dt.isoformat(),
-            window_end=decision_time.isoformat(),
+            window_end=window_end_dt.isoformat(),
         )
     return tuple(previews_by_id[request_id] for request_id in sorted(previews_by_id))
 
@@ -332,7 +336,7 @@ def build_option_chain_source_review(*, start_month: str, end_month: str, target
         request_count=len(previews),
         request_previews=previews,
         evidence_refs=("calendar:manager_us_equity_regular_trading_days",),
-        reason=f"{len(previews)} regular-session 30-minute window(s) require shared ThetaData option-chain source/cache acquisition before Layer 3.",
+        reason=f"{len(previews)} regular-session day window(s) require shared ThetaData option-chain source/cache acquisition before Layer 3.",
     )
 
 
