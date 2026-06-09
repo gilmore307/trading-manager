@@ -144,27 +144,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        (attribution_root / "post_replay_attribution_receipt.json").write_text(
-            json.dumps(
-                {
-                    "contract_type": "post_replay_layer_10_event_attribution_receipt",
-                    "status": "succeeded",
-                    "created_at_utc": "2026-05-28T00:00:01+00:00",
-                    "decision_rows_ref": str(decision_rows_path),
-                    "attribution_rows_ref": str(attribution_rows_path),
-                    "event_evidence_consumed": True,
-                    "event_observation_count": 1,
-                    "event_candidate_count": 1,
-                    "failure_scope_triage_status": "passed",
-                    "control_analysis_status": "passed",
-                }
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        proposal_root = dataset_root / "post_replay_event_focus_proposal_runs" / "event_focus_fixture"
-        proposal_root.mkdir(parents=True)
-        proposal_rows_path = proposal_root / "event_focus_proposals.jsonl"
+        proposal_rows_path = attribution_root / "event_focus_proposals.jsonl"
         proposal_rows_path.write_text(
             json.dumps(
                 {
@@ -178,17 +158,21 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        (proposal_root / "event_focus_proposal_receipt.json").write_text(
+        (attribution_root / "post_replay_attribution_receipt.json").write_text(
             json.dumps(
                 {
-                    "contract_type": "post_replay_layer_10_event_focus_proposal_receipt",
+                    "contract_type": "post_replay_layer_10_event_attribution_receipt",
                     "status": "succeeded",
-                    "created_at_utc": "2026-05-28T00:00:02+00:00",
-                    "layer_10_attribution_receipt_ref": str(attribution_root / "post_replay_attribution_receipt.json"),
+                    "created_at_utc": "2026-05-28T00:00:01+00:00",
+                    "decision_rows_ref": str(decision_rows_path),
+                    "attribution_rows_ref": str(attribution_rows_path),
                     "event_focus_proposals_ref": str(proposal_rows_path),
-                    "proposal_count": 1,
-                    "accepted_event_pool_mutation_performed": False,
-                    "temporal_attention_pool_mutation_performed": False,
+                    "event_focus_proposal_count": 1,
+                    "event_evidence_consumed": True,
+                    "event_observation_count": 1,
+                    "event_candidate_count": 1,
+                    "failure_scope_triage_status": "passed",
+                    "control_analysis_status": "passed",
                 }
             )
             + "\n",
@@ -339,28 +323,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            refreshed_attribution_receipt = refreshed_attribution_root / "post_replay_attribution_receipt.json"
-            refreshed_attribution_receipt.write_text(
-                json.dumps(
-                    {
-                        "contract_type": "post_replay_layer_10_event_attribution_receipt",
-                        "status": "succeeded",
-                        "created_at_utc": "2026-05-28T00:00:03+00:00",
-                        "decision_rows_ref": str(replay_decision_rows),
-                        "attribution_rows_ref": str(refreshed_attribution_rows),
-                        "event_evidence_consumed": True,
-                        "event_observation_count": 1,
-                        "event_candidate_count": 2,
-                        "failure_scope_triage_status": "passed",
-                        "control_analysis_status": "passed",
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            refreshed_proposal_root = dataset_root / "post_replay_event_focus_proposal_runs" / "event_focus_refreshed"
-            refreshed_proposal_root.mkdir(parents=True)
-            refreshed_proposal_rows = refreshed_proposal_root / "event_focus_proposals.jsonl"
+            refreshed_proposal_rows = refreshed_attribution_root / "event_focus_proposals.jsonl"
             refreshed_proposal_rows.write_text(
                 json.dumps(
                     {
@@ -374,15 +337,22 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (refreshed_proposal_root / "event_focus_proposal_receipt.json").write_text(
+            refreshed_attribution_receipt = refreshed_attribution_root / "post_replay_attribution_receipt.json"
+            refreshed_attribution_receipt.write_text(
                 json.dumps(
                     {
-                        "contract_type": "post_replay_layer_10_event_focus_proposal_receipt",
+                        "contract_type": "post_replay_layer_10_event_attribution_receipt",
                         "status": "succeeded",
-                        "created_at_utc": "2026-05-28T00:00:03.500000+00:00",
-                        "layer_10_attribution_receipt_ref": str(refreshed_attribution_receipt),
+                        "created_at_utc": "2026-05-28T00:00:03+00:00",
+                        "decision_rows_ref": str(replay_decision_rows),
+                        "attribution_rows_ref": str(refreshed_attribution_rows),
                         "event_focus_proposals_ref": str(refreshed_proposal_rows),
-                        "proposal_count": 1,
+                        "event_focus_proposal_count": 1,
+                        "event_evidence_consumed": True,
+                        "event_observation_count": 1,
+                        "event_candidate_count": 2,
+                        "failure_scope_triage_status": "passed",
+                        "control_analysis_status": "passed",
                     }
                 )
                 + "\n",

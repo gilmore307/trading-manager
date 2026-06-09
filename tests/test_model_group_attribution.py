@@ -7,7 +7,6 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.model_group_attribution import run_model_group_post_replay_attribution_if_ready
-from trading_manager_tasks.model_group_event_focus_proposal import run_model_group_event_focus_proposal_if_ready
 from trading_manager_tasks.model_group_layer_ten_attribution import run_model_group_layer_ten_attribution_if_ready
 
 
@@ -209,6 +208,22 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(rows[0]["contract_type"], "model_10_event_risk_governor_event_attribution_row")
             self.assertEqual(rows[0]["attribution_status"], "attributed")
+            self.assertEqual(receipt["event_focus_proposal_count"], 1)
+            self.assertFalse(receipt["accepted_event_pool_mutation_performed"])
+            self.assertFalse(receipt["temporal_attention_pool_mutation_performed"])
+            proposals = [
+                json.loads(line)
+                for line in Path(receipt["event_focus_proposals_ref"]).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(len(proposals), 1)
+            self.assertEqual(proposals[0]["contract_type"], "model_10_event_risk_governor_event_focus_proposal")
+            self.assertEqual(proposals[0]["stage_id"], "model_group.layer_10_event_attribution")
+            self.assertEqual(proposals[0]["proposal_status"], "watch_candidate")
+            self.assertEqual(proposals[0]["event_summary"]["normalized_event_type"], "microstructure_liquidity_disruption")
+            self.assertIn("Fixture PIT event", proposals[0]["event_summary"]["rationale_summary"])
+            self.assertIn("BTC filled_negative_or_underperforming_outcome failures", proposals[0]["failure_attention_reason"])
+            self.assertIn("requires_event_strategy_promotion_review", proposals[0]["acceptance_blockers"])
             self.assertFalse(receipt["layer_4_promotion_performed"])
 
     def test_layer_10_backoff_when_event_evidence_missing(self):
@@ -227,124 +242,6 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_layer_10_event_evidence_missing")
             self.assertFalse((dataset_root / "post_replay_attribution_runs").exists())
-
-    def test_writes_event_focus_proposals_without_accepting_pool(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            tmp = Path(raw_tmp)
-            storage_root = tmp / "storage" / "02_control_plane"
-            storage_root.mkdir(parents=True)
-            dataset_root = self._write_replay_dataset(storage_root)
-            attribution_root = dataset_root / "post_replay_attribution_runs" / "layer_10_fixture"
-            attribution_root.mkdir(parents=True)
-            attribution_rows_path = attribution_root / "layer_10_event_attribution_rows.jsonl"
-            attribution_rows_path.write_text(
-                "\n".join(
-                    [
-                        json.dumps(
-                            {
-                                "contract_type": "model_10_event_risk_governor_event_attribution_row",
-                                "source_triage_attribution_id": "l10_attr_1",
-                                "source_decision_id": "filled_loss",
-                                "failure_type": "filled_negative_or_underperforming_outcome",
-                                "target_symbol": "BTC",
-                                "replay_month": "2021-01",
-                                "failure_window_start": "2021-01-02T00:00:00-05:00",
-                                "failure_window_end": "2021-01-06T00:00:00-05:00",
-                                "attribution_status": "confounded",
-                                "dominant_event_candidate": "evt_liquidity",
-                                "event_interpretation_refs": ["event_interpretations.jsonl#1"],
-                                "co_event_group_id": "coevent_fixture",
-                                "incremental_attribution_score": 0.25,
-                                "attribution_confidence_score": 0.35,
-                            }
-                        ),
-                        json.dumps(
-                            {
-                                "contract_type": "model_10_event_risk_governor_event_attribution_row",
-                                "source_triage_attribution_id": "l10_attr_2",
-                                "source_decision_id": "rejected_winner",
-                                "failure_type": "filled_negative_or_underperforming_outcome",
-                                "target_symbol": "BTC",
-                                "replay_month": "2021-01",
-                                "attribution_status": "confounded",
-                                "dominant_event_candidate": "evt_liquidity",
-                                "event_interpretation_refs": ["event_interpretations.jsonl#1"],
-                                "incremental_attribution_score": 0.30,
-                                "attribution_confidence_score": 0.40,
-                            }
-                        ),
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            (attribution_root / "event_interpretations.jsonl").write_text(
-                json.dumps(
-                    {
-                        "contract_type": "event_interpretation",
-                        "canonical_relation": {"canonical_event_id": "evt_liquidity", "relation_type": "canonical"},
-                        "normalized_event_type": "microstructure_liquidity_disruption",
-                        "affected_scope": "target",
-                        "affected_entities": ["BTC"],
-                        "published_time": "2021-01-04T10:00:00-05:00",
-                        "available_time": "2021-01-04T10:05:00-05:00",
-                        "rationale_summary": "Liquidity disruption near failed replay decisions.",
-                        "event_domain_tags": ["crypto", "liquidity"],
-                        "source_name": "fixture",
-                        "source_artifact_ref": "fixture://event/btc_liquidity_disruption",
-                        "source_type": "reviewed_fixture",
-                        "evidence_confidence_score": 0.9,
-                        "intensity_score": 0.8,
-                        "direction_bias_score": -0.5,
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            receipt_path = attribution_root / "post_replay_attribution_receipt.json"
-            receipt_path.write_text(
-                json.dumps(
-                    {
-                        "contract_type": "post_replay_layer_10_event_attribution_receipt",
-                        "status": "succeeded",
-                        "created_at_utc": "2026-05-28T00:00:01+00:00",
-                        "decision_rows_ref": str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"),
-                        "attribution_rows_ref": str(attribution_rows_path),
-                        "event_interpretations_ref": str(attribution_root / "event_interpretations.jsonl"),
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            decision = run_model_group_event_focus_proposal_if_ready(storage_root=storage_root)
-
-            self.assertIsNotNone(decision)
-            assert decision is not None
-            self.assertEqual(decision.reason_code, "model_group_event_focus_proposal_executed")
-            receipt_paths = list((dataset_root / "post_replay_event_focus_proposal_runs").glob("*/event_focus_proposal_receipt.json"))
-            self.assertEqual(len(receipt_paths), 1)
-            receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
-            self.assertEqual(receipt["contract_type"], "post_replay_layer_10_event_focus_proposal_receipt")
-            self.assertEqual(receipt["layer_10_attribution_receipt_ref"], str(receipt_path))
-            self.assertFalse(receipt["accepted_event_pool_mutation_performed"])
-            self.assertFalse(receipt["temporal_attention_pool_mutation_performed"])
-            proposals = [
-                json.loads(line)
-                for line in Path(receipt["event_focus_proposals_ref"]).read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            ]
-            self.assertEqual(len(proposals), 1)
-            self.assertEqual(proposals[0]["event_ref"], "evt_liquidity")
-            self.assertEqual(proposals[0]["event_summary"]["normalized_event_type"], "microstructure_liquidity_disruption")
-            self.assertIn("Liquidity disruption", proposals[0]["event_summary"]["rationale_summary"])
-            self.assertIn("2 BTC filled_negative_or_underperforming_outcome failures", proposals[0]["failure_attention_reason"])
-            self.assertEqual(proposals[0]["proposal_status"], "watch_candidate")
-            self.assertEqual(proposals[0]["supporting_failure_count"], 2)
-            self.assertIn("requires_event_strategy_promotion_review", proposals[0]["acceptance_blockers"])
-
-            second = run_model_group_event_focus_proposal_if_ready(storage_root=storage_root)
-            self.assertIsNone(second)
 
 
 if __name__ == "__main__":

@@ -171,28 +171,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
     def _write_post_replay_attribution_receipt(self, replay_root: Path) -> Path:
         receipt_root = replay_root / "post_replay_attribution_runs" / "fixture"
         receipt_root.mkdir(parents=True, exist_ok=True)
-        receipt_path = receipt_root / "post_replay_attribution_receipt.json"
-        receipt_path.write_text(
-            json.dumps(
-                {
-                    "contract_type": "post_replay_layer_10_event_attribution_receipt",
-                    "status": "succeeded",
-                    "created_at_utc": "2026-05-22T12:49:00Z",
-                    "event_evidence_consumed": True,
-                    "event_observation_count": 1,
-                    "event_candidate_count": 1,
-                    "failure_scope_triage_status": "passed",
-                    "control_analysis_status": "passed",
-                }
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        return receipt_path
-
-    def _write_event_focus_proposal_receipt(self, replay_root: Path, attribution_receipt_path: Path) -> Path:
-        receipt_root = replay_root / "post_replay_event_focus_proposal_runs" / "fixture"
-        receipt_root.mkdir(parents=True, exist_ok=True)
         proposals_path = receipt_root / "event_focus_proposals.jsonl"
         proposals_path.write_text(
             json.dumps(
@@ -207,18 +185,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        receipt_path = receipt_root / "event_focus_proposal_receipt.json"
+        receipt_path = receipt_root / "post_replay_attribution_receipt.json"
         receipt_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "post_replay_layer_10_event_focus_proposal_receipt",
+                    "contract_type": "post_replay_layer_10_event_attribution_receipt",
                     "status": "succeeded",
-                    "created_at_utc": "2026-05-22T12:49:30Z",
-                    "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
+                    "created_at_utc": "2026-05-22T12:49:00Z",
+                    "event_evidence_consumed": True,
+                    "event_observation_count": 1,
+                    "event_candidate_count": 1,
                     "event_focus_proposals_ref": str(proposals_path),
-                    "proposal_count": 1,
-                    "accepted_event_pool_mutation_performed": False,
-                    "temporal_attention_pool_mutation_performed": False,
+                    "event_focus_proposal_count": 1,
+                    "failure_scope_triage_status": "passed",
+                    "control_analysis_status": "passed",
                 }
             )
             + "\n",
@@ -772,7 +752,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.model_10_event_risk_governor",
-                "model_group.layer_10_event_focus_proposal",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -780,7 +759,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertEqual(
             [task["stage_type"] for task in evaluation_tasks],
-            ["replay", "model_10_event_risk_governor", "event_focus_proposal", "model_evaluation", "promotion_review", "maintenance"],
+            ["replay", "model_10_event_risk_governor", "model_evaluation", "promotion_review", "maintenance"],
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
@@ -846,7 +825,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.model_10_event_risk_governor",
-                "model_group.layer_10_event_focus_proposal",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -912,7 +890,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
         fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2"]
-        self.assertEqual(len(fold1_tasks), 15)
+        self.assertEqual(len(fold1_tasks), 14)
         self.assertTrue(fold2_tasks)
         blocked_fold2_tasks = [task for task in fold2_tasks if task["task_state"] == "blocked"]
         self.assertTrue(blocked_fold2_tasks)
@@ -1268,7 +1246,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.model_10_event_risk_governor",
-                "model_group.layer_10_event_focus_proposal",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -1896,7 +1873,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             attribution_receipt_path = self._write_post_replay_attribution_receipt(replay_root)
-            event_focus_proposal_receipt_path = self._write_event_focus_proposal_receipt(replay_root, attribution_receipt_path)
+            event_focus_proposals_path = attribution_receipt_path.parent / "event_focus_proposals.jsonl"
             (review_root / "model_group_evaluation_receipt.json").write_text(
                 json.dumps(
                     {
@@ -1905,7 +1882,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "created_at_utc": "2026-05-22T12:50:00Z",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
                         "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
-                        "layer_10_event_focus_proposal_receipt_ref": str(event_focus_proposal_receipt_path),
+                        "layer_10_event_focus_proposals_ref": str(event_focus_proposals_path),
                     }
                 )
                 + "\n",
@@ -2016,7 +1993,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             attribution_receipt_path = self._write_post_replay_attribution_receipt(replay_root)
-            event_focus_proposal_receipt_path = self._write_event_focus_proposal_receipt(replay_root, attribution_receipt_path)
+            event_focus_proposals_path = attribution_receipt_path.parent / "event_focus_proposals.jsonl"
             (review_root / "model_group_evaluation_receipt.json").write_text(
                 json.dumps(
                     {
@@ -2025,7 +2002,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "created_at_utc": "2026-05-22T12:50:00Z",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
                         "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
-                        "layer_10_event_focus_proposal_receipt_ref": str(event_focus_proposal_receipt_path),
+                        "layer_10_event_focus_proposals_ref": str(event_focus_proposals_path),
                     }
                 )
                 + "\n",
@@ -3733,7 +3710,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.model_10_event_risk_governor",
-                "model_group.layer_10_event_focus_proposal",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",

@@ -28,6 +28,7 @@ from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler
 NEW_YORK = ZoneInfo("America/New_York")
 LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE = "post_replay_layer_10_event_attribution_receipt"
 LAYER_10_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_attribution_row"
+EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_focus_proposal"
 EVENT_INTERPRETATION_CONTRACT_TYPE = "event_interpretation"
 LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES = {"event_interpretation_v1"}
 COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
@@ -124,6 +125,13 @@ def run_model_group_layer_ten_attribution_if_ready(
         )
 
     attribution_rows, control_report = _build_attribution_rows(triage_rows=triage_rows, event_candidates=event_candidates, created_at_utc=now.isoformat())
+    event_focus_proposals = _build_event_focus_proposals(
+        attribution_rows=attribution_rows,
+        layer_10_attribution_receipt_ref=None,
+        attribution_rows_ref=None,
+        event_interpretations_ref=None,
+        event_summaries_by_ref=_event_summaries_by_ref(event_candidates),
+    )
     if not execute:
         return _decision(
             now=now,
@@ -139,6 +147,7 @@ def run_model_group_layer_ten_attribution_if_ready(
                 "fold_scope": fold_scope,
                 "event_candidate_count": len(event_candidates),
                 "expected_attribution_rows": len(attribution_rows),
+                "expected_event_focus_proposal_count": len(event_focus_proposals),
             },
         )
 
@@ -146,8 +155,16 @@ def run_model_group_layer_ten_attribution_if_ready(
     output_root = dataset_root / "post_replay_attribution_runs" / run_id
     attribution_rows_path = output_root / "layer_10_event_attribution_rows.jsonl"
     event_interpretations_path = output_root / "event_interpretations.jsonl"
+    event_focus_proposals_path = output_root / "event_focus_proposals.jsonl"
     control_report_path = output_root / "control_coevent_leakage_report.json"
     receipt_path = output_root / "post_replay_attribution_receipt.json"
+    event_focus_proposals = _build_event_focus_proposals(
+        attribution_rows=attribution_rows,
+        layer_10_attribution_receipt_ref=str(receipt_path),
+        attribution_rows_ref=str(attribution_rows_path),
+        event_interpretations_ref=str(event_interpretations_path),
+        event_summaries_by_ref=_event_summaries_by_ref(event_candidates),
+    )
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
         lock_scope="promotion",
@@ -160,6 +177,7 @@ def run_model_group_layer_ten_attribution_if_ready(
         output_root.mkdir(parents=True, exist_ok=True)
         _write_jsonl(event_interpretations_path, (candidate["interpretation"] for candidate in event_candidates))
         _write_jsonl(attribution_rows_path, attribution_rows)
+        _write_jsonl(event_focus_proposals_path, event_focus_proposals)
         control_report_path.write_text(json.dumps(control_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         receipt = {
             "contract_type": LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE,
@@ -175,6 +193,7 @@ def run_model_group_layer_ten_attribution_if_ready(
             "triage_rows_ref": str(triage_rows_path),
             "attribution_rows_ref": str(attribution_rows_path),
             "event_interpretations_ref": str(event_interpretations_path),
+            "event_focus_proposals_ref": str(event_focus_proposals_path),
             "control_coevent_leakage_report_ref": str(control_report_path),
             "event_evidence_consumed": True,
             "event_observation_count": sum(1 for candidate in event_candidates if candidate["observation_status"] == "accepted_observation"),
@@ -187,6 +206,10 @@ def run_model_group_layer_ten_attribution_if_ready(
             "upstream_overlap_status": "residual_after_upstream_conditioning",
             "processed_failure_count": len(triage_rows),
             "attribution_row_count": len(attribution_rows),
+            "event_focus_proposal_count": len(event_focus_proposals),
+            "event_focus_proposal_review_gate": "event-strategy-promotion-review",
+            "accepted_event_pool_mutation_performed": False,
+            "temporal_attention_pool_mutation_performed": False,
             "provider_calls": 0,
             "broker_execution_performed": False,
             "model_activation_performed": False,
@@ -206,8 +229,10 @@ def run_model_group_layer_ten_attribution_if_ready(
             "post_replay_layer_10_event_attribution_receipt": str(receipt_path),
             "attribution_rows_ref": str(attribution_rows_path),
             "event_interpretations_ref": str(event_interpretations_path),
+            "event_focus_proposals_ref": str(event_focus_proposals_path),
             "event_candidate_count": len(event_candidates),
             "attribution_row_count": len(attribution_rows),
+            "event_focus_proposal_count": len(event_focus_proposals),
         },
     )
 
@@ -346,6 +371,152 @@ def _build_attribution_rows(
         ],
     }
     return rows, control_report
+
+
+def _build_event_focus_proposals(
+    *,
+    attribution_rows: Sequence[Mapping[str, Any]],
+    layer_10_attribution_receipt_ref: str | None,
+    attribution_rows_ref: str | None,
+    event_interpretations_ref: str | None,
+    event_summaries_by_ref: Mapping[str, Mapping[str, Any]],
+    max_proposals: int = 200,
+) -> list[dict[str, Any]]:
+    groups: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in attribution_rows:
+        event_ref = str(row.get("dominant_event_candidate") or row.get("confounder_event_ref") or "").strip()
+        if not event_ref and str(row.get("attribution_status") or "") == "attributed":
+            candidate_refs = row.get("candidate_event_refs") if isinstance(row.get("candidate_event_refs"), list) else []
+            event_ref = str(candidate_refs[0]).strip() if candidate_refs else ""
+        if not event_ref:
+            continue
+        target_symbol = str(row.get("target_symbol") or "").strip().upper() or "UNKNOWN"
+        failure_type = str(row.get("failure_type") or "unknown_failure_type").strip()
+        key = (event_ref, target_symbol, failure_type)
+        group = groups.setdefault(
+            key,
+            {
+                "event_ref": event_ref,
+                "target_symbol": target_symbol,
+                "failure_type": failure_type,
+                "source_triage_attribution_ids": [],
+                "source_decision_ids": [],
+                "replay_months": set(),
+                "event_interpretation_refs": set(),
+                "attribution_status_counts": {},
+                "co_event_group_ids": set(),
+                "supporting_scores": [],
+                "supporting_confidences": [],
+                "failure_window_starts": [],
+                "failure_window_ends": [],
+            },
+        )
+        group["source_triage_attribution_ids"].append(row.get("source_triage_attribution_id"))
+        group["source_decision_ids"].append(row.get("source_decision_id"))
+        if row.get("replay_month"):
+            group["replay_months"].add(str(row.get("replay_month")))
+        if row.get("co_event_group_id"):
+            group["co_event_group_ids"].add(str(row.get("co_event_group_id")))
+        for ref in row.get("event_interpretation_refs") or []:
+            if str(ref).strip():
+                group["event_interpretation_refs"].add(str(ref))
+        status = str(row.get("attribution_status") or "unknown")
+        group["attribution_status_counts"][status] = int(group["attribution_status_counts"].get(status, 0)) + 1
+        group["supporting_scores"].append(_safe_float(row.get("incremental_attribution_score")))
+        group["supporting_confidences"].append(_safe_float(row.get("attribution_confidence_score")))
+        if row.get("failure_window_start"):
+            group["failure_window_starts"].append(str(row.get("failure_window_start")))
+        if row.get("failure_window_end"):
+            group["failure_window_ends"].append(str(row.get("failure_window_end")))
+    ranked = sorted(
+        groups.values(),
+        key=lambda group: (
+            len(group["source_decision_ids"]),
+            _average(group["supporting_confidences"]),
+            _average(group["supporting_scores"]),
+            str(group["event_ref"]),
+        ),
+        reverse=True,
+    )
+    proposals: list[dict[str, Any]] = []
+    for group in ranked[:max_proposals]:
+        proposal_id = "l10_event_focus_" + _stable_token(group["event_ref"], group["target_symbol"], group["failure_type"])
+        support_count = len(group["source_decision_ids"])
+        event_summary = dict(event_summaries_by_ref.get(str(group["event_ref"]), {}))
+        failure_attention_reason = (
+            f"{support_count} {group['target_symbol']} {group['failure_type']} failures "
+            f"in {', '.join(sorted(group['replay_months'])) or 'unknown replay months'} matched "
+            f"{group['event_ref']} with attribution statuses "
+            f"{dict(sorted(group['attribution_status_counts'].items()))} and "
+            f"{len(group['co_event_group_ids'])} co-event groups."
+        )
+        proposals.append(
+            {
+                "contract_type": EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE,
+                "stage_id": "model_group.layer_10_event_attribution",
+                "model_surface": "model_10_event_risk_governor",
+                "event_focus_proposal_id": proposal_id,
+                "proposal_status": "watch_candidate",
+                "review_gate": "event-strategy-promotion-review",
+                "recommended_next_action": "review_before_accepting_into_event_attention_pool",
+                "event_ref": group["event_ref"],
+                "event_summary": event_summary or None,
+                "failure_attention_reason": failure_attention_reason,
+                "target_symbol": group["target_symbol"],
+                "failure_type": group["failure_type"],
+                "supporting_failure_count": support_count,
+                "source_decision_ids": _compact_strings(group["source_decision_ids"], limit=50),
+                "source_triage_attribution_ids": _compact_strings(group["source_triage_attribution_ids"], limit=50),
+                "replay_months": sorted(group["replay_months"]),
+                "failure_window_start": min(group["failure_window_starts"]) if group["failure_window_starts"] else None,
+                "failure_window_end": max(group["failure_window_ends"]) if group["failure_window_ends"] else None,
+                "attribution_status_counts": dict(sorted(group["attribution_status_counts"].items())),
+                "co_event_group_count": len(group["co_event_group_ids"]),
+                "average_incremental_attribution_score": _average(group["supporting_scores"]),
+                "average_attribution_confidence_score": _average(group["supporting_confidences"]),
+                "event_interpretation_refs": sorted(group["event_interpretation_refs"])[:50],
+                "layer_10_attribution_receipt_ref": layer_10_attribution_receipt_ref,
+                "attribution_rows_ref": attribution_rows_ref,
+                "event_interpretations_ref": event_interpretations_ref,
+                "accepted_event_pool_mutation_performed": False,
+                "temporal_attention_pool_mutation_performed": False,
+                "acceptance_blockers": [
+                    "requires_event_strategy_promotion_review",
+                    "requires_incremental_value_evidence",
+                    "requires_co_event_confounder_disposition",
+                ],
+            }
+        )
+    return proposals
+
+
+def _event_summaries_by_ref(event_candidates: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    summaries: dict[str, dict[str, Any]] = {}
+    for candidate in event_candidates:
+        event_ref = str(candidate.get("event_ref") or "").strip()
+        interpretation = candidate.get("interpretation") if isinstance(candidate.get("interpretation"), Mapping) else {}
+        if not event_ref:
+            continue
+        summaries.setdefault(
+            event_ref,
+            {
+                "canonical_event_id": event_ref,
+                "normalized_event_type": interpretation.get("normalized_event_type"),
+                "affected_entities": interpretation.get("affected_entities") if isinstance(interpretation.get("affected_entities"), list) else [],
+                "affected_scope": interpretation.get("affected_scope"),
+                "published_time": interpretation.get("published_time"),
+                "available_time": interpretation.get("available_time"),
+                "rationale_summary": interpretation.get("rationale_summary"),
+                "event_domain_tags": interpretation.get("event_domain_tags") if isinstance(interpretation.get("event_domain_tags"), list) else [],
+                "source_name": interpretation.get("source_name"),
+                "source_artifact_ref": interpretation.get("source_artifact_ref"),
+                "source_type": interpretation.get("source_type"),
+                "evidence_confidence_score": _safe_float(interpretation.get("evidence_confidence_score")),
+                "intensity_score": _safe_float(interpretation.get("intensity_score")),
+                "direction_bias_score": _safe_float(interpretation.get("direction_bias_score")),
+            },
+        )
+    return summaries
 
 
 def _matching_event_candidates(triage_row: Mapping[str, Any], candidates: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
@@ -667,6 +838,15 @@ def _latest_layer_10_receipt(dataset_root: Path, *, decision_rows_ref: str) -> d
     return dict(receipt) if path is not None and receipt is not None else None
 
 
+def latest_layer_10_attribution_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
+    return _latest_receipt(
+        dataset_root / "post_replay_attribution_runs",
+        "post_replay_attribution_receipt.json",
+        accepted_statuses=COMPLETE_STATUSES,
+        predicate=lambda receipt: str(receipt.get("contract_type") or "") == LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE,
+    )
+
+
 def _latest_receipt(
     root: Path,
     filename: str,
@@ -813,6 +993,28 @@ def _score(row: Mapping[str, Any], *keys: str, default: float) -> float:
     return default
 
 
+def _safe_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _average(values: Sequence[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
+
+
+def _compact_strings(values: Sequence[Any], *, limit: int) -> list[str]:
+    compacted: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            compacted.append(text)
+        if len(compacted) >= limit:
+            break
+    return compacted
+
+
 def _stable_hash(*parts: Any) -> str:
     return "sha256:" + hashlib.sha256("|".join(json.dumps(part, sort_keys=True, default=str) for part in parts).encode("utf-8")).hexdigest()
 
@@ -824,7 +1026,9 @@ def _stable_token(*parts: Any) -> str:
 
 
 __all__ = [
+    "EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE",
     "LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE",
     "LAYER_10_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE",
+    "latest_layer_10_attribution_receipt",
     "run_model_group_layer_ten_attribution_if_ready",
 ]

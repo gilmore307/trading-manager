@@ -499,21 +499,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(layer_ten_row["payload"], "model_10_event_risk_governor_event_attribution_row")
         self.assertIn("event_interpretation", layer_ten_row["applies_to"])
 
-        focus_receipt = rows["MANAGER_POST_REPLAY_LAYER_10_EVENT_FOCUS_PROPOSAL_RECEIPT"]
-        self.assertEqual(focus_receipt["payload"], "post_replay_layer_10_event_focus_proposal_receipt")
-        self.assertIn("event-pool mutation", focus_receipt["note"])
-
         focus_row = rows["MANAGER_POST_REPLAY_LAYER_10_EVENT_FOCUS_PROPOSAL_ROW"]
         self.assertEqual(focus_row["payload"], "model_10_event_risk_governor_event_focus_proposal")
         self.assertIn("event-strategy-promotion-review", focus_row["applies_to"])
+        self.assertIn("model_group.layer_10_event_attribution", focus_row["applies_to"])
 
         runtime_surfaces = rows["MANAGER_POST_REPLAY_ATTRIBUTION_RUNTIME_SURFACES"]
         self.assertIn("post_replay_failure_triage_runs", runtime_surfaces["payload"])
         self.assertIn("model_group.layer_10_event_attribution", runtime_surfaces["payload"])
-
-        focus_surfaces = rows["MANAGER_POST_REPLAY_EVENT_FOCUS_PROPOSAL_RUNTIME_SURFACES"]
-        self.assertIn("post_replay_event_focus_proposal_runs", focus_surfaces["payload"])
-        self.assertIn("model_group.layer_10_event_focus_proposal", focus_surfaces["payload"])
 
         triage_script = rows["MODEL_GROUP_POST_REPLAY_FAILURE_TRIAGE_RUN"]
         self.assertEqual(triage_script["kind"], "script")
@@ -522,10 +515,6 @@ class RegistryHelperTests(unittest.TestCase):
         layer_ten_script = rows["MODEL_GROUP_LAYER_10_EVENT_ATTRIBUTION_RUN"]
         self.assertEqual(layer_ten_script["kind"], "script")
         self.assertIn("run_model_group_layer_ten_attribution.py", layer_ten_script["path"])
-
-        focus_script = rows["MODEL_GROUP_LAYER_10_EVENT_FOCUS_PROPOSAL_RUN"]
-        self.assertEqual(focus_script["kind"], "script")
-        self.assertIn("run_model_group_event_focus_proposal.py", focus_script["path"])
 
         self.assertNotIn("event_interpretation_v1", {row["payload"] for row in rows.values()})
 

@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
-from .model_group_event_focus_proposal import latest_event_focus_proposal_receipt
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID
 from .model_training_workflow import base_stack_model_generation_splits_complete
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -89,11 +88,8 @@ def run_model_group_evaluation_if_ready(
     )
     if attribution_receipt_path is None or attribution_receipt is None:
         return None
-    event_focus_proposal_receipt_path, event_focus_proposal_receipt = latest_event_focus_proposal_receipt(
-        dataset_root,
-        layer_10_attribution_receipt_ref=str(attribution_receipt_path),
-    )
-    if event_focus_proposal_receipt_path is None or event_focus_proposal_receipt is None:
+    event_focus_proposals_path = Path(str(attribution_receipt.get("event_focus_proposals_ref") or ""))
+    if not event_focus_proposals_path.exists():
         return None
     training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
     if training_fold is None:
@@ -127,7 +123,7 @@ def run_model_group_evaluation_if_ready(
         dataset_root,
         replay_result_ref=str(replay_receipt_path),
         layer_10_attribution_receipt_ref=str(attribution_receipt_path),
-        layer_10_event_focus_proposal_receipt_ref=str(event_focus_proposal_receipt_path),
+        layer_10_event_focus_proposals_ref=str(event_focus_proposals_path),
         minimum_mtime=_state_mtime(training_fold),
     ) is not None:
         return None
@@ -156,7 +152,7 @@ def run_model_group_evaluation_if_ready(
     check_summary = _evaluation_check_summary(
         rows=rows,
         attribution_rows=attribution_rows,
-        event_focus_proposal_receipt=event_focus_proposal_receipt,
+        attribution_receipt=attribution_receipt,
     )
 
     if not execute:
@@ -230,7 +226,7 @@ def run_model_group_evaluation_if_ready(
             "ready_check_count": len(set(check_summary["ready_checks"]).intersection(MODEL_GROUP_EVALUATION_CHECKS)),
             "replay_execution_receipt_ref": str(replay_receipt_path),
             "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
-            "layer_10_event_focus_proposal_receipt_ref": str(event_focus_proposal_receipt_path),
+            "layer_10_event_focus_proposals_ref": str(event_focus_proposals_path),
             "fold_settlement_run_ref": str(settlement_path),
             "promotion_evaluation_review_ref": str(review_path),
             "promotion_eligibility_decision_ref": str(decision_path),
@@ -2009,7 +2005,7 @@ def _evaluation_check_summary(
     *,
     rows: Sequence[Mapping[str, Any]],
     attribution_rows: Sequence[Mapping[str, Any]],
-    event_focus_proposal_receipt: Mapping[str, Any],
+    attribution_receipt: Mapping[str, Any],
 ) -> dict[str, Any]:
     ready_checks: list[str] = []
     checks: list[dict[str, Any]] = []
@@ -2017,13 +2013,14 @@ def _evaluation_check_summary(
     guardrail_ready = len(rows) >= 20
     comparison_ready = True
     attribution_ready = len(attribution_rows) > 0
-    event_focus_ready = str(event_focus_proposal_receipt.get("status") or "") in {"succeeded", "complete", "completed"}
+    event_focus_count = int(attribution_receipt.get("event_focus_proposal_count") or 0)
+    event_focus_ready = bool(str(attribution_receipt.get("event_focus_proposals_ref") or "").strip()) and event_focus_count > 0
     for check, ready, detail in (
         ("replay_metrics", replay_metrics_ready, f"{len(rows)} replay decision rows available"),
         ("guardrail_settlement", guardrail_ready, f"{len(rows)} replay decision rows checked against guardrails"),
         ("incumbent_comparison", comparison_ready, "incumbent comparison recorded as insufficient evidence for promotion"),
         ("layer_10_attribution", attribution_ready, f"{len(attribution_rows)} Layer 10 attribution rows linked"),
-        ("layer_10_event_focus_proposal", event_focus_ready, f"{int(event_focus_proposal_receipt.get('proposal_count') or 0)} event-focus proposals prepared"),
+        ("layer_10_event_focus_proposal", event_focus_ready, f"{event_focus_count} Layer 10 event-focus proposals prepared"),
     ):
         if ready:
             ready_checks.append(check)
@@ -2216,7 +2213,7 @@ def _latest_promotion_review_artifacts(
     *,
     replay_result_ref: str,
     layer_10_attribution_receipt_ref: str,
-    layer_10_event_focus_proposal_receipt_ref: str,
+    layer_10_event_focus_proposals_ref: str,
     minimum_mtime: float | None = None,
 ) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
@@ -2231,7 +2228,7 @@ def _latest_promotion_review_artifacts(
             continue
         if str(receipt.get("layer_10_attribution_receipt_ref") or "") != layer_10_attribution_receipt_ref:
             continue
-        if str(receipt.get("layer_10_event_focus_proposal_receipt_ref") or "") != layer_10_event_focus_proposal_receipt_ref:
+        if str(receipt.get("layer_10_event_focus_proposals_ref") or "") != layer_10_event_focus_proposals_ref:
             continue
         decision_path = receipt_path.parent / "promotion_eligibility_decision.json"
         if not decision_path.exists():
