@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 from .event_feed_backfill import prepare_event_feed_backfill
@@ -29,11 +32,30 @@ NEW_YORK = ZoneInfo("America/New_York")
 LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE = "post_replay_layer_10_event_attribution_receipt"
 LAYER_10_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_attribution_row"
 EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_focus_proposal"
+TEMPORAL_ATTENTION_CANDIDATE_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_temporal_attention_candidate"
+EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_family_occurrence_scan_row"
+EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_CONTRACT_TYPE = "model_10_event_risk_governor_event_family_bias_association_packet"
+EVENT_STRATEGY_PROMOTION_REVIEW_CONTRACT_TYPE = "event_strategy_promotion_review"
+ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE = "model_10_event_risk_governor_temporal_attention_pool_entry"
 EVENT_INTERPRETATION_CONTRACT_TYPE = "event_interpretation"
 LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES = {"event_interpretation_v1"}
 COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
 ACCEPTED_REVIEW_STATUSES = {"accepted", "reviewed_accepted", "approved", "reviewed"}
 ACCEPTED_STANDARDIZATION_STATUSES = {"standardized", "accepted", "complete", "validated"}
+EVENT_STRATEGY_REVIEW_DECISIONS = {"approve", "defer", "reject", "insufficient_evidence"}
+EVENT_STRATEGY_REVIEW_STATUSES = {"passed", "failed", "insufficient_evidence"}
+EVENT_STRATEGY_OVERLAP_STATUSES = {
+    "not_in_upstream_features",
+    "residual_after_upstream_conditioning",
+    "review_required_overlap_unknown",
+    "failed",
+    "insufficient_evidence",
+}
+EVENT_STRATEGY_CODEX_MODEL = "gpt-5.5"
+EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS = 900
+EVENT_STRATEGY_CODEX_WORKDIR = Path("/root/.openclaw/workspace")
+EVENT_STRATEGY_CODEX_ADD_DIR = Path("/root/projects")
+MAX_EVENT_STRATEGY_REVIEW_PACKETS = 3
 EVENT_WINDOW_BEFORE = timedelta(days=3)
 EVENT_WINDOW_AFTER = timedelta(days=1)
 M10_SQL_EVENT_FIELDS = [
@@ -67,6 +89,12 @@ def run_model_group_layer_ten_attribution_if_ready(
     python_executable: str = sys.executable,
     now_utc: datetime | None = None,
     force: bool = False,
+    call_agent_review: bool = True,
+    agent_reviewer: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
+    codex_bin: str = "codex",
+    codex_model: str | None = None,
+    codex_timeout_seconds: int = EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS,
+    max_agent_review_packets: int = MAX_EVENT_STRATEGY_REVIEW_PACKETS,
 ) -> SchedulerDecision | None:
     """Run Layer 10 attribution when replay triage and PIT event evidence exist."""
 
@@ -132,6 +160,14 @@ def run_model_group_layer_ten_attribution_if_ready(
         event_interpretations_ref=None,
         event_summaries_by_ref=_event_summaries_by_ref(event_candidates),
     )
+    attention_evidence = _build_event_family_attention_evidence(
+        event_focus_proposals=event_focus_proposals,
+        attribution_rows=attribution_rows,
+        event_candidates=event_candidates,
+        temporal_attention_candidate_pool_ref=None,
+        event_family_occurrence_scan_ref=None,
+        event_family_bias_association_packets_ref=None,
+    )
     if not execute:
         return _decision(
             now=now,
@@ -148,6 +184,9 @@ def run_model_group_layer_ten_attribution_if_ready(
                 "event_candidate_count": len(event_candidates),
                 "expected_attribution_rows": len(attribution_rows),
                 "expected_event_focus_proposal_count": len(event_focus_proposals),
+                "expected_temporal_attention_candidate_count": len(attention_evidence["temporal_attention_candidates"]),
+                "expected_event_family_occurrence_count": len(attention_evidence["event_family_occurrence_scan_rows"]),
+                "expected_event_family_bias_association_packet_count": len(attention_evidence["event_family_bias_association_packets"]),
             },
         )
 
@@ -156,6 +195,11 @@ def run_model_group_layer_ten_attribution_if_ready(
     attribution_rows_path = output_root / "layer_10_event_attribution_rows.jsonl"
     event_interpretations_path = output_root / "event_interpretations.jsonl"
     event_focus_proposals_path = output_root / "event_focus_proposals.jsonl"
+    temporal_attention_candidates_path = output_root / "temporal_attention_candidate_pool.jsonl"
+    event_family_occurrence_scan_path = output_root / "event_family_occurrence_scan.jsonl"
+    event_family_bias_packets_path = output_root / "event_family_bias_association_packets.jsonl"
+    event_strategy_reviews_path = output_root / "event_strategy_promotion_reviews.jsonl"
+    accepted_temporal_attention_pool_path = output_root / "accepted_temporal_attention_pool_entries.jsonl"
     control_report_path = output_root / "control_coevent_leakage_report.json"
     receipt_path = output_root / "post_replay_attribution_receipt.json"
     event_focus_proposals = _build_event_focus_proposals(
@@ -164,6 +208,30 @@ def run_model_group_layer_ten_attribution_if_ready(
         attribution_rows_ref=str(attribution_rows_path),
         event_interpretations_ref=str(event_interpretations_path),
         event_summaries_by_ref=_event_summaries_by_ref(event_candidates),
+    )
+    attention_evidence = _build_event_family_attention_evidence(
+        event_focus_proposals=event_focus_proposals,
+        attribution_rows=attribution_rows,
+        event_candidates=event_candidates,
+        temporal_attention_candidate_pool_ref=str(temporal_attention_candidates_path),
+        event_family_occurrence_scan_ref=str(event_family_occurrence_scan_path),
+        event_family_bias_association_packets_ref=str(event_family_bias_packets_path),
+    )
+    event_strategy_reviews = _build_event_strategy_promotion_reviews(
+        attention_evidence["event_family_bias_association_packets"],
+        call_agent_review=call_agent_review,
+        agent_reviewer=agent_reviewer,
+        codex_bin=codex_bin,
+        codex_model=codex_model,
+        codex_timeout_seconds=codex_timeout_seconds,
+        max_agent_review_packets=max_agent_review_packets,
+    )
+    accepted_temporal_attention_pool_entries = _build_accepted_temporal_attention_pool_entries(
+        attention_evidence["temporal_attention_candidates"],
+        event_strategy_reviews,
+        accepted_temporal_attention_pool_ref=str(accepted_temporal_attention_pool_path),
+        event_strategy_reviews_ref=str(event_strategy_reviews_path),
+        created_at_utc=now.isoformat(),
     )
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
@@ -178,6 +246,11 @@ def run_model_group_layer_ten_attribution_if_ready(
         _write_jsonl(event_interpretations_path, (candidate["interpretation"] for candidate in event_candidates))
         _write_jsonl(attribution_rows_path, attribution_rows)
         _write_jsonl(event_focus_proposals_path, event_focus_proposals)
+        _write_jsonl(temporal_attention_candidates_path, attention_evidence["temporal_attention_candidates"])
+        _write_jsonl(event_family_occurrence_scan_path, attention_evidence["event_family_occurrence_scan_rows"])
+        _write_jsonl(event_family_bias_packets_path, attention_evidence["event_family_bias_association_packets"])
+        _write_jsonl(event_strategy_reviews_path, event_strategy_reviews)
+        _write_jsonl(accepted_temporal_attention_pool_path, accepted_temporal_attention_pool_entries)
         control_report_path.write_text(json.dumps(control_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         receipt = {
             "contract_type": LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE,
@@ -194,6 +267,11 @@ def run_model_group_layer_ten_attribution_if_ready(
             "attribution_rows_ref": str(attribution_rows_path),
             "event_interpretations_ref": str(event_interpretations_path),
             "event_focus_proposals_ref": str(event_focus_proposals_path),
+            "temporal_attention_candidate_pool_ref": str(temporal_attention_candidates_path),
+            "event_family_occurrence_scan_ref": str(event_family_occurrence_scan_path),
+            "event_family_bias_association_packets_ref": str(event_family_bias_packets_path),
+            "event_strategy_promotion_reviews_ref": str(event_strategy_reviews_path),
+            "accepted_temporal_attention_pool_ref": str(accepted_temporal_attention_pool_path),
             "control_coevent_leakage_report_ref": str(control_report_path),
             "event_evidence_consumed": True,
             "event_observation_count": sum(1 for candidate in event_candidates if candidate["observation_status"] == "accepted_observation"),
@@ -207,9 +285,16 @@ def run_model_group_layer_ten_attribution_if_ready(
             "processed_failure_count": len(triage_rows),
             "attribution_row_count": len(attribution_rows),
             "event_focus_proposal_count": len(event_focus_proposals),
+            "temporal_attention_candidate_count": len(attention_evidence["temporal_attention_candidates"]),
+            "event_family_occurrence_scan_row_count": len(attention_evidence["event_family_occurrence_scan_rows"]),
+            "event_family_bias_association_packet_count": len(attention_evidence["event_family_bias_association_packets"]),
+            "event_strategy_promotion_review_count": len(event_strategy_reviews),
+            "accepted_temporal_attention_pool_entry_count": len(accepted_temporal_attention_pool_entries),
+            "deterministic_event_family_gate_status": attention_evidence["deterministic_gate_status"],
+            "event_strategy_promotion_review_status": _event_strategy_review_status(event_strategy_reviews),
             "event_focus_proposal_review_gate": "event-strategy-promotion-review",
             "accepted_event_pool_mutation_performed": False,
-            "temporal_attention_pool_mutation_performed": False,
+            "temporal_attention_pool_mutation_performed": bool(accepted_temporal_attention_pool_entries),
             "provider_calls": 0,
             "broker_execution_performed": False,
             "model_activation_performed": False,
@@ -230,9 +315,18 @@ def run_model_group_layer_ten_attribution_if_ready(
             "attribution_rows_ref": str(attribution_rows_path),
             "event_interpretations_ref": str(event_interpretations_path),
             "event_focus_proposals_ref": str(event_focus_proposals_path),
+            "temporal_attention_candidate_pool_ref": str(temporal_attention_candidates_path),
+            "event_family_occurrence_scan_ref": str(event_family_occurrence_scan_path),
+            "event_family_bias_association_packets_ref": str(event_family_bias_packets_path),
+            "event_strategy_promotion_reviews_ref": str(event_strategy_reviews_path),
+            "accepted_temporal_attention_pool_ref": str(accepted_temporal_attention_pool_path),
             "event_candidate_count": len(event_candidates),
             "attribution_row_count": len(attribution_rows),
             "event_focus_proposal_count": len(event_focus_proposals),
+            "temporal_attention_candidate_count": len(attention_evidence["temporal_attention_candidates"]),
+            "event_family_bias_association_packet_count": len(attention_evidence["event_family_bias_association_packets"]),
+            "event_strategy_promotion_review_count": len(event_strategy_reviews),
+            "accepted_temporal_attention_pool_entry_count": len(accepted_temporal_attention_pool_entries),
         },
     )
 
@@ -517,6 +611,521 @@ def _event_summaries_by_ref(event_candidates: Sequence[Mapping[str, Any]]) -> di
             },
         )
     return summaries
+
+
+def _build_event_family_attention_evidence(
+    *,
+    event_focus_proposals: Sequence[Mapping[str, Any]],
+    attribution_rows: Sequence[Mapping[str, Any]],
+    event_candidates: Sequence[Mapping[str, Any]],
+    temporal_attention_candidate_pool_ref: str | None,
+    event_family_occurrence_scan_ref: str | None,
+    event_family_bias_association_packets_ref: str | None,
+) -> dict[str, Any]:
+    """Build deterministic event-family evidence before agent review.
+
+    This deliberately keeps Codex out of base arithmetic. Co-event grouping,
+    point-in-time leakage, support counts, and matched-control base rates are
+    computed here; agent review later receives a compact packet only after
+    deterministic gates say the family is reviewable.
+    """
+
+    event_ref_to_candidate = {str(candidate.get("event_ref") or ""): candidate for candidate in event_candidates if str(candidate.get("event_ref") or "")}
+    target_family_ids = {
+        _event_family_id(event_ref_to_candidate.get(str(proposal.get("event_ref") or "")), target_symbol=str(proposal.get("target_symbol") or ""))
+        for proposal in event_focus_proposals
+        if str(proposal.get("event_ref") or "") in event_ref_to_candidate
+    }
+    target_family_ids.discard("")
+    event_ref_stats = _event_ref_failure_stats(attribution_rows, event_ref_to_candidate=event_ref_to_candidate)
+    occurrence_rows: list[dict[str, Any]] = []
+    family_groups: dict[str, dict[str, Any]] = {}
+    for candidate in event_candidates:
+        event_ref = str(candidate.get("event_ref") or "")
+        family_id = _event_family_id(candidate, target_symbol=_family_target_symbol(candidate, event_focus_proposals))
+        if not event_ref or family_id not in target_family_ids:
+            continue
+        interpretation = candidate.get("interpretation") if isinstance(candidate.get("interpretation"), Mapping) else {}
+        stats = event_ref_stats.get(event_ref, _empty_event_ref_stats())
+        row = {
+            "contract_type": EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE,
+            "stage_id": "model_group.layer_10_event_attribution",
+            "event_family_id": family_id,
+            "event_ref": event_ref,
+            "target_symbol": _family_target_symbol(candidate, event_focus_proposals),
+            "normalized_event_type": str(interpretation.get("normalized_event_type") or "event_candidate"),
+            "affected_scope": str(interpretation.get("affected_scope") or "unknown"),
+            "available_time": str(candidate.get("available_time") or ""),
+            "event_month": str(candidate.get("event_month") or ""),
+            "matched_failure_count": stats["matched_failure_count"],
+            "attributed_failure_count": stats["attributed_failure_count"],
+            "confounded_failure_count": stats["confounded_failure_count"],
+            "co_event_group_count": len(stats["co_event_group_ids"]),
+            "average_incremental_attribution_score": _average(stats["supporting_scores"]),
+            "average_attribution_confidence_score": _average(stats["supporting_confidences"]),
+            "leakage_violation_count": stats["leakage_violation_count"],
+        }
+        occurrence_rows.append(row)
+        group = family_groups.setdefault(
+            family_id,
+            {
+                "event_family_id": family_id,
+                "target_symbol": row["target_symbol"],
+                "normalized_event_type": row["normalized_event_type"],
+                "affected_scope": row["affected_scope"],
+                "event_refs": set(),
+                "occurrence_months": set(),
+                "source_event_refs": set(),
+                "supporting_proposal_ids": set(),
+                "supporting_failure_count": 0,
+                "matched_occurrence_count": 0,
+                "confounded_failure_count": 0,
+                "attributed_failure_count": 0,
+                "co_event_group_ids": set(),
+                "leakage_violation_count": 0,
+                "supporting_scores": [],
+                "supporting_confidences": [],
+                "source_decision_ids": set(),
+                "source_triage_attribution_ids": set(),
+            },
+        )
+        group["event_refs"].add(event_ref)
+        if row["event_month"]:
+            group["occurrence_months"].add(row["event_month"])
+        if row["matched_failure_count"] > 0:
+            group["matched_occurrence_count"] += 1
+        group["supporting_failure_count"] += row["matched_failure_count"]
+        group["confounded_failure_count"] += row["confounded_failure_count"]
+        group["attributed_failure_count"] += row["attributed_failure_count"]
+        group["leakage_violation_count"] += row["leakage_violation_count"]
+        group["supporting_scores"].extend(stats["supporting_scores"])
+        group["supporting_confidences"].extend(stats["supporting_confidences"])
+        group["co_event_group_ids"].update(stats["co_event_group_ids"])
+        group["source_decision_ids"].update(stats["source_decision_ids"])
+        group["source_triage_attribution_ids"].update(stats["source_triage_attribution_ids"])
+    for proposal in event_focus_proposals:
+        event_ref = str(proposal.get("event_ref") or "")
+        candidate = event_ref_to_candidate.get(event_ref)
+        family_id = _event_family_id(candidate, target_symbol=str(proposal.get("target_symbol") or ""))
+        group = family_groups.get(family_id)
+        if group is None:
+            continue
+        group["supporting_proposal_ids"].add(str(proposal.get("event_focus_proposal_id") or ""))
+        group["source_event_refs"].add(event_ref)
+
+    candidate_rows: list[dict[str, Any]] = []
+    packets: list[dict[str, Any]] = []
+    for group in sorted(family_groups.values(), key=lambda item: (item["supporting_failure_count"], item["event_family_id"]), reverse=True):
+        occurrence_count = len(group["event_refs"])
+        matched_occurrence_count = int(group["matched_occurrence_count"])
+        unmatched_occurrence_count = max(0, occurrence_count - matched_occurrence_count)
+        matched_failure_rate = matched_occurrence_count / occurrence_count if occurrence_count else 0.0
+        background_failure_rate = unmatched_occurrence_count / occurrence_count if occurrence_count else 0.0
+        average_score = _average(group["supporting_scores"])
+        average_confidence = _average(group["supporting_confidences"])
+        pit_status = "passed" if occurrence_count > 0 else "insufficient_evidence"
+        leakage_status = "passed" if group["leakage_violation_count"] == 0 else "failed"
+        co_event_confounder_status = "passed" if group["confounded_failure_count"] == 0 else "failed"
+        control_status = "passed" if occurrence_count >= 2 and matched_occurrence_count >= 1 and unmatched_occurrence_count >= 1 else "insufficient_evidence"
+        association_status = "passed" if group["supporting_failure_count"] >= 1 and average_score >= 0.5 and average_confidence >= 0.5 else "insufficient_evidence"
+        deterministic_gate_status = (
+            "passed"
+            if pit_status == "passed"
+            and leakage_status == "passed"
+            and co_event_confounder_status == "passed"
+            and control_status == "passed"
+            and association_status == "passed"
+            else "blocked"
+        )
+        blockers = []
+        if pit_status != "passed":
+            blockers.append("pit_occurrence_evidence_insufficient")
+        if leakage_status != "passed":
+            blockers.append("leakage_violation_detected")
+        if co_event_confounder_status != "passed":
+            blockers.append("co_event_or_confounder_not_discharged")
+        if control_status != "passed":
+            blockers.append("matched_control_base_rate_insufficient")
+        if association_status != "passed":
+            blockers.append("bias_association_strength_insufficient")
+        packet_ref = f"{event_family_bias_association_packets_ref or 'event_family_bias_association_packets.jsonl'}#{len(packets) + 1}"
+        candidate_ref = f"{temporal_attention_candidate_pool_ref or 'temporal_attention_candidate_pool.jsonl'}#{len(candidate_rows) + 1}"
+        candidate_rows.append(
+            {
+                "contract_type": TEMPORAL_ATTENTION_CANDIDATE_ROW_CONTRACT_TYPE,
+                "stage_id": "model_group.layer_10_event_attribution",
+                "candidate_id": "l10_temporal_attention_candidate_" + _stable_token(group["event_family_id"]),
+                "candidate_status": "ready_for_agent_review" if deterministic_gate_status == "passed" else "blocked_by_deterministic_controls",
+                "event_family_id": group["event_family_id"],
+                "target_symbol": group["target_symbol"],
+                "normalized_event_type": group["normalized_event_type"],
+                "supporting_failure_count": group["supporting_failure_count"],
+                "occurrence_count": occurrence_count,
+                "matched_occurrence_count": matched_occurrence_count,
+                "matched_failure_rate": matched_failure_rate,
+                "background_failure_rate": background_failure_rate,
+                "deterministic_gate_status": deterministic_gate_status,
+                "deterministic_blockers": blockers,
+                "event_family_bias_association_packet_ref": packet_ref,
+                "temporal_attention_pool_mutation_performed": False,
+            }
+        )
+        packets.append(
+            {
+                "contract_type": EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_CONTRACT_TYPE,
+                "review_type": "event_strategy_promotion_review",
+                "subject_ref": group["event_family_id"],
+                "candidate_ref": candidate_ref,
+                "event_family_id": group["event_family_id"],
+                "target_symbol": group["target_symbol"],
+                "normalized_event_type": group["normalized_event_type"],
+                "affected_scope": group["affected_scope"],
+                "deterministic_gate_status": deterministic_gate_status,
+                "pit_status": pit_status,
+                "control_status": control_status,
+                "co_event_confounder_status": co_event_confounder_status,
+                "overlap_status": "residual_after_upstream_conditioning",
+                "leakage_status": leakage_status,
+                "association_status": association_status,
+                "occurrence_count": occurrence_count,
+                "matched_occurrence_count": matched_occurrence_count,
+                "unmatched_occurrence_count": unmatched_occurrence_count,
+                "supporting_failure_count": group["supporting_failure_count"],
+                "attributed_failure_count": group["attributed_failure_count"],
+                "confounded_failure_count": group["confounded_failure_count"],
+                "co_event_group_count": len(group["co_event_group_ids"]),
+                "leakage_violation_count": group["leakage_violation_count"],
+                "matched_failure_rate": matched_failure_rate,
+                "background_failure_rate": background_failure_rate,
+                "average_incremental_attribution_score": average_score,
+                "average_attribution_confidence_score": average_confidence,
+                "occurrence_months": sorted(group["occurrence_months"]),
+                "source_event_refs": sorted(group["source_event_refs"])[:50],
+                "supporting_proposal_ids": sorted(item for item in group["supporting_proposal_ids"] if item)[:50],
+                "source_decision_ids": sorted(group["source_decision_ids"])[:50],
+                "source_triage_attribution_ids": sorted(group["source_triage_attribution_ids"])[:50],
+                "event_family_occurrence_scan_ref": event_family_occurrence_scan_ref,
+                "allowed_model_use": ["temporal_attention_pool", "event_family_scouting"],
+                "blocked_model_use": [] if deterministic_gate_status == "passed" else ["accepted_temporal_attention_pool", "layer_4_promotion"],
+                "blocking_issues": blockers,
+                "required_followups": [] if deterministic_gate_status == "passed" else ["collect non-confounded matched controls before agent review"],
+                "provider_calls": 0,
+                "broker_execution_performed": False,
+                "model_activation_performed": False,
+            }
+        )
+    return {
+        "temporal_attention_candidates": candidate_rows,
+        "event_family_occurrence_scan_rows": occurrence_rows,
+        "event_family_bias_association_packets": packets,
+        "deterministic_gate_status": "passed" if packets and any(packet["deterministic_gate_status"] == "passed" for packet in packets) else "blocked",
+    }
+
+
+def _event_ref_failure_stats(
+    attribution_rows: Sequence[Mapping[str, Any]],
+    *,
+    event_ref_to_candidate: Mapping[str, Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    stats: dict[str, dict[str, Any]] = {}
+    for row in attribution_rows:
+        refs = {str(ref) for ref in row.get("candidate_event_refs") or [] if str(ref)}
+        for key in ("dominant_event_candidate", "confounder_event_ref"):
+            if str(row.get(key) or ""):
+                refs.add(str(row[key]))
+        for event_ref in refs:
+            item = stats.setdefault(event_ref, _empty_event_ref_stats())
+            item["matched_failure_count"] += 1
+            status = str(row.get("attribution_status") or "")
+            if status == "attributed":
+                item["attributed_failure_count"] += 1
+            if status == "confounded":
+                item["confounded_failure_count"] += 1
+            if str(row.get("co_event_group_id") or ""):
+                item["co_event_group_ids"].add(str(row["co_event_group_id"]))
+            item["supporting_scores"].append(_safe_float(row.get("incremental_attribution_score")))
+            item["supporting_confidences"].append(_safe_float(row.get("attribution_confidence_score")))
+            if str(row.get("source_decision_id") or ""):
+                item["source_decision_ids"].add(str(row["source_decision_id"]))
+            if str(row.get("source_triage_attribution_id") or ""):
+                item["source_triage_attribution_ids"].add(str(row["source_triage_attribution_id"]))
+            candidate = event_ref_to_candidate.get(event_ref)
+            event_time = _parse_datetime(str(candidate.get("available_time") or candidate.get("event_time") or "")) if candidate else None
+            decision_time = _parse_datetime(str(row.get("decision_time") or ""))
+            if event_time is not None and decision_time is not None and event_time > decision_time:
+                item["leakage_violation_count"] += 1
+    return stats
+
+
+def _empty_event_ref_stats() -> dict[str, Any]:
+    return {
+        "matched_failure_count": 0,
+        "attributed_failure_count": 0,
+        "confounded_failure_count": 0,
+        "co_event_group_ids": set(),
+        "supporting_scores": [],
+        "supporting_confidences": [],
+        "source_decision_ids": set(),
+        "source_triage_attribution_ids": set(),
+        "leakage_violation_count": 0,
+    }
+
+
+def _event_family_id(candidate: Mapping[str, Any] | None, *, target_symbol: str) -> str:
+    if candidate is None:
+        return ""
+    interpretation = candidate.get("interpretation") if isinstance(candidate.get("interpretation"), Mapping) else {}
+    normalized_event_type = str(interpretation.get("normalized_event_type") or "event_candidate").strip().lower()
+    affected_scope = str(interpretation.get("affected_scope") or "unknown").strip().lower()
+    target = str(target_symbol or candidate.get("symbol") or "").strip().upper() or "GLOBAL"
+    return "event_family_" + _stable_token(normalized_event_type, affected_scope, target)
+
+
+def _family_target_symbol(candidate: Mapping[str, Any], proposals: Sequence[Mapping[str, Any]]) -> str:
+    event_ref = str(candidate.get("event_ref") or "")
+    for proposal in proposals:
+        if str(proposal.get("event_ref") or "") == event_ref:
+            return str(proposal.get("target_symbol") or "").strip().upper() or "UNKNOWN"
+    symbol = str(candidate.get("symbol") or "").strip().upper()
+    if symbol:
+        return symbol
+    interpretation = candidate.get("interpretation") if isinstance(candidate.get("interpretation"), Mapping) else {}
+    affected_entities = [str(item).strip().upper() for item in interpretation.get("affected_entities") or [] if str(item).strip()]
+    return affected_entities[0] if len(affected_entities) == 1 else "UNKNOWN"
+
+
+def _build_event_strategy_promotion_reviews(
+    packets: Sequence[Mapping[str, Any]],
+    *,
+    call_agent_review: bool,
+    agent_reviewer: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None,
+    codex_bin: str,
+    codex_model: str | None,
+    codex_timeout_seconds: int,
+    max_agent_review_packets: int,
+) -> list[dict[str, Any]]:
+    ready_packets = [
+        packet
+        for packet in packets
+        if str(packet.get("deterministic_gate_status") or "") == "passed"
+    ][: max(0, max_agent_review_packets)]
+    reviews: list[dict[str, Any]] = []
+    for packet in ready_packets:
+        fallback = _event_strategy_fallback_review(packet, invocation_status="not_invoked_local_fallback", invocation_error="")
+        if agent_reviewer is not None:
+            try:
+                payload = agent_reviewer(packet)
+                reviews.append(_normalize_event_strategy_review(payload, fallback=fallback, invocation_status="completed", invocation_error=""))
+            except Exception as exc:  # pragma: no cover - defensive runtime guard.
+                reviews.append(_event_strategy_fallback_review(packet, invocation_status="failed", invocation_error=f"agent_reviewer_failed: {exc}"))
+            continue
+        if not call_agent_review:
+            reviews.append(fallback)
+            continue
+        try:
+            payload = _invoke_event_strategy_review_agent(
+                review_packet=packet,
+                codex_bin=codex_bin,
+                codex_model=codex_model,
+                timeout_seconds=codex_timeout_seconds,
+            )
+            reviews.append(_normalize_event_strategy_review(payload, fallback=fallback, invocation_status="completed", invocation_error=""))
+        except Exception as exc:
+            reviews.append(_event_strategy_fallback_review(packet, invocation_status="failed", invocation_error=f"codex_agent_call_failed: {exc}"))
+    return reviews
+
+
+def _event_strategy_fallback_review(packet: Mapping[str, Any], *, invocation_status: str, invocation_error: str) -> dict[str, Any]:
+    return {
+        "contract_type": EVENT_STRATEGY_PROMOTION_REVIEW_CONTRACT_TYPE,
+        "review_type": "event_strategy_promotion_review",
+        "subject_ref": str(packet.get("subject_ref") or packet.get("event_family_id") or ""),
+        "decision": "insufficient_evidence",
+        "pit_status": str(packet.get("pit_status") or "insufficient_evidence"),
+        "control_status": str(packet.get("control_status") or "insufficient_evidence"),
+        "overlap_status": str(packet.get("overlap_status") or "review_required_overlap_unknown"),
+        "leakage_status": str(packet.get("leakage_status") or "insufficient_evidence"),
+        "allowed_model_use": [],
+        "blocked_model_use": ["accepted_temporal_attention_pool", "layer_4_promotion"],
+        "blocking_issues": _string_list(packet.get("blocking_issues")) + ["event_strategy_promotion_review_not_approved"],
+        "required_followups": _string_list(packet.get("required_followups")) + ["complete event-strategy-promotion-review successfully"],
+        "rationale": "Deterministic packet is reviewable, but no approving event-strategy review has accepted it.",
+        "source_packet_ref": str(packet.get("candidate_ref") or ""),
+        "agent_invocation_status": invocation_status,
+        "agent_invocation_error": invocation_error,
+        "provider_calls": 0,
+        "broker_execution_performed": False,
+        "model_activation_performed": False,
+        "temporal_attention_pool_mutation_performed": False,
+    }
+
+
+def _invoke_event_strategy_review_agent(
+    *,
+    review_packet: Mapping[str, Any],
+    codex_bin: str,
+    codex_model: str | None,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    prompt = _event_strategy_review_agent_prompt(review_packet)
+    model = codex_model or os.environ.get("TRADING_MANAGER_EVENT_STRATEGY_REVIEW_CODEX_MODEL") or EVENT_STRATEGY_CODEX_MODEL
+    with tempfile.TemporaryDirectory(prefix="event-strategy-promotion-review-") as raw_tmp:
+        final_output_path = Path(raw_tmp) / "codex_final_output.txt"
+        command = [
+            codex_bin,
+            "exec",
+            "--ephemeral",
+            "--ignore-rules",
+            "--skip-git-repo-check",
+            "--sandbox",
+            "read-only",
+            "-C",
+            str(EVENT_STRATEGY_CODEX_WORKDIR),
+            "--output-last-message",
+            str(final_output_path),
+            "-m",
+            model,
+            "--add-dir",
+            str(EVENT_STRATEGY_CODEX_ADD_DIR),
+            prompt,
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds)
+        output = final_output_path.read_text(encoding="utf-8") if final_output_path.exists() else result.stdout
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout or f"codex exited {result.returncode}").strip()[:2000])
+    return _json_object_from_text(output)
+
+
+def _event_strategy_review_agent_prompt(review_packet: Mapping[str, Any]) -> str:
+    return (
+        "Use the event-strategy-promotion-review skill. Review this deterministic Layer 10 event-family packet as a final guard only.\n"
+        "Do not recompute co-event/confounder gates; those are deterministic inputs. Do not activate models, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
+        "Return strict JSON only, with exactly this contract shape and no markdown:\n"
+        "{"
+        "\"review_type\":\"event_strategy_promotion_review\","
+        "\"subject_ref\":\"string\","
+        "\"decision\":\"approve|defer|reject|insufficient_evidence\","
+        "\"pit_status\":\"passed|failed|insufficient_evidence\","
+        "\"control_status\":\"passed|failed|insufficient_evidence\","
+        "\"overlap_status\":\"not_in_upstream_features|residual_after_upstream_conditioning|review_required_overlap_unknown|failed|insufficient_evidence\","
+        "\"leakage_status\":\"passed|failed|insufficient_evidence\","
+        "\"allowed_model_use\":[\"string\"],"
+        "\"blocked_model_use\":[\"string\"],"
+        "\"blocking_issues\":[\"string\"],"
+        "\"required_followups\":[\"string\"],"
+        "\"rationale\":\"short evidence-grounded explanation\""
+        "}\n"
+        "Evidence packet:\n"
+        f"{json.dumps(review_packet, indent=2, sort_keys=True, default=str)}\n"
+    )
+
+
+def _normalize_event_strategy_review(
+    payload: Mapping[str, Any],
+    *,
+    fallback: Mapping[str, Any],
+    invocation_status: str,
+    invocation_error: str,
+) -> dict[str, Any]:
+    return {
+        "contract_type": EVENT_STRATEGY_PROMOTION_REVIEW_CONTRACT_TYPE,
+        "review_type": "event_strategy_promotion_review",
+        "subject_ref": _string_choice(payload.get("subject_ref"), fallback.get("subject_ref"), allowed=None),
+        "decision": _string_choice(payload.get("decision"), "insufficient_evidence", allowed=EVENT_STRATEGY_REVIEW_DECISIONS),
+        "pit_status": _string_choice(payload.get("pit_status"), fallback.get("pit_status"), allowed=EVENT_STRATEGY_REVIEW_STATUSES),
+        "control_status": _string_choice(payload.get("control_status"), fallback.get("control_status"), allowed=EVENT_STRATEGY_REVIEW_STATUSES),
+        "overlap_status": _string_choice(payload.get("overlap_status"), fallback.get("overlap_status"), allowed=EVENT_STRATEGY_OVERLAP_STATUSES),
+        "leakage_status": _string_choice(payload.get("leakage_status"), fallback.get("leakage_status"), allowed=EVENT_STRATEGY_REVIEW_STATUSES),
+        "allowed_model_use": _string_list(payload.get("allowed_model_use")),
+        "blocked_model_use": _string_list(payload.get("blocked_model_use")),
+        "blocking_issues": _string_list(payload.get("blocking_issues")),
+        "required_followups": _string_list(payload.get("required_followups")),
+        "rationale": str(payload.get("rationale") or fallback.get("rationale") or ""),
+        "source_packet_ref": str(fallback.get("source_packet_ref") or ""),
+        "agent_invocation_status": invocation_status,
+        "agent_invocation_error": invocation_error,
+        "provider_calls": 0,
+        "broker_execution_performed": False,
+        "model_activation_performed": False,
+        "temporal_attention_pool_mutation_performed": False,
+    }
+
+
+def _build_accepted_temporal_attention_pool_entries(
+    candidate_rows: Sequence[Mapping[str, Any]],
+    reviews: Sequence[Mapping[str, Any]],
+    *,
+    accepted_temporal_attention_pool_ref: str,
+    event_strategy_reviews_ref: str,
+    created_at_utc: str,
+) -> list[dict[str, Any]]:
+    approved_by_subject = {
+        str(review.get("subject_ref") or ""): review
+        for review in reviews
+        if str(review.get("decision") or "") == "approve"
+        and str(review.get("pit_status") or "") == "passed"
+        and str(review.get("control_status") or "") == "passed"
+        and str(review.get("leakage_status") or "") == "passed"
+    }
+    entries: list[dict[str, Any]] = []
+    for candidate in candidate_rows:
+        family_id = str(candidate.get("event_family_id") or "")
+        review = approved_by_subject.get(family_id)
+        if review is None:
+            continue
+        entries.append(
+            {
+                "contract_type": ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE,
+                "stage_id": "model_group.layer_10_event_attribution",
+                "pool_entry_id": "temporal_attention_pool_" + _stable_token(family_id, created_at_utc),
+                "pool_status": "accepted",
+                "event_family_id": family_id,
+                "target_symbol": candidate.get("target_symbol"),
+                "normalized_event_type": candidate.get("normalized_event_type"),
+                "source_candidate_ref": candidate.get("event_family_bias_association_packet_ref"),
+                "event_strategy_review_ref": f"{event_strategy_reviews_ref}#{len(entries) + 1}",
+                "accepted_temporal_attention_pool_ref": accepted_temporal_attention_pool_ref,
+                "allowed_model_use": _string_list(review.get("allowed_model_use")) or ["temporal_attention_pool"],
+                "blocked_model_use": _string_list(review.get("blocked_model_use")),
+                "created_at_utc": created_at_utc,
+                "provider_calls": 0,
+                "broker_execution_performed": False,
+                "model_activation_performed": False,
+            }
+        )
+    return entries
+
+
+def _event_strategy_review_status(reviews: Sequence[Mapping[str, Any]]) -> str:
+    if not reviews:
+        return "not_invoked_no_deterministic_candidate"
+    if any(str(review.get("decision") or "") == "approve" for review in reviews):
+        return "approved"
+    if any(str(review.get("agent_invocation_status") or "") == "failed" for review in reviews):
+        return "agent_failed"
+    return "not_approved"
+
+
+def _json_object_from_text(text: str) -> dict[str, Any]:
+    stripped = text.strip()
+    try:
+        payload = json.loads(stripped)
+    except json.JSONDecodeError:
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start < 0 or end <= start:
+            raise ValueError("agent output did not contain a JSON object") from None
+        payload = json.loads(stripped[start : end + 1])
+    if not isinstance(payload, dict):
+        raise ValueError("agent output JSON was not an object")
+    return payload
+
+
+def _string_choice(value: Any, fallback: Any, *, allowed: set[str] | None) -> str:
+    text = str(value or fallback or "").strip()
+    if allowed is not None and text not in allowed:
+        return str(fallback or "")
+    return text
 
 
 def _matching_event_candidates(triage_row: Mapping[str, Any], candidates: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
@@ -959,7 +1568,8 @@ def _load_jsonl_objects(path: Path) -> list[dict[str, Any]]:
 
 
 def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
-    path.write_text("\n".join(json.dumps(dict(row), sort_keys=True) for row in rows) + "\n", encoding="utf-8")
+    lines = [json.dumps(dict(row), sort_keys=True) for row in rows]
+    path.write_text(("\n".join(lines) + "\n") if lines else "", encoding="utf-8")
 
 
 def _unique_csv_values(path: Path, field: str) -> set[str]:

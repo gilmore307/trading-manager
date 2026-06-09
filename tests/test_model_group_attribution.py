@@ -11,6 +11,23 @@ from trading_manager_tasks.model_group_layer_ten_attribution import run_model_gr
 
 
 class ModelGroupAttributionTests(unittest.TestCase):
+    @staticmethod
+    def _fake_approved_event_strategy_review(packet):
+        return {
+            "review_type": "event_strategy_promotion_review",
+            "subject_ref": packet["subject_ref"],
+            "decision": "approve",
+            "pit_status": "passed",
+            "control_status": "passed",
+            "overlap_status": "residual_after_upstream_conditioning",
+            "leakage_status": "passed",
+            "allowed_model_use": ["temporal_attention_pool", "event_family_scouting"],
+            "blocked_model_use": ["layer_4_promotion"],
+            "blocking_issues": [],
+            "required_followups": ["retest before layer_4_promotion"],
+            "rationale": "Fixture review approves the deterministic temporal attention candidate.",
+        }
+
     def _write_replay_dataset(self, storage_root: Path) -> Path:
         dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
         replay_run_root = dataset_root / "replay_execution_runs" / "model_group_replay_fixture"
@@ -179,6 +196,36 @@ class ModelGroupAttributionTests(unittest.TestCase):
                                 "evidence_spans": [{"source_ref": "fixture://event/btc_liquidity_disruption"}],
                                 "review_status": "reviewed",
                                 "standardization_status": "standardized",
+                            },
+                            {
+                                "contract_type": "event_interpretation",
+                                "schema_version": "1",
+                                "policy_version": "1",
+                                "source_artifact_ref": "fixture://event/btc_liquidity_disruption_control",
+                                "source_artifact_hash": "sha256:fixture-control",
+                                "source_name": "fixture",
+                                "source_type": "reviewed_fixture",
+                                "published_time": "2021-01-20T10:00:00-05:00",
+                                "available_time": "2021-01-20T10:05:00-05:00",
+                                "interpreted_at": "2021-01-20T10:06:00-05:00",
+                                "interpreter_agent_id": "unit",
+                                "interpreter_model_id": "unit",
+                                "prompt_policy_hash": "unit",
+                                "normalized_event_type": "microstructure_liquidity_disruption",
+                                "event_domain_tags": ["crypto", "liquidity"],
+                                "affected_scope": "target",
+                                "affected_entities": ["BTC"],
+                                "direction_bias_score": -0.5,
+                                "intensity_score": 0.7,
+                                "uncertainty_score": 0.2,
+                                "novelty_score": 0.7,
+                                "source_quality_score": 0.8,
+                                "evidence_confidence_score": 0.9,
+                                "canonical_relation": {"relation_type": "canonical"},
+                                "rationale_summary": "Fixture PIT same-family control occurrence without a matched replay failure.",
+                                "evidence_spans": [{"source_ref": "fixture://event/btc_liquidity_disruption_control"}],
+                                "review_status": "reviewed",
+                                "standardization_status": "standardized",
                             }
                         ],
                     }
@@ -187,7 +234,10 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            decision = run_model_group_layer_ten_attribution_if_ready(storage_root=storage_root)
+            decision = run_model_group_layer_ten_attribution_if_ready(
+                storage_root=storage_root,
+                agent_reviewer=self._fake_approved_event_strategy_review,
+            )
 
             self.assertIsNotNone(decision)
             assert decision is not None
@@ -198,8 +248,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["contract_type"], "post_replay_layer_10_event_attribution_receipt")
             self.assertTrue(receipt["event_evidence_consumed"])
-            self.assertEqual(receipt["event_candidate_count"], 1)
-            self.assertEqual(receipt["event_observation_count"], 1)
+            self.assertEqual(receipt["event_candidate_count"], 2)
+            self.assertEqual(receipt["event_observation_count"], 2)
             self.assertEqual(receipt["control_analysis_status"], "passed")
             rows = [
                 json.loads(line)
@@ -210,7 +260,12 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(rows[0]["attribution_status"], "attributed")
             self.assertEqual(receipt["event_focus_proposal_count"], 1)
             self.assertFalse(receipt["accepted_event_pool_mutation_performed"])
-            self.assertFalse(receipt["temporal_attention_pool_mutation_performed"])
+            self.assertTrue(receipt["temporal_attention_pool_mutation_performed"])
+            self.assertEqual(receipt["temporal_attention_candidate_count"], 1)
+            self.assertEqual(receipt["event_family_occurrence_scan_row_count"], 2)
+            self.assertEqual(receipt["event_family_bias_association_packet_count"], 1)
+            self.assertEqual(receipt["event_strategy_promotion_review_count"], 1)
+            self.assertEqual(receipt["accepted_temporal_attention_pool_entry_count"], 1)
             proposals = [
                 json.loads(line)
                 for line in Path(receipt["event_focus_proposals_ref"]).read_text(encoding="utf-8").splitlines()
@@ -224,6 +279,34 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertIn("Fixture PIT event", proposals[0]["event_summary"]["rationale_summary"])
             self.assertIn("BTC filled_negative_or_underperforming_outcome failures", proposals[0]["failure_attention_reason"])
             self.assertIn("requires_event_strategy_promotion_review", proposals[0]["acceptance_blockers"])
+            candidates = [
+                json.loads(line)
+                for line in Path(receipt["temporal_attention_candidate_pool_ref"]).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(candidates[0]["candidate_status"], "ready_for_agent_review")
+            packets = [
+                json.loads(line)
+                for line in Path(receipt["event_family_bias_association_packets_ref"]).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(packets[0]["deterministic_gate_status"], "passed")
+            self.assertEqual(packets[0]["co_event_confounder_status"], "passed")
+            self.assertEqual(packets[0]["matched_occurrence_count"], 1)
+            self.assertEqual(packets[0]["unmatched_occurrence_count"], 1)
+            reviews = [
+                json.loads(line)
+                for line in Path(receipt["event_strategy_promotion_reviews_ref"]).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(reviews[0]["decision"], "approve")
+            accepted = [
+                json.loads(line)
+                for line in Path(receipt["accepted_temporal_attention_pool_ref"]).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(accepted[0]["contract_type"], "model_10_event_risk_governor_temporal_attention_pool_entry")
+            self.assertEqual(accepted[0]["pool_status"], "accepted")
             self.assertFalse(receipt["layer_4_promotion_performed"])
 
     def test_layer_10_backoff_when_event_evidence_missing(self):
