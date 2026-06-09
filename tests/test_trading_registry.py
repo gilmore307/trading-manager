@@ -470,6 +470,20 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("policy_ref", event_interpretation_policy["applies_to"])
         self.assertIn("unversioned", event_interpretation_policy["note"])
 
+        event_sql_inputs = rows["LAYER_TEN_EVENT_FEED_SQL_INPUTS"]
+        self.assertIn("trading_data.feed_03_alpaca_news", event_sql_inputs["payload"])
+        self.assertIn("event_sql_inputs", event_sql_inputs["applies_to"])
+        self.assertIn("no provider calls", event_sql_inputs["note"])
+
+        event_sql_field = rows["EVENT_FEED_SQL_INPUTS"]
+        self.assertEqual(event_sql_field["kind"], "field")
+        self.assertEqual(event_sql_field["payload"], "event_feed_sql_inputs")
+        self.assertIn("m10_event_risk_governor_data_acquisition", event_sql_field["applies_to"])
+
+        zero_sql_status = rows["LAYER_TEN_DETECTOR_STATUS_SKIPPED_ZERO_SQL_BAR_ROWS"]
+        self.assertEqual(zero_sql_status["kind"], "status_value")
+        self.assertEqual(zero_sql_status["payload"], "skipped_zero_sql_bar_rows")
+
         triage_receipt = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_RECEIPT"]
         self.assertEqual(triage_receipt["payload"], "post_replay_failure_triage_receipt")
         self.assertIn("not Layer 10", triage_receipt["note"])
@@ -1875,6 +1889,9 @@ class RegistryHelperTests(unittest.TestCase):
             "earnings_guidance_event_family",
             "event_family_scouting_packet",
             "fold_scoped_source_data",
+            "detector_run",
+            "layer_10_event_risk_governor",
+            "manager_layer_ten_event_risk_governor_input_materialization",
             "ready_signal",
             "one_shot_replay_acquisition",
             "quarantine_candidate",
