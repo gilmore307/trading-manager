@@ -291,8 +291,58 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             second = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
             self.assertIsNone(second)
 
+            replay_decision_rows = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
+            refreshed_attribution_root = dataset_root / "post_replay_attribution_runs" / "post_replay_attribution_refreshed"
+            refreshed_attribution_root.mkdir(parents=True)
+            refreshed_attribution_rows = refreshed_attribution_root / "layer_10_event_attribution_rows.jsonl"
+            refreshed_attribution_rows.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "model_10_event_risk_governor_event_attribution_row",
+                        "attribution_id": "attr_2",
+                        "event_candidate_ref": "event_candidate_refreshed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            refreshed_attribution_receipt = refreshed_attribution_root / "post_replay_attribution_receipt.json"
+            refreshed_attribution_receipt.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "post_replay_layer_10_event_attribution_receipt",
+                        "status": "succeeded",
+                        "created_at_utc": "2026-05-28T00:00:03+00:00",
+                        "decision_rows_ref": str(replay_decision_rows),
+                        "attribution_rows_ref": str(refreshed_attribution_rows),
+                        "event_evidence_consumed": True,
+                        "event_observation_count": 1,
+                        "event_candidate_count": 2,
+                        "failure_scope_triage_status": "passed",
+                        "control_analysis_status": "passed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            refreshed_attribution_decision = run_model_group_evaluation_if_ready(
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                now_utc=datetime(2026, 5, 28, 0, 0, 4, tzinfo=UTC),
+                agent_reviewer=self._fake_deferred_agent_review,
+            )
+            self.assertIsNotNone(refreshed_attribution_decision)
+            assert refreshed_attribution_decision is not None
+            self.assertEqual(refreshed_attribution_decision.reason_code, "model_group_evaluation_executed")
+            receipt_paths = list((dataset_root / "promotion_review_runs").glob("*/model_group_evaluation_receipt.json"))
+            self.assertEqual(len(receipt_paths), 2)
+            latest_receipt_path = max(receipt_paths, key=lambda path: path.stat().st_mtime)
+            latest_receipt = json.loads(latest_receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(latest_receipt["layer_10_attribution_receipt_ref"], str(refreshed_attribution_receipt))
+
             state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
-            newer_mtime = max(path.stat().st_mtime for path in decision_paths) + 1
+            newer_mtime = max(path.stat().st_mtime for path in (dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json")) + 1
             os.utime(state_path, (newer_mtime, newer_mtime))
 
             refreshed = run_model_group_evaluation_if_ready(
@@ -304,7 +354,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertIsNotNone(refreshed)
             assert refreshed is not None
             self.assertEqual(refreshed.reason_code, "model_group_evaluation_executed")
-            self.assertEqual(len(list((dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json"))), 2)
+            self.assertEqual(len(list((dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json"))), 3)
 
     def test_local_fallback_review_writes_terminal_deferred_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -168,10 +168,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         wrapper.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
         return service, env, wrapper
 
-    def _write_post_replay_attribution_receipt(self, replay_root: Path) -> None:
+    def _write_post_replay_attribution_receipt(self, replay_root: Path) -> Path:
         receipt_root = replay_root / "post_replay_attribution_runs" / "fixture"
         receipt_root.mkdir(parents=True, exist_ok=True)
-        (receipt_root / "post_replay_attribution_receipt.json").write_text(
+        receipt_path = receipt_root / "post_replay_attribution_receipt.json"
+        receipt_path.write_text(
             json.dumps(
                 {
                     "contract_type": "post_replay_layer_10_event_attribution_receipt",
@@ -187,6 +188,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        return receipt_path
 
     def _write_completed_pre_replay_fold(self, runtime: Path, *, symbol: str = "AAPL") -> Path:
         fold_state = runtime / f"model_training_fold_state_{symbol.lower()}_2016-01_2016-06.json"
@@ -1814,7 +1816,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            self._write_post_replay_attribution_receipt(replay_root)
+            attribution_receipt_path = self._write_post_replay_attribution_receipt(replay_root)
+            (review_root / "model_group_evaluation_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "model_group_evaluation_receipt",
+                        "status": "succeeded",
+                        "created_at_utc": "2026-05-22T12:50:00Z",
+                        "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
+                        "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (review_root / "promotion_evaluation_review.json").write_text(
                 json.dumps(
                     {
@@ -1919,7 +1934,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            self._write_post_replay_attribution_receipt(replay_root)
+            attribution_receipt_path = self._write_post_replay_attribution_receipt(replay_root)
+            (review_root / "model_group_evaluation_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "model_group_evaluation_receipt",
+                        "status": "succeeded",
+                        "created_at_utc": "2026-05-22T12:50:00Z",
+                        "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
+                        "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (review_root / "promotion_evaluation_review.json").write_text(
                 json.dumps({"recommendation": "eligible_for_shadow", "created_at_utc": "2026-05-22T12:50:00Z"}) + "\n",
                 encoding="utf-8",

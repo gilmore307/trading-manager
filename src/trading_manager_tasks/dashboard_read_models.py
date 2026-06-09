@@ -3693,26 +3693,44 @@ def _replay_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> li
     return [str(ref) for ref in refs if ref]
 
 
-def _latest_promotion_review_artifacts(dataset_root: Path) -> dict[str, Any] | None:
+def _latest_promotion_review_artifacts(
+    dataset_root: Path,
+    *,
+    layer_10_attribution_receipt_ref: str | None,
+) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
     if not review_root.exists():
         return None
-    candidates: list[tuple[str, Path, Mapping[str, Any], Mapping[str, Any] | None]] = []
+    candidates: list[tuple[str, Path, Mapping[str, Any], Mapping[str, Any] | None, Path | None]] = []
     for decision_path in sorted(review_root.glob("*/promotion_eligibility_decision.json")):
         decision = _load_optional_json_object(decision_path)
         if decision is None:
             continue
+        receipt_path = decision_path.parent / "model_group_evaluation_receipt.json"
+        receipt = _load_optional_json_object(receipt_path)
+        if layer_10_attribution_receipt_ref is not None:
+            if receipt is None:
+                continue
+            if str(receipt.get("layer_10_attribution_receipt_ref") or "") != layer_10_attribution_receipt_ref:
+                continue
         review_path = decision_path.parent / "promotion_evaluation_review.json"
         review = _load_optional_json_object(review_path)
-        created = str(decision.get("created_at_utc") or (review or {}).get("created_at_utc") or decision_path.parent.name)
-        candidates.append((created, decision_path, decision, review))
+        created = str(
+            decision.get("created_at_utc")
+            or (receipt or {}).get("created_at_utc")
+            or (review or {}).get("created_at_utc")
+            or decision_path.parent.name
+        )
+        candidates.append((created, decision_path, decision, review, receipt_path if receipt is not None else None))
     if not candidates:
         return None
-    _created, decision_path, decision, review = sorted(candidates, key=lambda item: item[0])[-1]
+    _created, decision_path, decision, review, receipt_path = sorted(candidates, key=lambda item: item[0])[-1]
     refs = [str(decision_path)]
     review_path = decision_path.parent / "promotion_evaluation_review.json"
     if review_path.exists():
         refs.append(str(review_path))
+    if receipt_path is not None and receipt_path.exists():
+        refs.append(str(receipt_path))
     return {"decision": dict(decision), "review": dict(review or {}), "receipt_refs": refs}
 
 
@@ -3959,7 +3977,19 @@ def _model_group_replay_timeline_tasks(
         attribution_artifacts=attribution_artifacts,
         replay_complete=replay_complete,
     )
-    promotion_artifacts = _latest_promotion_review_artifacts(dataset_root) if lifecycle_artifacts_allowed and attribution_complete else None
+    layer_10_attribution_receipt_ref = (
+        str(attribution_artifacts["receipt_refs"][0])
+        if attribution_artifacts and attribution_artifacts.get("receipt_refs")
+        else None
+    )
+    promotion_artifacts = (
+        _latest_promotion_review_artifacts(
+            dataset_root,
+            layer_10_attribution_receipt_ref=layer_10_attribution_receipt_ref,
+        )
+        if lifecycle_artifacts_allowed and attribution_complete
+        else None
+    )
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
     promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
     promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")

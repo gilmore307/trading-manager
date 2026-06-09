@@ -118,6 +118,7 @@ def run_model_group_evaluation_if_ready(
     if not force and _latest_promotion_review_artifacts(
         dataset_root,
         replay_result_ref=str(replay_receipt_path),
+        layer_10_attribution_receipt_ref=str(attribution_receipt_path),
         minimum_mtime=_state_mtime(training_fold),
     ) is not None:
         return None
@@ -2193,19 +2194,28 @@ def _latest_promotion_review_artifacts(
     dataset_root: Path,
     *,
     replay_result_ref: str,
+    layer_10_attribution_receipt_ref: str,
     minimum_mtime: float | None = None,
 ) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
     if not review_root.exists():
         return None
     candidates: list[Path] = []
-    for path in sorted(review_root.glob("*/promotion_eligibility_decision.json")):
-        payload = _load_optional_json_object(path)
-        if payload is None or str(payload.get("replay_validation_ref") or "") != replay_result_ref:
+    for receipt_path in sorted(review_root.glob("*/model_group_evaluation_receipt.json")):
+        receipt = _load_optional_json_object(receipt_path)
+        if receipt is None:
             continue
-        if minimum_mtime is not None and path.stat().st_mtime < minimum_mtime:
+        if str(receipt.get("replay_execution_receipt_ref") or "") != replay_result_ref:
             continue
-        candidates.append(path)
+        if str(receipt.get("layer_10_attribution_receipt_ref") or "") != layer_10_attribution_receipt_ref:
+            continue
+        decision_path = receipt_path.parent / "promotion_eligibility_decision.json"
+        if not decision_path.exists():
+            continue
+        newest_artifact_mtime = max(receipt_path.stat().st_mtime, decision_path.stat().st_mtime)
+        if minimum_mtime is not None and newest_artifact_mtime < minimum_mtime:
+            continue
+        candidates.append(receipt_path)
     if not candidates:
         return None
     return {"decision_path": str(max(candidates, key=lambda candidate: candidate.stat().st_mtime))}
