@@ -63,7 +63,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
         )
         return dataset_root
 
-    def test_writes_post_replay_attribution_receipt_and_rows(self):
+    def test_writes_post_replay_failure_triage_receipt_and_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -75,18 +75,22 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "executed")
-            self.assertEqual(decision.reason_code, "model_group_post_replay_attribution_executed")
-            receipt_paths = list((dataset_root / "post_replay_attribution_runs").glob("*/post_replay_attribution_receipt.json"))
+            self.assertEqual(decision.reason_code, "model_group_post_replay_failure_triage_executed")
+            receipt_paths = list((dataset_root / "post_replay_failure_triage_runs").glob("*/post_replay_failure_triage_receipt.json"))
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
-            self.assertEqual(receipt["attributed_failure_count"], 3)
+            self.assertEqual(receipt["contract_type"], "post_replay_failure_triage_receipt")
+            self.assertEqual(receipt["triaged_failure_count"], 3)
+            self.assertEqual(receipt["layer_10_event_attribution_status"], "not_performed")
+            self.assertIs(receipt["event_evidence_consumed"], False)
             self.assertEqual(receipt["decision_rows_ref"], str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"))
             rows = [
                 json.loads(line)
-                for line in Path(receipt["attribution_rows_ref"]).read_text(encoding="utf-8").splitlines()
+                for line in Path(receipt["triage_rows_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
             self.assertEqual([row["source_decision_id"] for row in rows], ["filled_loss", "filled_under_baseline", "rejected_winner"])
+            self.assertEqual(rows[0]["contract_type"], "post_replay_failure_triage_row")
             self.assertEqual(rows[0]["replay_month"], "2021-01")
             self.assertEqual(rows[0]["target_symbol"], "BTC")
 
@@ -102,8 +106,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "ready")
-            self.assertEqual(decision.reason_code, "model_group_post_replay_attribution_ready")
-            self.assertFalse((dataset_root / "post_replay_attribution_runs").exists())
+            self.assertEqual(decision.reason_code, "model_group_post_replay_failure_triage_ready")
+            self.assertFalse((dataset_root / "post_replay_failure_triage_runs").exists())
 
     def test_skips_when_attribution_receipt_already_exists(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -111,13 +115,13 @@ class ModelGroupAttributionTests(unittest.TestCase):
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_replay_dataset(storage_root)
-            receipt_root = dataset_root / "post_replay_attribution_runs" / "existing"
+            receipt_root = dataset_root / "post_replay_failure_triage_runs" / "existing"
             receipt_root.mkdir(parents=True)
             decision_rows_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
-            (receipt_root / "post_replay_attribution_receipt.json").write_text(
+            (receipt_root / "post_replay_failure_triage_receipt.json").write_text(
                 json.dumps(
                     {
-                        "contract_type": "post_replay_event_attribution_receipt",
+                        "contract_type": "post_replay_failure_triage_receipt",
                         "decision_rows_ref": str(decision_rows_path),
                         "status": "succeeded",
                     }

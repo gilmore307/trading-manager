@@ -1,9 +1,10 @@
-"""Manager-owned post-replay Layer 10 attribution execution.
+"""Manager-owned post-replay failure triage execution.
 
-Layer 10 attribution is a local, side-effect-free lifecycle step after
-model-group replay. It converts replay failure/miss rows into durable
-attribution units so evaluation can consume a concrete receipt instead of a
-dashboard-only ready state.
+This step is local, replay-derived bookkeeping. It converts replay failure/miss
+rows into durable triage units for later attribution work. It is deliberately
+not Layer 10 EventRiskGovernor event attribution because it does not consume
+point-in-time event observations, event candidates, controls, co-events, or
+confounder evidence.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
 
 NEW_YORK = ZoneInfo("America/New_York")
+FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE = "post_replay_failure_triage_receipt"
+FAILURE_TRIAGE_ROW_CONTRACT_TYPE = "post_replay_failure_triage_row"
 
 
 def run_model_group_post_replay_attribution_if_ready(
@@ -48,14 +51,14 @@ def run_model_group_post_replay_attribution_if_ready(
     decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
     if not decision_rows_path.exists():
         return None
-    if not force and _latest_complete_attribution_receipt(dataset_root, decision_rows_ref=str(decision_rows_path)) is not None:
+    if not force and _latest_complete_failure_triage_receipt(dataset_root, decision_rows_ref=str(decision_rows_path)) is not None:
         return None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
-    run_id = "post_replay_attribution_" + now.strftime("%Y%m%dT%H%M%SZ")
-    output_root = dataset_root / "post_replay_attribution_runs" / run_id
-    attribution_rows_path = output_root / "failure_attribution_rows.jsonl"
-    receipt_path = output_root / "post_replay_attribution_receipt.json"
+    run_id = "post_replay_failure_triage_" + now.strftime("%Y%m%dT%H%M%SZ")
+    output_root = dataset_root / "post_replay_failure_triage_runs" / run_id
+    triage_rows_path = output_root / "failure_triage_rows.jsonl"
+    receipt_path = output_root / "post_replay_failure_triage_receipt.json"
     command = [
         python_executable,
         "scripts/tasks/run_model_group_post_replay_attribution.py",
@@ -72,34 +75,34 @@ def run_model_group_post_replay_attribution_if_ready(
         return _decision(
             now=now,
             decision_status="ready",
-            reason_code="model_group_post_replay_attribution_ready",
-            reason="model-group replay is complete; Layer 10 post-replay attribution is ready",
-            selected_work="model_group.model_10_event_risk_governor",
+            reason_code="model_group_post_replay_failure_triage_ready",
+            reason="model-group replay is complete; post-replay failure triage is ready",
+            selected_work="model_group.post_replay_failure_triage",
             command=command,
             execution_summary={
                 "contract_id": contract_id,
                 "dataset_root": str(dataset_root),
                 "decision_rows_ref": str(decision_rows_path),
-                "expected_failure_attributions": len(attribution_rows),
+                "expected_failure_triage_rows": len(attribution_rows),
             },
         )
 
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
         lock_scope="promotion",
-        lock_key=f"lock:model_group_post_replay_attribution:{contract_id}",
-        lock_path=str(storage_root / "runtime" / "locks" / "model_group" / f"{contract_id}.post_replay_attribution.lock"),
+        lock_key=f"lock:model_group_post_replay_failure_triage:{contract_id}",
+        lock_path=str(storage_root / "runtime" / "locks" / "model_group" / f"{contract_id}.post_replay_failure_triage.lock"),
         model_id="model_group",
         candidate_ref=contract_id,
     )
     with acquire_scheduler_lock(lock_ref):
         output_root.mkdir(parents=True, exist_ok=True)
-        _write_jsonl(attribution_rows_path, attribution_rows)
+        _write_jsonl(triage_rows_path, attribution_rows)
         receipt = {
-            "contract_type": "post_replay_event_attribution_receipt",
+            "contract_type": FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE,
             "status": "succeeded",
-            "stage_id": "model_group.model_10_event_risk_governor",
-            "model_surface": "model_10_event_risk_governor",
+            "stage_id": "model_group.post_replay_failure_triage",
+            "model_surface": "post_replay_failure_triage",
             "run_id": run_id,
             "contract_id": contract_id,
             "created_at_utc": now.isoformat(),
@@ -109,10 +112,15 @@ def run_model_group_post_replay_attribution_if_ready(
             "replay_execution_receipt_ref": str(dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json")
             if replay_run_id
             else None,
-            "attribution_rows_ref": str(attribution_rows_path),
+            "triage_rows_ref": str(triage_rows_path),
             "expected_failure_count": len(attribution_rows),
-            "attributed_failure_count": len(attribution_rows),
+            "triaged_failure_count": len(attribution_rows),
             "processed_failure_count": len(attribution_rows),
+            "layer_10_event_attribution_status": "not_performed",
+            "event_evidence_consumed": False,
+            "event_observation_count": 0,
+            "event_candidate_count": 0,
+            "control_analysis_performed": False,
             "provider_calls": 0,
             "broker_execution_performed": False,
             "model_activation_performed": False,
@@ -122,17 +130,18 @@ def run_model_group_post_replay_attribution_if_ready(
     return _decision(
         now=now,
         decision_status="executed",
-        reason_code="model_group_post_replay_attribution_executed",
-        reason="executed side-effect-free Layer 10 post-replay attribution over replay failures and missed opportunities",
-        selected_work="model_group.model_10_event_risk_governor",
+        reason_code="model_group_post_replay_failure_triage_executed",
+        reason="executed side-effect-free post-replay failure triage over replay failures and missed opportunities",
+        selected_work="model_group.post_replay_failure_triage",
         command=command,
         execution_summary={
             "contract_id": contract_id,
             "dataset_root": str(dataset_root),
             "decision_rows_ref": str(decision_rows_path),
-            "post_replay_attribution_receipt": str(receipt_path),
-            "attribution_rows_ref": str(attribution_rows_path),
-            "attributed_failure_count": len(attribution_rows),
+            "post_replay_failure_triage_receipt": str(receipt_path),
+            "triage_rows_ref": str(triage_rows_path),
+            "triaged_failure_count": len(attribution_rows),
+            "layer_10_event_attribution_status": "not_performed",
         },
     )
 
@@ -159,7 +168,7 @@ def _decision(
         resource_pressure_active=False,
         selected_work=selected_work,
         command=command,
-        next_internal_stage="post_replay_attribution",
+        next_internal_stage="post_replay_failure_triage",
         provider_calls=0,
         dispatch_performed=False,
         model_activation_performed=False,
@@ -169,7 +178,7 @@ def _decision(
         lock_plan=scheduler_lock_plan(
             month=None,
             selected_work=selected_work,
-            next_internal_stage="post_replay_attribution",
+            next_internal_stage="post_replay_failure_triage",
         ),
     )
 
@@ -198,12 +207,12 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
         failure_type = "rejected_positive_missed_opportunity"
     source_id = str(row.get("decision_id") or row.get("replay_decision_id") or f"decision_row_{decision_index}")
     return {
-        "contract_type": "model_10_event_risk_governor_post_replay_attribution_row",
-        "stage_id": "model_group.model_10_event_risk_governor",
+        "contract_type": FAILURE_TRIAGE_ROW_CONTRACT_TYPE,
+        "stage_id": "model_group.post_replay_failure_triage",
         "attribution_id": f"l10_attr_{attribution_index:08d}",
         "source_decision_id": source_id,
         "source_decision_index": decision_index,
-        "attribution_status": "attributed",
+        "triage_status": "triaged",
         "failure_type": failure_type,
         "replay_month": _replay_month(row),
         "target_symbol": _target_symbol(row),
@@ -276,12 +285,12 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
     return dict(receipt)
 
 
-def _latest_complete_attribution_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
-    attribution_root = dataset_root / "post_replay_attribution_runs"
-    if not attribution_root.exists():
+def _latest_complete_failure_triage_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
+    triage_root = dataset_root / "post_replay_failure_triage_runs"
+    if not triage_root.exists():
         return None
     candidates: list[tuple[str, Mapping[str, Any]]] = []
-    for receipt_path in sorted(attribution_root.glob("*/post_replay_attribution_receipt.json")):
+    for receipt_path in sorted(triage_root.glob("*/post_replay_failure_triage_receipt.json")):
         receipt = _load_optional_json_object(receipt_path)
         if receipt is None:
             continue
@@ -289,7 +298,7 @@ def _latest_complete_attribution_receipt(dataset_root: Path, *, decision_rows_re
         if status not in {"succeeded", "complete", "completed"}:
             continue
         contract_type = str(receipt.get("contract_type") or "")
-        if contract_type not in {"post_replay_event_attribution_receipt", "model_10_event_risk_governor_post_replay_attribution"}:
+        if contract_type != FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE:
             continue
         if str(receipt.get("decision_rows_ref") or "") != decision_rows_ref:
             continue

@@ -1704,13 +1704,13 @@ class SchedulerDaemonTests(unittest.TestCase):
                 now_utc="2026-05-28T00:00:01+00:00",
                 now_et="2026-05-27T20:00:01-04:00",
                 decision_status="executed",
-                reason_code="model_group_post_replay_attribution_executed",
-                reason="executed Layer 10 attribution",
+                reason_code="model_group_post_replay_failure_triage_executed",
+                reason="executed post-replay failure triage",
                 market_protection_active=False,
                 resource_pressure_active=False,
-                selected_work="model_group.model_10_event_risk_governor",
+                selected_work="model_group.post_replay_failure_triage",
                 command=[],
-                next_internal_stage="post_replay_attribution",
+                next_internal_stage="post_replay_failure_triage",
             )
 
             with patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=scheduler_decision), patch(
@@ -1735,9 +1735,9 @@ class SchedulerDaemonTests(unittest.TestCase):
                 )
 
             attribution.assert_called()
-            self.assertEqual(state.last_next_internal_stage, "post_replay_attribution")
+            self.assertEqual(state.last_next_internal_stage, "post_replay_failure_triage")
             log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_post_replay_attribution_executed"])
+            self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_post_replay_failure_triage_executed"])
 
     def test_daemon_dispatches_model_group_evaluation_after_attribution(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

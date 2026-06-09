@@ -134,23 +134,75 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         )
         attribution_rows_path = attribution_root / "failure_attribution_rows.jsonl"
         attribution_rows_path.write_text(
-            json.dumps({"contract_type": "model_10_event_risk_governor_post_replay_attribution_row", "attribution_id": "attr_1"}) + "\n",
+            json.dumps(
+                {
+                    "contract_type": "model_10_event_risk_governor_event_attribution_row",
+                    "attribution_id": "attr_1",
+                    "event_candidate_ref": "event_candidate_fixture",
+                }
+            )
+            + "\n",
             encoding="utf-8",
         )
         (attribution_root / "post_replay_attribution_receipt.json").write_text(
             json.dumps(
                 {
-                    "contract_type": "post_replay_event_attribution_receipt",
+                    "contract_type": "post_replay_layer_10_event_attribution_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-28T00:00:01+00:00",
                     "decision_rows_ref": str(decision_rows_path),
                     "attribution_rows_ref": str(attribution_rows_path),
+                    "event_evidence_consumed": True,
+                    "event_observation_count": 1,
+                    "event_candidate_count": 1,
+                    "failure_scope_triage_status": "passed",
+                    "control_analysis_status": "passed",
                 }
             )
             + "\n",
             encoding="utf-8",
         )
         return dataset_root
+
+    def test_ignores_replay_failure_triage_as_layer_10_event_attribution(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_ready_replay_and_attribution(storage_root)
+            self._write_completed_fold(storage_root)
+            attribution_receipt = next((dataset_root / "post_replay_attribution_runs").glob("*/post_replay_attribution_receipt.json"))
+            attribution_rows = attribution_receipt.parent / "failure_attribution_rows.jsonl"
+            attribution_rows.write_text(
+                json.dumps({"contract_type": "post_replay_failure_triage_row", "triage_status": "triaged"}) + "\n",
+                encoding="utf-8",
+            )
+            attribution_receipt.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "post_replay_failure_triage_receipt",
+                        "status": "succeeded",
+                        "created_at_utc": "2026-05-28T00:00:01+00:00",
+                        "decision_rows_ref": str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"),
+                        "triage_rows_ref": str(attribution_rows),
+                        "layer_10_event_attribution_status": "not_performed",
+                        "event_evidence_consumed": False,
+                        "event_observation_count": 0,
+                        "event_candidate_count": 0,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_evaluation_if_ready(
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                agent_reviewer=self._fake_deferred_agent_review,
+            )
+
+            self.assertIsNone(decision)
+            self.assertFalse((dataset_root / "promotion_review_runs").exists())
 
     def test_writes_model_group_evaluation_and_promotion_review_artifacts(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

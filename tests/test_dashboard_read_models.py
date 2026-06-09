@@ -174,9 +174,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         (receipt_root / "post_replay_attribution_receipt.json").write_text(
             json.dumps(
                 {
-                    "contract_type": "post_replay_event_attribution_receipt",
+                    "contract_type": "post_replay_layer_10_event_attribution_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-22T12:49:00Z",
+                    "event_evidence_consumed": True,
+                    "event_observation_count": 1,
+                    "event_candidate_count": 1,
+                    "failure_scope_triage_status": "passed",
+                    "control_analysis_status": "passed",
                 }
             )
             + "\n",

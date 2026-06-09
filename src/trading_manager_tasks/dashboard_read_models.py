@@ -84,6 +84,10 @@ MODEL_GROUP_MAINTENANCE_DATA_KINDS = (
     "promotion_readiness_record",
     "activation_guardrails",
 )
+LAYER_10_EVENT_ATTRIBUTION_CONTRACT_TYPES = {
+    "post_replay_layer_10_event_attribution_receipt",
+    "model_10_event_risk_governor_event_attribution_receipt",
+}
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
@@ -3724,8 +3728,7 @@ def _latest_post_replay_attribution_artifacts(dataset_root: Path) -> dict[str, A
         status = str(receipt.get("status") or receipt.get("attribution_status") or "")
         if status not in {"succeeded", "complete", "completed"}:
             continue
-        contract_type = str(receipt.get("contract_type") or "")
-        if contract_type not in {"post_replay_event_attribution_receipt", "model_10_event_risk_governor_post_replay_attribution"}:
+        if not _is_layer_10_event_attribution_receipt(receipt):
             continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt_path, receipt))
@@ -3733,6 +3736,21 @@ def _latest_post_replay_attribution_artifacts(dataset_root: Path) -> dict[str, A
         return None
     _created, receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
     return {"receipt": dict(receipt), "receipt_refs": [str(receipt_path)]}
+
+
+def _is_layer_10_event_attribution_receipt(receipt: Mapping[str, Any]) -> bool:
+    contract_type = str(receipt.get("contract_type") or "")
+    if contract_type not in LAYER_10_EVENT_ATTRIBUTION_CONTRACT_TYPES:
+        return False
+    if receipt.get("event_evidence_consumed") is not True:
+        return False
+    if _int_field(receipt, "event_observation_count") <= 0 and _int_field(receipt, "event_candidate_count") <= 0:
+        return False
+    triage_status = str(receipt.get("failure_scope_triage_status") or receipt.get("triage_status") or "")
+    if triage_status not in {"succeeded", "complete", "completed", "passed"}:
+        return False
+    control_status = str(receipt.get("control_analysis_status") or receipt.get("controls_status") or "")
+    return control_status in {"succeeded", "complete", "completed", "passed"}
 
 
 def _latest_promotion_readiness_artifacts(dataset_root: Path) -> dict[str, Any] | None:

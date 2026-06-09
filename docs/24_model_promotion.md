@@ -54,6 +54,15 @@ For the first accepted model bundle, evaluation may set `first_model_bootstrap =
 
 Failure attribution is a first-class task between replay and evaluation. It is not the same as evaluation and it is not limited to Layer 10 event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, and event/co-event explanations.
 
+Replay-derived failure triage is only the first bookkeeping step. A
+`post_replay_failure_triage_receipt` may identify failed fills, missed winners,
+and other candidate failure rows, but it does not satisfy Layer 10
+EventRiskGovernor attribution. Layer 10 attribution requires a separate receipt
+produced by the event-risk route with failure-scope triage, point-in-time event
+observations or candidates, event-evidence refs, and control/co-event/confounder
+analysis. Evaluation must not treat generic failure triage rows as completed
+Layer 10 event attribution.
+
 The same boundary is required in live operation. Execution may run C07 as a
 realtime failure/deviation watch during market hours, then run settlement
 attribution after the regular session closes or in another explicitly accepted

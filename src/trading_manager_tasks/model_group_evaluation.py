@@ -50,6 +50,11 @@ INTENDED_OPERATING_THRESHOLD = 0.70
 MAX_ACCEPTABLE_MAX_DRAWDOWN = -0.30
 MAX_ACCEPTABLE_BAD_FILL_RATE = 0.55
 MAX_ACCEPTABLE_MODEL_MISSED_WINNER_RATE = 0.45
+LAYER_10_EVENT_ATTRIBUTION_CONTRACT_TYPES = {
+    "post_replay_layer_10_event_attribution_receipt",
+    "model_10_event_risk_governor_event_attribution_receipt",
+}
+LAYER_10_COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
 
 
 def run_model_group_evaluation_if_ready(
@@ -2109,8 +2114,9 @@ def _latest_attribution_receipt(dataset_root: Path, *, decision_rows_ref: str) -
     return _latest_receipt(
         attribution_root,
         "post_replay_attribution_receipt.json",
-        accepted_statuses={"succeeded", "complete", "completed"},
+        accepted_statuses=LAYER_10_COMPLETE_STATUSES,
         required_field=("decision_rows_ref", decision_rows_ref),
+        predicate=_is_layer_10_event_attribution_receipt,
     )
 
 
@@ -2120,6 +2126,7 @@ def _latest_receipt(
     *,
     accepted_statuses: set[str] | None,
     required_field: tuple[str, str] | None = None,
+    predicate: Callable[[Mapping[str, Any]], bool] | None = None,
 ) -> tuple[Path | None, dict[str, Any] | None]:
     if not root.exists():
         return None, None
@@ -2136,12 +2143,42 @@ def _latest_receipt(
             key, expected = required_field
             if str(receipt.get(key) or "") != expected:
                 continue
+        if predicate is not None and not predicate(receipt):
+            continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt.get("generated_at_utc") or path.parent.name)
         candidates.append((created, path, receipt))
     if not candidates:
         return None, None
     _created, path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
     return path, dict(receipt)
+
+
+def _is_layer_10_event_attribution_receipt(receipt: Mapping[str, Any]) -> bool:
+    contract_type = str(receipt.get("contract_type") or "")
+    if contract_type not in LAYER_10_EVENT_ATTRIBUTION_CONTRACT_TYPES:
+        return False
+    if receipt.get("event_evidence_consumed") is not True:
+        return False
+    event_observation_count = _safe_int(receipt.get("event_observation_count"))
+    event_candidate_count = _safe_int(receipt.get("event_candidate_count"))
+    if (event_observation_count or 0) <= 0 and (event_candidate_count or 0) <= 0:
+        return False
+    triage_status = str(receipt.get("failure_scope_triage_status") or receipt.get("triage_status") or "")
+    if triage_status not in {"succeeded", "complete", "completed", "passed"}:
+        return False
+    control_status = str(receipt.get("control_analysis_status") or receipt.get("controls_status") or "")
+    if control_status not in {"succeeded", "complete", "completed", "passed"}:
+        return False
+    return True
+
+
+def _safe_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _state_mtime(training_fold: Mapping[str, Any]) -> float | None:
