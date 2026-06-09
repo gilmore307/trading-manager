@@ -56,6 +56,17 @@ EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS = 900
 EVENT_STRATEGY_CODEX_WORKDIR = Path("/root/.openclaw/workspace")
 EVENT_STRATEGY_CODEX_ADD_DIR = Path("/root/projects")
 MAX_EVENT_STRATEGY_REVIEW_PACKETS = 3
+PROSPECTIVE_UNCERTAINTY_EVENT_TOKENS = {
+    "earnings",
+    "guidance",
+    "filing",
+    "macro_release",
+    "economic_release",
+    "fomc",
+    "cpi",
+    "jobs_report",
+    "fed_decision",
+}
 EVENT_WINDOW_BEFORE = timedelta(days=3)
 EVENT_WINDOW_AFTER = timedelta(days=1)
 M10_SQL_EVENT_FIELDS = [
@@ -723,11 +734,15 @@ def _build_event_family_attention_evidence(
         background_failure_rate = unmatched_occurrence_count / occurrence_count if occurrence_count else 0.0
         average_score = _average(group["supporting_scores"])
         average_confidence = _average(group["supporting_confidences"])
+        effect_profile = _event_effect_profile(str(group["normalized_event_type"]))
         pit_status = "passed" if occurrence_count > 0 else "insufficient_evidence"
         leakage_status = "passed" if group["leakage_violation_count"] == 0 else "failed"
         co_event_confounder_status = "passed" if group["confounded_failure_count"] == 0 else "failed"
         control_status = "passed" if occurrence_count >= 2 and matched_occurrence_count >= 1 and unmatched_occurrence_count >= 1 else "insufficient_evidence"
-        association_status = "passed" if group["supporting_failure_count"] >= 1 and average_score >= 0.5 and average_confidence >= 0.5 else "insufficient_evidence"
+        if effect_profile["state_signal_type"] in {"risk_state", "uncertainty_state"}:
+            association_status = "passed" if group["supporting_failure_count"] >= 1 and matched_occurrence_count >= 1 and average_confidence >= 0.35 else "insufficient_evidence"
+        else:
+            association_status = "passed" if group["supporting_failure_count"] >= 1 and average_score >= 0.5 and average_confidence >= 0.5 else "insufficient_evidence"
         deterministic_gate_status = (
             "passed"
             if pit_status == "passed"
@@ -759,6 +774,9 @@ def _build_event_family_attention_evidence(
                 "event_family_id": group["event_family_id"],
                 "target_symbol": group["target_symbol"],
                 "normalized_event_type": group["normalized_event_type"],
+                "event_effect_mode": effect_profile["event_effect_mode"],
+                "state_signal_type": effect_profile["state_signal_type"],
+                "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
                 "supporting_failure_count": group["supporting_failure_count"],
                 "occurrence_count": occurrence_count,
                 "matched_occurrence_count": matched_occurrence_count,
@@ -779,6 +797,9 @@ def _build_event_family_attention_evidence(
                 "event_family_id": group["event_family_id"],
                 "target_symbol": group["target_symbol"],
                 "normalized_event_type": group["normalized_event_type"],
+                "event_effect_mode": effect_profile["event_effect_mode"],
+                "state_signal_type": effect_profile["state_signal_type"],
+                "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
                 "affected_scope": group["affected_scope"],
                 "deterministic_gate_status": deterministic_gate_status,
                 "pit_status": pit_status,
@@ -805,7 +826,7 @@ def _build_event_family_attention_evidence(
                 "source_decision_ids": sorted(group["source_decision_ids"])[:50],
                 "source_triage_attribution_ids": sorted(group["source_triage_attribution_ids"])[:50],
                 "event_family_occurrence_scan_ref": event_family_occurrence_scan_ref,
-                "allowed_model_use": ["temporal_attention_pool", "event_family_scouting"],
+                "allowed_model_use": ["temporal_attention_pool", "event_family_scouting", "layer_4_state_overlay_candidate"],
                 "blocked_model_use": [] if deterministic_gate_status == "passed" else ["accepted_temporal_attention_pool", "layer_4_promotion"],
                 "blocking_issues": blockers,
                 "required_followups": [] if deterministic_gate_status == "passed" else ["collect non-confounded matched controls before agent review"],
@@ -879,6 +900,21 @@ def _event_family_id(candidate: Mapping[str, Any] | None, *, target_symbol: str)
     affected_scope = str(interpretation.get("affected_scope") or "unknown").strip().lower()
     target = str(target_symbol or candidate.get("symbol") or "").strip().upper() or "GLOBAL"
     return "event_family_" + _stable_token(normalized_event_type, affected_scope, target)
+
+
+def _event_effect_profile(normalized_event_type: str) -> dict[str, str]:
+    event_type = str(normalized_event_type or "event_candidate").strip().lower()
+    if any(token in event_type for token in PROSPECTIVE_UNCERTAINTY_EVENT_TOKENS):
+        return {
+            "event_effect_mode": "prospective_uncertainty",
+            "state_signal_type": "uncertainty_state",
+            "layer_4_state_overlay": "event_uncertainty_risk_elevated",
+        }
+    return {
+        "event_effect_mode": "observed_market_impact",
+        "state_signal_type": "risk_state",
+        "layer_4_state_overlay": "event_risk_state_shift",
+    }
 
 
 def _family_target_symbol(candidate: Mapping[str, Any], proposals: Sequence[Mapping[str, Any]]) -> str:
@@ -999,7 +1035,8 @@ def _invoke_event_strategy_review_agent(
 def _event_strategy_review_agent_prompt(review_packet: Mapping[str, Any]) -> str:
     return (
         "Use the event-strategy-promotion-review skill. Review this deterministic Layer 10 event-family packet as a final guard only.\n"
-        "Do not recompute co-event/confounder gates; those are deterministic inputs. Do not activate models, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
+        "Do not recompute co-event/confounder gates; those are deterministic inputs. Some events are observed market-impact events, while scheduled/unknown-outcome events such as earnings are prospective uncertainty states; do not require a linear up/down prediction when the packet is a risk-state or uncertainty-state overlay for Layer 4.\n"
+        "Do not activate models, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
         "Return strict JSON only, with exactly this contract shape and no markdown:\n"
         "{"
         "\"review_type\":\"event_strategy_promotion_review\","
@@ -1082,6 +1119,9 @@ def _build_accepted_temporal_attention_pool_entries(
                 "event_family_id": family_id,
                 "target_symbol": candidate.get("target_symbol"),
                 "normalized_event_type": candidate.get("normalized_event_type"),
+                "event_effect_mode": candidate.get("event_effect_mode"),
+                "state_signal_type": candidate.get("state_signal_type"),
+                "layer_4_state_overlay": candidate.get("layer_4_state_overlay"),
                 "source_candidate_ref": candidate.get("event_family_bias_association_packet_ref"),
                 "event_strategy_review_ref": f"{event_strategy_reviews_ref}#{len(entries) + 1}",
                 "accepted_temporal_attention_pool_ref": accepted_temporal_attention_pool_ref,

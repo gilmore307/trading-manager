@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.model_group_attribution import run_model_group_post_replay_attribution_if_ready
-from trading_manager_tasks.model_group_layer_ten_attribution import run_model_group_layer_ten_attribution_if_ready
+from trading_manager_tasks.model_group_layer_ten_attribution import _event_effect_profile, run_model_group_layer_ten_attribution_if_ready
 
 
 class ModelGroupAttributionTests(unittest.TestCase):
@@ -292,6 +292,9 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(packets[0]["deterministic_gate_status"], "passed")
             self.assertEqual(packets[0]["co_event_confounder_status"], "passed")
+            self.assertEqual(packets[0]["event_effect_mode"], "observed_market_impact")
+            self.assertEqual(packets[0]["state_signal_type"], "risk_state")
+            self.assertEqual(packets[0]["layer_4_state_overlay"], "event_risk_state_shift")
             self.assertEqual(packets[0]["matched_occurrence_count"], 1)
             self.assertEqual(packets[0]["unmatched_occurrence_count"], 1)
             reviews = [
@@ -307,6 +310,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(accepted[0]["contract_type"], "model_10_event_risk_governor_temporal_attention_pool_entry")
             self.assertEqual(accepted[0]["pool_status"], "accepted")
+            self.assertEqual(accepted[0]["state_signal_type"], "risk_state")
+            self.assertEqual(accepted[0]["layer_4_state_overlay"], "event_risk_state_shift")
             self.assertFalse(receipt["layer_4_promotion_performed"])
 
     def test_layer_10_backoff_when_event_evidence_missing(self):
@@ -325,6 +330,13 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_layer_10_event_evidence_missing")
             self.assertFalse((dataset_root / "post_replay_attribution_runs").exists())
+
+    def test_event_effect_profile_keeps_earnings_as_uncertainty_state(self):
+        profile = _event_effect_profile("earnings_guidance_event_family")
+
+        self.assertEqual(profile["event_effect_mode"], "prospective_uncertainty")
+        self.assertEqual(profile["state_signal_type"], "uncertainty_state")
+        self.assertEqual(profile["layer_4_state_overlay"], "event_uncertainty_risk_elevated")
 
 
 if __name__ == "__main__":

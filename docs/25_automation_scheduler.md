@@ -134,6 +134,8 @@ Layer 10 is part of the historical-modeling service boundary, but it starts afte
 
 Layer 10 owns the temporal-attention promotion staging loop inside the same attribution run. It writes event-focus proposals, deterministic temporal-attention candidate rows, same-family occurrence scans, bias-association packets, event-strategy promotion reviews, and any accepted temporal-attention pool entries as Layer 10 artifacts. Co-event/confounder, point-in-time leakage, base-rate/control, and association-strength gates are deterministic. Codex CLI, when invoked, is a final `event-strategy-promotion-review` guard over a compact packet only; it must not calculate the base gates, call providers, activate models, or mutate broker/account/order state.
 
+Event-family packets do not have to prove a linear directional relationship. Layer 10 separates observed market-impact events from prospective uncertainty events such as earnings, filings, guidance, or scheduled macro releases. The former may describe observed risk-state shifts; the latter should usually describe elevated uncertainty or risk around the target, not a prediction of the result. Accepted packets hand Layer 4 a state overlay such as `event_risk_state_shift` or `event_uncertainty_risk_elevated` for downstream state composition.
+
 ## Dashboard Refresh Events
 
 The resident service triggers the storage-owned dashboard read-model refresh whenever it writes workflow-state progress, including stage-start transitions. The storage refresh timer remains a fallback calibration route; it is not the primary dashboard progress path.
