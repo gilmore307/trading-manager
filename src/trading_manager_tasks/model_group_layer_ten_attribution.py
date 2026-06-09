@@ -35,6 +35,27 @@ ACCEPTED_REVIEW_STATUSES = {"accepted", "reviewed_accepted", "approved", "review
 ACCEPTED_STANDARDIZATION_STATUSES = {"standardized", "accepted", "complete", "validated"}
 EVENT_WINDOW_BEFORE = timedelta(days=3)
 EVENT_WINDOW_AFTER = timedelta(days=1)
+M10_SQL_EVENT_FIELDS = [
+    "event_id",
+    "canonical_event_id",
+    "dedup_status",
+    "source_priority",
+    "coverage_reason",
+    "covered_by_event_id",
+    "event_time",
+    "available_time",
+    "information_role_type",
+    "event_category_type",
+    "scope_type",
+    "symbol",
+    "sector_type",
+    "title",
+    "summary",
+    "source_name",
+    "reference_type",
+    "reference",
+    "source_artifact_path",
+]
 
 
 def run_model_group_layer_ten_attribution_if_ready(
@@ -354,7 +375,7 @@ def _candidate_scope_matches(candidate: Mapping[str, Any], *, target_symbol: str
     affected_scope = str(interpretation.get("affected_scope") or "").strip().lower()
     if symbol == target_symbol or target_symbol in affected_entities:
         return True
-    return affected_scope in {"market", "global", "sector", "industry", "theme", "peer_group", "index_basket"}
+    return affected_scope in {"market", "macro", "global", "sector", "industry", "theme", "peer_group", "index_basket"}
 
 
 def _dominant_event(candidates: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
@@ -386,7 +407,7 @@ def _load_event_candidates(*, storage_root: Path, fold_scope: Mapping[str, str])
         if task_key_path.exists():
             payload = _load_optional_json_object(task_key_path) or {}
             params = payload.get("params") if isinstance(payload.get("params"), Mapping) else {}
-            raw_events.extend(_events_from_source_task_key(params, source_ref=str(task_key_path)))
+            raw_events.extend(_events_from_source_task_key(params, source_ref=str(task_key_path), materialization_receipt_path=input_dir / "materialization_receipt.json"))
     candidates = [_event_candidate(raw_event, index=index) for index, raw_event in enumerate(raw_events, start=1)]
     return candidates, {
         "checked_paths": checked_paths,
@@ -422,17 +443,89 @@ def _events_from_observation_payload(payload: Mapping[str, Any], *, source_ref: 
                 yield loaded
 
 
-def _events_from_source_task_key(params: Mapping[str, Any], *, source_ref: str) -> Iterable[dict[str, Any]]:
+def _events_from_source_task_key(params: Mapping[str, Any], *, source_ref: str, materialization_receipt_path: Path | None = None) -> Iterable[dict[str, Any]]:
     events = params.get("events")
-    if not isinstance(events, list):
-        return []
     rows: list[dict[str, Any]] = []
-    for item in events:
-        if isinstance(item, Mapping):
-            row = dict(item)
-            row.setdefault("source_artifact_ref", source_ref)
-            rows.append(row)
-    return rows
+    if isinstance(events, list):
+        for item in events:
+            if isinstance(item, Mapping):
+                row = dict(item)
+                row.setdefault("source_artifact_ref", source_ref)
+                rows.append(row)
+    if rows:
+        return rows
+    if not _materialization_receipt_ready(materialization_receipt_path):
+        return []
+    return _events_from_m10_sql(params, source_ref=source_ref)
+
+
+def _materialization_receipt_ready(path: Path | None) -> bool:
+    if path is None:
+        return False
+    payload = _load_optional_json_object(path)
+    if payload is None:
+        return False
+    if str(payload.get("contract_type") or "") != "manager_layer_ten_event_risk_governor_input_materialization":
+        return False
+    return int(payload.get("source_event_count") or 0) > 0 and bool(str(payload.get("source_receipt_path") or "").strip())
+
+
+def _events_from_m10_sql(params: Mapping[str, Any], *, source_ref: str) -> list[dict[str, Any]]:
+    database_url = _trading_storage_database_url()
+    if not database_url:
+        return []
+    clauses: list[str] = []
+    values: list[Any] = []
+    if params.get("start"):
+        clauses.append("available_time >= %s")
+        values.append(params["start"])
+    if params.get("end"):
+        clauses.append("available_time < %s")
+        values.append(params["end"])
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    statement = f"SELECT {', '.join(M10_SQL_EVENT_FIELDS)} FROM trading_data.m10_event_risk_governor_data_acquisition{where} ORDER BY available_time, event_id"
+    try:
+        import psycopg  # type: ignore
+        from psycopg.rows import dict_row  # type: ignore
+    except ImportError:
+        return []
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(statement, values)
+            rows = [dict(row) for row in cursor.fetchall()]
+    events: list[dict[str, Any]] = []
+    for row in rows:
+        event = {key: _json_safe_sql_value(value) for key, value in row.items()}
+        event["source_artifact_ref"] = event.get("source_artifact_path") or source_ref
+        events.append(event)
+    return events
+
+
+def _trading_storage_database_url() -> str | None:
+    for path in (Path("/root/secrets/trading_storage_postgres.json"), Path("/root/secrets/openclaw/database-url")):
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if not text:
+            continue
+        if text.startswith("{"):
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            dsn = str(payload.get("dsn") or "").strip()
+            if dsn:
+                return dsn
+            continue
+        return text
+    return None
+
+
+def _json_safe_sql_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
 
 
 def _event_candidate(raw_event: Mapping[str, Any], *, index: int) -> dict[str, Any]:

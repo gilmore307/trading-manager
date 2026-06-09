@@ -36,6 +36,39 @@ REQUIRED_EVENT_FEED_ARTIFACTS = {
     "gdelt_news": "gdelt_article.csv",
     "sec_company_financials": "sec_company_fact.csv",
 }
+EVENT_FEED_SQL_INPUTS = {
+    "alpaca_news": {
+        "table": "feed_03_alpaca_news",
+        "kind": "alpaca_news",
+        "columns": ["id", "timeline_headline", "created_at", "updated_at", "symbols", "summary", "event_link_url"],
+        "time_column": "created_at",
+        "order_by": ["created_at", "id"],
+    },
+    "gdelt_news": {
+        "table": "feed_05_gdelt_article",
+        "kind": "gdelt_news",
+        "columns": [
+            "article_id",
+            "seen_at",
+            "source_domain",
+            "event_link_url",
+            "title",
+            "source_theme_tags",
+            "organizations",
+            "tone",
+            "impact_scope",
+        ],
+        "time_column": "seen_at",
+        "order_by": ["seen_at", "article_id"],
+    },
+    "sec_company_financials": {
+        "table": "feed_08_sec_company_fact",
+        "kind": "sec_company_financials",
+        "columns": ["cik", "entity_name", "taxonomy", "tag", "label", "description", "unit", "fy", "fp", "form", "filed", "frame", "end", "value", "accession_number"],
+        "time_column": "filed",
+        "order_by": ["filed", "accession_number", "tag"],
+    },
+}
 EVENT_FEED_TIME_FIELDS = {
     "alpaca_news": ("created_at", "updated_at"),
     "gdelt_news": ("seen_at", "gdelt_date"),
@@ -68,6 +101,7 @@ class LayerTenEventRiskMaterialization:
     source_event_count: int
     detector_runs: tuple[DetectorRunRef, ...]
     event_feed_artifact_paths: tuple[str, ...]
+    event_feed_sql_inputs: tuple[dict[str, Any], ...]
     event_feed_coverage: dict[str, int]
     event_feed_row_coverage: dict[str, int]
     source_task_key_path: str
@@ -86,6 +120,7 @@ class LayerTenEventRiskMaterialization:
             "source_event_count": self.source_event_count,
             "detector_runs": [item.summary_row() for item in self.detector_runs],
             "event_feed_artifact_paths": list(self.event_feed_artifact_paths),
+            "event_feed_sql_inputs": list(self.event_feed_sql_inputs),
             "event_feed_coverage": dict(self.event_feed_coverage),
             "event_feed_row_coverage": dict(self.event_feed_row_coverage),
             "source_task_key_path": self.source_task_key_path,
@@ -250,6 +285,16 @@ def _run_detector(
         (log_dir / f"{symbol}_{ref_month}.stdout.log").write_text(result.stdout, encoding="utf-8")
         (log_dir / f"{symbol}_{ref_month}.stderr.log").write_text(result.stderr, encoding="utf-8")
         if result.returncode != 0:
+            if "bar input produced zero rows" in result.stdout or "bar input produced zero rows" in result.stderr:
+                return DetectorRunRef(
+                    symbol=symbol,
+                    month=ref_month,
+                    task_key_path=str(task_key_path),
+                    receipt_path=str(receipt_path),
+                    saved_event_path=None,
+                    event_count=0,
+                    status="skipped_zero_sql_bar_rows",
+                )
             raise TaskSystemError(f"Layer 10 detector failed for {symbol}: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
         status = str(payload.get("status") or "succeeded")
@@ -396,6 +441,50 @@ def _missing_event_feed_rows(row_coverage: Mapping[str, int]) -> list[str]:
     return [source_id for source_id in REQUIRED_EVENT_FEED_ARTIFACTS if int(row_coverage.get(source_id) or 0) <= 0]
 
 
+def _latest_successful_feed_run(receipt_path: Path) -> Mapping[str, Any] | None:
+    if not receipt_path.exists():
+        return None
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    runs = receipt.get("runs")
+    if not isinstance(runs, list):
+        return None
+    for run in reversed(runs):
+        if isinstance(run, Mapping) and str(run.get("status") or "") == "succeeded":
+            return run
+    return None
+
+
+def _discover_event_feed_sql_inputs(
+    *,
+    trading_storage_root: Path,
+    start_month: str,
+    end_month: str,
+) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, int]]:
+    coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
+    row_coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
+    for month in _iter_months(start_month, end_month):
+        for source_id in REQUIRED_EVENT_FEED_ARTIFACTS:
+            run = _latest_successful_feed_run(trading_storage_root / "monthly_backfill" / source_id / month / "completion_receipt.json")
+            if run is None:
+                continue
+            coverage[source_id] += 1
+            row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
+            row_coverage[source_id] += sum(int(value or 0) for value in row_counts.values())
+    start, end = _range_bounds(start_month, end_month)
+    sql_inputs: list[dict[str, Any]] = []
+    for source_id, template in EVENT_FEED_SQL_INPUTS.items():
+        if coverage[source_id] <= 0 or row_coverage[source_id] <= 0:
+            continue
+        sql_input = dict(template)
+        sql_input["start"] = start
+        sql_input["end"] = end
+        sql_inputs.append(sql_input)
+    return sql_inputs, coverage, row_coverage
+
+
 def _write_source_task_key(
     *,
     output_dir: Path,
@@ -405,6 +494,7 @@ def _write_source_task_key(
     end_month: str,
     events: Sequence[Mapping[str, Any]],
     event_artifact_paths: Sequence[str],
+    event_sql_inputs: Sequence[Mapping[str, Any]],
 ) -> Path:
     start, end = _range_bounds(start_month, end_month)
     fold_key = _fold_key(start_month, end_month)
@@ -416,6 +506,7 @@ def _write_source_task_key(
             "end": end,
             "events": list(events),
             "event_artifact_paths": list(event_artifact_paths),
+            "event_sql_inputs": [dict(item) for item in event_sql_inputs],
         },
         "output_root": str(trading_data_output_root / SOURCE / f"layer_10_event_risk_governor_{fold_key}"),
         "manager_stage_id": "layer_10_event_risk_governor.data_acquisition",
@@ -458,8 +549,17 @@ def materialize_layer_ten_event_risk_governor_inputs(
     )
     if not refs:
         raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 10 event-risk materialization")
-    event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
-    event_feed_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
+    event_artifact_paths, artifact_coverage = _discover_event_feed_artifacts(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
+    artifact_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
+    event_sql_inputs, sql_coverage, sql_row_coverage = _discover_event_feed_sql_inputs(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
+    event_feed_coverage = {
+        source_id: int(artifact_coverage.get(source_id) or 0) + int(sql_coverage.get(source_id) or 0)
+        for source_id in REQUIRED_EVENT_FEED_ARTIFACTS
+    }
+    event_feed_row_coverage = {
+        source_id: int(artifact_row_coverage.get(source_id) or 0) + int(sql_row_coverage.get(source_id) or 0)
+        for source_id in REQUIRED_EVENT_FEED_ARTIFACTS
+    }
     missing_feed_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
     missing_feed_rows = _missing_event_feed_rows(event_feed_row_coverage)
     if write and missing_feed_artifacts:
@@ -484,7 +584,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
         for ref in refs
     )
     events = [event for detector_run in detector_runs for event in _read_detector_events(detector_run)]
-    if not events and not event_artifact_paths and write:
+    if not events and not event_artifact_paths and not event_sql_inputs and write:
         raise TaskSystemError("Layer 10 event-risk materialization emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
     source_task_key_path = _write_source_task_key(
         output_dir=output_dir,
@@ -494,6 +594,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
         end_month=end_month,
         events=events,
         event_artifact_paths=event_artifact_paths,
+        event_sql_inputs=event_sql_inputs,
     )
     source_receipt_path: str | None = None
     source_event_count = len(events)
@@ -519,6 +620,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
         source_event_count=source_event_count,
         detector_runs=detector_runs,
         event_feed_artifact_paths=tuple(event_artifact_paths),
+        event_feed_sql_inputs=tuple(dict(item) for item in event_sql_inputs),
         event_feed_coverage=event_feed_coverage,
         event_feed_row_coverage=event_feed_row_coverage,
         source_task_key_path=str(source_task_key_path),
