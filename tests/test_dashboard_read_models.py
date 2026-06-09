@@ -731,8 +731,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             for task in payload["chart_payload"]["task_timeline"]
             if str(task["task_id"]).startswith("model_group.")
         ]
-        self.assertEqual([task["task_id"] for task in evaluation_tasks], ["model_group.replay"])
-        self.assertEqual([task["stage_type"] for task in evaluation_tasks], ["replay"])
+        self.assertEqual(
+            [task["task_id"] for task in evaluation_tasks],
+            [
+                "model_group.replay",
+                "model_group.model_10_event_risk_governor",
+                "model_group.evaluation",
+                "model_group.promotion",
+                "model_group.maintenance",
+            ],
+        )
+        self.assertEqual(
+            [task["stage_type"] for task in evaluation_tasks],
+            ["replay", "model_10_event_risk_governor", "model_evaluation", "promotion_review", "maintenance"],
+        )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
         self.assertTrue(all(task["month"] == "2016-fold1" for task in evaluation_tasks))
@@ -792,13 +804,22 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             for task in payload["chart_payload"]["task_timeline"]
             if str(task["task_id"]).startswith("model_group.")
         ]
-        self.assertEqual([task["task_id"] for task in model_group_tasks], ["model_group.replay"])
+        self.assertEqual(
+            [task["task_id"] for task in model_group_tasks],
+            [
+                "model_group.replay",
+                "model_group.model_10_event_risk_governor",
+                "model_group.evaluation",
+                "model_group.promotion",
+                "model_group.maintenance",
+            ],
+        )
         self.assertEqual(model_group_tasks[0]["task_state"], "current")
         self.assertEqual(model_group_tasks[0]["status"], "blocked")
         self.assertEqual(model_group_tasks[0]["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
 
-    def test_task_timeline_shows_fixed_model_group_lifecycle_for_first_open_fold(self):
+    def test_task_timeline_shows_fixed_model_group_lifecycle_for_later_fold_blocked_by_lane(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -853,11 +874,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
         fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2"]
-        self.assertEqual(len(fold1_tasks), 10)
-        self.assertEqual(fold2_tasks, [])
-        self.assertEqual(fold1_tasks[-1]["task_id"], "model_group.replay")
-        self.assertEqual(fold1_tasks[-1]["task_state"], "current")
-        self.assertEqual(fold1_tasks[-1]["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
+        self.assertEqual(len(fold1_tasks), 14)
+        self.assertTrue(fold2_tasks)
+        blocked_fold2_tasks = [task for task in fold2_tasks if task["task_state"] == "blocked"]
+        self.assertTrue(blocked_fold2_tasks)
+        self.assertEqual(blocked_fold2_tasks[0]["status"], "blocked")
+        self.assertIn("previous_fold_complete:2016-fold1", blocked_fold2_tasks[0]["detail"]["blockers"])
+        self.assertTrue(blocked_fold2_tasks[0]["detail"]["single_fold_lane_blocked"])
+        replay_task = next(task for task in fold1_tasks if task["task_id"] == "model_group.replay")
+        self.assertEqual(replay_task["task_state"], "current")
+        self.assertEqual(replay_task["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
 
     def test_ready_model_group_replay_becomes_active_after_pre_replay_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -1194,9 +1220,23 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:32:00Z")
 
-        task_ids = {task["task_id"] for task in payload["chart_payload"]["task_timeline"]}
-        self.assertNotIn("model_group.replay", task_ids)
-        self.assertNotIn("model_group.model_10_event_risk_governor", task_ids)
+        lifecycle_tasks = [
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if str(task["task_id"]).startswith("model_group.")
+        ]
+        self.assertEqual(
+            [task["task_id"] for task in lifecycle_tasks],
+            [
+                "model_group.replay",
+                "model_group.model_10_event_risk_governor",
+                "model_group.evaluation",
+                "model_group.promotion",
+                "model_group.maintenance",
+            ],
+        )
+        self.assertEqual(lifecycle_tasks[0]["status"], "blocked")
+        self.assertIn("model_group.replay", {task["task_id"] for task in lifecycle_tasks})
         self.assertNotEqual(payload["chart_payload"]["active_stage"], "model_group.model_10_event_risk_governor")
 
     def test_data_acquisition_progress_aggregates_fold_source_month_requests(self):
@@ -3645,7 +3685,18 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(model_tasks[0]["task_label"], "Layer 1 Market Regime Model")
         self.assertEqual(model_tasks[1]["task_label"], "Layer 2 Sector Context Model")
         self.assertEqual(model_tasks[2]["task_label"], "Layer 3 Target State Vector Model")
-        self.assertEqual(len(lifecycle_tasks), 0)
+        self.assertEqual(
+            [task["task_id"] for task in lifecycle_tasks],
+            [
+                "model_group.replay",
+                "model_group.model_10_event_risk_governor",
+                "model_group.evaluation",
+                "model_group.promotion",
+                "model_group.maintenance",
+            ],
+        )
+        self.assertTrue(all(task["task_state"] == "blocked" for task in lifecycle_tasks))
+        self.assertEqual(lifecycle_tasks[0]["detail"]["blockers"], ["fold_layers_01_09_model_generation_complete"])
         fold_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
@@ -3740,7 +3791,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["status"], "succeeded")
         self.assertEqual(task["target_symbol"], "AAPL")
 
-    def test_task_timeline_hides_later_fold_after_first_open_fold(self):
+    def test_task_timeline_blocks_later_fold_after_first_open_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -3816,7 +3867,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         ordered_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
         self.assertIn("2016-fold1", ordered_months)
-        self.assertNotIn("2016-fold2", ordered_months)
+        self.assertIn("2016-fold2", ordered_months)
+        fold2_blocked = [
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if task["month"] == "2016-fold2" and task["task_state"] == "blocked"
+        ]
+        self.assertTrue(fold2_blocked)
+        self.assertIn("previous_fold_complete:2016-fold1", fold2_blocked[0]["detail"]["blockers"])
 
     def test_current_incomplete_fold_is_not_exposed_as_ready_task(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -4149,7 +4207,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertEqual([(task["month"], task["task_id"]) for task in current_tasks], [("2020-fold2", "layer_03_target_state_vector")])
 
-    def test_task_timeline_hides_later_fold_until_earliest_open_fold_closes(self):
+    def test_task_timeline_blocks_later_fold_until_earliest_open_fold_closes(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -4208,8 +4266,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T12:00:00Z")
 
-        self.assertNotIn("2017-fold1", {task["month"] for task in payload["chart_payload"]["task_timeline"]})
-        self.assertNotIn("2016-fold2", {task["month"] for task in payload["chart_payload"]["task_timeline"]})
+        timeline = payload["chart_payload"]["task_timeline"]
+        self.assertIn("2016-fold2", {task["month"] for task in timeline})
+        self.assertIn("2017-fold1", {task["month"] for task in timeline})
+        fold_2017_blocked = [
+            task
+            for task in timeline
+            if task["month"] == "2017-fold1" and task["task_state"] == "blocked"
+        ]
+        self.assertTrue(fold_2017_blocked)
+        self.assertIn("previous_fold_complete:2016-fold2", fold_2017_blocked[0]["detail"]["blockers"])
 
     def test_task_timeline_exposes_missing_start_month_gap_before_later_work(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

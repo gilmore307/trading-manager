@@ -3049,8 +3049,8 @@ def _task_is_terminal_for_fold_gate(task: Mapping[str, Any]) -> bool:
     return status in {"succeeded", "not_applicable"} or task_state in {"completed", "skipped"}
 
 
-def _trim_task_timeline_after_first_open_fold(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Hide later fold scaffolds until the earliest open fold finishes."""
+def _block_task_timeline_after_first_open_fold(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep later fold tasks visible while making the single-fold lane explicit."""
 
     tasks_by_period: dict[str, list[dict[str, Any]]] = {}
     gate_periods: set[str] = set()
@@ -3065,13 +3065,36 @@ def _trim_task_timeline_after_first_open_fold(tasks: list[dict[str, Any]]) -> li
         period_tasks = tasks_by_period[period]
         if period_tasks and all(_task_is_terminal_for_fold_gate(task) for task in period_tasks):
             continue
+        for task in period_tasks:
+            if _task_is_terminal_for_fold_gate(task):
+                continue
+            if str(task.get("status") or "").lower() == "blocked" and str(task.get("task_state") or "").lower() != "current":
+                task["task_state"] = "blocked"
         cutoff_key = _period_sort_key(period)
-        return [
-            task
-            for task in tasks
-            if not _is_fold_task_period(str(task.get("month") or ""))
-            or _period_sort_key(str(task.get("month") or "")) <= cutoff_key
-        ]
+        blocker = f"previous_fold_complete:{period}"
+        for task in tasks:
+            task_period = str(task.get("month") or "")
+            if not _is_fold_task_period(task_period) or _period_sort_key(task_period) <= cutoff_key:
+                continue
+            if _task_is_terminal_for_fold_gate(task):
+                continue
+            task["task_state"] = "blocked"
+            task["status"] = "blocked"
+            task["reason"] = f"Waiting for earlier fold {period} to close before this fold can run."
+            detail = task.get("detail")
+            if not isinstance(detail, dict):
+                detail = {}
+                task["detail"] = detail
+            blockers = detail.get("blockers")
+            if not isinstance(blockers, list):
+                blockers = []
+            if blocker not in blockers:
+                blockers.insert(0, blocker)
+            detail["blockers"] = blockers
+            detail["blocked_by_period"] = period
+            detail["single_fold_lane_blocked"] = True
+            task["blocker_count"] = len(blockers)
+        return tasks
     return tasks
 
 
@@ -3082,15 +3105,16 @@ def _strip_task_timeline_internal_fields(tasks: list[dict[str, Any]]) -> list[di
 
 
 def _project_public_task_facts(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return the owner-facing task facts, not the internal future scaffold.
+    """Return the owner-facing task facts, not inert future scaffolds.
 
     Workflow state may carry every downstream blocked stage so the scheduler can
-    reason deterministically. The Tasks surface is narrower: it shows completed
-    history, failures, and the single current executable/review task. Future
-    dependencies stay in the current task detail or workflow checkpoint.
+    reason deterministically. The Tasks surface shows completed history,
+    failures, single-fold-lane blockers, and the current executable/review task.
+    Inert future dependencies stay in the current task detail or workflow
+    checkpoint.
     """
 
-    visible_states = {"completed", "skipped", "failed", "current"}
+    visible_states = {"completed", "skipped", "failed", "blocked", "current"}
     return [task for task in tasks if str(task.get("task_state") or "").lower() in visible_states]
 
 
@@ -4196,7 +4220,10 @@ def _model_group_lifecycle_tasks_for_visible_folds(
 
     visible_periods: list[tuple[str, str, str]] = []
     seen_periods: set[str] = set()
+    seen_windows: set[tuple[str, str]] = set()
     for task in task_timeline:
+        if task.get("_period_source") != "persisted_fold_state":
+            continue
         period = str(task.get("month") or "")
         if period in seen_periods:
             continue
@@ -4204,8 +4231,11 @@ def _model_group_lifecycle_tasks_for_visible_folds(
         if window is None:
             continue
         start_month, end_month = window
+        if (start_month, end_month) in seen_windows:
+            continue
         visible_periods.append((period, start_month, end_month))
         seen_periods.add(period)
+        seen_windows.add((start_month, end_month))
 
     if not visible_periods:
         return _model_group_replay_timeline_tasks(
@@ -4223,13 +4253,6 @@ def _model_group_lifecycle_tasks_for_visible_folds(
     if artifact_fold is None and visible_periods and _replay_dataset_root(storage_root, "promotion_replay_candidate_policy").exists():
         _period, start_month, end_month = visible_periods[0]
         artifact_fold = (start_month, end_month)
-    if artifact_fold is not None:
-        artifact_period = _fold_period_label(*artifact_fold)
-        visible_periods = [
-            (period, start_month, end_month)
-            for period, start_month, end_month in visible_periods
-            if (start_month, end_month) == artifact_fold
-        ] or [(artifact_period, artifact_fold[0], artifact_fold[1])]
     tasks: list[dict[str, Any]] = []
     for _period, start_month, end_month in visible_periods:
         pre_replay_complete = _pre_replay_fold_complete(
@@ -4276,7 +4299,7 @@ def build_historical_task_progress_summary(
             selected_target_symbol=selected_target_symbol,
         )
     )
-    task_timeline = _trim_task_timeline_after_first_open_fold(task_timeline)
+    task_timeline = _block_task_timeline_after_first_open_fold(task_timeline)
     task_timeline = _strip_task_timeline_internal_fields(task_timeline)
     task_timeline = _sort_task_timeline(task_timeline)
     agent_error_summary = _mark_superseded_agent_errors(
