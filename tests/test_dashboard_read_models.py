@@ -2572,6 +2572,183 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["handling_status"], "closed")
         self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
 
+    def test_agent_error_summary_closure_receipt_closes_diagnosed_repair(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            agent_root = tmp / "storage" / "02_control_plane" / "runtime" / "agent_error_handling"
+            request_root = agent_root / "erragent_closure_closed"
+            request_root.mkdir(parents=True, exist_ok=True)
+            final_report = {
+                "diagnosis_status": "completed",
+                "root_cause": "stage command contract was repaired locally",
+                "retry_recommendation": "retry stage after repair",
+            }
+            (request_root / "agent_error_diagnosis.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_error_diagnosis",
+                        "schema_version": "1",
+                        "diagnosis_id": "errdiag_closure_closed",
+                        "request_ref": "erragent_closure_closed",
+                        "agent_ref": "trader",
+                        "runner_command": "codex_cli",
+                        "status": "completed",
+                        "return_code": 0,
+                        "stdout": json.dumps(final_report),
+                        "stderr": "",
+                        "completed_at_utc": "2026-05-18T13:55:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (request_root / "agent_repair_closure_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_repair_closure_receipt",
+                        "schema_version": "1",
+                        "error_ref": "ERR-000016",
+                        "closure_status": "closed",
+                        "actions": [{"action": "dashboard_refresh", "status": "completed"}],
+                        "blockers": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 16,
+                        "error_ref": "ERR-000016",
+                        "error_fingerprint": "errfp_closure_closed",
+                        "request_id": "erragent_closure_closed",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_closure_closed/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_closure_closed/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.stage_executor",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.model_training_stage",
+                        "error_kind": "stage_command_failed",
+                        "severity": "error",
+                        "summary": "model training stage layer_03_target_state_vector.data_acquisition command returned non-zero status",
+                        "exit_code": 1,
+                        "occurred_at_utc": "2026-05-18T13:52:00Z",
+                        "created_at_utc": "2026-05-18T13:52:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T13:56:00Z")
+
+        agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(agent_errors[0]["error_ref"], "ERR-000016")
+        self.assertEqual(agent_errors[0]["repair_status"], "repaired")
+        self.assertEqual(agent_errors[0]["handling_status"], "closed")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
+        self.assertEqual(agent_errors[0]["closure_receipt"]["closure_status"], "closed")
+        self.assertEqual(agent_errors[0]["retry_recommendation"], "agent repair closure receipt recorded closed")
+
+    def test_agent_error_summary_closure_receipt_blocks_attempted_repair(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            agent_root = tmp / "storage" / "02_control_plane" / "runtime" / "agent_error_handling"
+            request_root = agent_root / "erragent_closure_blocked"
+            request_root.mkdir(parents=True, exist_ok=True)
+            final_report = {
+                "diagnosis_status": "repaired_with_push_blocked",
+                "root_cause": "provider route was changed but remote durability was incomplete",
+                "repair_attempted": True,
+                "retry_recommendation": "retry after push",
+            }
+            (request_root / "agent_error_diagnosis.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_error_diagnosis",
+                        "schema_version": "1",
+                        "diagnosis_id": "errdiag_closure_blocked",
+                        "request_ref": "erragent_closure_blocked",
+                        "agent_ref": "trader",
+                        "runner_command": "codex_cli",
+                        "status": "completed",
+                        "return_code": 0,
+                        "stdout": json.dumps(final_report),
+                        "stderr": "",
+                        "completed_at_utc": "2026-05-18T14:05:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (request_root / "agent_repair_closure_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_repair_closure_receipt",
+                        "schema_version": "1",
+                        "error_ref": "ERR-000017",
+                        "closure_status": "blocked",
+                        "blockers": ["remote durability is incomplete"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 17,
+                        "error_ref": "ERR-000017",
+                        "error_fingerprint": "errfp_closure_blocked",
+                        "request_id": "erragent_closure_blocked",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_closure_blocked/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_closure_blocked/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.model_group_replay_option_features",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.replay_option_feature_repair",
+                        "error_kind": "model_group_replay_option_source_acquisition_failed",
+                        "severity": "error",
+                        "summary": "replay option source/feature repair failed for emitted signal AAPL",
+                        "exit_code": 1,
+                        "occurred_at_utc": "2026-05-18T14:02:00Z",
+                        "created_at_utc": "2026-05-18T14:02:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T14:06:00Z")
+
+        agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(agent_errors[0]["error_ref"], "ERR-000017")
+        self.assertEqual(agent_errors[0]["repair_status"], "blocked")
+        self.assertEqual(agent_errors[0]["handling_status"], "open")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "error")
+        self.assertIn("remote durability", agent_errors[0]["retry_recommendation"])
+
     def test_agent_error_summary_closes_repaired_with_blockers_when_exact_retry_is_forbidden(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

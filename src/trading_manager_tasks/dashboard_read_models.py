@@ -282,6 +282,46 @@ def _agent_repair_status(diagnosis: Mapping[str, Any], agent_payload: Mapping[st
     return "unknown"
 
 
+def _agent_repair_closure_receipt(diagnosis_path: Path | None) -> dict[str, Any]:
+    if diagnosis_path is None:
+        return {}
+    receipt_path = diagnosis_path.parent / "agent_repair_closure_receipt.json"
+    if not receipt_path.exists():
+        return {}
+    try:
+        return _load_json_object(receipt_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def _apply_agent_repair_closure_receipt(
+    repair_status: str,
+    handling_status: str,
+    closure_receipt: Mapping[str, Any],
+) -> tuple[str, str]:
+    closure_status = str(closure_receipt.get("closure_status") or "").lower()
+    if closure_status == "closed":
+        return "repaired", "closed"
+    if closure_status == "blocked":
+        return "blocked", "open"
+    return repair_status, handling_status
+
+
+def _agent_repair_closure_text(closure_receipt: Mapping[str, Any]) -> str | None:
+    closure_status = str(closure_receipt.get("closure_status") or "").lower()
+    if closure_status == "closed":
+        return _agent_payload_text(
+            closure_receipt.get("summary"),
+            "agent repair closure receipt recorded closed",
+        )
+    if closure_status == "blocked":
+        return _agent_payload_text(
+            closure_receipt.get("retry_recommendation"),
+            closure_receipt.get("blockers") or closure_receipt.get("summary") or "agent repair closure receipt blocked",
+        )
+    return None
+
+
 def _agent_payload_text(value: object, fallback: object = None) -> str | None:
     if isinstance(value, str):
         text = value.strip()
@@ -401,6 +441,7 @@ def _agent_error_summary(
                 diagnosis = _load_json_object(diagnosis_path)
             except (OSError, ValueError, json.JSONDecodeError):
                 diagnosis = {}
+        closure_receipt = _agent_repair_closure_receipt(diagnosis_path)
         agent_payload = _agent_result_payload(diagnosis)
         repair_status = _agent_repair_status(diagnosis, agent_payload)
         retry_receipt = None
@@ -412,10 +453,16 @@ def _agent_error_summary(
         handling_status = _agent_error_handling_status(row, repair_status, agent_payload)
         if retry_receipt and repair_status == "repaired":
             handling_status = "closed"
+        repair_status, handling_status = _apply_agent_repair_closure_receipt(
+            repair_status,
+            handling_status,
+            closure_receipt,
+        )
         repair_payload = agent_payload.get("repair") if isinstance(agent_payload.get("repair"), Mapping) else {}
         files_changed = agent_payload.get("files_changed")
         if not isinstance(files_changed, list):
             files_changed = repair_payload.get("files_changed") if isinstance(repair_payload.get("files_changed"), list) else []
+        closure_text = _agent_repair_closure_text(closure_receipt)
         summary_rows.append(
             {
                 "error_ref": row.get("error_ref"),
@@ -437,11 +484,12 @@ def _agent_error_summary(
                 "retry_recommendation": (
                     f"retry completed successfully at {retry_receipt.get('completed_at_utc') or 'recorded receipt'}"
                     if retry_receipt
-                    else _agent_payload_text(agent_payload.get("retry_recommendation"))
+                    else closure_text or _agent_payload_text(agent_payload.get("retry_recommendation"))
                 ),
                 "root_cause": _agent_payload_text(agent_payload.get("root_cause"), row.get("summary")),
                 "files_changed": files_changed,
                 "retry_receipt": retry_receipt,
+                "closure_receipt": closure_receipt or None,
                 "request_path": row.get("request_path"),
                 "diagnosis_path": row.get("diagnosis_path"),
             }
