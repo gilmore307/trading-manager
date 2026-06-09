@@ -426,6 +426,36 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("valid_shadow_cycle_selection_required", write_policy["payload"])
         self.assertIn("rollback_ref_required", write_policy["payload"])
 
+    def test_option_chain_source_shared_names_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        review = rows["MANAGER_OPTION_CHAIN_STATE_SOURCE_ACQUISITION_REVIEW"]
+        self.assertEqual(review["kind"], "artifact_type")
+        self.assertEqual(review["payload"], "manager_option_chain_state_source_acquisition_review")
+        self.assertIn("option_chain_source_acquisition.py", review["path"])
+        self.assertIn("broker execution", review["note"])
+
+        policy = rows["OPTION_CHAIN_SOURCE_ACQUISITION_POLICY"]
+        self.assertEqual(policy["payload"], "target_option_chain_state_source_acquisition")
+        self.assertIn("policy_ref", policy["applies_to"])
+        self.assertIn("historical provider acquisition", policy["note"])
+
+        retry = rows["OPTION_CHAIN_SOURCE_RETRY_POLICY"]
+        self.assertEqual(retry["payload"], "target_option_chain_state_source_retry")
+        self.assertIn("Retry-policy token", retry["note"])
+
+        request_template = rows["OPTION_CHAIN_SOURCE_REQUEST_ID_TEMPLATE"]
+        self.assertEqual(
+            request_template["payload"],
+            "mgrreq_option_chain_window_<symbol>_<fold_start_month>_<window_date>_<hhmm>",
+        )
+        self.assertIn("provider run ids", request_template["note"])
+
+        stage = rows["OPTION_CHAIN_SOURCE_STAGE_ID"]
+        self.assertEqual(stage["payload"], "layer_03_target_state_vector.option_chain_data_acquisition")
+        self.assertIn("stage_id", stage["applies_to"])
+
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
