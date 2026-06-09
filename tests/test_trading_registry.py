@@ -506,7 +506,36 @@ class RegistryHelperTests(unittest.TestCase):
 
         runtime_surfaces = rows["MANAGER_POST_REPLAY_ATTRIBUTION_RUNTIME_SURFACES"]
         self.assertIn("post_replay_failure_triage_runs", runtime_surfaces["payload"])
+        self.assertIn("event_focus_proposals.jsonl", runtime_surfaces["payload"])
         self.assertIn("model_group.layer_10_event_attribution", runtime_surfaces["payload"])
+
+        focus_count = rows["EVENT_FOCUS_PROPOSAL_COUNT"]
+        self.assertEqual(focus_count["kind"], "field")
+        self.assertEqual(focus_count["payload"], "event_focus_proposal_count")
+
+        focus_review_gate = rows["EVENT_FOCUS_PROPOSAL_REVIEW_GATE"]
+        self.assertEqual(focus_review_gate["payload"], "event_focus_proposal_review_gate")
+        self.assertIn("event-strategy-promotion-review", focus_review_gate["applies_to"])
+
+        accepted_mutation_flag = rows["ACCEPTED_EVENT_POOL_MUTATION_PERFORMED"]
+        self.assertEqual(accepted_mutation_flag["payload"], "accepted_event_pool_mutation_performed")
+        self.assertIn("safety_flag", accepted_mutation_flag["applies_to"])
+
+        temporal_mutation_flag = rows["TEMPORAL_ATTENTION_POOL_MUTATION_PERFORMED"]
+        self.assertEqual(temporal_mutation_flag["payload"], "temporal_attention_pool_mutation_performed")
+        self.assertIn("safety_flag", temporal_mutation_flag["applies_to"])
+
+        event_focus_proposals_ref = rows["EVENT_FOCUS_PROPOSALS_REF"]
+        self.assertEqual(event_focus_proposals_ref["kind"], "path_field")
+        self.assertEqual(event_focus_proposals_ref["payload"], "event_focus_proposals_ref")
+        self.assertIn("model_group_evaluation", event_focus_proposals_ref["applies_to"])
+
+        layer_ten_event_focus_proposals_ref = rows["LAYER_10_EVENT_FOCUS_PROPOSALS_REF"]
+        self.assertEqual(
+            layer_ten_event_focus_proposals_ref["payload"],
+            "layer_10_event_focus_proposals_ref",
+        )
+        self.assertIn("dashboard_task_timeline", layer_ten_event_focus_proposals_ref["applies_to"])
 
         triage_script = rows["MODEL_GROUP_POST_REPLAY_FAILURE_TRIAGE_RUN"]
         self.assertEqual(triage_script["kind"], "script")
