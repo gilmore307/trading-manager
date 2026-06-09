@@ -465,6 +465,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(event_interpretation["payload"], "event_interpretation")
         self.assertIn("schema_version", event_interpretation["note"])
 
+        event_interpretation_policy = rows["EVENT_INTERPRETATION_STANDARD_POLICY"]
+        self.assertEqual(event_interpretation_policy["payload"], "event_interpretation_standard")
+        self.assertIn("policy_ref", event_interpretation_policy["applies_to"])
+        self.assertIn("unversioned", event_interpretation_policy["note"])
+
         triage_receipt = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_RECEIPT"]
         self.assertEqual(triage_receipt["payload"], "post_replay_failure_triage_receipt")
         self.assertIn("not Layer 10", triage_receipt["note"])
