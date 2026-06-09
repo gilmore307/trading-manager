@@ -151,9 +151,9 @@ class ModelGroupAttributionTests(unittest.TestCase):
                         "contract_type": "manager_layer_04_event_observation_materialization",
                         "reviewed_event_interpretations": [
                             {
-                                "contract_type": "event_interpretation_v1",
-                                "schema_version": 1,
-                                "policy_version": "event_interpretation_v1",
+                                "contract_type": "event_interpretation",
+                                "schema_version": "1",
+                                "policy_version": "1",
                                 "source_artifact_ref": "fixture://event/btc_liquidity_disruption",
                                 "source_artifact_hash": "sha256:fixture",
                                 "source_name": "fixture",

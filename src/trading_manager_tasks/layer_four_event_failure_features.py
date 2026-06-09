@@ -103,7 +103,7 @@ def materialize_layer_four_event_failure_features(
         start_month=start_month,
         end_month=end_month,
         event_feature_state=state,
-        event_interpretation_contract="event_interpretation_v1",
+        event_interpretation_contract="event_interpretation",
         event_interpretation_count=len(interpretations),
         accepted_interpretation_count=len(accepted),
         target_routed_gate_row_count=len(routed_rows),
@@ -145,7 +145,7 @@ def _load_interpretations(observation_payload: Mapping[str, Any]) -> list[dict[s
 
 def _accepted_interpretation(row: Mapping[str, Any]) -> bool:
     contract = str(row.get("contract_type") or row.get("schema_ref") or row.get("event_interpretation_contract") or "").strip()
-    if contract and contract != "event_interpretation_v1":
+    if contract and contract not in {"event_interpretation", "event_interpretation_v1"}:
         return False
     review_status = str(row.get("review_status") or row.get("status") or "").strip().lower()
     standardization_status = str(row.get("standardization_status") or "").strip().lower()
@@ -199,7 +199,7 @@ def _event_strategy_failure_gate(row: Mapping[str, Any]) -> dict[str, Any]:
         "strategy_disable_pressure_score": round(_clip01(effect - 0.4), 6),
         "evidence_quality_score": round(evidence_confidence, 6),
         "applicability_confidence_score": round(_clip01(evidence_confidence * (1.0 - 0.25 * uncertainty)), 6),
-        "reason_codes": ["reviewed_event_interpretation_v1", "target_routed_event_failure_gate"],
+        "reason_codes": ["reviewed_event_interpretation", "target_routed_event_failure_gate"],
     }
 
 

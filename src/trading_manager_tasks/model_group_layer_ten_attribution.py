@@ -28,7 +28,8 @@ from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler
 NEW_YORK = ZoneInfo("America/New_York")
 LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE = "post_replay_layer_10_event_attribution_receipt"
 LAYER_10_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_attribution_row"
-EVENT_INTERPRETATION_CONTRACT_TYPE = "event_interpretation_v1"
+EVENT_INTERPRETATION_CONTRACT_TYPE = "event_interpretation"
+LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES = {"event_interpretation_v1"}
 COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
 ACCEPTED_REVIEW_STATUSES = {"accepted", "reviewed_accepted", "approved", "reviewed"}
 ACCEPTED_STANDARDIZATION_STATUSES = {"standardized", "accepted", "complete", "validated"}
@@ -460,14 +461,22 @@ def _event_candidate(raw_event: Mapping[str, Any], *, index: int) -> dict[str, A
 def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: int) -> dict[str, Any]:
     if _is_event_interpretation(raw_event):
         row = dict(raw_event)
-        row.setdefault("contract_type", EVENT_INTERPRETATION_CONTRACT_TYPE)
-        row.setdefault("schema_version", 1)
-        row.setdefault("policy_version", "event_interpretation_v1")
+        row["contract_type"] = EVENT_INTERPRETATION_CONTRACT_TYPE
+        if str(row.get("schema_version") or "").strip() in LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES:
+            row["schema_version"] = "1"
+        row.setdefault("schema_version", "1")
+        row.setdefault("schema_ref", EVENT_INTERPRETATION_CONTRACT_TYPE)
+        row.setdefault("policy_ref", "event_interpretation_standard")
+        if str(row.get("policy_version") or "").strip() in LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES:
+            row["policy_version"] = "1"
+        row.setdefault("policy_version", "1")
         return _fill_interpretation_defaults(row, index=index)
     row = {
         "contract_type": EVENT_INTERPRETATION_CONTRACT_TYPE,
-        "schema_version": 1,
-        "policy_version": "event_interpretation_v1",
+        "schema_version": "1",
+        "schema_ref": EVENT_INTERPRETATION_CONTRACT_TYPE,
+        "policy_ref": "event_interpretation_standard",
+        "policy_version": "1",
         "source_artifact_ref": raw_event.get("source_artifact_ref") or raw_event.get("reference"),
         "source_name": raw_event.get("source_name") or "layer_10_local_event_candidate",
         "source_type": raw_event.get("reference_type") or "local_structured_event_candidate",
@@ -538,7 +547,11 @@ def _accepted_interpretation(row: Mapping[str, Any]) -> bool:
 def _is_event_interpretation(row: Mapping[str, Any]) -> bool:
     contract = str(row.get("contract_type") or row.get("schema_ref") or row.get("event_interpretation_contract") or "").strip()
     schema_version = str(row.get("schema_version") or "").strip()
-    return contract == EVENT_INTERPRETATION_CONTRACT_TYPE or schema_version == EVENT_INTERPRETATION_CONTRACT_TYPE
+    return (
+        contract == EVENT_INTERPRETATION_CONTRACT_TYPE
+        or contract in LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES
+        or schema_version in LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES
+    )
 
 
 def _latest_failure_triage_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:

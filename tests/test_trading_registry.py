@@ -456,6 +456,44 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(stage["payload"], "layer_03_target_state_vector.option_chain_data_acquisition")
         self.assertIn("stage_id", stage["applies_to"])
 
+    def test_post_replay_attribution_shared_names_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        event_interpretation = rows["EVENT_INTERPRETATION"]
+        self.assertEqual(event_interpretation["kind"], "artifact_type")
+        self.assertEqual(event_interpretation["payload"], "event_interpretation")
+        self.assertIn("schema_version", event_interpretation["note"])
+
+        triage_receipt = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_RECEIPT"]
+        self.assertEqual(triage_receipt["payload"], "post_replay_failure_triage_receipt")
+        self.assertIn("not Layer 10", triage_receipt["note"])
+
+        triage_row = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_ROW"]
+        self.assertEqual(triage_row["payload"], "post_replay_failure_triage_row")
+
+        layer_ten_receipt = rows["MANAGER_POST_REPLAY_LAYER_10_EVENT_ATTRIBUTION_RECEIPT"]
+        self.assertEqual(layer_ten_receipt["payload"], "post_replay_layer_10_event_attribution_receipt")
+        self.assertIn("provider calls", layer_ten_receipt["note"])
+
+        layer_ten_row = rows["MANAGER_POST_REPLAY_LAYER_10_EVENT_ATTRIBUTION_ROW"]
+        self.assertEqual(layer_ten_row["payload"], "model_10_event_risk_governor_event_attribution_row")
+        self.assertIn("event_interpretation", layer_ten_row["applies_to"])
+
+        runtime_surfaces = rows["MANAGER_POST_REPLAY_ATTRIBUTION_RUNTIME_SURFACES"]
+        self.assertIn("post_replay_failure_triage_runs", runtime_surfaces["payload"])
+        self.assertIn("model_group.layer_10_event_attribution", runtime_surfaces["payload"])
+
+        triage_script = rows["MODEL_GROUP_POST_REPLAY_FAILURE_TRIAGE_RUN"]
+        self.assertEqual(triage_script["kind"], "script")
+        self.assertIn("run_model_group_post_replay_attribution.py", triage_script["path"])
+
+        layer_ten_script = rows["MODEL_GROUP_LAYER_10_EVENT_ATTRIBUTION_RUN"]
+        self.assertEqual(layer_ten_script["kind"], "script")
+        self.assertIn("run_model_group_layer_ten_attribution.py", layer_ten_script["path"])
+
+        self.assertNotIn("event_interpretation_v1", {row["payload"] for row in rows.values()})
+
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
