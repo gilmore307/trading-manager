@@ -56,6 +56,10 @@ RETRYABLE_PROVIDER_FAILURE_PATTERNS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("request returned http 502",), "provider_http_retryable"),
     (("request returned http 503",), "provider_http_retryable"),
     (("request returned http 504",), "provider_http_retryable"),
+    (("http status 500",), "provider_http_retryable"),
+    (("http status 502",), "provider_http_retryable"),
+    (("http status 503",), "provider_http_retryable"),
+    (("http status 504",), "provider_http_retryable"),
 )
 
 

@@ -224,6 +224,14 @@ class StageReconcileTests(unittest.TestCase):
         self.assertEqual(rows[0]["failure_kind"], "provider_service_unavailable")
         self.assertIn("automatic retry", rows[0]["note"])
 
+    def test_provider_html_status_errors_generate_retry_required_proposals(self) -> None:
+        status, kind, note = classify_provider_failure(
+            'AuthenticationError: <!doctype html><html><head><title>HTTP Status 500 - Internal Server Error</title></head></html>'
+        )
+        self.assertEqual(status, "retry_required")
+        self.assertEqual(kind, "provider_http_retryable")
+        self.assertIn("automatic retry", note)
+
     def test_failure_classifier_routes_provider_policy_errors_to_auto_repair(self) -> None:
         status, kind, note = classify_provider_failure("ProviderPolicyError: provider not allowed: thetadata")
         self.assertEqual(status, "auto_repair_required")
