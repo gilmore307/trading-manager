@@ -1739,6 +1739,69 @@ class SchedulerDaemonTests(unittest.TestCase):
             log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_post_replay_failure_triage_executed"])
 
+    def test_daemon_dispatches_model_group_event_focus_proposal_after_layer_10(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state_path = tmp / "runtime" / "state.json"
+            lock_path = tmp / "runtime" / "scheduler.lock"
+            decision_log = tmp / "runtime" / "decisions.jsonl"
+            scheduler_decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-05-28T00:00:00+00:00",
+                now_et="2026-05-27T20:00:00-04:00",
+                decision_status="ready",
+                reason_code="no_month_stage_ready",
+                reason="no month stage ready",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work=None,
+                command=[],
+                next_internal_stage="historical_training_work_loop",
+            )
+            event_focus_decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-05-28T00:00:01+00:00",
+                now_et="2026-05-27T20:00:01-04:00",
+                decision_status="executed",
+                reason_code="model_group_event_focus_proposal_executed",
+                reason="executed model-group event focus proposal",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work="model_group.layer_10_event_focus_proposal",
+                command=[],
+                next_internal_stage="layer_10_event_focus_proposal",
+            )
+
+            with patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=scheduler_decision), patch(
+                "trading_manager_tasks.scheduler_daemon.run_model_group_replay_if_ready", return_value=None
+            ), patch(
+                "trading_manager_tasks.scheduler_daemon.run_model_group_post_replay_attribution_if_ready", return_value=None
+            ), patch(
+                "trading_manager_tasks.scheduler_daemon.run_model_group_layer_ten_attribution_if_ready", return_value=None
+            ), patch(
+                "trading_manager_tasks.scheduler_daemon.run_model_group_event_focus_proposal_if_ready",
+                return_value=event_focus_decision,
+            ) as event_focus:
+                state = run_daemon_loop(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp / "manager-storage",
+                    component_src_root=self._fake_data_src(tmp),
+                    state_path=state_path,
+                    lock_path=lock_path,
+                    decision_log_path=decision_log,
+                    interval_seconds=0,
+                    max_iterations=2,
+                    execute_safe_preparation=True,
+                    source_existing_bootstrap=False,
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                )
+
+            event_focus.assert_called()
+            self.assertEqual(state.last_next_internal_stage, "layer_10_event_focus_proposal")
+            log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_event_focus_proposal_executed"])
+
     def test_daemon_dispatches_model_group_evaluation_after_attribution(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

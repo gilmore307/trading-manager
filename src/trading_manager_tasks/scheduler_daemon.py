@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 from .model_group_attribution import run_model_group_post_replay_attribution_if_ready
+from .model_group_event_focus_proposal import run_model_group_event_focus_proposal_if_ready
 from .model_group_evaluation import run_model_group_evaluation_if_ready
 from .model_group_layer_ten_attribution import run_model_group_layer_ten_attribution_if_ready
 from .model_group_replay_option_features import run_model_group_replay_option_features_for_replay_backoff
@@ -1767,6 +1768,10 @@ def run_daemon_loop(
                             storage_root=storage_root,
                             execute=False,
                         )
+                        event_focus_proposal_probe = run_model_group_event_focus_proposal_if_ready(
+                            storage_root=storage_root,
+                            execute=False,
+                        )
                         evaluation_probe = run_model_group_evaluation_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -1778,6 +1783,7 @@ def run_daemon_loop(
                             or replay_probe is not None
                             or attribution_probe is not None
                             or layer_ten_attribution_probe is not None
+                            or event_focus_proposal_probe is not None
                             or evaluation_probe is not None
                         )
                         lane_limit = 1
@@ -2006,6 +2012,30 @@ def run_daemon_loop(
                                 row["worker_id"] = "layer_10_event_attribution_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                        event_focus_proposal_decision = run_model_group_event_focus_proposal_if_ready(
+                            storage_root=storage_root,
+                            execute=execute_model_group_attribution,
+                        )
+                        if event_focus_proposal_decision is not None:
+                            append_decision_log(decision_log_path, event_focus_proposal_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=event_focus_proposal_decision)
+                            state = replace(
+                                state,
+                                start_month=active_start_month,
+                                end_month=active_end_month,
+                                last_next_internal_stage="layer_10_event_focus_proposal",
+                                last_work_selection_reason="model_group_event_focus_proposal_ready",
+                                updated_utc=completed,
+                            )
+                            refresh_needed = refresh_needed or event_focus_proposal_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(event_focus_proposal_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = event_focus_proposal_decision.summary_row()
+                                row["worker_id"] = "layer_10_event_focus_proposal_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
                         evaluation_decision = run_model_group_evaluation_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -2202,6 +2232,22 @@ def run_daemon_loop(
                             if output is not None:
                                 row = layer_ten_attribution_decision.summary_row()
                                 row["worker_id"] = "layer_10_event_attribution_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
+                        event_focus_proposal_decision = run_model_group_event_focus_proposal_if_ready(
+                            storage_root=storage_root,
+                            execute=execute_model_group_attribution,
+                        )
+                        if event_focus_proposal_decision is not None:
+                            append_decision_log(decision_log_path, event_focus_proposal_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=event_focus_proposal_decision)
+                            refresh_needed = refresh_needed or event_focus_proposal_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(event_focus_proposal_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = event_focus_proposal_decision.summary_row()
+                                row["worker_id"] = "layer_10_event_focus_proposal_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
                         evaluation_decision = run_model_group_evaluation_if_ready(

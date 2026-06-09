@@ -58,6 +58,7 @@ FOLD_MODEL_STAGE_TYPES = {
     "model_generation",
     "replay",
     "model_10_event_risk_governor",
+    "event_focus_proposal",
     "model_evaluation",
     "post_replay_attribution",
     "promotion_review",
@@ -70,6 +71,7 @@ MODEL_GROUP_EVALUATION_TESTS = (
     "guardrail_checks",
     "incumbent_comparison",
     "layer_10_attribution",
+    "layer_10_event_focus_proposal",
 )
 MODEL_GROUP_PROMOTION_TESTS = (
     "fixed_benchmark",
@@ -103,6 +105,7 @@ TASK_STAGE_SORT_ORDER = {
     "replay": 40,
     "post_replay_attribution": 45,
     "model_10_event_risk_governor": 45,
+    "event_focus_proposal": 46,
     "model_evaluation": 48,
     "promotion_review_preparation": 45,
     "promotion_review": 50,
@@ -3643,7 +3646,20 @@ def _model_group_evaluation_progress(*, status: str, complete: bool) -> dict[str
         ready_checks=set(MODEL_GROUP_EVALUATION_TESTS) if complete else set(),
         unit_label="evaluation tests",
         progress_source="model_group_evaluation_test_contract",
-        progress_basis="required replay metrics, guardrail, incumbent-comparison, and Layer 10 attribution checks",
+        progress_basis="required replay metrics, guardrail, incumbent-comparison, Layer 10 attribution, and event-focus proposal checks",
+        can_unlock_downstream=complete,
+    )
+
+
+def _model_group_event_focus_proposal_progress(*, status: str, complete: bool) -> dict[str, Any]:
+    return _checklist_progress(
+        stage_id="model_group.layer_10_event_focus_proposal",
+        status=status,
+        checks=("attribution_rows", "event_focus_proposals", "review_gate_declared"),
+        ready_checks={"attribution_rows", "event_focus_proposals", "review_gate_declared"} if complete else set(),
+        unit_label="proposal checks",
+        progress_source="layer_10_event_focus_proposal_contract",
+        progress_basis="Layer 10 attribution must be converted into reviewable event-focus proposals before evaluation.",
         can_unlock_downstream=complete,
     )
 
@@ -3721,6 +3737,7 @@ def _latest_promotion_review_artifacts(
     dataset_root: Path,
     *,
     layer_10_attribution_receipt_ref: str | None,
+    layer_10_event_focus_proposal_receipt_ref: str | None = None,
 ) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
     if not review_root.exists():
@@ -3736,6 +3753,11 @@ def _latest_promotion_review_artifacts(
             if receipt is None:
                 continue
             if str(receipt.get("layer_10_attribution_receipt_ref") or "") != layer_10_attribution_receipt_ref:
+                continue
+        if layer_10_event_focus_proposal_receipt_ref is not None:
+            if receipt is None:
+                continue
+            if str(receipt.get("layer_10_event_focus_proposal_receipt_ref") or "") != layer_10_event_focus_proposal_receipt_ref:
                 continue
         review_path = decision_path.parent / "promotion_evaluation_review.json"
         review = _load_optional_json_object(review_path)
@@ -3771,6 +3793,35 @@ def _latest_post_replay_attribution_artifacts(dataset_root: Path) -> dict[str, A
         if status not in {"succeeded", "complete", "completed"}:
             continue
         if not _is_layer_10_event_attribution_receipt(receipt):
+            continue
+        created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
+        candidates.append((created, receipt_path, receipt))
+    if not candidates:
+        return None
+    _created, receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
+    return {"receipt": dict(receipt), "receipt_refs": [str(receipt_path)]}
+
+
+def _latest_event_focus_proposal_artifacts(
+    dataset_root: Path,
+    *,
+    layer_10_attribution_receipt_ref: str | None,
+) -> dict[str, Any] | None:
+    if layer_10_attribution_receipt_ref is None:
+        return None
+    proposal_root = dataset_root / "post_replay_event_focus_proposal_runs"
+    if not proposal_root.exists():
+        return None
+    candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
+    for receipt_path in sorted(proposal_root.glob("*/event_focus_proposal_receipt.json")):
+        receipt = _load_optional_json_object(receipt_path)
+        if receipt is None:
+            continue
+        if str(receipt.get("contract_type") or "") != "post_replay_layer_10_event_focus_proposal_receipt":
+            continue
+        if str(receipt.get("status") or "") not in {"succeeded", "complete", "completed"}:
+            continue
+        if str(receipt.get("layer_10_attribution_receipt_ref") or "") != layer_10_attribution_receipt_ref:
             continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt_path, receipt))
@@ -4006,12 +4057,27 @@ def _model_group_replay_timeline_tasks(
         if attribution_artifacts and attribution_artifacts.get("receipt_refs")
         else None
     )
-    promotion_artifacts = (
-        _latest_promotion_review_artifacts(
+    event_focus_artifacts = (
+        _latest_event_focus_proposal_artifacts(
             dataset_root,
             layer_10_attribution_receipt_ref=layer_10_attribution_receipt_ref,
         )
         if lifecycle_artifacts_allowed and attribution_complete
+        else None
+    )
+    event_focus_complete = event_focus_artifacts is not None
+    layer_10_event_focus_proposal_receipt_ref = (
+        str(event_focus_artifacts["receipt_refs"][0])
+        if event_focus_artifacts and event_focus_artifacts.get("receipt_refs")
+        else None
+    )
+    promotion_artifacts = (
+        _latest_promotion_review_artifacts(
+            dataset_root,
+            layer_10_attribution_receipt_ref=layer_10_attribution_receipt_ref,
+            layer_10_event_focus_proposal_receipt_ref=layer_10_event_focus_proposal_receipt_ref,
+        )
+        if lifecycle_artifacts_allowed and event_focus_complete
         else None
     )
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
@@ -4132,24 +4198,45 @@ def _model_group_replay_timeline_tasks(
         progress=attribution_progress,
     )
 
+    append_task(
+        task_id="model_group.layer_10_event_focus_proposal",
+        label="Event Focus Proposal",
+        task_state="completed" if event_focus_complete else ("current" if attribution_complete else "future"),
+        status="succeeded" if event_focus_complete else ("ready" if attribution_complete else "blocked"),
+        reason=(
+            "Layer 10 event-focus proposals are ready for review before entering the event attention pool."
+            if event_focus_complete
+            else "Layer 10 attribution is ready to be aggregated into reviewable event-focus proposals."
+            if attribution_complete
+            else "Waiting for Layer 10 attribution before event-focus proposals can be prepared."
+        ),
+        receipt_refs=list(event_focus_artifacts["receipt_refs"]) if event_focus_artifacts else None,
+        blockers=[] if attribution_complete else ["model_group.model_10_event_risk_governor"],
+        stage_type="event_focus_proposal",
+        progress=_model_group_event_focus_proposal_progress(
+            status="succeeded" if event_focus_complete else ("ready" if attribution_complete else "blocked"),
+            complete=event_focus_complete,
+        ),
+    )
+
     evaluation_complete = promotion_complete
     append_task(
         task_id="model_group.evaluation",
         label="Model Evaluation",
-        task_state="completed" if evaluation_complete else ("current" if attribution_complete else "future"),
-        status="succeeded" if evaluation_complete else ("ready" if attribution_complete else "blocked"),
+        task_state="completed" if evaluation_complete else ("current" if event_focus_complete else "future"),
+        status="succeeded" if evaluation_complete else ("ready" if event_focus_complete else "blocked"),
         reason=(
             "Model-group evaluation evidence is complete and available for promotion."
             if evaluation_complete
-            else "Evaluation is ready to aggregate replay metrics, guardrails, incumbent comparison, and Layer 10 attribution evidence."
-            if attribution_complete
-            else "Waiting for Layer 10 attribution before evaluation can run."
+            else "Evaluation is ready to aggregate replay metrics, guardrails, incumbent comparison, Layer 10 attribution, and event-focus proposal evidence."
+            if event_focus_complete
+            else "Waiting for Layer 10 event-focus proposals before evaluation can run."
         ),
         receipt_refs=list(promotion_artifacts["receipt_refs"]) if promotion_artifacts else None,
-        blockers=[] if attribution_complete else ["model_group.model_10_event_risk_governor"],
+        blockers=[] if event_focus_complete else ["model_group.layer_10_event_focus_proposal"],
         stage_type="model_evaluation",
         progress=_model_group_evaluation_progress(
-            status="succeeded" if evaluation_complete else ("ready" if attribution_complete else "blocked"),
+            status="succeeded" if evaluation_complete else ("ready" if event_focus_complete else "blocked"),
             complete=evaluation_complete,
         ),
     )

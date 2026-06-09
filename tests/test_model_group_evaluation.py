@@ -162,6 +162,38 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        proposal_root = dataset_root / "post_replay_event_focus_proposal_runs" / "event_focus_fixture"
+        proposal_root.mkdir(parents=True)
+        proposal_rows_path = proposal_root / "event_focus_proposals.jsonl"
+        proposal_rows_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "model_10_event_risk_governor_event_focus_proposal",
+                    "event_focus_proposal_id": "focus_1",
+                    "proposal_status": "watch_candidate",
+                    "event_ref": "event_candidate_fixture",
+                    "supporting_failure_count": 1,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (proposal_root / "event_focus_proposal_receipt.json").write_text(
+            json.dumps(
+                {
+                    "contract_type": "post_replay_layer_10_event_focus_proposal_receipt",
+                    "status": "succeeded",
+                    "created_at_utc": "2026-05-28T00:00:02+00:00",
+                    "layer_10_attribution_receipt_ref": str(attribution_root / "post_replay_attribution_receipt.json"),
+                    "event_focus_proposals_ref": str(proposal_rows_path),
+                    "proposal_count": 1,
+                    "accepted_event_pool_mutation_performed": False,
+                    "temporal_attention_pool_mutation_performed": False,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         return dataset_root
 
     def test_ignores_replay_failure_triage_as_layer_10_event_attribution(self):
@@ -230,7 +262,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(len(settlement_paths), 1)
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
-            self.assertEqual(receipt["ready_check_count"], 4)
+            self.assertEqual(receipt["ready_check_count"], 5)
+            self.assertIn("layer_10_event_focus_proposal", receipt["ready_checks"])
             review = json.loads(review_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(review["agent_invocation_status"], "completed")
             self.assertEqual(review["recommendation"], "deferred")
@@ -320,6 +353,36 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "event_candidate_count": 2,
                         "failure_scope_triage_status": "passed",
                         "control_analysis_status": "passed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            refreshed_proposal_root = dataset_root / "post_replay_event_focus_proposal_runs" / "event_focus_refreshed"
+            refreshed_proposal_root.mkdir(parents=True)
+            refreshed_proposal_rows = refreshed_proposal_root / "event_focus_proposals.jsonl"
+            refreshed_proposal_rows.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "model_10_event_risk_governor_event_focus_proposal",
+                        "event_focus_proposal_id": "focus_2",
+                        "proposal_status": "watch_candidate",
+                        "event_ref": "event_candidate_refreshed",
+                        "supporting_failure_count": 1,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (refreshed_proposal_root / "event_focus_proposal_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "post_replay_layer_10_event_focus_proposal_receipt",
+                        "status": "succeeded",
+                        "created_at_utc": "2026-05-28T00:00:03.500000+00:00",
+                        "layer_10_attribution_receipt_ref": str(refreshed_attribution_receipt),
+                        "event_focus_proposals_ref": str(refreshed_proposal_rows),
+                        "proposal_count": 1,
                     }
                 )
                 + "\n",
