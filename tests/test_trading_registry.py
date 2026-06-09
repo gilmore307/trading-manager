@@ -504,10 +504,52 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("event-strategy-promotion-review", focus_row["applies_to"])
         self.assertIn("model_group.layer_10_event_attribution", focus_row["applies_to"])
 
+        temporal_attention_candidate = rows["MANAGER_POST_REPLAY_TEMPORAL_ATTENTION_CANDIDATE_ROW"]
+        self.assertEqual(
+            temporal_attention_candidate["payload"],
+            "model_10_event_risk_governor_temporal_attention_candidate",
+        )
+        self.assertIn("temporal_attention_pool", temporal_attention_candidate["applies_to"])
+
+        occurrence_scan = rows["MANAGER_POST_REPLAY_EVENT_FAMILY_OCCURRENCE_SCAN_ROW"]
+        self.assertEqual(
+            occurrence_scan["payload"],
+            "model_10_event_risk_governor_event_family_occurrence_scan_row",
+        )
+
+        bias_packet = rows["MANAGER_POST_REPLAY_EVENT_FAMILY_BIAS_ASSOCIATION_PACKET"]
+        self.assertEqual(
+            bias_packet["payload"],
+            "model_10_event_risk_governor_event_family_bias_association_packet",
+        )
+        self.assertIn("event-strategy-promotion-review", bias_packet["applies_to"])
+
+        strategy_review = rows["EVENT_STRATEGY_PROMOTION_REVIEW"]
+        self.assertEqual(strategy_review["payload"], "event_strategy_promotion_review")
+        self.assertIn("agent_review", strategy_review["applies_to"])
+
+        attention_pool_entry = rows["MANAGER_POST_REPLAY_TEMPORAL_ATTENTION_POOL_ENTRY"]
+        self.assertEqual(
+            attention_pool_entry["payload"],
+            "model_10_event_risk_governor_temporal_attention_pool_entry",
+        )
+        self.assertIn("layer_4_state_overlay_candidate", attention_pool_entry["applies_to"])
+
         runtime_surfaces = rows["MANAGER_POST_REPLAY_ATTRIBUTION_RUNTIME_SURFACES"]
         self.assertIn("post_replay_failure_triage_runs", runtime_surfaces["payload"])
         self.assertIn("event_focus_proposals.jsonl", runtime_surfaces["payload"])
+        self.assertIn("temporal_attention_candidate_pool.jsonl", runtime_surfaces["payload"])
+        self.assertIn("event_family_occurrence_scan.jsonl", runtime_surfaces["payload"])
+        self.assertIn("event_family_bias_association_packets.jsonl", runtime_surfaces["payload"])
+        self.assertIn("event_strategy_promotion_reviews.jsonl", runtime_surfaces["payload"])
+        self.assertIn("accepted_temporal_attention_pool_entries.jsonl", runtime_surfaces["payload"])
         self.assertIn("model_group.layer_10_event_attribution", runtime_surfaces["payload"])
+
+        review_defaults = rows["MANAGER_LAYER_10_EVENT_STRATEGY_REVIEW_DEFAULTS"]
+        self.assertIn("codex_model=gpt-5.5", review_defaults["payload"])
+        self.assertIn("timeout_seconds=900", review_defaults["payload"])
+        self.assertIn("max_agent_review_packets=3", review_defaults["payload"])
+        self.assertIn("--local-fallback-review", review_defaults["payload"])
 
         focus_count = rows["EVENT_FOCUS_PROPOSAL_COUNT"]
         self.assertEqual(focus_count["kind"], "field")
@@ -525,6 +567,21 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(temporal_mutation_flag["payload"], "temporal_attention_pool_mutation_performed")
         self.assertIn("safety_flag", temporal_mutation_flag["applies_to"])
 
+        field_payloads = {
+            "TEMPORAL_ATTENTION_CANDIDATE_COUNT": "temporal_attention_candidate_count",
+            "EVENT_FAMILY_OCCURRENCE_SCAN_ROW_COUNT": "event_family_occurrence_scan_row_count",
+            "EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_COUNT": "event_family_bias_association_packet_count",
+            "EVENT_STRATEGY_PROMOTION_REVIEW_COUNT": "event_strategy_promotion_review_count",
+            "ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_COUNT": "accepted_temporal_attention_pool_entry_count",
+            "EVENT_STRATEGY_PROMOTION_REVIEW_STATUS": "event_strategy_promotion_review_status",
+            "EVENT_EFFECT_MODE": "event_effect_mode",
+            "STATE_SIGNAL_TYPE": "state_signal_type",
+            "LAYER_4_STATE_OVERLAY": "layer_4_state_overlay",
+        }
+        for key, payload in field_payloads.items():
+            self.assertEqual(rows[key]["kind"], "field")
+            self.assertEqual(rows[key]["payload"], payload)
+
         event_focus_proposals_ref = rows["EVENT_FOCUS_PROPOSALS_REF"]
         self.assertEqual(event_focus_proposals_ref["kind"], "path_field")
         self.assertEqual(event_focus_proposals_ref["payload"], "event_focus_proposals_ref")
@@ -537,6 +594,29 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("dashboard_task_timeline", layer_ten_event_focus_proposals_ref["applies_to"])
 
+        path_field_payloads = {
+            "TEMPORAL_ATTENTION_CANDIDATE_POOL_REF": "temporal_attention_candidate_pool_ref",
+            "EVENT_FAMILY_OCCURRENCE_SCAN_REF": "event_family_occurrence_scan_ref",
+            "EVENT_FAMILY_BIAS_ASSOCIATION_PACKETS_REF": "event_family_bias_association_packets_ref",
+            "EVENT_STRATEGY_PROMOTION_REVIEWS_REF": "event_strategy_promotion_reviews_ref",
+            "ACCEPTED_TEMPORAL_ATTENTION_POOL_REF": "accepted_temporal_attention_pool_ref",
+        }
+        for key, payload in path_field_payloads.items():
+            self.assertEqual(rows[key]["kind"], "path_field")
+            self.assertEqual(rows[key]["payload"], payload)
+
+        status_payloads = {
+            "EVENT_EFFECT_MODE_OBSERVED_MARKET_IMPACT": "observed_market_impact",
+            "EVENT_EFFECT_MODE_PROSPECTIVE_UNCERTAINTY": "prospective_uncertainty",
+            "STATE_SIGNAL_TYPE_RISK_STATE": "risk_state",
+            "STATE_SIGNAL_TYPE_UNCERTAINTY_STATE": "uncertainty_state",
+            "LAYER_4_STATE_OVERLAY_EVENT_RISK_STATE_SHIFT": "event_risk_state_shift",
+            "LAYER_4_STATE_OVERLAY_EVENT_UNCERTAINTY_RISK_ELEVATED": "event_uncertainty_risk_elevated",
+        }
+        for key, payload in status_payloads.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
+
         triage_script = rows["MODEL_GROUP_POST_REPLAY_FAILURE_TRIAGE_RUN"]
         self.assertEqual(triage_script["kind"], "script")
         self.assertIn("run_model_group_post_replay_attribution.py", triage_script["path"])
@@ -544,6 +624,7 @@ class RegistryHelperTests(unittest.TestCase):
         layer_ten_script = rows["MODEL_GROUP_LAYER_10_EVENT_ATTRIBUTION_RUN"]
         self.assertEqual(layer_ten_script["kind"], "script")
         self.assertIn("run_model_group_layer_ten_attribution.py", layer_ten_script["path"])
+        self.assertIn("event_strategy_promotion_review", layer_ten_script["applies_to"])
 
         self.assertNotIn("event_interpretation_v1", {row["payload"] for row in rows.values()})
 
@@ -1921,9 +2002,14 @@ class RegistryHelperTests(unittest.TestCase):
             "candidate_eligibility_state",
             "candidate_generation_reason_codes",
             "earnings_guidance_event_family",
+            "event_effect_mode",
+            "event_family_bias_association_packet",
             "event_family_scouting_packet",
             "fold_scoped_source_data",
             "detector_run",
+            "layer_04_event_failure_risk",
+            "layer_4_state_overlay",
+            "layer_4_state_overlay_candidate",
             "layer_10_event_risk_governor",
             "manager_layer_ten_event_risk_governor_input_materialization",
             "ready_signal",
@@ -1933,7 +2019,9 @@ class RegistryHelperTests(unittest.TestCase):
             "replay_freeze_gate",
             "retention_class",
             "storage_lifecycle",
+            "state_signal_type",
             "target_state_vector_model",
+            "temporal_attention_pool",
             "trading-storage",
         }
 
