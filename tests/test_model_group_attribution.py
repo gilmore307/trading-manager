@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.model_group_attribution import run_model_group_post_replay_attribution_if_ready
+from trading_manager_tasks.model_group_layer_ten_attribution import run_model_group_layer_ten_attribution_if_ready
 
 
 class ModelGroupAttributionTests(unittest.TestCase):
@@ -133,6 +134,98 @@ class ModelGroupAttributionTests(unittest.TestCase):
             decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root)
 
             self.assertIsNone(decision)
+
+    def test_writes_real_layer_10_attribution_receipt_from_event_observation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+            triage_decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root)
+            self.assertIsNotNone(triage_decision)
+            observation_root = storage_root / "runtime" / "layer_04_event_observation_inputs"
+            observation_root.mkdir(parents=True)
+            (observation_root / "2021-01_2021-02.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_layer_04_event_observation_materialization",
+                        "reviewed_event_interpretations": [
+                            {
+                                "contract_type": "event_interpretation_v1",
+                                "schema_version": 1,
+                                "policy_version": "event_interpretation_v1",
+                                "source_artifact_ref": "fixture://event/btc_liquidity_disruption",
+                                "source_artifact_hash": "sha256:fixture",
+                                "source_name": "fixture",
+                                "source_type": "reviewed_fixture",
+                                "published_time": "2021-01-05T10:00:00-05:00",
+                                "available_time": "2021-01-05T10:05:00-05:00",
+                                "interpreted_at": "2021-01-05T10:06:00-05:00",
+                                "interpreter_agent_id": "unit",
+                                "interpreter_model_id": "unit",
+                                "prompt_policy_hash": "unit",
+                                "normalized_event_type": "microstructure_liquidity_disruption",
+                                "event_domain_tags": ["crypto", "liquidity"],
+                                "affected_scope": "target",
+                                "affected_entities": ["BTC"],
+                                "direction_bias_score": -0.5,
+                                "intensity_score": 0.8,
+                                "uncertainty_score": 0.2,
+                                "novelty_score": 0.7,
+                                "source_quality_score": 0.8,
+                                "evidence_confidence_score": 0.9,
+                                "canonical_relation": {"relation_type": "canonical"},
+                                "rationale_summary": "Fixture PIT event near the failed replay decision.",
+                                "evidence_spans": [{"source_ref": "fixture://event/btc_liquidity_disruption"}],
+                                "review_status": "reviewed",
+                                "standardization_status": "standardized",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_layer_ten_attribution_if_ready(storage_root=storage_root)
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_layer_10_event_attribution_executed")
+            receipt_paths = list((dataset_root / "post_replay_attribution_runs").glob("*/post_replay_attribution_receipt.json"))
+            self.assertEqual(len(receipt_paths), 1)
+            receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
+            self.assertEqual(receipt["contract_type"], "post_replay_layer_10_event_attribution_receipt")
+            self.assertTrue(receipt["event_evidence_consumed"])
+            self.assertEqual(receipt["event_candidate_count"], 1)
+            self.assertEqual(receipt["event_observation_count"], 1)
+            self.assertEqual(receipt["control_analysis_status"], "passed")
+            rows = [
+                json.loads(line)
+                for line in Path(receipt["attribution_rows_ref"]).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(rows[0]["contract_type"], "model_10_event_risk_governor_event_attribution_row")
+            self.assertEqual(rows[0]["attribution_status"], "attributed")
+            self.assertFalse(receipt["layer_4_promotion_performed"])
+
+    def test_layer_10_backoff_when_event_evidence_missing(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+            triage_decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root)
+            self.assertIsNotNone(triage_decision)
+
+            decision = run_model_group_layer_ten_attribution_if_ready(storage_root=storage_root)
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_layer_10_event_evidence_missing")
+            self.assertFalse((dataset_root / "post_replay_attribution_runs").exists())
 
 
 if __name__ == "__main__":

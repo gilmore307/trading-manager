@@ -25,6 +25,7 @@ from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 from .model_group_attribution import run_model_group_post_replay_attribution_if_ready
 from .model_group_evaluation import run_model_group_evaluation_if_ready
+from .model_group_layer_ten_attribution import run_model_group_layer_ten_attribution_if_ready
 from .model_group_replay_option_features import run_model_group_replay_option_features_for_replay_backoff
 from .model_group_replay_dataset import run_model_group_replay_dataset_if_ready
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_replay_if_ready
@@ -1762,6 +1763,10 @@ def run_daemon_loop(
                             storage_root=storage_root,
                             execute=False,
                         )
+                        layer_ten_attribution_probe = run_model_group_layer_ten_attribution_if_ready(
+                            storage_root=storage_root,
+                            execute=False,
+                        )
                         evaluation_probe = run_model_group_evaluation_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -1772,6 +1777,7 @@ def run_daemon_loop(
                             or replay_dataset_probe is not None
                             or replay_probe is not None
                             or attribution_probe is not None
+                            or layer_ten_attribution_probe is not None
                             or evaluation_probe is not None
                         )
                         lane_limit = 1
@@ -1976,6 +1982,30 @@ def run_daemon_loop(
                                 row["worker_id"] = "post_replay_attribution_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                        layer_ten_attribution_decision = run_model_group_layer_ten_attribution_if_ready(
+                            storage_root=storage_root,
+                            execute=execute_model_group_attribution,
+                        )
+                        if layer_ten_attribution_decision is not None:
+                            append_decision_log(decision_log_path, layer_ten_attribution_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=layer_ten_attribution_decision)
+                            state = replace(
+                                state,
+                                start_month=active_start_month,
+                                end_month=active_end_month,
+                                last_next_internal_stage="layer_10_event_attribution",
+                                last_work_selection_reason="model_group_layer_10_event_attribution_ready",
+                                updated_utc=completed,
+                            )
+                            refresh_needed = refresh_needed or layer_ten_attribution_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(layer_ten_attribution_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = layer_ten_attribution_decision.summary_row()
+                                row["worker_id"] = "layer_10_event_attribution_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
                         evaluation_decision = run_model_group_evaluation_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -2158,6 +2188,22 @@ def run_daemon_loop(
                                 row["worker_id"] = "post_replay_attribution_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                        layer_ten_attribution_decision = run_model_group_layer_ten_attribution_if_ready(
+                            storage_root=storage_root,
+                            execute=execute_model_group_attribution,
+                        )
+                        if layer_ten_attribution_decision is not None:
+                            append_decision_log(decision_log_path, layer_ten_attribution_decision)
+                            completed = utc_now_iso()
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=layer_ten_attribution_decision)
+                            refresh_needed = refresh_needed or layer_ten_attribution_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(layer_ten_attribution_decision, advanced_month=False)
+                            decisions_this_cycle += 1
+                            if output is not None:
+                                row = layer_ten_attribution_decision.summary_row()
+                                row["worker_id"] = "layer_10_event_attribution_worker_1"
+                                output.write(json.dumps(row, sort_keys=True) + "\n")
+                                output.flush()
                         evaluation_decision = run_model_group_evaluation_if_ready(
                             storage_root=storage_root,
                             selected_target_symbol=selected_target_symbol,
@@ -2246,7 +2292,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dashboard-refresh-service-unit", default=DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT, help="systemd service unit to start for event-driven dashboard read-model refresh.")
     parser.add_argument("--disable-model-group-replay-dataset", action="store_true", help="Disable automatic model-group replay dataset preparation, acquisition, and freeze admission.")
     parser.add_argument("--disable-model-group-replay", action="store_true", help="Disable automatic side-effect-free model-group replay dispatch.")
-    parser.add_argument("--disable-model-group-attribution", action="store_true", help="Disable automatic side-effect-free post-replay Layer 10 attribution dispatch.")
+    parser.add_argument("--disable-model-group-attribution", action="store_true", help="Disable automatic post-replay failure triage and Layer 10 event attribution dispatch.")
     parser.add_argument("--disable-model-group-evaluation", action="store_true", help="Disable automatic side-effect-free model-group evaluation evidence build.")
     parser.add_argument("--disable-source-existing-bootstrap", action="store_true", help="Disable startup source-existing bootstrap. Default service startup inspects source tables and seeds workflow acquisition state so existing source data is reused.")
     parser.add_argument("--source-bootstrap-database-url", help="Database URL for startup source-existing bootstrap; defaults to OpenClaw database resolution.")

@@ -63,6 +63,13 @@ observations or candidates, event-evidence refs, and control/co-event/confounder
 analysis. Evaluation must not treat generic failure triage rows as completed
 Layer 10 event attribution.
 
+The manager-owned historical workflow therefore has two explicit post-replay
+steps before evaluation: first `post_replay_failure_triage`, then
+`layer_10_event_attribution`. If failure triage is ready but no reviewed
+point-in-time event evidence exists, Layer 10 must back off and prepare the
+bounded event-feed backfill task keys needed to materialize event observations;
+that preparation is not itself attribution and does not call providers.
+
 The same boundary is required in live operation. Execution may run C07 as a
 realtime failure/deviation watch during market hours, then run settlement
 attribution after the regular session closes or in another explicitly accepted

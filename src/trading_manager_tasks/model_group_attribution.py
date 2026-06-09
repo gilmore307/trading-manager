@@ -37,7 +37,7 @@ def run_model_group_post_replay_attribution_if_ready(
     now_utc: datetime | None = None,
     force: bool = False,
 ) -> SchedulerDecision | None:
-    """Run one post-replay attribution dispatch when replay is complete."""
+    """Run one post-replay failure triage dispatch when replay is complete."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     replay_receipt = _latest_replay_execution_receipt(dataset_root)
@@ -212,6 +212,7 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
         "attribution_id": f"l10_attr_{attribution_index:08d}",
         "source_decision_id": source_id,
         "source_decision_index": decision_index,
+        "decision_time": _decision_time(row),
         "triage_status": "triaged",
         "failure_type": failure_type,
         "replay_month": _replay_month(row),
@@ -227,6 +228,14 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
             else "rejected decision missed a positive next outcome"
         ),
     }
+
+
+def _decision_time(row: Mapping[str, Any]) -> str | None:
+    for key in ("decision_time", "timestamp", "decision_timestamp", "created_at", "created_at_utc"):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value
+    return None
 
 
 def _replay_month(row: Mapping[str, Any]) -> str | None:
