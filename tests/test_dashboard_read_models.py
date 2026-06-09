@@ -13,6 +13,7 @@ from trading_manager_tasks.dashboard_read_models import (
     _agent_errors_for_task,
     _attach_task_error_context,
     _close_global_nonblocking_agent_errors,
+    _mark_superseded_agent_errors,
     _task_error_intervention_status,
     build_historical_task_progress_summary,
 )
@@ -117,6 +118,39 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(by_ref["ERR-000003"]["handling_status"], "closed")
         self.assertEqual(by_ref["ERR-000003"]["dashboard_severity"], "notice")
         self.assertEqual(by_ref["ERR-000004"]["handling_status"], "open")
+
+    def test_supersedes_retired_layer_nine_option_data_acquisition_errors(self):
+        rows = [
+            {
+                "error_ref": "ERR-000005",
+                "repair_status": "blocked",
+                "handling_status": "open",
+                "dashboard_severity": "warning",
+                "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests",
+                "root_cause": "old layer_09_option_expression.data_acquisition route failed before current shared source route",
+            },
+            {
+                "error_ref": "ERR-000006",
+                "repair_status": "repaired",
+                "handling_status": "closed",
+                "dashboard_severity": "notice",
+                "summary": "provider stage layer_09_option_expression.data_acquisition was already closed",
+                "root_cause": "old layer_09_option_expression.data_acquisition route already has a closure receipt",
+            }
+        ]
+        task_timeline = [
+            {"task_id": "layer_03_target_state_vector.option_chain_data_acquisition"},
+            {"task_id": "layer_09_option_expression.feature_generation"},
+        ]
+
+        updated = _mark_superseded_agent_errors(rows, task_timeline)
+
+        self.assertEqual(updated[0]["repair_status"], "superseded")
+        self.assertEqual(updated[0]["handling_status"], "closed")
+        self.assertEqual(updated[0]["dashboard_severity"], "notice")
+        self.assertIn("option_chain_state_source", updated[0]["retry_recommendation"])
+        self.assertEqual(updated[1]["repair_status"], "repaired")
+        self.assertEqual(updated[1]["handling_status"], "closed")
 
     def _write_service_files(self, root: Path) -> tuple[Path, Path, Path]:
         service = root / "deploy" / "systemd" / "trading-manager-historical-scheduler.service"
@@ -2508,7 +2542,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "diagnosis_status": "repaired_verified",
                 "root_cause": "workflow now blocks missing target-local feed artifacts before execution",
                 "repair": {"repair_status": "repaired", "files_changed": ["/repo/workflow.py"]},
-                "retry_recommendation": "do_not_retry",
+                "retry_recommendation": "do_not_retry: retired direct materialization route",
                 "blockers": ["target-local feed artifacts are unavailable"],
             }
             (request_root / "agent_error_diagnosis.json").write_text(
@@ -2748,6 +2782,110 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["handling_status"], "open")
         self.assertEqual(agent_errors[0]["dashboard_severity"], "error")
         self.assertIn("remote durability", agent_errors[0]["retry_recommendation"])
+
+    def test_agent_error_summary_successful_retry_closes_stale_blocked_closure(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            agent_root = runtime / "agent_error_handling"
+            request_root = agent_root / "erragent_blocked_then_retry_closed"
+            request_root.mkdir(parents=True, exist_ok=True)
+            final_report = {
+                "diagnosis_status": "repaired_with_push_blocked",
+                "root_cause": "stage repair was initially blocked before retry evidence arrived",
+                "repair_attempted": True,
+                "retry_recommendation": "retry stage after repair",
+            }
+            (request_root / "agent_error_diagnosis.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_error_diagnosis",
+                        "schema_version": "1",
+                        "diagnosis_id": "errdiag_blocked_then_retry_closed",
+                        "request_ref": "erragent_blocked_then_retry_closed",
+                        "agent_ref": "trader",
+                        "runner_command": "codex_cli",
+                        "status": "completed",
+                        "return_code": 0,
+                        "stdout": json.dumps(final_report),
+                        "stderr": "",
+                        "completed_at_utc": "2026-05-18T14:05:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (request_root / "agent_repair_closure_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_repair_closure_receipt",
+                        "schema_version": "1",
+                        "error_ref": "ERR-000018",
+                        "closure_status": "blocked",
+                        "blockers": ["stale closure blocker"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            receipt_dir = runtime / "model_training_stage_receipts" / "layer_09_option_expression__model_generation__train"
+            receipt_dir.mkdir(parents=True, exist_ok=True)
+            (receipt_dir / "2026-05-18T141000.000000+0000.receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "component_completion_receipt",
+                        "manager_stage_id": "layer_09_option_expression.model_generation.train",
+                        "status": "succeeded",
+                        "completed_at": "2026-05-18T14:10:00Z",
+                        "runs": [{"status": "succeeded", "return_code": 0}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 18,
+                        "error_ref": "ERR-000018",
+                        "error_fingerprint": "errfp_blocked_then_retry_closed",
+                        "request_id": "erragent_blocked_then_retry_closed",
+                        "request_path": "storage/runtime/agent_error_handling/erragent_blocked_then_retry_closed/server_error_agent_request.json",
+                        "diagnosis_path": "storage/runtime/agent_error_handling/erragent_blocked_then_retry_closed/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.stage_executor",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.model_training_stage",
+                        "error_kind": "stage_command_failed",
+                        "severity": "error",
+                        "summary": "model training stage layer_09_option_expression.model_generation.train command returned non-zero status",
+                        "exit_code": 1,
+                        "occurred_at_utc": "2026-05-18T14:02:00Z",
+                        "created_at_utc": "2026-05-18T14:02:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T14:11:00Z")
+
+        agent_errors = payload["chart_payload"]["agent_error_summary"]
+        self.assertEqual(agent_errors[0]["error_ref"], "ERR-000018")
+        self.assertEqual(agent_errors[0]["repair_status"], "repaired")
+        self.assertEqual(agent_errors[0]["handling_status"], "closed")
+        self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
+        self.assertIn("retry completed successfully", agent_errors[0]["retry_recommendation"])
 
     def test_agent_error_summary_closes_repaired_with_blockers_when_exact_retry_is_forbidden(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -354,8 +354,10 @@ def _agent_error_handling_status(
         payload = agent_payload or {}
         retry_recommendation = str(payload.get("retry_recommendation") or "").lower()
         blockers = payload.get("blockers")
-        if retry_recommendation in {"do_not_retry", "no_retry", "not_applicable"} or retry_recommendation.startswith(
-            "do not retry"
+        if (
+            retry_recommendation in {"do_not_retry", "no_retry", "not_applicable"}
+            or retry_recommendation.startswith("do_not_retry")
+            or retry_recommendation.startswith("do not retry")
         ):
             return "closed"
         if retry_recommendation == "manual_review" and isinstance(blockers, list) and blockers:
@@ -450,14 +452,14 @@ def _agent_error_summary(
             retry_receipt = _successful_retry_receipt(storage_root, stage_id)
             if retry_receipt and repair_status not in {"superseded", "no_action_needed"}:
                 repair_status = "repaired"
-        handling_status = _agent_error_handling_status(row, repair_status, agent_payload)
-        if retry_receipt and repair_status == "repaired":
-            handling_status = "closed"
         repair_status, handling_status = _apply_agent_repair_closure_receipt(
             repair_status,
-            handling_status,
+            _agent_error_handling_status(row, repair_status, agent_payload),
             closure_receipt,
         )
+        if retry_receipt and repair_status not in {"superseded", "no_action_needed"}:
+            repair_status = "repaired"
+            handling_status = "closed"
         repair_payload = agent_payload.get("repair") if isinstance(agent_payload.get("repair"), Mapping) else {}
         files_changed = agent_payload.get("files_changed")
         if not isinstance(files_changed, list):
@@ -503,12 +505,14 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
         task_id == "layer_10_event_risk_governor" or task_id.startswith("layer_10_event_risk_governor.")
         for task_id in current_task_ids
     )
-    if not has_current_layer_ten_event_risk:
-        return agent_errors
     updated_rows: list[dict[str, Any]] = []
     for row in agent_errors:
         text = " ".join(str(row.get(field) or "") for field in ("summary", "root_cause", "retry_recommendation"))
-        if "layer_09_event_risk_governor" in text and "layer_09_event_risk_governor.data_acquisition" not in current_task_ids:
+        if (
+            has_current_layer_ten_event_risk
+            and "layer_09_event_risk_governor" in text
+            and "layer_09_event_risk_governor.data_acquisition" not in current_task_ids
+        ):
             updated = dict(row)
             updated["repair_status"] = "superseded"
             updated["handling_status"] = "closed"
@@ -516,6 +520,20 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
             updated["retry_recommendation"] = (
                 "Superseded by layer_10_event_risk_governor. "
                 "Prepare fold-scoped Layer 4 event-observation artifacts before replay; Layer 10 starts after replay for attribution."
+            )
+            updated_rows.append(updated)
+        elif (
+            str(row.get("handling_status") or "") != "closed"
+            and "layer_09_option_expression.data_acquisition" in text
+            and "layer_09_option_expression.data_acquisition" not in current_task_ids
+        ):
+            updated = dict(row)
+            updated["repair_status"] = "superseded"
+            updated["handling_status"] = "closed"
+            updated["dashboard_severity"] = "notice"
+            updated["retry_recommendation"] = (
+                "Superseded by shared layer_03_target_state_vector.option_chain_data_acquisition; "
+                "current Layer 9 option-expression features are generated from option_chain_state_source."
             )
             updated_rows.append(updated)
         else:
