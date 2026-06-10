@@ -3093,14 +3093,17 @@ class RegistryHelperTests(unittest.TestCase):
             "model_realtime_decision_route_plan_validation",
         )
         self.assertIn(
-            "background_context_component",
+            "component_01_intake",
             rows["MODEL_REALTIME_DECISION_COMPONENT_ORDER"]["payload"],
         )
         self.assertIn(
-            "residual_event_governance_component",
+            "component_06_execution_gate",
             rows["MODEL_REALTIME_DECISION_REQUIRED_COMPONENTS"]["payload"],
         )
-        self.assertEqual(rows["MODEL_REALTIME_DECISION_OPTIONAL_COMPONENTS"]["payload"], "option_expression_component")
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_OPTIONAL_COMPONENTS"]["payload"],
+            "component_04_option_review;component_07_failure_review",
+        )
         self.assertIn("plan_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_PLAN"]["path"])
         self.assertIn("validate_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_VALIDATE"]["path"])
         self.assertIn("no_production_model_activation", rows["MODEL_REALTIME_DECISION_HANDOFF_POLICY"]["payload"])
