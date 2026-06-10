@@ -704,6 +704,30 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("build_event_family_impact_window_replay.py", replay_runner["path"])
         self.assertIn("event_family_impact_window_replay_overlay", replay_runner["applies_to"])
 
+        family_terms = {
+            "BREAKING_NEWS_SHOCK_EVENT_FAMILY": "breaking_news_shock",
+            "CPI_INFLATION_RELEASE_EVENT_FAMILY": "cpi_inflation_release",
+            "TRIPLE_WITCHING_CALENDAR_EVENT_FAMILY": "triple_witching_calendar",
+        }
+        for key, payload in family_terms.items():
+            self.assertEqual(rows[key]["kind"], "term")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("event_family_key", rows[key]["applies_to"])
+
+        self.assertEqual(rows["EVENT_FAMILY_KEY"]["kind"], "field")
+        self.assertEqual(rows["EVENT_FAMILY_KEY"]["payload"], "event_family_key")
+        self.assertEqual(rows["EVENT_WINDOW_POLICY"]["kind"], "field")
+        self.assertEqual(rows["EVENT_WINDOW_POLICY"]["payload"], "window_policy")
+
+        window_policies = {
+            "CALIBRATED_IMPACT_WINDOW_POLICY": "calibrated_impact_window",
+            "KEYWORD_SQL_OBSERVATION_DAY_UNVALIDATED_POLICY": "keyword_sql_observation_day_unvalidated",
+        }
+        for key, payload in window_policies.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertEqual(rows[key]["applies_to"], "window_policy")
+
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -2105,6 +2129,7 @@ class RegistryHelperTests(unittest.TestCase):
             "target_state_vector_model",
             "temporal_attention_pool",
             "trading-storage",
+            "window_policy",
         }
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
