@@ -857,6 +857,34 @@ class RegistryHelperTests(unittest.TestCase):
         }
         self.assertFalse(retired_contrast_keys & rows.keys())
 
+    def test_event_family_remaining_acceptance_names_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        self.assertEqual(rows["ACCEPTANCE_STATUS"]["kind"], "field")
+        self.assertEqual(rows["ACCEPTANCE_STATUS"]["payload"], "acceptance_status")
+        self.assertEqual(rows["ACCEPTED_CURRENT_USE"]["kind"], "field")
+        self.assertEqual(rows["ACCEPTED_CURRENT_USE"]["payload"], "accepted_current_use")
+
+        status_values = {
+            "EVENT_FAMILY_ACCEPTANCE_BLOCKED_MISSING_LIQUIDITY_EVIDENCE": "blocked_missing_liquidity_evidence",
+            "EVENT_FAMILY_ACCEPTANCE_BLOCKED_MISSING_PIT_EXPECTATION_OR_COMPARABLE_BASELINE": "blocked_missing_pit_expectation_or_comparable_baseline",
+            "EVENT_FAMILY_ACCEPTANCE_BLOCKED_MISSING_RESIDUAL_DEFINITION": "blocked_missing_residual_definition",
+            "EVENT_FAMILY_ACCEPTANCE_PACKET_REQUIRED_HIGH_PRIORITY": "packet_required_high_priority",
+            "EVENT_FAMILY_ACCEPTANCE_PACKET_REQUIRED_NORMAL_PRIORITY": "packet_required_normal_priority",
+            "EVENT_FAMILY_ACCEPTANCE_RISK_ONLY_CANDIDATE_PENDING_CANONICAL_EVIDENCE": "risk_only_candidate_pending_canonical_evidence",
+            "EVENT_FAMILY_ACCEPTANCE_RISK_ONLY_SCOUTING_UNDERPOWERED": "risk_only_scouting_underpowered",
+            "EVENT_FAMILY_CURRENT_USE_MACRO_RISK_SURPRISE_CONTROL_PENDING_CANONICAL_TE_HISTORY": "macro_risk_surprise_control_pending_canonical_te_history",
+        }
+        for key, payload in status_values.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("event_family_remaining_acceptance", rows[key]["applies_to"])
+
+        registry_text = Path("scripts/registry/current.csv").read_text(encoding="utf-8")
+        self.assertNotIn("risk_only_candidate_temporary_evidence", registry_text)
+        self.assertNotIn("temporary_macro_risk_surprise_evidence_pending_canonical_te_history", registry_text)
+
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -2245,6 +2273,7 @@ class RegistryHelperTests(unittest.TestCase):
             "candidate_eligibility_state",
             "candidate_generation_reason_codes",
             "earnings_guidance_event_family",
+            "event_family_remaining_acceptance",
             "event_lifecycle_stage",
             "event_release_phase",
             "event_failure_risk_vector",
