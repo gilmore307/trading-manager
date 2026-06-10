@@ -3085,14 +3085,26 @@ class RegistryHelperTests(unittest.TestCase):
             rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["payload"],
             "model_realtime_decision_route_plan",
         )
-        self.assertIn("historical_model_decision_route", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
+        self.assertIn("current_model_component_route", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
+        self.assertIn("execution unit is component", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["note"])
+        self.assertNotIn("layers_1_10", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
         self.assertEqual(
             rows["MODEL_REALTIME_DECISION_ROUTE_PLAN_VALIDATION"]["payload"],
             "model_realtime_decision_route_plan_validation",
         )
+        self.assertIn(
+            "background_context_component",
+            rows["MODEL_REALTIME_DECISION_COMPONENT_ORDER"]["payload"],
+        )
+        self.assertIn(
+            "residual_event_governance_component",
+            rows["MODEL_REALTIME_DECISION_REQUIRED_COMPONENTS"]["payload"],
+        )
+        self.assertEqual(rows["MODEL_REALTIME_DECISION_OPTIONAL_COMPONENTS"]["payload"], "option_expression_component")
         self.assertIn("plan_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_PLAN"]["path"])
         self.assertIn("validate_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_VALIDATE"]["path"])
         self.assertIn("no_production_model_activation", rows["MODEL_REALTIME_DECISION_HANDOFF_POLICY"]["payload"])
+        self.assertIn("component_route_coverage_required", rows["MODEL_REALTIME_DECISION_HANDOFF_POLICY"]["payload"])
 
     def test_manager_realtime_shadow_handoff_receipt_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
