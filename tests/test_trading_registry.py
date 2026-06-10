@@ -801,6 +801,56 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "status_value")
             self.assertEqual(rows[key]["payload"], payload)
 
+    def test_layer_4_focus_pool_and_layer_5_contrast_names_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        focus_pool = rows["LAYER_04_FOCUS_POOL_INPUTS_20260610"]
+        self.assertEqual(focus_pool["kind"], "artifact_type")
+        self.assertEqual(focus_pool["payload"], "layer_04_focus_pool_inputs")
+        self.assertIn("layer_04_focus_pool_inputs_20260610", focus_pool["path"])
+        self.assertIn("layer_10_focus_pool_inputs", focus_pool["applies_to"])
+
+        self.assertEqual(rows["LAYER_04_FOCUS_POOL_INPUT_ROWS"]["payload"], "layer_04_focus_pool_input_rows")
+        self.assertEqual(rows["LAYER_04_FOCUS_POOL_MODEL_ROWS"]["payload"], "model_04_event_failure_risk_rows")
+
+        focus_runner = rows["MODEL_04_EVENT_FAILURE_RISK_LAYER_10_FOCUS_POOL_INPUTS_BUILD"]
+        self.assertEqual(focus_runner["kind"], "script")
+        self.assertIn("build_layer4_focus_pool_inputs.py", focus_runner["path"])
+        self.assertIn("layer10_focus_pool_inputs.py", focus_runner["path"])
+
+        contrast = rows["LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_20260610"]
+        self.assertEqual(contrast["kind"], "artifact_type")
+        self.assertEqual(contrast["payload"], "layer_05_event_conditioned_alpha_contrast")
+        self.assertIn("layer_05_event_conditioned_alpha_contrast_20260610", contrast["path"])
+        self.assertIn("diagnostic_not_promotion", contrast["applies_to"])
+
+        contrast_artifacts = {
+            "LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_SUMMARY": "event_conditioned_alpha_contrast_summary",
+            "LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_PREDICTIONS": "event_conditioned_alpha_contrast_predictions",
+            "LAYER_05_EVENT_CONDITIONED_BASELINE_ALPHA_MODEL": "baseline_after_cost_alpha_model",
+            "LAYER_05_EVENT_CONDITIONED_AFTER_COST_ALPHA_MODEL": "event_conditioned_after_cost_alpha_model",
+        }
+        for key, payload in contrast_artifacts.items():
+            self.assertEqual(rows[key]["kind"], "artifact_type")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("layer_05_event_conditioned_alpha_contrast", rows[key]["applies_to"])
+
+        contrast_runner = rows["MODEL_05_ALPHA_CONFIDENCE_EVENT_CONDITIONED_ALPHA_CONTRAST_BUILD"]
+        self.assertEqual(contrast_runner["kind"], "script")
+        self.assertIn("build_event_conditioned_alpha_contrast.py", contrast_runner["path"])
+        self.assertIn("event_conditioned_contrast.py", contrast_runner["path"])
+        self.assertIn("diagnostic_not_promotion", contrast_runner["applies_to"])
+
+        self.assertEqual(rows["LAYER_05_LABEL_SOURCE"]["payload"], "layer_05_label_source")
+        self.assertEqual(rows["LAYER_05_DIAGNOSTIC_SCOPE"]["payload"], "layer_05_diagnostic_scope")
+        self.assertEqual(rows["SOURCE_DECISION_ID"]["payload"], "source_decision_id")
+        self.assertEqual(rows["LAYER_05_DIAGNOSTIC_SCOPE_NOT_PROMOTION"]["payload"], "diagnostic_not_promotion")
+        self.assertEqual(
+            rows["LAYER_05_LABEL_SOURCE_LAYER10_REPLAY_EXCESS_RETURN"]["payload"],
+            "layer10_replay_excess_return",
+        )
+
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
@@ -1155,6 +1205,20 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR"]["payload"], "alpha_confidence_vector")
         self.assertEqual(rows["BASE_ALPHA_VECTOR"]["payload"], "base_alpha_vector")
         self.assertEqual(rows["EVENT_FAILURE_RISK_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
+        self.assertIn("frozen_layer_10_focus_pool_contract_allowed", rows["EVENT_FAILURE_RISK_BOUNDARY_POLICY"]["payload"])
+        self.assertIn("no_layer_10_event_parameter_mutation", rows["EVENT_FAILURE_RISK_BOUNDARY_POLICY"]["payload"])
+        self.assertIn(
+            "4_event_response_strength_score_<horizon>",
+            rows["EVENT_FAILURE_RISK_VECTOR_SCORE_FAMILIES"]["payload"],
+        )
+        self.assertIn(
+            "4_event_response_direction_score_<horizon>",
+            rows["EVENT_FAILURE_RISK_VECTOR_SCORE_FAMILIES"]["payload"],
+        )
+        self.assertIn(
+            "4_event_response_uncertainty_score_<horizon>",
+            rows["EVENT_FAILURE_RISK_VECTOR_SCORE_FAMILIES"]["payload"],
+        )
         self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn("5_alpha_direction_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("5_alpha_tradability_score_<horizon>", rows["ALPHA_CONFIDENCE_VECTOR_SCORE_FAMILIES"]["payload"])
@@ -1171,6 +1235,7 @@ class RegistryHelperTests(unittest.TestCase):
             rows["ALPHA_CONFIDENCE_VECTOR_OUTPUT_TIER_POLICY"]["payload"],
             "base_unadjusted_diagnostic_only;final_adjusted_layer_5_facing",
         )
+        self.assertIn("diagnostic_not_promotion", rows["ALPHA_CONFIDENCE_EVENT_CONDITIONED_ALPHA_CONTRAST_POLICY"]["payload"])
         self.assertEqual(rows["POSITION_PROJECTION_MODEL"]["payload"], "position_projection_model")
         self.assertEqual(rows["MODEL_07_POSITION_PROJECTION"]["payload"], "model_07_position_projection")
         self.assertEqual(rows["POSITION_PROJECTION_VECTOR"]["payload"], "position_projection_vector")
@@ -2189,6 +2254,9 @@ class RegistryHelperTests(unittest.TestCase):
             "layer_4_projection_type",
             "layer_4_state_overlay",
             "layer_4_state_overlay_candidate",
+            "layer_05_diagnostic_scope",
+            "layer_05_event_conditioned_alpha_contrast",
+            "layer_05_label_source",
             "layer_10_event_risk_governor",
             "layer_10_fold_completion",
             "layer_10_fold_completion_summary",
@@ -2394,6 +2462,9 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_SCOPE_CONFIDENCE_SCORE_BY_HORIZON": "10_event_scope_confidence_score_<horizon>",
             "EVENT_SCOPE_ESCALATION_RISK_SCORE_BY_HORIZON": "10_event_scope_escalation_risk_score_<horizon>",
             "EVENT_TARGET_RELEVANCE_SCORE_BY_HORIZON": "10_event_target_relevance_score_<horizon>",
+            "EVENT_RESPONSE_STRENGTH_SCORE_BY_HORIZON": "4_event_response_strength_score_<horizon>",
+            "EVENT_RESPONSE_DIRECTION_SCORE_BY_HORIZON": "4_event_response_direction_score_<horizon>",
+            "EVENT_RESPONSE_UNCERTAINTY_SCORE_BY_HORIZON": "4_event_response_uncertainty_score_<horizon>",
             "ALPHA_DIRECTION_SCORE_BY_HORIZON": "5_alpha_direction_score_<horizon>",
             "ALPHA_STRENGTH_SCORE_BY_HORIZON": "5_alpha_strength_score_<horizon>",
             "ALPHA_EXPECTED_RETURN_SCORE_BY_HORIZON": "5_expected_return_score_<horizon>",
