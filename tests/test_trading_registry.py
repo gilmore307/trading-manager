@@ -728,6 +728,33 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], payload)
             self.assertEqual(rows[key]["applies_to"], "window_policy")
 
+    def test_layer_10_fold_completion_names_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        fold_artifact = rows["EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_20260610"]
+        self.assertEqual(fold_artifact["kind"], "artifact_type")
+        self.assertEqual(fold_artifact["payload"], "layer_10_fold_completion")
+        self.assertIn("layer_10_fold_completion_20260610", fold_artifact["path"])
+        self.assertIn("review_ready_not_promotion_approved", fold_artifact["applies_to"])
+        self.assertIn("production evidence incomplete", fold_artifact["note"])
+
+        summary = rows["EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_SUMMARY"]
+        self.assertEqual(summary["kind"], "artifact_type")
+        self.assertEqual(summary["payload"], "layer_10_fold_completion_summary")
+        self.assertIn("layer_10_fold_completion_summary.json", summary["applies_to"])
+
+        gate_matrix = rows["EVENT_RISK_GOVERNOR_LAYER_10_FAMILY_GATE_MATRIX"]
+        self.assertEqual(gate_matrix["kind"], "artifact_type")
+        self.assertEqual(gate_matrix["payload"], "layer_10_family_gate_matrix")
+        self.assertIn("layer_10_family_gate_matrix.csv", gate_matrix["applies_to"])
+
+        runner = rows["MODEL_10_EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_BUILD"]
+        self.assertEqual(runner["kind"], "script")
+        self.assertIn("build_layer_10_fold_completion.py", runner["path"])
+        self.assertIn("fold_completion.py", runner["path"])
+        self.assertIn("layer_10_fold_completion", runner["applies_to"])
+
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
