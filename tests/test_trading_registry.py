@@ -850,6 +850,29 @@ class RegistryHelperTests(unittest.TestCase):
             rows["LAYER_05_LABEL_SOURCE_LAYER10_REPLAY_EXCESS_RETURN"]["payload"],
             "layer10_replay_excess_return",
         )
+        self.assertEqual(rows["LAYER4_EVENT_FEATURE_POLICY"]["payload"], "layer4_event_feature_policy")
+        self.assertEqual(rows["LAYER4_EVENT_FEATURE_NAMES"]["payload"], "layer4_event_feature_names")
+        self.assertEqual(rows["FEATURE_CONSUMPTION_CONTRACT"]["payload"], "feature_consumption_contract")
+        self.assertEqual(rows["BASELINE_WITHOUT_LAYER4_EVENT_FEATURES"]["payload"], "baseline_without_layer4_event_features")
+        self.assertEqual(rows["BASELINE_ROLE"]["payload"], "baseline_role")
+        self.assertEqual(rows["FORMAL_TRAINING_ROUTE"]["payload"], "formal_training_route")
+        self.assertIn(
+            "consume_reviewed_layer4_event_failure_risk_vector_when_present",
+            rows["ALPHA_CONFIDENCE_LAYER4_EVENT_FEATURE_CONSUMPTION_POLICY"]["payload"],
+        )
+        self.assertEqual(
+            rows["LAYER_05_LAYER4_EVENT_FEATURE_POLICY_CONSUME_REVIEWED_WHEN_PRESENT"]["payload"],
+            "consume_reviewed_layer4_event_failure_risk_vector_when_present",
+        )
+        self.assertEqual(rows["LAYER_05_FEATURE_CONSUMPTION_FORMAL_TRAINING_INPUT"]["payload"], "formal_training_input")
+        self.assertEqual(
+            rows["LAYER_05_FEATURE_CONSUMPTION_EVALUATION_ONLY_NOT_TRAINING_ROUTE"]["payload"],
+            "evaluation_only_not_training_route",
+        )
+        self.assertEqual(
+            rows["LAYER_05_FORMAL_TRAINING_ROUTE_CONSUME_LAYER4_EVENT_FAILURE_RISK_VECTOR"]["payload"],
+            "consume_layer4_event_failure_risk_vector_when_present",
+        )
 
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -2242,11 +2265,14 @@ class RegistryHelperTests(unittest.TestCase):
             "earnings_guidance_event_family",
             "event_lifecycle_stage",
             "event_release_phase",
+            "event_failure_risk_vector",
             "event_family_bias_association_packet",
             "event_family_prior_role",
             "event_family_scouting_packet",
             "event_instance_observation_role",
             "fold_scoped_source_data",
+            "formal_training_route",
+            "feature_consumption_contract",
             "detector_run",
             "event_schedule_type",
             "event_temporal_form",
@@ -2254,6 +2280,8 @@ class RegistryHelperTests(unittest.TestCase):
             "layer_4_projection_type",
             "layer_4_state_overlay",
             "layer_4_state_overlay_candidate",
+            "layer4_event_feature_policy",
+            "baseline_role",
             "layer_05_diagnostic_scope",
             "layer_05_event_conditioned_alpha_contrast",
             "layer_05_label_source",
