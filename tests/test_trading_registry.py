@@ -503,6 +503,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(focus_row["payload"], "model_10_event_risk_governor_event_focus_proposal")
         self.assertIn("event-strategy-promotion-review", focus_row["applies_to"])
         self.assertIn("model_group.layer_10_event_attribution", focus_row["applies_to"])
+        self.assertIn("temporal_attention_pool", focus_row["applies_to"])
 
         temporal_attention_candidate = rows["MANAGER_POST_REPLAY_TEMPORAL_ATTENTION_CANDIDATE_ROW"]
         self.assertEqual(
@@ -558,6 +559,7 @@ class RegistryHelperTests(unittest.TestCase):
         focus_review_gate = rows["EVENT_FOCUS_PROPOSAL_REVIEW_GATE"]
         self.assertEqual(focus_review_gate["payload"], "event_focus_proposal_review_gate")
         self.assertIn("event-strategy-promotion-review", focus_review_gate["applies_to"])
+        self.assertNotIn("event attention pool", focus_review_gate["note"])
 
         accepted_mutation_flag = rows["ACCEPTED_EVENT_POOL_MUTATION_PERFORMED"]
         self.assertEqual(accepted_mutation_flag["payload"], "accepted_event_pool_mutation_performed")
@@ -2027,6 +2029,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
+        self.assertNotIn("event_attention_pool", Path("scripts/registry/current.csv").read_text(encoding="utf-8"))
 
         self.assertFalse({row["kind"] for row in rows} & old_status_kinds)
         status_rows = [row for row in rows if row["kind"] == "status_value"]

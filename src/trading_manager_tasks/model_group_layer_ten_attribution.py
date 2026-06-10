@@ -563,7 +563,7 @@ def _build_event_focus_proposals(
                 "event_focus_proposal_id": proposal_id,
                 "proposal_status": "watch_candidate",
                 "review_gate": "event-strategy-promotion-review",
-                "recommended_next_action": "review_before_accepting_into_event_attention_pool",
+                "recommended_next_action": "review_before_accepting_into_temporal_attention_pool",
                 "event_ref": group["event_ref"],
                 "event_summary": event_summary or None,
                 "failure_attention_reason": failure_attention_reason,
