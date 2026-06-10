@@ -58,6 +58,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "instrument_ref": "BTC-USDT",
                             "outcome_label": 0,
                             "timestamp": "2021-01-05T11:00:00-05:00",
+                            "impact_exposure_time": "2021-01-05T10:10:00-05:00",
+                            "target_expected_move_abs_return": 0.02,
                         }
                     ),
                     json.dumps({"decision_id": "filled_under_baseline", "decision_status": "approved", "outcome_label": 1, "realized_return": 0.01, "baseline_return": 0.02, "month": "2021-01"}),
@@ -258,6 +260,10 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(rows[0]["contract_type"], "model_10_event_risk_governor_event_attribution_row")
             self.assertEqual(rows[0]["attribution_status"], "attributed")
+            self.assertEqual(rows[0]["impact_exposure_time"], "2021-01-05T10:10:00-05:00")
+            self.assertEqual(rows[0]["impact_onset_basis"], "source_impact_clock")
+            self.assertEqual(rows[0]["impact_search_window_end"], "2021-01-05T10:10:00-05:00")
+            self.assertEqual(rows[0]["impact_normalized_severity_score"], 0.0)
             self.assertEqual(receipt["event_focus_proposal_count"], 1)
             self.assertFalse(receipt["accepted_event_pool_mutation_performed"])
             self.assertTrue(receipt["temporal_attention_pool_mutation_performed"])
@@ -292,6 +298,9 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(packets[0]["deterministic_gate_status"], "passed")
             self.assertEqual(packets[0]["co_event_confounder_status"], "passed")
+            self.assertEqual(packets[0]["impact_onset_status"], "passed")
+            self.assertEqual(packets[0]["impact_severity_status"], "passed")
+            self.assertEqual(packets[0]["impact_onset_basis_counts"], {"source_impact_clock": 1})
             self.assertEqual(packets[0]["event_release_phase"], "post_release")
             self.assertEqual(packets[0]["event_lifecycle_stage"], "post_release_impact_state")
             self.assertEqual(packets[0]["state_signal_type"], "impact_state")

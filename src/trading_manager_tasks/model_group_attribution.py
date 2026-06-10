@@ -206,13 +206,25 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
     else:
         failure_type = "rejected_positive_missed_opportunity"
     source_id = str(row.get("decision_id") or row.get("replay_decision_id") or f"decision_row_{decision_index}")
+    decision_time = _decision_time(row)
+    impact_profile = _impact_profile(row, failure_type=failure_type, decision_time=decision_time)
     return {
         "contract_type": FAILURE_TRIAGE_ROW_CONTRACT_TYPE,
         "stage_id": "model_group.post_replay_failure_triage",
         "attribution_id": f"l10_attr_{attribution_index:08d}",
         "source_decision_id": source_id,
         "source_decision_index": decision_index,
-        "decision_time": _decision_time(row),
+        "decision_time": decision_time,
+        "impact_exposure_time": impact_profile["impact_exposure_time"],
+        "impact_onset_time": impact_profile["impact_onset_time"],
+        "impact_onset_basis": impact_profile["impact_onset_basis"],
+        "impact_scope_type": impact_profile["impact_scope_type"],
+        "impact_direction": impact_profile["impact_direction"],
+        "impact_raw_return_delta": impact_profile["impact_raw_return_delta"],
+        "impact_magnitude_abs_return": impact_profile["impact_magnitude_abs_return"],
+        "impact_normalization_denominator": impact_profile["impact_normalization_denominator"],
+        "impact_normalized_severity_score": impact_profile["impact_normalized_severity_score"],
+        "impact_severity_basis": impact_profile["impact_severity_basis"],
         "triage_status": "triaged",
         "failure_type": failure_type,
         "replay_month": _replay_month(row),
@@ -228,6 +240,75 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
             else "rejected decision missed a positive next outcome"
         ),
     }
+
+
+def _impact_profile(row: Mapping[str, Any], *, failure_type: str, decision_time: str | None) -> dict[str, Any]:
+    explicit_onset = _first_text(
+        row,
+        (
+            "impact_exposure_time",
+            "impact_onset_time",
+            "impact_start_time",
+            "adverse_move_start_time",
+            "drawdown_start_time",
+            "market_impact_start_time",
+        ),
+    )
+    impact_exposure_time = explicit_onset or decision_time
+    realized_return = _safe_float(row.get("realized_return")) or 0.0
+    baseline_return = _safe_float(row.get("baseline_return")) or 0.0
+    raw_delta = realized_return - baseline_return
+    magnitude = abs(raw_delta)
+    denominator = _impact_normalization_denominator(row)
+    normalized = magnitude / denominator if denominator and denominator > 0 else None
+    if denominator and denominator > 0:
+        severity_basis = "target_normalized_return_move"
+    else:
+        severity_basis = "raw_return_without_target_volatility_normalization"
+    if failure_type == "rejected_positive_missed_opportunity":
+        direction = "missed_upside"
+    elif raw_delta < 0:
+        direction = "adverse_downside"
+    elif raw_delta > 0:
+        direction = "relative_underperformance"
+    else:
+        direction = "outcome_failure_without_return_delta"
+    return {
+        "impact_exposure_time": impact_exposure_time,
+        "impact_onset_time": impact_exposure_time,
+        "impact_onset_basis": "source_impact_clock" if explicit_onset else "decision_time_fallback",
+        "impact_scope_type": str(row.get("impact_scope_type") or row.get("scope_type") or "target").strip() or "target",
+        "impact_direction": direction,
+        "impact_raw_return_delta": raw_delta,
+        "impact_magnitude_abs_return": magnitude,
+        "impact_normalization_denominator": denominator,
+        "impact_normalized_severity_score": normalized,
+        "impact_severity_basis": severity_basis,
+    }
+
+
+def _impact_normalization_denominator(row: Mapping[str, Any]) -> float | None:
+    for key in (
+        "target_expected_move_abs_return",
+        "expected_move_abs_return",
+        "target_intraday_volatility",
+        "target_realized_volatility",
+        "realized_volatility",
+        "atr_percent",
+        "average_true_range_percent",
+    ):
+        value = _safe_float(row.get(key))
+        if value and value > 0:
+            return value
+    return None
+
+
+def _first_text(row: Mapping[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value
+    return None
 
 
 def _decision_time(row: Mapping[str, Any]) -> str | None:

@@ -442,7 +442,11 @@ def _build_attribution_rows(
             incremental_score = 0.65
             confidence = 0.65
         decision_time = str(triage_row.get("decision_time") or "")
-        window_start, window_end = _failure_window(decision_time, replay_month=str(triage_row.get("replay_month") or ""))
+        impact_profile = _impact_profile_from_triage(triage_row, decision_time=decision_time)
+        window_start, window_end = _impact_search_window(
+            impact_profile["impact_exposure_time"],
+            replay_month=str(triage_row.get("replay_month") or ""),
+        )
         row_id = f"l10_event_attr_{index:08d}"
         rows.append(
             {
@@ -456,6 +460,18 @@ def _build_attribution_rows(
                 "target_symbol": triage_row.get("target_symbol"),
                 "replay_month": triage_row.get("replay_month"),
                 "decision_time": decision_time or None,
+                "impact_exposure_time": impact_profile["impact_exposure_time"],
+                "impact_onset_time": impact_profile["impact_onset_time"],
+                "impact_onset_basis": impact_profile["impact_onset_basis"],
+                "impact_scope_type": impact_profile["impact_scope_type"],
+                "impact_direction": impact_profile["impact_direction"],
+                "impact_raw_return_delta": impact_profile["impact_raw_return_delta"],
+                "impact_magnitude_abs_return": impact_profile["impact_magnitude_abs_return"],
+                "impact_normalization_denominator": impact_profile["impact_normalization_denominator"],
+                "impact_normalized_severity_score": impact_profile["impact_normalized_severity_score"],
+                "impact_severity_basis": impact_profile["impact_severity_basis"],
+                "impact_search_window_start": window_start,
+                "impact_search_window_end": window_end,
                 "failure_window_start": window_start,
                 "failure_window_end": window_end,
                 "attribution_status": status,
@@ -492,6 +508,7 @@ def _build_attribution_rows(
         "notes": [
             "Layer 10 attribution consumes post-replay residual triage rows; it does not create same-fold Layer 4 inputs.",
             "Rows with multiple matching events are marked confounded until a later promotion packet proves incremental value.",
+            "Layer 10 uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay triage row provides an impact clock.",
         ],
     }
     return rows, control_report
@@ -533,6 +550,12 @@ def _build_event_focus_proposals(
                 "supporting_confidences": [],
                 "failure_window_starts": [],
                 "failure_window_ends": [],
+                "impact_search_window_starts": [],
+                "impact_search_window_ends": [],
+                "impact_onset_basis_counts": {},
+                "impact_scope_type_counts": {},
+                "impact_severity_scores": [],
+                "impact_magnitude_abs_returns": [],
             },
         )
         group["source_triage_attribution_ids"].append(row.get("source_triage_attribution_id"))
@@ -552,6 +575,16 @@ def _build_event_focus_proposals(
             group["failure_window_starts"].append(str(row.get("failure_window_start")))
         if row.get("failure_window_end"):
             group["failure_window_ends"].append(str(row.get("failure_window_end")))
+        if row.get("impact_search_window_start"):
+            group["impact_search_window_starts"].append(str(row.get("impact_search_window_start")))
+        if row.get("impact_search_window_end"):
+            group["impact_search_window_ends"].append(str(row.get("impact_search_window_end")))
+        _increment_count(group["impact_onset_basis_counts"], row.get("impact_onset_basis"))
+        _increment_count(group["impact_scope_type_counts"], row.get("impact_scope_type"))
+        if row.get("impact_normalized_severity_score") is not None:
+            group["impact_severity_scores"].append(_safe_float(row.get("impact_normalized_severity_score")))
+        if row.get("impact_magnitude_abs_return") is not None:
+            group["impact_magnitude_abs_returns"].append(_safe_float(row.get("impact_magnitude_abs_return")))
     ranked = sorted(
         groups.values(),
         key=lambda group: (
@@ -594,6 +627,13 @@ def _build_event_focus_proposals(
                 "replay_months": sorted(group["replay_months"]),
                 "failure_window_start": min(group["failure_window_starts"]) if group["failure_window_starts"] else None,
                 "failure_window_end": max(group["failure_window_ends"]) if group["failure_window_ends"] else None,
+                "impact_search_window_start": min(group["impact_search_window_starts"]) if group["impact_search_window_starts"] else None,
+                "impact_search_window_end": max(group["impact_search_window_ends"]) if group["impact_search_window_ends"] else None,
+                "impact_onset_basis_counts": dict(sorted(group["impact_onset_basis_counts"].items())),
+                "impact_scope_type_counts": dict(sorted(group["impact_scope_type_counts"].items())),
+                "average_impact_normalized_severity_score": _average(group["impact_severity_scores"]),
+                "max_impact_normalized_severity_score": max(group["impact_severity_scores"]) if group["impact_severity_scores"] else 0.0,
+                "average_impact_magnitude_abs_return": _average(group["impact_magnitude_abs_returns"]),
                 "attribution_status_counts": dict(sorted(group["attribution_status_counts"].items())),
                 "co_event_group_count": len(group["co_event_group_ids"]),
                 "average_incremental_attribution_score": _average(group["supporting_scores"]),
@@ -699,6 +739,13 @@ def _build_event_family_attention_evidence(
             "average_incremental_attribution_score": _average(stats["supporting_scores"]),
             "average_attribution_confidence_score": _average(stats["supporting_confidences"]),
             "leakage_violation_count": stats["leakage_violation_count"],
+            "impact_cutoff_violation_count": stats["impact_cutoff_violation_count"],
+            "impact_onset_basis_counts": dict(sorted(stats["impact_onset_basis_counts"].items())),
+            "impact_scope_type_counts": dict(sorted(stats["impact_scope_type_counts"].items())),
+            "average_impact_normalized_severity_score": _average(stats["impact_severity_scores"]),
+            "max_impact_normalized_severity_score": max(stats["impact_severity_scores"]) if stats["impact_severity_scores"] else 0.0,
+            "impact_normalized_severity_score_count": len(stats["impact_severity_scores"]),
+            "average_impact_magnitude_abs_return": _average(stats["impact_magnitude_abs_returns"]),
         }
         occurrence_rows.append(row)
         group = family_groups.setdefault(
@@ -722,6 +769,11 @@ def _build_event_family_attention_evidence(
                 "state_signal_type_counts": {},
                 "layer_4_state_overlay_counts": {},
                 "leakage_violation_count": 0,
+                "impact_cutoff_violation_count": 0,
+                "impact_onset_basis_counts": {},
+                "impact_scope_type_counts": {},
+                "impact_severity_scores": [],
+                "impact_magnitude_abs_returns": [],
                 "supporting_scores": [],
                 "supporting_confidences": [],
                 "source_decision_ids": set(),
@@ -737,6 +789,15 @@ def _build_event_family_attention_evidence(
         group["confounded_failure_count"] += row["confounded_failure_count"]
         group["attributed_failure_count"] += row["attributed_failure_count"]
         group["leakage_violation_count"] += row["leakage_violation_count"]
+        group["impact_cutoff_violation_count"] += row["impact_cutoff_violation_count"]
+        for key, count in row["impact_onset_basis_counts"].items():
+            group["impact_onset_basis_counts"][key] = int(group["impact_onset_basis_counts"].get(key, 0)) + int(count)
+        for key, count in row["impact_scope_type_counts"].items():
+            group["impact_scope_type_counts"][key] = int(group["impact_scope_type_counts"].get(key, 0)) + int(count)
+        if row["impact_normalized_severity_score_count"] > 0:
+            group["impact_severity_scores"].append(row["average_impact_normalized_severity_score"])
+        if row["average_impact_magnitude_abs_return"]:
+            group["impact_magnitude_abs_returns"].append(row["average_impact_magnitude_abs_return"])
         group["supporting_scores"].extend(stats["supporting_scores"])
         group["supporting_confidences"].extend(stats["supporting_confidences"])
         group["co_event_group_ids"].update(stats["co_event_group_ids"])
@@ -769,6 +830,8 @@ def _build_event_family_attention_evidence(
         effect_profile = _dominant_effect_profile(group)
         pit_status = "passed" if occurrence_count > 0 else "insufficient_evidence"
         leakage_status = "passed" if group["leakage_violation_count"] == 0 else "failed"
+        impact_onset_status = "passed" if int(group["impact_onset_basis_counts"].get("source_impact_clock") or 0) > 0 and int(group["impact_onset_basis_counts"].get("decision_time_fallback") or 0) == 0 else "insufficient_evidence"
+        impact_severity_status = "passed" if group["impact_severity_scores"] else "insufficient_evidence"
         co_event_confounder_status = "passed" if group["confounded_failure_count"] == 0 else "failed"
         control_status = "passed" if occurrence_count >= 2 and matched_occurrence_count >= 1 and unmatched_occurrence_count >= 1 else "insufficient_evidence"
         if effect_profile["state_signal_type"] in {"risk_state", "impact_state"}:
@@ -779,6 +842,8 @@ def _build_event_family_attention_evidence(
             "passed"
             if pit_status == "passed"
             and leakage_status == "passed"
+            and impact_onset_status == "passed"
+            and impact_severity_status == "passed"
             and co_event_confounder_status == "passed"
             and control_status == "passed"
             and association_status == "passed"
@@ -789,6 +854,10 @@ def _build_event_family_attention_evidence(
             blockers.append("pit_occurrence_evidence_insufficient")
         if leakage_status != "passed":
             blockers.append("leakage_violation_detected")
+        if impact_onset_status != "passed":
+            blockers.append("impact_onset_not_estimated_from_market_path")
+        if impact_severity_status != "passed":
+            blockers.append("impact_severity_not_target_normalized")
         if co_event_confounder_status != "passed":
             blockers.append("co_event_or_confounder_not_discharged")
         if control_status != "passed":
@@ -817,6 +886,13 @@ def _build_event_family_attention_evidence(
                 "background_failure_rate": background_failure_rate,
                 "deterministic_gate_status": deterministic_gate_status,
                 "deterministic_blockers": blockers,
+                "impact_onset_status": impact_onset_status,
+                "impact_severity_status": impact_severity_status,
+                "impact_onset_basis_counts": dict(sorted(group["impact_onset_basis_counts"].items())),
+                "impact_scope_type_counts": dict(sorted(group["impact_scope_type_counts"].items())),
+                "average_impact_normalized_severity_score": _average(group["impact_severity_scores"]),
+                "max_impact_normalized_severity_score": max(group["impact_severity_scores"]) if group["impact_severity_scores"] else 0.0,
+                "average_impact_magnitude_abs_return": _average(group["impact_magnitude_abs_returns"]),
                 "event_family_bias_association_packet_ref": packet_ref,
                 "temporal_attention_pool_mutation_performed": False,
             }
@@ -845,6 +921,8 @@ def _build_event_family_attention_evidence(
                 "co_event_confounder_status": co_event_confounder_status,
                 "overlap_status": "residual_after_upstream_conditioning",
                 "leakage_status": leakage_status,
+                "impact_onset_status": impact_onset_status,
+                "impact_severity_status": impact_severity_status,
                 "association_status": association_status,
                 "occurrence_count": occurrence_count,
                 "matched_occurrence_count": matched_occurrence_count,
@@ -854,6 +932,12 @@ def _build_event_family_attention_evidence(
                 "confounded_failure_count": group["confounded_failure_count"],
                 "co_event_group_count": len(group["co_event_group_ids"]),
                 "leakage_violation_count": group["leakage_violation_count"],
+                "impact_cutoff_violation_count": group["impact_cutoff_violation_count"],
+                "impact_onset_basis_counts": dict(sorted(group["impact_onset_basis_counts"].items())),
+                "impact_scope_type_counts": dict(sorted(group["impact_scope_type_counts"].items())),
+                "average_impact_normalized_severity_score": _average(group["impact_severity_scores"]),
+                "max_impact_normalized_severity_score": max(group["impact_severity_scores"]) if group["impact_severity_scores"] else 0.0,
+                "average_impact_magnitude_abs_return": _average(group["impact_magnitude_abs_returns"]),
                 "matched_failure_rate": matched_failure_rate,
                 "background_failure_rate": background_failure_rate,
                 "average_incremental_attribution_score": average_score,
@@ -908,11 +992,18 @@ def _event_ref_failure_stats(
                 item["source_decision_ids"].add(str(row["source_decision_id"]))
             if str(row.get("source_triage_attribution_id") or ""):
                 item["source_triage_attribution_ids"].add(str(row["source_triage_attribution_id"]))
+            _increment_count(item["impact_onset_basis_counts"], row.get("impact_onset_basis"))
+            _increment_count(item["impact_scope_type_counts"], row.get("impact_scope_type"))
+            if row.get("impact_normalized_severity_score") is not None:
+                item["impact_severity_scores"].append(_safe_float(row.get("impact_normalized_severity_score")))
+            if row.get("impact_magnitude_abs_return") is not None:
+                item["impact_magnitude_abs_returns"].append(_safe_float(row.get("impact_magnitude_abs_return")))
             candidate = event_ref_to_candidate.get(event_ref)
             event_time = _parse_datetime(str(candidate.get("available_time") or candidate.get("event_time") or "")) if candidate else None
-            decision_time = _parse_datetime(str(row.get("decision_time") or ""))
-            if event_time is not None and decision_time is not None and event_time > decision_time:
+            impact_cutoff_time = _parse_datetime(str(row.get("impact_exposure_time") or row.get("impact_onset_time") or row.get("decision_time") or ""))
+            if event_time is not None and impact_cutoff_time is not None and event_time > impact_cutoff_time:
                 item["leakage_violation_count"] += 1
+                item["impact_cutoff_violation_count"] += 1
     return stats
 
 
@@ -927,6 +1018,11 @@ def _empty_event_ref_stats() -> dict[str, Any]:
         "source_decision_ids": set(),
         "source_triage_attribution_ids": set(),
         "leakage_violation_count": 0,
+        "impact_cutoff_violation_count": 0,
+        "impact_onset_basis_counts": {},
+        "impact_scope_type_counts": {},
+        "impact_severity_scores": [],
+        "impact_magnitude_abs_returns": [],
     }
 
 
@@ -1130,7 +1226,7 @@ def _invoke_event_strategy_review_agent(
 def _event_strategy_review_agent_prompt(review_packet: Mapping[str, Any]) -> str:
     return (
         "Use the event-strategy-promotion-review skill. Review this deterministic Layer 10 event-family packet as a final guard only.\n"
-        "Do not recompute co-event/confounder gates; those are deterministic inputs. Some events are observed market-impact events, while scheduled/unknown-outcome events such as earnings are prospective uncertainty states; do not require a linear up/down prediction when the packet is a risk-state or uncertainty-state overlay for Layer 4.\n"
+        "Do not recompute co-event/confounder, impact-onset, impact-severity, or leakage gates; those are deterministic inputs. Pre-release and post-release evidence are lifecycle stages of the same event family. Do not require a linear up/down prediction when the packet is a phase-aware state overlay for Layer 4.\n"
         "Do not activate models, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
         "Return strict JSON only, with exactly this contract shape and no markdown:\n"
         "{"
@@ -1268,7 +1364,8 @@ def _matching_event_candidates(triage_row: Mapping[str, Any], candidates: Sequen
     target_symbol = str(triage_row.get("target_symbol") or "").strip().upper()
     replay_month = str(triage_row.get("replay_month") or "").strip()
     decision_time = str(triage_row.get("decision_time") or "").strip()
-    start, end = _failure_window_datetimes(decision_time, replay_month=replay_month)
+    impact_profile = _impact_profile_from_triage(triage_row, decision_time=decision_time)
+    start, end = _impact_search_window_datetimes(impact_profile["impact_exposure_time"], replay_month=replay_month)
     matched: list[Mapping[str, Any]] = []
     for candidate in candidates:
         event_time = _parse_datetime(str(candidate.get("available_time") or candidate.get("event_time") or ""))
@@ -1665,6 +1762,42 @@ def _failure_window_datetimes(decision_time: str, *, replay_month: str) -> tuple
     return parsed - EVENT_WINDOW_BEFORE, parsed + EVENT_WINDOW_AFTER
 
 
+def _impact_search_window(impact_exposure_time: str | None, *, replay_month: str) -> tuple[str | None, str | None]:
+    start, end = _impact_search_window_datetimes(impact_exposure_time, replay_month=replay_month)
+    return (start.isoformat() if start is not None else None, end.isoformat() if end is not None else None)
+
+
+def _impact_search_window_datetimes(impact_exposure_time: str | None, *, replay_month: str) -> tuple[datetime | None, datetime | None]:
+    parsed = _parse_datetime(str(impact_exposure_time or ""))
+    if parsed is None and len(replay_month) == 7:
+        try:
+            parsed = datetime.fromisoformat(f"{replay_month}-01T00:00:00").replace(tzinfo=NEW_YORK)
+        except ValueError:
+            parsed = None
+    if parsed is None:
+        return None, None
+    return parsed - EVENT_WINDOW_BEFORE, parsed
+
+
+def _impact_profile_from_triage(triage_row: Mapping[str, Any], *, decision_time: str) -> dict[str, Any]:
+    impact_exposure_time = str(triage_row.get("impact_exposure_time") or triage_row.get("impact_onset_time") or decision_time or "").strip()
+    onset_basis = str(triage_row.get("impact_onset_basis") or "").strip()
+    if not onset_basis:
+        onset_basis = "source_impact_clock" if impact_exposure_time and impact_exposure_time != decision_time else "decision_time_fallback"
+    return {
+        "impact_exposure_time": impact_exposure_time or None,
+        "impact_onset_time": str(triage_row.get("impact_onset_time") or impact_exposure_time or "").strip() or None,
+        "impact_onset_basis": onset_basis,
+        "impact_scope_type": str(triage_row.get("impact_scope_type") or "target").strip() or "target",
+        "impact_direction": str(triage_row.get("impact_direction") or "unknown").strip() or "unknown",
+        "impact_raw_return_delta": _nullable_float(triage_row.get("impact_raw_return_delta")),
+        "impact_magnitude_abs_return": _nullable_float(triage_row.get("impact_magnitude_abs_return")),
+        "impact_normalization_denominator": _nullable_float(triage_row.get("impact_normalization_denominator")),
+        "impact_normalized_severity_score": _nullable_float(triage_row.get("impact_normalized_severity_score")),
+        "impact_severity_basis": str(triage_row.get("impact_severity_basis") or "unknown").strip() or "unknown",
+    }
+
+
 def _parse_datetime(value: str) -> datetime | None:
     text = str(value or "").strip()
     if not text:
@@ -1749,6 +1882,13 @@ def _safe_float(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _nullable_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _average(values: Sequence[float]) -> float:

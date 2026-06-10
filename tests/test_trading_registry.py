@@ -584,6 +584,13 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_LIFECYCLE_STAGE_COUNTS": "event_lifecycle_stage_counts",
             "STATE_SIGNAL_TYPE_COUNTS": "state_signal_type_counts",
             "LAYER_4_STATE_OVERLAY_COUNTS": "layer_4_state_overlay_counts",
+            "IMPACT_EXPOSURE_TIME": "impact_exposure_time",
+            "IMPACT_ONSET_BASIS": "impact_onset_basis",
+            "IMPACT_SCOPE_TYPE": "impact_scope_type",
+            "IMPACT_NORMALIZED_SEVERITY_SCORE": "impact_normalized_severity_score",
+            "IMPACT_SEVERITY_BASIS": "impact_severity_basis",
+            "IMPACT_ONSET_STATUS": "impact_onset_status",
+            "IMPACT_SEVERITY_STATUS": "impact_severity_status",
         }
         for key, payload in field_payloads.items():
             self.assertEqual(rows[key]["kind"], "field")
