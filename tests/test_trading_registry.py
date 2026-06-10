@@ -732,12 +732,22 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
+        all_family_backtest = rows["EVENT_FAMILY_IMPACT_WINDOW_ALL_FAMILY_REAL_INPUT_BACKTEST_20260610"]
+        self.assertEqual(all_family_backtest["kind"], "artifact_type")
+        self.assertEqual(all_family_backtest["payload"], "event_family_impact_window_all_family_real_input_backtest")
+        self.assertIn("event_family_impact_window_all_family_real_input_backtest_20260610", all_family_backtest["path"])
+
+        all_family_replay = rows["EVENT_FAMILY_IMPACT_WINDOW_ALL_FAMILY_REPLAY_OVERLAY_20260610"]
+        self.assertEqual(all_family_replay["kind"], "artifact_type")
+        self.assertEqual(all_family_replay["payload"], "event_family_impact_window_all_family_replay_overlay")
+        self.assertIn("event_family_impact_window_all_family_replay_20260610", all_family_replay["path"])
+
         fold_artifact = rows["EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_20260610"]
         self.assertEqual(fold_artifact["kind"], "artifact_type")
         self.assertEqual(fold_artifact["payload"], "layer_10_fold_completion")
         self.assertIn("layer_10_fold_completion_20260610", fold_artifact["path"])
         self.assertIn("review_ready_not_promotion_approved", fold_artifact["applies_to"])
-        self.assertIn("production evidence incomplete", fold_artifact["note"])
+        self.assertIn("production-route review dispositions", fold_artifact["note"])
 
         summary = rows["EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_SUMMARY"]
         self.assertEqual(summary["kind"], "artifact_type")
@@ -749,11 +759,47 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(gate_matrix["payload"], "layer_10_family_gate_matrix")
         self.assertIn("layer_10_family_gate_matrix.csv", gate_matrix["applies_to"])
 
+        all_family_runner = rows["MODEL_10_EVENT_FAMILY_IMPACT_WINDOW_ALL_FAMILY_REAL_INPUT_BACKTEST_BUILD"]
+        self.assertEqual(all_family_runner["kind"], "script")
+        self.assertIn("build_event_family_impact_window_all_family_real_input_backtest.py", all_family_runner["path"])
+        self.assertIn("event_family_impact_window_all_family_real_input_backtest", all_family_runner["applies_to"])
+
         runner = rows["MODEL_10_EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_BUILD"]
         self.assertEqual(runner["kind"], "script")
         self.assertIn("build_layer_10_fold_completion.py", runner["path"])
         self.assertIn("fold_completion.py", runner["path"])
         self.assertIn("layer_10_fold_completion", runner["applies_to"])
+
+        fold_fields = {
+            "CROSS_FOLD_STABILITY_ROLE": "cross_fold_stability_role",
+            "FOCUS_POOL_STATUS": "focus_pool_status",
+            "PRODUCTION_COMPLETION_STATUS": "production_completion_status",
+            "PRODUCTION_ROUTE_DECISION": "production_route_decision",
+            "PRODUCTION_ROUTE_REVIEW_STATUS": "production_route_review_status",
+        }
+        for key, payload in fold_fields.items():
+            self.assertEqual(rows[key]["kind"], "field")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("layer_10_fold_completion", rows[key]["applies_to"])
+
+        fold_status_values = {
+            "LAYER_10_CROSS_FOLD_STABILITY_POST_FOCUS_POOL_MONITORING": "post_focus_pool_monitoring_not_focus_pool_prerequisite",
+            "LAYER_10_FOCUS_POOL_ACCEPTED_TEMPORAL_ATTENTION": "accepted_temporal_attention_focus_pool",
+            "LAYER_10_FOCUS_POOL_DEFERRED_TEMPORAL_ATTENTION": "deferred_from_temporal_attention_focus_pool",
+            "LAYER_10_FOCUS_POOL_REJECTED_TEMPORAL_ATTENTION": "rejected_from_temporal_attention_focus_pool",
+            "LAYER_10_PRODUCTION_COMPLETION_ROUTE_REVIEW_COMPLETE": "production_route_review_complete",
+            "LAYER_10_PRODUCTION_ROUTE_DECISION_APPROVE_FOCUS_POOL_DEFER_STRONGER_MODEL_USE": "approve_focus_pool_entry_defer_stronger_model_use",
+            "LAYER_10_PRODUCTION_ROUTE_DECISION_APPROVE_FOCUS_POOL_RISK_CONTROL_ONLY": "approve_focus_pool_entry_risk_control_only",
+            "LAYER_10_PRODUCTION_ROUTE_DECISION_DEFER_INCOMPLETE_WORKFLOW": "defer_incomplete_layer10_workflow",
+            "LAYER_10_PRODUCTION_ROUTE_DECISION_REJECT_CURRENT_DEFINITION_NEEDS_REWORK": "reject_current_definition_needs_rework",
+            "LAYER_10_PRODUCTION_ROUTE_REVIEW_AGENT_COMPLETE": "agent_review_complete",
+            "LAYER_10_PRODUCTION_ROUTE_REVIEW_BLOCKED_MISSING_PACKET_OR_PRECONDITION": "agent_review_blocked_missing_packet_or_precondition",
+            "LAYER_10_PRODUCTION_ROUTE_REVIEW_BLOCKED_UNVALIDATED_IMPACT_WINDOW": "agent_review_blocked_unvalidated_impact_window",
+            "LAYER_10_PRODUCTION_ROUTE_REVIEW_DEFERRED_INCOMPLETE_WORKFLOW": "agent_review_deferred_incomplete_layer10_workflow",
+        }
+        for key, payload in fold_status_values.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
 
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -2144,9 +2190,15 @@ class RegistryHelperTests(unittest.TestCase):
             "layer_4_state_overlay",
             "layer_4_state_overlay_candidate",
             "layer_10_event_risk_governor",
+            "layer_10_fold_completion",
+            "layer_10_fold_completion_summary",
             "manager_layer_ten_event_risk_governor_input_materialization",
+            "focus_pool_status",
             "ready_signal",
             "one_shot_replay_acquisition",
+            "production_completion_status",
+            "production_route_decision",
+            "production_route_review_status",
             "quarantine_candidate",
             "replay_dataset_preparation",
             "replay_freeze_gate",
@@ -2155,8 +2207,10 @@ class RegistryHelperTests(unittest.TestCase):
             "state_signal_type",
             "target_state_vector_model",
             "temporal_attention_pool",
+            "temporal_attention_focus_pool",
             "trading-storage",
             "window_policy",
+            "cross_fold_stability_role",
         }
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
