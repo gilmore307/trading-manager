@@ -3126,7 +3126,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(
             rows["MODEL_REALTIME_DECISION_OPTIONAL_COMPONENTS"]["payload"],
-            "component_04_option_review;component_07_failure_review",
+            "component_04_expression_review;component_07_failure_review",
         )
         self.assertIn("plan_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_PLAN"]["path"])
         self.assertIn("validate_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_VALIDATE"]["path"])
