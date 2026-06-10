@@ -654,6 +654,34 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertNotIn("event_interpretation_v1", {row["payload"] for row in rows.values()})
 
+    def test_event_family_impact_window_backtest_names_are_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        backtest_artifact = rows["EVENT_FAMILY_IMPACT_WINDOW_BACKTEST"]
+        self.assertEqual(backtest_artifact["kind"], "artifact_type")
+        self.assertEqual(backtest_artifact["payload"], "event_family_impact_window_backtest")
+        self.assertIn("real_input_backtest", backtest_artifact["applies_to"])
+        self.assertIn("reviewed real-input", backtest_artifact["note"])
+
+        real_input_evidence = rows["EVENT_FAMILY_IMPACT_WINDOW_REAL_INPUT_BACKTEST_20260610"]
+        self.assertEqual(real_input_evidence["kind"], "artifact_type")
+        self.assertEqual(real_input_evidence["payload"], "event_family_impact_window_real_input_backtest")
+        self.assertIn("event_family_impact_window_real_input_backtest_20260610", real_input_evidence["path"])
+        self.assertIn("review_ready_not_promotion_approved", real_input_evidence["applies_to"])
+        self.assertIn("SQL-retained", real_input_evidence["note"])
+
+        generic_runner = rows["MODEL_10_EVENT_FAMILY_IMPACT_WINDOW_BACKTEST_BUILD"]
+        self.assertEqual(generic_runner["kind"], "script")
+        self.assertIn("build_event_family_impact_window_backtest.py", generic_runner["path"])
+        self.assertIn("real_input_backtest", generic_runner["applies_to"])
+
+        real_input_runner = rows["MODEL_10_EVENT_FAMILY_IMPACT_WINDOW_REAL_INPUT_BACKTEST_BUILD"]
+        self.assertEqual(real_input_runner["kind"], "script")
+        self.assertIn("build_event_family_impact_window_real_input_backtest.py", real_input_runner["path"])
+        self.assertIn("event_family_impact_window_real_input_backtest", real_input_runner["payload"])
+        self.assertIn("review_ready_not_promotion_approved", real_input_runner["applies_to"])
+
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
