@@ -86,6 +86,54 @@ POST_RELEASE_TEXT_TOKENS = {
     "results",
 }
 PRE_RELEASE_TEXT_TOKENS = {"scheduled", "expected", "preview", "upcoming", "estimate", "estimates", "before the release", "ahead of"}
+SCHEDULED_DATA_RELEASE_TOKENS = PRE_RELEASE_EVENT_TOKENS | {
+    "inflation",
+    "ppi",
+    "pce",
+    "nfp",
+    "payroll",
+    "unemployment",
+    "retail_sales",
+    "ism",
+    "pmi",
+    "gdp",
+}
+SCHEDULED_CALENDAR_TOKENS = {
+    "holiday",
+    "market_holiday",
+    "market_closure",
+    "market_close",
+    "market_closed",
+    "triple_witching",
+    "quadruple_witching",
+    "options_expiration",
+    "index_rebalance",
+    "rebalance",
+    "roll",
+}
+CONTINUOUS_EVENT_TOKENS = {
+    "war",
+    "conflict",
+    "strike",
+    "shutdown",
+    "regime",
+    "investigation",
+    "probe",
+    "litigation",
+    "supply_chain",
+    "liquidity_crisis",
+}
+INSTANT_EVENT_TOKENS = {
+    "breaking_news",
+    "symbol_news",
+    "sector_news",
+    "headline",
+    "shock",
+    "halt",
+    "downgrade",
+    "upgrade",
+    "microstructure_liquidity_disruption",
+}
 EVENT_WINDOW_BEFORE = timedelta(days=3)
 EVENT_WINDOW_AFTER = timedelta(days=1)
 M10_SQL_EVENT_FIELDS = [
@@ -726,10 +774,16 @@ def _build_event_family_attention_evidence(
             "target_symbol": _family_target_symbol(candidate, event_focus_proposals),
             "normalized_event_type": str(interpretation.get("normalized_event_type") or "event_candidate"),
             "affected_scope": str(interpretation.get("affected_scope") or "unknown"),
+            "event_temporal_form": effect_profile["event_temporal_form"],
+            "event_schedule_type": effect_profile["event_schedule_type"],
+            "event_instance_observation_role": effect_profile["event_instance_observation_role"],
+            "event_family_prior_role": effect_profile["event_family_prior_role"],
             "event_release_phase": effect_profile["event_release_phase"],
             "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
             "state_signal_type": effect_profile["state_signal_type"],
             "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
+            "layer_4_projection_type": effect_profile["layer_4_projection_type"],
+            "event_family_impact_parameterization": effect_profile["event_family_impact_parameterization"],
             "available_time": str(candidate.get("available_time") or ""),
             "event_month": str(candidate.get("event_month") or ""),
             "matched_failure_count": stats["matched_failure_count"],
@@ -764,10 +818,15 @@ def _build_event_family_attention_evidence(
                 "confounded_failure_count": 0,
                 "attributed_failure_count": 0,
                 "co_event_group_ids": set(),
+                "event_temporal_form_counts": {},
+                "event_schedule_type_counts": {},
+                "event_instance_observation_role_counts": {},
                 "event_release_phase_counts": {},
                 "event_lifecycle_stage_counts": {},
                 "state_signal_type_counts": {},
                 "layer_4_state_overlay_counts": {},
+                "layer_4_projection_type_counts": {},
+                "dominant_event_schedule_type": row["event_schedule_type"],
                 "leakage_violation_count": 0,
                 "impact_cutoff_violation_count": 0,
                 "impact_onset_basis_counts": {},
@@ -803,10 +862,14 @@ def _build_event_family_attention_evidence(
         group["co_event_group_ids"].update(stats["co_event_group_ids"])
         group["source_decision_ids"].update(stats["source_decision_ids"])
         group["source_triage_attribution_ids"].update(stats["source_triage_attribution_ids"])
+        _increment_count(group["event_temporal_form_counts"], row["event_temporal_form"])
+        _increment_count(group["event_schedule_type_counts"], row["event_schedule_type"])
+        _increment_count(group["event_instance_observation_role_counts"], row["event_instance_observation_role"])
         _increment_count(group["event_release_phase_counts"], row["event_release_phase"])
         _increment_count(group["event_lifecycle_stage_counts"], row["event_lifecycle_stage"])
         _increment_count(group["state_signal_type_counts"], row["state_signal_type"])
         _increment_count(group["layer_4_state_overlay_counts"], row["layer_4_state_overlay"])
+        _increment_count(group["layer_4_projection_type_counts"], row["layer_4_projection_type"])
     for proposal in event_focus_proposals:
         event_ref = str(proposal.get("event_ref") or "")
         candidate = event_ref_to_candidate.get(event_ref)
@@ -875,10 +938,16 @@ def _build_event_family_attention_evidence(
                 "event_family_id": group["event_family_id"],
                 "target_symbol": group["target_symbol"],
                 "normalized_event_type": group["normalized_event_type"],
+                "event_temporal_form": effect_profile["event_temporal_form"],
+                "event_schedule_type": effect_profile["event_schedule_type"],
+                "event_instance_observation_role": effect_profile["event_instance_observation_role"],
+                "event_family_prior_role": effect_profile["event_family_prior_role"],
                 "event_release_phase": effect_profile["event_release_phase"],
                 "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
                 "state_signal_type": effect_profile["state_signal_type"],
                 "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
+                "layer_4_projection_type": effect_profile["layer_4_projection_type"],
+                "event_family_impact_parameterization": effect_profile["event_family_impact_parameterization"],
                 "supporting_failure_count": group["supporting_failure_count"],
                 "occurrence_count": occurrence_count,
                 "matched_occurrence_count": matched_occurrence_count,
@@ -906,15 +975,25 @@ def _build_event_family_attention_evidence(
                 "event_family_id": group["event_family_id"],
                 "target_symbol": group["target_symbol"],
                 "normalized_event_type": group["normalized_event_type"],
+                "event_temporal_form": effect_profile["event_temporal_form"],
+                "event_schedule_type": effect_profile["event_schedule_type"],
+                "event_instance_observation_role": effect_profile["event_instance_observation_role"],
+                "event_family_prior_role": effect_profile["event_family_prior_role"],
                 "event_release_phase": effect_profile["event_release_phase"],
                 "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
                 "state_signal_type": effect_profile["state_signal_type"],
                 "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
+                "layer_4_projection_type": effect_profile["layer_4_projection_type"],
+                "event_family_impact_parameterization": effect_profile["event_family_impact_parameterization"],
                 "affected_scope": group["affected_scope"],
+                "event_temporal_form_counts": dict(sorted(group["event_temporal_form_counts"].items())),
+                "event_schedule_type_counts": dict(sorted(group["event_schedule_type_counts"].items())),
+                "event_instance_observation_role_counts": dict(sorted(group["event_instance_observation_role_counts"].items())),
                 "event_release_phase_counts": dict(sorted(group["event_release_phase_counts"].items())),
                 "event_lifecycle_stage_counts": dict(sorted(group["event_lifecycle_stage_counts"].items())),
                 "state_signal_type_counts": dict(sorted(group["state_signal_type_counts"].items())),
                 "layer_4_state_overlay_counts": dict(sorted(group["layer_4_state_overlay_counts"].items())),
+                "layer_4_projection_type_counts": dict(sorted(group["layer_4_projection_type_counts"].items())),
                 "deterministic_gate_status": deterministic_gate_status,
                 "pit_status": pit_status,
                 "control_status": control_status,
@@ -1041,33 +1120,68 @@ def _event_effect_profile(
     *,
     information_role_type: str = "",
     text: str = "",
-) -> dict[str, str]:
+) -> dict[str, Any]:
     event_type = str(normalized_event_type or "event_candidate").strip().lower()
     role = str(information_role_type or "").strip().lower()
     text_lower = str(text or "").strip().lower()
-    if _contains_any(role, POST_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, POST_RELEASE_TEXT_TOKENS):
-        return {
-            "event_release_phase": "post_release",
-            "event_lifecycle_stage": "post_release_impact_state",
-            "state_signal_type": "impact_state",
-            "layer_4_state_overlay": "event_post_release_impact_state",
-        }
-    if any(token in event_type for token in PRE_RELEASE_EVENT_TOKENS) or _contains_any(role, PRE_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, PRE_RELEASE_TEXT_TOKENS):
-        return {
-            "event_release_phase": "pre_release",
-            "event_lifecycle_stage": "pre_release_risk_state",
-            "state_signal_type": "risk_state",
-            "layer_4_state_overlay": "event_pre_release_risk_state_change",
-        }
+    combined = " ".join(item for item in (event_type, role, text_lower) if item)
+    if _contains_any(combined, SCHEDULED_CALENDAR_TOKENS):
+        temporal_form = "scheduled_calendar_event"
+        schedule_type = "scheduled_periodic_calendar"
+        instance_role = "calendar_state"
+    elif _contains_any(combined, SCHEDULED_DATA_RELEASE_TOKENS):
+        temporal_form = "scheduled_data_release_event"
+        schedule_type = "scheduled_release_calendar"
+        instance_role = "observed_release" if _contains_any(role, POST_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, POST_RELEASE_TEXT_TOKENS) else "scheduled_or_expected_release"
+    elif _contains_any(combined, CONTINUOUS_EVENT_TOKENS):
+        temporal_form = "continuous_or_regime_event"
+        schedule_type = "unscheduled_continuous"
+        instance_role = "ongoing_event_state"
+    elif _contains_any(combined, INSTANT_EVENT_TOKENS):
+        temporal_form = "instantaneous_unscheduled_event"
+        schedule_type = "unscheduled"
+        instance_role = "observed_shock"
+    else:
+        temporal_form = "instantaneous_unscheduled_event"
+        schedule_type = "unscheduled"
+        instance_role = "observed_event"
+
+    if instance_role == "observed_release" or _contains_any(role, POST_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, POST_RELEASE_TEXT_TOKENS):
+        release_phase = "post_release"
+        lifecycle_stage = "post_release_impact_state"
+        state_signal_type = "impact_state"
+        layer_4_overlay = "event_post_release_impact_state"
+    elif temporal_form in {"scheduled_data_release_event", "scheduled_calendar_event"}:
+        release_phase = "pre_release"
+        lifecycle_stage = "pre_release_risk_state"
+        state_signal_type = "risk_state"
+        layer_4_overlay = "event_pre_release_risk_state_change"
+    else:
+        release_phase = "post_release"
+        lifecycle_stage = "post_release_impact_state"
+        state_signal_type = "impact_state"
+        layer_4_overlay = "event_post_release_impact_state"
+
     return {
-        "event_release_phase": "post_release",
-        "event_lifecycle_stage": "post_release_impact_state",
-        "state_signal_type": "impact_state",
-        "layer_4_state_overlay": "event_post_release_impact_state",
+        "event_temporal_form": temporal_form,
+        "event_schedule_type": schedule_type,
+        "event_instance_observation_role": instance_role,
+        "event_family_prior_role": "event_family_impact_parameterization",
+        "event_release_phase": release_phase,
+        "event_lifecycle_stage": lifecycle_stage,
+        "state_signal_type": state_signal_type,
+        "layer_4_state_overlay": layer_4_overlay,
+        "layer_4_projection_type": "event_family_impact_state_projection",
+        "event_family_impact_parameterization": _event_family_impact_parameterization(
+            temporal_form=temporal_form,
+            schedule_type=schedule_type,
+            state_signal_type=state_signal_type,
+            layer_4_overlay=layer_4_overlay,
+        ),
     }
 
 
-def _event_effect_profile_from_candidate(candidate: Mapping[str, Any]) -> dict[str, str]:
+def _event_effect_profile_from_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
     interpretation = candidate.get("interpretation") if isinstance(candidate.get("interpretation"), Mapping) else {}
     text_parts = [
         interpretation.get("rationale_summary"),
@@ -1082,21 +1196,103 @@ def _event_effect_profile_from_candidate(candidate: Mapping[str, Any]) -> dict[s
     )
 
 
-def _dominant_effect_profile(group: Mapping[str, Any]) -> dict[str, str]:
+def _dominant_effect_profile(group: Mapping[str, Any]) -> dict[str, Any]:
+    temporal_forms = group.get("event_temporal_form_counts") if isinstance(group.get("event_temporal_form_counts"), Mapping) else {}
+    dominant_temporal_form = _dominant_count_key(temporal_forms) or "instantaneous_unscheduled_event"
+    schedule_type = str(group.get("dominant_event_schedule_type") or _schedule_type_for_temporal_form(dominant_temporal_form))
     phases = group.get("event_release_phase_counts") if isinstance(group.get("event_release_phase_counts"), Mapping) else {}
     if int(phases.get("post_release") or 0) > 0:
         return {
+            "event_temporal_form": dominant_temporal_form,
+            "event_schedule_type": schedule_type,
+            "event_instance_observation_role": "observed_release" if dominant_temporal_form == "scheduled_data_release_event" else "observed_event",
+            "event_family_prior_role": "event_family_impact_parameterization",
             "event_release_phase": "post_release",
             "event_lifecycle_stage": "post_release_impact_state",
             "state_signal_type": "impact_state",
             "layer_4_state_overlay": "event_post_release_impact_state",
+            "layer_4_projection_type": "event_family_impact_state_projection",
+            "event_family_impact_parameterization": _event_family_impact_parameterization(
+                temporal_form=dominant_temporal_form,
+                schedule_type=schedule_type,
+                state_signal_type="impact_state",
+                layer_4_overlay="event_post_release_impact_state",
+            ),
         }
     return {
+        "event_temporal_form": dominant_temporal_form,
+        "event_schedule_type": schedule_type,
+        "event_instance_observation_role": "scheduled_or_expected_release" if dominant_temporal_form == "scheduled_data_release_event" else "calendar_state",
+        "event_family_prior_role": "event_family_impact_parameterization",
         "event_release_phase": "pre_release",
         "event_lifecycle_stage": "pre_release_risk_state",
         "state_signal_type": "risk_state",
         "layer_4_state_overlay": "event_pre_release_risk_state_change",
+        "layer_4_projection_type": "event_family_impact_state_projection",
+        "event_family_impact_parameterization": _event_family_impact_parameterization(
+            temporal_form=dominant_temporal_form,
+            schedule_type=schedule_type,
+            state_signal_type="risk_state",
+            layer_4_overlay="event_pre_release_risk_state_change",
+        ),
     }
+
+
+def _event_family_impact_parameterization(
+    *,
+    temporal_form: str,
+    schedule_type: str,
+    state_signal_type: str,
+    layer_4_overlay: str,
+) -> dict[str, Any]:
+    if temporal_form == "scheduled_data_release_event":
+        curve = {
+            "pre_event_component": "anticipation_window",
+            "event_time_component": "release_shock",
+            "post_event_component": "absorption_or_followthrough_decay",
+        }
+    elif temporal_form == "scheduled_calendar_event":
+        curve = {
+            "pre_event_component": "calendar_positioning_window",
+            "event_time_component": "session_or_expiration_mechanics",
+            "post_event_component": "calendar_effect_decay",
+        }
+    elif temporal_form == "continuous_or_regime_event":
+        curve = {
+            "pre_event_component": "not_calendar_defined",
+            "event_time_component": "state_persistence",
+            "post_event_component": "resolution_or_decay",
+        }
+    else:
+        curve = {
+            "pre_event_component": "not_calendar_defined",
+            "event_time_component": "shock_onset",
+            "post_event_component": "shock_absorption_or_followthrough",
+        }
+    return {
+        "parameterization_status": "candidate_pending_event_family_backtest",
+        "temporal_form": temporal_form,
+        "schedule_type": schedule_type,
+        "impact_curve_components": curve,
+        "impact_scope_parameter": "learn_from_event_family_occurrence_scan",
+        "severity_model": "target_normalized_market_response",
+        "layer_4_projection_type": "event_family_impact_state_projection",
+        "state_signal_type": state_signal_type,
+        "layer_4_state_overlay": layer_4_overlay,
+    }
+
+
+def _schedule_type_for_temporal_form(temporal_form: str) -> str:
+    return {
+        "scheduled_data_release_event": "scheduled_release_calendar",
+        "scheduled_calendar_event": "scheduled_periodic_calendar",
+        "continuous_or_regime_event": "unscheduled_continuous",
+    }.get(temporal_form, "unscheduled")
+
+
+def _dominant_count_key(counts: Mapping[str, Any]) -> str:
+    ranked = sorted(((str(key), int(value or 0)) for key, value in counts.items()), key=lambda item: (item[1], item[0]), reverse=True)
+    return ranked[0][0] if ranked else ""
 
 
 def _contains_any(text: str, tokens: set[str]) -> bool:
@@ -1310,10 +1506,16 @@ def _build_accepted_temporal_attention_pool_entries(
                 "event_family_id": family_id,
                 "target_symbol": candidate.get("target_symbol"),
                 "normalized_event_type": candidate.get("normalized_event_type"),
+                "event_temporal_form": candidate.get("event_temporal_form"),
+                "event_schedule_type": candidate.get("event_schedule_type"),
+                "event_instance_observation_role": candidate.get("event_instance_observation_role"),
+                "event_family_prior_role": candidate.get("event_family_prior_role"),
                 "event_release_phase": candidate.get("event_release_phase"),
                 "event_lifecycle_stage": candidate.get("event_lifecycle_stage"),
                 "state_signal_type": candidate.get("state_signal_type"),
                 "layer_4_state_overlay": candidate.get("layer_4_state_overlay"),
+                "layer_4_projection_type": candidate.get("layer_4_projection_type"),
+                "event_family_impact_parameterization": candidate.get("event_family_impact_parameterization"),
                 "source_candidate_ref": candidate.get("event_family_bias_association_packet_ref"),
                 "event_strategy_review_ref": f"{event_strategy_reviews_ref}#{len(entries) + 1}",
                 "accepted_temporal_attention_pool_ref": accepted_temporal_attention_pool_ref,

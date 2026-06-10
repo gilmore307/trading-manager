@@ -291,6 +291,11 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 if line.strip()
             ]
             self.assertEqual(candidates[0]["candidate_status"], "ready_for_agent_review")
+            self.assertEqual(candidates[0]["event_temporal_form"], "instantaneous_unscheduled_event")
+            self.assertEqual(candidates[0]["event_schedule_type"], "unscheduled")
+            self.assertEqual(candidates[0]["event_family_prior_role"], "event_family_impact_parameterization")
+            self.assertEqual(candidates[0]["layer_4_projection_type"], "event_family_impact_state_projection")
+            self.assertEqual(candidates[0]["event_family_impact_parameterization"]["severity_model"], "target_normalized_market_response")
             packets = [
                 json.loads(line)
                 for line in Path(receipt["event_family_bias_association_packets_ref"]).read_text(encoding="utf-8").splitlines()
@@ -301,6 +306,9 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(packets[0]["impact_onset_status"], "passed")
             self.assertEqual(packets[0]["impact_severity_status"], "passed")
             self.assertEqual(packets[0]["impact_onset_basis_counts"], {"source_impact_clock": 1})
+            self.assertEqual(packets[0]["event_temporal_form"], "instantaneous_unscheduled_event")
+            self.assertEqual(packets[0]["event_temporal_form_counts"], {"instantaneous_unscheduled_event": 2})
+            self.assertEqual(packets[0]["event_family_impact_parameterization"]["impact_curve_components"]["event_time_component"], "shock_onset")
             self.assertEqual(packets[0]["event_release_phase"], "post_release")
             self.assertEqual(packets[0]["event_lifecycle_stage"], "post_release_impact_state")
             self.assertEqual(packets[0]["state_signal_type"], "impact_state")
@@ -320,6 +328,9 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(accepted[0]["contract_type"], "model_10_event_risk_governor_temporal_attention_pool_entry")
             self.assertEqual(accepted[0]["pool_status"], "accepted")
+            self.assertEqual(accepted[0]["event_temporal_form"], "instantaneous_unscheduled_event")
+            self.assertEqual(accepted[0]["event_family_prior_role"], "event_family_impact_parameterization")
+            self.assertEqual(accepted[0]["layer_4_projection_type"], "event_family_impact_state_projection")
             self.assertEqual(accepted[0]["event_release_phase"], "post_release")
             self.assertEqual(accepted[0]["event_lifecycle_stage"], "post_release_impact_state")
             self.assertEqual(accepted[0]["state_signal_type"], "impact_state")
@@ -346,6 +357,11 @@ class ModelGroupAttributionTests(unittest.TestCase):
     def test_event_effect_profile_keeps_earnings_in_pre_release_risk_stage(self):
         profile = _event_effect_profile("earnings_guidance_event_family")
 
+        self.assertEqual(profile["event_temporal_form"], "scheduled_data_release_event")
+        self.assertEqual(profile["event_schedule_type"], "scheduled_release_calendar")
+        self.assertEqual(profile["event_instance_observation_role"], "scheduled_or_expected_release")
+        self.assertEqual(profile["event_family_prior_role"], "event_family_impact_parameterization")
+        self.assertEqual(profile["event_family_impact_parameterization"]["impact_curve_components"]["event_time_component"], "release_shock")
         self.assertEqual(profile["event_release_phase"], "pre_release")
         self.assertEqual(profile["event_lifecycle_stage"], "pre_release_risk_state")
         self.assertEqual(profile["state_signal_type"], "risk_state")
@@ -358,10 +374,31 @@ class ModelGroupAttributionTests(unittest.TestCase):
             text="Company reported earnings results after market close.",
         )
 
+        self.assertEqual(profile["event_temporal_form"], "scheduled_data_release_event")
+        self.assertEqual(profile["event_schedule_type"], "scheduled_release_calendar")
+        self.assertEqual(profile["event_instance_observation_role"], "observed_release")
         self.assertEqual(profile["event_release_phase"], "post_release")
         self.assertEqual(profile["event_lifecycle_stage"], "post_release_impact_state")
         self.assertEqual(profile["state_signal_type"], "impact_state")
         self.assertEqual(profile["layer_4_state_overlay"], "event_post_release_impact_state")
+
+    def test_event_effect_profile_represents_scheduled_calendar_events(self):
+        profile = _event_effect_profile("triple_witching", information_role_type="calendar", text="Known options expiration calendar event.")
+
+        self.assertEqual(profile["event_temporal_form"], "scheduled_calendar_event")
+        self.assertEqual(profile["event_schedule_type"], "scheduled_periodic_calendar")
+        self.assertEqual(profile["event_instance_observation_role"], "calendar_state")
+        self.assertEqual(profile["state_signal_type"], "risk_state")
+        self.assertEqual(profile["event_family_impact_parameterization"]["impact_curve_components"]["event_time_component"], "session_or_expiration_mechanics")
+
+    def test_event_effect_profile_represents_unscheduled_instant_events(self):
+        profile = _event_effect_profile("breaking_news", text="Unexpected trading halt shock.")
+
+        self.assertEqual(profile["event_temporal_form"], "instantaneous_unscheduled_event")
+        self.assertEqual(profile["event_schedule_type"], "unscheduled")
+        self.assertEqual(profile["event_instance_observation_role"], "observed_shock")
+        self.assertEqual(profile["state_signal_type"], "impact_state")
+        self.assertEqual(profile["event_family_impact_parameterization"]["impact_curve_components"]["event_time_component"], "shock_onset")
 
 
 if __name__ == "__main__":
