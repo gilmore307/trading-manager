@@ -20,17 +20,12 @@ from typing import Any, Mapping, Sequence
 
 from .control_plane import CompletionReceiptRows, TaskSystemError, normalize_completion_receipt, persist_completion_rows
 
-MODEL_LAYER_ORDER = (
-    "layer_01_market_regime",
-    "layer_02_sector_context",
-    "layer_03_target_state_vector",
-    "layer_04_event_failure_risk",
-    "layer_05_alpha_confidence",
-    "layer_06_dynamic_risk_policy",
-    "layer_07_position_projection",
-    "layer_08_underlying_action",
-    "layer_09_option_expression",
-    "layer_10_event_risk_governor",
+REQUIRED_RUNTIME_COMPONENT_ORDER = (
+    "component_01_intake",
+    "component_02_entry",
+    "component_03_lifecycle",
+    "component_05_order_intent",
+    "component_06_execution_gate",
 )
 
 FORBIDDEN_HANDOFF_ACTIONS = (
@@ -57,7 +52,7 @@ class RealtimeShadowHandoffValidation:
     valid: bool
     missing_fields: tuple[str, ...]
     mismatched_fields: tuple[str, ...]
-    missing_model_layers: tuple[str, ...]
+    missing_runtime_components: tuple[str, ...]
     forbidden_actions_present: tuple[str, ...]
     route_plan_ready: bool
     provider_calls_performed: int
@@ -69,7 +64,7 @@ class RealtimeShadowHandoffValidation:
         row = asdict(self)
         row["missing_fields"] = list(self.missing_fields)
         row["mismatched_fields"] = list(self.mismatched_fields)
-        row["missing_model_layers"] = list(self.missing_model_layers)
+        row["missing_runtime_components"] = list(self.missing_runtime_components)
         row["forbidden_actions_present"] = list(self.forbidden_actions_present)
         return row
 
@@ -87,18 +82,26 @@ def _is_sequence(value: Any) -> bool:
     return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
 
 
-def _layer_set_from_decision_input(decision_input: Mapping[str, Any]) -> set[str]:
-    rows = decision_input.get("layer_input_refs") or []
+def _component_set_from_decision_input(decision_input: Mapping[str, Any]) -> set[str]:
+    rows = decision_input.get("component_input_refs") or []
     if not _is_sequence(rows):
         return set()
-    return {str(row.get("model_layer")) for row in rows if isinstance(row, Mapping) and row.get("model_layer")}
+    return {
+        str(row.get("component_id") or row.get("model_component"))
+        for row in rows
+        if isinstance(row, Mapping) and (row.get("component_id") or row.get("model_component"))
+    }
 
 
-def _layer_set_from_route_plan(route_plan: Mapping[str, Any]) -> set[str]:
-    rows = route_plan.get("layer_routes") or []
+def _component_set_from_route_plan(route_plan: Mapping[str, Any]) -> set[str]:
+    rows = route_plan.get("component_routes") or []
     if not _is_sequence(rows):
         return set()
-    return {str(row.get("model_layer")) for row in rows if isinstance(row, Mapping) and row.get("model_layer")}
+    return {
+        str(row.get("component_id") or row.get("model_component"))
+        for row in rows
+        if isinstance(row, Mapping) and (row.get("component_id") or row.get("model_component"))
+    }
 
 
 def validate_realtime_shadow_handoff_pair(
@@ -125,17 +128,17 @@ def validate_realtime_shadow_handoff_pair(
         if decision_input.get(field) and route_plan.get(field) and decision_input.get(field) != route_plan.get(field):
             mismatched_fields.append(field)
 
-    layer_set = _layer_set_from_decision_input(decision_input).intersection(_layer_set_from_route_plan(route_plan))
-    missing_layers = sorted(set(MODEL_LAYER_ORDER) - layer_set)
+    component_set = _component_set_from_decision_input(decision_input).intersection(_component_set_from_route_plan(route_plan))
+    missing_components = sorted(set(REQUIRED_RUNTIME_COMPONENT_ORDER) - component_set)
     requested_actions = set(decision_input.get("requested_actions") or []) | set(route_plan.get("requested_actions") or [])
     forbidden_actions_present = sorted(requested_actions.intersection(FORBIDDEN_HANDOFF_ACTIONS))
     input_validation = route_plan.get("input_validation") or {}
     route_plan_ready = (
-        route_plan.get("readiness_status") == "ready_for_fixture_shadow_historical_model_decision_route"
+        route_plan.get("readiness_status") == "ready_for_fixture_shadow_runtime_component_route"
         and isinstance(input_validation, Mapping)
         and input_validation.get("valid") is True
     )
-    valid = not missing_fields and not mismatched_fields and not missing_layers and not forbidden_actions_present and route_plan_ready
+    valid = not missing_fields and not mismatched_fields and not missing_components and not forbidden_actions_present and route_plan_ready
     result = RealtimeShadowHandoffValidation(
         contract_type="manager_realtime_shadow_handoff_validation",
         request_id=request_id,
@@ -144,7 +147,7 @@ def validate_realtime_shadow_handoff_pair(
         valid=valid,
         missing_fields=tuple(missing_fields),
         mismatched_fields=tuple(mismatched_fields),
-        missing_model_layers=tuple(missing_layers),
+        missing_runtime_components=tuple(missing_components),
         forbidden_actions_present=tuple(forbidden_actions_present),
         route_plan_ready=route_plan_ready,
         provider_calls_performed=0,
@@ -214,7 +217,7 @@ def build_realtime_shadow_handoff_receipt(
                 "row_counts": {
                     "decision_input_snapshots": 1,
                     "route_plans": 1,
-                    "layer_routes": len(route_plan.get("layer_routes") or []),
+                    "component_routes": len(route_plan.get("component_routes") or []),
                 },
                 "outputs": [
                     {

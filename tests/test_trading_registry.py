@@ -3063,14 +3063,18 @@ class RegistryHelperTests(unittest.TestCase):
             "execution_model_decision_input_snapshot",
         )
         self.assertIn("historical_model_decision_handoff", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
+        self.assertIn("current_model_component_route", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
+        self.assertNotIn("layers_1_10", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
         self.assertEqual(
             rows["EXECUTION_MODEL_DECISION_INPUT_VALIDATION"]["payload"],
             "execution_model_decision_input_validation",
         )
+        self.assertIn("current_model_component_route", rows["EXECUTION_MODEL_DECISION_INPUT_VALIDATION"]["applies_to"])
         self.assertIn("build_realtime_feature_snapshot.py", rows["EXECUTION_REALTIME_FEATURE_SNAPSHOT_BUILD"]["path"])
         self.assertIn("build_realtime_model_input.py", rows["EXECUTION_REALTIME_MODEL_INPUT_BUILD"]["path"])
         self.assertIn("validate_realtime_model_input.py", rows["EXECUTION_REALTIME_MODEL_INPUT_VALIDATE"]["path"])
         self.assertIn("historical_feature_parity_required", rows["EXECUTION_REALTIME_MODEL_DECISION_HANDOFF_POLICY"]["payload"])
+        self.assertIn("runtime_component_refs_required", rows["EXECUTION_REALTIME_MODEL_DECISION_HANDOFF_POLICY"]["payload"])
 
     def test_model_realtime_decision_handoff_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -3118,6 +3122,7 @@ class RegistryHelperTests(unittest.TestCase):
             "manager_realtime_shadow_handoff_validation",
         )
         self.assertIn("model_realtime_decision_route_plan", rows["MANAGER_REALTIME_SHADOW_HANDOFF_VALIDATION"]["applies_to"])
+        self.assertIn("current_model_component_route", rows["MANAGER_REALTIME_SHADOW_HANDOFF_VALIDATION"]["applies_to"])
         self.assertEqual(
             rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECEIPT"]["payload"],
             "manager_realtime_shadow_handoff_receipt",

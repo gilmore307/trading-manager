@@ -16,17 +16,26 @@ from trading_manager_tasks.realtime_shadow_handoff import (
 
 
 def _decision_input_snapshot() -> dict[str, object]:
-    layers = [
-        ("layer_01_market_regime", "market_regime_model", "market_context_state"),
-        ("layer_02_sector_context", "sector_context_model", "sector_context_state"),
-        ("layer_03_target_state_vector", "target_state_vector_model", "target_context_state"),
-        ("layer_04_event_failure_risk", "event_failure_risk_model", "event_failure_risk_vector"),
-        ("layer_05_alpha_confidence", "alpha_confidence_model", "alpha_confidence_vector"),
-        ("layer_06_dynamic_risk_policy", "dynamic_risk_policy_model", "dynamic_risk_policy_state"),
-        ("layer_07_position_projection", "position_projection_model", "position_projection_vector"),
-        ("layer_08_underlying_action", "underlying_action_model", "underlying_action_plan"),
-        ("layer_09_option_expression", "option_expression_model", "option_expression_plan"),
-        ("layer_10_event_risk_governor", "event_risk_governor", "event_context_vector"),
+    components = [
+        ("component_01_intake", "C01", "Intake", ("model_01_background_context", "model_02_target_state"), ()),
+        (
+            "component_02_entry",
+            "C02",
+            "Entry",
+            ("model_03_event_state", "model_04_unified_decision"),
+            ("model_06_residual_event_governance",),
+        ),
+        (
+            "component_03_lifecycle",
+            "C03",
+            "Lifecycle",
+            ("model_03_event_state", "model_04_unified_decision"),
+            ("model_06_residual_event_governance",),
+        ),
+        ("component_04_option_review", "C04", "Option Review", (), ("model_05_option_expression", "model_06_residual_event_governance")),
+        ("component_05_order_intent", "C05", "Order Intent", (), ()),
+        ("component_06_execution_gate", "C06", "Execution Gate", (), ()),
+        ("component_07_failure_review", "C07", "Failure Review", (), ("model_06_residual_event_governance",)),
     ]
     return {
         "contract_type": "execution_model_decision_input_snapshot",
@@ -37,21 +46,23 @@ def _decision_input_snapshot() -> dict[str, object]:
         "historical_dataset_snapshot_ref": "trading-model://snapshots/historical/unit",
         "frozen_model_config_ref": "trading-model://configs/frozen/unit",
         "realtime_feature_snapshot_ref": "realtime-feature-snapshot://rtfeat_unit",
-        "layer_input_refs": [
+        "component_input_refs": [
             {
-                "contract_type": "execution_model_decision_layer_input",
+                "contract_type": "execution_model_decision_component_input",
                 "decision_input_snapshot_id": "rtdecision_unit",
-                "model_layer": layer,
-                "model_id": model_id,
-                "expected_model_output": output,
-                "feature_ref": f"realtime-feature://rtfeat_unit/{layer}",
-                "upstream_context_refs": [],
+                "component_id": component_id,
+                "component_step": component_step,
+                "component_name": component_name,
+                "required_model_surfaces": list(required_model_surfaces),
+                "optional_model_surfaces": list(optional_model_surfaces),
+                "feature_ref": f"realtime-feature://rtfeat_unit/{component_id}",
+                "upstream_context_refs": ["realtime-feature-snapshot://rtfeat_unit"],
                 "frozen_model_config_ref": "trading-model://configs/frozen/unit",
                 "historical_dataset_snapshot_ref": "trading-model://snapshots/historical/unit",
                 "realtime_feature_snapshot_ref": "realtime-feature-snapshot://rtfeat_unit",
                 "decision_handoff_status": "ready_for_historical_model_decision_input",
             }
-            for layer, model_id, output in layers
+            for component_id, component_step, component_name, required_model_surfaces, optional_model_surfaces in components
         ],
     }
 
@@ -59,19 +70,24 @@ def _decision_input_snapshot() -> dict[str, object]:
 def _route_plan() -> dict[str, object]:
     decision = _decision_input_snapshot()
     routes = []
-    for row in decision["layer_input_refs"]:  # type: ignore[index]
+    for row in decision["component_input_refs"]:  # type: ignore[index]
         routes.append(
             {
-                "contract_type": "model_realtime_decision_layer_route",
+                "contract_type": "model_realtime_decision_component_route",
                 "route_plan_id": "rtdroute_unit",
-                "model_layer": row["model_layer"],
-                "model_id": row["model_id"],
-                "expected_model_output": row["expected_model_output"],
+                "component_id": row["component_id"],
+                "component_step": row["component_step"],
+                "component_name": row["component_name"],
+                "required_model_surfaces": row["required_model_surfaces"],
+                "optional_model_surfaces": row["optional_model_surfaces"],
+                "input_contracts": [],
+                "output_contracts": [],
                 "feature_ref": row["feature_ref"],
                 "upstream_context_refs": row["upstream_context_refs"],
                 "frozen_model_config_ref": row["frozen_model_config_ref"],
                 "historical_dataset_snapshot_ref": row["historical_dataset_snapshot_ref"],
-                "generator_entrypoint_ref": "trading-model/scripts/models/fixture_physical_surface/generate_fixture_physical_surface.py",
+                "model_entrypoint_refs": [],
+                "invocation_policy": "unit_fixture",
                 "generation_mode": "shadow_monitoring",
                 "route_status": "ready_for_fixture_shadow_generation",
             }
@@ -83,9 +99,10 @@ def _route_plan() -> dict[str, object]:
         "decision_time": "2026-05-11T13:30:00+00:00",
         "instrument_ref": "AAPL",
         "handoff_mode": "shadow_monitoring",
+        "execution_unit": "runtime_component",
         "input_validation": {"valid": True},
-        "layer_routes": routes,
-        "readiness_status": "ready_for_fixture_shadow_historical_model_decision_route",
+        "component_routes": routes,
+        "readiness_status": "ready_for_fixture_shadow_runtime_component_route",
         "provider_calls_performed": 0,
         "model_activation_performed": False,
         "broker_calls_performed": 0,
@@ -101,7 +118,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
         )
 
         self.assertTrue(validation["valid"])
-        self.assertEqual(validation["missing_model_layers"], [])
+        self.assertEqual(validation["missing_runtime_components"], [])
         self.assertEqual(validation["provider_calls_performed"], 0)
         self.assertFalse(validation["model_activation_performed"])
 
@@ -115,7 +132,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
         self.assertEqual(receipt["contract_type"], "component_completion_receipt")
         self.assertEqual(receipt["receipt_kind"], "manager_realtime_shadow_handoff_receipt")
         self.assertEqual(receipt["status"], "succeeded")
-        self.assertEqual(receipt["runs"][0]["row_counts"]["layer_routes"], 10)
+        self.assertEqual(receipt["runs"][0]["row_counts"]["component_routes"], 7)
         self.assertFalse(receipt["model_activation_performed"])
         self.assertFalse(receipt["broker_order_construction_performed"])
 
@@ -196,7 +213,7 @@ class RealtimeShadowHandoffTests(unittest.TestCase):
         self.assertEqual(bundle["rehearsal_status"], "ready")
         self.assertEqual(bundle["provider_calls_performed"], 0)
         self.assertFalse(bundle["broker_order_construction_performed"])
-        self.assertEqual(len(bundle["route_plan"]["layer_routes"]), 10)
+        self.assertEqual(len(bundle["route_plan"]["component_routes"]), 7)
         self.assertEqual(bundle["manager_handoff"]["receipt"]["status"], "succeeded")
 
     def test_cli_emits_bundle(self) -> None:
