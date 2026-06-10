@@ -56,7 +56,7 @@ EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS = 900
 EVENT_STRATEGY_CODEX_WORKDIR = Path("/root/.openclaw/workspace")
 EVENT_STRATEGY_CODEX_ADD_DIR = Path("/root/projects")
 MAX_EVENT_STRATEGY_REVIEW_PACKETS = 3
-PROSPECTIVE_UNCERTAINTY_EVENT_TOKENS = {
+PRE_RELEASE_EVENT_TOKENS = {
     "earnings",
     "guidance",
     "macro_release",
@@ -687,7 +687,7 @@ def _build_event_family_attention_evidence(
             "normalized_event_type": str(interpretation.get("normalized_event_type") or "event_candidate"),
             "affected_scope": str(interpretation.get("affected_scope") or "unknown"),
             "event_release_phase": effect_profile["event_release_phase"],
-            "event_effect_mode": effect_profile["event_effect_mode"],
+            "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
             "state_signal_type": effect_profile["state_signal_type"],
             "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
             "available_time": str(candidate.get("available_time") or ""),
@@ -718,7 +718,7 @@ def _build_event_family_attention_evidence(
                 "attributed_failure_count": 0,
                 "co_event_group_ids": set(),
                 "event_release_phase_counts": {},
-                "event_effect_mode_counts": {},
+                "event_lifecycle_stage_counts": {},
                 "state_signal_type_counts": {},
                 "layer_4_state_overlay_counts": {},
                 "leakage_violation_count": 0,
@@ -743,7 +743,7 @@ def _build_event_family_attention_evidence(
         group["source_decision_ids"].update(stats["source_decision_ids"])
         group["source_triage_attribution_ids"].update(stats["source_triage_attribution_ids"])
         _increment_count(group["event_release_phase_counts"], row["event_release_phase"])
-        _increment_count(group["event_effect_mode_counts"], row["event_effect_mode"])
+        _increment_count(group["event_lifecycle_stage_counts"], row["event_lifecycle_stage"])
         _increment_count(group["state_signal_type_counts"], row["state_signal_type"])
         _increment_count(group["layer_4_state_overlay_counts"], row["layer_4_state_overlay"])
     for proposal in event_focus_proposals:
@@ -771,7 +771,7 @@ def _build_event_family_attention_evidence(
         leakage_status = "passed" if group["leakage_violation_count"] == 0 else "failed"
         co_event_confounder_status = "passed" if group["confounded_failure_count"] == 0 else "failed"
         control_status = "passed" if occurrence_count >= 2 and matched_occurrence_count >= 1 and unmatched_occurrence_count >= 1 else "insufficient_evidence"
-        if effect_profile["state_signal_type"] in {"risk_state", "uncertainty_state"}:
+        if effect_profile["state_signal_type"] in {"risk_state", "impact_state"}:
             association_status = "passed" if group["supporting_failure_count"] >= 1 and matched_occurrence_count >= 1 and average_confidence >= 0.35 else "insufficient_evidence"
         else:
             association_status = "passed" if group["supporting_failure_count"] >= 1 and average_score >= 0.5 and average_confidence >= 0.5 else "insufficient_evidence"
@@ -807,7 +807,7 @@ def _build_event_family_attention_evidence(
                 "target_symbol": group["target_symbol"],
                 "normalized_event_type": group["normalized_event_type"],
                 "event_release_phase": effect_profile["event_release_phase"],
-                "event_effect_mode": effect_profile["event_effect_mode"],
+                "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
                 "state_signal_type": effect_profile["state_signal_type"],
                 "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
                 "supporting_failure_count": group["supporting_failure_count"],
@@ -831,12 +831,12 @@ def _build_event_family_attention_evidence(
                 "target_symbol": group["target_symbol"],
                 "normalized_event_type": group["normalized_event_type"],
                 "event_release_phase": effect_profile["event_release_phase"],
-                "event_effect_mode": effect_profile["event_effect_mode"],
+                "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
                 "state_signal_type": effect_profile["state_signal_type"],
                 "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
                 "affected_scope": group["affected_scope"],
                 "event_release_phase_counts": dict(sorted(group["event_release_phase_counts"].items())),
-                "event_effect_mode_counts": dict(sorted(group["event_effect_mode_counts"].items())),
+                "event_lifecycle_stage_counts": dict(sorted(group["event_lifecycle_stage_counts"].items())),
                 "state_signal_type_counts": dict(sorted(group["state_signal_type_counts"].items())),
                 "layer_4_state_overlay_counts": dict(sorted(group["layer_4_state_overlay_counts"].items())),
                 "deterministic_gate_status": deterministic_gate_status,
@@ -952,22 +952,22 @@ def _event_effect_profile(
     if _contains_any(role, POST_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, POST_RELEASE_TEXT_TOKENS):
         return {
             "event_release_phase": "post_release",
-            "event_effect_mode": "observed_market_impact",
-            "state_signal_type": "risk_state",
-            "layer_4_state_overlay": "event_risk_state_shift",
+            "event_lifecycle_stage": "post_release_impact_state",
+            "state_signal_type": "impact_state",
+            "layer_4_state_overlay": "event_post_release_impact_state",
         }
-    if any(token in event_type for token in PROSPECTIVE_UNCERTAINTY_EVENT_TOKENS) or _contains_any(role, PRE_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, PRE_RELEASE_TEXT_TOKENS):
+    if any(token in event_type for token in PRE_RELEASE_EVENT_TOKENS) or _contains_any(role, PRE_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, PRE_RELEASE_TEXT_TOKENS):
         return {
             "event_release_phase": "pre_release",
-            "event_effect_mode": "prospective_uncertainty",
-            "state_signal_type": "uncertainty_state",
-            "layer_4_state_overlay": "event_uncertainty_risk_elevated",
+            "event_lifecycle_stage": "pre_release_risk_state",
+            "state_signal_type": "risk_state",
+            "layer_4_state_overlay": "event_pre_release_risk_state_change",
         }
     return {
         "event_release_phase": "post_release",
-        "event_effect_mode": "observed_market_impact",
-        "state_signal_type": "risk_state",
-        "layer_4_state_overlay": "event_risk_state_shift",
+        "event_lifecycle_stage": "post_release_impact_state",
+        "state_signal_type": "impact_state",
+        "layer_4_state_overlay": "event_post_release_impact_state",
     }
 
 
@@ -991,15 +991,15 @@ def _dominant_effect_profile(group: Mapping[str, Any]) -> dict[str, str]:
     if int(phases.get("post_release") or 0) > 0:
         return {
             "event_release_phase": "post_release",
-            "event_effect_mode": "observed_market_impact",
-            "state_signal_type": "risk_state",
-            "layer_4_state_overlay": "event_risk_state_shift",
+            "event_lifecycle_stage": "post_release_impact_state",
+            "state_signal_type": "impact_state",
+            "layer_4_state_overlay": "event_post_release_impact_state",
         }
     return {
         "event_release_phase": "pre_release",
-        "event_effect_mode": "prospective_uncertainty",
-        "state_signal_type": "uncertainty_state",
-        "layer_4_state_overlay": "event_uncertainty_risk_elevated",
+        "event_lifecycle_stage": "pre_release_risk_state",
+        "state_signal_type": "risk_state",
+        "layer_4_state_overlay": "event_pre_release_risk_state_change",
     }
 
 
@@ -1215,7 +1215,7 @@ def _build_accepted_temporal_attention_pool_entries(
                 "target_symbol": candidate.get("target_symbol"),
                 "normalized_event_type": candidate.get("normalized_event_type"),
                 "event_release_phase": candidate.get("event_release_phase"),
-                "event_effect_mode": candidate.get("event_effect_mode"),
+                "event_lifecycle_stage": candidate.get("event_lifecycle_stage"),
                 "state_signal_type": candidate.get("state_signal_type"),
                 "layer_4_state_overlay": candidate.get("layer_4_state_overlay"),
                 "source_candidate_ref": candidate.get("event_family_bias_association_packet_ref"),

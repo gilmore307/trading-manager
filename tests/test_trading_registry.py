@@ -576,12 +576,12 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_STRATEGY_PROMOTION_REVIEW_COUNT": "event_strategy_promotion_review_count",
             "ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_COUNT": "accepted_temporal_attention_pool_entry_count",
             "EVENT_STRATEGY_PROMOTION_REVIEW_STATUS": "event_strategy_promotion_review_status",
-            "EVENT_EFFECT_MODE": "event_effect_mode",
+            "EVENT_LIFECYCLE_STAGE": "event_lifecycle_stage",
             "STATE_SIGNAL_TYPE": "state_signal_type",
             "LAYER_4_STATE_OVERLAY": "layer_4_state_overlay",
             "EVENT_RELEASE_PHASE": "event_release_phase",
             "EVENT_RELEASE_PHASE_COUNTS": "event_release_phase_counts",
-            "EVENT_EFFECT_MODE_COUNTS": "event_effect_mode_counts",
+            "EVENT_LIFECYCLE_STAGE_COUNTS": "event_lifecycle_stage_counts",
             "STATE_SIGNAL_TYPE_COUNTS": "state_signal_type_counts",
             "LAYER_4_STATE_OVERLAY_COUNTS": "layer_4_state_overlay_counts",
         }
@@ -613,12 +613,12 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], payload)
 
         status_payloads = {
-            "EVENT_EFFECT_MODE_OBSERVED_MARKET_IMPACT": "observed_market_impact",
-            "EVENT_EFFECT_MODE_PROSPECTIVE_UNCERTAINTY": "prospective_uncertainty",
+            "EVENT_LIFECYCLE_STAGE_PRE_RELEASE_RISK_STATE": "pre_release_risk_state",
+            "EVENT_LIFECYCLE_STAGE_POST_RELEASE_IMPACT_STATE": "post_release_impact_state",
             "STATE_SIGNAL_TYPE_RISK_STATE": "risk_state",
-            "STATE_SIGNAL_TYPE_UNCERTAINTY_STATE": "uncertainty_state",
-            "LAYER_4_STATE_OVERLAY_EVENT_RISK_STATE_SHIFT": "event_risk_state_shift",
-            "LAYER_4_STATE_OVERLAY_EVENT_UNCERTAINTY_RISK_ELEVATED": "event_uncertainty_risk_elevated",
+            "STATE_SIGNAL_TYPE_IMPACT_STATE": "impact_state",
+            "LAYER_4_STATE_OVERLAY_EVENT_PRE_RELEASE_RISK_STATE_CHANGE": "event_pre_release_risk_state_change",
+            "LAYER_4_STATE_OVERLAY_EVENT_POST_RELEASE_IMPACT_STATE": "event_post_release_impact_state",
             "EVENT_RELEASE_PHASE_PRE_RELEASE": "pre_release",
             "EVENT_RELEASE_PHASE_POST_RELEASE": "post_release",
         }
@@ -2011,7 +2011,7 @@ class RegistryHelperTests(unittest.TestCase):
             "candidate_eligibility_state",
             "candidate_generation_reason_codes",
             "earnings_guidance_event_family",
-            "event_effect_mode",
+            "event_lifecycle_stage",
             "event_release_phase",
             "event_family_bias_association_packet",
             "event_family_scouting_packet",
