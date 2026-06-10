@@ -1294,6 +1294,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["CURRENT_UNDERLYING_POSITION_STATE"]["payload"], "current_underlying_position_state")
         self.assertEqual(rows["PENDING_UNDERLYING_ORDER_STATE"]["payload"], "pending_underlying_order_state")
         self.assertEqual(rows["EFFECTIVE_CURRENT_UNDERLYING_EXPOSURE"]["payload"], "effective_current_underlying_exposure")
+        self.assertEqual(rows["BACKGROUND_CONTEXT_MODEL"]["payload"], "background_context_model")
+        self.assertEqual(rows["MODEL_01_BACKGROUND_CONTEXT"]["payload"], "model_01_background_context")
+        self.assertEqual(rows["BACKGROUND_CONTEXT_STATE"]["payload"], "background_context_state")
+        self.assertEqual(rows["BACKGROUND_CONTEXT_STATE_HORIZONS"]["payload"], "model_decision_horizon_grid")
+        self.assertIn("1_market_direction_score_<horizon>", rows["BACKGROUND_CONTEXT_STATE_SCORE_FAMILIES"]["payload"])
+        self.assertIn("1_background_context_quality_score_<horizon>", rows["BACKGROUND_CONTEXT_STATE_SCORE_FAMILIES"]["payload"])
+        self.assertEqual(rows["TARGET_STATE_MODEL"]["payload"], "target_state_model")
+        self.assertEqual(rows["MODEL_02_TARGET_STATE"]["payload"], "model_02_target_state")
+        self.assertEqual(rows["TARGET_CONTEXT_STATE"]["payload"], "target_context_state")
+        self.assertEqual(rows["TARGET_CONTEXT_STATE_HORIZONS"]["payload"], "model_decision_horizon_grid")
+        self.assertIn("2_target_direction_score_<horizon>", rows["TARGET_CONTEXT_STATE_SCORE_FAMILIES"]["payload"])
+        self.assertIn("2_tradability_score_<horizon>", rows["TARGET_CONTEXT_STATE_SCORE_FAMILIES"]["payload"])
+        self.assertEqual(rows["EVENT_STATE_MODEL"]["payload"], "event_state_model")
+        self.assertEqual(rows["MODEL_03_EVENT_STATE"]["payload"], "model_03_event_state")
+        self.assertEqual(rows["EVENT_STATE_VECTOR"]["payload"], "event_state_vector")
+        self.assertEqual(rows["EVENT_STATE_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
+        self.assertIn("3_event_response_direction_score_<horizon>", rows["EVENT_STATE_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("3_event_applicability_confidence_score_<horizon>", rows["EVENT_STATE_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertEqual(rows["UNIFIED_DECISION_MODEL"]["payload"], "unified_decision_model")
         self.assertEqual(rows["MODEL_04_UNIFIED_DECISION"]["payload"], "model_04_unified_decision")
         self.assertEqual(rows["UNIFIED_DECISION_VECTOR"]["payload"], "unified_decision_vector")
@@ -1383,6 +1401,15 @@ class RegistryHelperTests(unittest.TestCase):
             "MODEL_05_ALPHA_CONFIDENCE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_05_alpha_confidence/evaluate_model_05_alpha_confidence.py",
             "MODEL_01_MARKET_REGIME_DIAGNOSE_SUBSTRATE": "scripts/models/model_01_market_regime/diagnose_model_01_market_regime_substrate.py",
             "MODEL_05_ALPHA_CONFIDENCE_REVIEW_PROMOTION": "scripts/models/model_05_alpha_confidence/review_alpha_confidence_promotion.py",
+            "MODEL_01_BACKGROUND_CONTEXT_GENERATE": "scripts/models/model_01_background_context/generate_model_01_background_context.py",
+            "MODEL_01_BACKGROUND_CONTEXT_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_01_background_context/evaluate_model_01_background_context.py",
+            "MODEL_01_BACKGROUND_CONTEXT_REVIEW_PROMOTION": "scripts/models/model_01_background_context/review_background_context_promotion.py",
+            "MODEL_02_TARGET_STATE_GENERATE": "scripts/models/model_02_target_state/generate_model_02_target_state.py",
+            "MODEL_02_TARGET_STATE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_02_target_state/evaluate_model_02_target_state.py",
+            "MODEL_02_TARGET_STATE_REVIEW_PROMOTION": "scripts/models/model_02_target_state/review_target_state_promotion.py",
+            "MODEL_03_EVENT_STATE_GENERATE": "scripts/models/model_03_event_state/generate_model_03_event_state.py",
+            "MODEL_03_EVENT_STATE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_03_event_state/evaluate_model_03_event_state.py",
+            "MODEL_03_EVENT_STATE_REVIEW_PROMOTION": "scripts/models/model_03_event_state/review_event_state_promotion.py",
             "MODEL_04_UNIFIED_DECISION_GENERATE": "scripts/models/model_04_unified_decision/generate_model_04_unified_decision.py",
             "MODEL_04_UNIFIED_DECISION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_04_unified_decision/evaluate_model_04_unified_decision.py",
             "MODEL_04_UNIFIED_DECISION_REVIEW_PROMOTION": "scripts/models/model_04_unified_decision/review_unified_decision_promotion.py",
