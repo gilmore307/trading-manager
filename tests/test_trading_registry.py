@@ -682,6 +682,28 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("event_family_impact_window_real_input_backtest", real_input_runner["payload"])
         self.assertIn("review_ready_not_promotion_approved", real_input_runner["applies_to"])
 
+        replay_overlay = rows["EVENT_FAMILY_IMPACT_WINDOW_REPLAY_OVERLAY_20260610"]
+        self.assertEqual(replay_overlay["kind"], "artifact_type")
+        self.assertEqual(replay_overlay["payload"], "event_family_impact_window_replay_overlay")
+        self.assertIn("event_family_impact_window_replay_20260610", replay_overlay["path"])
+        self.assertIn("replay_overlay_evidence_not_promotion_approval", replay_overlay["applies_to"])
+
+        replay_summary = rows["EVENT_FAMILY_IMPACT_WINDOW_REPLAY_OVERLAY_SUMMARY"]
+        self.assertEqual(replay_summary["kind"], "artifact_type")
+        self.assertEqual(replay_summary["payload"], "event_family_impact_window_replay_overlay_summary")
+        self.assertIn("event_family_impact_window_replay_summary.json", replay_summary["applies_to"])
+
+        replay_row = rows["EVENT_FAMILY_IMPACT_WINDOW_REPLAY_OVERLAY_ROW"]
+        self.assertEqual(replay_row["kind"], "artifact_type")
+        self.assertEqual(replay_row["payload"], "event_family_impact_window_replay_overlay_row")
+        self.assertIn("decision_event_overlay_rows.jsonl", replay_row["applies_to"])
+        self.assertIn("Uncalibrated", replay_row["note"])
+
+        replay_runner = rows["MODEL_10_EVENT_FAMILY_IMPACT_WINDOW_REPLAY_OVERLAY_BUILD"]
+        self.assertEqual(replay_runner["kind"], "script")
+        self.assertIn("build_event_family_impact_window_replay.py", replay_runner["path"])
+        self.assertIn("event_family_impact_window_replay_overlay", replay_runner["applies_to"])
+
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
