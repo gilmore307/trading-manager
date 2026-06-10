@@ -1294,17 +1294,29 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["CURRENT_UNDERLYING_POSITION_STATE"]["payload"], "current_underlying_position_state")
         self.assertEqual(rows["PENDING_UNDERLYING_ORDER_STATE"]["payload"], "pending_underlying_order_state")
         self.assertEqual(rows["EFFECTIVE_CURRENT_UNDERLYING_EXPOSURE"]["payload"], "effective_current_underlying_exposure")
+        self.assertEqual(rows["UNIFIED_DECISION_MODEL"]["payload"], "unified_decision_model")
+        self.assertEqual(rows["MODEL_04_UNIFIED_DECISION"]["payload"], "model_04_unified_decision")
+        self.assertEqual(rows["UNIFIED_DECISION_VECTOR"]["payload"], "unified_decision_vector")
+        self.assertEqual(rows["UNIFIED_DECISION_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
+        self.assertIn("4_edge_direction_score_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("4_action_confidence_score_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("4_resolved_underlying_action_type", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("4_resolved_reason_codes", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("open_long", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
+        self.assertIn("bearish_underlying_path_but_no_short_allowed", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
+        self.assertIn("limit_near_mid", rows["UNIFIED_DECISION_ENTRY_STYLES"]["payload"])
+        self.assertIn("no_entry", rows["UNIFIED_DECISION_ENTRY_STYLES"]["payload"])
         self.assertEqual(rows["OPTION_EXPRESSION_MODEL"]["payload"], "option_expression_model")
-        self.assertEqual(rows["MODEL_09_OPTION_EXPRESSION"]["payload"], "model_09_option_expression")
+        self.assertEqual(rows["MODEL_05_OPTION_EXPRESSION"]["payload"], "model_05_option_expression")
         self.assertEqual(rows["OPTION_EXPRESSION_PLAN"]["payload"], "option_expression_plan")
         self.assertEqual(rows["EXPRESSION_VECTOR"]["payload"], "expression_vector")
         self.assertEqual(rows["OPTION_EXPRESSION_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
-        self.assertIn("layer_09_after_underlying_action", rows["OPTION_EXPRESSION_MODEL_LAYER_POLICY"]["payload"])
-        self.assertIn("9_option_expression_eligibility_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
-        self.assertIn("9_option_theta_risk_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
-        self.assertIn("9_resolved_expression_type", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
-        self.assertIn("9_resolved_selected_contract_ref", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
-        self.assertIn("9_resolved_no_option_reason_codes", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("M05_after_unified_decision", rows["OPTION_EXPRESSION_MODEL_LAYER_POLICY"]["payload"])
+        self.assertIn("5_option_expression_eligibility_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("5_option_theta_risk_score_<horizon>", rows["OPTION_EXPRESSION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("5_resolved_expression_type", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("5_resolved_selected_contract_ref", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("5_resolved_no_option_reason_codes", rows["OPTION_EXPRESSION_RESOLVED_FIELD_FAMILIES"]["payload"])
         self.assertIn("long_call", rows["OPTION_EXPRESSION_TYPES"]["payload"])
         self.assertIn("underlying_only_expression", rows["OPTION_EXPRESSION_TYPES"]["payload"])
         self.assertIn("option_expression_not_broker_order", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
@@ -1312,7 +1324,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("maintain_or_no_trade_means_no_option_expression", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
         self.assertIn("preferred_delta_range_hard_filter", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
         self.assertIn("target_range_moneyness_guardrail", rows["OPTION_EXPRESSION_BOUNDARY_POLICY"]["payload"])
-        self.assertIn("9_candidate_hard_filter_fail_reason_codes", rows["OPTION_EXPRESSION_DIAGNOSTIC_FIELD_FAMILIES"]["payload"])
+        self.assertIn("5_candidate_hard_filter_fail_reason_codes", rows["OPTION_EXPRESSION_DIAGNOSTIC_FIELD_FAMILIES"]["payload"])
         self.assertIn("bullish_call_strike_not_above_target_price_high", rows["OPTION_EXPRESSION_MONEYNESS_GUARDRAIL"]["payload"])
         self.assertEqual(rows["OPTION_CHAIN_SNAPSHOT_REF"]["payload"], "option_chain_snapshot_ref")
         self.assertEqual(rows["UNDERLYING_QUOTE_SNAPSHOT_REF"]["payload"], "underlying_quote_snapshot_ref")
@@ -1360,6 +1372,12 @@ class RegistryHelperTests(unittest.TestCase):
             "MODEL_05_ALPHA_CONFIDENCE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_05_alpha_confidence/evaluate_model_05_alpha_confidence.py",
             "MODEL_01_MARKET_REGIME_DIAGNOSE_SUBSTRATE": "scripts/models/model_01_market_regime/diagnose_model_01_market_regime_substrate.py",
             "MODEL_05_ALPHA_CONFIDENCE_REVIEW_PROMOTION": "scripts/models/model_05_alpha_confidence/review_alpha_confidence_promotion.py",
+            "MODEL_04_UNIFIED_DECISION_GENERATE": "scripts/models/model_04_unified_decision/generate_model_04_unified_decision.py",
+            "MODEL_04_UNIFIED_DECISION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_04_unified_decision/evaluate_model_04_unified_decision.py",
+            "MODEL_04_UNIFIED_DECISION_REVIEW_PROMOTION": "scripts/models/model_04_unified_decision/review_unified_decision_promotion.py",
+            "MODEL_05_OPTION_EXPRESSION_GENERATE": "scripts/models/model_05_option_expression/generate_model_05_option_expression.py",
+            "MODEL_05_OPTION_EXPRESSION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_05_option_expression/evaluate_model_05_option_expression.py",
+            "MODEL_05_OPTION_EXPRESSION_REVIEW_PROMOTION": "scripts/models/model_05_option_expression/review_option_expression_promotion.py",
             "MODEL_07_POSITION_PROJECTION_GENERATE": "scripts/models/model_07_position_projection/generate_model_07_position_projection.py",
             "MODEL_07_POSITION_PROJECTION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_07_position_projection/evaluate_model_07_position_projection.py",
             "MODEL_07_POSITION_PROJECTION_REVIEW_PROMOTION": "scripts/models/model_07_position_projection/review_position_projection_promotion.py",
@@ -2522,16 +2540,16 @@ class RegistryHelperTests(unittest.TestCase):
             "UNDERLYING_LIQUIDITY_FIT_SCORE_BY_HORIZON": "8_underlying_liquidity_fit_score_<horizon>",
             "UNDERLYING_HOLDING_TIME_FIT_SCORE_BY_HORIZON": "8_underlying_holding_time_fit_score_<horizon>",
             "UNDERLYING_ACTION_CONFIDENCE_SCORE_BY_HORIZON": "8_underlying_action_confidence_score_<horizon>",
-            "OPTION_EXPRESSION_ELIGIBILITY_SCORE_BY_HORIZON": "9_option_expression_eligibility_score_<horizon>",
-            "OPTION_EXPRESSION_DIRECTION_SCORE_BY_HORIZON": "9_option_expression_direction_score_<horizon>",
-            "OPTION_CONTRACT_FIT_SCORE_BY_HORIZON": "9_option_contract_fit_score_<horizon>",
-            "OPTION_LIQUIDITY_FIT_SCORE_BY_HORIZON": "9_option_liquidity_fit_score_<horizon>",
-            "OPTION_IV_FIT_SCORE_BY_HORIZON": "9_option_iv_fit_score_<horizon>",
-            "OPTION_GREEK_FIT_SCORE_BY_HORIZON": "9_option_greek_fit_score_<horizon>",
-            "OPTION_REWARD_RISK_SCORE_BY_HORIZON": "9_option_reward_risk_score_<horizon>",
-            "OPTION_THETA_RISK_SCORE_BY_HORIZON": "9_option_theta_risk_score_<horizon>",
-            "OPTION_FILL_QUALITY_SCORE_BY_HORIZON": "9_option_fill_quality_score_<horizon>",
-            "OPTION_EXPRESSION_CONFIDENCE_SCORE_BY_HORIZON": "9_option_expression_confidence_score_<horizon>",
+            "OPTION_EXPRESSION_ELIGIBILITY_SCORE_BY_HORIZON": "5_option_expression_eligibility_score_<horizon>",
+            "OPTION_EXPRESSION_DIRECTION_SCORE_BY_HORIZON": "5_option_expression_direction_score_<horizon>",
+            "OPTION_CONTRACT_FIT_SCORE_BY_HORIZON": "5_option_contract_fit_score_<horizon>",
+            "OPTION_LIQUIDITY_FIT_SCORE_BY_HORIZON": "5_option_liquidity_fit_score_<horizon>",
+            "OPTION_IV_FIT_SCORE_BY_HORIZON": "5_option_iv_fit_score_<horizon>",
+            "OPTION_GREEK_FIT_SCORE_BY_HORIZON": "5_option_greek_fit_score_<horizon>",
+            "OPTION_REWARD_RISK_SCORE_BY_HORIZON": "5_option_reward_risk_score_<horizon>",
+            "OPTION_THETA_RISK_SCORE_BY_HORIZON": "5_option_theta_risk_score_<horizon>",
+            "OPTION_FILL_QUALITY_SCORE_BY_HORIZON": "5_option_fill_quality_score_<horizon>",
+            "OPTION_EXPRESSION_CONFIDENCE_SCORE_BY_HORIZON": "5_option_expression_confidence_score_<horizon>",
         }
         self.assertEqual(state_vector_values.keys(), expected_state_vector_values.keys())
         for key, payload in expected_state_vector_values.items():
