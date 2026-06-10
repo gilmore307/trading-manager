@@ -801,7 +801,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "status_value")
             self.assertEqual(rows[key]["payload"], payload)
 
-    def test_layer_4_focus_pool_and_layer_5_contrast_names_are_registered(self):
+    def test_layer_4_focus_pool_and_layer_5_event_feature_policy_names_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
@@ -810,6 +810,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(focus_pool["payload"], "layer_04_focus_pool_inputs")
         self.assertIn("layer_04_focus_pool_inputs_20260610", focus_pool["path"])
         self.assertIn("layer_10_focus_pool_inputs", focus_pool["applies_to"])
+        self.assertIn("review_ready_not_promotion_approved", focus_pool["applies_to"])
 
         self.assertEqual(rows["LAYER_04_FOCUS_POOL_INPUT_ROWS"]["payload"], "layer_04_focus_pool_input_rows")
         self.assertEqual(rows["LAYER_04_FOCUS_POOL_MODEL_ROWS"]["payload"], "model_04_event_failure_risk_rows")
@@ -818,61 +819,43 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(focus_runner["kind"], "script")
         self.assertIn("build_layer4_focus_pool_inputs.py", focus_runner["path"])
         self.assertIn("layer10_focus_pool_inputs.py", focus_runner["path"])
+        self.assertIn("review_ready_not_promotion_approved", focus_runner["applies_to"])
 
-        contrast = rows["LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_20260610"]
-        self.assertEqual(contrast["kind"], "artifact_type")
-        self.assertEqual(contrast["payload"], "layer_05_event_conditioned_alpha_contrast")
-        self.assertIn("layer_05_event_conditioned_alpha_contrast_20260610", contrast["path"])
-        self.assertIn("diagnostic_not_promotion", contrast["applies_to"])
-
-        contrast_artifacts = {
-            "LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_SUMMARY": "event_conditioned_alpha_contrast_summary",
-            "LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_PREDICTIONS": "event_conditioned_alpha_contrast_predictions",
-            "LAYER_05_EVENT_CONDITIONED_BASELINE_ALPHA_MODEL": "baseline_after_cost_alpha_model",
-            "LAYER_05_EVENT_CONDITIONED_AFTER_COST_ALPHA_MODEL": "event_conditioned_after_cost_alpha_model",
-        }
-        for key, payload in contrast_artifacts.items():
-            self.assertEqual(rows[key]["kind"], "artifact_type")
-            self.assertEqual(rows[key]["payload"], payload)
-            self.assertIn("layer_05_event_conditioned_alpha_contrast", rows[key]["applies_to"])
-
-        contrast_runner = rows["MODEL_05_ALPHA_CONFIDENCE_EVENT_CONDITIONED_ALPHA_CONTRAST_BUILD"]
-        self.assertEqual(contrast_runner["kind"], "script")
-        self.assertIn("build_event_conditioned_alpha_contrast.py", contrast_runner["path"])
-        self.assertIn("event_conditioned_contrast.py", contrast_runner["path"])
-        self.assertIn("diagnostic_not_promotion", contrast_runner["applies_to"])
-
-        self.assertEqual(rows["LAYER_05_LABEL_SOURCE"]["payload"], "layer_05_label_source")
-        self.assertEqual(rows["LAYER_05_DIAGNOSTIC_SCOPE"]["payload"], "layer_05_diagnostic_scope")
-        self.assertEqual(rows["SOURCE_DECISION_ID"]["payload"], "source_decision_id")
-        self.assertEqual(rows["LAYER_05_DIAGNOSTIC_SCOPE_NOT_PROMOTION"]["payload"], "diagnostic_not_promotion")
-        self.assertEqual(
-            rows["LAYER_05_LABEL_SOURCE_LAYER10_REPLAY_EXCESS_RETURN"]["payload"],
-            "layer10_replay_excess_return",
-        )
         self.assertEqual(rows["LAYER4_EVENT_FEATURE_POLICY"]["payload"], "layer4_event_feature_policy")
         self.assertEqual(rows["LAYER4_EVENT_FEATURE_NAMES"]["payload"], "layer4_event_feature_names")
         self.assertEqual(rows["FEATURE_CONSUMPTION_CONTRACT"]["payload"], "feature_consumption_contract")
-        self.assertEqual(rows["BASELINE_WITHOUT_LAYER4_EVENT_FEATURES"]["payload"], "baseline_without_layer4_event_features")
-        self.assertEqual(rows["BASELINE_ROLE"]["payload"], "baseline_role")
-        self.assertEqual(rows["FORMAL_TRAINING_ROUTE"]["payload"], "formal_training_route")
         self.assertIn(
             "consume_reviewed_layer4_event_failure_risk_vector_when_present",
             rows["ALPHA_CONFIDENCE_LAYER4_EVENT_FEATURE_CONSUMPTION_POLICY"]["payload"],
         )
+        self.assertIn("formal_training_input", rows["ALPHA_CONFIDENCE_LAYER4_EVENT_FEATURE_CONSUMPTION_POLICY"]["payload"])
+        self.assertNotIn("baseline_without_layer4_event_features", rows["ALPHA_CONFIDENCE_LAYER4_EVENT_FEATURE_CONSUMPTION_POLICY"]["payload"])
         self.assertEqual(
             rows["LAYER_05_LAYER4_EVENT_FEATURE_POLICY_CONSUME_REVIEWED_WHEN_PRESENT"]["payload"],
             "consume_reviewed_layer4_event_failure_risk_vector_when_present",
         )
         self.assertEqual(rows["LAYER_05_FEATURE_CONSUMPTION_FORMAL_TRAINING_INPUT"]["payload"], "formal_training_input")
-        self.assertEqual(
-            rows["LAYER_05_FEATURE_CONSUMPTION_EVALUATION_ONLY_NOT_TRAINING_ROUTE"]["payload"],
-            "evaluation_only_not_training_route",
-        )
-        self.assertEqual(
-            rows["LAYER_05_FORMAL_TRAINING_ROUTE_CONSUME_LAYER4_EVENT_FAILURE_RISK_VECTOR"]["payload"],
-            "consume_layer4_event_failure_risk_vector_when_present",
-        )
+
+        retired_contrast_keys = {
+            "ALPHA_CONFIDENCE_EVENT_CONDITIONED_ALPHA_CONTRAST_POLICY",
+            "BASELINE_ROLE",
+            "BASELINE_WITHOUT_LAYER4_EVENT_FEATURES",
+            "FORMAL_TRAINING_ROUTE",
+            "LAYER_05_DIAGNOSTIC_SCOPE",
+            "LAYER_05_DIAGNOSTIC_SCOPE_NOT_PROMOTION",
+            "LAYER_05_EVENT_CONDITIONED_AFTER_COST_ALPHA_MODEL",
+            "LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_20260610",
+            "LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_PREDICTIONS",
+            "LAYER_05_EVENT_CONDITIONED_ALPHA_CONTRAST_SUMMARY",
+            "LAYER_05_EVENT_CONDITIONED_BASELINE_ALPHA_MODEL",
+            "LAYER_05_FEATURE_CONSUMPTION_EVALUATION_ONLY_NOT_TRAINING_ROUTE",
+            "LAYER_05_FORMAL_TRAINING_ROUTE_CONSUME_LAYER4_EVENT_FAILURE_RISK_VECTOR",
+            "LAYER_05_LABEL_SOURCE",
+            "LAYER_05_LABEL_SOURCE_LAYER10_REPLAY_EXCESS_RETURN",
+            "MODEL_05_ALPHA_CONFIDENCE_EVENT_CONDITIONED_ALPHA_CONTRAST_BUILD",
+            "SOURCE_DECISION_ID",
+        }
+        self.assertFalse(retired_contrast_keys & rows.keys())
 
     def test_sql_output_table_inventory_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -1258,7 +1241,6 @@ class RegistryHelperTests(unittest.TestCase):
             rows["ALPHA_CONFIDENCE_VECTOR_OUTPUT_TIER_POLICY"]["payload"],
             "base_unadjusted_diagnostic_only;final_adjusted_layer_5_facing",
         )
-        self.assertIn("diagnostic_not_promotion", rows["ALPHA_CONFIDENCE_EVENT_CONDITIONED_ALPHA_CONTRAST_POLICY"]["payload"])
         self.assertEqual(rows["POSITION_PROJECTION_MODEL"]["payload"], "position_projection_model")
         self.assertEqual(rows["MODEL_07_POSITION_PROJECTION"]["payload"], "model_07_position_projection")
         self.assertEqual(rows["POSITION_PROJECTION_VECTOR"]["payload"], "position_projection_vector")
@@ -2271,7 +2253,6 @@ class RegistryHelperTests(unittest.TestCase):
             "event_family_scouting_packet",
             "event_instance_observation_role",
             "fold_scoped_source_data",
-            "formal_training_route",
             "feature_consumption_contract",
             "detector_run",
             "event_schedule_type",
@@ -2281,10 +2262,6 @@ class RegistryHelperTests(unittest.TestCase):
             "layer_4_state_overlay",
             "layer_4_state_overlay_candidate",
             "layer4_event_feature_policy",
-            "baseline_role",
-            "layer_05_diagnostic_scope",
-            "layer_05_event_conditioned_alpha_contrast",
-            "layer_05_label_source",
             "layer_10_event_risk_governor",
             "layer_10_fold_completion",
             "layer_10_fold_completion_summary",
