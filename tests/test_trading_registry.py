@@ -1050,7 +1050,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["TRADING_GUIDANCE_RECORD"]["payload"], "trading_guidance_record")
         self.assertEqual(rows["EVENT_RISK_GOVERNOR"]["payload"], "event_risk_governor")
         self.assertEqual(rows["EVENT_RISK_INTERVENTION"]["payload"], "event_risk_intervention")
-        self.assertIn("flatten_candidate", rows["EVENT_RISK_INTERVENTION_STATUS_VALUES"]["payload"])
+        self.assertIn("reduce_or_flatten_review", rows["EVENT_RISK_INTERVENTION_STATUS_VALUES"]["payload"])
         self.assertIn("broker order", rows["EVENT_RISK_INTERVENTION"]["note"])
         self.assertIn("current_physical_surfaces_aligned_with_six_model_order", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
         self.assertIn("legacy_ten_layer_surfaces_migration_source_only", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
@@ -1331,6 +1331,17 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["PENDING_OPTION_EXPOSURE_CONTEXT"]["payload"], "pending_option_exposure_context")
         self.assertIn("underlying_only_expression", rows["OPTION_EXPRESSION_BASELINE_LADDER"]["payload"])
         self.assertIn("underlying_target_hit_but_option_lost_label_<horizon>", rows["OPTION_EXPRESSION_EVALUATION_LABEL_FAMILIES"]["payload"])
+        self.assertEqual(rows["RESIDUAL_EVENT_GOVERNANCE_MODEL"]["payload"], "residual_event_governance_model")
+        self.assertEqual(rows["MODEL_06_RESIDUAL_EVENT_GOVERNANCE"]["payload"], "model_06_residual_event_governance")
+        self.assertEqual(rows["RESIDUAL_EVENT_GOVERNANCE_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
+        self.assertIn("6_event_presence_score_<horizon>", rows["RESIDUAL_EVENT_GOVERNANCE_CORE_SCORE_FAMILIES"]["payload"])
+        self.assertIn("6_event_contagion_risk_score_<horizon>", rows["RESIDUAL_EVENT_GOVERNANCE_CORE_SCORE_FAMILIES"]["payload"])
+        self.assertIn("6_event_market_impact_score_<horizon>", rows["RESIDUAL_EVENT_GOVERNANCE_IMPACT_SCORE_FAMILIES"]["payload"])
+        self.assertIn("6_event_target_relevance_score_<horizon>", rows["RESIDUAL_EVENT_GOVERNANCE_IMPACT_SCORE_FAMILIES"]["payload"])
+        self.assertIn("6_resolved_intervention_action", rows["RESIDUAL_EVENT_GOVERNANCE_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("6_resolved_reason_codes", rows["RESIDUAL_EVENT_GOVERNANCE_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("block_new_entry", rows["RESIDUAL_EVENT_GOVERNANCE_INTERVENTION_ACTIONS"]["payload"])
+        self.assertIn("reduce_or_flatten_review", rows["RESIDUAL_EVENT_GOVERNANCE_INTERVENTION_ACTIONS"]["payload"])
         self.assertIn("dataset_snapshot_ref", rows["MODEL_PROMOTION_READINESS_CHECKLIST"]["payload"])
         self.assertIn("calibration_report_ref", rows["MODEL_PROMOTION_READINESS_CHECKLIST"]["payload"])
         self.assertIn("layer_2_deferred", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
@@ -1378,6 +1389,9 @@ class RegistryHelperTests(unittest.TestCase):
             "MODEL_05_OPTION_EXPRESSION_GENERATE": "scripts/models/model_05_option_expression/generate_model_05_option_expression.py",
             "MODEL_05_OPTION_EXPRESSION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_05_option_expression/evaluate_model_05_option_expression.py",
             "MODEL_05_OPTION_EXPRESSION_REVIEW_PROMOTION": "scripts/models/model_05_option_expression/review_option_expression_promotion.py",
+            "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_GENERATE": "scripts/models/model_06_residual_event_governance/generate_model_06_residual_event_governance.py",
+            "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_06_residual_event_governance/evaluate_model_06_residual_event_governance.py",
+            "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_REVIEW_PROMOTION": "scripts/models/model_06_residual_event_governance/review_residual_event_governance_promotion.py",
             "MODEL_07_POSITION_PROJECTION_GENERATE": "scripts/models/model_07_position_projection/generate_model_07_position_projection.py",
             "MODEL_07_POSITION_PROJECTION_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_07_position_projection/evaluate_model_07_position_projection.py",
             "MODEL_07_POSITION_PROJECTION_REVIEW_PROMOTION": "scripts/models/model_07_position_projection/review_position_projection_promotion.py",
