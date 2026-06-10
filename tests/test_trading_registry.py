@@ -579,6 +579,11 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_EFFECT_MODE": "event_effect_mode",
             "STATE_SIGNAL_TYPE": "state_signal_type",
             "LAYER_4_STATE_OVERLAY": "layer_4_state_overlay",
+            "EVENT_RELEASE_PHASE": "event_release_phase",
+            "EVENT_RELEASE_PHASE_COUNTS": "event_release_phase_counts",
+            "EVENT_EFFECT_MODE_COUNTS": "event_effect_mode_counts",
+            "STATE_SIGNAL_TYPE_COUNTS": "state_signal_type_counts",
+            "LAYER_4_STATE_OVERLAY_COUNTS": "layer_4_state_overlay_counts",
         }
         for key, payload in field_payloads.items():
             self.assertEqual(rows[key]["kind"], "field")
@@ -614,6 +619,8 @@ class RegistryHelperTests(unittest.TestCase):
             "STATE_SIGNAL_TYPE_UNCERTAINTY_STATE": "uncertainty_state",
             "LAYER_4_STATE_OVERLAY_EVENT_RISK_STATE_SHIFT": "event_risk_state_shift",
             "LAYER_4_STATE_OVERLAY_EVENT_UNCERTAINTY_RISK_ELEVATED": "event_uncertainty_risk_elevated",
+            "EVENT_RELEASE_PHASE_PRE_RELEASE": "pre_release",
+            "EVENT_RELEASE_PHASE_POST_RELEASE": "post_release",
         }
         for key, payload in status_payloads.items():
             self.assertEqual(rows[key]["kind"], "status_value")
@@ -2005,6 +2012,7 @@ class RegistryHelperTests(unittest.TestCase):
             "candidate_generation_reason_codes",
             "earnings_guidance_event_family",
             "event_effect_mode",
+            "event_release_phase",
             "event_family_bias_association_packet",
             "event_family_scouting_packet",
             "fold_scoped_source_data",
