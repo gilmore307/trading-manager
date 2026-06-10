@@ -159,7 +159,7 @@ class RegistryHelperTests(unittest.TestCase):
             "script_called_agent_decision_surface",
             "startup_abnormality_scope",
             "target_substrate_lane",
-            "ten_layer_model_stack",
+            "six_model_stack",
         }
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             term_payloads = {
@@ -1052,7 +1052,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EVENT_RISK_INTERVENTION"]["payload"], "event_risk_intervention")
         self.assertIn("flatten_candidate", rows["EVENT_RISK_INTERVENTION_STATUS_VALUES"]["payload"])
         self.assertIn("broker order", rows["EVENT_RISK_INTERVENTION"]["note"])
-        self.assertIn("current_physical_surfaces_aligned_with_ten_layer_order", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
+        self.assertIn("current_physical_surfaces_aligned_with_six_model_order", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
+        self.assertIn("legacy_ten_layer_surfaces_migration_source_only", rows["CURRENT_PHYSICAL_MODEL_LAYER_NAME_POLICY"]["payload"])
 
     def test_active_model_control_plane_registry_rows_use_stable_model_ids(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -1063,36 +1064,28 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(
             stable_targets,
             [
-                "market_regime_model",
-                "sector_context_model",
-                "target_state_vector_model",
-                "event_failure_risk_model",
-                "alpha_confidence_model",
-                "dynamic_risk_policy_model",
-                "position_projection_model",
-                "underlying_action_model",
+                "background_context_model",
+                "target_state_model",
+                "event_state_model",
+                "unified_decision_model",
                 "option_expression_model",
-                "event_risk_governor",
+                "residual_event_governance_model",
             ],
         )
         expected_receipt_model_sequence = [
-            ("layer_1", "market_regime_model"),
-            ("layer_2", "sector_context_model"),
-            ("layer_3", "target_state_vector_model"),
-            ("layer_4", "event_failure_risk_model"),
-            ("layer_5", "alpha_confidence_model"),
-            ("layer_6", "dynamic_risk_policy_model"),
-            ("layer_7", "position_projection_model"),
-            ("layer_8", "underlying_action_model"),
-            ("layer_9", "option_expression_model"),
-            ("layer_10", "event_risk_governor"),
+            ("M01", "background_context_model"),
+            ("M02", "target_state_model"),
+            ("M03", "event_state_model"),
+            ("M04", "unified_decision_model"),
+            ("M05", "option_expression_model"),
+            ("M06", "residual_event_governance_model"),
         ]
         receipt_entries = rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"].split(";")
         self.assertEqual(
             [(entry.split(":", 2)[0], entry.split(":", 2)[1]) for entry in receipt_entries],
             expected_receipt_model_sequence,
         )
-        self.assertEqual(len(receipt_entries), 10)
+        self.assertEqual(len(receipt_entries), 6)
         self.assertIn("no_persisted_decision_receipt", receipt_entries[-1])
 
         for key in (
@@ -1336,7 +1329,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("execution_owns_shadow_cycle_activation", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertEqual(
             rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["payload"],
-            "market_regime_model;sector_context_model;target_state_vector_model;event_failure_risk_model;alpha_confidence_model;dynamic_risk_policy_model;position_projection_model;underlying_action_model;option_expression_model;event_risk_governor",
+            "background_context_model;target_state_model;event_state_model;unified_decision_model;option_expression_model;residual_event_governance_model",
         )
         self.assertIn("Canonical stable model ids", rows["MODEL_PROMOTION_UNIFIED_TARGETS"]["note"])
         self.assertEqual(rows["MANAGER_MODEL_PROMOTION_REVIEW_PLAN"]["kind"], "script")
@@ -1353,8 +1346,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_1_deferred_after_real_evaluation", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertIn("layer_3_real_production_eval_substrate_deferred_upstream_dependencies_and_calibration", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertIn("layer_8_agent_reviewed_deferred_no_production_eval_substrate", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
-        self.assertIn("layer_6:dynamic_risk_policy_model:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
-        self.assertIn("layer_10:event_risk_governor:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
+        self.assertIn("M01:background_context_model:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
+        self.assertIn("M06:residual_event_governance_model:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
         self.assertEqual(rows["REVIEW_LAYERS_03_10_PROMOTION_ACCEPTANCE"]["kind"], "script")
         self.assertIn("review_layers_03_10_promotion_acceptance.py", rows["REVIEW_LAYERS_03_10_PROMOTION_ACCEPTANCE"]["path"])
         self.assertEqual(rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["kind"], "script")
