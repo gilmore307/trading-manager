@@ -979,6 +979,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("trading-execution/docs/50_runtime_components.md", rows["EXECUTION_RUNTIME_COMPONENT"]["path"])
         self.assertEqual(rows["EXECUTION_RUNTIME_COMPONENT_GRAPH"]["payload"], "execution_runtime_component_graph")
         self.assertIn("trading-evaluation calls this graph", rows["EXECUTION_RUNTIME_COMPONENT_GRAPH"]["note"])
+        self.assertEqual(rows["EXECUTION_RUNTIME_COMPONENT_MANIFEST"]["payload"], "execution_runtime_component_manifest")
+        self.assertIn("manifest_checksum", rows["EXECUTION_RUNTIME_COMPONENT_MANIFEST"]["applies_to"])
         self.assertEqual(rows["EXECUTION_INTAKE_SNAPSHOT"]["payload"], "execution_intake_snapshot")
         self.assertIn("does not allocate risk budget", rows["EXECUTION_INTAKE_SNAPSHOT"]["note"])
         self.assertEqual(rows["ENTRY_DECISION"]["payload"], "entry_decision")
@@ -2342,6 +2344,7 @@ class RegistryHelperTests(unittest.TestCase):
             "event_family_prior_role",
             "event_family_scouting_packet",
             "event_instance_observation_role",
+            "execution_model_decision_input_handoff_status",
             "fold_scoped_source_data",
             "feature_consumption_contract",
             "detector_run",
@@ -2357,6 +2360,8 @@ class RegistryHelperTests(unittest.TestCase):
             "layer_10_fold_completion_summary",
             "manager_layer_ten_event_risk_governor_input_materialization",
             "focus_pool_status",
+            "model_realtime_decision_component_route_status",
+            "model_realtime_decision_route_plan_readiness",
             "ready_signal",
             "one_shot_replay_acquisition",
             "production_completion_status",
@@ -3066,6 +3071,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("current_model_component_route", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
         self.assertNotIn("layers_1_10", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
         self.assertEqual(
+            rows["EXECUTION_MODEL_DECISION_COMPONENT_INPUT"]["payload"],
+            "execution_model_decision_component_input",
+        )
+        self.assertIn("runtime_component", rows["EXECUTION_MODEL_DECISION_COMPONENT_INPUT"]["applies_to"])
+        self.assertEqual(
             rows["EXECUTION_MODEL_DECISION_INPUT_VALIDATION"]["payload"],
             "execution_model_decision_input_validation",
         )
@@ -3075,6 +3085,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("validate_realtime_model_input.py", rows["EXECUTION_REALTIME_MODEL_INPUT_VALIDATE"]["path"])
         self.assertIn("historical_feature_parity_required", rows["EXECUTION_REALTIME_MODEL_DECISION_HANDOFF_POLICY"]["payload"])
         self.assertIn("runtime_component_refs_required", rows["EXECUTION_REALTIME_MODEL_DECISION_HANDOFF_POLICY"]["payload"])
+        self.assertIn("placeholder_context_refs_use_placeholder_upstream_context_scheme", rows["EXECUTION_REALTIME_PLACEHOLDER_CONTEXT_REF_POLICY"]["payload"])
+        self.assertEqual(
+            rows["EXECUTION_MODEL_DECISION_INPUT_READY_FOR_HISTORICAL_MODEL_DECISION_INPUT"]["payload"],
+            "ready_for_historical_model_decision_input",
+        )
 
     def test_model_realtime_decision_handoff_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -3092,6 +3107,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("current_model_component_route", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
         self.assertIn("execution unit is component", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["note"])
         self.assertNotIn("layers_1_10", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_COMPONENT_ROUTE"]["payload"],
+            "model_realtime_decision_component_route",
+        )
+        self.assertIn("runtime_component", rows["MODEL_REALTIME_DECISION_COMPONENT_ROUTE"]["applies_to"])
         self.assertEqual(
             rows["MODEL_REALTIME_DECISION_ROUTE_PLAN_VALIDATION"]["payload"],
             "model_realtime_decision_route_plan_validation",
@@ -3112,6 +3132,23 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("validate_realtime_decision_handoff.py", rows["MODEL_REALTIME_DECISION_HANDOFF_VALIDATE"]["path"])
         self.assertIn("no_production_model_activation", rows["MODEL_REALTIME_DECISION_HANDOFF_POLICY"]["payload"])
         self.assertIn("component_route_coverage_required", rows["MODEL_REALTIME_DECISION_HANDOFF_POLICY"]["payload"])
+        self.assertIn("route_plan_id_prefix=rtdroute_", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN_ID_POLICY"]["payload"])
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_COMPONENT_ROUTE_READY_FOR_FIXTURE_SHADOW_GENERATION"]["payload"],
+            "ready_for_fixture_shadow_generation",
+        )
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_ROUTE_PLAN_READY_FOR_FIXTURE_SHADOW_RUNTIME_COMPONENT_ROUTE"]["payload"],
+            "ready_for_fixture_shadow_runtime_component_route",
+        )
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_COMPONENT_ROUTE_BLOCKED_INPUT_VALIDATION_FAILED"]["payload"],
+            "blocked_input_validation_failed",
+        )
+        self.assertEqual(
+            rows["MODEL_REALTIME_DECISION_ROUTE_PLAN_BLOCKED_REALTIME_DECISION_INPUT_VALIDATION"]["payload"],
+            "blocked_realtime_decision_input_validation",
+        )
 
     def test_manager_realtime_shadow_handoff_receipt_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -3134,6 +3171,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("record_realtime_shadow_handoff.py", rows["MANAGER_REALTIME_SHADOW_HANDOFF_RECORD"]["path"])
         self.assertIn("no_model_activation", rows["MANAGER_REALTIME_SHADOW_HANDOFF_POLICY"]["payload"])
+        self.assertIn("mgrreq_realtime_shadow_rehearsal", rows["MANAGER_REALTIME_SHADOW_REHEARSAL_DEFAULT_ID_POLICY"]["payload"])
 
     def test_execution_order_construction_gate_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
