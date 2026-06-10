@@ -59,7 +59,6 @@ MAX_EVENT_STRATEGY_REVIEW_PACKETS = 3
 PROSPECTIVE_UNCERTAINTY_EVENT_TOKENS = {
     "earnings",
     "guidance",
-    "filing",
     "macro_release",
     "economic_release",
     "fomc",
@@ -67,6 +66,26 @@ PROSPECTIVE_UNCERTAINTY_EVENT_TOKENS = {
     "jobs_report",
     "fed_decision",
 }
+PRE_RELEASE_ROLE_TOKENS = {"scheduled", "expected", "calendar", "preview", "estimate", "anticipated", "upcoming", "pre_release", "before_release"}
+POST_RELEASE_ROLE_TOKENS = {"released", "reported", "actual", "result", "results", "announced", "filed", "post_release", "after_release"}
+POST_RELEASE_TEXT_TOKENS = {
+    "reported",
+    "reports",
+    "announced",
+    "announces",
+    "released",
+    "files",
+    "filed",
+    "10-q",
+    "10-k",
+    "8-k",
+    "form 10",
+    "beats",
+    "misses",
+    "actual",
+    "results",
+}
+PRE_RELEASE_TEXT_TOKENS = {"scheduled", "expected", "preview", "upcoming", "estimate", "estimates", "before the release", "ahead of"}
 EVENT_WINDOW_BEFORE = timedelta(days=3)
 EVENT_WINDOW_AFTER = timedelta(days=1)
 M10_SQL_EVENT_FIELDS = [
@@ -657,6 +676,7 @@ def _build_event_family_attention_evidence(
         if not event_ref or family_id not in target_family_ids:
             continue
         interpretation = candidate.get("interpretation") if isinstance(candidate.get("interpretation"), Mapping) else {}
+        effect_profile = _event_effect_profile_from_candidate(candidate)
         stats = event_ref_stats.get(event_ref, _empty_event_ref_stats())
         row = {
             "contract_type": EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE,
@@ -666,6 +686,10 @@ def _build_event_family_attention_evidence(
             "target_symbol": _family_target_symbol(candidate, event_focus_proposals),
             "normalized_event_type": str(interpretation.get("normalized_event_type") or "event_candidate"),
             "affected_scope": str(interpretation.get("affected_scope") or "unknown"),
+            "event_release_phase": effect_profile["event_release_phase"],
+            "event_effect_mode": effect_profile["event_effect_mode"],
+            "state_signal_type": effect_profile["state_signal_type"],
+            "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
             "available_time": str(candidate.get("available_time") or ""),
             "event_month": str(candidate.get("event_month") or ""),
             "matched_failure_count": stats["matched_failure_count"],
@@ -693,6 +717,10 @@ def _build_event_family_attention_evidence(
                 "confounded_failure_count": 0,
                 "attributed_failure_count": 0,
                 "co_event_group_ids": set(),
+                "event_release_phase_counts": {},
+                "event_effect_mode_counts": {},
+                "state_signal_type_counts": {},
+                "layer_4_state_overlay_counts": {},
                 "leakage_violation_count": 0,
                 "supporting_scores": [],
                 "supporting_confidences": [],
@@ -714,6 +742,10 @@ def _build_event_family_attention_evidence(
         group["co_event_group_ids"].update(stats["co_event_group_ids"])
         group["source_decision_ids"].update(stats["source_decision_ids"])
         group["source_triage_attribution_ids"].update(stats["source_triage_attribution_ids"])
+        _increment_count(group["event_release_phase_counts"], row["event_release_phase"])
+        _increment_count(group["event_effect_mode_counts"], row["event_effect_mode"])
+        _increment_count(group["state_signal_type_counts"], row["state_signal_type"])
+        _increment_count(group["layer_4_state_overlay_counts"], row["layer_4_state_overlay"])
     for proposal in event_focus_proposals:
         event_ref = str(proposal.get("event_ref") or "")
         candidate = event_ref_to_candidate.get(event_ref)
@@ -734,7 +766,7 @@ def _build_event_family_attention_evidence(
         background_failure_rate = unmatched_occurrence_count / occurrence_count if occurrence_count else 0.0
         average_score = _average(group["supporting_scores"])
         average_confidence = _average(group["supporting_confidences"])
-        effect_profile = _event_effect_profile(str(group["normalized_event_type"]))
+        effect_profile = _dominant_effect_profile(group)
         pit_status = "passed" if occurrence_count > 0 else "insufficient_evidence"
         leakage_status = "passed" if group["leakage_violation_count"] == 0 else "failed"
         co_event_confounder_status = "passed" if group["confounded_failure_count"] == 0 else "failed"
@@ -774,6 +806,7 @@ def _build_event_family_attention_evidence(
                 "event_family_id": group["event_family_id"],
                 "target_symbol": group["target_symbol"],
                 "normalized_event_type": group["normalized_event_type"],
+                "event_release_phase": effect_profile["event_release_phase"],
                 "event_effect_mode": effect_profile["event_effect_mode"],
                 "state_signal_type": effect_profile["state_signal_type"],
                 "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
@@ -797,10 +830,15 @@ def _build_event_family_attention_evidence(
                 "event_family_id": group["event_family_id"],
                 "target_symbol": group["target_symbol"],
                 "normalized_event_type": group["normalized_event_type"],
+                "event_release_phase": effect_profile["event_release_phase"],
                 "event_effect_mode": effect_profile["event_effect_mode"],
                 "state_signal_type": effect_profile["state_signal_type"],
                 "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
                 "affected_scope": group["affected_scope"],
+                "event_release_phase_counts": dict(sorted(group["event_release_phase_counts"].items())),
+                "event_effect_mode_counts": dict(sorted(group["event_effect_mode_counts"].items())),
+                "state_signal_type_counts": dict(sorted(group["state_signal_type_counts"].items())),
+                "layer_4_state_overlay_counts": dict(sorted(group["layer_4_state_overlay_counts"].items())),
                 "deterministic_gate_status": deterministic_gate_status,
                 "pit_status": pit_status,
                 "control_status": control_status,
@@ -902,19 +940,76 @@ def _event_family_id(candidate: Mapping[str, Any] | None, *, target_symbol: str)
     return "event_family_" + _stable_token(normalized_event_type, affected_scope, target)
 
 
-def _event_effect_profile(normalized_event_type: str) -> dict[str, str]:
+def _event_effect_profile(
+    normalized_event_type: str,
+    *,
+    information_role_type: str = "",
+    text: str = "",
+) -> dict[str, str]:
     event_type = str(normalized_event_type or "event_candidate").strip().lower()
-    if any(token in event_type for token in PROSPECTIVE_UNCERTAINTY_EVENT_TOKENS):
+    role = str(information_role_type or "").strip().lower()
+    text_lower = str(text or "").strip().lower()
+    if _contains_any(role, POST_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, POST_RELEASE_TEXT_TOKENS):
         return {
+            "event_release_phase": "post_release",
+            "event_effect_mode": "observed_market_impact",
+            "state_signal_type": "risk_state",
+            "layer_4_state_overlay": "event_risk_state_shift",
+        }
+    if any(token in event_type for token in PROSPECTIVE_UNCERTAINTY_EVENT_TOKENS) or _contains_any(role, PRE_RELEASE_ROLE_TOKENS) or _contains_any(text_lower, PRE_RELEASE_TEXT_TOKENS):
+        return {
+            "event_release_phase": "pre_release",
             "event_effect_mode": "prospective_uncertainty",
             "state_signal_type": "uncertainty_state",
             "layer_4_state_overlay": "event_uncertainty_risk_elevated",
         }
     return {
+        "event_release_phase": "post_release",
         "event_effect_mode": "observed_market_impact",
         "state_signal_type": "risk_state",
         "layer_4_state_overlay": "event_risk_state_shift",
     }
+
+
+def _event_effect_profile_from_candidate(candidate: Mapping[str, Any]) -> dict[str, str]:
+    interpretation = candidate.get("interpretation") if isinstance(candidate.get("interpretation"), Mapping) else {}
+    text_parts = [
+        interpretation.get("rationale_summary"),
+        interpretation.get("title"),
+        interpretation.get("summary"),
+        interpretation.get("source_name"),
+    ]
+    return _event_effect_profile(
+        str(interpretation.get("normalized_event_type") or "event_candidate"),
+        information_role_type=str(interpretation.get("information_role_type") or candidate.get("information_role_type") or ""),
+        text=" ".join(str(part) for part in text_parts if part),
+    )
+
+
+def _dominant_effect_profile(group: Mapping[str, Any]) -> dict[str, str]:
+    phases = group.get("event_release_phase_counts") if isinstance(group.get("event_release_phase_counts"), Mapping) else {}
+    if int(phases.get("post_release") or 0) > 0:
+        return {
+            "event_release_phase": "post_release",
+            "event_effect_mode": "observed_market_impact",
+            "state_signal_type": "risk_state",
+            "layer_4_state_overlay": "event_risk_state_shift",
+        }
+    return {
+        "event_release_phase": "pre_release",
+        "event_effect_mode": "prospective_uncertainty",
+        "state_signal_type": "uncertainty_state",
+        "layer_4_state_overlay": "event_uncertainty_risk_elevated",
+    }
+
+
+def _contains_any(text: str, tokens: set[str]) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _increment_count(counts: dict[str, int], value: Any) -> None:
+    key = str(value or "unknown")
+    counts[key] = counts.get(key, 0) + 1
 
 
 def _family_target_symbol(candidate: Mapping[str, Any], proposals: Sequence[Mapping[str, Any]]) -> str:
@@ -1119,6 +1214,7 @@ def _build_accepted_temporal_attention_pool_entries(
                 "event_family_id": family_id,
                 "target_symbol": candidate.get("target_symbol"),
                 "normalized_event_type": candidate.get("normalized_event_type"),
+                "event_release_phase": candidate.get("event_release_phase"),
                 "event_effect_mode": candidate.get("event_effect_mode"),
                 "state_signal_type": candidate.get("state_signal_type"),
                 "layer_4_state_overlay": candidate.get("layer_4_state_overlay"),
@@ -1361,6 +1457,7 @@ def _event_candidate(raw_event: Mapping[str, Any], *, index: int) -> dict[str, A
         "event_ref": event_ref,
         "event_interpretation_ref": f"event_interpretations.jsonl#{index}",
         "interpretation": interpretation,
+        "information_role_type": str(interpretation.get("information_role_type") or raw_event.get("information_role_type") or ""),
         "available_time": available_time,
         "event_time": str(raw_event.get("event_time") or raw_event.get("effective_time") or available_time),
         "event_month": available_time[:7] if len(available_time) >= 7 else str(raw_event.get("fold_month") or ""),
@@ -1395,6 +1492,9 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
         "source_type": raw_event.get("reference_type") or "local_structured_event_candidate",
         "published_time": raw_event.get("published_time") or raw_event.get("event_time") or raw_event.get("available_time"),
         "available_time": raw_event.get("available_time") or raw_event.get("event_time") or raw_event.get("effective_time"),
+        "information_role_type": raw_event.get("information_role_type"),
+        "title": raw_event.get("title"),
+        "summary": raw_event.get("summary"),
         "interpreted_at": datetime.now(UTC).isoformat(),
         "interpreter_agent_id": "trading-manager.layer_10_event_attribution",
         "interpreter_model_id": "deterministic_event_candidate_standardizer",
@@ -1430,6 +1530,7 @@ def _fill_interpretation_defaults(row: dict[str, Any], *, index: int) -> dict[st
     row.setdefault("published_time", row.get("available_time") or row.get("interpreted_at"))
     row.setdefault("available_time", row.get("published_time") or row.get("interpreted_at"))
     row.setdefault("interpreted_at", datetime.now(UTC).isoformat())
+    row.setdefault("information_role_type", "unknown")
     row.setdefault("interpreter_agent_id", "trading-manager.layer_10_event_attribution")
     row.setdefault("interpreter_model_id", "deterministic_event_candidate_standardizer")
     row.setdefault("prompt_policy_hash", "not_applicable_deterministic_structured_event")

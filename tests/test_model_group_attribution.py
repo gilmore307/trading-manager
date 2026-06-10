@@ -292,6 +292,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(packets[0]["deterministic_gate_status"], "passed")
             self.assertEqual(packets[0]["co_event_confounder_status"], "passed")
+            self.assertEqual(packets[0]["event_release_phase"], "post_release")
             self.assertEqual(packets[0]["event_effect_mode"], "observed_market_impact")
             self.assertEqual(packets[0]["state_signal_type"], "risk_state")
             self.assertEqual(packets[0]["layer_4_state_overlay"], "event_risk_state_shift")
@@ -310,6 +311,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(accepted[0]["contract_type"], "model_10_event_risk_governor_temporal_attention_pool_entry")
             self.assertEqual(accepted[0]["pool_status"], "accepted")
+            self.assertEqual(accepted[0]["event_release_phase"], "post_release")
             self.assertEqual(accepted[0]["state_signal_type"], "risk_state")
             self.assertEqual(accepted[0]["layer_4_state_overlay"], "event_risk_state_shift")
             self.assertFalse(receipt["layer_4_promotion_performed"])
@@ -334,9 +336,22 @@ class ModelGroupAttributionTests(unittest.TestCase):
     def test_event_effect_profile_keeps_earnings_as_uncertainty_state(self):
         profile = _event_effect_profile("earnings_guidance_event_family")
 
+        self.assertEqual(profile["event_release_phase"], "pre_release")
         self.assertEqual(profile["event_effect_mode"], "prospective_uncertainty")
         self.assertEqual(profile["state_signal_type"], "uncertainty_state")
         self.assertEqual(profile["layer_4_state_overlay"], "event_uncertainty_risk_elevated")
+
+    def test_event_effect_profile_turns_released_earnings_into_observed_impact(self):
+        profile = _event_effect_profile(
+            "earnings_guidance_event_family",
+            information_role_type="released_result",
+            text="Company reported earnings results after market close.",
+        )
+
+        self.assertEqual(profile["event_release_phase"], "post_release")
+        self.assertEqual(profile["event_effect_mode"], "observed_market_impact")
+        self.assertEqual(profile["state_signal_type"], "risk_state")
+        self.assertEqual(profile["layer_4_state_overlay"], "event_risk_state_shift")
 
 
 if __name__ == "__main__":
