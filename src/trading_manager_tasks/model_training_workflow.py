@@ -314,7 +314,7 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
         "python3",
         f"/root/projects/trading-model/scripts/models/{physical_model_key}/{script_name}",
     ]
-    if layer == 5 and verb == "generate":
+    if layer in {4, 5} and verb == "generate":
         command.extend([
             "--from-database",
             "--source-start",
