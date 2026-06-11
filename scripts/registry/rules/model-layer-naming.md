@@ -6,18 +6,18 @@ This file owns shared naming rules for model-layer source, feature, and model su
 
 | Layer | Boundary | Stable model id | Model-generation table |
 |---|---|---|---|
-| 1 | MarketRegimeModel | `market_regime_model` | `trading_model.m01_market_regime_model_generation` |
-| 2 | SectorContextModel | `sector_context_model` | `trading_model.m02_sector_context_model_generation` |
-| 3 | TargetStateVectorModel | `target_state_vector_model` | `trading_model.m03_target_state_vector_model_generation` |
-| 4 | UnifiedDecisionModel | `unified_decision_model` | `trading_model.m04_unified_decision_model_generation` |
-| 5 | OptionExpressionModel | `option_expression_model` | `trading_model.m05_option_expression_model_generation` |
-| 6 | ResidualEventGovernanceModel | `residual_event_governance_model` | `trading_model.m06_residual_event_governance_model_generation` |
+| 1 | MarketRegimeModel | `market_regime_model` | `trading_model.model_01_market_regime_model_generation` |
+| 2 | SectorContextModel | `sector_context_model` | `trading_model.model_02_sector_context_model_generation` |
+| 3 | TargetStateVectorModel | `target_state_vector_model` | `trading_model.model_03_target_state_vector` |
+| 4 | UnifiedDecisionModel | `unified_decision_model` | `trading_model.model_04_unified_decision` |
+| 5 | OptionExpressionModel | `option_expression_model` | `trading_model.model_05_option_expression` |
+| 6 | ResidualEventGovernanceModel | `residual_event_governance_model` | `trading_model.model_06_residual_event_governance` |
 
 ## Stable Id Rule
 
 Use the stable model id for semantic interfaces: `model_id` fields, promotion targets, manager requests, completion/evaluation receipts, CLI `--model` arguments, scheduler/control-plane routing, and active registry payloads that name a model as an interface.
 
-Use `mNN_<domain_slug>_<task_stage>` SQL names for physical table surfaces. Implementation package and script paths may continue to use existing directory names until a reviewed source-path migration is scheduled; SQL table naming should not follow those package-path names.
+Use `model_NN_<domain_slug>_<task_stage>` SQL names for physical table surfaces. Implementation package and script paths may continue to use existing directory names until a reviewed source-path migration is scheduled; SQL table naming should not follow those package-path names.
 
 ## SQL Table Surface Patterns
 
@@ -28,7 +28,7 @@ Model/data table surfaces apply the shared pattern from
 <schema>.<owner_prefix>_<domain_slug>_<task_stage>[_<artifact_role>]
 ```
 
-For model-layer tables, `owner_prefix` is `mNN`, `domain_slug` is the reviewed
+For model-layer tables, `owner_prefix` is `model_NN`, `domain_slug` is the reviewed
 model/domain slug, `task_stage` is the task that generates the table, and
 `artifact_role` is optional support evidence such as `explainability` or
 `diagnostics`.
@@ -36,30 +36,30 @@ model/domain slug, `task_stage` is the task that generates the table, and
 Examples:
 
 ```text
-trading_data.m01_market_regime_data_acquisition
-trading_data.m01_market_regime_feature_generation
-trading_model.m01_market_regime_model_generation
-trading_model.m01_market_regime_model_generation_explainability
-trading_model.m01_market_regime_model_generation_diagnostics
+trading_data.model_01_market_regime_data_acquisition
+trading_data.model_01_market_regime_feature_generation
+trading_model.model_01_market_regime_model_generation
+trading_model.model_01_market_regime_model_generation_explainability
+trading_model.model_01_market_regime_model_generation_diagnostics
 ```
 
-Old `source_NN_*`, `feature_NN_*`, and `model_NN_*` names are migration debt, not current planning names. Do not introduce, document, or register new tables with the old surface-stem pattern. Historical applied migrations may still mention old names as immutable history.
+Old `mNN_*`, `source_NN_*`, and `feature_NN_*` names are migration debt, not current planning names. Do not introduce, document, or register new tables with the old surface-stem pattern. Historical applied migrations may still mention old names as immutable history.
 
 Layer-neutral governance, control-plane, registry, receipt, and audit tables must not invent a fake layer number; they should carry layer refs in row fields when needed.
 
 ## Current Shared Table Examples
 
 ```text
-trading_data.m01_market_regime_data_acquisition
-trading_data.m01_market_regime_feature_generation
-trading_model.m01_market_regime_model_generation
-trading_data.m02_sector_context_data_acquisition
-trading_data.m02_sector_context_feature_generation
-trading_data.m03_target_state_vector_data_acquisition
-trading_data.m03_target_state_vector_feature_generation
+trading_data.model_01_market_regime_data_acquisition
+trading_data.model_01_market_regime_feature_generation
+trading_model.model_01_market_regime_model_generation
+trading_data.model_02_sector_context_data_acquisition
+trading_data.model_02_sector_context_feature_generation
+trading_data.model_03_target_state_vector_data_acquisition
+trading_data.model_03_target_state_vector_feature_generation
 trading_data.option_chain_state_source
-trading_data.m05_option_expression_feature_generation
-trading_data.m05_option_expression_data_acquisition_contract_path
+trading_data.model_05_option_expression_feature_generation
+trading_data.model_05_option_expression_data_acquisition_contract_path
 trading_data.model_06_residual_event_governance_data_acquisition
 trading_data.model_06_residual_event_governance_feature_generation
 ```

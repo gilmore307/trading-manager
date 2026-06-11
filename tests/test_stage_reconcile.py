@@ -27,7 +27,7 @@ def _write_receipt(root: Path, *, symbol: str = "SPY", month: str = "2016-01", s
                         "status": status,
                         "started_at": "2026-05-10T00:00:00Z",
                         "completed_at": "2026-05-10T00:00:01Z",
-                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
+                        "outputs": ["trading_data.model_01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": 10},
                         "error": {"type": "AlpacaBarsError", "message": "bars unavailable"} if status != "succeeded" else None,
                     }
@@ -59,7 +59,7 @@ def _write_retry_receipt(root: Path, *, symbol: str = "SPY", month: str = "2016-
                         "status": "succeeded",
                         "started_at": "2026-05-10T00:01:00Z",
                         "completed_at": "2026-05-10T00:01:01Z",
-                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
+                        "outputs": ["trading_data.model_01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": 10},
                     },
                 ]

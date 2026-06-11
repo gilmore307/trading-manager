@@ -866,9 +866,9 @@ class RegistryHelperTests(unittest.TestCase):
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         expected_tables = {
-            "M01_MARKET_REGIME_DATA_ACQUISITION_TABLE": "trading_data.m01_market_regime_data_acquisition",
-            "M01_MARKET_REGIME_FEATURE_GENERATION_TABLE": "trading_data.m01_market_regime_feature_generation",
-            "M05_OPTION_EXPRESSION_CONTRACT_PATH_TABLE": "trading_data.m05_option_expression_data_acquisition_contract_path",
+            "M01_MARKET_REGIME_DATA_ACQUISITION_TABLE": "trading_data.model_01_market_regime_data_acquisition",
+            "M01_MARKET_REGIME_FEATURE_GENERATION_TABLE": "trading_data.model_01_market_regime_feature_generation",
+            "M05_OPTION_EXPRESSION_CONTRACT_PATH_TABLE": "trading_data.model_05_option_expression_data_acquisition_contract_path",
             "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_DATA_ACQUISITION_TABLE": "trading_data.model_06_residual_event_governance_data_acquisition",
             "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_FEATURE_GENERATION_TABLE": "trading_data.model_06_residual_event_governance_feature_generation",
             "MODEL_01_BACKGROUND_CONTEXT_TABLE": "trading_model.model_01_background_context",
@@ -1736,11 +1736,11 @@ class RegistryHelperTests(unittest.TestCase):
 
         expected = {
             "OPTION_SYMBOL": ("identity_field", "option_symbol", "option_chain_state_source"),
-            "DOLLAR_VOLUME": ("field", "dollar_volume", "m03_target_state_vector_data_acquisition"),
-            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "m03_target_state_vector_data_acquisition"),
-            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "m03_target_state_vector_data_acquisition"),
-            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "m03_target_state_vector_data_acquisition"),
-            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "m05_option_expression_feature_generation"),
+            "DOLLAR_VOLUME": ("field", "dollar_volume", "model_03_target_state_vector_data_acquisition"),
+            "QUOTE_AVG_BID_SIZE": ("field", "avg_bid_size", "model_03_target_state_vector_data_acquisition"),
+            "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "model_03_target_state_vector_data_acquisition"),
+            "QUOTE_SPREAD_BPS": ("field", "spread_bps", "model_03_target_state_vector_data_acquisition"),
+            "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "model_05_option_expression_feature_generation"),
             "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "model_06_residual_event_governance_data_acquisition"),
             "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "model_06_residual_event_governance_data_acquisition"),
             "SCOPE_TYPE": ("classification_field", "scope_type", "model_06_residual_event_governance_data_acquisition"),
@@ -1762,9 +1762,9 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn(applies_to, rows[key]["applies_to"])
 
         for key in ["SYMBOL", "DATA_TIMESTAMP", "BAR_OPEN", "BAR_VWAP"]:
-            self.assertIn("m01_market_regime_data_acquisition", rows[key]["applies_to"])
+            self.assertIn("model_01_market_regime_data_acquisition", rows[key]["applies_to"])
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
-            self.assertIn("m02_sector_context_data_acquisition", rows[key]["applies_to"])
+            self.assertIn("model_02_sector_context_data_acquisition", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
             self.assertIn("model_06_residual_event_governance_data_acquisition", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
@@ -1811,9 +1811,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("data_feature/m05_option_expression_feature_generation", data_features["M05_OPTION_EXPRESSION_FEATURE_GENERATION"]["path"])
         self.assertIn("trading-data", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("market_regime_model", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
-        self.assertIn("m01_market_regime_data_acquisition", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
+        self.assertIn("model_01_market_regime_data_acquisition", data_features["M01_MARKET_REGIME_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("sector_context_model", data_features["M02_SECTOR_CONTEXT_FEATURE_GENERATION"]["applies_to"])
-        self.assertIn("m01_market_regime_data_acquisition", data_features["M02_SECTOR_CONTEXT_FEATURE_GENERATION"]["applies_to"])
+        self.assertIn("model_01_market_regime_data_acquisition", data_features["M02_SECTOR_CONTEXT_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("model_03_target_state_vector", data_features["M03_TARGET_STATE_VECTOR_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("target_state_vector_model", data_features["M03_TARGET_STATE_VECTOR_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("model_06_residual_event_governance_data_acquisition", data_features["M06_RESIDUAL_EVENT_GOVERNANCE_FEATURE_GENERATION"]["applies_to"])
@@ -1872,7 +1872,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(by_key["SNAPSHOT_TIME"]["kind"], "temporal_field")
         self.assertEqual(by_key["SNAPSHOT_TIME"]["payload"], "snapshot_time")
         self.assertIn("option_chain_state_source", by_key["SNAPSHOT_TIME"]["applies_to"])
-        self.assertIn("m01_market_regime_feature_generation", by_key["SNAPSHOT_TIME"]["applies_to"])
+        self.assertIn("model_01_market_regime_feature_generation", by_key["SNAPSHOT_TIME"]["applies_to"])
         self.assertNotIn("feature_snapshots", by_key["SNAPSHOT_TIME"]["applies_to"])
         payloads = {row["payload"] for row in rows}
         for generated_feature_column in {"spy_return_30m", "spy_return_1d", "spy_return_5d", "spy_return_20d"}:
@@ -1952,16 +1952,16 @@ class RegistryHelperTests(unittest.TestCase):
         expected = {
             "M01_MARKET_REGIME_DATA_ACQUISITION": ("data_source", "m01_market_regime_data_acquisition"),
             "M01_MARKET_REGIME_FEATURE_GENERATION": ("data_feature", "m01_market_regime_feature_generation"),
-            "MODEL_01_MARKET_REGIME": ("term", "m01_market_regime_model_generation"),
-            "MODEL_01_MARKET_REGIME_EXPLAINABILITY": ("term", "m01_market_regime_model_generation_explainability"),
-            "MODEL_01_MARKET_REGIME_DIAGNOSTICS": ("term", "m01_market_regime_model_generation_diagnostics"),
+            "MODEL_01_MARKET_REGIME": ("term", "model_01_market_regime_model_generation"),
+            "MODEL_01_MARKET_REGIME_EXPLAINABILITY": ("term", "model_01_market_regime_model_generation_explainability"),
+            "MODEL_01_MARKET_REGIME_DIAGNOSTICS": ("term", "model_01_market_regime_model_generation_diagnostics"),
         }
         for key, (kind, payload) in expected.items():
             self.assertEqual(rows[key]["kind"], kind)
             self.assertEqual(rows[key]["payload"], payload)
 
-        self.assertIn("m01_market_regime_model_generation", rows["MODEL_01_MARKET_REGIME_EXPLAINABILITY"]["applies_to"])
-        self.assertIn("m01_market_regime_model_generation", rows["MODEL_01_MARKET_REGIME_DIAGNOSTICS"]["applies_to"])
+        self.assertIn("model_01_market_regime_model_generation", rows["MODEL_01_MARKET_REGIME_EXPLAINABILITY"]["applies_to"])
+        self.assertIn("model_01_market_regime_model_generation", rows["MODEL_01_MARKET_REGIME_DIAGNOSTICS"]["applies_to"])
 
     def test_market_regime_etf_universe_shared_csv_columns_are_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
@@ -2419,9 +2419,9 @@ class RegistryHelperTests(unittest.TestCase):
             "BAR_TRADE_COUNT": "bar_trade_count",
         }
         for key, payload in expected_bar_fields.items():
-            self.assertIn("m01_market_regime_data_acquisition", by_key[key]["applies_to"])
-            self.assertIn("m03_target_state_vector_data_acquisition", by_key[key]["applies_to"])
-            self.assertIn("m05_option_expression_data_acquisition_contract_path", by_key[key]["applies_to"])
+            self.assertIn("model_01_market_regime_data_acquisition", by_key[key]["applies_to"])
+            self.assertIn("model_03_target_state_vector_data_acquisition", by_key[key]["applies_to"])
+            self.assertIn("model_05_option_expression_data_acquisition_contract_path", by_key[key]["applies_to"])
             self.assertEqual(by_key[key]["payload"], payload)
         self.assertEqual(by_key["TIMEFRAME"]["payload"], "timeframe")
         self.assertEqual(by_key["TARGET_CANDIDATE_ID"]["kind"], "identity_field")
@@ -2436,7 +2436,7 @@ class RegistryHelperTests(unittest.TestCase):
         }
         for key, payload in target_state_fields.items():
             self.assertEqual(by_key[key]["payload"], payload)
-        self.assertIn("m03_target_state_vector_feature_generation", by_key["RUN_ID"]["applies_to"])
+        self.assertIn("model_03_target_state_vector_feature_generation", by_key["RUN_ID"]["applies_to"])
 
         state_vector_values = {row["key"]: row for row in state_vector_value_rows}
         expected_state_vector_values = {

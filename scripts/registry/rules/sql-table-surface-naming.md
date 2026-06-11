@@ -20,7 +20,7 @@ Where:
 - `schema` is the repository-owned SQL namespace, for example
   `trading_data`, `trading_model`, `trading_evaluation`, or
   `trading_execution`.
-- `owner_prefix` is `mNN` for model-owned layer surfaces.
+- `owner_prefix` is `model_NN` for model-owned layer surfaces.
 - `domain_slug` is the reviewed model, component, lifecycle, or data domain.
 - `task_stage` is the task or lifecycle stage that creates the table.
 - `artifact_role` is optional and names a support artifact such as
@@ -87,11 +87,11 @@ until their reviewed gates exist.
 Model/data surfaces:
 
 ```text
-trading_data.m01_market_regime_data_acquisition
-trading_data.m01_market_regime_feature_generation
-trading_model.m01_market_regime_model_generation
-trading_model.m01_market_regime_model_generation_explainability
-trading_model.m01_market_regime_model_generation_diagnostics
+trading_data.model_01_market_regime_data_acquisition
+trading_data.model_01_market_regime_feature_generation
+trading_model.model_01_market_regime_model_generation
+trading_model.model_01_market_regime_model_generation_explainability
+trading_model.model_01_market_regime_model_generation_diagnostics
 ```
 
 Execution status and realtime surfaces:
@@ -151,6 +151,6 @@ trading_evaluation.fold_settlement_run
 trading_evaluation.promoted_model_parameter
 ```
 
-Old `source_NN_*`, `feature_NN_*`, and `model_NN_*` names are migration debt,
-not current planning names. Historical applied migrations may still mention old
+Old `mNN_*`, `source_NN_*`, and `feature_NN_*` names are migration debt, not
+current planning names. Historical applied migrations may still mention old
 names as immutable history.

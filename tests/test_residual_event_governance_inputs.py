@@ -20,9 +20,9 @@ def _write_layer_two_bar_receipt(storage_root: Path, symbol: str, month: str, ro
                     {
                         "run_id": "run_001",
                         "status": "succeeded",
-                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
+                        "outputs": ["trading_data.model_01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": row_count},
-                        "steps": {"save": {"references": ["trading_data.m01_market_regime_data_acquisition"]}},
+                        "steps": {"save": {"references": ["trading_data.model_01_market_regime_data_acquisition"]}},
                     }
                 ]
             }

@@ -37,9 +37,9 @@ def _write_target_feed_artifact(root: Path, *, symbol: str = "AAPL", month: str 
                     {
                         "run_id": "run_001",
                         "status": "succeeded",
-                        "outputs": ["trading_data.m03_target_state_vector_data_acquisition"],
+                        "outputs": ["trading_data.model_03_target_state_vector_data_acquisition"],
                         "row_counts": {"equity_bar": 1},
-                        "steps": {"save": {"references": ["trading_data.m03_target_state_vector_data_acquisition"]}},
+                        "steps": {"save": {"references": ["trading_data.model_03_target_state_vector_data_acquisition"]}},
                     }
                 ]
             }

@@ -29,9 +29,9 @@ def _write_bar_receipt(storage_root: Path, symbol: str, month: str, *, row_count
                     {
                         "run_id": "run_001",
                         "status": "succeeded",
-                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
+                        "outputs": ["trading_data.model_01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": row_count},
-                        "steps": {"save": {"references": ["trading_data.m01_market_regime_data_acquisition"]}},
+                        "steps": {"save": {"references": ["trading_data.model_01_market_regime_data_acquisition"]}},
                     }
                 ]
             }
@@ -82,7 +82,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(len(refs), 1)
             self.assertEqual(refs[0].symbol, "XLF")
             self.assertEqual(refs[0].row_count, 1)
-            self.assertEqual(refs[0].bar_source_ref, "trading_data.m01_market_regime_data_acquisition")
+            self.assertEqual(refs[0].bar_source_ref, "trading_data.model_01_market_regime_data_acquisition")
             self.assertEqual(refs[0].timeframe, "1Min")
 
     def test_builds_source_task_key_with_sql_bar_sources(self) -> None:
@@ -93,7 +93,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
                     symbol="XLF",
                     month="2016-01",
                     receipt_path=str(tmp / "completion_receipt.json"),
-                    bar_source_ref="trading_data.m01_market_regime_data_acquisition",
+                    bar_source_ref="trading_data.model_01_market_regime_data_acquisition",
                     run_id="run_001",
                     row_count=17,
                     timeframe="1Min",
@@ -126,7 +126,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             source = task_key["params"]["bar_sql_sources"][0]
             self.assertEqual(source["source_symbol"], "XLF")
             self.assertEqual(source["target_symbol"], "XLF")
-            self.assertEqual(source["table"], "m01_market_regime_data_acquisition")
+            self.assertEqual(source["table"], "model_01_market_regime_data_acquisition")
             self.assertEqual(source["timeframe"], "1Min")
 
     def test_dry_run_writes_task_evidence_but_does_not_call_provider(self) -> None:

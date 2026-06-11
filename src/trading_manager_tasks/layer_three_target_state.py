@@ -34,7 +34,7 @@ SOURCE = "m03_target_state_vector_data_acquisition"
 OPTION_CHAIN_SOURCE_TABLE = "option_chain_state_source"
 OPTION_CHAIN_SOURCE_POLICY_REF = "LAYER_03_OPTION_CHAIN_ROLE_SELECTOR_POLICY"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
-BAR_SOURCE_TABLE = "m01_market_regime_data_acquisition"
+BAR_SOURCE_TABLE = "model_01_market_regime_data_acquisition"
 DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME = "1Min"
 
 

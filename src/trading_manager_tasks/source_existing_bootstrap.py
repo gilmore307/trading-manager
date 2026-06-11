@@ -32,8 +32,8 @@ DEFAULT_BOOTSTRAP_REPORT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "source_exist
 SOURCE_TIMEZONE = "America/New_York"
 
 STAGE_SOURCE_TABLES: Mapping[str, str] = {
-    "model_01_background_context.data_acquisition": "trading_data.m01_market_regime_data_acquisition",
-    "model_02_target_state.data_acquisition": "trading_data.m03_target_state_vector_data_acquisition",
+    "model_01_background_context.data_acquisition": "trading_data.model_01_market_regime_data_acquisition",
+    "model_02_target_state.data_acquisition": "trading_data.model_03_target_state_vector_data_acquisition",
 }
 
 
@@ -282,14 +282,14 @@ def _fetch_source_counts_from_database(
 
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         with connection.cursor() as cursor:
-            if table_exists(cursor, "trading_data.m01_market_regime_data_acquisition"):
+            if table_exists(cursor, "trading_data.model_01_market_regime_data_acquisition"):
                 cursor.execute(
                     f"""
                     SELECT
                       to_char(date_trunc('month', timestamp AT TIME ZONE %s), 'YYYY-MM') AS month,
                       upper(symbol) AS symbol,
                       count(*)::BIGINT AS row_count
-                    FROM trading_data.m01_market_regime_data_acquisition
+                    FROM trading_data.model_01_market_regime_data_acquisition
                     WHERE timestamp >= (%s::date AT TIME ZONE %s)
                       AND timestamp < (%s::date AT TIME ZONE %s)
                     GROUP BY 1, 2
@@ -303,7 +303,7 @@ def _fetch_source_counts_from_database(
                     SELECT
                       upper(symbol) AS symbol,
                       to_char(date_trunc('month', min(timestamp) AT TIME ZONE %s), 'YYYY-MM') AS first_month
-                    FROM trading_data.m01_market_regime_data_acquisition
+                    FROM trading_data.model_01_market_regime_data_acquisition
                     GROUP BY 1
                     """,
                     [SOURCE_TIMEZONE],
@@ -311,16 +311,16 @@ def _fetch_source_counts_from_database(
                 for row in cursor.fetchall():
                     m01_first_seen[str(row["symbol"])] = str(row["first_month"])
             else:
-                warnings.append("missing table trading_data.m01_market_regime_data_acquisition")
+                warnings.append("missing table trading_data.model_01_market_regime_data_acquisition")
 
-            if table_exists(cursor, "trading_data.m03_target_state_vector_data_acquisition") and target:
+            if table_exists(cursor, "trading_data.model_03_target_state_vector_data_acquisition") and target:
                 cursor.execute(
                     f"""
                     SELECT
                       to_char(date_trunc('month', timestamp AT TIME ZONE %s), 'YYYY-MM') AS month,
                       upper(symbol) AS symbol,
                       count(*)::BIGINT AS row_count
-                    FROM trading_data.m03_target_state_vector_data_acquisition
+                    FROM trading_data.model_03_target_state_vector_data_acquisition
                     WHERE timestamp >= (%s::date AT TIME ZONE %s)
                       AND timestamp < (%s::date AT TIME ZONE %s)
                       AND upper(symbol) = %s
@@ -331,9 +331,9 @@ def _fetch_source_counts_from_database(
                 for row in cursor.fetchall():
                     source_03.setdefault(str(row["month"]), {})[str(row["symbol"])] = int(row["row_count"])
             elif not target:
-                warnings.append("selected_target_symbol missing; m03_target_state_vector_data_acquisition database scan skipped")
+                warnings.append("selected_target_symbol missing; model_03_target_state_vector_data_acquisition database scan skipped")
             else:
-                warnings.append("missing table trading_data.m03_target_state_vector_data_acquisition")
+                warnings.append("missing table trading_data.model_03_target_state_vector_data_acquisition")
 
             if table_exists(cursor, "trading_data.model_06_residual_event_governance_data_acquisition"):
                 cursor.execute(

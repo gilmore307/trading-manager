@@ -26,7 +26,7 @@ DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = Path("/root/projects/trading-manager/.venv/bin/python")
 FEATURE_STAGE_ID = "model_05_option_expression.feature_generation"
 SOURCE_TABLE = "option_chain_state_source"
-FEATURE_TABLE = "m05_option_expression_feature_generation"
+FEATURE_TABLE = "model_05_option_expression_feature_generation"
 FEATURE_STAGE_CONTRACT_TYPE = "manager_model_05_option_expression_feature_generation_stage"
 
 

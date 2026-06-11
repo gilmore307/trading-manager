@@ -162,7 +162,7 @@ Historical workflow stages must keep source data, derived features, and model-de
 - If a derived table requires any upstream model output, it is not a `feature_generation` output for that source stage. It needs a separate model/input table, an explicit model-generation stage, or a newly named intermediate task with its own contract and blockers.
 - Model outputs, replay state, promotion review evidence, and maintenance surfaces must not be stored under source/feature contracts just because they are convenient downstream inputs.
 
-For example, `trading_data.m01_market_regime_feature_generation` is a valid feature surface when it is deterministically derived from acquired market bars. A target/event table that requires TargetStateVectorModel output, EventFailureRiskModel output, or replay portfolio state is not a feature surface under this definition.
+For example, `trading_data.model_01_market_regime_feature_generation` is a valid feature surface when it is deterministically derived from acquired market bars. A target/event table that requires TargetStateVectorModel output, EventFailureRiskModel output, or replay portfolio state is not a feature surface under this definition.
 
 ## Model Group Rerun Semantics
 

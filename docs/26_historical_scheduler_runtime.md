@@ -62,7 +62,7 @@ bounded historical ThetaData calls only when
 `trading_data.option_chain_state_source`, and retries replay from the same
 lifecycle. If the bounded provider request deterministically reports unavailable
 source data, the daemon records a `snapshot_type = source_unavailable` sentinel
-row in `trading_data.m05_option_expression_feature_generation` for that signal
+row in `trading_data.model_05_option_expression_feature_generation` for that signal
 timestamp so replay can continue through a no-option expression path instead of
 repeating the same provider request. It must not derive option downloads from
 all equity bars, and it must not perform broker/order/fill/account mutation,
