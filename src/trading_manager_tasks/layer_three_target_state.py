@@ -31,6 +31,7 @@ DEFAULT_TARGET_CONTEXT_MAPPING = Path("/root/projects/trading-storage/main/share
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_03_target_state_vector" / "input_materialization"
 LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
 SOURCE = "m03_target_state_vector_data_acquisition"
+OUTPUT_TABLE = "model_03_target_state_vector_data_acquisition"
 OPTION_CHAIN_SOURCE_TABLE = "option_chain_state_source"
 OPTION_CHAIN_SOURCE_POLICY_REF = "LAYER_03_OPTION_CHAIN_ROLE_SELECTOR_POLICY"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
@@ -196,12 +197,25 @@ def _bar_source_ref(run: Mapping[str, Any]) -> str:
 
 
 def _source_timeframe(receipt_path: Path) -> str:
+    timeframe = ""
     task_key_path = receipt_path.parent / "task_key.json"
-    if not task_key_path.exists():
-        return DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME
-    task_key = json.loads(task_key_path.read_text(encoding="utf-8"))
-    params = task_key.get("params") if isinstance(task_key.get("params"), Mapping) else {}
-    timeframe = str(params.get("timeframe") or "").strip()
+    if task_key_path.exists():
+        task_key = json.loads(task_key_path.read_text(encoding="utf-8"))
+        params = task_key.get("params") if isinstance(task_key.get("params"), Mapping) else {}
+        timeframe = str(params.get("timeframe") or "").strip()
+        if timeframe:
+            return timeframe
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    run = _latest_successful_run(receipt)
+    output_dir = str(run.get("output_dir") or "").strip() if run else ""
+    if output_dir:
+        manifest_path = Path(output_dir) / "request_manifest.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            params = manifest.get("params") if isinstance(manifest.get("params"), Mapping) else {}
+            timeframe = str(params.get("timeframe") or "").strip()
+            if timeframe:
+                return timeframe
     return timeframe or DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME
 
 
@@ -420,7 +434,8 @@ def materialize_layer_three_target_state_inputs(
         if result.returncode != 0:
             raise TaskSystemError(f"m03_target_state_vector_data_acquisition materialization failed: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
-        source_row_count = int((payload.get("row_counts") or {}).get(SOURCE) or 0)
+        row_counts = payload.get("row_counts") if isinstance(payload.get("row_counts"), Mapping) else {}
+        source_row_count = int(row_counts.get(OUTPUT_TABLE) or row_counts.get(SOURCE) or 0)
         refs_out = [str(item) for item in payload.get("references") or []]
         trading_data_receipt_path = next((item for item in refs_out if item.endswith("completion_receipt.json")), str(trading_data_output_root / "completion_receipt.json"))
     summary = LayerThreeTargetStateMaterialization(

@@ -15,13 +15,21 @@ from trading_manager_tasks.layer_three_target_state import (
 )
 
 
-def _write_bar_receipt(storage_root: Path, symbol: str, month: str, *, row_count: int = 1) -> Path:
+def _write_bar_receipt(storage_root: Path, symbol: str, month: str, *, row_count: int = 1, write_task_key: bool = True, manifest_timeframe: str | None = None) -> Path:
     receipt_path = storage_root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
-    (receipt_path.parent / "task_key.json").write_text(
-        json.dumps({"params": {"timeframe": "1Min"}}),
-        encoding="utf-8",
-    )
+    if write_task_key:
+        (receipt_path.parent / "task_key.json").write_text(
+            json.dumps({"params": {"timeframe": "1Min"}}),
+            encoding="utf-8",
+        )
+    output_dir = receipt_path.parent / "runs" / "run_001"
+    if manifest_timeframe:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "request_manifest.json").write_text(
+            json.dumps({"params": {"timeframe": manifest_timeframe}}),
+            encoding="utf-8",
+        )
     receipt_path.write_text(
         json.dumps(
             {
@@ -29,6 +37,7 @@ def _write_bar_receipt(storage_root: Path, symbol: str, month: str, *, row_count
                     {
                         "run_id": "run_001",
                         "status": "succeeded",
+                        "output_dir": str(output_dir),
                         "outputs": ["trading_data.model_01_market_regime_data_acquisition"],
                         "row_counts": {"equity_bar": row_count},
                         "steps": {"save": {"references": ["trading_data.model_01_market_regime_data_acquisition"]}},
@@ -84,6 +93,25 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(refs[0].row_count, 1)
             self.assertEqual(refs[0].bar_source_ref, "trading_data.model_01_market_regime_data_acquisition")
             self.assertEqual(refs[0].timeframe, "1Min")
+
+    def test_discovers_timeframe_from_run_manifest_when_task_key_is_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,model_layer\nAAPL,layer_02_sector_context\n", encoding="utf-8")
+            _write_bar_receipt(storage_root, "AAPL", "2021-01", write_task_key=False, manifest_timeframe="1Day")
+
+            refs = discover_layer_two_feed_artifacts(
+                start_month="2021-01",
+                trading_data_root=tmp / "trading-data",
+                trading_storage_root=storage_root,
+                universe_path=universe_path,
+                symbols=("AAPL",),
+            )
+
+            self.assertEqual(len(refs), 1)
+            self.assertEqual(refs[0].timeframe, "1Day")
 
     def test_builds_source_task_key_with_sql_bar_sources(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -158,6 +186,37 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertIn("bar_sql_sources", task_key["params"])
             self.assertEqual(summary.option_chain_source_table, "option_chain_state_source")
             self.assertEqual(summary.option_chain_source_usage, "optional_sql_overlay_for_layer_3_target_level_reduction")
+
+    def test_write_summary_reads_downstream_output_table_row_count(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,model_layer\nAAPL,layer_02_sector_context\n", encoding="utf-8")
+            _write_bar_receipt(storage_root, "AAPL", "2021-01", write_task_key=False, manifest_timeframe="1Day")
+
+            with patch("trading_manager_tasks.layer_three_target_state.subprocess.run") as run:
+                run.return_value.returncode = 0
+                run.return_value.stdout = json.dumps(
+                    {
+                        "row_counts": {"model_03_target_state_vector_data_acquisition": 20},
+                        "references": [str(tmp / "completion_receipt.json")],
+                    }
+                )
+                run.return_value.stderr = ""
+
+                summary = materialize_layer_three_target_state_inputs(
+                    start_month="2021-01",
+                    end_month="2021-01",
+                    manager_storage_root=tmp / "manager-storage",
+                    trading_data_root=tmp / "trading-data",
+                    trading_storage_root=storage_root,
+                    universe_path=universe_path,
+                    target_symbol="AAPL",
+                    write=True,
+                )
+
+            self.assertEqual(summary.source_row_count, 20)
 
     def test_selected_target_symbol_limits_materialization_to_that_target(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
