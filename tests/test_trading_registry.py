@@ -868,11 +868,25 @@ class RegistryHelperTests(unittest.TestCase):
         expected_tables = {
             "M01_MARKET_REGIME_DATA_ACQUISITION_TABLE": "trading_data.m01_market_regime_data_acquisition",
             "M01_MARKET_REGIME_FEATURE_GENERATION_TABLE": "trading_data.m01_market_regime_feature_generation",
-            "M01_MARKET_REGIME_MODEL_GENERATION_TABLE": "trading_model.m01_market_regime_model_generation",
-            "M01_MARKET_REGIME_MODEL_GENERATION_EXPLAINABILITY_TABLE": "trading_model.m01_market_regime_model_generation_explainability",
-            "M01_MARKET_REGIME_MODEL_GENERATION_DIAGNOSTICS_TABLE": "trading_model.m01_market_regime_model_generation_diagnostics",
-            "M02_SECTOR_CONTEXT_DATA_ACQUISITION_TABLE": "trading_data.m02_sector_context_data_acquisition",
             "M05_OPTION_EXPRESSION_CONTRACT_PATH_TABLE": "trading_data.m05_option_expression_data_acquisition_contract_path",
+            "MODEL_01_BACKGROUND_CONTEXT_TABLE": "trading_model.model_01_background_context",
+            "MODEL_01_BACKGROUND_CONTEXT_EXPLAINABILITY_TABLE": "trading_model.model_01_background_context_explainability",
+            "MODEL_01_BACKGROUND_CONTEXT_DIAGNOSTICS_TABLE": "trading_model.model_01_background_context_diagnostics",
+            "MODEL_02_TARGET_STATE_TABLE": "trading_model.model_02_target_state",
+            "MODEL_02_TARGET_STATE_EXPLAINABILITY_TABLE": "trading_model.model_02_target_state_explainability",
+            "MODEL_02_TARGET_STATE_DIAGNOSTICS_TABLE": "trading_model.model_02_target_state_diagnostics",
+            "MODEL_03_EVENT_STATE_TABLE": "trading_model.model_03_event_state",
+            "MODEL_03_EVENT_STATE_EXPLAINABILITY_TABLE": "trading_model.model_03_event_state_explainability",
+            "MODEL_03_EVENT_STATE_DIAGNOSTICS_TABLE": "trading_model.model_03_event_state_diagnostics",
+            "MODEL_04_UNIFIED_DECISION_TABLE": "trading_model.model_04_unified_decision",
+            "MODEL_04_UNIFIED_DECISION_EXPLAINABILITY_TABLE": "trading_model.model_04_unified_decision_explainability",
+            "MODEL_04_UNIFIED_DECISION_DIAGNOSTICS_TABLE": "trading_model.model_04_unified_decision_diagnostics",
+            "MODEL_05_OPTION_EXPRESSION_TABLE": "trading_model.model_05_option_expression",
+            "MODEL_05_OPTION_EXPRESSION_EXPLAINABILITY_TABLE": "trading_model.model_05_option_expression_explainability",
+            "MODEL_05_OPTION_EXPRESSION_DIAGNOSTICS_TABLE": "trading_model.model_05_option_expression_diagnostics",
+            "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_TABLE": "trading_model.model_06_residual_event_governance",
+            "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_EXPLAINABILITY_TABLE": "trading_model.model_06_residual_event_governance_explainability",
+            "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_DIAGNOSTICS_TABLE": "trading_model.model_06_residual_event_governance_diagnostics",
             "EVALUATION_REPLAY_CONTRACT_TABLE": "trading_evaluation.replay_contract",
             "EVALUATION_REPLAY_DATASET_PREPARATION_TABLE": "trading_evaluation.replay_dataset_preparation",
             "EVALUATION_REPLAY_DATASET_FREEZE_TABLE": "trading_evaluation.replay_dataset_freeze",
@@ -925,6 +939,15 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "sql_table")
             self.assertEqual(rows[key]["payload"], payload)
             self.assertIn("sql_table", rows[key]["applies_to"])
+
+        retired_table_keys = {
+            "M01_MARKET_REGIME_MODEL_GENERATION_TABLE",
+            "M01_MARKET_REGIME_MODEL_GENERATION_EXPLAINABILITY_TABLE",
+            "M01_MARKET_REGIME_MODEL_GENERATION_DIAGNOSTICS_TABLE",
+            "M02_SECTOR_CONTEXT_DATA_ACQUISITION_TABLE",
+        }
+        for key in retired_table_keys:
+            self.assertNotIn(key, rows)
 
         policy = rows["SQL_OUTPUT_TABLE_INVENTORY_POLICY"]
         self.assertIn("schema_qualified_table_names_required", policy["payload"])
