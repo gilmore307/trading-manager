@@ -26,6 +26,7 @@ from .model_group_replay import (
     _dataset_is_frozen_and_complete,
     _load_json_object,
     _replay_dataset_root,
+    _replay_dataset_scope_status,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
@@ -63,22 +64,29 @@ def run_model_group_replay_dataset_if_ready(
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     manifest_path = dataset_root / "dataset_manifest.json"
     freeze_receipt_path = dataset_root / "replay_freeze_receipt.json"
-    if manifest_path.exists() and freeze_receipt_path.exists():
-        manifest = _load_json_object(manifest_path)
-        freeze_receipt = _load_json_object(freeze_receipt_path)
-        if _dataset_is_frozen_and_complete(manifest, freeze_receipt):
-            return None
-
     training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
     if training_fold is None:
         return None
+
+    manifest = _load_json_object(manifest_path) if manifest_path.exists() else None
+    freeze_receipt = _load_json_object(freeze_receipt_path) if freeze_receipt_path.exists() else None
+    stale_dataset_scope = False
+    stale_manifest = None
+    stale_freeze_receipt = None
+    if manifest is not None and freeze_receipt is not None and _dataset_is_frozen_and_complete(manifest, freeze_receipt):
+        replay_scope_status = _replay_dataset_scope_status(dataset_root=dataset_root, manifest=manifest, training_fold=training_fold)
+        if replay_scope_status["compatible"]:
+            return None
+        stale_dataset_scope = True
+        stale_manifest = manifest
+        stale_freeze_receipt = freeze_receipt
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     resolved_python = python_executable or _python_executable()
     contract = _load_json_object(contract_path)
     base_context_path = _base_context_path(contract=contract, dataset_root=dataset_root)
     base_context_written = False
-    if not base_context_path.exists():
+    if stale_dataset_scope or not base_context_path.exists():
         if not execute:
             return _decision(
                 now=now,
@@ -99,7 +107,8 @@ def run_model_group_replay_dataset_if_ready(
         _write_base_context(base_context_path, contract=contract, training_fold=training_fold, now=now)
         base_context_written = True
 
-    if not manifest_path.exists():
+    replaced_stale_dataset = False
+    if stale_dataset_scope or not manifest_path.exists():
         command = [
             resolved_python,
             str(prepare_runner_path),
@@ -129,6 +138,9 @@ def run_model_group_replay_dataset_if_ready(
                     training_fold=training_fold,
                     base_context_path=base_context_path,
                     base_context_written=base_context_written,
+                    stale_dataset_scope=stale_dataset_scope,
+                    previous_manifest=stale_manifest,
+                    previous_freeze_receipt=stale_freeze_receipt,
                 ),
             )
         completed = _run(command, cwd=evaluation_repo_root, pythonpath=[evaluation_repo_root / "src"])
@@ -147,9 +159,13 @@ def run_model_group_replay_dataset_if_ready(
                     training_fold=training_fold,
                     base_context_path=base_context_path,
                     base_context_written=base_context_written,
+                    stale_dataset_scope=stale_dataset_scope,
+                    previous_manifest=stale_manifest,
+                    previous_freeze_receipt=stale_freeze_receipt,
                 ),
             )
         manifest = _load_json_object(manifest_path)
+        replaced_stale_dataset = stale_dataset_scope
     else:
         manifest = _load_json_object(manifest_path)
 
@@ -249,7 +265,7 @@ def run_model_group_replay_dataset_if_ready(
             ),
         )
 
-    if freeze_receipt_path.exists():
+    if freeze_receipt_path.exists() and not replaced_stale_dataset:
         freeze_receipt = _load_json_object(freeze_receipt_path)
         if _dataset_is_frozen_and_complete(manifest, freeze_receipt):
             return None
@@ -313,6 +329,9 @@ def run_model_group_replay_dataset_if_ready(
             base_context_written=base_context_written,
             manifest=_load_json_object(manifest_path),
             freeze_receipt=_load_json_object(freeze_receipt_path),
+            stale_dataset_scope=stale_dataset_scope,
+            previous_manifest=stale_manifest,
+            previous_freeze_receipt=stale_freeze_receipt,
         ),
     )
 

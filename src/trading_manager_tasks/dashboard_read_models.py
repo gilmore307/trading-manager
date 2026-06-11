@@ -3337,6 +3337,20 @@ def _replay_dataset_scope_status(
     }
 
 
+def _replay_manifest_fold_window(manifest: Mapping[str, Any] | None) -> tuple[str, str] | None:
+    if manifest is None:
+        return None
+    fold_id = str(manifest.get("candidate_fold_id") or manifest.get("fold_id") or "").strip()
+    match = re.fullmatch(r"(?:fold_)?(\d{4}-\d{2})_(\d{4}-\d{2})", fold_id)
+    if match:
+        start_month, end_month = match.groups()
+        if _is_month_key(start_month) and _is_month_key(end_month):
+            return start_month, end_month
+    if FOLD_LABEL_RE.fullmatch(fold_id):
+        return _fold_window_for_period(fold_id)
+    return None
+
+
 def _replay_dataset_target_refs(*, dataset_root: Path, manifest: Mapping[str, Any]) -> set[str]:
     refs = _string_set(manifest.get("pre_replay_target_refs"))
     for row in _replay_coverage_rows(dataset_root / "feed_acquisition_plan.csv"):
@@ -4031,7 +4045,11 @@ def _model_group_replay_timeline_tasks(
         missing = sum(int(row.get("missing_acquisition_count") or 0) for row in coverage_rows)
 
     coverage_complete = manifest is not None and expected > 0 and missing == 0
-    month_operation_detail = _replay_month_operation_detail(dataset_root)
+    month_operation_detail = (
+        _replay_month_operation_detail(dataset_root)
+        if lifecycle_artifacts_allowed and manifest is not None and not coverage_complete
+        else None
+    )
     freeze_status = str((manifest or {}).get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
     compatible_replay_run_ids = (
@@ -4300,6 +4318,8 @@ def _model_group_lifecycle_tasks_for_visible_folds(
 ) -> list[dict[str, Any]]:
     """Return fixed replay-through-maintenance task rows for visible folds."""
 
+    dataset_root = _replay_dataset_root(storage_root, "promotion_replay_candidate_policy")
+    manifest = _load_optional_json_object(dataset_root / "dataset_manifest.json")
     visible_periods: list[tuple[str, str, str]] = []
     seen_periods: set[str] = set()
     seen_windows: set[tuple[str, str]] = set()
@@ -4331,12 +4351,16 @@ def _model_group_lifecycle_tasks_for_visible_folds(
         storage_root=storage_root,
         selected_target_symbol=selected_target_symbol,
     )
-    artifact_fold = (completed_fold[0], completed_fold[1]) if completed_fold is not None else None
-    if artifact_fold is None and visible_periods and _replay_dataset_root(storage_root, "promotion_replay_candidate_policy").exists():
+    artifact_fold = _replay_manifest_fold_window(manifest)
+    if artifact_fold is None and completed_fold is not None:
+        artifact_fold = (completed_fold[0], completed_fold[1])
+    if artifact_fold is None and visible_periods and dataset_root.exists():
         _period, start_month, end_month = visible_periods[0]
         artifact_fold = (start_month, end_month)
     tasks: list[dict[str, Any]] = []
     for _period, start_month, end_month in visible_periods:
+        if artifact_fold is not None and (start_month, end_month) < artifact_fold:
+            continue
         pre_replay_complete = _pre_replay_fold_complete(
             storage_root=storage_root,
             start_month=start_month,

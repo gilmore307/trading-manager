@@ -11,9 +11,15 @@ from trading_manager_tasks.model_group_replay_dataset import run_model_group_rep
 
 
 class ModelGroupReplayDatasetTests(unittest.TestCase):
-    def _write_completed_fold(self, storage_root: Path) -> None:
-        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
-        state_path.parent.mkdir(parents=True)
+    def _write_completed_fold(
+        self,
+        storage_root: Path,
+        *,
+        start_month: str = "2016-01",
+        end_month: str = "2016-06",
+    ) -> None:
+        state_path = storage_root / "runtime" / f"model_training_fold_state_aapl_{start_month}_{end_month}.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
         stages = []
         for layer in range(1, 7):
             for split_name in ("train", "validation", "test"):
@@ -34,8 +40,8 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             json.dumps(
                 {
                     "contract_type": "manager_model_training_workflow_state",
-                    "start_month": "2016-01",
-                    "end_month": "2016-06",
+                    "start_month": start_month,
+                    "end_month": end_month,
                     "target_symbol": "AAPL",
                     "stages": stages,
                 }
@@ -48,9 +54,9 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             / "03_model_artifacts"
             / "runtime"
             / "model_05_option_expression"
-            / "option_expression_model_aapl_2016-01_2016-06.json"
+            / f"option_expression_model_aapl_{start_month}_{end_month}.json"
         )
-        artifact_path.parent.mkdir(parents=True)
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
         artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
 
     def _write_contract(self, path: Path, *, base_context_ref: Path) -> None:
@@ -196,6 +202,59 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
             )
             self.assertIsNone(second)
+
+    def test_stale_frozen_manifest_is_reprepared_for_latest_completed_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_completed_fold(storage_root, start_month="2016-01", end_month="2016-06")
+            self._write_completed_fold(storage_root, start_month="2016-07", end_month="2016-12")
+            dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            dataset_root.mkdir(parents=True, exist_ok=True)
+            (dataset_root / "base_context.json").write_text(
+                json.dumps({"candidate_fold_id": "fold_2016-01_2016-06", "pre_replay_target_refs": ["AAPL"]}) + "\n",
+                encoding="utf-8",
+            )
+            (dataset_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "freeze_status": "frozen",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "missing_feed_acquisition_count": 0,
+                        "pre_replay_target_refs": ["AAPL"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (dataset_root / "replay_freeze_receipt.json").write_text(
+                json.dumps({"freeze_status": "frozen", "validation": {"validation_status": "passed"}}) + "\n",
+                encoding="utf-8",
+            )
+            contract_path = tmp / "replays" / "promotion_replay_candidate_policy.json"
+            self._write_contract(contract_path, base_context_ref=dataset_root / "base_context.json")
+
+            decision = run_model_group_replay_dataset_if_ready(
+                storage_root=storage_root,
+                contract_path=contract_path,
+                prepare_runner_path=self._write_prepare_script(tmp / "prepare.py", missing_count=0),
+                freeze_runner_path=self._write_freeze_script(tmp / "freeze.py"),
+                evaluation_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.reason_code, "model_group_replay_dataset_frozen")
+            self.assertTrue(decision.execution_summary["stale_dataset_scope"])
+            manifest = json.loads((dataset_root / "dataset_manifest.json").read_text(encoding="utf-8"))
+            base_context = json.loads((dataset_root / "base_context.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["candidate_fold_id"], "fold_2016-07_2016-12")
+            self.assertEqual(base_context["candidate_fold_id"], "fold_2016-07_2016-12")
 
     def test_missing_coverage_requires_provider_acquisition_gate(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

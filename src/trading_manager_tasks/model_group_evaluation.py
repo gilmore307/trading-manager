@@ -2065,7 +2065,7 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                 },
             )
         )
-    return sorted(candidates, key=lambda item: item[0])[0][1] if candidates else None
+    return sorted(candidates, key=lambda item: item[0])[-1][1] if candidates else None
 
 
 def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | None:

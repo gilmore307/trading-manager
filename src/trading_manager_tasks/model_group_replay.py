@@ -552,7 +552,7 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                 "fold_stack_evidence_ref": str(path),
             }
         )
-    return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))[0] if candidates else None
+    return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))[-1] if candidates else None
 
 
 def _candidate_model_ref(*, target_symbol: str | None, start_month: str, end_month: str) -> str:

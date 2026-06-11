@@ -16,6 +16,7 @@ from trading_manager_tasks.dashboard_read_models import (
     _close_global_nonblocking_agent_errors,
     _agent_error_summary,
     _mark_superseded_agent_errors,
+    _model_group_replay_timeline_tasks,
     _stage_id_from_error_row,
     _task_error_intervention_status,
     build_historical_task_progress_summary,
@@ -997,6 +998,61 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         replay_task = next(task for task in fold1_tasks if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["task_state"], "current")
         self.assertEqual(replay_task["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
+
+    def test_model_group_replay_does_not_attach_stale_dataset_operations_to_later_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            replay_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "fold_id": "fold_2016-01_2016-06",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 180,
+                        "available_feed_acquisition_count": 180,
+                        "missing_feed_acquisition_count": 0,
+                        "pre_replay_target_refs": ["AAPL"],
+                        "target_refs": ["AAPL"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "replay_window_manifest.csv").write_text(
+                "contract_id,replay_mode,start_date,end_date,min_trading_days,candidate_policy_ref,replay_route_ref,market_condition_tags,selection_metric_refs\n"
+                "promotion_replay_candidate_policy,candidate_policy_replay,2021-01-01,2026-01-01,1255,candidate,route,tags,metrics\n",
+                encoding="utf-8",
+            )
+            (replay_root / "feed_acquisition_plan.csv").write_text(
+                "contract_id,source_id,month,coverage_status\n"
+                "promotion_replay_candidate_policy,alpaca_bars,2025-12,available\n"
+                "promotion_replay_candidate_policy,gdelt_news,2025-12,available\n"
+                "promotion_replay_candidate_policy,trading_economics_calendar_web,2025-12,available\n",
+                encoding="utf-8",
+            )
+
+            tasks = _model_group_replay_timeline_tasks(
+                storage_root=tmp / "storage" / "02_control_plane",
+                generated_at_utc="2026-06-11T15:45:00Z",
+                starting_sequence=0,
+                selected_target_symbol="AAPL",
+                training_start_month="2016-07",
+                training_end_month="2016-12",
+                pre_replay_complete=False,
+                use_lifecycle_artifacts=False,
+            )
+
+        replay_task = next(task for task in tasks if task["task_id"] == "model_group.replay")
+        self.assertEqual(replay_task["task_state"], "future")
+        self.assertEqual(replay_task["status"], "blocked")
+        self.assertEqual(replay_task["detail"]["blockers"], ["fold_models_01_06_model_generation_complete"])
+        self.assertNotIn("replay_month_operation", replay_task["detail"])
+        self.assertNotIn("Replay month 2025-12 is incomplete", replay_task["reason"])
+        self.assertIn("Waiting for pre-replay Layer 1-9 model generation", replay_task["reason"])
 
     def test_ready_model_group_replay_becomes_active_after_pre_replay_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
