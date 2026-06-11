@@ -1411,6 +1411,7 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
     known_nonprogress_reasons = {
         "waiting_for_next_training_fold_to_complete",
         "model_group_lifecycle_holds_fold_lane",
+        "model_group_layer_10_event_evidence_missing",
         "model_group_residual_event_evidence_missing",
         "model_group_m06_event_evidence_missing",
     }

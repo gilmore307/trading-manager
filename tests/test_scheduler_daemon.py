@@ -309,6 +309,7 @@ class SchedulerDaemonTests(unittest.TestCase):
 
     def test_scheduler_progress_stall_ignores_event_evidence_waits(self):
         for reason_code in (
+            "model_group_layer_10_event_evidence_missing",
             "model_group_residual_event_evidence_missing",
             "model_group_m06_event_evidence_missing",
         ):
