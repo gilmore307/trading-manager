@@ -1004,6 +1004,61 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.fold_id, "fold_2016-01_2016-06")
         self.assertEqual(selection.reason_code, "resume_open_model_worker_fold")
 
+    def test_completed_model_generation_splits_close_fold_even_with_failed_prep_stage(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            state_path = model_worker_fold_state_path(
+                "2016-01",
+                "2016-06",
+                root=storage_root / "runtime",
+                selected_target_symbol="AAPL",
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                state_path=state_path,
+                completed_stage_ids=all_stage_ids,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+            for stage in payload["stages"]:
+                if stage["stage_id"] == "model_02_target_state.feature_generation":
+                    stage["status"] = "failed"
+                    stage["last_reason"] = "stage progress stalled for timeout_seconds=600"
+                    break
+            state_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+            selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            blocked = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                default_end_month="2016-01",
+                max_month="2016-12",
+            )
+
+        self.assertIsNone(selection)
+        self.assertEqual(blocked.reason_code, "model_group_lifecycle_holds_fold_lane")
+        self.assertEqual(blocked.blocked_fold_state_path, str(state_path))
+
     def test_model_worker_open_fold_waits_for_monthly_foundation_after_layer_two_reset(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"

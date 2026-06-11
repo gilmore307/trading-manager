@@ -504,6 +504,13 @@ def _workflow_payload_all_stages_complete(payload: dict[str, Any]) -> bool:
     return bool(statuses) and all(status in {"succeeded", "not_applicable"} for status in statuses)
 
 
+def _workflow_payload_pre_replay_complete(payload: dict[str, Any]) -> bool:
+    """Return whether the fold has enough model evidence to enter replay lifecycle."""
+
+    stages = payload.get("stages")
+    return isinstance(stages, list) and base_stack_model_generation_splits_complete(stages)
+
+
 def _workflow_payload_missing_model_generation_splits(payload: dict[str, Any]) -> bool:
     stages = payload.get("stages")
     if not isinstance(stages, list) or not stages:
@@ -682,7 +689,7 @@ def _completed_pre_replay_fold_states(
             )
             if path != expected_path:
                 continue
-        if not _workflow_payload_all_stages_complete(payload):
+        if not _workflow_payload_pre_replay_complete(payload):
             continue
         paths.append((start_month, end_month, path))
     return tuple(path for _start_month, _end_month, path in sorted(paths))
@@ -748,6 +755,8 @@ def _is_model_worker_routable_stage(stage: dict[str, Any]) -> bool:
 
 
 def _fold_payload_has_open_model_worker_stage(payload: dict[str, Any]) -> bool:
+    if _workflow_payload_pre_replay_complete(payload):
+        return False
     if _workflow_payload_missing_model_generation_splits(payload):
         return True
     stages = payload.get("stages")
