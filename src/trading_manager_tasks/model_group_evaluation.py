@@ -76,7 +76,13 @@ def run_model_group_evaluation_if_ready(
     """Run one model-group evaluation build when M06 evidence is complete."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
-    replay_receipt_path, replay_receipt = _latest_replay_execution_receipt(dataset_root)
+    training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
+    if training_fold is None:
+        return None
+    replay_receipt_path, replay_receipt = _latest_replay_execution_receipt(
+        dataset_root,
+        training_fold=training_fold,
+    )
     if replay_receipt_path is None or replay_receipt is None:
         return None
     decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
@@ -90,9 +96,6 @@ def run_model_group_evaluation_if_ready(
         return None
     event_focus_proposals_path = Path(str(attribution_receipt.get("event_focus_proposals_ref") or ""))
     if not event_focus_proposals_path.exists():
-        return None
-    training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
-    if training_fold is None:
         return None
     replay_scope_status = _replay_receipt_scope_status(replay_receipt=replay_receipt, training_fold=training_fold)
     if not replay_scope_status["compatible"]:
@@ -2091,6 +2094,8 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     target_refs = _string_set(replay_receipt.get("pre_replay_target_refs") or replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
     receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "").strip()
     training_fold_id = str(training_fold.get("fold_id") or "").strip()
+    receipt_fold_window = _candidate_model_ref_fold_window(candidate_model_ref)
+    training_fold_window = _training_fold_window(training_fold)
     if "current_deterministic_crypto_policy" in candidate_model_ref:
         return {
             "compatible": False,
@@ -2105,12 +2110,32 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
             "candidate_model_ref": candidate_model_ref,
             "receipt_target_refs": sorted(target_refs),
         }
+    if receipt_fold_window and training_fold_window and receipt_fold_window != training_fold_window:
+        return {
+            "compatible": False,
+            "reason": (
+                f"replay receipt fold {receipt_fold_window} does not match completed training fold {training_fold_window}"
+            ),
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+        }
     return {
         "compatible": True,
         "reason": "replay receipt is eligible for fold-bound execution-component-graph replay evaluation",
         "candidate_model_ref": candidate_model_ref,
         "receipt_target_refs": sorted(target_refs),
     }
+
+
+def _candidate_model_ref_fold_window(candidate_model_ref: str) -> str | None:
+    match = re.search(r"(\d{4}-\d{2}_\d{4}-\d{2})(?:$|[^0-9-])", candidate_model_ref)
+    return match.group(1) if match else None
+
+
+def _training_fold_window(training_fold: Mapping[str, Any]) -> str | None:
+    start_month = str(training_fold.get("start_month") or "").strip()
+    end_month = str(training_fold.get("end_month") or "").strip()
+    return f"{start_month}_{end_month}" if start_month and end_month else None
 
 
 def _string_set(value: Any) -> set[str]:
@@ -2122,9 +2147,36 @@ def _string_set(value: Any) -> set[str]:
     return set()
 
 
-def _latest_replay_execution_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
+def _latest_replay_execution_receipt(
+    dataset_root: Path,
+    *,
+    training_fold: Mapping[str, Any] | None = None,
+) -> tuple[Path | None, dict[str, Any] | None]:
     replay_root = dataset_root / "replay_execution_runs"
-    return _latest_receipt(replay_root, "replay_execution_receipt.json", accepted_statuses=None)
+    receipt_path, receipt = _latest_receipt(
+        replay_root,
+        "replay_execution_receipt.json",
+        accepted_statuses=None,
+        predicate=(
+            (lambda candidate: _replay_receipt_scope_status(replay_receipt=candidate, training_fold=training_fold)["compatible"])
+            if training_fold is not None
+            else None
+        ),
+    )
+    if receipt_path is not None or training_fold is None:
+        return receipt_path, receipt
+
+    latest_path, latest_receipt = _latest_receipt(replay_root, "replay_execution_receipt.json", accepted_statuses=None)
+    if latest_path is None or latest_receipt is None:
+        return None, None
+    minimum_mtime = _state_mtime(training_fold)
+    if minimum_mtime is not None:
+        try:
+            if latest_path.stat().st_mtime < minimum_mtime:
+                return None, None
+        except OSError:
+            return None, None
+    return latest_path, latest_receipt
 
 
 def _latest_attribution_receipt(dataset_root: Path, *, decision_rows_ref: str) -> tuple[Path | None, dict[str, Any] | None]:

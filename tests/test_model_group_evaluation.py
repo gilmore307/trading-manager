@@ -70,6 +70,38 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _write_completed_fold_two(self, storage_root: Path) -> None:
+        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-07_2016-12.json"
+        state_path.parent.mkdir(parents=True)
+        stages = []
+        for layer in range(1, 7):
+            for split_name in ("train", "validation", "test"):
+                stages.append(
+                    {
+                        "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                        "stage_type": "model_generation",
+                        "layer": layer,
+                        "layer_key": f"layer_{layer:02d}_fixture",
+                        "status": "succeeded",
+                        "dataset_split": {
+                            "split_name": split_name,
+                            "split_policy": "chronological_rolling_fold_4_1_1",
+                        },
+                    }
+                )
+        state_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "manager_model_training_workflow_state",
+                    "start_month": "2016-07",
+                    "end_month": "2016-12",
+                    "stages": stages,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     def test_temporal_stability_publishes_monthly_return_path_ohlc(self):
         diagnostics = _temporal_stability_diagnostics(
             [
@@ -433,6 +465,18 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
             self.assertIn("deterministic crypto placeholder", decision.reason)
+
+    def test_stale_prior_fold_replay_receipt_does_not_unlock_evaluation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_ready_replay_and_attribution(storage_root)
+            self._write_completed_fold_two(storage_root)
+
+            decision = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
+
+            self.assertIsNone(decision)
 
     def test_replay_receipt_base_context_without_training_symbol_unlocks_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
