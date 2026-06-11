@@ -485,6 +485,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("event_sql_inputs", event_sql_inputs["applies_to"])
         self.assertIn("no provider calls", event_sql_inputs["note"])
 
+        event_row_coverage = rows["M06_EVENT_FEED_IN_WINDOW_ROW_COVERAGE"]
+        self.assertEqual(event_row_coverage["payload"], "m06_event_feed_in_window_row_coverage")
+        event_source_gate = rows["M06_EVENT_SOURCE_COVERAGE_GATE"]
+        self.assertEqual(event_source_gate["payload"], "m06_event_source_coverage_gate")
+
         event_sql_field = rows["EVENT_FEED_SQL_INPUTS"]
         self.assertEqual(event_sql_field["kind"], "field")
         self.assertEqual(event_sql_field["payload"], "event_feed_sql_inputs")
@@ -1244,8 +1249,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR"]["payload"], "alpha_confidence_vector")
         self.assertEqual(rows["BASE_ALPHA_VECTOR"]["payload"], "base_alpha_vector")
         self.assertEqual(rows["EVENT_FAILURE_RISK_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
-        self.assertIn("frozen_layer_10_focus_pool_contract_allowed", rows["EVENT_FAILURE_RISK_BOUNDARY_POLICY"]["payload"])
-        self.assertIn("no_layer_10_event_parameter_mutation", rows["EVENT_FAILURE_RISK_BOUNDARY_POLICY"]["payload"])
+        self.assertIn("frozen_m06_focus_pool_contract_allowed", rows["EVENT_FAILURE_RISK_BOUNDARY_POLICY"]["payload"])
+        self.assertIn("no_m06_event_parameter_mutation", rows["EVENT_FAILURE_RISK_BOUNDARY_POLICY"]["payload"])
         self.assertIn(
             "4_event_response_strength_score_<horizon>",
             rows["EVENT_FAILURE_RISK_VECTOR_SCORE_FAMILIES"]["payload"],
@@ -3062,6 +3067,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("forward_holdout", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
         self.assertIn("ready_signal", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
         self.assertIn("zero_provider_calls", rows["EXECUTION_REALTIME_COVERAGE_GAP_POLICY"]["payload"])
+        self.assertIn("m06_event_adapter_review_required", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
         self.assertIn("layer_07_broker_account_route_deferred", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
         self.assertIn("layer_09_thetadata_terminal_required", rows["EXECUTION_REALTIME_LAYER_GAP_SUMMARY"]["payload"])
 
