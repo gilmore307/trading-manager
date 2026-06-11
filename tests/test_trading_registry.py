@@ -999,11 +999,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EXECUTION_INTAKE_SNAPSHOT"]["payload"], "execution_intake_snapshot")
         self.assertIn("does not allocate risk budget", rows["EXECUTION_INTAKE_SNAPSHOT"]["note"])
         self.assertEqual(rows["ENTRY_DECISION"]["payload"], "entry_decision")
-        self.assertIn("does not call M05 or M06", rows["ENTRY_DECISION"]["note"])
+        self.assertIn("C02 consumes M03/M04 plus optional M06 residual governance", rows["ENTRY_DECISION"]["note"])
         self.assertEqual(rows["POSITION_LIFECYCLE_DECISION"]["payload"], "position_lifecycle_decision")
+        self.assertIn("C03 is M04/M06-driven", rows["POSITION_LIFECYCLE_DECISION"]["note"])
         self.assertEqual(rows["OPTION_REEXPRESSION_DECISION"]["payload"], "option_reexpression_decision")
         self.assertEqual(rows["FAILURE_EXPLANATION_PACKET"]["payload"], "failure_explanation_packet")
-        self.assertIn("Layer 4 feedback candidates", rows["FAILURE_EXPLANATION_PACKET"]["note"])
+        self.assertIn("residual event feedback candidates", rows["FAILURE_EXPLANATION_PACKET"]["note"])
         self.assertEqual(rows["EXECUTION_ORDER_INTENT"]["payload"], "execution_order_intent")
         self.assertEqual(rows["SIMULATED_FILL_EVENT"]["payload"], "simulated_fill_event")
 
@@ -3051,18 +3052,15 @@ class RegistryHelperTests(unittest.TestCase):
         )
         realtime_coverage = rows["EXECUTION_REALTIME_INPUT_COVERAGE_MATRIX"]["applies_to"]
         for model_id in (
-            "model_01_market_regime",
-            "model_02_sector_context",
-            "model_03_target_state_vector",
-            "model_04_event_failure_risk",
-            "model_05_alpha_confidence",
-            "model_06_dynamic_risk_policy",
-            "model_07_position_projection",
-            "model_08_underlying_action",
+            "model_01_background_context",
+            "model_02_target_state",
+            "model_03_event_state",
+            "model_04_unified_decision",
             "model_05_option_expression",
             "model_06_residual_event_governance",
         ):
             self.assertIn(model_id, realtime_coverage)
+        self.assertNotIn("model_08_underlying_action", realtime_coverage)
         self.assertEqual(rows["REALTIME_CAPTURE_CONTRACT"]["payload"], "realtime_capture_contract")
         self.assertIn("forward_holdout", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
         self.assertIn("ready_signal", rows["REALTIME_CAPTURE_CONTRACT"]["applies_to"])
