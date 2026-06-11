@@ -587,6 +587,20 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
                 "Superseded by the current Terminal REST option-source acquisition contract."
             )
             updated_rows.append(updated)
+        elif (
+            str(row.get("handling_status") or "") != "closed"
+            and str(row.get("source_component") or "") == "trading-manager.historical_scheduler_daemon"
+            and "scheduler daemon lock is active" in text.lower()
+            and "active run_automation_scheduler_daemon.py process" in text.lower()
+        ):
+            updated = dict(row)
+            updated["repair_status"] = "no_action_needed"
+            updated["handling_status"] = "closed"
+            updated["dashboard_severity"] = "notice"
+            updated["retry_recommendation"] = (
+                "Closed as expected one-shot scheduler concurrency: the managed historical scheduler daemon already held the lock."
+            )
+            updated_rows.append(updated)
         else:
             updated_rows.append(row)
     return updated_rows

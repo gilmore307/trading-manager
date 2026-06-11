@@ -182,6 +182,30 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(updated[0]["handling_status"], "closed")
         self.assertEqual(updated[0]["dashboard_severity"], "notice")
 
+    def test_closes_scheduler_lock_conflict_when_managed_daemon_is_active(self):
+        rows = [
+            {
+                "error_ref": "ERR-000039",
+                "error_kind": "RuntimeError",
+                "source_component": "trading-manager.historical_scheduler_daemon",
+                "repair_status": "blocked",
+                "handling_status": "open",
+                "dashboard_severity": "error",
+                "root_cause": (
+                    "The failed one-shot scheduler invocation attempted to acquire historical_scheduler.lock while an "
+                    "existing historical scheduler daemon was already running. The lock file records pid 123, and process "
+                    "inspection confirmed that pid is an active run_automation_scheduler_daemon.py process."
+                ),
+                "summary": "historical scheduler daemon failed: scheduler daemon lock is active",
+            }
+        ]
+
+        updated = _mark_superseded_agent_errors(rows, [])
+
+        self.assertEqual(updated[0]["repair_status"], "no_action_needed")
+        self.assertEqual(updated[0]["handling_status"], "closed")
+        self.assertEqual(updated[0]["dashboard_severity"], "notice")
+
     def test_agent_error_summary_filters_foreign_absolute_artifact_paths(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
