@@ -32,6 +32,8 @@ def is_current_option_chain_request(row: Mapping[str, Any], *, start_month: str,
     request_id = str(row.get("request_id") or "")
     if not request_id.startswith("mgrreq_option_chain_window_"):
         return False
+    if not request_id.endswith("_0930"):
+        return False
     parameter_ref = str(row.get("parameter_ref") or "")
     current_prefix = f"storage://trading-manager/runtime/model_05_option_expression/{OPTION_CHAIN_SOURCE_ID}/"
     months = tuple(_iter_months(start_month, end_month))

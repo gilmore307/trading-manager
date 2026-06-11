@@ -74,6 +74,28 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertTrue(is_current_option_chain_request(current, start_month="2021-01", end_month="2021-06"))
         self.assertFalse(is_current_option_chain_request(stale_end_month, start_month="2021-01", end_month="2021-06"))
 
+    def test_current_request_matching_excludes_intraday_or_after_close_windows(self) -> None:
+        current = {
+            "request_id": "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_0930",
+            "request_kind": "option_chain_snapshot",
+            "target_component_id": "option_chain_state_source",
+            "parameter_ref": "storage://trading-manager/runtime/model_05_option_expression/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_0930/task_key.json",
+        }
+        stale_intraday = {
+            **current,
+            "request_id": "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1600",
+            "parameter_ref": "storage://trading-manager/runtime/model_05_option_expression/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1600/task_key.json",
+        }
+        stale_after_close = {
+            **current,
+            "request_id": "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700",
+            "parameter_ref": "storage://trading-manager/runtime/model_05_option_expression/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700/task_key.json",
+        }
+
+        self.assertTrue(is_current_option_chain_request(current, start_month="2021-01", end_month="2021-06"))
+        self.assertFalse(is_current_option_chain_request(stale_intraday, start_month="2021-01", end_month="2021-06"))
+        self.assertFalse(is_current_option_chain_request(stale_after_close, start_month="2021-01", end_month="2021-06"))
+
     def test_replay_decision_requests_regular_session_day_window(self) -> None:
         previews = request_previews_for_replay_decision_times(
             target_symbol="AAPL",

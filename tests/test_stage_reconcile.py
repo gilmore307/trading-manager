@@ -424,6 +424,59 @@ class StageReconcileTests(unittest.TestCase):
         self.assertEqual([ref.request_id for ref in refs], [current_request_id])
         self.assertEqual(failure_rows, ())
 
+    def test_option_chain_reconcile_ignores_stale_after_close_model_five_requests(self) -> None:
+        current_request_id = "mgrreq_option_chain_window_aapl_2021_06_2021_06_14_0930"
+        stale_request_id = "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700"
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            manager_root = root / "manager"
+            component_root = root / "data"
+            current_ref = _write_option_chain_task(
+                manager_root,
+                component_root,
+                model_layer="model_05_option_expression",
+                request_id=current_request_id,
+            )
+            stale_ref = _write_option_chain_task(
+                manager_root,
+                component_root,
+                model_layer="model_05_option_expression",
+                request_id=stale_request_id,
+                status="failed",
+            )
+            rows = [
+                {
+                    "request_id": stale_request_id,
+                    "request_kind": "option_chain_snapshot",
+                    "target_component_id": "option_chain_state_source",
+                    "parameter_ref": stale_ref,
+                },
+                {
+                    "request_id": current_request_id,
+                    "request_kind": "option_chain_snapshot",
+                    "target_component_id": "option_chain_state_source",
+                    "parameter_ref": current_ref,
+                },
+            ]
+
+            with patch("trading_manager_tasks.stage_reconcile.fetch_manager_requests", return_value=rows):
+                refs = discover_stage_receipts(
+                    stage_id="model_05_option_expression.option_chain_data_acquisition",
+                    start_month="2021-01",
+                    end_month="2021-06",
+                    component_storage_root=component_root,
+                    manager_storage_root=manager_root,
+                )
+                failure_rows = propose_failure_register_rows(
+                    refs,
+                    stage_id="model_05_option_expression.option_chain_data_acquisition",
+                    start_month="2021-01",
+                    end_month="2021-06",
+                )
+
+        self.assertEqual([ref.request_id for ref in refs], [current_request_id])
+        self.assertEqual(failure_rows, ())
+
     def test_reconcile_can_write_failure_proposal_without_accepting_failure(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch(
             "trading_manager_tasks.stage_reconcile.collect_stage_coverage",
