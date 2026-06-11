@@ -1408,10 +1408,14 @@ def _scheduler_waiting_for_future_fold(state: SchedulerDaemonState) -> bool:
 
 
 def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonState) -> bool:
-    return state.last_work_selection_reason in {
+    known_nonprogress_reasons = {
         "waiting_for_next_training_fold_to_complete",
         "model_group_lifecycle_holds_fold_lane",
+        "model_group_layer_10_event_evidence_missing",
+        "model_group_residual_event_evidence_missing",
+        "model_group_m06_event_evidence_missing",
     }
+    return state.last_work_selection_reason in known_nonprogress_reasons or state.last_reason_code in known_nonprogress_reasons
 
 
 def handle_scheduler_progress_stall(

@@ -307,6 +307,36 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertIsNone(updated.last_stall_agent_error_ref)
         handler.assert_not_called()
 
+    def test_scheduler_progress_stall_ignores_event_evidence_waits(self):
+        for reason_code in (
+            "model_group_layer_10_event_evidence_missing",
+            "model_group_residual_event_evidence_missing",
+            "model_group_m06_event_evidence_missing",
+        ):
+            with self.subTest(reason_code=reason_code):
+                state = SchedulerDaemonState(
+                    start_month="2021-01",
+                    end_month="2025-12",
+                    last_decision_status="backoff",
+                    last_reason_code=reason_code,
+                    last_work_selection_reason="model_group_post_replay_attribution_ready",
+                    last_progress_utc="2026-01-01T00:00:00+00:00",
+                )
+                with tempfile.TemporaryDirectory() as raw_tmp, patch(
+                    "trading_manager_tasks.scheduler_daemon.handle_server_error"
+                ) as handler:
+                    tmp = Path(raw_tmp)
+                    updated = handle_scheduler_progress_stall(
+                        state,
+                        storage_root=tmp / "storage",
+                        state_path=tmp / "runtime" / "state.json",
+                        decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                        stall_seconds=600,
+                    )
+
+                self.assertIsNone(updated.last_stall_agent_error_ref)
+                handler.assert_not_called()
+
     def test_replay_option_feature_failure_routes_server_error_agent(self):
         decision = SchedulerDecision(
             contract_type="manager_scheduler_decision",
