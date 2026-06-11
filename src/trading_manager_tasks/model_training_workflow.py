@@ -242,7 +242,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "target_state_full_minute_coverage",
         "candidate_axis": "target_symbol;six_month_window;target_candidate_id",
         "candidate_progression_policy": "materialize anonymous target-state samples for every eligible minute; evaluation and promotion must aggregate by fold and candidate-universe policy batch",
-        "data_surface": "target-local source artifacts, accepted target-context mappings, m03_target_state_vector_data_acquisition, and m03_target_state_vector_feature_generation as migration-source input",
+        "data_surface": "target-local source artifacts, accepted target-context mappings, model_03_target_state_vector_data_acquisition, and model_03_target_state_vector_feature_generation as migration-source input",
         "feature_cli": "trading-data-m03-target-state-vector-feature-generation",
     },
     {
@@ -276,7 +276,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "conditional_option_expression_after_underlying_intent",
         "candidate_axis": "target_symbol;six_month_window;minute_timestamp;option_contract_bucket",
         "candidate_progression_policy": "train option-expression and explicit no-option/not-applicable states after M04 direct-underlying intent exists; live/replay invocation remains conditional",
-        "data_surface": "m05_option_expression_feature_generation migration-source rows derived from shared option_chain_state_source after M04 intent",
+        "data_surface": "model_05_option_expression_feature_generation migration-source rows derived from shared option_chain_state_source after M04 intent",
         "feature_cli": "trading-data-m05-option-expression-feature-generation",
     },
     {

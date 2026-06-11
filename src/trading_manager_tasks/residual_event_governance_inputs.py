@@ -1,6 +1,6 @@
 """Safe M06 event-risk input materialization.
 
-This module builds ``m06_residual_event_governance_data_acquisition`` rows only from already-saved local
+This module builds ``model_06_residual_event_governance_data_acquisition`` SQL rows only from already-saved local
 Layer 2 bar SQL receipts. It may run the trading-data equity abnormal activity
 source-detector, but it performs no provider calls, no model activation, no
 broker execution, and no storage lifecycle mutation.
@@ -637,7 +637,7 @@ def write_summary(summary: ResidualEventGovernanceInputMaterialization, *, outpu
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize M06 m06_residual_event_governance_data_acquisition rows from local reviewed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize M06 model_06_residual_event_governance_data_acquisition SQL rows from local reviewed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

@@ -105,21 +105,83 @@ def run_model_group_replay_if_ready(
     resolved_python = python_executable or _python_executable()
     after_cost_alpha_model_path = _after_cost_alpha_model_path(storage_root=storage_root, training_fold=training_fold)
     if not after_cost_alpha_model_path.exists():
-        return _decision(
-            now=now,
-            decision_status="backoff",
-            reason_code="model_group_replay_after_cost_alpha_model_missing",
-            reason="fold-scoped after-cost alpha model artifact is required for replay Layer 5 inference",
-            selected_work="model_group.replay",
-            command=[],
-            execution_summary={
-                "contract_id": contract_id,
-                "dataset_root": str(dataset_root),
-                "training_fold": training_fold,
-                "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
-                "required_next_step": "train or restore the fold-scoped after-cost alpha model artifact before replay",
-            },
+        alpha_training_command = _after_cost_alpha_training_command(
+            python_executable=resolved_python,
+            model_repo_root=model_repo_root,
+            storage_root=storage_root,
+            training_fold=training_fold,
+            output_path=after_cost_alpha_model_path,
         )
+        if execute:
+            training_env = dict(os.environ)
+            if option_feature_database_url and not training_env.get("OPENCLAW_DATABASE_URL"):
+                training_env["OPENCLAW_DATABASE_URL"] = option_feature_database_url
+            training_env["PYTHONPATH"] = os.pathsep.join(
+                [
+                    str(model_repo_root / "src"),
+                    training_env.get("PYTHONPATH", ""),
+                ]
+            ).rstrip(os.pathsep)
+            try:
+                subprocess.run(
+                    alpha_training_command,
+                    cwd=model_repo_root,
+                    env=training_env,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as exc:
+                runner_error = (exc.stderr or exc.stdout or str(exc)).strip()
+                return _decision(
+                    now=now,
+                    decision_status="backoff",
+                    reason_code="model_group_replay_after_cost_alpha_model_training_failed",
+                    reason=runner_error,
+                    selected_work="model_group.replay",
+                    command=alpha_training_command,
+                    execution_summary={
+                        "contract_id": contract_id,
+                        "dataset_root": str(dataset_root),
+                        "training_fold": training_fold,
+                        "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+                        "runner_returncode": exc.returncode,
+                        "runner_stdout": exc.stdout,
+                        "runner_stderr": exc.stderr,
+                        "required_next_step": "repair the fold-scoped after-cost alpha training inputs, then retry model_group.replay",
+                    },
+                )
+        if not after_cost_alpha_model_path.exists():
+            reason_code = (
+                "model_group_replay_after_cost_alpha_model_training_required"
+                if not execute
+                else "model_group_replay_after_cost_alpha_model_missing"
+            )
+            reason = (
+                "fold-scoped after-cost alpha model artifact training is ready"
+                if not execute
+                else "fold-scoped after-cost alpha model artifact is required for replay Layer 5 inference"
+            )
+            required_next_step = (
+                "run the fold-scoped after-cost alpha training command before replay"
+                if not execute
+                else "train or restore the fold-scoped after-cost alpha model artifact before replay"
+            )
+            return _decision(
+                now=now,
+                decision_status="backoff",
+                reason_code=reason_code,
+                reason=reason,
+                selected_work="model_group.replay",
+                command=alpha_training_command,
+                execution_summary={
+                    "contract_id": contract_id,
+                    "dataset_root": str(dataset_root),
+                    "training_fold": training_fold,
+                    "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+                    "required_next_step": required_next_step,
+                },
+            )
     replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
     resolved_candidate_universe_path = candidate_universe_path or _historical_candidate_universe_path(storage_root)
     fixed_candidate_universe_symbols = _fixed_historical_candidate_symbols(resolved_candidate_universe_path)
@@ -422,6 +484,49 @@ def _after_cost_alpha_model_path(*, storage_root: Path, training_fold: Mapping[s
     end_month = str(training_fold.get("end_month") or "").strip()
     filename = f"after_cost_alpha_model_{target_symbol}_{start_month}_{end_month}.json"
     return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / filename
+
+
+def _after_cost_alpha_training_command(
+    *,
+    python_executable: str,
+    model_repo_root: Path,
+    storage_root: Path,
+    training_fold: Mapping[str, Any],
+    output_path: Path,
+) -> list[str]:
+    source_start, source_end = _after_cost_alpha_training_bounds(training_fold)
+    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        python_executable,
+        str(model_repo_root / "scripts" / "models" / "model_05_alpha_confidence" / "train_model_05_alpha_confidence.py"),
+        "--from-database",
+        "--all-horizons",
+        "--source-start",
+        source_start,
+        "--source-end",
+        source_end,
+        "--output-json",
+        str(output_path),
+    ]
+    if target_symbol:
+        command.extend(["--target-symbol", target_symbol])
+    return command
+
+
+def _after_cost_alpha_training_bounds(training_fold: Mapping[str, Any]) -> tuple[str, str]:
+    start_month = str(training_fold.get("start_month") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}", start_month):
+        raise ValueError("training fold start_month must be YYYY-MM")
+    source_end_month = _add_months(start_month, 4)
+    return f"{start_month}-01T00:00:00-05:00", f"{source_end_month}-01T00:00:00-05:00"
+
+
+def _add_months(month: str, count: int) -> str:
+    year = int(month[:4])
+    month_number = int(month[5:7])
+    total = year * 12 + (month_number - 1) + count
+    return f"{total // 12:04d}-{total % 12 + 1:02d}"
 
 
 def _validated_initial_capital_usd(value: float) -> float:

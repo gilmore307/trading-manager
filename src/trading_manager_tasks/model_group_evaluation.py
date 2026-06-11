@@ -2169,6 +2169,9 @@ def _latest_replay_execution_receipt(
     latest_path, latest_receipt = _latest_receipt(replay_root, "replay_execution_receipt.json", accepted_statuses=None)
     if latest_path is None or latest_receipt is None:
         return None, None
+    latest_scope_status = _replay_receipt_scope_status(replay_receipt=latest_receipt, training_fold=training_fold)
+    if "does not match completed training fold" in str(latest_scope_status.get("reason") or ""):
+        return None, None
     minimum_mtime = _state_mtime(training_fold)
     if minimum_mtime is not None:
         try:

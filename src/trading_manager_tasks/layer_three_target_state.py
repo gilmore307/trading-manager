@@ -1,7 +1,7 @@
 """Safe Layer 3 target-state input materialization.
 
 This module turns already-approved target-local Alpaca bar receipts into the local
-``m03_target_state_vector_data_acquisition`` input surface. It performs no provider calls; it only
+``model_03_target_state_vector_data_acquisition`` SQL input surface. It performs no provider calls; it only
 reads completed feed receipts, writes a compact task key/evidence bundle, and delegates
 SQL-backed normalization to ``trading-data``'s source_03 runner.
 """
@@ -449,7 +449,7 @@ def write_summary(summary: LayerThreeTargetStateMaterialization, *, output: Text
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize Layer 3 m03_target_state_vector_data_acquisition rows from existing target-local feed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize Layer 3 model_03_target_state_vector_data_acquisition SQL rows from existing target-local feed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
