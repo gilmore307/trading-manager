@@ -87,6 +87,7 @@ class SchedulerTests(unittest.TestCase):
     def test_regular_trading_day_excludes_weekends_and_market_holidays(self):
         self.assertFalse(is_regular_us_equity_trading_day(datetime(2026, 5, 10, tzinfo=UTC).date()))
         self.assertFalse(is_regular_us_equity_trading_day(datetime(2026, 1, 1, tzinfo=UTC).date()))
+        self.assertFalse(is_regular_us_equity_trading_day(datetime(2018, 12, 5, tzinfo=UTC).date()))
         self.assertTrue(is_regular_us_equity_trading_day(datetime(2026, 5, 11, tzinfo=UTC).date()))
 
     def test_resource_gate_reserves_live_capacity(self):

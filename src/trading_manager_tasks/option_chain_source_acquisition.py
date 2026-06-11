@@ -50,6 +50,9 @@ OPTION_CHAIN_PROVIDER_CONTROLS = {
 }
 DEFAULT_THETADATA_TRANSPORT = "python_library"
 ET = ZoneInfo("America/New_York")
+AD_HOC_US_EQUITY_MARKET_CLOSURES = {
+    date(2018, 12, 5),  # National day of mourning for President George H. W. Bush.
+}
 
 
 @dataclass(frozen=True)
@@ -196,6 +199,7 @@ def us_equity_market_holidays(year: int) -> set[date]:
     }
     if year >= 2022:
         holidays.add(_observed_fixed_holiday(year, 6, 19))
+    holidays.update(day for day in AD_HOC_US_EQUITY_MARKET_CLOSURES if day.year == year)
     return holidays
 
 

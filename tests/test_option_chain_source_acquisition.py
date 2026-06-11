@@ -25,6 +25,12 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertEqual(previews[-1].request_id, "mgrreq_option_chain_window_aapl_2016_01_2016_01_29_0930")
         self.assertEqual(previews[-1].window_end, "2016-01-29T16:00:00-05:00")
 
+    def test_preparation_excludes_ad_hoc_us_equity_closures(self) -> None:
+        previews = request_previews_for_fold(start_month="2018-12", end_month="2018-12", target_symbol="AAPL")
+
+        request_ids = {preview.request_id for preview in previews}
+        self.assertNotIn("mgrreq_option_chain_window_aapl_2018_12_2018_12_05_0930", request_ids)
+
     def test_manager_controls_use_provider_supported_time_window(self) -> None:
         review = build_option_chain_source_review(start_month="2016-01", end_month="2016-01", target_symbol="AAPL")
         request = manager_requests_from_review(review)[0]

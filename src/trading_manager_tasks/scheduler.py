@@ -55,6 +55,9 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_locks import acquire_scheduler_lock, month_stage_lock_ref, scheduler_lock_plan
 
 NEW_YORK = ZoneInfo("America/New_York")
+AD_HOC_US_EQUITY_MARKET_CLOSURES = {
+    date(2018, 12, 5),  # National day of mourning for President George H. W. Bush.
+}
 PROTECTION_START = time(9, 20)
 PROTECTION_END = time(16, 10)
 DEFAULT_MIN_AVAILABLE_MEMORY_MB = 2048
@@ -203,6 +206,7 @@ def us_equity_market_holidays(year: int) -> set[date]:
     }
     if year >= 2022:
         holidays.add(_observed_fixed_holiday(year, 6, 19))
+    holidays.update(day for day in AD_HOC_US_EQUITY_MARKET_CLOSURES if day.year == year)
     return holidays
 
 

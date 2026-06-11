@@ -10,6 +10,7 @@ from trading_manager_tasks.stage_coverage import StageCoverageReport
 from trading_manager_tasks.stage_reconcile import (
     classify_provider_failure,
     discover_stage_receipts,
+    exclude_accepted_failure_rows,
     propose_failure_register_rows,
     reconcile_provider_stage,
 )
@@ -223,6 +224,25 @@ class StageReconcileTests(unittest.TestCase):
         self.assertEqual(rows[0]["failure_status"], "retry_required")
         self.assertEqual(rows[0]["failure_kind"], "provider_service_unavailable")
         self.assertIn("automatic retry", rows[0]["note"])
+
+    def test_accepted_failure_rows_do_not_reopen_reconcile_proposals(self) -> None:
+        row = {
+            "request_id": "mgrreq_option_chain_window_aapl_2018_07_2018_12_05_0930",
+            "failure_status": "auto_repair_required",
+        }
+
+        with patch(
+            "trading_manager_tasks.stage_reconcile.accepted_failure_request_ids_from_register",
+            return_value=((row["request_id"],), ("server_error_repair:ERR-000040",)),
+        ):
+            rows = exclude_accepted_failure_rows(
+                [row],
+                stage_id="model_05_option_expression.option_chain_data_acquisition",
+                start_month="2018-07",
+                end_month="2018-12",
+            )
+
+        self.assertEqual(rows, ())
 
     def test_provider_html_status_errors_generate_retry_required_proposals(self) -> None:
         status, kind, note = classify_provider_failure(

@@ -19,6 +19,7 @@ from typing import Any, Iterable, Mapping, Sequence, TextIO
 from .control_plane import CompletionReceiptRows, TaskSystemError, _error_summary, _receipt_runs, _status, fetch_manager_requests, normalize_completion_receipt, persist_completion_rows
 from .agent_error_handler import handle_server_error
 from .failure_register import (
+    accepted_failure_request_ids_from_register,
     mark_failure_register_requests_corrected,
     persist_failure_register_rows,
     validate_failure_register_row,
@@ -325,6 +326,26 @@ def write_failure_proposals(rows: Sequence[Mapping[str, Any]], path: Path) -> No
             handle.write(json.dumps(dict(row), sort_keys=True) + "\n")
 
 
+def exclude_accepted_failure_rows(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    stage_id: str,
+    start_month: str,
+    end_month: str,
+    database_url: str | None = None,
+) -> tuple[dict[str, Any], ...]:
+    accepted_request_ids, _refs = accepted_failure_request_ids_from_register(
+        database_url=database_url,
+        stage_id=stage_id,
+        start_month=start_month,
+        end_month=end_month,
+    )
+    accepted = set(accepted_request_ids)
+    if not accepted:
+        return tuple(dict(row) for row in rows)
+    return tuple(dict(row) for row in rows if str(row.get("request_id") or "") not in accepted)
+
+
 def _stage_failure_agent_request_id(
     *,
     stage_id: str,
@@ -455,7 +476,13 @@ def _reconcile_provider_stage_unlocked(
     rows = normalize_stage_receipts(refs)
     if persist_control_plane:
         persist_completion_rows(rows, database_url=database_url)
-    failure_rows = propose_failure_register_rows(refs, stage_id=stage_id, start_month=start_month, end_month=end_month)
+    failure_rows = exclude_accepted_failure_rows(
+        propose_failure_register_rows(refs, stage_id=stage_id, start_month=start_month, end_month=end_month),
+        stage_id=stage_id,
+        start_month=start_month,
+        end_month=end_month,
+        database_url=database_url,
+    )
     auto_repair_failure_rows = tuple(
         row for row in failure_rows if str(row.get("failure_status") or "") == "auto_repair_required"
     )
