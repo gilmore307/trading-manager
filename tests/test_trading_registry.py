@@ -1399,6 +1399,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("M06:residual_event_governance_model:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
         self.assertEqual(rows["CURRENT_MODEL_CHAIN_RECEIPT"]["payload"], "current_model_chain_receipt")
         self.assertIn("activation_allowed=false", rows["CURRENT_MODEL_CHAIN_RECEIPT"]["note"])
+        self.assertEqual(rows["CURRENT_MODEL_HISTORICAL_EVALUATION_ARTIFACT"]["payload"], "current_model_historical_evaluation_artifact")
+        self.assertEqual(rows["CURRENT_MODEL_HISTORICAL_EVALUATION_RECEIPT"]["payload"], "current_model_historical_evaluation_receipt")
+        self.assertIn("baseline_training_enabled_by_default", rows["CURRENT_MODEL_HISTORICAL_EVALUATION_DEFAULTS"]["payload"])
+        self.assertIn("migration_source_current_chain_payload", rows["CURRENT_MODEL_HISTORICAL_EVALUATION_DATA_KEYS"]["payload"])
+        self.assertEqual(rows["CURRENT_SIX_MODEL_CHAIN"]["payload"], "current_six_model_chain")
         self.assertEqual(
             rows["CURRENT_MODEL_CHAIN_MODEL_ORDER"]["payload"],
             "model_01_background_context;model_02_target_state;model_03_event_state;model_04_unified_decision;model_05_option_expression;model_06_residual_event_governance",
@@ -1411,6 +1416,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("review_target_state_vector_production_substrate.py", rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["path"])
         expected_layer_script_paths = {
             "CURRENT_MODEL_CHAIN_RUN": "scripts/models/run_current_model_chain.py",
+            "CURRENT_MODEL_HISTORICAL_EVALUATION_RUN": "scripts/models/run_current_model_historical_evaluation.py",
             "MODEL_10_EVENT_RISK_GOVERNOR_GENERATE": "scripts/models/model_10_event_risk_governor/generate_model_10_event_risk_governor.py",
             "MODEL_10_EVENT_RISK_GOVERNOR_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_10_event_risk_governor/evaluate_model_10_event_risk_governor.py",
             "MODEL_10_EVENT_RISK_GOVERNOR_REVIEW_PROMOTION": "scripts/models/model_10_event_risk_governor/review_event_risk_governor_promotion.py",
