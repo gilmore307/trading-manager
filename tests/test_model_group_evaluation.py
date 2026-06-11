@@ -42,7 +42,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True)
         stages = []
-        for layer in range(1, 10):
+        for layer in range(1, 7):
             for split_name in ("train", "validation", "test"):
                 stages.append(
                     {
@@ -109,8 +109,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "action": "trade" if positive else "skip",
                     "decision_status": "approved" if positive else "rejected",
                     "fill_status": "simulated_filled" if positive else "simulated_rejected",
-                    "8_resolved_action_side": "long" if positive else "flat",
-                    "8_resolved_underlying_action_type": "open_long" if positive else "no_trade",
+                    "resolved_action_side": "long" if positive else "flat",
+                    "4_resolved_underlying_action_type": "open_long" if positive else "no_trade",
                     "feature_momentum_7d": 0.8 if positive else -0.3,
                     "feature_momentum_30d": 0.6 if positive else -0.2,
                     "feature_volume_rank_30d": (index % 5) / 5,

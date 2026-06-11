@@ -889,7 +889,6 @@ def _decision_intended_side(row: Mapping[str, Any]) -> str:
         row,
         "decision_intended_side",
         "intended_side",
-        "8_resolved_action_side",
         "resolved_action_side",
         "position_side",
         "action_side",
@@ -899,7 +898,7 @@ def _decision_intended_side(row: Mapping[str, Any]) -> str:
         return normalized
     action_type = _first_text(
         row,
-        "8_resolved_underlying_action_type",
+        "4_resolved_underlying_action_type",
         "resolved_underlying_action_type",
         "planned_underlying_action_type",
         "decision_intended_action",
@@ -926,7 +925,7 @@ def _decision_intended_action(row: Mapping[str, Any]) -> str:
     value = _first_text(
         row,
         "decision_intended_action",
-        "8_resolved_underlying_action_type",
+        "4_resolved_underlying_action_type",
         "resolved_underlying_action_type",
         "planned_underlying_action_type",
         "decision_action",

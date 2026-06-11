@@ -31,7 +31,7 @@ class SchedulerLocksTest(unittest.TestCase):
             month_stage_lock_ref("2016-01", "layer_01_market_regime.data_acquisition"),
             provider_partition_lock_ref("2016-01", "layer_01_market_regime.data_acquisition", "alpaca", "SPY"),
             reconcile_lock_ref("2016-01", "layer_01_market_regime.data_acquisition"),
-            promotion_lock_ref("model_05_alpha_confidence", "candidate_001"),
+            promotion_lock_ref("model_05_option_expression", "candidate_001"),
         ]
         for ref in refs:
             validate(instance=ref.summary_row(), schema=SCHEMA)
@@ -71,12 +71,12 @@ class SchedulerLocksTest(unittest.TestCase):
         self.assertIn(str(DEFAULT_STORAGE_ROOT / "runtime" / "locks" / "provider" / "2016-01"), spy.lock_path)
 
     def test_promotion_lock_uses_model_and_candidate_identity(self) -> None:
-        ref = promotion_lock_ref("model_05_alpha_confidence", "trading-model://promotion-candidates/candidate one")
+        ref = promotion_lock_ref("model_05_option_expression", "trading-model://promotion-candidates/candidate one")
         self.assertEqual(
             ref.lock_key,
-            "lock:promotion:model_05_alpha_confidence:trading-model://promotion-candidates/candidate one",
+            "lock:promotion:model_05_option_expression:trading-model://promotion-candidates/candidate one",
         )
-        self.assertIn("model_05_alpha_confidence", ref.lock_path)
+        self.assertIn("model_05_option_expression", ref.lock_path)
         self.assertIn("trading-model_promotion-candidates_candidate_one.lock", ref.lock_path)
 
     def test_lock_token_is_filesystem_safe_and_readable(self) -> None:

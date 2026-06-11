@@ -15,7 +15,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True)
         stages = []
-        for layer in range(1, 10):
+        for layer in range(1, 7):
             for split_name in ("train", "validation", "test"):
                 stages.append(
                     {
@@ -47,8 +47,8 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             storage_root.parent
             / "03_model_artifacts"
             / "runtime"
-            / "model_05_alpha_confidence"
-            / "after_cost_alpha_model_aapl_2016-01_2016-06.json"
+            / "model_05_option_expression"
+            / "option_expression_model_aapl_2016-01_2016-06.json"
         )
         artifact_path.parent.mkdir(parents=True)
         artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")

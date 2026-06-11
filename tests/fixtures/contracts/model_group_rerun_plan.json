@@ -2,13 +2,13 @@
   "plan_id": "mgr_rerun_plan_example_001",
   "contract_type": "model_group_rerun_plan",
   "rerun_id": "model_group_rerun_2016_fold1_aapl_architecture_contract_change",
-  "reason": "Layer 5 model_generation contract changed; downstream model group outputs must be rebuilt.",
+  "reason": "M05 option-expression model_generation contract changed; downstream model group outputs must be rebuilt.",
   "created_at_utc": "2026-06-02T04:30:00Z",
   "dry_run": true,
   "change_origin": {
     "layer_id": 5,
     "stage": "model_generation",
-    "description": "Alpha confidence output schema and scoring contract changed."
+    "description": "Option-expression output schema and scoring contract changed."
   },
   "affected_scope": {
     "fold_id": "2016-fold1",
@@ -26,7 +26,7 @@
   "delete_set": [
     {
       "artifact_class": "model_output",
-      "ref": "postgres://trading_model.m05_alpha_confidence_model_generation?target=AAPL&start=2016-01&end=2016-06",
+      "ref": "postgres://trading_model.model_05_option_expression_model_generation?target=AAPL&start=2016-01&end=2016-06",
       "delete_reason": "Earliest affected model_generation stage changed.",
       "requires_storage_lifecycle_review": false
     },
@@ -74,9 +74,9 @@
     "origin_ref": "mgr_rerun_plan_example_001",
     "origin_rerun_id": "model_group_rerun_2016_fold1_aapl_architecture_contract_change",
     "requested_action": "classify_rerun_invalidated_artifacts",
-    "reason": "Layer 5 model_generation contract changed; downstream model group outputs must be rebuilt.",
+    "reason": "M05 option-expression model_generation contract changed; downstream model group outputs must be rebuilt.",
     "candidate_refs": [
-      "postgres://trading_model.m05_alpha_confidence_model_generation?target=AAPL&start=2016-01&end=2016-06",
+      "postgres://trading_model.model_05_option_expression_model_generation?target=AAPL&start=2016-01&end=2016-06",
       "storage://02_control_plane/runtime/model_training_workflow_state_2016-01.json#layer_05_plus"
     ],
     "protected_refs": [

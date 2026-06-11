@@ -37,8 +37,8 @@ class TaskProgressTests(unittest.TestCase):
             write_task_progress_node(
                 progress_root=progress_root,
                 worker_id="model_worker_1",
-                task_uid="2016-01..2016-06:layer_05_alpha_confidence.model_generation",
-                stage_id="layer_05_alpha_confidence.model_generation",
+                task_uid="2016-01..2016-06:model_05_option_expression.model_generation",
+                stage_id="model_05_option_expression.model_generation",
                 status="running",
                 unit_label="model job",
                 node_id="stage_started",
@@ -47,7 +47,7 @@ class TaskProgressTests(unittest.TestCase):
 
             payloads = load_active_task_progress(progress_root)
 
-        progress = payloads["2016-01..2016-06:layer_05_alpha_confidence.model_generation"]
+        progress = payloads["2016-01..2016-06:model_05_option_expression.model_generation"]
         self.assertEqual(progress["expected_count"], 1)
         self.assertEqual(progress["ready_count"], 0)
         self.assertEqual(progress["pending_count"], 1)
@@ -60,14 +60,14 @@ class TaskProgressTests(unittest.TestCase):
             env = {
                 "TRADING_MANAGER_TASK_PROGRESS_ROOT": str(progress_root),
                 "TRADING_MANAGER_TASK_PROGRESS_WORKER_ID": "model_worker_1",
-                "TRADING_MANAGER_TASK_PROGRESS_TASK_UID": "2016-01..2016-06:layer_05_alpha_confidence.model_generation.validation",
-                "TRADING_MANAGER_TASK_PROGRESS_STAGE_ID": "layer_05_alpha_confidence.model_generation.validation",
+                "TRADING_MANAGER_TASK_PROGRESS_TASK_UID": "2016-01..2016-06:model_05_option_expression.model_generation.validation",
+                "TRADING_MANAGER_TASK_PROGRESS_STAGE_ID": "model_05_option_expression.model_generation.validation",
             }
 
             write_task_progress_from_env(processed_count=1, expected_count=1, env=env)
             payloads = load_active_task_progress(progress_root)
 
-        progress = payloads["2016-01..2016-06:layer_05_alpha_confidence.model_generation.validation"]
+        progress = payloads["2016-01..2016-06:model_05_option_expression.model_generation.validation"]
         self.assertEqual(progress["unit_label"], "dataset months")
         self.assertEqual(progress["expected_count"], 1)
         self.assertEqual(progress["ready_count"], 1)

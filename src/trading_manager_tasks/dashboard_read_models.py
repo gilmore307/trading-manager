@@ -2374,12 +2374,6 @@ def _instrument_scope_for_task(layer: object) -> str:
         return "option_expression_or_underlying_fallback"
     if layer_number == 6:
         return "residual_event_governance"
-    if layer_number == 7:
-        return "target_underlying_evidence"
-    if layer_number == 8:
-        return "underlying_action_plan"
-    if layer_number == 9:
-        return "option_expression_or_underlying_fallback"
     return "not_applicable"
 
 
@@ -2498,7 +2492,7 @@ def _is_presentable_task_stage(raw_stage: Mapping[str, Any]) -> bool:
         layer = int(raw_stage.get("layer"))
     except (TypeError, ValueError):
         layer = 0
-    if layer in {5, 6, 7} and stage_type in {"data_acquisition", "feature_generation"}:
+    if layer in {5, 6} and stage_type in {"data_acquisition", "feature_generation"}:
         return False
     return True
 

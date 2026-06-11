@@ -1515,10 +1515,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_08_underlying_action.model_task",
+                                "stage_id": "model_06_residual_event_governance.model_task",
                                 "stage_type": "model_task",
-                                "layer": 8,
-                                "layer_key": "layer_08_underlying_action",
+                                "layer": 6,
+                                "layer_key": "model_06_residual_event_governance",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "target_symbol_six_month",
@@ -1563,12 +1563,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         tasks = payload["chart_payload"]["task_timeline"]
         layer_one = next(task for task in tasks if task["layer"] == 1)
-        layer_eight = next(task for task in tasks if task["layer"] == 8)
+        model_six = next(task for task in tasks if task["layer"] == 6)
         model_five = next(task for task in tasks if task["task_id"] == "model_05_option_expression")
         self.assertEqual(layer_one["target_scope"], "market_context_panel")
         self.assertEqual(layer_one["instrument_scope"], "market_context_proxy_panel")
-        self.assertEqual(layer_eight["target_scope"], "target_symbol")
-        self.assertEqual(layer_eight["instrument_scope"], "underlying_action_plan")
+        self.assertEqual(model_six["target_scope"], "target_symbol")
+        self.assertEqual(model_six["instrument_scope"], "residual_event_governance")
         self.assertEqual(model_five["instrument_scope"], "option_expression_or_underlying_fallback")
         self.assertEqual(payload["chart_payload"]["target_queue"]["enabled_targets"], ["AAPL", "NVDA"])
 
@@ -2471,10 +2471,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_08_underlying_action.model_generation.test",
+                                "stage_id": "model_05_option_expression.model_generation.test",
                                 "stage_type": "model_generation",
-                                "layer": 8,
-                                "layer_key": "layer_08_underlying_action",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "target_symbol_six_month",
@@ -3972,30 +3972,30 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2019-04",
                         "stages": [
                             {
-                                "stage_id": "layer_05_alpha_confidence.data_acquisition",
+                                "stage_id": "model_06_residual_event_governance.data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 5,
-                                "layer_key": "layer_05_alpha_confidence",
+                                "layer": 6,
+                                "layer_key": "model_06_residual_event_governance",
                                 "status": "not_applicable",
                             },
                             {
-                                "stage_id": "layer_05_alpha_confidence.feature_generation",
+                                "stage_id": "model_06_residual_event_governance.feature_generation",
                                 "stage_type": "feature_generation",
-                                "layer": 5,
-                                "layer_key": "layer_05_alpha_confidence",
-                                "status": "succeeded",
+                                "layer": 6,
+                                "layer_key": "model_06_residual_event_governance",
+                                "status": "not_applicable",
                             },
                             {
-                                "stage_id": "layer_05_alpha_confidence.model_generation",
+                                "stage_id": "model_06_residual_event_governance.model_generation",
                                 "stage_type": "model_generation",
-                                "layer": 5,
-                                "layer_key": "layer_05_alpha_confidence",
+                                "layer": 6,
+                                "layer_key": "model_06_residual_event_governance",
                                 "status": "blocked",
                             },
                             {
                                 "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 8,
+                                "layer": 5,
                                 "layer_key": "layer_03_target_state_vector",
                                 "status": "not_applicable",
                                 "last_reason": "no M05 training-eligible underlying minutes ready for option-expression acquisition",
@@ -4023,9 +4023,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task_timeline = payload["chart_payload"]["task_timeline"]
         self.assertFalse(
-            any(task["layer"] == 5 and task["stage_type"] in {"data_acquisition", "feature_generation"} for task in task_timeline)
+            any(task["layer"] == 6 and task["stage_type"] in {"data_acquisition", "feature_generation"} for task in task_timeline)
         )
-        self.assertFalse(any(task["layer"] == 5 and task["stage_type"] == "model_task" for task in task_timeline))
+        self.assertFalse(any(task["layer"] == 6 and task["stage_type"] == "model_task" for task in task_timeline))
         real_skip = next(task for task in task_timeline if task["task_id"] == "layer_03_target_state_vector")
         self.assertEqual(real_skip["task_state"], "skipped")
         self.assertIn("no M05 training-eligible", real_skip["reason"])
