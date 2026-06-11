@@ -1698,7 +1698,7 @@ def _events_from_m06_sql(params: Mapping[str, Any], *, source_ref: str) -> list[
         clauses.append("available_time < %s")
         values.append(params["end"])
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
-    statement = f"SELECT {', '.join(M06_SQL_EVENT_FIELDS)} FROM trading_data.m06_residual_event_governance_data_acquisition{where} ORDER BY available_time, event_id"
+    statement = f"SELECT {', '.join(M06_SQL_EVENT_FIELDS)} FROM trading_data.model_06_residual_event_governance_data_acquisition{where} ORDER BY available_time, event_id"
     try:
         import psycopg  # type: ignore
         from psycopg.rows import dict_row  # type: ignore

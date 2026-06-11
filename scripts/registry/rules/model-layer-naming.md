@@ -60,8 +60,8 @@ trading_data.m03_target_state_vector_feature_generation
 trading_data.option_chain_state_source
 trading_data.m05_option_expression_feature_generation
 trading_data.m05_option_expression_data_acquisition_contract_path
-trading_data.m06_residual_event_governance_data_acquisition
-trading_data.m06_residual_event_governance_feature_generation
+trading_data.model_06_residual_event_governance_data_acquisition
+trading_data.model_06_residual_event_governance_feature_generation
 ```
 
 The table prefix is not automatic proof of business authority. The registered row and accepted boundary decide ownership.

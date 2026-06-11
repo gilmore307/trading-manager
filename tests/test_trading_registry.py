@@ -490,7 +490,7 @@ class RegistryHelperTests(unittest.TestCase):
         event_sql_field = rows["EVENT_FEED_SQL_INPUTS"]
         self.assertEqual(event_sql_field["kind"], "field")
         self.assertEqual(event_sql_field["payload"], "event_feed_sql_inputs")
-        self.assertIn("m06_residual_event_governance_data_acquisition", event_sql_field["applies_to"])
+        self.assertIn("model_06_residual_event_governance_data_acquisition", event_sql_field["applies_to"])
 
         zero_sql_status = rows["M06_DETECTOR_STATUS_SKIPPED_ZERO_SQL_BAR_ROWS"]
         self.assertEqual(zero_sql_status["kind"], "status_value")
@@ -869,6 +869,8 @@ class RegistryHelperTests(unittest.TestCase):
             "M01_MARKET_REGIME_DATA_ACQUISITION_TABLE": "trading_data.m01_market_regime_data_acquisition",
             "M01_MARKET_REGIME_FEATURE_GENERATION_TABLE": "trading_data.m01_market_regime_feature_generation",
             "M05_OPTION_EXPRESSION_CONTRACT_PATH_TABLE": "trading_data.m05_option_expression_data_acquisition_contract_path",
+            "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_DATA_ACQUISITION_TABLE": "trading_data.model_06_residual_event_governance_data_acquisition",
+            "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_FEATURE_GENERATION_TABLE": "trading_data.model_06_residual_event_governance_feature_generation",
             "MODEL_01_BACKGROUND_CONTEXT_TABLE": "trading_model.model_01_background_context",
             "MODEL_01_BACKGROUND_CONTEXT_EXPLAINABILITY_TABLE": "trading_model.model_01_background_context_explainability",
             "MODEL_01_BACKGROUND_CONTEXT_DIAGNOSTICS_TABLE": "trading_model.model_01_background_context_diagnostics",
@@ -1739,16 +1741,16 @@ class RegistryHelperTests(unittest.TestCase):
             "QUOTE_AVG_ASK_SIZE": ("field", "avg_ask_size", "m03_target_state_vector_data_acquisition"),
             "QUOTE_SPREAD_BPS": ("field", "spread_bps", "m03_target_state_vector_data_acquisition"),
             "SNAPSHOT_TYPE": ("classification_field", "snapshot_type", "m05_option_expression_feature_generation"),
-            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "m06_residual_event_governance_data_acquisition"),
-            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "m06_residual_event_governance_data_acquisition"),
-            "SCOPE_TYPE": ("classification_field", "scope_type", "m06_residual_event_governance_data_acquisition"),
-            "REFERENCE_TYPE": ("classification_field", "reference_type", "m06_residual_event_governance_data_acquisition"),
-            "EVENT_REFERENCE": ("path_field", "reference", "m06_residual_event_governance_data_acquisition"),
-            "EVENT_CANONICAL_EVENT_ID": ("identity_field", "canonical_event_id", "m06_residual_event_governance_data_acquisition"),
-            "EVENT_DEDUP_STATUS": ("classification_field", "dedup_status", "m06_residual_event_governance_data_acquisition"),
-            "EVENT_SOURCE_PRIORITY": ("field", "source_priority", "m06_residual_event_governance_data_acquisition"),
-            "EVENT_COVERAGE_REASON": ("text_field", "coverage_reason", "m06_residual_event_governance_data_acquisition"),
-            "EVENT_COVERED_BY_EVENT_ID": ("identity_field", "covered_by_event_id", "m06_residual_event_governance_data_acquisition"),
+            "INFORMATION_ROLE_TYPE": ("classification_field", "information_role_type", "model_06_residual_event_governance_data_acquisition"),
+            "EVENT_CATEGORY_TYPE": ("classification_field", "event_category_type", "model_06_residual_event_governance_data_acquisition"),
+            "SCOPE_TYPE": ("classification_field", "scope_type", "model_06_residual_event_governance_data_acquisition"),
+            "REFERENCE_TYPE": ("classification_field", "reference_type", "model_06_residual_event_governance_data_acquisition"),
+            "EVENT_REFERENCE": ("path_field", "reference", "model_06_residual_event_governance_data_acquisition"),
+            "EVENT_CANONICAL_EVENT_ID": ("identity_field", "canonical_event_id", "model_06_residual_event_governance_data_acquisition"),
+            "EVENT_DEDUP_STATUS": ("classification_field", "dedup_status", "model_06_residual_event_governance_data_acquisition"),
+            "EVENT_SOURCE_PRIORITY": ("field", "source_priority", "model_06_residual_event_governance_data_acquisition"),
+            "EVENT_COVERAGE_REASON": ("text_field", "coverage_reason", "model_06_residual_event_governance_data_acquisition"),
+            "EVENT_COVERED_BY_EVENT_ID": ("identity_field", "covered_by_event_id", "model_06_residual_event_governance_data_acquisition"),
             "QUOTE_BID_EXCHANGE": ("field", "bid_exchange", "option_chain_state_source"),
             "QUOTE_ASK_EXCHANGE": ("field", "ask_exchange", "option_chain_state_source"),
             "QUOTE_BID_CONDITION": ("field", "bid_condition", "option_chain_state_source"),
@@ -1764,7 +1766,7 @@ class RegistryHelperTests(unittest.TestCase):
         for key in ["ETF_SYMBOL", "ETF_HOLDING_SYMBOL", "SECTOR_TYPE"]:
             self.assertIn("m02_sector_context_data_acquisition", rows[key]["applies_to"])
         for key in ["EVENT_ID", "EVENT_TIME", "TITLE", "SOURCE_NAME"]:
-            self.assertIn("m06_residual_event_governance_data_acquisition", rows[key]["applies_to"])
+            self.assertIn("model_06_residual_event_governance_data_acquisition", rows[key]["applies_to"])
         self.assertNotIn("OPTION_CONTRACT_COUNT", rows)
         self.assertNotIn("OPTION_CONTRACTS", rows)
         self.assertNotIn("QUOTE_TIMESTAMP", rows)
@@ -1814,7 +1816,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("m01_market_regime_data_acquisition", data_features["M02_SECTOR_CONTEXT_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("model_03_target_state_vector", data_features["M03_TARGET_STATE_VECTOR_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("target_state_vector_model", data_features["M03_TARGET_STATE_VECTOR_FEATURE_GENERATION"]["applies_to"])
-        self.assertIn("m06_residual_event_governance_data_acquisition", data_features["M06_RESIDUAL_EVENT_GOVERNANCE_FEATURE_GENERATION"]["applies_to"])
+        self.assertIn("model_06_residual_event_governance_data_acquisition", data_features["M06_RESIDUAL_EVENT_GOVERNANCE_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("event_risk_governor", data_features["M06_RESIDUAL_EVENT_GOVERNANCE_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("option_chain_state_source", data_features["M05_OPTION_EXPRESSION_FEATURE_GENERATION"]["applies_to"])
         self.assertIn("option_expression_model", data_features["M05_OPTION_EXPRESSION_FEATURE_GENERATION"]["applies_to"])
