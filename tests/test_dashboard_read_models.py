@@ -175,7 +175,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         proposals_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "model_10_event_risk_governor_event_focus_proposal",
+                    "contract_type": "model_06_residual_event_governance_event_focus_proposal",
                     "event_focus_proposal_id": "focus_fixture",
                     "proposal_status": "watch_candidate",
                     "event_ref": "event_fixture",
@@ -189,7 +189,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         receipt_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "post_replay_layer_10_event_attribution_receipt",
+                    "contract_type": "post_replay_residual_event_governance_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-22T12:49:00Z",
                     "event_evidence_consumed": True,
@@ -751,7 +751,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [task["task_id"] for task in evaluation_tasks],
             [
                 "model_group.replay",
-                "model_group.model_10_event_risk_governor",
+                "model_group.model_06_residual_event_governance",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -759,7 +759,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertEqual(
             [task["stage_type"] for task in evaluation_tasks],
-            ["replay", "model_10_event_risk_governor", "model_evaluation", "promotion_review", "maintenance"],
+            ["replay", "model_06_residual_event_governance", "model_evaluation", "promotion_review", "maintenance"],
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
@@ -824,7 +824,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [task["task_id"] for task in model_group_tasks],
             [
                 "model_group.replay",
-                "model_group.model_10_event_risk_governor",
+                "model_group.model_06_residual_event_governance",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -1031,7 +1031,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["detail"]["blockers"], ["replay_dataset_scope_matches_training_fold"])
         self.assertIn("does not match completed training fold", replay_task["reason"])
 
-    def test_replay_completion_surfaces_layer_ten_ready_despite_internal_lifecycle_hold(self):
+    def test_replay_completion_surfaces_residual_event_governance_ready_despite_internal_lifecycle_hold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -1128,24 +1128,24 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(status.current_stage, "model_group.replay")
         self.assertEqual(status.blocked_reason, "waiting_for_model_group_lifecycle_tasks")
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
-        layer_ten_task = next(
+        residual_event_governance_task = next(
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if task["task_id"] == "model_group.model_10_event_risk_governor"
+            if task["task_id"] == "model_group.model_06_residual_event_governance"
         )
         self.assertEqual(replay_task["status"], "succeeded")
         self.assertEqual(replay_task["task_state"], "completed")
-        self.assertEqual(layer_ten_task["status"], "ready")
-        self.assertEqual(layer_ten_task["task_state"], "current")
-        self.assertEqual(layer_ten_task["detail"]["progress"]["unit_label"], "failure attributions")
-        self.assertEqual(layer_ten_task["detail"]["progress"]["expected_count"], 2)
-        self.assertEqual(layer_ten_task["detail"]["progress"]["ready_count"], 0)
-        self.assertEqual(layer_ten_task["detail"]["progress"]["pending_count"], 2)
-        self.assertEqual(layer_ten_task["detail"]["progress"]["progress_source"], "replay_failure_attribution_units")
-        self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.model_10_event_risk_governor")
+        self.assertEqual(residual_event_governance_task["status"], "ready")
+        self.assertEqual(residual_event_governance_task["task_state"], "current")
+        self.assertEqual(residual_event_governance_task["detail"]["progress"]["unit_label"], "failure attributions")
+        self.assertEqual(residual_event_governance_task["detail"]["progress"]["expected_count"], 2)
+        self.assertEqual(residual_event_governance_task["detail"]["progress"]["ready_count"], 0)
+        self.assertEqual(residual_event_governance_task["detail"]["progress"]["pending_count"], 2)
+        self.assertEqual(residual_event_governance_task["detail"]["progress"]["progress_source"], "replay_failure_attribution_units")
+        self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.model_06_residual_event_governance")
         self.assertEqual(payload["chart_payload"]["blocker_category"], None)
         self.assertEqual(payload["status"], "running")
-        self.assertIn("Layer 10 Event Risk Governor", payload["summary"])
+        self.assertIn("M06 Residual Event Governance", payload["summary"])
         self.assertNotIn("blocked at model_group.replay", payload["summary"])
         self.assertFalse(
             any(ref.get("issue_id") == "model_group.replay" and ref.get("summary") == "waiting_for_model_group_lifecycle_tasks" for ref in payload["issue_refs"])
@@ -1245,7 +1245,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [task["task_id"] for task in lifecycle_tasks],
             [
                 "model_group.replay",
-                "model_group.model_10_event_risk_governor",
+                "model_group.model_06_residual_event_governance",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -1253,7 +1253,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertEqual(lifecycle_tasks[0]["status"], "blocked")
         self.assertIn("model_group.replay", {task["task_id"] for task in lifecycle_tasks})
-        self.assertNotEqual(payload["chart_payload"]["active_stage"], "model_group.model_10_event_risk_governor")
+        self.assertNotEqual(payload["chart_payload"]["active_stage"], "model_group.model_06_residual_event_governance")
 
     def test_data_acquisition_progress_aggregates_fold_source_month_requests(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -1881,8 +1881,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "status": "succeeded",
                         "created_at_utc": "2026-05-22T12:50:00Z",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
-                        "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
-                        "layer_10_event_focus_proposals_ref": str(event_focus_proposals_path),
+                        "residual_event_governance_receipt_ref": str(attribution_receipt_path),
+                        "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
                     }
                 )
                 + "\n",
@@ -2001,8 +2001,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "status": "succeeded",
                         "created_at_utc": "2026-05-22T12:50:00Z",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
-                        "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
-                        "layer_10_event_focus_proposals_ref": str(event_focus_proposals_path),
+                        "residual_event_governance_receipt_ref": str(attribution_receipt_path),
+                        "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
                     }
                 )
                 + "\n",
@@ -3069,7 +3069,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "review_type": "server_error_repair",
                 "error_ref": "ERR-000006",
                 "diagnosis_status": "repaired_verified",
-                "root_cause": "planner exposed layer_10_event_risk_governor.data_acquisition before event-feed coverage",
+                "root_cause": "planner exposed model_06_residual_event_governance.data_acquisition before event-feed coverage",
                 "repair": {"repair_status": "repaired", "files_changed": ["/repo/planner.py"]},
                 "retry_recommendation": "manual_review",
                 "blockers": ["reviewed event-feed artifacts are still missing"],
@@ -3110,7 +3110,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage layer_10_event_risk_governor.data_acquisition command returned non-zero status",
+                        "summary": "model training stage model_06_residual_event_governance.data_acquisition command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-21T12:01:49Z",
                         "created_at_utc": "2026-05-21T12:01:49Z",
@@ -3241,10 +3241,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_10_event_risk_governor.data_acquisition",
+                                "stage_id": "model_06_residual_event_governance.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 10,
-                                "layer_key": "layer_10_event_risk_governor",
+                                "layer_key": "model_06_residual_event_governance",
                                 "status": "blocked",
                                 "last_reason": "waiting for upstream_layer_08_model_evaluation_complete",
                                 "updated_utc": "2026-05-21T10:00:00Z",
@@ -3325,7 +3325,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["repair_status"], "superseded")
         self.assertEqual(agent_errors[0]["handling_status"], "closed")
         self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
-        self.assertIn("layer_10_event_risk_governor", agent_errors[0]["retry_recommendation"])
+        self.assertIn("model_06_residual_event_governance", agent_errors[0]["retry_recommendation"])
 
     def test_active_scheduler_no_executable_backoff_is_running_not_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3709,14 +3709,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [task["task_id"] for task in lifecycle_tasks],
             [
                 "model_group.replay",
-                "model_group.model_10_event_risk_governor",
+                "model_group.model_06_residual_event_governance",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
             ],
         )
         self.assertTrue(all(task["task_state"] == "blocked" for task in lifecycle_tasks))
-        self.assertEqual(lifecycle_tasks[0]["detail"]["blockers"], ["fold_layers_01_09_model_generation_complete"])
+        self.assertEqual(lifecycle_tasks[0]["detail"]["blockers"], ["fold_models_01_06_model_generation_complete"])
         fold_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
@@ -4241,12 +4241,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-12",
                         "stages": [
                             {
-                                "stage_id": "layer_10_event_risk_governor.model_generation",
+                                "stage_id": "model_06_residual_event_governance.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_10_event_risk_governor",
+                                "layer_key": "model_06_residual_event_governance",
                                 "status": "blocked",
-                                "last_reason": "waiting for layer_10_event_risk_governor.feature_or_input_ready",
+                                "last_reason": "waiting for model_06_residual_event_governance.feature_or_input_ready",
                             }
                         ],
                     }

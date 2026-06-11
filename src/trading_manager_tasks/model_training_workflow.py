@@ -159,7 +159,7 @@ class ModelTrainingWorkflowPlan:
     foundation_catch_up_only: bool = True
     foundation_catch_up_layers: tuple[int, ...] = FOUNDATION_CATCH_UP_LAYERS
     reusable_substrate_stage_types: tuple[str, ...] = FOUNDATION_CATCH_UP_STAGE_TYPES
-    post_model_generation_artifacts_policy: str = "supersede_and_rebuild_after_layer_01_02_historical_catch_up"
+    post_model_generation_artifacts_policy: str = "supersede_and_rebuild_after_model_01_03_historical_catch_up"
 
     def summary_row(self) -> dict[str, Any]:
         return {
@@ -585,7 +585,7 @@ def _upstream_model_ready_blockers(depends_on_layers: tuple[int, ...], *, founda
 
 
 def _event_feed_coverage_blockers(*, start_month: str, end_month: str, trading_storage_root: Path) -> tuple[str, ...]:
-    from .layer_ten_event_risk_governor import (
+    from .residual_event_governance_inputs import (
         _discover_event_feed_artifacts,
         _event_feed_row_coverage,
         _missing_event_feed_artifacts,

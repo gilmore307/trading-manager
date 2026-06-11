@@ -15,7 +15,7 @@ This file records the active numbering rule for manager-facing docs, scripts, an
 | 7 | PositionProjectionModel | `layer_07_position_projection`, `position_projection_model`, `model_07_position_projection` |
 | 8 | UnderlyingActionModel | `layer_08_underlying_action`, `underlying_action_model`, `model_08_underlying_action` |
 | 9 | OptionExpressionModel | `layer_09_option_expression`, `option_expression_model`, `model_09_option_expression` |
-| 10 | EventRiskGovernor | `layer_10_event_risk_governor`, `event_risk_governor`, `model_10_event_risk_governor` |
+| 10 | EventRiskGovernor | `model_06_residual_event_governance`, `event_risk_governor`, `model_06_residual_event_governance` |
 
 ## Rule
 

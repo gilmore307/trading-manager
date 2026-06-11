@@ -16,7 +16,7 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         self.assertEqual(row["contract_type"], "manager_event_model_regeneration_plan")
         self.assertEqual(row["fold_months"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
         self.assertIn("layer_01_market_regime_and_layer_02_sector_context_persistent_foundation_data", row["preserved_surfaces"])
-        self.assertIn("pre_replay_layer_10_data_or_feature_outputs", row["superseded_surfaces"])
+        self.assertIn("pre_replay_residual_event_governance_data_or_feature_outputs", row["superseded_surfaces"])
         self.assertIn("base-stack and replay outputs remain reusable", row["invalidation_scope"])
         self.assertFalse(row["write_performed"])
         self.assertFalse(row["model_activation_performed"])
@@ -35,9 +35,9 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         self.assertTrue(steps["09_revisit_storage_lifecycle_hold"]["requires_review_before_apply"])
         self.assertIn("materialize_layer_four_event_observation_inputs.py", steps["04_materialize_layer_4_event_observation_fold_pool"]["command_ref"])
         self.assertEqual(steps["05_run_concentrated_live_flow_replay"]["status"], "blocked_until_layer_4_event_observation_pool_ready")
-        self.assertEqual(steps["06_generate_post_replay_layer_10_attribution"]["status"], "blocked_until_model_group_replay_complete")
+        self.assertEqual(steps["06_generate_post_replay_residual_event_governance"]["status"], "blocked_until_model_group_replay_complete")
         self.assertIn("--model event_risk_governor", steps["07_evaluate_and_review_without_activation"]["command_ref"])
-        self.assertNotIn("--model model_10_event_risk_governor", steps["07_evaluate_and_review_without_activation"]["command_ref"])
+        self.assertNotIn("--model model_06_residual_event_governance", steps["07_evaluate_and_review_without_activation"]["command_ref"])
         self.assertEqual(steps["07_evaluate_and_review_without_activation"]["status"], "blocked_until_post_replay_event_attribution_ready")
 
     def test_writes_plan_file(self) -> None:

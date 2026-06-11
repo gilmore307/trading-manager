@@ -1,10 +1,10 @@
-"""Post-replay Layer 10 EventRiskGovernor attribution.
+"""Post-replay M06 ResidualEventGovernance attribution.
 
-This module is the real Layer 10 boundary between replay failure triage and
+This module is the real M06 boundary between replay failure triage and
 model-group evaluation. It consumes replay failure triage rows plus local
 point-in-time event observations or candidates, writes standardized event
 interpretation evidence, applies basic co-event/control/leakage checks, and
-emits a Layer 10 attribution receipt. It performs no provider calls, no broker
+emits a M06 attribution receipt. It performs no provider calls, no broker
 mutation, and no model activation.
 """
 
@@ -29,14 +29,14 @@ from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
 
 NEW_YORK = ZoneInfo("America/New_York")
-LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE = "post_replay_layer_10_event_attribution_receipt"
-LAYER_10_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_attribution_row"
-EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_focus_proposal"
-TEMPORAL_ATTENTION_CANDIDATE_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_temporal_attention_candidate"
-EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE = "model_10_event_risk_governor_event_family_occurrence_scan_row"
-EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_CONTRACT_TYPE = "model_10_event_risk_governor_event_family_bias_association_packet"
+RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE = "post_replay_residual_event_governance_receipt"
+RESIDUAL_EVENT_GOVERNANCE_ATTRIBUTION_ROW_CONTRACT_TYPE = "model_06_residual_event_governance_event_attribution_row"
+EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE = "model_06_residual_event_governance_event_focus_proposal"
+TEMPORAL_ATTENTION_CANDIDATE_ROW_CONTRACT_TYPE = "model_06_residual_event_governance_temporal_attention_candidate"
+EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE = "model_06_residual_event_governance_event_family_occurrence_scan_row"
+EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_CONTRACT_TYPE = "model_06_residual_event_governance_event_family_bias_association_packet"
 EVENT_STRATEGY_PROMOTION_REVIEW_CONTRACT_TYPE = "event_strategy_promotion_review"
-ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE = "model_10_event_risk_governor_temporal_attention_pool_entry"
+ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE = "model_06_residual_event_governance_temporal_attention_pool_entry"
 EVENT_INTERPRETATION_CONTRACT_TYPE = "event_interpretation"
 LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES = {"event_interpretation_v1"}
 COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
@@ -136,7 +136,7 @@ INSTANT_EVENT_TOKENS = {
 }
 EVENT_WINDOW_BEFORE = timedelta(days=3)
 EVENT_WINDOW_AFTER = timedelta(days=1)
-M10_SQL_EVENT_FIELDS = [
+M06_SQL_EVENT_FIELDS = [
     "event_id",
     "canonical_event_id",
     "dedup_status",
@@ -159,7 +159,7 @@ M10_SQL_EVENT_FIELDS = [
 ]
 
 
-def run_model_group_layer_ten_attribution_if_ready(
+def run_model_group_residual_event_governance_if_ready(
     *,
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     contract_id: str = DEFAULT_REPLAY_CONTRACT_ID,
@@ -174,7 +174,7 @@ def run_model_group_layer_ten_attribution_if_ready(
     codex_timeout_seconds: int = EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS,
     max_agent_review_packets: int = MAX_EVENT_STRATEGY_REVIEW_PACKETS,
 ) -> SchedulerDecision | None:
-    """Run Layer 10 attribution when replay triage and PIT event evidence exist."""
+    """Run M06 attribution when replay triage and PIT event evidence exist."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     triage_receipt_path, triage_receipt = _latest_failure_triage_receipt(dataset_root)
@@ -184,7 +184,7 @@ def run_model_group_layer_ten_attribution_if_ready(
     triage_rows_path = Path(str(triage_receipt.get("triage_rows_ref") or ""))
     if not decision_rows_ref or not triage_rows_path.exists():
         return None
-    if not force and _latest_layer_10_receipt(dataset_root, decision_rows_ref=decision_rows_ref) is not None:
+    if not force and _latest_residual_event_governance_receipt(dataset_root, decision_rows_ref=decision_rows_ref) is not None:
         return None
 
     triage_rows = tuple(_load_jsonl_objects(triage_rows_path))
@@ -193,7 +193,7 @@ def run_model_group_layer_ten_attribution_if_ready(
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     command = [
         python_executable,
-        "scripts/tasks/run_model_group_layer_ten_attribution.py",
+        "scripts/tasks/run_model_group_residual_event_governance.py",
         "--contract-id",
         contract_id,
         "--storage-root",
@@ -215,8 +215,8 @@ def run_model_group_layer_ten_attribution_if_ready(
         return _decision(
             now=now,
             decision_status="backoff",
-            reason_code="model_group_layer_10_event_evidence_missing",
-            reason="post-replay failure triage is ready, but Layer 10 has no local point-in-time event observations or candidates to attribute",
+            reason_code="model_group_residual_event_evidence_missing",
+            reason="post-replay failure triage is ready, but M06 has no local point-in-time event observations or candidates to attribute",
             command=command,
             execution_summary={
                 "contract_id": contract_id,
@@ -226,14 +226,14 @@ def run_model_group_layer_ten_attribution_if_ready(
                 "fold_scope": fold_scope,
                 "event_source_summary": event_source_summary,
                 "event_feed_backfill_preparation": event_feed_backfill_preparation,
-                "required_next_action": "materialize reviewed PIT event observations/candidates before Layer 10 attribution can complete",
+                "required_next_action": "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
             },
         )
 
     attribution_rows, control_report = _build_attribution_rows(triage_rows=triage_rows, event_candidates=event_candidates, created_at_utc=now.isoformat())
     event_focus_proposals = _build_event_focus_proposals(
         attribution_rows=attribution_rows,
-        layer_10_attribution_receipt_ref=None,
+        residual_event_governance_receipt_ref=None,
         attribution_rows_ref=None,
         event_interpretations_ref=None,
         event_summaries_by_ref=_event_summaries_by_ref(event_candidates),
@@ -250,8 +250,8 @@ def run_model_group_layer_ten_attribution_if_ready(
         return _decision(
             now=now,
             decision_status="ready",
-            reason_code="model_group_layer_10_event_attribution_ready",
-            reason="post-replay Layer 10 event attribution is ready to run over triaged failures and PIT event candidates",
+            reason_code="model_group_residual_event_governance_ready",
+            reason="post-replay M06 event attribution is ready to run over triaged failures and PIT event candidates",
             command=command,
             execution_summary={
                 "contract_id": contract_id,
@@ -268,9 +268,9 @@ def run_model_group_layer_ten_attribution_if_ready(
             },
         )
 
-    run_id = "post_replay_layer_10_event_attribution_" + now.strftime("%Y%m%dT%H%M%SZ")
+    run_id = "post_replay_residual_event_governance_" + now.strftime("%Y%m%dT%H%M%SZ")
     output_root = dataset_root / "post_replay_attribution_runs" / run_id
-    attribution_rows_path = output_root / "layer_10_event_attribution_rows.jsonl"
+    attribution_rows_path = output_root / "residual_event_governance_rows.jsonl"
     event_interpretations_path = output_root / "event_interpretations.jsonl"
     event_focus_proposals_path = output_root / "event_focus_proposals.jsonl"
     temporal_attention_candidates_path = output_root / "temporal_attention_candidate_pool.jsonl"
@@ -282,7 +282,7 @@ def run_model_group_layer_ten_attribution_if_ready(
     receipt_path = output_root / "post_replay_attribution_receipt.json"
     event_focus_proposals = _build_event_focus_proposals(
         attribution_rows=attribution_rows,
-        layer_10_attribution_receipt_ref=str(receipt_path),
+        residual_event_governance_receipt_ref=str(receipt_path),
         attribution_rows_ref=str(attribution_rows_path),
         event_interpretations_ref=str(event_interpretations_path),
         event_summaries_by_ref=_event_summaries_by_ref(event_candidates),
@@ -314,8 +314,8 @@ def run_model_group_layer_ten_attribution_if_ready(
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
         lock_scope="promotion",
-        lock_key=f"lock:model_group_layer_10_event_attribution:{contract_id}",
-        lock_path=str(storage_root / "runtime" / "locks" / "model_group" / f"{contract_id}.layer_10_event_attribution.lock"),
+        lock_key=f"lock:model_group_residual_event_governance:{contract_id}",
+        lock_path=str(storage_root / "runtime" / "locks" / "model_group" / f"{contract_id}.residual_event_governance.lock"),
         model_id="model_group",
         candidate_ref=contract_id,
     )
@@ -331,10 +331,10 @@ def run_model_group_layer_ten_attribution_if_ready(
         _write_jsonl(accepted_temporal_attention_pool_path, accepted_temporal_attention_pool_entries)
         control_report_path.write_text(json.dumps(control_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         receipt = {
-            "contract_type": LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE,
+            "contract_type": RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE,
             "status": "succeeded",
-            "stage_id": "model_group.layer_10_event_attribution",
-            "model_surface": "model_10_event_risk_governor",
+            "stage_id": "model_group.residual_event_governance",
+            "model_surface": "model_06_residual_event_governance",
             "run_id": run_id,
             "contract_id": contract_id,
             "created_at_utc": now.isoformat(),
@@ -383,13 +383,13 @@ def run_model_group_layer_ten_attribution_if_ready(
     return _decision(
         now=now,
         decision_status="executed",
-        reason_code="model_group_layer_10_event_attribution_executed",
-        reason="executed post-replay Layer 10 EventRiskGovernor attribution over triaged failures and PIT event candidates",
+        reason_code="model_group_residual_event_governance_executed",
+        reason="executed post-replay M06 ResidualEventGovernance attribution over triaged failures and PIT event candidates",
         command=command,
         execution_summary={
             "contract_id": contract_id,
             "dataset_root": str(dataset_root),
-            "post_replay_layer_10_event_attribution_receipt": str(receipt_path),
+            "post_replay_residual_event_governance_receipt": str(receipt_path),
             "attribution_rows_ref": str(attribution_rows_path),
             "event_interpretations_ref": str(event_interpretations_path),
             "event_focus_proposals_ref": str(event_focus_proposals_path),
@@ -428,23 +428,23 @@ def _decision(
         reason=reason,
         market_protection_active=False,
         resource_pressure_active=False,
-        selected_work="model_group.layer_10_event_attribution",
+        selected_work="model_group.residual_event_governance",
         command=command,
-        next_internal_stage="layer_10_event_attribution",
+        next_internal_stage="residual_event_governance",
         provider_calls=0,
         dispatch_performed=False,
         model_activation_performed=False,
         broker_execution_performed=False,
         storage_lifecycle_mutation_performed=False,
         execution_summary=execution_summary,
-        lock_plan=scheduler_lock_plan(month=None, selected_work="model_group.layer_10_event_attribution", next_internal_stage="layer_10_event_attribution"),
+        lock_plan=scheduler_lock_plan(month=None, selected_work="model_group.residual_event_governance", next_internal_stage="residual_event_governance"),
     )
 
 
 def _compact_backfill_preparation(summary: Any) -> dict[str, Any]:
     task_keys = tuple(getattr(summary, "task_keys", ()) or ())
     return {
-        "contract_type": getattr(summary, "contract_type", "manager_layer_10_event_feed_backfill_preparation"),
+        "contract_type": getattr(summary, "contract_type", "manager_residual_event_governance_event_feed_backfill_preparation"),
         "start_month": getattr(summary, "start_month", None),
         "end_month": getattr(summary, "end_month", None),
         "target_symbol": getattr(summary, "target_symbol", None),
@@ -498,8 +498,8 @@ def _build_attribution_rows(
         row_id = f"l10_event_attr_{index:08d}"
         rows.append(
             {
-                "contract_type": LAYER_10_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE,
-                "stage_id": "model_group.layer_10_event_attribution",
+                "contract_type": RESIDUAL_EVENT_GOVERNANCE_ATTRIBUTION_ROW_CONTRACT_TYPE,
+                "stage_id": "model_group.residual_event_governance",
                 "attribution_id": row_id,
                 "source_triage_row_contract_type": str(triage_row.get("contract_type") or FAILURE_TRIAGE_ROW_CONTRACT_TYPE),
                 "source_triage_attribution_id": triage_row.get("attribution_id"),
@@ -540,7 +540,7 @@ def _build_attribution_rows(
             }
         )
     control_report = {
-        "contract_type": "model_10_event_risk_governor_control_coevent_leakage_report",
+        "contract_type": "model_06_residual_event_governance_control_coevent_leakage_report",
         "status": "passed",
         "triage_row_count": len(triage_rows),
         "event_candidate_count": len(event_candidates),
@@ -554,9 +554,9 @@ def _build_attribution_rows(
         "upstream_overlap_status": "residual_after_upstream_conditioning",
         "same_fold_layer_4_mutation_performed": False,
         "notes": [
-            "Layer 10 attribution consumes post-replay residual triage rows; it does not create same-fold Layer 4 inputs.",
+            "M06 attribution consumes post-replay residual triage rows; it does not create same-fold Layer 4 inputs.",
             "Rows with multiple matching events are marked confounded until a later promotion packet proves incremental value.",
-            "Layer 10 uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay triage row provides an impact clock.",
+            "M06 uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay triage row provides an impact clock.",
         ],
     }
     return rows, control_report
@@ -565,7 +565,7 @@ def _build_attribution_rows(
 def _build_event_focus_proposals(
     *,
     attribution_rows: Sequence[Mapping[str, Any]],
-    layer_10_attribution_receipt_ref: str | None,
+    residual_event_governance_receipt_ref: str | None,
     attribution_rows_ref: str | None,
     event_interpretations_ref: str | None,
     event_summaries_by_ref: Mapping[str, Mapping[str, Any]],
@@ -658,8 +658,8 @@ def _build_event_focus_proposals(
         proposals.append(
             {
                 "contract_type": EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE,
-                "stage_id": "model_group.layer_10_event_attribution",
-                "model_surface": "model_10_event_risk_governor",
+                "stage_id": "model_group.residual_event_governance",
+                "model_surface": "model_06_residual_event_governance",
                 "event_focus_proposal_id": proposal_id,
                 "proposal_status": "watch_candidate",
                 "review_gate": "event-strategy-promotion-review",
@@ -687,7 +687,7 @@ def _build_event_focus_proposals(
                 "average_incremental_attribution_score": _average(group["supporting_scores"]),
                 "average_attribution_confidence_score": _average(group["supporting_confidences"]),
                 "event_interpretation_refs": sorted(group["event_interpretation_refs"])[:50],
-                "layer_10_attribution_receipt_ref": layer_10_attribution_receipt_ref,
+                "residual_event_governance_receipt_ref": residual_event_governance_receipt_ref,
                 "attribution_rows_ref": attribution_rows_ref,
                 "event_interpretations_ref": event_interpretations_ref,
                 "accepted_event_pool_mutation_performed": False,
@@ -768,7 +768,7 @@ def _build_event_family_attention_evidence(
         stats = event_ref_stats.get(event_ref, _empty_event_ref_stats())
         row = {
             "contract_type": EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE,
-            "stage_id": "model_group.layer_10_event_attribution",
+            "stage_id": "model_group.residual_event_governance",
             "event_family_id": family_id,
             "event_ref": event_ref,
             "target_symbol": _family_target_symbol(candidate, event_focus_proposals),
@@ -932,7 +932,7 @@ def _build_event_family_attention_evidence(
         candidate_rows.append(
             {
                 "contract_type": TEMPORAL_ATTENTION_CANDIDATE_ROW_CONTRACT_TYPE,
-                "stage_id": "model_group.layer_10_event_attribution",
+                "stage_id": "model_group.residual_event_governance",
                 "candidate_id": "l10_temporal_attention_candidate_" + _stable_token(group["event_family_id"]),
                 "candidate_status": "ready_for_agent_review" if deterministic_gate_status == "passed" else "blocked_by_deterministic_controls",
                 "event_family_id": group["event_family_id"],
@@ -1421,7 +1421,7 @@ def _invoke_event_strategy_review_agent(
 
 def _event_strategy_review_agent_prompt(review_packet: Mapping[str, Any]) -> str:
     return (
-        "Use the event-strategy-promotion-review skill. Review this deterministic Layer 10 event-family packet as a final guard only.\n"
+        "Use the event-strategy-promotion-review skill. Review this deterministic M06 event-family packet as a final guard only.\n"
         "Do not recompute co-event/confounder, impact-onset, impact-severity, or leakage gates; those are deterministic inputs. Pre-release and post-release evidence are lifecycle stages of the same event family. Do not require a linear up/down prediction when the packet is a phase-aware state overlay for Layer 4.\n"
         "Do not activate models, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
         "Return strict JSON only, with exactly this contract shape and no markdown:\n"
@@ -1500,7 +1500,7 @@ def _build_accepted_temporal_attention_pool_entries(
         entries.append(
             {
                 "contract_type": ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE,
-                "stage_id": "model_group.layer_10_event_attribution",
+                "stage_id": "model_group.residual_event_governance",
                 "pool_entry_id": "temporal_attention_pool_" + _stable_token(family_id, created_at_utc),
                 "pool_status": "accepted",
                 "event_family_id": family_id,
@@ -1615,7 +1615,7 @@ def _load_event_candidates(*, storage_root: Path, fold_scope: Mapping[str, str])
     if observation_path.exists():
         payload = _load_optional_json_object(observation_path) or {}
         raw_events.extend(_events_from_observation_payload(payload, source_ref=str(observation_path)))
-    input_dir = storage_root / "runtime" / "layer_10_event_risk_governor" / "input_materialization" / _fold_key(start_month, end_month)
+    input_dir = storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month)
     for filename in ("m10_event_risk_governor_data_acquisition_task_key.json", "source_10_task_key.json"):
         task_key_path = input_dir / filename
         checked_paths.append(str(task_key_path))
@@ -1671,7 +1671,7 @@ def _events_from_source_task_key(params: Mapping[str, Any], *, source_ref: str, 
         return rows
     if not _materialization_receipt_ready(materialization_receipt_path):
         return []
-    return _events_from_m10_sql(params, source_ref=source_ref)
+    return _events_from_m06_sql(params, source_ref=source_ref)
 
 
 def _materialization_receipt_ready(path: Path | None) -> bool:
@@ -1680,12 +1680,12 @@ def _materialization_receipt_ready(path: Path | None) -> bool:
     payload = _load_optional_json_object(path)
     if payload is None:
         return False
-    if str(payload.get("contract_type") or "") != "manager_layer_ten_event_risk_governor_input_materialization":
+    if str(payload.get("contract_type") or "") != "manager_residual_event_governance_input_materialization":
         return False
     return int(payload.get("source_event_count") or 0) > 0 and bool(str(payload.get("source_receipt_path") or "").strip())
 
 
-def _events_from_m10_sql(params: Mapping[str, Any], *, source_ref: str) -> list[dict[str, Any]]:
+def _events_from_m06_sql(params: Mapping[str, Any], *, source_ref: str) -> list[dict[str, Any]]:
     database_url = _trading_storage_database_url()
     if not database_url:
         return []
@@ -1698,7 +1698,7 @@ def _events_from_m10_sql(params: Mapping[str, Any], *, source_ref: str) -> list[
         clauses.append("available_time < %s")
         values.append(params["end"])
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
-    statement = f"SELECT {', '.join(M10_SQL_EVENT_FIELDS)} FROM trading_data.m10_event_risk_governor_data_acquisition{where} ORDER BY available_time, event_id"
+    statement = f"SELECT {', '.join(M06_SQL_EVENT_FIELDS)} FROM trading_data.m10_event_risk_governor_data_acquisition{where} ORDER BY available_time, event_id"
     try:
         import psycopg  # type: ignore
         from psycopg.rows import dict_row  # type: ignore
@@ -1787,7 +1787,7 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
         "policy_ref": "event_interpretation_standard",
         "policy_version": "1",
         "source_artifact_ref": raw_event.get("source_artifact_ref") or raw_event.get("reference"),
-        "source_name": raw_event.get("source_name") or "layer_10_local_event_candidate",
+        "source_name": raw_event.get("source_name") or "residual_event_governance_local_event_candidate",
         "source_type": raw_event.get("reference_type") or "local_structured_event_candidate",
         "published_time": raw_event.get("published_time") or raw_event.get("event_time") or raw_event.get("available_time"),
         "available_time": raw_event.get("available_time") or raw_event.get("event_time") or raw_event.get("effective_time"),
@@ -1795,7 +1795,7 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
         "title": raw_event.get("title"),
         "summary": raw_event.get("summary"),
         "interpreted_at": datetime.now(UTC).isoformat(),
-        "interpreter_agent_id": "trading-manager.layer_10_event_attribution",
+        "interpreter_agent_id": "trading-manager.residual_event_governance",
         "interpreter_model_id": "deterministic_event_candidate_standardizer",
         "prompt_policy_hash": "not_applicable_deterministic_structured_event",
         "normalized_event_type": raw_event.get("normalized_event_type") or raw_event.get("event_category_type") or raw_event.get("event_type") or "event_candidate",
@@ -1813,7 +1813,7 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
             "relation_type": raw_event.get("dedup_status") or "canonical",
             "canonical_event_id": raw_event.get("canonical_event_id") or raw_event.get("event_id"),
         },
-        "rationale_summary": raw_event.get("rationale_summary") or raw_event.get("summary") or raw_event.get("title") or "Structured local event candidate standardized for Layer 10 attribution.",
+        "rationale_summary": raw_event.get("rationale_summary") or raw_event.get("summary") or raw_event.get("title") or "Structured local event candidate standardized for M06 attribution.",
         "evidence_spans": raw_event.get("evidence_spans") or [{"source_ref": raw_event.get("reference") or raw_event.get("source_artifact_ref"), "field": "structured_event_candidate"}],
         "review_status": raw_event.get("review_status") or "candidate",
         "standardization_status": raw_event.get("standardization_status") or "standardized",
@@ -1822,15 +1822,15 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
 
 
 def _fill_interpretation_defaults(row: dict[str, Any], *, index: int) -> dict[str, Any]:
-    row.setdefault("source_artifact_ref", f"layer_10_event_candidate:{index}")
+    row.setdefault("source_artifact_ref", f"residual_event_governance_event_candidate:{index}")
     row.setdefault("source_artifact_hash", _stable_hash(row.get("source_artifact_ref"), row.get("normalized_event_type"), row.get("available_time"), row.get("affected_entities")))
-    row.setdefault("source_name", "layer_10_local_event_candidate")
+    row.setdefault("source_name", "residual_event_governance_local_event_candidate")
     row.setdefault("source_type", "local_structured_event_candidate")
     row.setdefault("published_time", row.get("available_time") or row.get("interpreted_at"))
     row.setdefault("available_time", row.get("published_time") or row.get("interpreted_at"))
     row.setdefault("interpreted_at", datetime.now(UTC).isoformat())
     row.setdefault("information_role_type", "unknown")
-    row.setdefault("interpreter_agent_id", "trading-manager.layer_10_event_attribution")
+    row.setdefault("interpreter_agent_id", "trading-manager.residual_event_governance")
     row.setdefault("interpreter_model_id", "deterministic_event_candidate_standardizer")
     row.setdefault("prompt_policy_hash", "not_applicable_deterministic_structured_event")
     row.setdefault("normalized_event_type", "event_candidate")
@@ -1844,7 +1844,7 @@ def _fill_interpretation_defaults(row: dict[str, Any], *, index: int) -> dict[st
     row.setdefault("source_quality_score", 0.5)
     row.setdefault("evidence_confidence_score", 0.5)
     row.setdefault("canonical_relation", {"relation_type": "canonical"})
-    row.setdefault("rationale_summary", "Structured local event candidate standardized for Layer 10 attribution.")
+    row.setdefault("rationale_summary", "Structured local event candidate standardized for M06 attribution.")
     row.setdefault("evidence_spans", [])
     row.setdefault("review_status", "candidate")
     row.setdefault("standardization_status", "standardized")
@@ -1876,23 +1876,23 @@ def _latest_failure_triage_receipt(dataset_root: Path) -> tuple[Path | None, dic
     )
 
 
-def _latest_layer_10_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
+def _latest_residual_event_governance_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
     path, receipt = _latest_receipt(
         dataset_root / "post_replay_attribution_runs",
         "post_replay_attribution_receipt.json",
         accepted_statuses=COMPLETE_STATUSES,
         required_field=("decision_rows_ref", decision_rows_ref),
-        predicate=lambda receipt: str(receipt.get("contract_type") or "") == LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE,
+        predicate=lambda receipt: str(receipt.get("contract_type") or "") == RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE,
     )
     return dict(receipt) if path is not None and receipt is not None else None
 
 
-def latest_layer_10_attribution_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
+def latest_residual_event_governance_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
     return _latest_receipt(
         dataset_root / "post_replay_attribution_runs",
         "post_replay_attribution_receipt.json",
         accepted_statuses=COMPLETE_STATUSES,
-        predicate=lambda receipt: str(receipt.get("contract_type") or "") == LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE,
+        predicate=lambda receipt: str(receipt.get("contract_type") or "") == RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE,
     )
 
 
@@ -2120,8 +2120,8 @@ def _stable_token(*parts: Any) -> str:
 
 __all__ = [
     "EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE",
-    "LAYER_10_EVENT_ATTRIBUTION_RECEIPT_CONTRACT_TYPE",
-    "LAYER_10_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE",
-    "latest_layer_10_attribution_receipt",
-    "run_model_group_layer_ten_attribution_if_ready",
+    "RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE",
+    "RESIDUAL_EVENT_GOVERNANCE_ATTRIBUTION_ROW_CONTRACT_TYPE",
+    "latest_residual_event_governance_receipt",
+    "run_model_group_residual_event_governance_if_ready",
 ]

@@ -439,7 +439,16 @@ class RegistryHelperTests(unittest.TestCase):
         policy = rows["OPTION_CHAIN_SOURCE_ACQUISITION_POLICY"]
         self.assertEqual(policy["payload"], "target_option_chain_state_source_acquisition")
         self.assertIn("policy_ref", policy["applies_to"])
+        self.assertIn("model_05_option_expression", policy["applies_to"])
         self.assertIn("historical provider acquisition", policy["note"])
+
+        bounds = rows["OPTION_CHAIN_SOURCE_M05_DEFAULT_BOUNDS"]
+        self.assertEqual(bounds["payload"], "max_dte=180;strike_range=5;source_envelope_not_model_selector")
+        self.assertIn("model_05_option_expression", bounds["applies_to"])
+
+        role_selector = rows["MODEL_05_OPTION_CHAIN_ROLE_SELECTOR_POLICY"]
+        self.assertIn("stable_core_front_near_mid_atm_and_canonical_wings", role_selector["payload"])
+        self.assertIn("model_05_option_expression", role_selector["applies_to"])
 
         retry = rows["OPTION_CHAIN_SOURCE_RETRY_POLICY"]
         self.assertEqual(retry["payload"], "target_option_chain_state_source_retry")
@@ -453,8 +462,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("provider run ids", request_template["note"])
 
         stage = rows["OPTION_CHAIN_SOURCE_STAGE_ID"]
-        self.assertEqual(stage["payload"], "layer_03_target_state_vector.option_chain_data_acquisition")
+        self.assertEqual(stage["payload"], "model_05_option_expression.option_chain_data_acquisition")
         self.assertIn("stage_id", stage["applies_to"])
+        self.assertIn("model_05_option_expression", stage["applies_to"])
 
     def test_post_replay_attribution_shared_names_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -470,7 +480,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("policy_ref", event_interpretation_policy["applies_to"])
         self.assertIn("unversioned", event_interpretation_policy["note"])
 
-        event_sql_inputs = rows["LAYER_TEN_EVENT_FEED_SQL_INPUTS"]
+        event_sql_inputs = rows["M06_EVENT_FEED_SQL_INPUTS"]
         self.assertIn("trading_data.feed_03_alpaca_news", event_sql_inputs["payload"])
         self.assertIn("event_sql_inputs", event_sql_inputs["applies_to"])
         self.assertIn("no provider calls", event_sql_inputs["note"])
@@ -480,48 +490,48 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(event_sql_field["payload"], "event_feed_sql_inputs")
         self.assertIn("m10_event_risk_governor_data_acquisition", event_sql_field["applies_to"])
 
-        zero_sql_status = rows["LAYER_TEN_DETECTOR_STATUS_SKIPPED_ZERO_SQL_BAR_ROWS"]
+        zero_sql_status = rows["M06_DETECTOR_STATUS_SKIPPED_ZERO_SQL_BAR_ROWS"]
         self.assertEqual(zero_sql_status["kind"], "status_value")
         self.assertEqual(zero_sql_status["payload"], "skipped_zero_sql_bar_rows")
 
         triage_receipt = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_RECEIPT"]
         self.assertEqual(triage_receipt["payload"], "post_replay_failure_triage_receipt")
-        self.assertIn("not Layer 10", triage_receipt["note"])
+        self.assertIn("not M06", triage_receipt["note"])
 
         triage_row = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_ROW"]
         self.assertEqual(triage_row["payload"], "post_replay_failure_triage_row")
 
-        layer_ten_receipt = rows["MANAGER_POST_REPLAY_LAYER_10_EVENT_ATTRIBUTION_RECEIPT"]
-        self.assertEqual(layer_ten_receipt["payload"], "post_replay_layer_10_event_attribution_receipt")
-        self.assertIn("provider calls", layer_ten_receipt["note"])
+        residual_event_governance_receipt = rows["MANAGER_POST_REPLAY_M06_EVENT_ATTRIBUTION_RECEIPT"]
+        self.assertEqual(residual_event_governance_receipt["payload"], "post_replay_residual_event_governance_receipt")
+        self.assertIn("provider calls", residual_event_governance_receipt["note"])
 
-        layer_ten_row = rows["MANAGER_POST_REPLAY_LAYER_10_EVENT_ATTRIBUTION_ROW"]
-        self.assertEqual(layer_ten_row["payload"], "model_10_event_risk_governor_event_attribution_row")
-        self.assertIn("event_interpretation", layer_ten_row["applies_to"])
+        residual_event_governance_row = rows["MANAGER_POST_REPLAY_M06_EVENT_ATTRIBUTION_ROW"]
+        self.assertEqual(residual_event_governance_row["payload"], "model_06_residual_event_governance_event_attribution_row")
+        self.assertIn("event_interpretation", residual_event_governance_row["applies_to"])
 
-        focus_row = rows["MANAGER_POST_REPLAY_LAYER_10_EVENT_FOCUS_PROPOSAL_ROW"]
-        self.assertEqual(focus_row["payload"], "model_10_event_risk_governor_event_focus_proposal")
+        focus_row = rows["MANAGER_POST_REPLAY_M06_EVENT_FOCUS_PROPOSAL_ROW"]
+        self.assertEqual(focus_row["payload"], "model_06_residual_event_governance_event_focus_proposal")
         self.assertIn("event-strategy-promotion-review", focus_row["applies_to"])
-        self.assertIn("model_group.layer_10_event_attribution", focus_row["applies_to"])
+        self.assertIn("model_group.residual_event_governance", focus_row["applies_to"])
         self.assertIn("temporal_attention_pool", focus_row["applies_to"])
 
         temporal_attention_candidate = rows["MANAGER_POST_REPLAY_TEMPORAL_ATTENTION_CANDIDATE_ROW"]
         self.assertEqual(
             temporal_attention_candidate["payload"],
-            "model_10_event_risk_governor_temporal_attention_candidate",
+            "model_06_residual_event_governance_temporal_attention_candidate",
         )
         self.assertIn("temporal_attention_pool", temporal_attention_candidate["applies_to"])
 
         occurrence_scan = rows["MANAGER_POST_REPLAY_EVENT_FAMILY_OCCURRENCE_SCAN_ROW"]
         self.assertEqual(
             occurrence_scan["payload"],
-            "model_10_event_risk_governor_event_family_occurrence_scan_row",
+            "model_06_residual_event_governance_event_family_occurrence_scan_row",
         )
 
         bias_packet = rows["MANAGER_POST_REPLAY_EVENT_FAMILY_BIAS_ASSOCIATION_PACKET"]
         self.assertEqual(
             bias_packet["payload"],
-            "model_10_event_risk_governor_event_family_bias_association_packet",
+            "model_06_residual_event_governance_event_family_bias_association_packet",
         )
         self.assertIn("event-strategy-promotion-review", bias_packet["applies_to"])
 
@@ -532,7 +542,7 @@ class RegistryHelperTests(unittest.TestCase):
         attention_pool_entry = rows["MANAGER_POST_REPLAY_TEMPORAL_ATTENTION_POOL_ENTRY"]
         self.assertEqual(
             attention_pool_entry["payload"],
-            "model_10_event_risk_governor_temporal_attention_pool_entry",
+            "model_06_residual_event_governance_temporal_attention_pool_entry",
         )
         self.assertIn("layer_4_state_overlay_candidate", attention_pool_entry["applies_to"])
 
@@ -544,9 +554,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("event_family_bias_association_packets.jsonl", runtime_surfaces["payload"])
         self.assertIn("event_strategy_promotion_reviews.jsonl", runtime_surfaces["payload"])
         self.assertIn("accepted_temporal_attention_pool_entries.jsonl", runtime_surfaces["payload"])
-        self.assertIn("model_group.layer_10_event_attribution", runtime_surfaces["payload"])
+        self.assertIn("model_group.residual_event_governance", runtime_surfaces["payload"])
 
-        review_defaults = rows["MANAGER_LAYER_10_EVENT_STRATEGY_REVIEW_DEFAULTS"]
+        review_defaults = rows["MANAGER_M06_EVENT_STRATEGY_REVIEW_DEFAULTS"]
         self.assertIn("codex_model=gpt-5.5", review_defaults["payload"])
         self.assertIn("timeout_seconds=900", review_defaults["payload"])
         self.assertIn("max_agent_review_packets=3", review_defaults["payload"])
@@ -611,10 +621,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(event_focus_proposals_ref["payload"], "event_focus_proposals_ref")
         self.assertIn("model_group_evaluation", event_focus_proposals_ref["applies_to"])
 
-        layer_ten_event_focus_proposals_ref = rows["LAYER_10_EVENT_FOCUS_PROPOSALS_REF"]
+        layer_ten_event_focus_proposals_ref = rows["M06_EVENT_FOCUS_PROPOSALS_REF"]
         self.assertEqual(
             layer_ten_event_focus_proposals_ref["payload"],
-            "layer_10_event_focus_proposals_ref",
+            "residual_event_governance_event_focus_proposals_ref",
         )
         self.assertIn("dashboard_task_timeline", layer_ten_event_focus_proposals_ref["applies_to"])
 
@@ -647,10 +657,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(triage_script["kind"], "script")
         self.assertIn("run_model_group_post_replay_attribution.py", triage_script["path"])
 
-        layer_ten_script = rows["MODEL_GROUP_LAYER_10_EVENT_ATTRIBUTION_RUN"]
-        self.assertEqual(layer_ten_script["kind"], "script")
-        self.assertIn("run_model_group_layer_ten_attribution.py", layer_ten_script["path"])
-        self.assertIn("event_strategy_promotion_review", layer_ten_script["applies_to"])
+        residual_event_governance_script = rows["MODEL_GROUP_M06_EVENT_ATTRIBUTION_RUN"]
+        self.assertEqual(residual_event_governance_script["kind"], "script")
+        self.assertIn("run_model_group_residual_event_governance.py", residual_event_governance_script["path"])
+        self.assertIn("event_strategy_promotion_review", residual_event_governance_script["applies_to"])
 
         self.assertNotIn("event_interpretation_v1", {row["payload"] for row in rows.values()})
 
@@ -728,7 +738,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], payload)
             self.assertEqual(rows[key]["applies_to"], "window_policy")
 
-    def test_layer_10_fold_completion_names_are_registered(self):
+    def test_residual_event_governance_fold_completion_names_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
@@ -742,19 +752,19 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(all_family_replay["payload"], "event_family_impact_window_all_family_replay_overlay")
         self.assertIn("event_family_impact_window_all_family_replay_20260610", all_family_replay["path"])
 
-        fold_artifact = rows["EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_20260610"]
+        fold_artifact = rows["EVENT_RISK_GOVERNOR_M06_FOLD_COMPLETION_20260610"]
         self.assertEqual(fold_artifact["kind"], "artifact_type")
         self.assertEqual(fold_artifact["payload"], "layer_10_fold_completion")
         self.assertIn("layer_10_fold_completion_20260610", fold_artifact["path"])
         self.assertIn("review_ready_not_promotion_approved", fold_artifact["applies_to"])
         self.assertIn("production-route review dispositions", fold_artifact["note"])
 
-        summary = rows["EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_SUMMARY"]
+        summary = rows["EVENT_RISK_GOVERNOR_M06_FOLD_COMPLETION_SUMMARY"]
         self.assertEqual(summary["kind"], "artifact_type")
         self.assertEqual(summary["payload"], "layer_10_fold_completion_summary")
         self.assertIn("layer_10_fold_completion_summary.json", summary["applies_to"])
 
-        gate_matrix = rows["EVENT_RISK_GOVERNOR_LAYER_10_FAMILY_GATE_MATRIX"]
+        gate_matrix = rows["EVENT_RISK_GOVERNOR_M06_FAMILY_GATE_MATRIX"]
         self.assertEqual(gate_matrix["kind"], "artifact_type")
         self.assertEqual(gate_matrix["payload"], "layer_10_family_gate_matrix")
         self.assertIn("layer_10_family_gate_matrix.csv", gate_matrix["applies_to"])
@@ -764,7 +774,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("build_event_family_impact_window_all_family_real_input_backtest.py", all_family_runner["path"])
         self.assertIn("event_family_impact_window_all_family_real_input_backtest", all_family_runner["applies_to"])
 
-        runner = rows["MODEL_10_EVENT_RISK_GOVERNOR_LAYER_10_FOLD_COMPLETION_BUILD"]
+        runner = rows["MODEL_10_EVENT_RISK_GOVERNOR_M06_FOLD_COMPLETION_BUILD"]
         self.assertEqual(runner["kind"], "script")
         self.assertIn("build_layer_10_fold_completion.py", runner["path"])
         self.assertIn("fold_completion.py", runner["path"])
@@ -783,19 +793,19 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("layer_10_fold_completion", rows[key]["applies_to"])
 
         fold_status_values = {
-            "LAYER_10_CROSS_FOLD_STABILITY_POST_FOCUS_POOL_MONITORING": "post_focus_pool_monitoring_not_focus_pool_prerequisite",
-            "LAYER_10_FOCUS_POOL_ACCEPTED_TEMPORAL_ATTENTION": "accepted_temporal_attention_focus_pool",
-            "LAYER_10_FOCUS_POOL_DEFERRED_TEMPORAL_ATTENTION": "deferred_from_temporal_attention_focus_pool",
-            "LAYER_10_FOCUS_POOL_REJECTED_TEMPORAL_ATTENTION": "rejected_from_temporal_attention_focus_pool",
-            "LAYER_10_PRODUCTION_COMPLETION_ROUTE_REVIEW_COMPLETE": "production_route_review_complete",
-            "LAYER_10_PRODUCTION_ROUTE_DECISION_APPROVE_FOCUS_POOL_DEFER_STRONGER_MODEL_USE": "approve_focus_pool_entry_defer_stronger_model_use",
-            "LAYER_10_PRODUCTION_ROUTE_DECISION_APPROVE_FOCUS_POOL_RISK_CONTROL_ONLY": "approve_focus_pool_entry_risk_control_only",
-            "LAYER_10_PRODUCTION_ROUTE_DECISION_DEFER_INCOMPLETE_WORKFLOW": "defer_incomplete_layer10_workflow",
-            "LAYER_10_PRODUCTION_ROUTE_DECISION_REJECT_CURRENT_DEFINITION_NEEDS_REWORK": "reject_current_definition_needs_rework",
-            "LAYER_10_PRODUCTION_ROUTE_REVIEW_AGENT_COMPLETE": "agent_review_complete",
-            "LAYER_10_PRODUCTION_ROUTE_REVIEW_BLOCKED_MISSING_PACKET_OR_PRECONDITION": "agent_review_blocked_missing_packet_or_precondition",
-            "LAYER_10_PRODUCTION_ROUTE_REVIEW_BLOCKED_UNVALIDATED_IMPACT_WINDOW": "agent_review_blocked_unvalidated_impact_window",
-            "LAYER_10_PRODUCTION_ROUTE_REVIEW_DEFERRED_INCOMPLETE_WORKFLOW": "agent_review_deferred_incomplete_layer10_workflow",
+            "M06_CROSS_FOLD_STABILITY_POST_FOCUS_POOL_MONITORING": "post_focus_pool_monitoring_not_focus_pool_prerequisite",
+            "M06_FOCUS_POOL_ACCEPTED_TEMPORAL_ATTENTION": "accepted_temporal_attention_focus_pool",
+            "M06_FOCUS_POOL_DEFERRED_TEMPORAL_ATTENTION": "deferred_from_temporal_attention_focus_pool",
+            "M06_FOCUS_POOL_REJECTED_TEMPORAL_ATTENTION": "rejected_from_temporal_attention_focus_pool",
+            "M06_PRODUCTION_COMPLETION_ROUTE_REVIEW_COMPLETE": "production_route_review_complete",
+            "M06_PRODUCTION_ROUTE_DECISION_APPROVE_FOCUS_POOL_DEFER_STRONGER_MODEL_USE": "approve_focus_pool_entry_defer_stronger_model_use",
+            "M06_PRODUCTION_ROUTE_DECISION_APPROVE_FOCUS_POOL_RISK_CONTROL_ONLY": "approve_focus_pool_entry_risk_control_only",
+            "M06_PRODUCTION_ROUTE_DECISION_DEFER_INCOMPLETE_WORKFLOW": "defer_incomplete_layer10_workflow",
+            "M06_PRODUCTION_ROUTE_DECISION_REJECT_CURRENT_DEFINITION_NEEDS_REWORK": "reject_current_definition_needs_rework",
+            "M06_PRODUCTION_ROUTE_REVIEW_AGENT_COMPLETE": "agent_review_complete",
+            "M06_PRODUCTION_ROUTE_REVIEW_BLOCKED_MISSING_PACKET_OR_PRECONDITION": "agent_review_blocked_missing_packet_or_precondition",
+            "M06_PRODUCTION_ROUTE_REVIEW_BLOCKED_UNVALIDATED_IMPACT_WINDOW": "agent_review_blocked_unvalidated_impact_window",
+            "M06_PRODUCTION_ROUTE_REVIEW_DEFERRED_INCOMPLETE_WORKFLOW": "agent_review_deferred_incomplete_layer10_workflow",
         }
         for key, payload in fold_status_values.items():
             self.assertEqual(rows[key]["kind"], "status_value")
@@ -815,7 +825,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["LAYER_04_FOCUS_POOL_INPUT_ROWS"]["payload"], "layer_04_focus_pool_input_rows")
         self.assertEqual(rows["LAYER_04_FOCUS_POOL_MODEL_ROWS"]["payload"], "model_04_event_failure_risk_rows")
 
-        focus_runner = rows["MODEL_04_EVENT_FAILURE_RISK_LAYER_10_FOCUS_POOL_INPUTS_BUILD"]
+        focus_runner = rows["MODEL_04_EVENT_FAILURE_RISK_M06_FOCUS_POOL_INPUTS_BUILD"]
         self.assertEqual(focus_runner["kind"], "script")
         self.assertIn("build_layer4_focus_pool_inputs.py", focus_runner["path"])
         self.assertIn("layer10_focus_pool_inputs.py", focus_runner["path"])
@@ -984,7 +994,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["EXECUTION_INTAKE_SNAPSHOT"]["payload"], "execution_intake_snapshot")
         self.assertIn("does not allocate risk budget", rows["EXECUTION_INTAKE_SNAPSHOT"]["note"])
         self.assertEqual(rows["ENTRY_DECISION"]["payload"], "entry_decision")
-        self.assertIn("does not call Layer 9 or Layer 10", rows["ENTRY_DECISION"]["note"])
+        self.assertIn("does not call Layer 9 or M06", rows["ENTRY_DECISION"]["note"])
         self.assertEqual(rows["POSITION_LIFECYCLE_DECISION"]["payload"], "position_lifecycle_decision")
         self.assertEqual(rows["OPTION_REEXPRESSION_DECISION"]["payload"], "option_reexpression_decision")
         self.assertEqual(rows["FAILURE_EXPLANATION_PACKET"]["payload"], "failure_explanation_packet")
@@ -1046,7 +1056,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_05_alpha_confidence", layer_policy["payload"])
         self.assertIn("layer_06_dynamic_risk_policy", layer_policy["payload"])
         self.assertIn("layer_09_option_expression", layer_policy["payload"])
-        self.assertIn("layer_10_event_risk_governor", layer_policy["payload"])
+        self.assertIn("model_06_residual_event_governance", layer_policy["payload"])
 
         self.assertEqual(rows["TRADING_GUIDANCE_MODEL"]["payload"], "trading_guidance_model")
         self.assertEqual(rows["TRADING_GUIDANCE_RECORD"]["payload"], "trading_guidance_record")
@@ -1221,12 +1231,12 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn(expected_target_state_vector_payload, {row["payload"] for row in rows.values()})
         self.assertEqual(rows["MODEL_VECTOR_TAXONOMY"]["payload"], "model_vector_taxonomy")
         self.assertEqual(rows["EVENT_RISK_GOVERNOR"]["payload"], "event_risk_governor")
-        self.assertEqual(rows["MODEL_10_EVENT_RISK_GOVERNOR"]["payload"], "model_10_event_risk_governor")
+        self.assertEqual(rows["MODEL_10_EVENT_RISK_GOVERNOR"]["payload"], "model_06_residual_event_governance")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR"]["payload"], "event_context_vector")
         self.assertEqual(rows["EVENT_CONTEXT_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn("price_action", rows["EVENT_CATEGORY_TYPE_VALUES"]["payload"])
         self.assertIn("false_breakout", rows["PRICE_ACTION_EVENT_TYPES"]["payload"])
-        self.assertIn("layer_10_event_risk_governor_event_not_new_model_layer", rows["PRICE_ACTION_EVENT_LAYER_POLICY"]["payload"])
+        self.assertIn("model_06_residual_event_governance_event_not_new_model_layer", rows["PRICE_ACTION_EVENT_LAYER_POLICY"]["payload"])
         self.assertIn("10_event_presence_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("10_event_target_relevance_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertEqual(rows["ALPHA_CONFIDENCE_MODEL"]["payload"], "alpha_confidence_model")
@@ -1417,9 +1427,9 @@ class RegistryHelperTests(unittest.TestCase):
         expected_layer_script_paths = {
             "CURRENT_MODEL_CHAIN_RUN": "scripts/models/run_current_model_chain.py",
             "CURRENT_MODEL_HISTORICAL_EVALUATION_RUN": "scripts/models/run_current_model_historical_evaluation.py",
-            "MODEL_10_EVENT_RISK_GOVERNOR_GENERATE": "scripts/models/model_10_event_risk_governor/generate_model_10_event_risk_governor.py",
-            "MODEL_10_EVENT_RISK_GOVERNOR_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_10_event_risk_governor/evaluate_model_10_event_risk_governor.py",
-            "MODEL_10_EVENT_RISK_GOVERNOR_REVIEW_PROMOTION": "scripts/models/model_10_event_risk_governor/review_event_risk_governor_promotion.py",
+            "MODEL_10_EVENT_RISK_GOVERNOR_GENERATE": "scripts/models/model_06_residual_event_governance/generate_model_06_residual_event_governance.py",
+            "MODEL_10_EVENT_RISK_GOVERNOR_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_06_residual_event_governance/evaluate_model_06_residual_event_governance.py",
+            "MODEL_10_EVENT_RISK_GOVERNOR_REVIEW_PROMOTION": "scripts/models/model_06_residual_event_governance/review_event_risk_governor_promotion.py",
             "MODEL_05_ALPHA_CONFIDENCE_GENERATE": "scripts/models/model_05_alpha_confidence/generate_model_05_alpha_confidence.py",
             "MODEL_05_ALPHA_CONFIDENCE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_05_alpha_confidence/evaluate_model_05_alpha_confidence.py",
             "MODEL_01_MARKET_REGIME_DIAGNOSE_SUBSTRATE": "scripts/models/model_01_market_regime/diagnose_model_01_market_regime_substrate.py",
@@ -1464,7 +1474,6 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn(expected_path, rows[key]["path"])
         self.assertIn("--table-scope current", rows["MODEL_OUTPUT_TABLE_QUALITY_AUDIT"]["payload"])
         self.assertIn("trading_model.model_06_residual_event_governance", rows["MODEL_OUTPUT_TABLE_QUALITY_AUDIT"]["applies_to"])
-        self.assertNotIn("trading_model.model_10_event_risk_governor", rows["MODEL_OUTPUT_TABLE_QUALITY_AUDIT"]["applies_to"])
         self.assertIn("current six-model output table families", rows["MODEL_OUTPUT_QUALITY_GATE"]["note"])
         self.assertIn("option_expression_model", rows["M09_OPTION_EXPRESSION_DATA_ACQUISITION_CONTRACT_PATH"]["applies_to"])
         self.assertNotIn("position_execution_model", rows["M09_OPTION_EXPRESSION_DATA_ACQUISITION_CONTRACT_PATH"]["applies_to"])
@@ -1620,15 +1629,15 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("no_broker_execution_enabled", rows["TRADING_MANAGER_CONTROL_PLANE_ACCEPTANCE_STATUS"]["payload"])
         self.assertIn("continuous_safe_work", rows["MANAGER_AUTONOMOUS_SCHEDULER_POLICY"]["payload"])
         self.assertIn("execution_priority_reserved", rows["MANAGER_AUTONOMOUS_SCHEDULER_POLICY"]["payload"])
-        self.assertIn("layer_01_02_foundation_catch_up_priority", rows["MANAGER_AUTONOMOUS_SCHEDULER_POLICY"]["payload"])
-        self.assertEqual(rows["MANAGER_FOUNDATION_CATCH_UP_PRIORITY"]["payload"], "layer_01_02_foundation_catch_up_priority")
+        self.assertIn("model_01_03_foundation_catch_up_priority", rows["MANAGER_AUTONOMOUS_SCHEDULER_POLICY"]["payload"])
+        self.assertEqual(rows["MANAGER_FOUNDATION_CATCH_UP_PRIORITY"]["payload"], "model_01_03_foundation_catch_up_priority")
         self.assertEqual(
-            rows["LAYER_01_02_HISTORICAL_CATCH_UP_TO_CURRENT_REQUIRED"]["payload"],
-            "layer_01_02_historical_catch_up_to_current_required",
+            rows["MODEL_01_03_HISTORICAL_CATCH_UP_TO_CURRENT_REQUIRED"]["payload"],
+            "model_01_03_historical_catch_up_to_current_required",
         )
         self.assertEqual(
-            rows["POST_MODEL_GENERATION_REBUILD_REQUIRED_AFTER_LAYER_01_02_CATCH_UP"]["payload"],
-            "post_model_generation_rebuild_required_after_layer_01_02_catch_up",
+            rows["POST_MODEL_GENERATION_REBUILD_REQUIRED_AFTER_MODEL_01_03_CATCH_UP"]["payload"],
+            "post_model_generation_rebuild_required_after_model_01_03_catch_up",
         )
         self.assertEqual(
             rows["HISTORICAL_SUBSTRATE_REUSE_POLICY"]["payload"],
@@ -1641,12 +1650,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["PROMOTION_STAGE_TYPE"]["payload"], "promotion_review")
         self.assertEqual(
             rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["payload"],
-            "pinned_layer_01_09_pre_replay_generation_then_replay_layer_10_attribution_complete",
+            "pinned_models_01_06_generation_then_replay_and_residual_event_governance_complete",
         )
         self.assertIn("all-or-nothing", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
-        self.assertIn("post-replay Layer 10 attribution", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
-        self.assertIn("fold_layers_01_09_model_generation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
-        self.assertIn("post_replay_layer_10_attribution_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("residual-event governance attribution", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
+        self.assertIn("fold_models_01_06_model_generation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("residual_event_governance_attribution_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertEqual(
             rows["DYNAMIC_RISK_POLICY_MODEL_LAYER"]["payload"],
             "layer_06_dynamic_risk_policy_model_global_market_driven_premium_risk_budget_state",
@@ -1658,10 +1667,10 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("components to choose no target", rows["MODEL_REPLAY_CANDIDATE_SELECTION_POLICY"]["note"])
         self.assertEqual(
-            rows["LAYER_10_POST_REPLAY_ATTRIBUTION_POLICY"]["payload"],
+            rows["M06_POST_REPLAY_ATTRIBUTION_POLICY"]["payload"],
             "layer_10_starts_after_concentrated_replay_not_before_replay_input_stage",
         )
-        self.assertIn("pre-replay data-acquisition", rows["LAYER_10_POST_REPLAY_ATTRIBUTION_POLICY"]["note"])
+        self.assertIn("pre-replay data-acquisition", rows["M06_POST_REPLAY_ATTRIBUTION_POLICY"]["note"])
         self.assertEqual(
             rows["LAYER_4_FOLD_EVENT_OBSERVATION_POLICY"]["payload"],
             "layer_4_global_sector_event_observation_substrate_collected_each_fold",
@@ -1672,8 +1681,8 @@ class RegistryHelperTests(unittest.TestCase):
             rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["payload"],
         )
         self.assertIn("model_training_workflow", rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["applies_to"])
-        self.assertNotIn("MANAGER_MATERIALIZE_LAYER_TEN_EVENT_RISK_INPUTS", rows)
-        self.assertNotIn("MANAGER_LAYER_TEN_EVENT_RISK_INPUT_MATERIALIZATION", rows)
+        self.assertNotIn("MANAGER_MATERIALIZE_M06_EVENT_RISK_INPUTS", rows)
+        self.assertNotIn("MANAGER_M06_EVENT_RISK_INPUT_MATERIALIZATION", rows)
         self.assertIn(
             "promotion_waits_for_model_group_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
@@ -1682,8 +1691,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("train_months=4", rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["payload"])
         self.assertEqual(
             rows["MONTH_SCOPED_INGEST_ONLY_DURING_FOUNDATION_CATCH_UP"]["payload"],
-            "month_scoped_layer_01_02_workflow_exposes_data_acquisition_and_feature_generation_only",
+            "month_scoped_model_01_03_workflow_exposes_data_acquisition_and_feature_generation_only",
         )
+        self.assertIn("model_01_03_historical_catch_up_to_current_required", rows["MODEL_TRAINING_WORKFLOW_CURRENT_BLOCKERS"]["payload"])
+        self.assertIn("model_05_option_expression.option_chain_data_acquisition_complete", rows["MODEL_TRAINING_WORKFLOW_CURRENT_BLOCKERS"]["payload"])
+        self.assertIn("m01_m06_pre_replay_boundary", rows["MODEL_TRAINING_WORKFLOW_CURRENT_STACK_POLICY"]["payload"])
         self.assertIn("live_trading_capacity_reserved", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("historical_worker_count_capacity_adaptive", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("pre_promotion_full_training_mode", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])
@@ -1733,10 +1745,10 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertEqual(rows["DASHBOARD_HISTORICAL_TASK_TIMELINE"]["payload"], "historical_task_progress_summary.chart_payload.task_timeline")
         self.assertIn("task_timeline", rows["DASHBOARD_HISTORICAL_TASK_PROGRESS_PAGE"]["applies_to"])
-        self.assertIn("layer_04_event_failure_risk", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
-        self.assertIn("model_09_option_expression", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
-        self.assertIn("layer_06_dynamic_risk_policy", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
-        self.assertIn("post_replay_layer_10_attribution", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertIn("model_04_unified_decision", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertIn("model_05_option_expression", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertIn("model_06_residual_event_governance", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
+        self.assertIn("residual_event_governance", rows["MANAGER_MODEL_TRAINING_WORKFLOW_PLAN_ARTIFACT"]["applies_to"])
         self.assertEqual(rows["MANAGER_SCHEDULER_DECISION"]["payload"], "manager_scheduler_decision")
         self.assertEqual(rows["MANAGER_SCHEDULER_DAEMON_STATE"]["payload"], "manager_scheduler_daemon_state")
         self.assertIn("historical_scheduler_state.json", rows["MANAGER_HISTORICAL_SCHEDULER_RUNTIME_FILES"]["payload"])
@@ -2371,10 +2383,10 @@ class RegistryHelperTests(unittest.TestCase):
             "layer_4_state_overlay",
             "layer_4_state_overlay_candidate",
             "layer4_event_feature_policy",
-            "layer_10_event_risk_governor",
+            "model_06_residual_event_governance",
             "layer_10_fold_completion",
             "layer_10_fold_completion_summary",
-            "manager_layer_ten_event_risk_governor_input_materialization",
+            "manager_residual_event_governance_input_materialization",
             "focus_pool_status",
             "model_realtime_decision_component_route_status",
             "model_realtime_decision_route_plan_readiness",
@@ -2880,7 +2892,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(registry_payload("trm_L2XES001"), "cross_etf_summary")
         self.assertEqual(registry_payload("trm_L2TCP001"), "target_context_profile")
         self.assertEqual(registry_payload("trm_M6DRP01"), "model_06_dynamic_risk_policy")
-        self.assertEqual(registry_payload("mlv_L10ERG001"), "layer_10_event_risk_governor")
+        self.assertEqual(registry_payload("mlv_L10ERG001"), "model_06_residual_event_governance")
         self.assertTrue(registry_value("out_TL2CTX001", "path").endswith("layer_02_target_context_mapping.csv"))
 
     def test_require_item_by_id_throws_for_missing_item(self):
@@ -3043,7 +3055,7 @@ class RegistryHelperTests(unittest.TestCase):
             "model_07_position_projection",
             "model_08_underlying_action",
             "model_09_option_expression",
-            "model_10_event_risk_governor",
+            "model_06_residual_event_governance",
         ):
             self.assertIn(model_id, realtime_coverage)
         self.assertEqual(rows["REALTIME_CAPTURE_CONTRACT"]["payload"], "realtime_capture_contract")

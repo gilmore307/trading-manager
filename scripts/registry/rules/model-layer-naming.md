@@ -93,7 +93,7 @@ Core scalar score tokens that are shared across repositories belong in `state_ve
 - Layer 7 projects abstract holding state; it does not emit broker orders.
 - Layer 8 produces offline direct-underlying thesis; it does not route orders or select option contracts.
 - Layer 9 produces optional offline guidance/option-expression plans; it does not execute or mutate broker/account state.
-- Layer 10 produces event-risk governance/intervention evidence from the Layer 8 direct-underlying thesis, with Layer 9 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
+- M06 produces event-risk governance/intervention evidence from the Layer 8 direct-underlying thesis, with Layer 9 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
 
 ## Registry Review Checklist
 

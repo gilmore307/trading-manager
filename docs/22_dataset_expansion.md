@@ -15,7 +15,7 @@ Dataset expansion decides which historical dataset role should be broadened next
 2. Layer 3 target-state target windows.
 3. Layers 4-9 downstream risk-policy/context/action/guidance chains once prerequisites exist.
 4. Concentrated replay.
-5. Layer 10 post-replay event-risk attribution with reviewed event families and strict non-overlap rules.
+5. M06 post-replay event-risk attribution with reviewed event families and strict non-overlap rules.
 
 ## Dataset Unit
 

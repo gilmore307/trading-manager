@@ -37,7 +37,7 @@ The scheduler should first advance reusable targetless foundation substrate befo
 
 Historical training uses the six-month fold as the public first-class work unit across all layers. Months are child partitions inside a fold for data coverage, receipts, and provider batching; they are not separate owner-facing training tasks. Dashboard task identity and stage progress must therefore present Layer 1+ data acquisition, feature generation, model generation, evaluation, and review under the same fold period such as `2016-fold1`. A fold is eligible only after its final calendar month is complete in `America/New_York`; for example `2026-fold1` stays closed until 2026-07-01 because it ends at 2026-06. Public task numbers are list sequence numbers assigned after chronological fold, layer, and workflow-stage sorting; `task_uid` is the durable identity for progress/evidence joins. Historical runtime advances one canonical month at a time; worker identity is internal execution detail and Tasks should not display or filter by worker.
 
-The scheduler must finish one fold's full run cycle before opening the next fold. Completion means Layer 1-9 pre-replay model work, model replay, Layer 10 Event Risk Governor attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. Layer 10 can update the event-observation pool used by later Layer 4 folds, so starting the next fold after Layer 1-9 alone is invalid.
+The scheduler must finish one fold's full run cycle before opening the next fold. Completion means Layer 1-9 pre-replay model work, model replay, M06 Residual Event Governance attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. M06 can update the event-observation pool used by later Layer 4 folds, so starting the next fold after Layer 1-9 alone is invalid.
 
 ## D008 - Layer 9 is optional trading guidance/expression
 
@@ -47,19 +47,19 @@ Layer 9 may produce optional offline trading-guidance records and option-express
 
 Layer 4 may condition alpha only with evidence packets that passed source precedence, point-in-time availability, non-overlap, matched controls, leakage review, and agent/manager acceptance. Raw anomalies and unreviewed event text cannot enter Layer 4 scoring.
 
-When Layer 10 has not yet produced accepted attribution or promotion evidence,
+When M06 has not yet produced accepted attribution or promotion evidence,
 the Layer 4 event-observation substrate may be empty. That is a valid state:
 Layer 4 should materialize a no-event-risk input and downstream scoring should
 resolve to `no_reviewed_event_failure_risk` rather than blocking the fold.
 
 C07 provisional untrained-event risk estimates are not Layer 4 inputs. They may
-support live trading-review decisions and later Layer 10/Layer 4 promotion
+support live trading-review decisions and later M06/Layer 4 promotion
 research, but they cannot be treated as trained event-failure evidence until the
 normal review and acceptance route completes.
 
-## D010 - Layer 10 remains post-replay residual event-risk governance
+## D010 - M06 remains post-replay residual event-risk governance
 
-Layer 10 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It must not run as a pre-replay data-acquisition or feature-generation stage. Layer 9 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
+M06 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It must not run as a pre-replay data-acquisition or feature-generation stage. Layer 9 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Agent model review is advisory and blinded
 
@@ -134,7 +134,7 @@ microstructure_liquidity_disruption
 option_derivatives_abnormality
 ```
 
-Ordinary bar, volume, spread, liquidity, target-state, option-expression, Layer 10 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into Layer 9 evidence.
+Ordinary bar, volume, spread, liquidity, target-state, option-expression, M06 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into Layer 9 evidence.
 
 ## D212 - Layer 3 candidate selection is policy-based
 

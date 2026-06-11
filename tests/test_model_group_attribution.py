@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.model_group_attribution import run_model_group_post_replay_attribution_if_ready
-from trading_manager_tasks.model_group_layer_ten_attribution import _event_effect_profile, run_model_group_layer_ten_attribution_if_ready
+from trading_manager_tasks.model_group_residual_event_governance import _event_effect_profile, run_model_group_residual_event_governance_if_ready
 
 
 class ModelGroupAttributionTests(unittest.TestCase):
@@ -101,7 +101,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["contract_type"], "post_replay_failure_triage_receipt")
             self.assertEqual(receipt["triaged_failure_count"], 3)
-            self.assertEqual(receipt["layer_10_event_attribution_status"], "not_performed")
+            self.assertEqual(receipt["residual_event_governance_status"], "not_performed")
             self.assertIs(receipt["event_evidence_consumed"], False)
             self.assertEqual(receipt["decision_rows_ref"], str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"))
             rows = [
@@ -154,7 +154,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
 
             self.assertIsNone(decision)
 
-    def test_writes_real_layer_10_attribution_receipt_from_event_observation(self):
+    def test_writes_real_residual_event_governance_receipt_from_event_observation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -236,7 +236,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            decision = run_model_group_layer_ten_attribution_if_ready(
+            decision = run_model_group_residual_event_governance_if_ready(
                 storage_root=storage_root,
                 agent_reviewer=self._fake_approved_event_strategy_review,
             )
@@ -244,11 +244,11 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "executed")
-            self.assertEqual(decision.reason_code, "model_group_layer_10_event_attribution_executed")
+            self.assertEqual(decision.reason_code, "model_group_residual_event_governance_executed")
             receipt_paths = list((dataset_root / "post_replay_attribution_runs").glob("*/post_replay_attribution_receipt.json"))
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
-            self.assertEqual(receipt["contract_type"], "post_replay_layer_10_event_attribution_receipt")
+            self.assertEqual(receipt["contract_type"], "post_replay_residual_event_governance_receipt")
             self.assertTrue(receipt["event_evidence_consumed"])
             self.assertEqual(receipt["event_candidate_count"], 2)
             self.assertEqual(receipt["event_observation_count"], 2)
@@ -258,7 +258,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 for line in Path(receipt["attribution_rows_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            self.assertEqual(rows[0]["contract_type"], "model_10_event_risk_governor_event_attribution_row")
+            self.assertEqual(rows[0]["contract_type"], "model_06_residual_event_governance_event_attribution_row")
             self.assertEqual(rows[0]["attribution_status"], "attributed")
             self.assertEqual(rows[0]["impact_exposure_time"], "2021-01-05T10:10:00-05:00")
             self.assertEqual(rows[0]["impact_onset_basis"], "source_impact_clock")
@@ -278,8 +278,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 if line.strip()
             ]
             self.assertEqual(len(proposals), 1)
-            self.assertEqual(proposals[0]["contract_type"], "model_10_event_risk_governor_event_focus_proposal")
-            self.assertEqual(proposals[0]["stage_id"], "model_group.layer_10_event_attribution")
+            self.assertEqual(proposals[0]["contract_type"], "model_06_residual_event_governance_event_focus_proposal")
+            self.assertEqual(proposals[0]["stage_id"], "model_group.residual_event_governance")
             self.assertEqual(proposals[0]["proposal_status"], "watch_candidate")
             self.assertEqual(proposals[0]["event_summary"]["normalized_event_type"], "microstructure_liquidity_disruption")
             self.assertIn("Fixture PIT event", proposals[0]["event_summary"]["rationale_summary"])
@@ -326,7 +326,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 for line in Path(receipt["accepted_temporal_attention_pool_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            self.assertEqual(accepted[0]["contract_type"], "model_10_event_risk_governor_temporal_attention_pool_entry")
+            self.assertEqual(accepted[0]["contract_type"], "model_06_residual_event_governance_temporal_attention_pool_entry")
             self.assertEqual(accepted[0]["pool_status"], "accepted")
             self.assertEqual(accepted[0]["event_temporal_form"], "instantaneous_unscheduled_event")
             self.assertEqual(accepted[0]["event_family_prior_role"], "event_family_impact_parameterization")
@@ -337,7 +337,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(accepted[0]["layer_4_state_overlay"], "event_post_release_impact_state")
             self.assertFalse(receipt["layer_4_promotion_performed"])
 
-    def test_layer_10_backoff_when_event_evidence_missing(self):
+    def test_residual_event_governance_backoff_when_event_evidence_missing(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -346,12 +346,12 @@ class ModelGroupAttributionTests(unittest.TestCase):
             triage_decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root)
             self.assertIsNotNone(triage_decision)
 
-            decision = run_model_group_layer_ten_attribution_if_ready(storage_root=storage_root)
+            decision = run_model_group_residual_event_governance_if_ready(storage_root=storage_root)
 
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
-            self.assertEqual(decision.reason_code, "model_group_layer_10_event_evidence_missing")
+            self.assertEqual(decision.reason_code, "model_group_residual_event_evidence_missing")
             self.assertFalse((dataset_root / "post_replay_attribution_runs").exists())
 
     def test_event_effect_profile_keeps_earnings_in_pre_release_risk_stage(self):

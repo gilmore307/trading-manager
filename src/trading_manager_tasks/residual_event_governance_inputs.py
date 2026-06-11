@@ -1,4 +1,4 @@
-"""Safe Layer 10 event-risk input materialization.
+"""Safe M06 event-risk input materialization.
 
 This module builds ``m10_event_risk_governor_data_acquisition`` rows only from already-saved local
 Layer 2 bar SQL receipts. It may run the trading-data equity abnormal activity
@@ -28,7 +28,7 @@ from .storage_paths import data_storage_root
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
-DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_10_event_risk_governor" / "input_materialization"
+DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_06_residual_event_governance" / "input_materialization"
 DETECTOR_SOURCE = "m10_event_risk_governor_data_acquisition.equity_abnormal_activity"
 SOURCE = "m10_event_risk_governor_data_acquisition"
 REQUIRED_EVENT_FEED_ARTIFACTS = {
@@ -92,7 +92,7 @@ class DetectorRunRef:
 
 
 @dataclass(frozen=True)
-class LayerTenEventRiskMaterialization:
+class ResidualEventGovernanceInputMaterialization:
     contract_type: str
     start_month: str
     end_month: str
@@ -263,13 +263,13 @@ def _run_detector(
             status="skipped_zero_bar_rows",
         )
     task_key = {
-        "task_id": f"layer_10_event_risk_governor_detector_{symbol}_{ref_month.replace('-', '_')}_{output_dir.name.replace('-', '_')}",
+        "task_id": f"model_06_residual_event_governance_detector_{symbol}_{ref_month.replace('-', '_')}_{output_dir.name.replace('-', '_')}",
         "source": DETECTOR_SOURCE,
         "params": {
             "bars_sql_source": _bar_sql_source(ref),
         },
         "output_root": str(detector_output_root),
-        "manager_stage_id": "layer_10_event_risk_governor.data_acquisition",
+        "manager_stage_id": "model_06_residual_event_governance.data_acquisition",
         "source_policy": "local_source_detector_over_reviewed_layer_02_alpaca_bar_sql_receipts_no_provider_calls",
     }
     task_key_path.parent.mkdir(parents=True, exist_ok=True)
@@ -295,7 +295,7 @@ def _run_detector(
                     event_count=0,
                     status="skipped_zero_sql_bar_rows",
                 )
-            raise TaskSystemError(f"Layer 10 detector failed for {symbol}: {result.stderr.strip() or result.stdout.strip()}")
+            raise TaskSystemError(f"M06 detector failed for {symbol}: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
         status = str(payload.get("status") or "succeeded")
         event_count = int((payload.get("row_counts") or {}).get("equity_abnormal_activity_event") or 0)
@@ -348,10 +348,10 @@ def _discover_event_feed_artifacts(
     start_month: str,
     end_month: str,
 ) -> tuple[list[str], dict[str, int]]:
-    """Return reviewed saved feed artifacts available for Layer 10 event extraction.
+    """Return reviewed saved feed artifacts available for M06 event extraction.
 
     The bridge is intentionally local-artifact only. It never dispatches feed
-    work or performs provider calls; the coverage gate refuses to let Layer 10
+    work or performs provider calls; the coverage gate refuses to let M06
     advance when required event feeds are absent.
     """
 
@@ -424,7 +424,7 @@ def _event_feed_row_coverage(event_artifact_paths: Sequence[str], *, start_month
     start = _parse_event_feed_time(start_text)
     end = _parse_event_feed_time(end_text)
     if start is None or end is None:
-        raise TaskSystemError(f"invalid Layer 10 event-feed coverage bounds: {start_text} -> {end_text}")
+        raise TaskSystemError(f"invalid M06 event-feed coverage bounds: {start_text} -> {end_text}")
     coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
     for raw_path in event_artifact_paths:
         source_id = _event_feed_source_from_path(raw_path)
@@ -499,7 +499,7 @@ def _write_source_task_key(
     start, end = _range_bounds(start_month, end_month)
     fold_key = _fold_key(start_month, end_month)
     task_key = {
-        "task_id": f"layer_10_event_risk_governor_{fold_key}",
+        "task_id": f"model_06_residual_event_governance_{fold_key}",
         "source": SOURCE,
         "params": {
             "start": start,
@@ -508,8 +508,8 @@ def _write_source_task_key(
             "event_artifact_paths": list(event_artifact_paths),
             "event_sql_inputs": [dict(item) for item in event_sql_inputs],
         },
-        "output_root": str(trading_data_output_root / SOURCE / f"layer_10_event_risk_governor_{fold_key}"),
-        "manager_stage_id": "layer_10_event_risk_governor.data_acquisition",
+        "output_root": str(trading_data_output_root / SOURCE / f"model_06_residual_event_governance_{fold_key}"),
+        "manager_stage_id": "model_06_residual_event_governance.data_acquisition",
         "source_policy": "local_event_index_over_source_detector_outputs_no_provider_calls",
     }
     path = output_dir / "m10_event_risk_governor_data_acquisition_task_key.json"
@@ -517,7 +517,7 @@ def _write_source_task_key(
     return path
 
 
-def materialize_layer_ten_event_risk_governor_inputs(
+def materialize_residual_event_governance_inputs_inputs(
     *,
     start_month: str,
     end_month: str,
@@ -528,7 +528,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     run_id: str | None = None,
     write: bool = False,
-) -> LayerTenEventRiskMaterialization:
+) -> ResidualEventGovernanceInputMaterialization:
     if not manager_storage_root.is_absolute():
         manager_storage_root = Path.cwd() / manager_storage_root
     fold_key = _fold_key(start_month, end_month)
@@ -536,7 +536,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
     output_dir = output_base / fold_key
     output_dir.mkdir(parents=True, exist_ok=True)
     trading_data_output_root = output_dir / "trading_data_outputs"
-    run_id = run_id or f"layer_10_event_risk_governor_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_id = run_id or f"model_06_residual_event_governance_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     refs = tuple(
         ref
         for month in _iter_months(start_month, end_month)
@@ -548,7 +548,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
         )
     )
     if not refs:
-        raise TaskSystemError("no successful Layer 2 feed artifacts are available for Layer 10 event-risk materialization")
+        raise TaskSystemError("no successful Layer 2 feed artifacts are available for M06 event-risk materialization")
     event_artifact_paths, artifact_coverage = _discover_event_feed_artifacts(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
     artifact_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
     event_sql_inputs, sql_coverage, sql_row_coverage = _discover_event_feed_sql_inputs(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
@@ -564,12 +564,12 @@ def materialize_layer_ten_event_risk_governor_inputs(
     missing_feed_rows = _missing_event_feed_rows(event_feed_row_coverage)
     if write and missing_feed_artifacts:
         raise TaskSystemError(
-            "Layer 10 event-risk coverage is incomplete; missing reviewed feed artifacts for "
+            "M06 event-risk coverage is incomplete; missing reviewed feed artifacts for "
             + ",".join(missing_feed_artifacts)
         )
     if write and missing_feed_rows:
         raise TaskSystemError(
-            "Layer 10 event-risk coverage is incomplete; reviewed feed artifacts have zero in-window rows for "
+            "M06 event-risk coverage is incomplete; reviewed feed artifacts have zero in-window rows for "
             + ",".join(missing_feed_rows)
         )
     detector_runs = tuple(
@@ -585,7 +585,7 @@ def materialize_layer_ten_event_risk_governor_inputs(
     )
     events = [event for detector_run in detector_runs for event in _read_detector_events(detector_run)]
     if not events and not event_artifact_paths and not event_sql_inputs and write:
-        raise TaskSystemError("Layer 10 event-risk materialization emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
+        raise TaskSystemError("M06 event-risk materialization emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
     source_task_key_path = _write_source_task_key(
         output_dir=output_dir,
         trading_data_output_root=trading_data_output_root,
@@ -611,8 +611,8 @@ def materialize_layer_ten_event_risk_governor_inputs(
         references = [str(item) for item in payload.get("references") or []]
         source_receipt_path = next((item for item in references if item.endswith("completion_receipt.json")), None)
         source_event_count = int((payload.get("row_counts") or {}).get(SOURCE) or source_event_count)
-    summary = LayerTenEventRiskMaterialization(
-        contract_type="manager_layer_ten_event_risk_governor_input_materialization",
+    summary = ResidualEventGovernanceInputMaterialization(
+        contract_type="manager_residual_event_governance_input_materialization",
         start_month=start_month,
         end_month=end_month,
         detector_run_count=len(detector_runs),
@@ -631,13 +631,13 @@ def materialize_layer_ten_event_risk_governor_inputs(
     return summary
 
 
-def write_summary(summary: LayerTenEventRiskMaterialization, *, output: TextIO) -> None:
+def write_summary(summary: ResidualEventGovernanceInputMaterialization, *, output: TextIO) -> None:
     json.dump(summary.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize Layer 10 m10_event_risk_governor_data_acquisition rows from local reviewed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize M06 m10_event_risk_governor_data_acquisition rows from local reviewed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
@@ -648,7 +648,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-id")
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args(argv)
-    summary = materialize_layer_ten_event_risk_governor_inputs(
+    summary = materialize_residual_event_governance_inputs_inputs(
         start_month=args.start_month,
         end_month=args.end_month,
         manager_storage_root=args.manager_storage_root,
@@ -663,7 +663,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-__all__ = ["DetectorRunRef", "LayerTenEventRiskMaterialization", "materialize_layer_ten_event_risk_governor_inputs"]
+__all__ = ["DetectorRunRef", "ResidualEventGovernanceInputMaterialization", "materialize_residual_event_governance_inputs_inputs"]
 
 
 if __name__ == "__main__":  # pragma: no cover

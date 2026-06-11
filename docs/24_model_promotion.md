@@ -52,21 +52,21 @@ For the first accepted model bundle, evaluation may set `first_model_bootstrap =
 
 ## Failure Attribution Boundary
 
-Failure attribution is a first-class task between replay and evaluation. It is not the same as evaluation and it is not limited to Layer 10 event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, and event/co-event explanations.
+Failure attribution is a first-class task between replay and evaluation. It is not the same as evaluation and it is not limited to M06 event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, and event/co-event explanations.
 
 Replay-derived failure triage is only the first bookkeeping step. A
 `post_replay_failure_triage_receipt` may identify failed fills, missed winners,
-and other candidate failure rows, but it does not satisfy Layer 10
-EventRiskGovernor attribution. Layer 10 attribution requires a separate receipt
+and other candidate failure rows, but it does not satisfy M06
+EventRiskGovernor attribution. M06 attribution requires a separate receipt
 produced by the event-risk route with failure-scope triage, point-in-time event
 observations or candidates, event-evidence refs, and control/co-event/confounder
 analysis. Evaluation must not treat generic failure triage rows as completed
-Layer 10 event attribution.
+M06 event attribution.
 
 The manager-owned historical workflow therefore has two explicit post-replay
 steps before evaluation: first `post_replay_failure_triage`, then
-`layer_10_event_attribution`. If failure triage is ready but no reviewed
-point-in-time event evidence exists, Layer 10 must back off and prepare the
+`residual_event_governance`. If failure triage is ready but no reviewed
+point-in-time event evidence exists, M06 must back off and prepare the
 bounded event-feed backfill task keys needed to materialize event observations;
 that preparation is not itself attribution and does not call providers.
 
@@ -76,16 +76,16 @@ attribution after the regular session closes or in another explicitly accepted
 off-hours window. Realtime watch may produce warning evidence for C03/C05/C06
 review paths, but it must not mutate intraday entry, lifecycle, sizing, or
 execution decisions by itself. If C07 identifies an event or anomaly that has not
-been trained and accepted through Layer 10/Layer 4, it may only emit a
+been trained and accepted through M06/Layer 4, it may only emit a
 provisional untrained-event risk estimate from model-failure severity and
 supporting evidence. That estimate must be routed to the trading-review agent
 before it can affect a live block, reduce, exit, or human-review path.
 Evaluation may use attribution evidence, but evaluation must not silently invent
 attribution labels inside promotion scoring.
 
-## Layer 10 / Layer 4 Rule
+## M06 / Layer 4 Rule
 
-Layer 10 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
+M06 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
 
 ## Useful Commands
 

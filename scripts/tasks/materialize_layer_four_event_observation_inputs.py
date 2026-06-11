@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from trading_manager_tasks.layer_ten_event_risk_governor import (
+from trading_manager_tasks.residual_event_governance_inputs import (
     _discover_event_feed_artifacts,
     _event_feed_row_coverage,
     _missing_event_feed_artifacts,

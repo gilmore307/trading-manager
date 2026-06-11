@@ -112,13 +112,13 @@ def build_event_model_regeneration_plan(
             "storage_artifacts_and_dashboard_snapshots_until_regeneration_review_completes",
         ),
         superseded_surfaces=(
-            "pre_replay_layer_10_data_or_feature_outputs",
+            "pre_replay_residual_event_governance_data_or_feature_outputs",
             "event_risk_governor_outputs_built_before_concentrated_replay_failure_attribution",
             "promotion_review_artifacts_claiming_event_alpha_without_layer_4_acceptance_and_replay_attribution_evidence",
             "model_run_metadata_that_depends_on_non_current_event_observation_or_replay_attribution_after_reviewed_rebuild_exists",
         ),
         invalidation_scope=(
-            "state_only_post_replay_layer_10_attribution_and_event_adjusted_outputs; base-stack and replay outputs remain reusable "
+            "state_only_post_replay_residual_event_governance_and_event_adjusted_outputs; base-stack and replay outputs remain reusable "
             "unless a specific artifact consumed non-current event observations, non-current replay traces, or violates the rolling-fold policy"
         ),
         regeneration_steps=(
@@ -126,7 +126,7 @@ def build_event_model_regeneration_plan(
                 step_id="01_build_acceptance_report",
                 owner_repo="trading-model",
                 action="emit event_model_acceptance_report from accepted final judgment",
-                command_ref="python3 scripts/models/model_10_event_risk_governor/build_event_model_acceptance_report.py",
+                command_ref="python3 scripts/models/model_06_residual_event_governance/build_event_model_acceptance_report.py",
                 status="ready_offline",
                 mutation_class="report_artifact_only",
                 provider_calls_allowed=False,
@@ -136,7 +136,7 @@ def build_event_model_regeneration_plan(
                 step_id="02_prepare_event_feed_backfill_task_keys",
                 owner_repo="trading-manager",
                 action="prepare required monthly event-feed task keys for the fold without provider calls",
-                command_ref="PYTHONPATH=src python3 scripts/tasks/prepare_layer_ten_event_feed_backfill.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write-files",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/prepare_residual_event_feed_backfill.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write-files",
                 status="ready_offline",
                 mutation_class="manager_task_key_write_only",
                 provider_calls_allowed=False,
@@ -155,7 +155,7 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="04_materialize_layer_4_event_observation_fold_pool",
                 owner_repo="trading-manager",
-                action="materialize the fold-scoped Layer 4 event-observation substrate, allowing an explicit empty pool before Layer 10 has accepted event attribution",
+                action="materialize the fold-scoped Layer 4 event-observation substrate, allowing an explicit empty pool before M06 has accepted event attribution",
                 command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_observation_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
                 status="ready_without_provider_calls",
                 mutation_class="local_event_observation_substrate_receipt",
@@ -173,10 +173,10 @@ def build_event_model_regeneration_plan(
                 requires_review_before_apply=False,
             ),
             RegenerationStep(
-                step_id="06_generate_post_replay_layer_10_attribution",
+                step_id="06_generate_post_replay_residual_event_governance",
                 owner_repo="trading-model",
-                action="generate Layer 10 attribution from replay failures, residuals, misses, path deviations, overblocks, underblocks, and option-expression drag",
-                command_ref="python3 scripts/models/model_10_event_risk_governor/generate_post_replay_event_attribution.py",
+                action="generate M06 attribution from replay failures, residuals, misses, path deviations, overblocks, underblocks, and option-expression drag",
+                command_ref="python3 scripts/models/model_06_residual_event_governance/generate_post_replay_event_attribution.py",
                 status="blocked_until_model_group_replay_complete",
                 mutation_class="offline_post_replay_attribution_generation",
                 provider_calls_allowed=False,
@@ -186,7 +186,7 @@ def build_event_model_regeneration_plan(
                 step_id="07_evaluate_and_review_without_activation",
                 owner_repo="trading-model;trading-manager",
                 action="evaluate post-replay EventRiskGovernor attribution quality, then submit conservative manager promotion review",
-                command_ref="python3 scripts/models/model_10_event_risk_governor/evaluate_model_10_event_risk_governor.py; PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model event_risk_governor",
+                command_ref="python3 scripts/models/model_06_residual_event_governance/evaluate_model_06_residual_event_governance.py; PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model event_risk_governor",
                 status="blocked_until_post_replay_event_attribution_ready",
                 mutation_class="promotion_evidence_and_review_request_only",
                 provider_calls_allowed=False,
@@ -195,8 +195,8 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="08_state_only_invalidation_if_old_outputs_remain",
                 owner_repo="trading-manager",
-                action="mark stale pre-replay Layer 10 or event-adjusted workflow stages rebuild-required without deleting artifacts",
-                command_ref="PYTHONPATH=src python3 scripts/tasks/invalidate_layer_ten_event_downstream_outputs.py --write",
+                action="mark stale pre-replay M06 or event-adjusted workflow stages rebuild-required without deleting artifacts",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/invalidate_residual_event_downstream_outputs.py --write",
                 status="review_before_write",
                 mutation_class="workflow_state_only_no_artifact_deletion",
                 provider_calls_allowed=False,
@@ -220,7 +220,7 @@ def build_event_model_regeneration_plan(
         notes=(
             "Layer 1 and Layer 2 data are persistent foundations: compress/archive only, never auto-delete.",
             "Layer 4 event observations are collected for each fold before replay, even for global/sector events, because the accepted observation pool can change by fold.",
-            "Layer 10 starts after concentrated replay and learns attribution from replay failures/residuals; it is not a pre-replay data-acquisition lane.",
+            "M06 starts after concentrated replay and learns attribution from replay failures/residuals; it is not a pre-replay data-acquisition lane.",
             "Current earnings/guidance route remains blocked for signed claims by missing comparable current guidance and PIT expectation baselines.",
             "This plan is non-mutating; executable steps remain separate reviewed tools.",
         ),

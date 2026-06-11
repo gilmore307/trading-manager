@@ -23,7 +23,7 @@ This file is the manager-side map of the current Layer 1-10 stack. It is a routi
 | 7 | `PositionProjectionModel` | `layer_07_position_projection`, `position_projection_model`, `model_07_position_projection` | Abstract holding-state projection under Layer 6 risk policy | `position_projection_vector` | No buy/sell/hold order. |
 | 8 | `UnderlyingActionModel` | `layer_08_underlying_action`, `underlying_action_model`, `model_08_underlying_action` | Offline underlying thesis | `underlying_action_plan` | Not broker routing or order construction. |
 | 9 | `OptionExpressionModel` | `layer_09_option_expression`, `option_expression_model`, `model_09_option_expression` | Optional offline option-expression context from the Layer 8 thesis | `option_expression_plan` | Not execution and not broker/account mutation. |
-| 10 | `EventRiskGovernor` | `layer_10_event_risk_governor`, `event_risk_governor`, `model_10_event_risk_governor` | Residual event-risk governance over the Layer 8 direct-underlying thesis, with Layer 9 context optional | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
+| 10 | `EventRiskGovernor` | `model_06_residual_event_governance`, `event_risk_governor`, `model_06_residual_event_governance` | Residual event-risk governance over the Layer 8 direct-underlying thesis, with Layer 9 context optional | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
 
 ## Physical Surface Rule
 
@@ -31,13 +31,13 @@ Active code, scripts, registry rows, and docs should use the current layer numbe
 
 ## Event Path Rule
 
-Layer 10 may inspect residual event evidence and abnormal activity only after
+M06 may inspect residual event evidence and abnormal activity only after
 concentrated live-flow replay has exposed failures, residuals, misses, or path
 deviations. It is not a pre-replay input stage. Layer 4 may consume only Layer
 10 evidence packets that passed point-in-time checks, non-overlap checks,
 matched-control review, leakage review, and agent/manager acceptance.
 
-Layer 9 remains the optional base guidance/expression layer. It should not directly absorb event anomalies as alpha or duplicate Layer 10 residual evidence.
+Layer 9 remains the optional base guidance/expression layer. It should not directly absorb event anomalies as alpha or duplicate M06 residual evidence.
 
 ## Layer 3 Candidate Policy
 

@@ -1,7 +1,7 @@
 """Layer 4 event-failure feature materialization.
 
 Layer 4 does not discover event families and does not reinterpret raw event
-artifacts. It consumes Layer 10 / review-owned event interpretation evidence and
+artifacts. It consumes M06 / review-owned event interpretation evidence and
 turns accepted, point-in-time interpretations into model-facing event failure
 gate rows when they are already target-routable. Empty input is an explicit
 neutral receipt, not a missing-data error.

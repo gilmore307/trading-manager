@@ -1,6 +1,6 @@
 """Manager-owned model-group evaluation execution.
 
-The dashboard can see when replay and Layer 10 attribution are ready, but the
+The dashboard can see when replay and M06 attribution are ready, but the
 manager must still write concrete evaluation evidence before promotion can
 inspect it. This module performs that side-effect-free evidence build over the
 local replay dataset.
@@ -31,8 +31,8 @@ MODEL_GROUP_EVALUATION_CHECKS = (
     "replay_metrics",
     "guardrail_settlement",
     "incumbent_comparison",
-    "layer_10_attribution",
-    "layer_10_event_focus_proposal",
+    "residual_event_governance",
+    "residual_event_governance_event_focus_proposal",
 )
 PROMOTION_REVIEW_RECOMMENDATIONS = {"failed", "deferred", "eligible_for_shadow", "insufficient_evidence"}
 PROMOTION_REVIEW_CONFIDENCE = {"low", "medium", "high"}
@@ -51,11 +51,11 @@ INTENDED_OPERATING_THRESHOLD = 0.70
 MAX_ACCEPTABLE_MAX_DRAWDOWN = -0.30
 MAX_ACCEPTABLE_BAD_FILL_RATE = 0.55
 MAX_ACCEPTABLE_MODEL_MISSED_WINNER_RATE = 0.45
-LAYER_10_EVENT_ATTRIBUTION_CONTRACT_TYPES = {
-    "post_replay_layer_10_event_attribution_receipt",
-    "model_10_event_risk_governor_event_attribution_receipt",
+RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES = {
+    "post_replay_residual_event_governance_receipt",
+    "model_06_residual_event_governance_event_attribution_receipt",
 }
-LAYER_10_COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
+M06_COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
 
 
 def run_model_group_evaluation_if_ready(
@@ -73,7 +73,7 @@ def run_model_group_evaluation_if_ready(
     codex_model: str | None = None,
     codex_timeout_seconds: int = DEFAULT_PROMOTION_REVIEW_CODEX_TIMEOUT_SECONDS,
 ) -> SchedulerDecision | None:
-    """Run one model-group evaluation build when Layer 10 evidence is complete."""
+    """Run one model-group evaluation build when M06 evidence is complete."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     replay_receipt_path, replay_receipt = _latest_replay_execution_receipt(dataset_root)
@@ -122,8 +122,8 @@ def run_model_group_evaluation_if_ready(
     if not force and _latest_promotion_review_artifacts(
         dataset_root,
         replay_result_ref=str(replay_receipt_path),
-        layer_10_attribution_receipt_ref=str(attribution_receipt_path),
-        layer_10_event_focus_proposals_ref=str(event_focus_proposals_path),
+        residual_event_governance_receipt_ref=str(attribution_receipt_path),
+        residual_event_governance_event_focus_proposals_ref=str(event_focus_proposals_path),
         minimum_mtime=_state_mtime(training_fold),
     ) is not None:
         return None
@@ -160,7 +160,7 @@ def run_model_group_evaluation_if_ready(
             now=now,
             decision_status="ready",
             reason_code="model_group_evaluation_ready",
-            reason="model-group evaluation is ready to build replay metrics, guardrails, incumbent comparison, and Layer 10 attribution checks",
+            reason="model-group evaluation is ready to build replay metrics, guardrails, incumbent comparison, and M06 attribution checks",
             selected_work="model_group.evaluation",
             command=command,
             execution_summary={
@@ -196,7 +196,7 @@ def run_model_group_evaluation_if_ready(
             settlement=settlement,
             settlement_ref=str(settlement_path),
             benchmark_contract_ref=f"trading-evaluation/replays/{contract_id}.json",
-            layer_10_attribution_ref=str(attribution_receipt_path),
+            residual_event_governance_ref=str(attribution_receipt_path),
             created_at_utc=now.isoformat(),
             call_agent_review=call_agent_review,
             agent_reviewer=agent_reviewer,
@@ -225,8 +225,8 @@ def run_model_group_evaluation_if_ready(
             "expected_check_count": len(MODEL_GROUP_EVALUATION_CHECKS),
             "ready_check_count": len(set(check_summary["ready_checks"]).intersection(MODEL_GROUP_EVALUATION_CHECKS)),
             "replay_execution_receipt_ref": str(replay_receipt_path),
-            "layer_10_attribution_receipt_ref": str(attribution_receipt_path),
-            "layer_10_event_focus_proposals_ref": str(event_focus_proposals_path),
+            "residual_event_governance_receipt_ref": str(attribution_receipt_path),
+            "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
             "fold_settlement_run_ref": str(settlement_path),
             "promotion_evaluation_review_ref": str(review_path),
             "promotion_eligibility_decision_ref": str(decision_path),
@@ -1649,7 +1649,7 @@ def _build_promotion_review(
     settlement: Mapping[str, Any],
     settlement_ref: str,
     benchmark_contract_ref: str,
-    layer_10_attribution_ref: str,
+    residual_event_governance_ref: str,
     created_at_utc: str,
     call_agent_review: bool,
     agent_reviewer: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None,
@@ -1661,7 +1661,7 @@ def _build_promotion_review(
         settlement=settlement,
         settlement_ref=settlement_ref,
         benchmark_contract_ref=benchmark_contract_ref,
-        layer_10_attribution_ref=layer_10_attribution_ref,
+        residual_event_governance_ref=residual_event_governance_ref,
         created_at_utc=created_at_utc,
     )
     if agent_reviewer is not None:
@@ -1699,7 +1699,7 @@ def _build_promotion_review_packet(
     settlement: Mapping[str, Any],
     settlement_ref: str,
     benchmark_contract_ref: str,
-    layer_10_attribution_ref: str,
+    residual_event_governance_ref: str,
     created_at_utc: str,
 ) -> dict[str, Any]:
     metrics = settlement.get("metrics") if isinstance(settlement.get("metrics"), Mapping) else {}
@@ -1732,7 +1732,7 @@ def _build_promotion_review_packet(
         "uncertainty_status": "insufficient_evidence",
         "shadow_readiness_status": "insufficient_evidence",
         "settlement_run_ref": settlement_ref,
-        "layer_10_attribution_ref": layer_10_attribution_ref,
+        "residual_event_governance_ref": residual_event_governance_ref,
         "first_model_bootstrap": False,
         "bootstrap_baseline_ref": "",
         "candidate_model_ref": str(settlement.get("candidate_model_ref") or ""),
@@ -2019,8 +2019,8 @@ def _evaluation_check_summary(
         ("replay_metrics", replay_metrics_ready, f"{len(rows)} replay decision rows available"),
         ("guardrail_settlement", guardrail_ready, f"{len(rows)} replay decision rows checked against guardrails"),
         ("incumbent_comparison", comparison_ready, "incumbent comparison recorded as insufficient evidence for promotion"),
-        ("layer_10_attribution", attribution_ready, f"{len(attribution_rows)} Layer 10 attribution rows linked"),
-        ("layer_10_event_focus_proposal", event_focus_ready, f"{event_focus_count} Layer 10 event-focus proposals prepared"),
+        ("residual_event_governance", attribution_ready, f"{len(attribution_rows)} M06 attribution rows linked"),
+        ("residual_event_governance_event_focus_proposal", event_focus_ready, f"{event_focus_count} M06 event-focus proposals prepared"),
     ):
         if ready:
             ready_checks.append(check)
@@ -2133,9 +2133,9 @@ def _latest_attribution_receipt(dataset_root: Path, *, decision_rows_ref: str) -
     return _latest_receipt(
         attribution_root,
         "post_replay_attribution_receipt.json",
-        accepted_statuses=LAYER_10_COMPLETE_STATUSES,
+        accepted_statuses=M06_COMPLETE_STATUSES,
         required_field=("decision_rows_ref", decision_rows_ref),
-        predicate=_is_layer_10_event_attribution_receipt,
+        predicate=_is_residual_event_governance_receipt,
     )
 
 
@@ -2172,9 +2172,9 @@ def _latest_receipt(
     return path, dict(receipt)
 
 
-def _is_layer_10_event_attribution_receipt(receipt: Mapping[str, Any]) -> bool:
+def _is_residual_event_governance_receipt(receipt: Mapping[str, Any]) -> bool:
     contract_type = str(receipt.get("contract_type") or "")
-    if contract_type not in LAYER_10_EVENT_ATTRIBUTION_CONTRACT_TYPES:
+    if contract_type not in RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES:
         return False
     if receipt.get("event_evidence_consumed") is not True:
         return False
@@ -2212,8 +2212,8 @@ def _latest_promotion_review_artifacts(
     dataset_root: Path,
     *,
     replay_result_ref: str,
-    layer_10_attribution_receipt_ref: str,
-    layer_10_event_focus_proposals_ref: str,
+    residual_event_governance_receipt_ref: str,
+    residual_event_governance_event_focus_proposals_ref: str,
     minimum_mtime: float | None = None,
 ) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
@@ -2226,9 +2226,9 @@ def _latest_promotion_review_artifacts(
             continue
         if str(receipt.get("replay_execution_receipt_ref") or "") != replay_result_ref:
             continue
-        if str(receipt.get("layer_10_attribution_receipt_ref") or "") != layer_10_attribution_receipt_ref:
+        if str(receipt.get("residual_event_governance_receipt_ref") or "") != residual_event_governance_receipt_ref:
             continue
-        if str(receipt.get("layer_10_event_focus_proposals_ref") or "") != layer_10_event_focus_proposals_ref:
+        if str(receipt.get("residual_event_governance_event_focus_proposals_ref") or "") != residual_event_governance_event_focus_proposals_ref:
             continue
         decision_path = receipt_path.parent / "promotion_eligibility_decision.json"
         if not decision_path.exists():

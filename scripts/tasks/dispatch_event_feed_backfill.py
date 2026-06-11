@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate or dispatch bounded Layer 10 event-feed backfill task keys."""
+"""Validate or dispatch bounded M06 event-feed backfill task keys."""
 
 from trading_manager_tasks.event_feed_dispatch import main
 

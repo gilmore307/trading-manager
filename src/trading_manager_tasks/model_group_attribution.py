@@ -2,7 +2,7 @@
 
 This step is local, replay-derived bookkeeping. It converts replay failure/miss
 rows into durable triage units for later attribution work. It is deliberately
-not Layer 10 EventRiskGovernor event attribution because it does not consume
+not M06 ResidualEventGovernance event attribution because it does not consume
 point-in-time event observations, event candidates, controls, co-events, or
 confounder evidence.
 """
@@ -116,7 +116,7 @@ def run_model_group_post_replay_attribution_if_ready(
             "expected_failure_count": len(attribution_rows),
             "triaged_failure_count": len(attribution_rows),
             "processed_failure_count": len(attribution_rows),
-            "layer_10_event_attribution_status": "not_performed",
+            "residual_event_governance_status": "not_performed",
             "event_evidence_consumed": False,
             "event_observation_count": 0,
             "event_candidate_count": 0,
@@ -141,7 +141,7 @@ def run_model_group_post_replay_attribution_if_ready(
             "post_replay_failure_triage_receipt": str(receipt_path),
             "triage_rows_ref": str(triage_rows_path),
             "triaged_failure_count": len(attribution_rows),
-            "layer_10_event_attribution_status": "not_performed",
+            "residual_event_governance_status": "not_performed",
         },
     )
 

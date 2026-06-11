@@ -136,7 +136,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         attribution_rows_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "model_10_event_risk_governor_event_attribution_row",
+                    "contract_type": "model_06_residual_event_governance_event_attribution_row",
                     "attribution_id": "attr_1",
                     "event_candidate_ref": "event_candidate_fixture",
                 }
@@ -148,7 +148,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         proposal_rows_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "model_10_event_risk_governor_event_focus_proposal",
+                    "contract_type": "model_06_residual_event_governance_event_focus_proposal",
                     "event_focus_proposal_id": "focus_1",
                     "proposal_status": "watch_candidate",
                     "event_ref": "event_candidate_fixture",
@@ -161,7 +161,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         (attribution_root / "post_replay_attribution_receipt.json").write_text(
             json.dumps(
                 {
-                    "contract_type": "post_replay_layer_10_event_attribution_receipt",
+                    "contract_type": "post_replay_residual_event_governance_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-28T00:00:01+00:00",
                     "decision_rows_ref": str(decision_rows_path),
@@ -180,7 +180,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         )
         return dataset_root
 
-    def test_ignores_replay_failure_triage_as_layer_10_event_attribution(self):
+    def test_ignores_replay_failure_triage_as_residual_event_governance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -201,7 +201,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "created_at_utc": "2026-05-28T00:00:01+00:00",
                         "decision_rows_ref": str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"),
                         "triage_rows_ref": str(attribution_rows),
-                        "layer_10_event_attribution_status": "not_performed",
+                        "residual_event_governance_status": "not_performed",
                         "event_evidence_consumed": False,
                         "event_observation_count": 0,
                         "event_candidate_count": 0,
@@ -247,7 +247,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["ready_check_count"], 5)
-            self.assertIn("layer_10_event_focus_proposal", receipt["ready_checks"])
+            self.assertIn("residual_event_governance_event_focus_proposal", receipt["ready_checks"])
             review = json.loads(review_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(review["agent_invocation_status"], "completed")
             self.assertEqual(review["recommendation"], "deferred")
@@ -311,11 +311,11 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             replay_decision_rows = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
             refreshed_attribution_root = dataset_root / "post_replay_attribution_runs" / "post_replay_attribution_refreshed"
             refreshed_attribution_root.mkdir(parents=True)
-            refreshed_attribution_rows = refreshed_attribution_root / "layer_10_event_attribution_rows.jsonl"
+            refreshed_attribution_rows = refreshed_attribution_root / "residual_event_governance_rows.jsonl"
             refreshed_attribution_rows.write_text(
                 json.dumps(
                     {
-                        "contract_type": "model_10_event_risk_governor_event_attribution_row",
+                        "contract_type": "model_06_residual_event_governance_event_attribution_row",
                         "attribution_id": "attr_2",
                         "event_candidate_ref": "event_candidate_refreshed",
                     }
@@ -327,7 +327,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             refreshed_proposal_rows.write_text(
                 json.dumps(
                     {
-                        "contract_type": "model_10_event_risk_governor_event_focus_proposal",
+                        "contract_type": "model_06_residual_event_governance_event_focus_proposal",
                         "event_focus_proposal_id": "focus_2",
                         "proposal_status": "watch_candidate",
                         "event_ref": "event_candidate_refreshed",
@@ -341,7 +341,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             refreshed_attribution_receipt.write_text(
                 json.dumps(
                     {
-                        "contract_type": "post_replay_layer_10_event_attribution_receipt",
+                        "contract_type": "post_replay_residual_event_governance_receipt",
                         "status": "succeeded",
                         "created_at_utc": "2026-05-28T00:00:03+00:00",
                         "decision_rows_ref": str(replay_decision_rows),
@@ -372,7 +372,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(len(receipt_paths), 2)
             latest_receipt_path = max(receipt_paths, key=lambda path: path.stat().st_mtime)
             latest_receipt = json.loads(latest_receipt_path.read_text(encoding="utf-8"))
-            self.assertEqual(latest_receipt["layer_10_attribution_receipt_ref"], str(refreshed_attribution_receipt))
+            self.assertEqual(latest_receipt["residual_event_governance_receipt_ref"], str(refreshed_attribution_receipt))
 
             state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
             newer_mtime = max(path.stat().st_mtime for path in (dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json")) + 1
