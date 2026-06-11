@@ -18,7 +18,7 @@ from trading_manager_tasks.stage_run_dashboard import (
 def _coverage(*, status: str = "partial_ready") -> StageCoverageReport:
     return StageCoverageReport(
         contract_type="manager_stage_coverage",
-        stage_id="layer_02_sector_context.data_acquisition",
+        stage_id="model_01_background_context.data_acquisition",
         start_month="2016-01",
         end_month="2016-01",
         expected_count=25,
@@ -32,7 +32,7 @@ def _coverage(*, status: str = "partial_ready") -> StageCoverageReport:
         ready_request_ids=(
             "mgrreq_backfill_alpaca_bars_xlb_2016_01",
             "mgrreq_backfill_alpaca_bars_xle_2016_01",
-            "mgrreq_backfill_alpaca_bars_xlk_2016_01",
+            "mgrreq_backfill_alpaca_bars_spy_2016_01",
         ),
         failed_request_ids=("mgrreq_backfill_alpaca_bars_xop_2016_01",) if status == "failed" else (),
         accepted_failed_request_ids=(
@@ -43,7 +43,7 @@ def _coverage(*, status: str = "partial_ready") -> StageCoverageReport:
             "mgrreq_backfill_alpaca_bars_xlc_2016_01",
         ),
         pending_request_ids=("mgrreq_backfill_alpaca_bars_arkg_2016_01",),
-        accepted_failure_refs=("review://layer2-preflight",),
+        accepted_failure_refs=("review://model1-preflight",),
         reason="stage coverage partial 3 ready + 5 reviewed failed/skip / 25; downstream remains blocked",
     )
 
@@ -75,7 +75,7 @@ class StageRunDashboardTests(unittest.TestCase):
             return_value=_preview(),
         ):
             dashboard = build_stage_run_dashboard(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 packet_storage_root=Path("/tmp/does-not-exist"),
@@ -99,7 +99,7 @@ class StageRunDashboardTests(unittest.TestCase):
             return_value=_preview(),
         ):
             dashboard = build_stage_run_dashboard(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 packet_storage_root=Path("/tmp/does-not-exist"),
@@ -124,7 +124,7 @@ class StageRunDashboardTests(unittest.TestCase):
             return_value=retry_preview,
         ):
             dashboard = build_stage_run_dashboard(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 packet_storage_root=Path("/tmp/does-not-exist"),
@@ -138,7 +138,7 @@ class StageRunDashboardTests(unittest.TestCase):
         request_id = "mgrreq_option_chain_window_aapl_2016_01_2016_04_20_0930"
         coverage = StageCoverageReport(
             contract_type="manager_stage_coverage",
-            stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+            stage_id="model_05_option_expression.option_chain_data_acquisition",
             start_month="2016-01",
             end_month="2016-06",
             expected_count=125,
@@ -175,7 +175,7 @@ class StageRunDashboardTests(unittest.TestCase):
             return_value=dispatch_summary,
         ):
             preview = preview_next_provider_dispatch(
-                stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+                stage_id="model_05_option_expression.option_chain_data_acquisition",
                 start_month="2016-01",
                 end_month="2016-06",
                 limit=4,
@@ -189,8 +189,8 @@ class StageRunDashboardTests(unittest.TestCase):
 
     def test_default_dashboard_path_is_stable(self) -> None:
         self.assertEqual(
-            default_dashboard_path(stage_id="layer_02_sector_context.data_acquisition", start_month="2016-01"),
-            DEFAULT_STAGE_RUN_DASHBOARD_ROOT / "layer_02_sector_context_data_acquisition_2016-01.json",
+            default_dashboard_path(stage_id="model_01_background_context.data_acquisition", start_month="2016-01"),
+            DEFAULT_STAGE_RUN_DASHBOARD_ROOT / "model_01_background_context_data_acquisition_2016-01.json",
         )
 
 

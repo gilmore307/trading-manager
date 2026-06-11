@@ -176,7 +176,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.execution_summary["request_count"], 19)
         self.assertEqual(decision.execution_summary["handoff_validation_count"], 19)
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], BASE_STACK_LAYER_COUNT)
-        self.assertEqual(decision.execution_summary["workflow_plan"]["next_stage"]["stage_id"], "layer_01_market_regime.data_acquisition")
+        self.assertEqual(decision.execution_summary["workflow_plan"]["next_stage"]["stage_id"], "model_01_background_context.data_acquisition")
 
     def test_scheduler_progresses_to_autonomous_provider_acquisition_after_layer_one_payloads_exist(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -190,7 +190,7 @@ class SchedulerTests(unittest.TestCase):
             )
         self.assertEqual(decision.decision_status, "ready")
         self.assertEqual(decision.reason_code, "autonomous_provider_stage_ready")
-        self.assertEqual(decision.selected_work, "layer_01_market_regime.data_acquisition")
+        self.assertEqual(decision.selected_work, "model_01_background_context.data_acquisition")
         self.assertIsNone(decision.approval_gate_required)
         self.assertEqual(decision.execution_summary["workflow_plan"]["layer_count"], BASE_STACK_LAYER_COUNT)
         self.assertEqual(
@@ -199,7 +199,7 @@ class SchedulerTests(unittest.TestCase):
         )
         self.assertEqual(
             decision.lock_plan["lock_templates"][0]["lock_key_template"],
-            "lock:provider:2016-01:layer_01_market_regime.data_acquisition:<provider_id>:<partition_id>",
+            "lock:provider:2016-01:model_01_background_context.data_acquisition:<provider_id>:<partition_id>",
         )
 
     def test_safe_offline_stage_flag_does_not_execute_provider_acquisition(self):
@@ -257,7 +257,7 @@ class SchedulerTests(unittest.TestCase):
             "storage_lifecycle_mutation_performed": False,
         }
         ready_stage = SimpleNamespace(
-            stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+            stage_id="model_05_option_expression.option_chain_data_acquisition",
             status="ready",
             command=["prepare-option-chain-source"],
             stage_type="data_acquisition",
@@ -288,7 +288,7 @@ class SchedulerTests(unittest.TestCase):
             )
 
         self.assertEqual(decision.decision_status, "executed")
-        self.assertEqual(decision.selected_work, "layer_03_target_state_vector.option_chain_data_acquisition")
+        self.assertEqual(decision.selected_work, "model_05_option_expression.option_chain_data_acquisition")
         self.assertFalse(execute_provider_stage.call_args.kwargs["foundation_catch_up_only"])
         self.assertEqual(execute_provider_stage.call_args.kwargs["state_path"], state_path)
 
@@ -336,7 +336,7 @@ class SchedulerTests(unittest.TestCase):
         ) as reconcile_mock:
             target_state_path = Path(raw_tmp) / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
             _execute_autonomous_provider_stage(
-                stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+                stage_id="model_05_option_expression.option_chain_data_acquisition",
                 start_month="2016-01",
                 end_month="2016-06",
                 storage_root=Path(raw_tmp),
@@ -357,9 +357,9 @@ class SchedulerTests(unittest.TestCase):
 
     def test_scheduler_reports_first_blocked_stage_instead_of_plan_fallback(self):
         blocked_stage = SimpleNamespace(
-            stage_id="layer_03_target_state_vector.data_acquisition",
+            stage_id="model_02_target_state.data_acquisition",
             status="blocked",
-            blockers=("layer_03_target_local_feed_artifacts_ready",),
+            blockers=("model_02_target_local_feed_artifacts_ready",),
             command=["materialize-l3"],
             stage_type="data_acquisition",
         )
@@ -367,7 +367,7 @@ class SchedulerTests(unittest.TestCase):
             stages=(blocked_stage,),
             summary_row=lambda: {"stages": [{"stage_id": blocked_stage.stage_id, "status": blocked_stage.status}]},
         )
-        plan_stage = SimpleNamespace(stage_id="layer_01_market_regime.data_acquisition", command=["layer1"], stage_type="data_acquisition")
+        plan_stage = SimpleNamespace(stage_id="model_01_background_context.data_acquisition", command=["layer1"], stage_type="data_acquisition")
         plan = SimpleNamespace(
             summary_row=lambda: {"next_stage": {"stage_id": plan_stage.stage_id}},
             next_stage=plan_stage,
@@ -387,14 +387,14 @@ class SchedulerTests(unittest.TestCase):
 
         self.assertEqual(decision.decision_status, "backoff")
         self.assertEqual(decision.reason_code, "workflow_stage_blocked")
-        self.assertEqual(decision.selected_work, "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(decision.selected_work, "model_02_target_state.data_acquisition")
         self.assertEqual(decision.command, ["materialize-l3"])
 
     def test_scheduler_surfaces_target_local_provider_work_for_layer_three_blocker(self):
         blocked_stage = SimpleNamespace(
-            stage_id="layer_03_target_state_vector.data_acquisition",
+            stage_id="model_02_target_state.data_acquisition",
             status="blocked",
-            blockers=("layer_03_target_local_feed_artifacts_ready",),
+            blockers=("model_02_target_local_feed_artifacts_ready",),
             command=["materialize-l3"],
             stage_type="data_acquisition",
         )
@@ -424,7 +424,7 @@ class SchedulerTests(unittest.TestCase):
 
         self.assertEqual(decision.decision_status, "ready")
         self.assertEqual(decision.reason_code, "target_local_provider_stage_ready")
-        self.assertEqual(decision.selected_work, "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(decision.selected_work, "model_02_target_state.data_acquisition")
         self.assertEqual(decision.next_internal_stage, "autonomous_target_local_provider_acquisition")
         self.assertIn("--target-symbol", decision.command)
 

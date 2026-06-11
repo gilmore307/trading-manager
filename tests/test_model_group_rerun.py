@@ -47,9 +47,9 @@ class ModelGroupRerunTests(unittest.TestCase):
                 start_month="2016-07",
                 end_month="2016-12",
                 target_symbol="AAPL",
-                layer_id=3,
+                layer_id=2,
                 stage="data_acquisition",
-                reason="Layer 3 target-local acquisition route changed.",
+                reason="M02 target-local acquisition route changed.",
                 write=False,
             )
             schema = json.loads(Path("schemas/model_group_rerun_plan.schema.json").read_text(encoding="utf-8"))
@@ -61,7 +61,7 @@ class ModelGroupRerunTests(unittest.TestCase):
         self.assertFalse(result.reset_receipt_written)
         self.assertIsNone(result.reset_receipt_path)
         self.assertEqual(before, after)
-        self.assertEqual(result.cutpoint_stage_id, "layer_03_target_state_vector.option_chain_data_acquisition")
+        self.assertEqual(result.cutpoint_stage_id, "model_02_target_state.data_acquisition")
         self.assertFalse(result.source_data_delete_required)
         protected_refs = {row["ref"] for row in result.plan["protected_set"]}
         self.assertIn("storage://01_source_data/monthly_backfill/trading_economics_calendar_web/", protected_refs)
@@ -122,9 +122,9 @@ class ModelGroupRerunTests(unittest.TestCase):
                 start_month="2016-07",
                 end_month="2016-12",
                 target_symbol="AAPL",
-                layer_id=3,
+                layer_id=2,
                 stage="data_acquisition",
-                reason="Layer 3 target-local acquisition route changed.",
+                reason="M02 target-local acquisition route changed.",
                 write=True,
             )
             payload = json.loads(state_path.read_text(encoding="utf-8"))
@@ -136,23 +136,22 @@ class ModelGroupRerunTests(unittest.TestCase):
         self.assertIsNotNone(result.reset_receipt_path)
         self.assertEqual(receipt_payload["contract_type"], "manager_model_group_rerun_reset_receipt")
         self.assertEqual(receipt_payload["rerun_id"], result.rerun_id)
-        self.assertEqual(receipt_payload["cutpoint_stage_id"], "layer_03_target_state_vector.option_chain_data_acquisition")
+        self.assertEqual(receipt_payload["cutpoint_stage_id"], "model_02_target_state.data_acquisition")
         receipt_root_classes = {row["root_class"] for row in receipt_payload["controlled_artifact_roots"]}
         self.assertIn("rerun_reset_receipts", receipt_root_classes)
         self.assertIn("protected_source_data", receipt_root_classes)
-        self.assertEqual(by_stage["layer_01_market_regime.data_acquisition"]["status"], "succeeded")
-        self.assertEqual(by_stage["layer_02_sector_context.data_acquisition"]["status"], "succeeded")
-        self.assertEqual(by_stage["layer_03_target_state_vector.data_acquisition"]["status"], "blocked")
+        self.assertEqual(by_stage["model_01_background_context.data_acquisition"]["status"], "succeeded")
+        self.assertEqual(by_stage["model_02_target_state.data_acquisition"]["status"], "blocked")
         self.assertEqual(
-            by_stage["layer_03_target_state_vector.data_acquisition"]["last_reason"],
-            "waiting for layer_03_target_state_vector.option_chain_data_acquisition_complete,layer_03_target_local_feed_artifacts_ready",
+            by_stage["model_02_target_state.data_acquisition"]["last_reason"],
+            "waiting for model_02_target_local_feed_artifacts_ready",
         )
-        self.assertEqual(by_stage["layer_03_target_state_vector.feature_generation"]["status"], "blocked")
-        self.assertEqual(by_stage["layer_04_event_failure_risk.model_generation.train"]["status"], "blocked")
-        self.assertEqual(by_stage["layer_03_target_state_vector.data_acquisition"].get("artifact_refs") or [], [])
+        self.assertEqual(by_stage["model_02_target_state.feature_generation"]["status"], "blocked")
+        self.assertEqual(by_stage["model_04_unified_decision.model_generation.train"]["status"], "blocked")
+        self.assertEqual(by_stage["model_02_target_state.data_acquisition"].get("artifact_refs") or [], [])
         self.assertEqual(
-            by_stage["layer_03_target_state_vector.feature_generation"]["last_reason"],
-            "waiting for layer_03_target_state_vector.data_acquisition_complete",
+            by_stage["model_02_target_state.feature_generation"]["last_reason"],
+            "waiting for model_02_target_state.data_acquisition_complete",
         )
 
     def test_execute_resets_model_training_cutpoint(self):
@@ -189,17 +188,18 @@ class ModelGroupRerunTests(unittest.TestCase):
                 end_month="2016-12",
                 target_symbol="AAPL",
                 layer_id=5,
-                stage="model_training",
-                reason="Layer 5 training environment changed.",
+                stage="model_generation",
+                reason="M05 option-expression generation environment changed.",
                 write=True,
             )
             payload = json.loads(state_path.read_text(encoding="utf-8"))
             by_stage = {stage["stage_id"]: stage for stage in payload["stages"]}
 
-        self.assertEqual(result.cutpoint_stage_id, "layer_05_alpha_confidence.model_training.train")
-        self.assertEqual(by_stage["layer_04_event_failure_risk.model_generation.test"]["status"], "succeeded")
-        self.assertEqual(by_stage["layer_05_alpha_confidence.model_training.train"]["status"], "ready")
-        self.assertEqual(by_stage["layer_05_alpha_confidence.model_generation.train"]["status"], "blocked")
+        self.assertEqual(result.cutpoint_stage_id, "model_05_option_expression.model_generation.train")
+        self.assertEqual(by_stage["model_04_unified_decision.model_generation.test"]["status"], "succeeded")
+        self.assertEqual(by_stage["model_05_option_expression.feature_generation"]["status"], "succeeded")
+        self.assertEqual(by_stage["model_05_option_expression.model_generation.train"]["status"], "ready")
+        self.assertEqual(by_stage["model_06_residual_event_governance.model_generation.train"]["status"], "blocked")
 
     def test_batch_receipt_summarizes_per_state_reset_receipts(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -236,9 +236,9 @@ class ModelGroupRerunTests(unittest.TestCase):
                     start_month=month,
                     end_month=month,
                     target_symbol=None,
-                    layer_id=2,
+                    layer_id=1,
                     stage="data_acquisition",
-                    reason="Layer 2 contract changed.",
+                    reason="M01 source contract changed.",
                     write=True,
                 )
                 receipt_paths.append(Path(result.reset_receipt_path or ""))
@@ -257,7 +257,7 @@ class ModelGroupRerunTests(unittest.TestCase):
         self.assertEqual(batch_payload["state_count"], 2)
         self.assertEqual(batch_payload["scope"]["start_month"], "2016-07")
         self.assertEqual(batch_payload["scope"]["end_month"], "2016-08")
-        self.assertEqual(batch_payload["scope"]["cutpoint_stage_ids"], ["layer_02_sector_context.data_acquisition"])
+        self.assertEqual(batch_payload["scope"]["cutpoint_stage_ids"], ["model_01_background_context.data_acquisition"])
         self.assertFalse(batch_payload["source_data_delete_required"])
         self.assertIn("operator_entrypoint", batch_payload)
         self.assertEqual(len(batch_payload["reset_receipts"]), 2)

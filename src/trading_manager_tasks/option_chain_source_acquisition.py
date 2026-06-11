@@ -1,10 +1,9 @@
-"""Shared option-chain source/cache acquisition for target-state folds.
+"""Shared option-chain source/cache acquisition for option-expression folds.
 
-The manager prepares ThetaData option-chain source requests before Layer 3
-feature generation. The source plans a selected contract universe, then writes
-exact-contract SQL cache evidence in ``trading_data.option_chain_state_source``;
-Layer 3 reduces those rows to target-level option state, and Layer 9 derives
-option-expression context from the same cache.
+The manager prepares ThetaData option-chain source requests before M05
+option-expression work. The source plans a selected contract universe, then
+writes exact-contract SQL cache evidence in
+``trading_data.option_chain_state_source``.
 """
 
 from __future__ import annotations
@@ -26,18 +25,18 @@ from .provider_dispatch import ProviderDispatchItem, ProviderDispatchSummary, se
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root
 
-STAGE_ID = "layer_03_target_state_vector.option_chain_data_acquisition"
+STAGE_ID = "model_05_option_expression.option_chain_data_acquisition"
 SOURCE_ID = "option_chain_state_source"
 TARGET_COMPONENT_ID = SOURCE_ID
 REQUEST_KIND = "option_chain_snapshot"
-DEFAULT_SOURCE_OUTPUT_ROOT = data_storage_root() / "layer_03_target_state_vector" / SOURCE_ID
+DEFAULT_SOURCE_OUTPUT_ROOT = data_storage_root() / "model_05_option_expression" / SOURCE_ID
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_SESSION_START = time(9, 30)
 DEFAULT_SESSION_END = time(16, 0)
 DEFAULT_WINDOW_MINUTES = 30
 DEFAULT_MAX_DTE = 180
 DEFAULT_STRIKE_RANGE = 5
-DEFAULT_OPTION_BUCKET_POLICY_REF = "LAYER_03_OPTION_CHAIN_ROLE_SELECTOR_POLICY"
+DEFAULT_OPTION_BUCKET_POLICY_REF = "MODEL_05_OPTION_CHAIN_ROLE_SELECTOR_POLICY"
 OPTION_CHAIN_PROVIDER_CONTROLS = {
     "allowed_providers": ["thetadata"],
     "allowed_endpoint_families": ["option_selection_snapshot"],
@@ -249,11 +248,11 @@ def iter_regular_session_day_windows(start_month: str, end_month: str) -> Iterab
 
 
 def _task_key_path_for_request(request_id: str, *, start_month: str, storage_root: Path = DEFAULT_STORAGE_ROOT) -> Path:
-    return storage_root / "runtime" / "layer_03_target_state_vector" / SOURCE_ID / start_month / request_id / "task_key.json"
+    return storage_root / "runtime" / "model_05_option_expression" / SOURCE_ID / start_month / request_id / "task_key.json"
 
 
 def _task_key_ref_for_request(request_id: str, *, start_month: str) -> str:
-    return f"storage://trading-manager/runtime/layer_03_target_state_vector/{SOURCE_ID}/{start_month}/{request_id}/task_key.json"
+    return f"storage://trading-manager/runtime/model_05_option_expression/{SOURCE_ID}/{start_month}/{request_id}/task_key.json"
 
 
 def _source_output_root_for_request(request_id: str, *, start_month: str, source_output_root: Path = DEFAULT_SOURCE_OUTPUT_ROOT) -> Path:

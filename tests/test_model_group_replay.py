@@ -45,14 +45,14 @@ class ModelGroupReplayTests(unittest.TestCase):
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True)
         stages = []
-        for layer in range(1, 10):
+        for layer in range(1, 7):
             for split_name in ("train", "validation", "test"):
                 stages.append(
                     {
-                        "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                        "stage_id": f"model_{layer:02d}_fixture.model_generation.{split_name}",
                         "stage_type": "model_generation",
                         "layer": layer,
-                        "layer_key": f"layer_{layer:02d}_fixture",
+                        "layer_key": f"model_{layer:02d}_fixture",
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
@@ -72,9 +72,6 @@ class ModelGroupReplayTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        artifact_path = storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / "after_cost_alpha_model_aapl_2016-01_2016-06.json"
-        artifact_path.parent.mkdir(parents=True)
-        artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
 
     def _write_runner(self, root: Path) -> Path:
         runner = root / "run_replay_execution.py"
@@ -151,7 +148,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
             self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2016-06", decision.command)
-            self.assertIn("--after-cost-alpha-model-json", decision.command)
+            self.assertNotIn("--after-cost-alpha-model-json", decision.command)
             self.assertIn("--initial-capital-usd", decision.command)
             self.assertEqual(decision.command[decision.command.index("--initial-capital-usd") + 1], "25000.0")
             self.assertNotIn("--option-feature-database-url", decision.command)
@@ -307,13 +304,13 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": f"layer_{layer:02d}_fixture.model_generation",
+                                "stage_id": f"model_{layer:02d}_fixture.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": layer,
-                                "layer_key": f"layer_{layer:02d}_fixture",
+                                "layer_key": f"model_{layer:02d}_fixture",
                                 "status": "succeeded",
                             }
-                            for layer in range(1, 10)
+                            for layer in range(1, 7)
                         ],
                     }
                 )
@@ -455,7 +452,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_option_feature_acquisition_required")
-            self.assertEqual(decision.execution_summary["blocked_stage_id"], "layer_03_target_state_vector.option_chain_data_acquisition")
+            self.assertEqual(decision.execution_summary["blocked_stage_id"], "model_05_option_expression.option_chain_data_acquisition")
             self.assertEqual(decision.execution_summary["resume_stage_id"], "model_group.replay")
 
     def test_legacy_equity_replay_without_candidate_handoff_does_not_unlock_replay(self):

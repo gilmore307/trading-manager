@@ -58,10 +58,8 @@ class StageRunControllerReceipt:
 
 
 def _model_layer_for_stage(stage_id: str) -> str:
-    if stage_id == "layer_01_market_regime.data_acquisition":
+    if stage_id == "model_01_background_context.data_acquisition":
         return "layer_01_market_regime"
-    if stage_id == "layer_02_sector_context.data_acquisition":
-        return "layer_02_sector_context"
     if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
         return OPTION_CHAIN_SOURCE_STAGE_ID
     raise TaskSystemError(f"unsupported stage controller: {stage_id}")

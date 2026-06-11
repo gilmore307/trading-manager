@@ -623,7 +623,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             ready = [stage["stage_id"] for stage in payload["stages"] if stage["status"] == "ready"]
 
         self.assertEqual(state_path.name, "model_training_fold_state_aapl_2016-01_2016-06.json")
-        self.assertIn("layer_01_market_regime.model_generation.train", ready)
+        self.assertIn("model_01_background_context.model_generation.train", ready)
 
     def test_seed_model_worker_fold_state_refreshes_existing_monthly_foundation_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -669,9 +669,9 @@ class SchedulerDaemonTests(unittest.TestCase):
             statuses = {stage["stage_id"]: stage["status"] for stage in payload["stages"]}
 
         self.assertEqual(seeded_path, state_path)
-        self.assertEqual(statuses["layer_02_sector_context.data_acquisition"], "succeeded")
-        self.assertEqual(statuses["layer_02_sector_context.feature_generation"], "succeeded")
-        self.assertEqual(payload["next_stage"]["stage_id"], "layer_01_market_regime.model_generation.train")
+        self.assertEqual(statuses["model_03_event_state.data_acquisition"], "succeeded")
+        self.assertEqual(statuses["model_01_background_context.feature_generation"], "succeeded")
+        self.assertEqual(payload["next_stage"]["stage_id"], "model_01_background_context.model_generation.train")
 
     def test_target_scoped_fold_state_path_prevents_cross_target_collision(self):
         path = model_worker_fold_state_path(
@@ -1414,8 +1414,8 @@ class SchedulerDaemonTests(unittest.TestCase):
                     config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
                 )
 
-        self.assertEqual(state.last_work_selection_reason, "model_group_lifecycle_holds_fold_lane")
-        self.assertEqual(state.last_next_internal_stage, "model_group_lifecycle")
+        self.assertEqual(state.last_work_selection_reason, "model_group_replay_ready")
+        self.assertEqual(state.last_next_internal_stage, "evaluation_worker_1")
         self.assertEqual(state.start_month, "2016-01")
         self.assertEqual(state.end_month, "2016-06")
         handler.assert_not_called()
@@ -1491,19 +1491,19 @@ class SchedulerDaemonTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation",
+                                "stage_id": "model_02_target_state.model_generation.train",
                                 "stage_type": "model_generation",
-                                "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
                                 "status": "blocked",
-                                "last_reason": "waiting for layer_03_target_state_vector.feature_or_input_ready",
+                                "last_reason": "waiting for model_02_target_state.feature_or_input_ready",
                             },
                         ],
                     }

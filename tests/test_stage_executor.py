@@ -17,7 +17,7 @@ class StageExecutorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_01_market_regime.feature_generation",
+                stage_id="model_01_background_context.feature_generation",
                 layer=1,
                 layer_key="layer_01_market_regime",
                 stage_type="feature_generation",
@@ -39,7 +39,7 @@ class StageExecutorTests(unittest.TestCase):
                     receipt_root=tmp / "receipts",
                     log_root=tmp / "logs",
                     progress_root=progress_root,
-                    task_uid="2016-01:layer_01_market_regime.feature_generation",
+                    task_uid="2016-01:model_01_background_context.feature_generation",
                     worker_id="month_ingest_worker_1",
                 )
             self.assertEqual(summary.contract_type, "manager_stage_execution_summary")
@@ -49,14 +49,14 @@ class StageExecutorTests(unittest.TestCase):
             self.assertFalse(summary.broker_execution_performed)
             self.assertTrue(Path(summary.receipt_path or "").exists())
             stdout = Path(summary.stdout_path or "").read_text(encoding="utf-8")
-            self.assertIn("offline ok True 2016-01:layer_01_market_regime.feature_generation", stdout)
+            self.assertIn("offline ok True 2016-01:model_01_background_context.feature_generation", stdout)
             self.assertFalse(list(progress_root.glob("*.json")))
 
     def test_executes_python_stage_with_manager_interpreter(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_01_market_regime.feature_generation",
+                stage_id="model_01_background_context.feature_generation",
                 layer=1,
                 layer_key="layer_01_market_regime",
                 stage_type="feature_generation",
@@ -83,7 +83,7 @@ class StageExecutorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_01_market_regime.feature_generation",
+                stage_id="model_01_background_context.feature_generation",
                 layer=1,
                 layer_key="layer_01_market_regime",
                 stage_type="feature_generation",
@@ -118,7 +118,7 @@ class StageExecutorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_01_market_regime.feature_generation",
+                stage_id="model_01_background_context.feature_generation",
                 layer=1,
                 layer_key="layer_01_market_regime",
                 stage_type="feature_generation",
@@ -157,9 +157,9 @@ class StageExecutorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_09_option_expression.feature_generation",
+                stage_id="model_05_option_expression.feature_generation",
                 layer=9,
-                layer_key="layer_09_option_expression",
+                layer_key="model_05_option_expression",
                 stage_type="feature_generation",
                 status="ready",
                 command=["python3", "-c", "import time; time.sleep(0.4); print('long sql complete')"],
@@ -201,7 +201,7 @@ class StageExecutorTests(unittest.TestCase):
                 "print('retry ok') if marker.exists() else (marker.write_text('1'), sys.exit(1))"
             )
             stage = StageProgress(
-                stage_id="layer_01_market_regime.feature_generation",
+                stage_id="model_01_background_context.feature_generation",
                 layer=1,
                 layer_key="layer_01_market_regime",
                 stage_type="feature_generation",
@@ -311,7 +311,7 @@ class StageExecutorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_03_target_state_vector.data_acquisition",
+                stage_id="model_02_target_state.data_acquisition",
                 layer=3,
                 layer_key="layer_03_target_state_vector",
                 stage_type="data_acquisition",
@@ -360,7 +360,7 @@ class StageExecutorTests(unittest.TestCase):
     def test_refuses_provider_dispatch_data_acquisition_command(self):
         for script in ("dispatch_and_reconcile_provider_stage.py", "dispatch_event_feed_backfill.py"):
             stage = StageProgress(
-                stage_id="layer_01_market_regime.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 layer=1,
                 layer_key="layer_01_market_regime",
                 stage_type="data_acquisition",
@@ -374,7 +374,7 @@ class StageExecutorTests(unittest.TestCase):
 
     def test_refuses_option_chain_source_preparation_as_safe_offline_stage(self):
         stage = StageProgress(
-            stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+            stage_id="model_05_option_expression.option_chain_data_acquisition",
             layer=3,
             layer_key="layer_03_target_state_vector",
             stage_type="data_acquisition",
@@ -388,7 +388,7 @@ class StageExecutorTests(unittest.TestCase):
 
     def test_refuses_unapproved_local_data_acquisition_command(self):
         stage = StageProgress(
-            stage_id="layer_03_target_state_vector.data_acquisition",
+            stage_id="model_02_target_state.data_acquisition",
             layer=3,
             layer_key="layer_03_target_state_vector",
             stage_type="data_acquisition",
@@ -401,7 +401,7 @@ class StageExecutorTests(unittest.TestCase):
 
     def test_refuses_approval_gated_stage(self):
         stage = StageProgress(
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             layer=1,
             layer_key="layer_01_market_regime",
             stage_type="data_acquisition",

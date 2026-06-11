@@ -8,15 +8,15 @@ from unittest.mock import patch
 
 from trading_manager_tasks.model_training_workflow import (
     BASE_STACK_LAYER_COUNT,
-    FOUNDATION_CATCH_UP_BLOCKER,
     FOUNDATION_CATCH_UP_LAYERS,
-    MULTI_TARGET_SYMBOL_BLOCKER,
-    POST_MODEL_GENERATION_REBUILD_BLOCKER,
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
-    LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
+    MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,
+    MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID,
+    MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
+    MULTI_TARGET_SYMBOL_BLOCKER,
     build_model_training_workflow_plan,
 )
-from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 
 
 def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
@@ -26,20 +26,7 @@ def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") ->
         path.write_text("{}\n", encoding="utf-8")
 
 
-def _write_event_feed_artifacts(root: Path, *, month: str = "2016-01") -> None:
-    artifacts = {
-        "alpaca_news": ("equity_news.csv", f"id,timeline_headline,created_at,updated_at,symbols,summary,event_link_url\nn1,Headline,{month}-04T10:00:00-05:00,{month}-04T10:01:00-05:00,AAPL,Summary,https://example.com/news\n"),
-        "gdelt_news": ("gdelt_article.csv", f"article_id,seen_at,source_domain,event_link_url,title,source_theme_tags,organizations,tone,impact_scope\ng1,{month}-04T09:00:00-05:00,reuters.com,https://example.com/gdelt,Fed news,ECON,Federal Reserve,-1,market\n"),
-        "sec_company_financials": ("sec_company_fact.csv", f"cik,entity_name,taxonomy,tag,label,description,unit,fy,fp,form,filed,frame,end,value,accession_number,symbol\n1,Test Inc,us-gaap,Revenues,Revenue,,USD,2016,Q1,10-Q,{month}-05,,{month}-05,1,a1,AAPL\n"),
-        "trading_economics_calendar_web": ("trading_economics_calendar_event.csv", f"event_time,country,event,source_event_type,reference,actual,previous,consensus,te_forecast,revised,importance,symbol\n{month}-08T08:30:00-05:00,United States,Payrolls,Labour,Dec,200K,180K,190K,,,3,\n"),
-    }
-    for source_id, (filename, content) in artifacts.items():
-        path = root / "monthly_backfill" / source_id / month / "runs" / "run_001" / "saved" / filename
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-
-
-def _write_layer_three_feed_artifact(root: Path, *, symbol: str = "AAPL", month: str = "2016-01") -> None:
+def _write_target_feed_artifact(root: Path, *, symbol: str = "AAPL", month: str = "2016-01") -> None:
     receipt_path = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(
@@ -49,9 +36,9 @@ def _write_layer_three_feed_artifact(root: Path, *, symbol: str = "AAPL", month:
                     {
                         "run_id": "run_001",
                         "status": "succeeded",
-                        "outputs": ["trading_data.m01_market_regime_data_acquisition"],
+                        "outputs": ["trading_data.m03_target_state_vector_data_acquisition"],
                         "row_counts": {"equity_bar": 1},
-                        "steps": {"save": {"references": ["trading_data.m01_market_regime_data_acquisition"]}},
+                        "steps": {"save": {"references": ["trading_data.m03_target_state_vector_data_acquisition"]}},
                     }
                 ]
             }
@@ -61,158 +48,100 @@ def _write_layer_three_feed_artifact(root: Path, *, symbol: str = "AAPL", month:
 
 
 class ModelTrainingWorkflowTests(unittest.TestCase):
-    def test_base_stack_plan_covers_pre_replay_layers_and_stage_types_after_foundation_catch_up(self):
+    def test_six_model_workflow_plan_shape_after_foundation_catch_up(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
                 end_month="2016-06",
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
 
-        self.assertEqual(plan.contract_type, "manager_model_training_workflow_plan")
         self.assertEqual(plan.layer_count, BASE_STACK_LAYER_COUNT)
-        self.assertEqual([layer.layer for layer in plan.layers], list(range(1, 10)))
-        for layer in plan.layers:
-            if layer.layer == 3:
-                expected_stage_types = ["data_acquisition", "data_acquisition", "feature_generation", "model_generation", "model_generation", "model_generation"]
-            elif layer.layer in {1, 2, 4}:
-                expected_stage_types = ["data_acquisition", "feature_generation", "model_generation", "model_generation", "model_generation"]
-            elif layer.layer == 9:
-                expected_stage_types = ["feature_generation", "model_generation", "model_generation", "model_generation"]
-            elif layer.layer == 5:
-                expected_stage_types = ["model_training", "model_generation", "model_generation", "model_generation"]
-            else:
-                expected_stage_types = ["model_generation", "model_generation", "model_generation"]
-            self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
-            self.assertIn("model_", " ".join(layer.model_generate_command))
-            self.assertIn("model_", " ".join(layer.model_evaluate_command))
-            self.assertTrue(layer.progression_mode)
-            self.assertTrue(layer.candidate_axis)
-            self.assertTrue(layer.candidate_progression_policy)
+        self.assertEqual(
+            [layer.layer_key for layer in plan.layers],
+            [
+                "model_01_background_context",
+                "model_02_target_state",
+                "model_03_event_state",
+                "model_04_unified_decision",
+                "model_05_option_expression",
+                "model_06_residual_event_governance",
+            ],
+        )
+        self.assertEqual(
+            [layer.model_name for layer in plan.layers],
+            [
+                "BackgroundContextModel",
+                "TargetStateModel",
+                "EventStateModel",
+                "UnifiedDecisionModel",
+                "OptionExpressionModel",
+                "ResidualEventGovernanceModel",
+            ],
+        )
+        self.assertFalse(any("layer_09_option_expression" in stage.stage_id for layer in plan.layers for stage in layer.stages))
+        self.assertFalse(any("layer_10_event_risk_governor" in stage.stage_id for layer in plan.layers for stage in layer.stages))
 
-    def test_model_generation_uses_chronological_train_validation_test_split_stages(self):
+    def test_foundation_catch_up_only_exposes_m01_and_m03_input_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-06",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-
-        layer = plan.layers[2]
-        split_stages = [stage for stage in layer.stages if stage.stage_type == "model_generation"]
-        self.assertEqual([stage.stage_id for stage in split_stages], [
-            "layer_03_target_state_vector.model_generation.train",
-            "layer_03_target_state_vector.model_generation.validation",
-            "layer_03_target_state_vector.model_generation.test",
-        ])
-        self.assertEqual([stage.dataset_split["split_name"] for stage in split_stages], ["train", "validation", "test"])
-        self.assertEqual([stage.dataset_split["split_months"] for stage in split_stages], [4, 1, 1])
-        self.assertIn("2016-01-01T00:00:00-05:00", split_stages[0].command)
-        self.assertIn("2016-05-01T00:00:00-05:00", split_stages[0].command)
-        self.assertIn("2016-05-01T00:00:00-05:00", split_stages[1].command)
-        self.assertIn("2016-06-01T00:00:00-05:00", split_stages[1].command)
-        self.assertIn("2016-06-01T00:00:00-05:00", split_stages[2].command)
-        self.assertIn("2016-07-01T00:00:00-05:00", split_stages[2].command)
-        for split_stage in split_stages:
-            self.assertNotIn("--output", split_stage.command)
-            self.assertNotIn("--output-jsonl", split_stage.command)
-            self.assertFalse(any("model_rows" in token for token in split_stage.command))
-        self.assertIn("TRADING_MODEL_DATASET_SPLIT_NAME=train", split_stages[0].command)
-        self.assertEqual(split_stages[1].blockers, ("layer_03_target_state_vector.model_generation.train_complete",))
-        self.assertEqual(split_stages[2].blockers, ("layer_03_target_state_vector.model_generation.validation_complete",))
-
-    def test_foundation_catch_up_months_do_not_expose_model_or_promotion_review_stages(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
                 end_month="2016-01",
                 selected_target_symbol="AAPL",
             )
 
         self.assertTrue(plan.foundation_catch_up_only)
-        for layer in plan.layers:
-            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in {1, 2, 4} else []
-            self.assertEqual([stage.stage_type for stage in layer.stages], expected_stage_types)
-            self.assertNotIn("model_generation", {stage.stage_type for stage in layer.stages})
-            self.assertNotIn("model_evaluation", {stage.stage_type for stage in layer.stages})
-            self.assertNotIn("promotion_review", {stage.stage_type for stage in layer.stages})
+        self.assertEqual(plan.foundation_catch_up_layers, FOUNDATION_CATCH_UP_LAYERS)
+        self.assertEqual([stage.stage_type for stage in plan.layers[0].stages], ["data_acquisition", "feature_generation"])
+        self.assertEqual([stage.stage_type for stage in plan.layers[2].stages], ["data_acquisition"])
+        for layer in (plan.layers[1], plan.layers[3], plan.layers[4], plan.layers[5]):
+            self.assertEqual(layer.stages, ())
 
-    def test_layer_one_acquisition_waits_for_task_key_preparation_then_auto_dispatch(self):
+    def test_m01_acquisition_waits_for_task_key_preparation_then_auto_dispatch(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
-            plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
-            layer_one_acquisition = plan.layers[0].stages[0]
-            self.assertEqual(layer_one_acquisition.status, "blocked")
-            self.assertIn("layer_01_task_key_preparation", layer_one_acquisition.blockers)
-            self.assertIsNone(layer_one_acquisition.approval_gate_required)
+            plan = build_model_training_workflow_plan(storage_root=root, trading_storage_root=root, start_month="2016-01", end_month="2016-01")
+            acquisition = plan.layers[0].stages[0]
+            self.assertEqual(acquisition.stage_id, "model_01_background_context.data_acquisition")
+            self.assertEqual(acquisition.status, "blocked")
+            self.assertIn("layer_01_task_key_preparation", acquisition.blockers)
 
             _write_task_keys(root, model_layer=LAYER_ONE_MODEL_LAYER)
-            plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
-            layer_one_acquisition = plan.layers[0].stages[0]
-            self.assertEqual(plan.layer_one_task_key_count, LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS)
-            self.assertEqual(layer_one_acquisition.status, "ready")
-            self.assertIsNone(layer_one_acquisition.approval_gate_required)
-            self.assertEqual(layer_one_acquisition.blockers, ())
-            self.assertTrue(layer_one_acquisition.provider_calls_allowed)
-            self.assertIn("scripts/tasks/dispatch_and_reconcile_provider_stage.py", layer_one_acquisition.command)
-            self.assertIn("--reject-terminal-coverage", layer_one_acquisition.command)
-            self.assertEqual(plan.next_stage, layer_one_acquisition)
+            plan = build_model_training_workflow_plan(storage_root=root, trading_storage_root=root, start_month="2016-01", end_month="2016-01")
+            acquisition = plan.layers[0].stages[0]
 
-    def test_layer_two_acquisition_waits_for_own_task_key_preparation_then_auto_dispatch(self):
+        self.assertEqual(plan.layer_one_task_key_count, LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS)
+        self.assertEqual(acquisition.status, "ready")
+        self.assertEqual(acquisition.blockers, ())
+        self.assertTrue(acquisition.provider_calls_allowed)
+        self.assertIn("scripts/tasks/dispatch_and_reconcile_provider_stage.py", acquisition.command)
+
+    def test_m02_target_state_uses_target_local_materializer_without_provider_dispatch(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
-            _write_task_keys(root, model_layer=LAYER_ONE_MODEL_LAYER)
-            plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
-            layer_two_acquisition = plan.layers[1].stages[0]
-            self.assertEqual(layer_two_acquisition.status, "blocked")
-            self.assertIn("layer_02_task_key_preparation", layer_two_acquisition.blockers)
-            self.assertIsNone(layer_two_acquisition.approval_gate_required)
-
-            _write_task_keys(root, model_layer=LAYER_TWO_MODEL_LAYER)
-            plan = build_model_training_workflow_plan(storage_root=root, start_month="2016-01", end_month="2016-01")
-            layer_two_acquisition = plan.layers[1].stages[0]
-            self.assertEqual(plan.layer_two_task_key_count, LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS)
-            self.assertEqual(layer_two_acquisition.status, "ready")
-            self.assertIsNone(layer_two_acquisition.approval_gate_required)
-            self.assertEqual(layer_two_acquisition.blockers, ())
-            self.assertTrue(layer_two_acquisition.provider_calls_allowed)
-            self.assertIn("--model-layer", layer_two_acquisition.command)
-            self.assertIn("layer_02_sector_context", layer_two_acquisition.command)
-            self.assertIn("--skip-registered-failures", layer_two_acquisition.command)
-            self.assertIn("--reject-terminal-coverage", layer_two_acquisition.command)
-            self.assertIn("scripts/tasks/dispatch_and_reconcile_provider_stage.py", layer_two_acquisition.command)
-
-    def test_layer_three_data_acquisition_uses_local_materializer_without_provider_dispatch(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            _write_layer_three_feed_artifact(Path(raw_tmp), symbol="AAPL", month="2016-01")
+            _write_target_feed_artifact(root, symbol="AAPL", month="2016-01")
             plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                trading_storage_root=Path(raw_tmp),
+                storage_root=root,
+                trading_storage_root=root,
                 start_month="2016-01",
                 end_month="2016-01",
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
 
-        stages = {stage.stage_id: stage for stage in plan.layers[2].stages}
-        stage = stages["layer_03_target_state_vector.data_acquisition"]
-        command = stage.command
-        self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", command)
-        self.assertIn("--write", command)
-        self.assertIn("--target-symbol", command)
-        self.assertIn("AAPL", command)
-        self.assertIsNone(stage.approval_gate_required)
+        stage = {stage.stage_id: stage for stage in plan.layers[1].stages}["model_02_target_state.data_acquisition"]
+        self.assertEqual(stage.status, "ready")
         self.assertFalse(stage.provider_calls_allowed)
         self.assertTrue(stage.safe_without_provider_calls)
-        self.assertEqual(stage.status, "blocked")
-        self.assertIn("layer_03_target_state_vector.option_chain_data_acquisition_complete", stage.blockers)
+        self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", stage.command)
+        self.assertIn("--target-symbol", stage.command)
 
-    def test_layer_three_data_acquisition_blocks_without_target_local_feed_artifacts(self):
+    def test_m02_target_state_blocks_without_target_local_feed_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -223,43 +152,43 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        stage = {stage.stage_id: stage for stage in plan.layers[2].stages}["layer_03_target_state_vector.data_acquisition"]
+        stage = {stage.stage_id: stage for stage in plan.layers[1].stages}["model_02_target_state.data_acquisition"]
         self.assertEqual(stage.status, "blocked")
-        self.assertEqual(stage.blockers, ("layer_03_target_state_vector.option_chain_data_acquisition_complete", "layer_03_target_local_feed_artifacts_ready"))
+        self.assertEqual(stage.blockers, (MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,))
 
-    def test_layer_three_data_acquisition_blocks_crypto_target_when_context_proxy_rows_are_empty(self):
+    def test_m03_event_state_input_waits_for_m01_foundation(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
-            tmp = Path(raw_tmp)
-            mapping_path = tmp / "target_context_mapping.csv"
-            mapping_path.write_text(
-                "target_symbol,target_asset_class,spot_ref,layer2_context_symbol,review_status\n"
-                "BTC,crypto_spot,BTC,BKCH,accepted\n",
-                encoding="utf-8",
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
             )
-            _write_layer_three_feed_artifact(tmp, symbol="BKCH", month="2016-01")
-            receipt_path = tmp / "monthly_backfill" / "alpaca_bars" / "BKCH" / "2016-01" / "completion_receipt.json"
-            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-            receipt["runs"][0]["row_counts"] = {"equity_bar": 0}
-            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
 
-            with patch("trading_manager_tasks.layer_three_target_state.DEFAULT_TARGET_CONTEXT_MAPPING", mapping_path):
-                plan = build_model_training_workflow_plan(
-                    storage_root=tmp,
-                    trading_storage_root=tmp,
-                    start_month="2016-01",
-                    end_month="2016-01",
-                    selected_target_symbol="BTC",
-                    foundation_catch_up_only=False,
-                )
+        stage = {stage.stage_id: stage for stage in plan.layers[2].stages}["model_03_event_state.data_acquisition"]
+        self.assertEqual(stage.blockers, ("model_01_background_context.feature_or_input_ready",))
+        self.assertIn("scripts/tasks/materialize_layer_four_event_observation_inputs.py", stage.command)
 
-        layer_three_stages = {stage.stage_id: stage for stage in plan.layers[2].stages}
-        self.assertNotIn("layer_03_target_state_vector.option_chain_data_acquisition", layer_three_stages)
-        stage = layer_three_stages["layer_03_target_state_vector.data_acquisition"]
-        self.assertEqual(stage.status, "blocked")
-        self.assertEqual(stage.blockers, ("layer_03_target_local_feed_artifacts_ready",))
-        self.assertEqual(plan.layers[8].stages, ())
+    def test_m05_option_expression_owns_option_source_when_options_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2016-06",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
 
-    def test_confirmed_no_options_total_pool_target_skips_option_stages(self):
+        stages = {stage.stage_id: stage for stage in plan.layers[4].stages}
+        self.assertIn(MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID, stages)
+        self.assertIn("scripts/tasks/prepare_option_chain_source_acquisition.py", stages[MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID].command)
+        self.assertIn(MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER, stages["model_05_option_expression.feature_generation"].blockers)
+        self.assertIn("model_05_option_expression.feature_or_input_ready", stages["model_05_option_expression.model_generation.train"].blockers)
+
+    def test_m05_no_option_target_skips_option_source_but_keeps_model_generation(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             pool_path = tmp / "main" / "shared" / "equity_total_symbol_pool.csv"
@@ -273,344 +202,46 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=tmp,
                 trading_storage_root=tmp,
                 start_month="2016-01",
-                end_month="2016-01",
+                end_month="2016-06",
                 selected_target_symbol="XYZ",
                 foundation_catch_up_only=False,
             )
 
-        layer_three_stages = {stage.stage_id: stage for stage in plan.layers[2].stages}
-        self.assertNotIn("layer_03_target_state_vector.option_chain_data_acquisition", layer_three_stages)
-        self.assertEqual(layer_three_stages["layer_03_target_state_vector.data_acquisition"].blockers, ("layer_03_target_local_feed_artifacts_ready",))
-        self.assertEqual(plan.layers[8].stages, ())
+        stage_ids = [stage.stage_id for stage in plan.layers[4].stages]
+        self.assertNotIn(MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID, stage_ids)
+        self.assertEqual(stage_ids, [
+            "model_05_option_expression.model_generation.train",
+            "model_05_option_expression.model_generation.validation",
+            "model_05_option_expression.model_generation.test",
+        ])
 
-    def test_foundation_catch_up_omits_monthly_post_feature_model_stages(self):
+    def test_model_generation_uses_chronological_train_validation_test_split_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-01",
-                selected_target_symbol="AAPL",
-            )
-
-        self.assertTrue(plan.foundation_catch_up_only)
-        self.assertEqual(plan.foundation_catch_up_layers, FOUNDATION_CATCH_UP_LAYERS)
-        self.assertEqual(plan.reusable_substrate_stage_types, ("data_acquisition", "feature_generation"))
-        for layer in plan.layers:
-            expected_stage_types = ["data_acquisition", "feature_generation"] if layer.layer in {1, 2, 4} else []
-            self.assertEqual(
-                [stage.stage_type for stage in layer.stages],
-                expected_stage_types,
-            )
-        self.assertEqual(plan.layers[2].stages, ())
-
-    def test_foundation_substrate_stages_use_fold_scoped_units(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            fold_plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-07",
-                end_month="2016-12",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-
-        for layer_index in (0, 1):
-            for stage in fold_plan.layers[layer_index].stages[:2]:
-                self.assertEqual(stage.dataset_unit.start_month, "2016-07")
-                self.assertEqual(stage.dataset_unit.end_month, "2016-12")
-                self.assertEqual(stage.dataset_unit.unit_months, 6)
-            acquisition_stage = fold_plan.layers[layer_index].stages[0]
-            self.assertIn("--start-month", acquisition_stage.command)
-            self.assertIn("--end-month", acquisition_stage.command)
-            self.assertEqual(acquisition_stage.command[acquisition_stage.command.index("--start-month") + 1], "${START_MONTH}")
-            self.assertEqual(acquisition_stage.command[acquisition_stage.command.index("--end-month") + 1], "${END_MONTH}")
-        layer_three_model_stages = [stage for stage in fold_plan.layers[2].stages if stage.stage_type == "model_generation"]
-        self.assertEqual(layer_three_model_stages[0].stage_type, "model_generation")
-        self.assertEqual(fold_plan.end_month, "2016-12")
-        self.assertIn("2016-07-01T00:00:00-05:00", layer_three_model_stages[0].command)
-
-    def test_post_foundation_model_stages_can_be_reenabled_after_catch_up_acceptance(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-01",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-
-        self.assertFalse(plan.foundation_catch_up_only)
-        self.assertNotIn(POST_MODEL_GENERATION_REBUILD_BLOCKER, plan.layers[0].stages[2].blockers)
-        self.assertNotIn(FOUNDATION_CATCH_UP_BLOCKER, plan.layers[2].stages[0].blockers)
-
-    def test_layer_one_and_two_model_evaluation_read_database_rows(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
-
-        for index, script_name in ((0, "evaluate_model_01_market_regime.py"), (1, "evaluate_model_02_sector_context.py")):
-            command = plan.layers[index].model_evaluate_command
-            self.assertIn(script_name, " ".join(command))
-            self.assertIn("--from-database", command)
-            self.assertIn("--output-json", command)
-            self.assertTrue(any("evaluation_summary_${START_MONTH}.json" in item for item in command))
-
-    def test_layer_one_and_two_promotion_review_use_evaluation_summary_artifact(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
-
-        for index, script_name in ((0, "review_market_regime_promotion.py"), (1, "review_sector_context_promotion.py")):
-            command = plan.layers[index].promotion_review_command
-            self.assertIn(script_name, " ".join(command))
-            self.assertIn("--evaluation-summary-json", command)
-            self.assertIn("--local-fallback-review", command)
-
-    def test_layer_one_feature_generation_materializes_feed_artifacts_first(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
-
-        command = plan.layers[0].feature_command
-
-        self.assertIn("data_feature.m01_market_regime_feature_generation.from_feed_artifacts", command)
-        self.assertIn("--month", command)
-        self.assertIn("${START_MONTH}", command)
-
-    def test_layer_two_feature_generation_materializes_features_without_provider_calls(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
-
-        stage = plan.layers[1].stages[1]
-        command = plan.layers[1].feature_command
-
-        self.assertIn("scripts/tasks/execute_layer_two_feature_generation.py", command)
-        self.assertIn("--month", command)
-        self.assertIn("${START_MONTH}", command)
-        self.assertIn("--write", command)
-        self.assertFalse(stage.provider_calls_allowed)
-        self.assertTrue(stage.safe_without_provider_calls)
-
-    def test_layer_nine_option_expression_feature_generation_uses_option_adapter_with_no_provider_skip_support(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
                 end_month="2016-06",
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
 
-        command = plan.layers[8].feature_command
+        split_stages = [stage for stage in plan.layers[3].stages if stage.stage_type == "model_generation"]
+        self.assertEqual([stage.stage_id for stage in split_stages], [
+            "model_04_unified_decision.model_generation.train",
+            "model_04_unified_decision.model_generation.validation",
+            "model_04_unified_decision.model_generation.test",
+        ])
+        self.assertEqual([stage.dataset_split["split_name"] for stage in split_stages], ["train", "validation", "test"])
+        self.assertEqual([stage.dataset_split["split_months"] for stage in split_stages], [4, 1, 1])
+        self.assertEqual(split_stages[1].blockers, ("model_04_unified_decision.model_generation.train_complete",))
+        self.assertEqual(split_stages[2].blockers, ("model_04_unified_decision.model_generation.validation_complete",))
 
-        self.assertIn("scripts/tasks/execute_layer_nine_option_feature_generation.py", command)
-        self.assertIn("--start-month", command)
-        self.assertIn("${START_MONTH}", command)
-        self.assertIn("--end-month", command)
-
-    def test_layer_nine_option_expression_starts_with_feature_generation(self):
+    def test_dataset_units_are_model_aware_and_target_visible(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-06",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-
-        stage_ids = [stage.stage_id for stage in plan.layers[8].stages]
-
-        self.assertFalse(any(stage_id.startswith("layer_09_option_expression.") and stage_id.endswith(".data_acquisition") for stage_id in stage_ids))
-        self.assertEqual(plan.layers[8].stages[0].stage_id, "layer_09_option_expression.feature_generation")
-        self.assertIn("layer_03_target_state_vector.option_chain_data_acquisition_complete", plan.layers[8].stages[0].blockers)
-
-    def test_layer_three_feature_generation_reads_month_scoped_source_rows(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01")
-
-        command = plan.layers[2].feature_command
-
-        self.assertIn("data_feature.m03_target_state_vector_feature_generation", command)
-        self.assertIn("--source-start", command)
-        self.assertIn("${START_MONTH_START_ET}", command)
-        self.assertIn("--source-end", command)
-        self.assertIn("${END_MONTH_EXCLUSIVE_START_ET}", command)
-
-    def test_layer_three_model_commands_use_database_rows_and_evaluation_summary(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(storage_root=Path(raw_tmp), start_month="2016-01", end_month="2016-01", selected_target_symbol="AAPL")
-
-        layer = plan.layers[2]
-        self.assertIn("--from-database", layer.model_generate_command)
-        self.assertIn("--source-end", layer.model_generate_command)
-        self.assertIn("--target-symbol", layer.model_generate_command)
-        self.assertIn("AAPL", layer.model_generate_command)
-        self.assertNotIn("--output", layer.model_generate_command)
-        self.assertNotIn("--output-jsonl", layer.model_generate_command)
-        self.assertFalse(any("model_rows" in token for token in layer.model_generate_command))
-        self.assertIn("--from-database", layer.model_evaluate_command)
-        self.assertIn("--output-json", layer.model_evaluate_command)
-        self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
-        self.assertIn("real_database_evaluation", layer.promotion_review_command)
-
-    def test_alpha_confidence_has_no_event_risk_materializer_or_event_source_blocker(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-06",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-
-        layer = plan.layers[4]
-        self.assertEqual(layer.layer_key, "layer_05_alpha_confidence")
-        self.assertEqual([stage.stage_type for stage in layer.stages], ["model_training", "model_generation", "model_generation", "model_generation"])
-        self.assertNotIn("materialize_layer_ten_event_risk_governor_inputs.py", " ".join(token for stage in layer.stages for token in stage.command))
-        self.assertIn("train_model_05_alpha_confidence.py", " ".join(layer.stages[0].command))
-        self.assertIn("--all-horizons", layer.stages[0].command)
-        self.assertIn("--from-database", layer.stages[0].command)
-        self.assertIn("generate_model_05_alpha_confidence.py", " ".join(layer.model_generate_command))
-        self.assertIn("--from-database", layer.model_generate_command)
-        self.assertIn("--target-symbol", layer.model_generate_command)
-        self.assertIn("AAPL", layer.model_generate_command)
-        self.assertNotIn("--output-jsonl", layer.model_generate_command)
-        self.assertFalse(any("model_rows" in token for token in layer.model_generate_command))
-        self.assertIn("--after-cost-alpha-model-json", layer.model_generate_command)
-        self.assertIn(
-            "/root/projects/trading-storage/storage/03_model_artifacts/runtime/model_05_alpha_confidence/after_cost_alpha_model_aapl_2016-01_2016-06.json",
-            layer.model_generate_command,
-        )
-        self.assertIn("upstream_layer_04_model_generation_complete", layer.stages[0].blockers)
-        self.assertEqual(
-            layer.stages[1].blockers,
-            ("upstream_layer_04_model_generation_complete", "layer_05_alpha_confidence.model_training.train_complete"),
-        )
-        self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
-        self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
-
-    def test_base_layers_four_to_nine_use_database_generation_without_runtime_row_dumps(self):
-        expected_scripts = {
-            3: "generate_model_04_event_failure_risk.py",
-            4: "generate_model_05_alpha_confidence.py",
-            5: "generate_model_06_dynamic_risk_policy.py",
-            6: "generate_model_07_position_projection.py",
-            7: "generate_model_08_underlying_action.py",
-            8: "generate_model_09_option_expression.py",
-        }
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-06",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-
-        for index, script_name in expected_scripts.items():
-            layer = plan.layers[index]
-            self.assertIn(script_name, " ".join(layer.model_generate_command))
-            self.assertIn("--from-database", layer.model_generate_command)
-            self.assertNotIn("--output-jsonl", layer.model_generate_command)
-            self.assertFalse(any("model_rows" in token for token in layer.model_generate_command))
-            self.assertIn("--from-database", layer.model_evaluate_command)
-            self.assertIn("database_rows_fixture_outcomes", layer.model_evaluate_command)
-            self.assertIn("--evaluation-summary-json", layer.promotion_review_command)
-            self.assertIn("--output-json", layer.promotion_review_command)
-
-    def test_progression_modes_encode_background_panels_target_chain_and_base_guidance_gate(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-06",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-
-        self.assertEqual(plan.layers[0].progression_mode, "background_panel_continuous")
-        self.assertEqual(plan.layers[1].progression_mode, "sector_panel_continuous")
-        self.assertTrue(all(plan.layers[index].progression_mode == "target_major_serial_chain" for index in range(2, 8)))
-        self.assertEqual(plan.layers[8].progression_mode, "optional_trading_guidance_after_underlying_action")
-        self.assertEqual(plan.layers[8].depends_on_layers, (8,))
-        self.assertIn("replay/live routing decides separately which minutes use the guidance", plan.layers[8].candidate_progression_policy)
-        self.assertIn("upstream_layer_08_model_generation_complete", plan.layers[8].stages[0].blockers)
-
-    def test_layer_four_event_observation_data_acquisition_waits_for_foundation_not_event_feeds(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            root = Path(raw_tmp)
-            plan = build_model_training_workflow_plan(
-                storage_root=root,
-                trading_storage_root=root,
-                start_month="2016-01",
-                end_month="2016-01",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-            empty_pool_stage = plan.layers[3].stages[0]
-
-            _write_event_feed_artifacts(root, month="2016-01")
-            ready_plan = build_model_training_workflow_plan(
-                storage_root=root,
-                trading_storage_root=root,
-                start_month="2016-01",
-                end_month="2016-01",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-            coverage_ready_stage = ready_plan.layers[3].stages[0]
-
-        self.assertEqual(empty_pool_stage.status, "blocked")
-        self.assertEqual(
-            empty_pool_stage.blockers,
-            ("layer_01_market_regime.feature_or_input_ready", "layer_02_sector_context.feature_or_input_ready"),
-        )
-        self.assertEqual(coverage_ready_stage.status, "blocked")
-        self.assertEqual(coverage_ready_stage.blockers, empty_pool_stage.blockers)
-        self.assertIn("materialize_layer_four_event_observation_inputs.py", " ".join(coverage_ready_stage.command))
-        self.assertEqual([layer.layer for layer in ready_plan.layers], list(range(1, 10)))
-
-    def test_layer_stages_stop_at_model_generation_before_model_group_replay(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-06",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-
-        for layer in plan.layers:
-            stage_types = {stage.stage_type for stage in layer.stages}
-            self.assertIn("model_generation", stage_types)
-            self.assertNotIn("model_evaluation", stage_types)
-            self.assertNotIn("promotion_review", stage_types)
-            self.assertNotIn("maintenance", stage_types)
-
-    def test_layers_without_dedicated_data_features_do_not_create_nonexistent_tasks(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
-                start_month="2016-01",
-                end_month="2016-06",
-                selected_target_symbol="AAPL",
-                foundation_catch_up_only=False,
-            )
-        layer_four_stage_types = [stage.stage_type for stage in plan.layers[3].stages]
-        self.assertEqual(
-            layer_four_stage_types,
-            ["data_acquisition", "feature_generation", "model_generation", "model_generation", "model_generation"],
-        )
-        self.assertIn("execute_layer_four_event_failure_feature_generation.py", " ".join(plan.layers[3].feature_command))
-        for layer_number in (5, 6, 7, 8):
-            layer = plan.layers[layer_number - 1]
-            stage_types = [stage.stage_type for stage in layer.stages]
-            self.assertNotIn("data_acquisition", stage_types)
-            self.assertNotIn("feature_generation", stage_types)
-            expected_stage_types = ["model_training", "model_generation", "model_generation", "model_generation"] if layer_number == 5 else ["model_generation", "model_generation", "model_generation"]
-            self.assertEqual(stage_types, expected_stage_types)
-            self.assertIn("no-dedicated-trading-data-feature-stage", " ".join(layer.feature_command))
-
-    def test_dataset_units_are_layer_aware_and_target_visible(self):
-        with tempfile.TemporaryDirectory() as raw_tmp:
-            plan = build_model_training_workflow_plan(
-                storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
                 end_month="2016-06",
                 selected_target_symbol="aapl",
@@ -619,46 +250,39 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         self.assertEqual(plan.selected_target_symbol, "AAPL")
         self.assertEqual(plan.layers[0].dataset_unit.unit_kind, "six_month_panel")
-        self.assertEqual(plan.layers[0].dataset_unit.unit_months, 6)
-        self.assertIsNone(plan.layers[0].dataset_unit.target_symbol)
         self.assertFalse(plan.layers[0].dataset_unit.target_required)
-        self.assertEqual(plan.layers[1].dataset_unit.unit_kind, "six_month_panel")
-        for layer in plan.layers[2:]:
+        self.assertEqual(plan.layers[2].stages[0].dataset_unit.unit_kind, "event_observation_fold_panel")
+        for layer in (plan.layers[1], plan.layers[3], plan.layers[4], plan.layers[5]):
             self.assertEqual(layer.dataset_unit.unit_kind, "target_symbol_six_month")
-            self.assertEqual(layer.dataset_unit.unit_months, 6)
             self.assertEqual(layer.dataset_unit.target_symbol, "AAPL")
             self.assertTrue(layer.dataset_unit.target_required)
-            if layer.layer == 4 and layer.stages[0].stage_type == "data_acquisition":
-                self.assertEqual(layer.stages[0].dataset_unit.unit_kind, "event_observation_fold_panel")
-                self.assertIsNone(layer.stages[0].dataset_unit.target_symbol)
-            else:
-                self.assertEqual(layer.stages[0].dataset_unit.target_symbol, "AAPL")
 
-    def test_multi_target_symbol_requires_separate_workflows(self):
+    def test_multi_target_symbol_requires_separate_workflows(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             with self.assertRaisesRegex(ValueError, MULTI_TARGET_SYMBOL_BLOCKER):
                 build_model_training_workflow_plan(
                     storage_root=Path(raw_tmp),
+                    trading_storage_root=Path(raw_tmp),
                     start_month="2016-01",
                     end_month="2016-06",
                     selected_target_symbol="AAPL,MSFT",
                     foundation_catch_up_only=False,
                 )
 
-    def test_later_layers_block_when_task_intro_omits_target_symbol(self):
+    def test_m02_plus_model_generation_requires_selected_target_symbol(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
                 end_month="2016-06",
                 foundation_catch_up_only=False,
             )
 
         self.assertIsNone(plan.selected_target_symbol)
-        layer_three_acquisition = plan.layers[2].stages[0]
-        self.assertIn("selected_target_symbol_required", layer_three_acquisition.blockers)
-        self.assertTrue(layer_three_acquisition.dataset_unit.target_required)
-        self.assertIsNone(layer_three_acquisition.dataset_unit.target_symbol)
+        m02_generation = next(stage for stage in plan.layers[1].stages if stage.stage_type == "model_generation")
+        self.assertIn("selected_target_symbol_required", m02_generation.blockers)
+        self.assertTrue(m02_generation.dataset_unit.target_required)
 
 
 if __name__ == "__main__":

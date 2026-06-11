@@ -24,7 +24,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                     "target_ref": requirement.target_ref,
                     "timestamp": requirement.timestamp,
                     "maximum_permitted_source_end": requirement.timestamp,
-                    "signal_source": "layer_08_underlying_action.handoff_to_layer_9",
+                    "signal_source": "model_04_unified_decision.handoff_to_model_05",
                 }
             ],
         }
@@ -47,14 +47,14 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
         stages = []
-        for layer in range(1, 10):
+        for layer in range(1, 7):
             for split_name in ("train", "validation", "test"):
                 stages.append(
                     {
-                        "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                        "stage_id": f"model_{layer:02d}_fixture.model_generation.{split_name}",
                         "stage_type": "model_generation",
                         "layer": layer,
-                        "layer_key": f"layer_{layer:02d}_fixture",
+                        "layer_key": f"model_{layer:02d}_fixture",
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
@@ -75,15 +75,6 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        artifact_path = (
-            storage_root.parent
-            / "03_model_artifacts"
-            / "runtime"
-            / "model_05_alpha_confidence"
-            / "after_cost_alpha_model_aapl_2016-01_2016-06.json"
-        )
-        artifact_path.parent.mkdir(parents=True, exist_ok=True)
-        artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
 
     def _write_frozen_dataset(self, storage_root: Path) -> Path:
         dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
@@ -181,7 +172,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         assert decision is not None
         self.assertEqual(decision.decision_status, "backoff")
         self.assertEqual(decision.reason_code, "model_group_replay_option_source_acquisition_required")
-        self.assertEqual(decision.execution_summary["blocked_stage_id"], "layer_03_target_state_vector.option_chain_data_acquisition")
+        self.assertEqual(decision.execution_summary["blocked_stage_id"], "model_05_option_expression.option_chain_data_acquisition")
 
     def test_provider_failure_returns_repair_failure_decision(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-03-05T16:00:00-05:00", "2021-03")

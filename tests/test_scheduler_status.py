@@ -143,7 +143,7 @@ class SchedulerStatusTests(unittest.TestCase):
             foundation_stage_ids = [
                 stage.stage_id
                 for layer in plan.layers
-                if layer.layer in {1, 2}
+                if layer.layer in {1, 3}
                 for stage in layer.stages
             ]
             advance_workflow_state(

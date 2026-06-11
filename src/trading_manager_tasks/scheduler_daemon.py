@@ -186,11 +186,7 @@ def _workflow_payload_foundation_catch_up_complete(payload: dict[str, Any]) -> b
     stages = payload.get("stages")
     if not isinstance(stages, list) or not stages:
         return False
-    required = {
-        (layer, stage_type)
-        for layer in MONTHLY_SUBSTRATE_LAYERS
-        for stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES
-    }
+    required: set[tuple[int, str]] = set()
     satisfied: set[tuple[int, str]] = set()
     for stage in stages:
         if not isinstance(stage, dict):
@@ -200,9 +196,14 @@ def _workflow_payload_foundation_catch_up_complete(payload: dict[str, Any]) -> b
         except (TypeError, ValueError):
             continue
         stage_type = str(stage.get("stage_type") or "")
-        if (layer, stage_type) in required and stage.get("status") in {"succeeded", "not_applicable"}:
+        if layer in MONTHLY_SUBSTRATE_LAYERS and stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES:
+            required.add((layer, stage_type))
+        if layer in MONTHLY_SUBSTRATE_LAYERS and stage_type in FOUNDATION_CATCH_UP_STAGE_TYPES and stage.get("status") in {
+            "succeeded",
+            "not_applicable",
+        }:
             satisfied.add((layer, stage_type))
-    return required <= satisfied
+    return bool(required) and required <= satisfied
 
 
 def _workflow_payload_is_complete(payload: dict[str, Any]) -> bool:

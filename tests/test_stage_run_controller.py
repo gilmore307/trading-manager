@@ -44,8 +44,8 @@ def _preview() -> StageRunProviderDispatchPreview:
 def _dashboard(next_action: str) -> StageRunDashboard:
     return StageRunDashboard(
         contract_type="manager_stage_run_dashboard",
-        stage_id="layer_02_sector_context.data_acquisition",
-        model_layer="layer_02_sector_context",
+        stage_id="model_01_background_context.data_acquisition",
+        model_layer="layer_01_market_regime",
         start_month="2016-01",
         end_month="2016-01",
         coverage=_coverage(),
@@ -69,7 +69,7 @@ class StageRunControllerTests(unittest.TestCase):
             dispatch_mock.return_value.dispatch_performed = True
             dashboard_path = Path(raw_tmp) / "dashboard.json"
             receipt, dashboard = run_stage_controller_step(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 packet_storage_root=Path(raw_tmp) / "storage",
@@ -95,7 +95,7 @@ class StageRunControllerTests(unittest.TestCase):
             side_effect=[_dashboard("autonomous_provider_dispatch_ready"), _dashboard("autonomous_provider_dispatch_ready")],
         ), patch("trading_manager_tasks.stage_run_controller.dispatch_layer_provider_acquisition") as dispatch_mock:
             receipt, _dashboard_row = run_stage_controller_step(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 auto_execute_provider_calls=False,
@@ -113,7 +113,7 @@ class StageRunControllerTests(unittest.TestCase):
             side_effect=[_dashboard("automatic_repair_required"), _dashboard("automatic_repair_required")],
         ), patch("trading_manager_tasks.stage_run_controller.dispatch_layer_provider_acquisition") as dispatch_mock:
             receipt, _dashboard_row = run_stage_controller_step(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 dashboard_path=Path(raw_tmp) / "dashboard.json",
@@ -133,7 +133,7 @@ class StageRunControllerTests(unittest.TestCase):
             dispatch_mock.return_value.provider_calls = 1
             dispatch_mock.return_value.dispatch_performed = True
             receipt, _dashboard_row = run_stage_controller_step(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 packet_storage_root=Path(raw_tmp) / "storage",

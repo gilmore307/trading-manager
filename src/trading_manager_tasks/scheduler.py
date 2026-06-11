@@ -41,8 +41,9 @@ from .model_training_state import (
 )
 from .model_training_workflow import (
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
-    LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS,
+    MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID,
+    MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     build_model_training_workflow_plan,
 )
 from .provider_dispatch import dispatch_layer_provider_acquisition
@@ -297,9 +298,8 @@ def live_runtime_historical_task_gate(config: SchedulerConfig = SchedulerConfig(
 
 
 PROVIDER_STAGE_MODEL_LAYERS = {
-    "layer_01_market_regime.data_acquisition": LAYER_ONE_MODEL_LAYER,
-    "layer_02_sector_context.data_acquisition": LAYER_TWO_MODEL_LAYER,
-    OPTION_CHAIN_SOURCE_STAGE_ID: OPTION_CHAIN_SOURCE_STAGE_ID,
+    "model_01_background_context.data_acquisition": LAYER_ONE_MODEL_LAYER,
+    MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID: OPTION_CHAIN_SOURCE_STAGE_ID,
 }
 
 
@@ -330,16 +330,10 @@ def _stage_status(workflow_state: Any, stage_id: str) -> str | None:
 
 def _next_preparation_model_layer(*, workflow_plan: Any, workflow_state: Any) -> str | None:
     if (
-        _stage_status(workflow_state, "layer_01_market_regime.data_acquisition") != "succeeded"
+        _stage_status(workflow_state, "model_01_background_context.data_acquisition") != "succeeded"
         and workflow_plan.layer_one_task_key_count < LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS
     ):
         return LAYER_ONE_MODEL_LAYER
-    if (
-        _stage_status(workflow_state, "layer_01_market_regime.data_acquisition") == "succeeded"
-        and _stage_status(workflow_state, "layer_02_sector_context.data_acquisition") != "succeeded"
-        and workflow_plan.layer_two_task_key_count < LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS
-    ):
-        return LAYER_TWO_MODEL_LAYER
     return None
 
 
@@ -369,7 +363,7 @@ def _execute_autonomous_provider_stage(
     locks_dir = storage_root / "runtime" / "locks"
     effective_foundation_catch_up_only = workflow_foundation_catch_up_only_for_stage(stage_id, foundation_catch_up_only)
     with acquire_scheduler_lock(month_stage_lock_ref(start_month, stage_id, locks_dir=locks_dir)):
-        if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
+        if stage_id == MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID:
             if not selected_target_symbol:
                 raise TaskSystemError("selected_target_symbol is required for option-chain source acquisition")
             review, requests, task_key_paths = prepare_option_chain_source_acquisition(
@@ -685,8 +679,8 @@ def run_scheduler_once(
     if (
         workflow_next_stage is None
         and workflow_blocked_stage is not None
-        and workflow_blocked_stage.stage_id == "layer_03_target_state_vector.data_acquisition"
-        and LAYER_THREE_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER in workflow_blocked_stage.blockers
+        and workflow_blocked_stage.stage_id == "model_02_target_state.data_acquisition"
+        and MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER in workflow_blocked_stage.blockers
         and target_symbol
     ):
         missing_months = _missing_target_local_feed_months(
@@ -718,7 +712,7 @@ def run_scheduler_once(
                     now_et=now_et.isoformat(),
                     decision_status="ready",
                     reason_code="target_local_provider_stage_ready",
-                    reason=f"Layer 3 target-local feed artifacts are missing for {target_symbol}; autonomous target-local provider acquisition can fill {len(missing_months)} month(s)",
+                    reason=f"M02 target-local feed artifacts are missing for {target_symbol}; autonomous target-local provider acquisition can fill {len(missing_months)} month(s)",
                     market_protection_active=False,
                     resource_pressure_active=False,
                     selected_work=workflow_blocked_stage.stage_id,
@@ -753,7 +747,7 @@ def run_scheduler_once(
                 now_et=now_et.isoformat(),
                 decision_status="executed",
                 reason_code="target_local_provider_stage_executed",
-                reason="executed one bounded autonomous target-local provider-dispatch slice for Layer 3 feed artifacts",
+                reason="executed one bounded autonomous target-local provider-dispatch slice for M02 feed artifacts",
                 market_protection_active=False,
                 resource_pressure_active=False,
                 selected_work=workflow_blocked_stage.stage_id,

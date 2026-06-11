@@ -34,11 +34,11 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             state = initial_workflow_state(plan)
         stage = state.stages[0]
         self.assertEqual(state.contract_type, "manager_model_training_workflow_state")
-        self.assertEqual(stage.stage_id, "layer_01_market_regime.data_acquisition")
+        self.assertEqual(stage.stage_id, "model_01_background_context.data_acquisition")
         self.assertEqual(stage.status, "blocked")
         self.assertIn("layer_01_task_key_preparation", stage.last_reason or "")
         self.assertIsNone(next_ready_or_blocked_stage(state))
-        self.assertEqual(first_blocked_stage(state).stage_id, "layer_01_market_regime.data_acquisition")
+        self.assertEqual(first_blocked_stage(state).stage_id, "model_01_background_context.data_acquisition")
 
     def test_approval_then_receipt_progresses_layer_one_to_feature_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -52,19 +52,19 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=storage,
                 state_path=state_path,
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
                 write=True,
             )
             next_stage = next_ready_or_blocked_stage(state)
             self.assertIsNotNone(next_stage)
-            self.assertEqual(next_stage.stage_id, "layer_01_market_regime.data_acquisition")
+            self.assertEqual(next_stage.stage_id, "model_01_background_context.data_acquisition")
             self.assertEqual(next_stage.status, "ready")
 
             receipt = tmp / "receipt.json"
             receipt.write_text(
                 json.dumps(
                     {
-                        "manager_stage_id": "layer_01_market_regime.data_acquisition",
+                        "manager_stage_id": "model_01_background_context.data_acquisition",
                         "run_id": "run_layer_01_acq",
                         "status": "succeeded",
                         "started_at": "2026-05-10T00:00:00+00:00",
@@ -84,10 +84,10 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 write=True,
             )
             stage_by_id = {stage.stage_id: stage for stage in state.stages}
-            self.assertEqual(stage_by_id["layer_01_market_regime.data_acquisition"].status, "succeeded")
-            self.assertIn("storage://bars/layer1", stage_by_id["layer_01_market_regime.data_acquisition"].artifact_refs)
-            self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "ready")
-            self.assertEqual(next_ready_or_blocked_stage(state).stage_id, "layer_01_market_regime.feature_generation")
+            self.assertEqual(stage_by_id["model_01_background_context.data_acquisition"].status, "succeeded")
+            self.assertIn("storage://bars/layer1", stage_by_id["model_01_background_context.data_acquisition"].artifact_refs)
+            self.assertEqual(stage_by_id["model_01_background_context.feature_generation"].status, "ready")
+            self.assertEqual(next_ready_or_blocked_stage(state).stage_id, "model_01_background_context.feature_generation")
 
     def test_stage_receipts_attach_partial_evidence_without_unlocking_downstream(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -123,18 +123,18 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=storage,
                 state_path=tmp / "workflow_state.json",
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
-                stage_receipts=[("layer_01_market_regime.data_acquisition", receipt) for receipt in receipts],
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
+                stage_receipts=[("model_01_background_context.data_acquisition", receipt) for receipt in receipts],
                 write=False,
             )
 
             stage_by_id = {stage.stage_id: stage for stage in state.stages}
-            acquisition = stage_by_id["layer_01_market_regime.data_acquisition"]
+            acquisition = stage_by_id["model_01_background_context.data_acquisition"]
             self.assertEqual(acquisition.status, "ready")
             self.assertEqual(len(acquisition.receipt_refs), 3)
             self.assertIn("partial component receipt coverage 3/19", acquisition.last_reason)
-            self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "blocked")
-            self.assertIn("layer_01_market_regime.data_acquisition_complete", stage_by_id["layer_01_market_regime.feature_generation"].last_reason)
+            self.assertEqual(stage_by_id["model_01_background_context.feature_generation"].status, "blocked")
+            self.assertIn("model_01_background_context.data_acquisition_complete", stage_by_id["model_01_background_context.feature_generation"].last_reason)
 
     def test_stage_receipts_complete_stage_after_expected_coverage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -166,18 +166,18 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=tmp,
                 state_path=tmp / "workflow_state.json",
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
-                stage_receipts=[("layer_01_market_regime.data_acquisition", receipt) for receipt in receipts],
-                expected_receipt_counts={"layer_01_market_regime.data_acquisition": 2},
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
+                stage_receipts=[("model_01_background_context.data_acquisition", receipt) for receipt in receipts],
+                expected_receipt_counts={"model_01_background_context.data_acquisition": 2},
                 write=False,
             )
 
             stage_by_id = {stage.stage_id: stage for stage in state.stages}
-            acquisition = stage_by_id["layer_01_market_regime.data_acquisition"]
+            acquisition = stage_by_id["model_01_background_context.data_acquisition"]
             self.assertEqual(acquisition.status, "succeeded")
             self.assertEqual(len(acquisition.receipt_refs), 2)
             self.assertIn("storage://bars/0.csv", acquisition.artifact_refs)
-            self.assertEqual(stage_by_id["layer_01_market_regime.feature_generation"].status, "ready")
+            self.assertEqual(stage_by_id["model_01_background_context.feature_generation"].status, "ready")
 
     def test_lifecycle_timestamps_are_recorded_on_creation_start_and_terminal_transition(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -189,10 +189,10 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=storage,
                 state_path=tmp / "workflow_state.json",
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
                 write=False,
             )
-            stage_id = "layer_01_market_regime.data_acquisition"
+            stage_id = "model_01_background_context.data_acquisition"
             stage = {stage.stage_id: stage for stage in state.stages}[stage_id]
             self.assertIsNotNone(stage.created_at_utc)
             self.assertIsNotNone(stage.status_updated_at_utc)
@@ -217,10 +217,10 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=storage,
                 state_path=state_path,
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
                 write=False,
             )
-            stage = {stage.stage_id: stage for stage in state.stages}["layer_01_market_regime.data_acquisition"]
+            stage = {stage.stage_id: stage for stage in state.stages}["model_01_background_context.data_acquisition"]
             legacy_payload = state.summary_row()
             legacy_payload["stages"][0]["started_at_utc"] = "2026-05-13T10:00:00+00:00"
             state_path.write_text(json.dumps(legacy_payload) + "\n", encoding="utf-8")
@@ -230,7 +230,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=storage,
                 state_path=state_path,
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
                 write=False,
             )
 
@@ -266,7 +266,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                         "updated_utc": "2026-05-12T00:00:00+00:00",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_background_context.data_acquisition",
                                 "status": "succeeded",
                                 "updated_utc": "2026-05-12T00:00:00+00:00",
                             }
@@ -282,11 +282,11 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=tmp,
                 state_path=state_path,
-                completed_stage_ids=["layer_01_market_regime.data_acquisition"],
+                completed_stage_ids=["model_01_background_context.data_acquisition"],
                 write=False,
             )
 
-            stage = {stage.stage_id: stage for stage in state.stages}["layer_01_market_regime.data_acquisition"]
+            stage = {stage.stage_id: stage for stage in state.stages}["model_01_background_context.data_acquisition"]
             self.assertEqual(stage.status, "succeeded")
             self.assertIsNone(stage.created_at_utc)
             self.assertIsNone(stage.started_at_utc)
@@ -319,7 +319,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             receipt.write_text(
                 json.dumps(
                     {
-                        "manager_stage_id": "layer_01_market_regime.data_acquisition",
+                        "manager_stage_id": "model_01_background_context.data_acquisition",
                         "status": "succeeded",
                         "provider_calls": 2,
                         "output_refs": ["storage://bars/layer1"],
@@ -350,45 +350,29 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertEqual(state.provider_calls_observed, 2)
             self.assertEqual(state.summary_row()["provider_calls_observed"], 2)
 
-    def test_layer_nine_option_feature_generation_is_ready_after_shared_option_source_and_upstream_chain(self):
+    def test_m05_option_feature_generation_is_ready_after_shared_option_source_and_m04_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             state_path = tmp / "workflow_state.json"
-            completions = []
-            layer_slugs = {
-                1: "market_regime",
-                2: "sector_context",
-                3: "target_state_vector",
-                4: "event_failure_risk",
-                5: "alpha_confidence",
-                6: "dynamic_risk_policy",
-                7: "position_projection",
-                8: "underlying_action",
-            }
-            for layer, key in layer_slugs.items():
-                prefix = f"layer_{layer:02d}_{key}"
-                stage_types = ["model_generation.train", "model_generation.validation", "model_generation.test"]
-                if layer not in {4, 5, 6, 7, 8}:
-                    stage_types = ["data_acquisition", "feature_generation", *stage_types]
-                completions.extend(f"{prefix}.{stage_type}" for stage_type in stage_types)
+            completions = [
+                "model_04_unified_decision.model_generation.train",
+                "model_04_unified_decision.model_generation.validation",
+                "model_04_unified_decision.model_generation.test",
+            ]
             state = advance_workflow_state(
                 start_month="2016-01",
                 end_month="2016-06",
                 storage_root=tmp,
                 state_path=state_path,
-                completed_stage_ids=completions
-                + [
-                    "layer_03_target_state_vector.option_chain_data_acquisition",
-                    "layer_04_event_failure_risk.data_acquisition",
-                ],
+                completed_stage_ids=completions + ["model_05_option_expression.option_chain_data_acquisition"],
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
                 write=False,
             )
-            layer_nine_feature = {stage.stage_id: stage for stage in state.stages}["layer_09_option_expression.feature_generation"]
-            self.assertEqual(layer_nine_feature.status, "ready")
-            self.assertIsNone(layer_nine_feature.approval_gate_required)
-            self.assertTrue(any(token.endswith("execute_layer_nine_option_feature_generation.py") for token in layer_nine_feature.command))
+            m05_feature = {stage.stage_id: stage for stage in state.stages}["model_05_option_expression.feature_generation"]
+            self.assertEqual(m05_feature.status, "ready")
+            self.assertIsNone(m05_feature.approval_gate_required)
+            self.assertTrue(any(token.endswith("execute_layer_nine_option_feature_generation.py") for token in m05_feature.command))
 
     def test_layer_workflow_state_has_no_layer_local_post_generation_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -409,41 +393,29 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertNotIn("promotion_review", stage_types)
             self.assertNotIn("maintenance", stage_types)
 
-    def test_layers_without_input_tasks_can_progress_from_upstream_completion(self):
+    def test_m04_unified_decision_can_progress_from_upstream_model_generation_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             state_path = tmp / "workflow_state.json"
-            completions = []
-            for layer in range(1, 4):
-                key = [
-                    "market_regime",
-                    "sector_context",
-                    "target_state_vector",
-                ][layer - 1]
-                prefix = f"layer_{layer:02d}_{key}"
-                completions.extend(
-                    [
-                        f"{prefix}.data_acquisition",
-                        f"{prefix}.feature_generation",
-                        f"{prefix}.model_generation.train",
-                        f"{prefix}.model_generation.validation",
-                        f"{prefix}.model_generation.test",
-                    ]
-                )
+            completions = [
+                f"model_{layer:02d}_{slug}.model_generation.{split}"
+                for layer, slug in ((1, "background_context"), (2, "target_state"), (3, "event_state"))
+                for split in ("train", "validation", "test")
+            ]
             state = advance_workflow_state(
                 start_month="2016-01",
                 end_month="2016-06",
                 storage_root=tmp,
                 state_path=state_path,
-                completed_stage_ids=completions + ["layer_04_event_failure_risk.data_acquisition"],
+                completed_stage_ids=completions,
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
                 write=False,
             )
             stage_by_id = {stage.stage_id: stage for stage in state.stages}
-            self.assertNotIn("layer_05_alpha_confidence.data_acquisition", stage_by_id)
-            self.assertNotIn("layer_05_alpha_confidence.feature_generation", stage_by_id)
-            self.assertEqual(stage_by_id["layer_04_event_failure_risk.model_generation.train"].status, "ready")
+            self.assertNotIn("model_04_unified_decision.data_acquisition", stage_by_id)
+            self.assertNotIn("model_04_unified_decision.feature_generation", stage_by_id)
+            self.assertEqual(stage_by_id["model_04_unified_decision.model_generation.train"].status, "ready")
 
     def test_workflow_state_write_triggers_dashboard_refresh_when_enabled(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

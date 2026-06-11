@@ -19,33 +19,44 @@ from typing import Any, Mapping
 from trading_manager_tasks.registry_values import registry_payload
 
 
+MODEL_01_BACKGROUND_CONTEXT = registry_payload("trm_M1BC001")
+MODEL_02_TARGET_STATE = registry_payload("trm_M2TS001")
+MODEL_03_EVENT_STATE = registry_payload("trm_M3ES001")
+MODEL_04_UNIFIED_DECISION = registry_payload("trm_M4UD001")
+MODEL_05_OPTION_EXPRESSION = registry_payload("trm_M5OE002")
+MODEL_06_RESIDUAL_EVENT_GOVERNANCE = registry_payload("trm_M6REG001")
 LOCAL_RUNTIME_COMPONENTS = (
-    ("component_01_intake", "C01", "Intake", ("model_01_background_context", "model_02_target_state"), ()),
+    ("component_01_intake", "C01", "Intake", (MODEL_01_BACKGROUND_CONTEXT, MODEL_02_TARGET_STATE), ()),
     (
         "component_02_entry",
         "C02",
         "Entry",
-        ("model_03_event_state", "model_04_unified_decision"),
-        ("model_06_residual_event_governance",),
+        (MODEL_03_EVENT_STATE, MODEL_04_UNIFIED_DECISION),
+        (MODEL_06_RESIDUAL_EVENT_GOVERNANCE,),
     ),
     (
         "component_03_lifecycle",
         "C03",
         "Lifecycle",
-        ("model_03_event_state", "model_04_unified_decision"),
-        ("model_06_residual_event_governance",),
+        (MODEL_03_EVENT_STATE, MODEL_04_UNIFIED_DECISION),
+        (MODEL_06_RESIDUAL_EVENT_GOVERNANCE,),
     ),
-    ("component_04_option_review", "C04", "Option Review", (), ("model_05_option_expression", "model_06_residual_event_governance")),
+    ("component_04_option_review", "C04", "Option Review", (), (MODEL_05_OPTION_EXPRESSION, MODEL_06_RESIDUAL_EVENT_GOVERNANCE)),
     ("component_05_order_intent", "C05", "Order Intent", (), ()),
     ("component_06_execution_gate", "C06", "Execution Gate", (), ()),
-    ("component_07_failure_review", "C07", "Failure Review", (), ("model_06_residual_event_governance",)),
+    ("component_07_failure_review", "C07", "Failure Review", (), (MODEL_06_RESIDUAL_EVENT_GOVERNANCE,)),
 )
 
 AVAILABLE_TIME = registry_payload("fld_STKEX011")
+EXECUTION_MODEL_DECISION_COMPONENT_INPUT = registry_payload("art_EXEC_RT010")
 EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT = registry_payload("trm_EXEC_RT008")
 EXECUTION_REALTIME_SHADOW_FIXTURE_BUNDLE = registry_payload("trm_RTLV003")
 MANAGER_REALTIME_SHADOW_HANDOFF_REHEARSAL = registry_payload("trm_RTLV004")
+MODEL_REALTIME_DECISION_COMPONENT_ROUTE = registry_payload("art_MODEL_RTD004")
 MODEL_REALTIME_DECISION_ROUTE_PLAN = registry_payload("trm_MODEL_RTD002")
+MODEL_REALTIME_DECISION_ROUTE_PLAN_READY_FOR_FIXTURE_SHADOW_RUNTIME_COMPONENT_ROUTE = registry_payload("sts_MODEL_RTD003")
+MODEL_REALTIME_DECISION_COMPONENT_ROUTE_READY_FOR_FIXTURE_SHADOW_GENERATION = registry_payload("sts_MODEL_RTD001")
+EXECUTION_MODEL_DECISION_INPUT_READY_FOR_HISTORICAL_MODEL_DECISION_INPUT = registry_payload("sts_EXEC_RT010")
 SUCCEEDED = registry_payload("sts_MSH003")
 TRADEABLE_TIME = registry_payload("fld_TSV001")
 
@@ -64,7 +75,7 @@ def _local_execution_fixture(args: argparse.Namespace) -> dict[str, Any]:
     for component_id, component_step, component_name, required_model_surfaces, optional_model_surfaces in LOCAL_RUNTIME_COMPONENTS:
         component_rows.append(
             {
-                "contract_type": "execution_model_decision_component_input",
+                "contract_type": EXECUTION_MODEL_DECISION_COMPONENT_INPUT,
                 "decision_input_snapshot_id": snapshot_id,
                 "component_id": component_id,
                 "component_step": component_step,
@@ -76,7 +87,7 @@ def _local_execution_fixture(args: argparse.Namespace) -> dict[str, Any]:
                 "frozen_model_config_ref": args.frozen_model_config_ref,
                 "historical_dataset_snapshot_ref": args.historical_dataset_snapshot_ref,
                 "realtime_feature_snapshot_ref": feature_snapshot_ref,
-                "decision_handoff_status": "ready_for_historical_model_decision_input",
+                "decision_handoff_status": EXECUTION_MODEL_DECISION_INPUT_READY_FOR_HISTORICAL_MODEL_DECISION_INPUT,
             }
         )
     decision_input = {
@@ -120,7 +131,7 @@ def _local_route_plan(decision_input: Mapping[str, Any], *, mode: str) -> dict[s
             continue
         component_routes.append(
             {
-                "contract_type": "model_realtime_decision_component_route",
+                "contract_type": MODEL_REALTIME_DECISION_COMPONENT_ROUTE,
                 "route_plan_id": f"rtdroute_{decision_input.get('decision_input_snapshot_id')}",
                 "component_id": row.get("component_id"),
                 "component_step": row.get("component_step"),
@@ -136,7 +147,7 @@ def _local_route_plan(decision_input: Mapping[str, Any], *, mode: str) -> dict[s
                 "model_entrypoint_refs": [],
                 "invocation_policy": "fixture_only_rehearsal",
                 "generation_mode": "shadow_monitoring" if mode != "dry_run" else "fixture_replay",
-                "route_status": "ready_for_fixture_shadow_generation",
+                "route_status": MODEL_REALTIME_DECISION_COMPONENT_ROUTE_READY_FOR_FIXTURE_SHADOW_GENERATION,
             }
         )
     return {
@@ -149,7 +160,7 @@ def _local_route_plan(decision_input: Mapping[str, Any], *, mode: str) -> dict[s
         "execution_unit": "runtime_component",
         "input_validation": {"valid": True},
         "component_routes": component_routes,
-        "readiness_status": "ready_for_fixture_shadow_runtime_component_route",
+        "readiness_status": MODEL_REALTIME_DECISION_ROUTE_PLAN_READY_FOR_FIXTURE_SHADOW_RUNTIME_COMPONENT_ROUTE,
         "provider_calls_performed": 0,
         "model_activation_performed": False,
         "broker_calls_performed": 0,

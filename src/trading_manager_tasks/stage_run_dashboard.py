@@ -19,7 +19,7 @@ from typing import Any, Sequence, TextIO
 
 from .control_plane import TaskSystemError
 from .failure_register import fetch_failure_register_rows
-from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER
 from .option_chain_source_acquisition import STAGE_ID as OPTION_CHAIN_SOURCE_STAGE_ID, dispatch_option_chain_source_acquisition
 from .provider_dispatch import dispatch_layer_provider_acquisition
 from .stage_coverage import StageCoverageReport, collect_stage_coverage
@@ -29,8 +29,7 @@ from .storage_paths import data_storage_root
 DEFAULT_STAGE_RUN_DASHBOARD_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "stage_run_dashboard"
 DEFAULT_COMPONENT_STORAGE_ROOT = data_storage_root()
 SUPPORTED_DASHBOARD_STAGE_IDS = (
-    "layer_01_market_regime.data_acquisition",
-    "layer_02_sector_context.data_acquisition",
+    "model_01_background_context.data_acquisition",
     OPTION_CHAIN_SOURCE_STAGE_ID,
 )
 
@@ -86,10 +85,8 @@ class StageRunDashboard:
 
 
 def _model_layer_for_stage(stage_id: str) -> str:
-    if stage_id == "layer_01_market_regime.data_acquisition":
+    if stage_id == "model_01_background_context.data_acquisition":
         return LAYER_ONE_MODEL_LAYER
-    if stage_id == "layer_02_sector_context.data_acquisition":
-        return LAYER_TWO_MODEL_LAYER
     if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
         return OPTION_CHAIN_SOURCE_STAGE_ID
     raise TaskSystemError(f"unsupported stage dashboard: {stage_id}")

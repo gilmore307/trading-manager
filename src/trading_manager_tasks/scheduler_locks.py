@@ -309,7 +309,7 @@ def scheduler_lock_plan(
             stage_ref = month_stage_lock_ref(month, "chronological_month_advance", locks_dir=locks_dir)
             lock_refs.append(stage_ref.summary_row())
             scopes.append("month_stage")
-        elif selected_work.startswith("layer_"):
+        elif selected_work.startswith(("model_", "layer_")):
             stage_ref = month_stage_lock_ref(month, selected_work, locks_dir=locks_dir)
             lock_refs.append(stage_ref.summary_row())
             scopes.append("month_stage")

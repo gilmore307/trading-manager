@@ -258,6 +258,15 @@ def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
     if blocker.startswith("upstream_layer_") and blocker.endswith("_complete"):
         layer_number = int(blocker.removeprefix("upstream_layer_").removesuffix("_complete"))
         return _layer_complete(layer_number, stages)
+    if blocker.startswith("upstream_model_") and blocker.endswith("_model_evaluation_complete"):
+        layer_number = int(blocker.removeprefix("upstream_model_").removesuffix("_model_evaluation_complete"))
+        return _layer_model_evaluation_complete(layer_number, stages)
+    if blocker.startswith("upstream_model_") and blocker.endswith("_model_generation_complete"):
+        layer_number = int(blocker.removeprefix("upstream_model_").removesuffix("_model_generation_complete"))
+        return _layer_model_generation_complete(layer_number, stages)
+    if blocker.startswith("upstream_model_") and blocker.endswith("_complete"):
+        layer_number = int(blocker.removeprefix("upstream_model_").removesuffix("_complete"))
+        return _layer_complete(layer_number, stages)
     if blocker.endswith("_complete"):
         stage_id = blocker.removesuffix("_complete")
         stage = stages.get(stage_id)
@@ -384,7 +393,7 @@ def _terminal_receipt_success(receipt: Mapping[str, Any]) -> bool:
 def _task_key_count_for_stage(stage_id: str, *, storage_root: Path, start_month: str, end_month: str) -> int | None:
     if start_month != end_month:
         return None
-    if stage_id == "layer_01_market_regime.data_acquisition":
+    if stage_id == "model_01_background_context.data_acquisition":
         return len(list((storage_root / "monthly_backfill" / "alpaca_bars").glob(f"*/{start_month}/task_key.json")))
     return None
 

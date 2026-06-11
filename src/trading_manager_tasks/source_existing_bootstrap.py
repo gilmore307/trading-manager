@@ -23,7 +23,7 @@ from typing import Any, Mapping, Sequence, TextIO
 
 from .dataset_evidence import database_url as resolve_database_url
 from .model_training_state import advance_workflow_state, workflow_state_path_for_month
-from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, Month, load_market_regime_universe
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, Month, load_market_regime_universe
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root
 
@@ -32,9 +32,8 @@ DEFAULT_BOOTSTRAP_REPORT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "source_exist
 SOURCE_TIMEZONE = "America/New_York"
 
 STAGE_SOURCE_TABLES: Mapping[str, str] = {
-    "layer_01_market_regime.data_acquisition": "trading_data.m01_market_regime_data_acquisition",
-    "layer_02_sector_context.data_acquisition": "trading_data.m01_market_regime_data_acquisition",
-    "layer_03_target_state_vector.data_acquisition": "trading_data.m03_target_state_vector_data_acquisition",
+    "model_01_background_context.data_acquisition": "trading_data.m01_market_regime_data_acquisition",
+    "model_02_target_state.data_acquisition": "trading_data.m03_target_state_vector_data_acquisition",
 }
 
 
@@ -67,7 +66,7 @@ class SourceStageCoverage:
 
 @dataclass(frozen=True)
 class EventSourceCoverage:
-    """Existing Layer 9 source coverage observed at service bootstrap."""
+    """Existing event source coverage observed at service bootstrap."""
 
     contract_type: str
     source_table: str
@@ -197,9 +196,9 @@ def _source_stage_coverage(
 def _event_source_coverage(*, month: str, row_count: int) -> EventSourceCoverage:
     status = "ready" if row_count > 0 else "missing"
     reason = (
-        f"existing m10_event_risk_governor_data_acquisition rows found for {month}; Layer 10 event-risk lane can reuse source evidence"
+        f"existing m10_event_risk_governor_data_acquisition rows found for {month}; M06 residual-event governance can reuse source evidence"
         if row_count > 0
-        else f"no m10_event_risk_governor_data_acquisition rows found for {month}; Layer 10 event-risk lane has no existing source evidence"
+        else f"no m10_event_risk_governor_data_acquisition rows found for {month}; M06 residual-event governance has no existing source evidence"
     )
     return EventSourceCoverage(
         contract_type="manager_source_existing_event_coverage",
@@ -225,27 +224,16 @@ def build_source_coverages_from_counts(
     warnings: list[str] = []
     target_symbol = selected_target_symbol.strip().upper() if selected_target_symbol else None
     layer_one_symbols = _symbols_for_model_layer(LAYER_ONE_MODEL_LAYER)
-    layer_two_symbols = _symbols_for_model_layer(LAYER_TWO_MODEL_LAYER)
     stage_coverages: list[SourceStageCoverage] = []
     event_coverages: list[EventSourceCoverage] = []
     for month in months:
         m01_month = {symbol.upper(): int(count) for symbol, count in dict(m01_counts.get(month, {})).items()}
         stage_coverages.append(
             _source_stage_coverage(
-                stage_id="layer_01_market_regime.data_acquisition",
-                source_table=STAGE_SOURCE_TABLES["layer_01_market_regime.data_acquisition"],
+                stage_id="model_01_background_context.data_acquisition",
+                source_table=STAGE_SOURCE_TABLES["model_01_background_context.data_acquisition"],
                 month=month,
                 expected_symbols=layer_one_symbols,
-                counts_by_symbol=m01_month,
-                first_seen_month_by_symbol=m01_first_seen_month_by_symbol,
-            )
-        )
-        stage_coverages.append(
-            _source_stage_coverage(
-                stage_id="layer_02_sector_context.data_acquisition",
-                source_table=STAGE_SOURCE_TABLES["layer_02_sector_context.data_acquisition"],
-                month=month,
-                expected_symbols=layer_two_symbols,
                 counts_by_symbol=m01_month,
                 first_seen_month_by_symbol=m01_first_seen_month_by_symbol,
             )
@@ -254,15 +242,15 @@ def build_source_coverages_from_counts(
             source_03_month = {symbol.upper(): int(count) for symbol, count in dict(source_03_counts.get(month, {})).items()}
             stage_coverages.append(
                 _source_stage_coverage(
-                    stage_id="layer_03_target_state_vector.data_acquisition",
-                    source_table=STAGE_SOURCE_TABLES["layer_03_target_state_vector.data_acquisition"],
+                    stage_id="model_02_target_state.data_acquisition",
+                    source_table=STAGE_SOURCE_TABLES["model_02_target_state.data_acquisition"],
                     month=month,
                     expected_symbols=(target_symbol,),
                     counts_by_symbol=source_03_month,
                 )
             )
         else:
-            warnings.append("selected_target_symbol missing; m03_target_state_vector_data_acquisition bootstrap was skipped")
+            warnings.append("selected_target_symbol missing; model_02_target_state source bootstrap was skipped")
         event_coverages.append(_event_source_coverage(month=month, row_count=int(source_10_counts.get(month, 0))))
     return tuple(stage_coverages), tuple(event_coverages), tuple(dict.fromkeys(warnings))
 
@@ -478,11 +466,17 @@ def run_source_existing_bootstrap(
         ready_coverages = [
             coverage
             for coverage in coverages_by_month.get(month, [])
-            if coverage.stage_id.startswith(("layer_01_", "layer_02_", "layer_03_"))
+            if coverage.stage_id
+            in {
+                "model_01_background_context.data_acquisition",
+                "model_02_target_state.data_acquisition",
+            }
         ]
         if not ready_coverages:
             continue
-        include_post_foundation_stages = any(coverage.stage_id.startswith("layer_03_") for coverage in ready_coverages)
+        include_post_foundation_stages = any(
+            coverage.stage_id == "model_02_target_state.data_acquisition" for coverage in ready_coverages
+        )
         report_paths: list[Path] = []
         for coverage in ready_coverages:
             path = _coverage_report_path(report_root=resolved_report_root, month=month, stage_id=coverage.stage_id)

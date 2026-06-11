@@ -101,7 +101,6 @@ def run_model_group_replay_if_ready(
     run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
     progress_path = dataset_root / "replay_progress.jsonl"
     candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
-    after_cost_alpha_model_path = str(training_fold.get("layer_05_after_cost_alpha_model_ref") or "")
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
     replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
@@ -122,8 +121,6 @@ def run_model_group_replay_if_ready(
         run_id,
         "--candidate-model-ref",
         candidate_model_ref,
-        "--after-cost-alpha-model-json",
-        after_cost_alpha_model_path,
         "--progress-path",
         str(progress_path),
         "--initial-capital-usd",
@@ -276,12 +273,12 @@ def run_model_group_replay_if_ready(
                     "runner_stdout": exc.stdout,
                     "runner_stderr": exc.stderr,
                     "required_next_step": (
-                        "run shared option_chain_state_source acquisition before Layer 3 with source_end no later than each missing replay decision timestamp, generate Layer 9 option features from that shared source, then retry model_group.replay"
+                        "run shared option_chain_state_source acquisition under M05 with source_end no later than each missing replay decision timestamp, generate M05 option features from that shared source, then retry model_group.replay"
                         if option_feature_acquisition_required
                         else None
                     ),
                     "blocked_stage_id": (
-                        "layer_03_target_state_vector.option_chain_data_acquisition"
+                        "model_05_option_expression.option_chain_data_acquisition"
                         if option_feature_acquisition_required
                         else None
                     ),
@@ -509,14 +506,6 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
         if not start_month or not end_month:
             continue
         target_symbol = _fold_state_target_symbol(path, payload)
-        after_cost_alpha_model_path = _layer_05_after_cost_alpha_model_path(
-            storage_root=storage_root,
-            start_month=start_month,
-            end_month=end_month,
-            target_symbol=target_symbol,
-        )
-        if not after_cost_alpha_model_path.exists():
-            continue
         candidates.append(
             {
                 "fold_id": f"fold_{start_month}_{end_month}",
@@ -530,21 +519,10 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                     start_month=start_month,
                     end_month=end_month,
                 ),
-                "layer_05_after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+                "fold_stack_evidence_ref": str(path),
             }
         )
     return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))[0] if candidates else None
-
-
-def _layer_05_after_cost_alpha_model_path(
-    *,
-    storage_root: Path,
-    start_month: str,
-    end_month: str,
-    target_symbol: str | None,
-) -> Path:
-    target_token = str(target_symbol or "target").strip().lower().replace(".", "_")
-    return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / f"after_cost_alpha_model_{target_token}_{start_month}_{end_month}.json"
 
 
 def _candidate_model_ref(*, target_symbol: str | None, start_month: str, end_month: str) -> str:

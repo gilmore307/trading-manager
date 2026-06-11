@@ -31,6 +31,13 @@ MODEL_IDS_BY_LAYER: dict[int, str] = {
     int(meta["layer"]): f"{meta['slug']}_model" if meta["slug"] != "target_state_vector" else "target_state_vector_model"
     for meta in LAYER_METADATA
 }
+MODEL_ID_ALIASES_BY_LAYER: dict[int, tuple[str, ...]] = {
+    1: ("market_regime_model",),
+    2: ("sector_context_model", "target_state_vector_model"),
+    3: ("event_failure_risk_model",),
+    5: ("alpha_confidence_model", "option_expression_model"),
+    6: ("dynamic_risk_policy_model", "event_risk_governor_model"),
+}
 LAYER_KEYS_BY_LAYER: dict[int, str] = {
     int(meta["layer"]): workflow_layer_key(int(meta["layer"]), str(meta["slug"])) for meta in LAYER_METADATA
 }
@@ -282,15 +289,17 @@ def collect_dataset_evidence_from_rows(
     global_warnings = list(warnings)
     for layer in sorted(MODEL_IDS_BY_LAYER):
         model_id = MODEL_IDS_BY_LAYER[layer]
-        model_snapshots = [row for row in snapshot_rows if row.get("model_id") == model_id]
+        model_ids = (model_id, *MODEL_ID_ALIASES_BY_LAYER.get(layer, ()))
+        model_id_set = set(model_ids)
+        model_snapshots = [row for row in snapshot_rows if row.get("model_id") in model_id_set]
         role_accumulator: dict[DatasetRole, dict[str, Any]] = {
             role: {
                 "month_count": 0,
                 "sample_count": 0,
                 "label_count": 0,
                 "eval_run_count": 0,
-                "artifact_count": artifact_count_by_model_role[(model_id, role)],
-                "ready_signal_count": ready_count_by_model_role[(model_id, role)],
+                "artifact_count": sum(artifact_count_by_model_role[(candidate_model_id, role)] for candidate_model_id in model_ids),
+                "ready_signal_count": sum(ready_count_by_model_role[(candidate_model_id, role)] for candidate_model_id in model_ids),
                 "snapshot_ref": None,
                 "split_refs": [],
             }
@@ -343,7 +352,9 @@ def collect_dataset_evidence_from_rows(
                     split_refs=tuple(dict.fromkeys(acc["split_refs"])),
                 )
             )
-        gaps = set(_promotion_gaps_from_metrics(metrics_by_model[model_id]))
+        gaps = set()
+        for candidate_model_id in model_ids:
+            gaps.update(_promotion_gaps_from_metrics(metrics_by_model[candidate_model_id]))
         if not model_snapshots:
             gaps.add("coverage")
             layer_warnings.append("no model_dataset_snapshot rows found")

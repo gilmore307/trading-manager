@@ -39,9 +39,34 @@ Progress stall guard: the daemon uses `TRADING_MANAGER_SCHEDULER_PROGRESS_STALL_
 
 Agent repair closure is a separate internal service. `trading-manager-agent-repair-closure.timer` runs `scripts/tasks/close_agent_repairs.py` every minute. The closure controller scans completed server-error diagnoses, refuses broker/account/order/fill/position/buying-power/funds scopes, pushes already-committed internal repo repairs, restarts internal services when the diagnosis requires it, triggers dashboard refresh, and writes `agent_repair_closure_receipt.json`. This controller is the manager-owned handoff after agent repair; agent diagnosis alone is not considered closed-loop completion.
 
-Replay dataset closure is part of the daemon lifecycle, not a manual side path. After a fold completes Layer 1-9 model generation, the daemon runs `model_group.replay_dataset` before `model_group.replay`. That worker writes the fold-bound Layer 1/2 base context when missing, calls the evaluation-owned dataset preparation script, runs bounded one-shot replay acquisition only when `--execute-autonomous-provider-stages` is enabled, refreshes coverage, and freezes the dataset once local coverage is complete. It must report safety flags for provider calls, SQL mutation, model training, model activation, broker execution, and account mutation on every decision.
+Replay dataset closure is part of the daemon lifecycle, not a manual side path.
+After a fold completes M01-M06 model generation, the daemon runs
+`model_group.replay_dataset` before `model_group.replay`. That worker writes the
+fold-bound background/target/event context when missing, calls the
+evaluation-owned dataset preparation script, runs bounded one-shot replay
+acquisition only when `--execute-autonomous-provider-stages` is enabled,
+refreshes coverage, and freezes the dataset once local coverage is complete. It
+must report safety flags for provider calls, SQL mutation, model training, model
+activation, broker execution, and account mutation on every decision.
 
-Replay option-feature closure is also part of the daemon lifecycle, but it is not a pre-replay scan. The daemon runs `model_group.replay` first so the replay clock advances through Layers 1-8 using only point-in-time evidence. If Layer 8 emits an option-expression signal and Layer 9 lacks the matching point-in-time candidates, replay backs off with `model_group_replay_option_feature_acquisition_required`; the daemon then runs `model_group.replay_option_features` only for the emitted sample timestamps, prepares the matching regular-session option-chain source day windows, dispatches bounded historical ThetaData calls only when `--execute-autonomous-provider-stages` is enabled, generates Layer 9 features from `trading_data.option_chain_state_source`, and retries replay from the same lifecycle. If the bounded provider request deterministically reports unavailable source data, the daemon records a `snapshot_type = source_unavailable` sentinel row in `trading_data.m09_option_expression_feature_generation` for that signal timestamp so replay can continue through a no-option expression path instead of repeating the same provider request. It must not derive option downloads from all equity bars, and it must not perform broker/order/fill/account mutation, production model activation, or promoted-roster changes.
+Replay option-feature closure is also part of the daemon lifecycle, but it is
+not a pre-replay scan. The daemon runs `model_group.replay` first so the replay
+clock advances through the current component graph using only point-in-time
+evidence. If replay emits an M05 option-expression signal and lacks the matching
+point-in-time candidates, replay backs off with
+`model_group_replay_option_feature_acquisition_required`; the daemon then runs
+`model_group.replay_option_features` only for the emitted sample timestamps,
+prepares the matching regular-session option-chain source day windows, dispatches
+bounded historical ThetaData calls only when
+`--execute-autonomous-provider-stages` is enabled, generates M05 features from
+`trading_data.option_chain_state_source`, and retries replay from the same
+lifecycle. If the bounded provider request deterministically reports unavailable
+source data, the daemon records a `snapshot_type = source_unavailable` sentinel
+row in `trading_data.m09_option_expression_feature_generation` for that signal
+timestamp so replay can continue through a no-option expression path instead of
+repeating the same provider request. It must not derive option downloads from
+all equity bars, and it must not perform broker/order/fill/account mutation,
+production model activation, or promoted-roster changes.
 
 ## Lock Contract
 
@@ -70,15 +95,32 @@ PYTHONPATH=src python3 scripts/tasks/build_historical_task_progress_summary.py
 
 ## Current Priority
 
-Reusable foundation catch-up remains first. Runtime advances exactly one canonical month during this phase after reusable data-acquisition and feature-generation substrate is complete for market context, sector context, and fold-scoped global/sector Layer 4 event-observation context. Layer 4 event-observation substrate is collected each fold because the accepted event observation pool may differ across folds. Researching another target later must reuse that foundation evidence instead of redownloading it.
+Reusable foundation catch-up remains first. Runtime advances exactly one
+canonical month during this phase after reusable M01 background-context
+data/feature substrate and fold-scoped M03 event-state observation inputs are
+complete. M03 event substrate is collected each fold because accepted event
+families and M06-governed event attributes may differ across folds.
 
-Target-specific substrate work is the second phase. It prepares target state, target-local event evidence, option-expression inputs, and other target-scoped source/feature rows only when a downstream run needs them. Target-substrate checkpoints are data-preparation state, not parallel public task lanes; they do not force replay to trade that target.
+Target-specific substrate work is the second phase. It prepares M02 target
+state, target-local evidence, M05 option-expression inputs when applicable, and
+other target-scoped source/feature rows only when a downstream run needs them.
+Target-substrate checkpoints are data-preparation state, not parallel public
+task lanes; they do not force replay to trade that target.
 
-Fold progression is serial. After a fold finishes Layer 1-9 pre-replay model work, the scheduler holds the fold lane until model replay, Layer 10 Event Risk Governor attribution, model evaluation, model promotion, and maintenance/readiness handoff complete. It must not start the next fold or rotate to another target while that model-group lifecycle is still open, because Layer 10 may change the accepted event-observation pool that the next fold's Layer 4 substrate consumes.
+Fold progression is serial. After a fold finishes M01-M06 model work, the
+scheduler holds the fold lane until model replay, residual-event governance
+attribution, model evaluation, model promotion, and maintenance/readiness
+handoff complete. It must not start the next fold or rotate to another target
+while that model-group lifecycle is still open.
 
 Replay is run-cycle scoped. It simulates the frozen live component graph against the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. Replay does not start from a preselected symbol except in explicit diagnostic repair scenarios.
 
-Failure attribution is a separate task between replay and evaluation. Layer 10 starts at this boundary and must not run as a pre-replay input stage. Attribution may inspect target selection misses, portfolio combinations, event/co-event explanations, alpha residuals, position-management choices, option-expression drag, and overblock/underblock behavior. This boundary must also exist in live operation as an execution-owned C07 path: realtime watch may run during market hours for early failure/deviation evidence, and settlement attribution may run after close or in an accepted off-hours window. C07 provisional risk estimates for untrained event evidence are review inputs only and must route through the trading-review agent before affecting live protective action.
+Failure attribution is a separate task between replay and evaluation. M06
+residual-event governance starts at this boundary for settled replay evidence
+and must not run as a pre-replay provider input stage. Attribution may inspect
+target selection misses, portfolio combinations, event/co-event explanations,
+underlying-vs-option failure locus, option-expression drag, and
+overblock/underblock behavior.
 
 Evaluation consumes replay and attribution evidence. Promotion review must wait for the candidate bundle's replay, attribution, and evaluation evidence; single-layer checks and target-substrate runs remain diagnostic until the full run cycle closes.
 

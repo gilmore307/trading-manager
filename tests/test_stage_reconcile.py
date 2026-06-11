@@ -15,7 +15,7 @@ from trading_manager_tasks.stage_reconcile import (
 )
 
 
-def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01", status: str = "succeeded") -> Path:
+def _write_receipt(root: Path, *, symbol: str = "SPY", month: str = "2016-01", status: str = "succeeded") -> Path:
     path = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -40,7 +40,7 @@ def _write_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01", s
     return path
 
 
-def _write_retry_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01") -> Path:
+def _write_retry_receipt(root: Path, *, symbol: str = "SPY", month: str = "2016-01") -> Path:
     path = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -71,7 +71,7 @@ def _write_retry_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-
     return path
 
 
-def _write_connection_refused_receipt(root: Path, *, symbol: str = "XLK", month: str = "2016-01") -> Path:
+def _write_connection_refused_receipt(root: Path, *, symbol: str = "SPY", month: str = "2016-01") -> Path:
     path = root / "monthly_backfill" / "alpaca_bars" / symbol / month / "completion_receipt.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -97,7 +97,7 @@ def _write_connection_refused_receipt(root: Path, *, symbol: str = "XLK", month:
     return path
 
 
-def _coverage(stage_id: str = "layer_02_sector_context.data_acquisition") -> StageCoverageReport:
+def _coverage(stage_id: str = "model_01_background_context.data_acquisition") -> StageCoverageReport:
     return StageCoverageReport(
         contract_type="manager_stage_coverage",
         stage_id=stage_id,
@@ -111,7 +111,7 @@ def _coverage(stage_id: str = "layer_02_sector_context.data_acquisition") -> Sta
         accepted_failed_count=5,
         status="partial_ready",
         can_unlock_downstream=False,
-        ready_request_ids=("mgrreq_backfill_alpaca_bars_xlk_2016_01",),
+        ready_request_ids=("mgrreq_backfill_alpaca_bars_spy_2016_01",),
         failed_request_ids=(),
         accepted_failed_request_ids=(
             "mgrreq_backfill_alpaca_bars_aiq_2016_01",
@@ -121,28 +121,28 @@ def _coverage(stage_id: str = "layer_02_sector_context.data_acquisition") -> Sta
             "mgrreq_backfill_alpaca_bars_xlc_2016_01",
         ),
         pending_request_ids=(),
-        accepted_failure_refs=("review://layer2-preflight",),
+        accepted_failure_refs=("review://model1-preflight",),
         reason="stage coverage partial 1 ready + 5 reviewed failed/skip / 25; downstream remains blocked",
     )
 
 
 class StageReconcileTests(unittest.TestCase):
-    def test_discovers_layer_two_receipts_by_reviewed_universe(self) -> None:
+    def test_discovers_m01_receipts_by_reviewed_universe(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
-            receipt = _write_receipt(root, symbol="XLK")
+            receipt = _write_receipt(root, symbol="SPY")
             refs = discover_stage_receipts(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 component_storage_root=root,
             )
 
         self.assertEqual(len(refs), 1)
-        self.assertEqual(refs[0].symbol, "XLK")
-        self.assertEqual(refs[0].request_id, "mgrreq_backfill_alpaca_bars_xlk_2016_01")
+        self.assertEqual(refs[0].symbol, "SPY")
+        self.assertEqual(refs[0].request_id, "mgrreq_backfill_alpaca_bars_spy_2016_01")
         self.assertEqual(refs[0].receipt_path, receipt)
-        self.assertEqual(refs[0].receipt_uri, "storage://trading-data/monthly_backfill/alpaca_bars/XLK/2016-01/completion_receipt.json")
+        self.assertEqual(refs[0].receipt_uri, "storage://trading-data/monthly_backfill/alpaca_bars/SPY/2016-01/completion_receipt.json")
 
     def test_reconcile_normalizes_receipts_without_provider_calls_or_writes_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch(
@@ -152,9 +152,9 @@ class StageReconcileTests(unittest.TestCase):
             "trading_manager_tasks.stage_reconcile.persist_completion_rows",
         ) as persist_mock:
             root = Path(raw_tmp)
-            _write_receipt(root, symbol="XLK")
+            _write_receipt(root, symbol="SPY")
             summary = reconcile_provider_stage(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 component_storage_root=root,
@@ -179,23 +179,23 @@ class StageReconcileTests(unittest.TestCase):
     def test_failed_receipts_generate_auto_repair_required_failure_proposals(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
-            _write_receipt(root, symbol="XLK", status="failed")
+            _write_receipt(root, symbol="SPY", status="failed")
             refs = discover_stage_receipts(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 component_storage_root=root,
             )
             rows = propose_failure_register_rows(
                 refs,
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
             )
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["contract_type"], "manager_failure_register")
-        self.assertEqual(rows[0]["request_id"], "mgrreq_backfill_alpaca_bars_xlk_2016_01")
+        self.assertEqual(rows[0]["request_id"], "mgrreq_backfill_alpaca_bars_spy_2016_01")
         self.assertEqual(rows[0]["failure_status"], "auto_repair_required")
         self.assertEqual(rows[0]["failure_kind"], "unclassified_provider_failure")
         self.assertFalse(rows[0]["skip_future_matching"])
@@ -205,16 +205,16 @@ class StageReconcileTests(unittest.TestCase):
     def test_retryable_provider_runtime_failures_generate_retry_required_proposals(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
-            _write_connection_refused_receipt(root, symbol="XLK")
+            _write_connection_refused_receipt(root, symbol="SPY")
             refs = discover_stage_receipts(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 component_storage_root=root,
             )
             rows = propose_failure_register_rows(
                 refs,
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
             )
@@ -241,16 +241,16 @@ class StageReconcileTests(unittest.TestCase):
     def test_retried_receipt_with_latest_success_does_not_propose_stale_failure(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
-            _write_retry_receipt(root, symbol="XLK")
+            _write_retry_receipt(root, symbol="SPY")
             refs = discover_stage_receipts(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 component_storage_root=root,
             )
             rows = propose_failure_register_rows(
                 refs,
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
             )
@@ -273,10 +273,10 @@ class StageReconcileTests(unittest.TestCase):
                     "status": "queued",
                 }
                 root = Path(raw_tmp)
-                _write_receipt(root, symbol="XLK", status="failed")
+                _write_receipt(root, symbol="SPY", status="failed")
                 proposal_path = root / "failure_proposals.jsonl"
                 summary = reconcile_provider_stage(
-                    stage_id="layer_02_sector_context.data_acquisition",
+                    stage_id="model_01_background_context.data_acquisition",
                     start_month="2016-01",
                     end_month="2016-01",
                     component_storage_root=root,
@@ -307,10 +307,10 @@ class StageReconcileTests(unittest.TestCase):
         ) as correction_mock:
             with patch("trading_manager_tasks.stage_reconcile.handle_server_error") as error_handoff_mock:
                 root = Path(raw_tmp)
-                _write_connection_refused_receipt(root, symbol="XLK")
+                _write_connection_refused_receipt(root, symbol="SPY")
                 proposal_path = root / "failure_proposals.jsonl"
                 summary = reconcile_provider_stage(
-                    stage_id="layer_02_sector_context.data_acquisition",
+                    stage_id="model_01_background_context.data_acquisition",
                     start_month="2016-01",
                     end_month="2016-01",
                     component_storage_root=root,
@@ -337,10 +337,10 @@ class StageReconcileTests(unittest.TestCase):
             "trading_manager_tasks.stage_reconcile.advance_workflow_state",
         ) as advance_mock:
             root = Path(raw_tmp)
-            _write_receipt(root, symbol="XLK")
+            _write_receipt(root, symbol="SPY")
             coverage_path = root / "coverage.json"
             summary = reconcile_provider_stage(
-                stage_id="layer_02_sector_context.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 component_storage_root=root,
@@ -361,7 +361,7 @@ class StageReconcileTests(unittest.TestCase):
             advance_mock.assert_called_once()
 
     def test_option_chain_reconcile_advances_full_target_workflow_by_default(self) -> None:
-        stage_id = "layer_03_target_state_vector.option_chain_data_acquisition"
+        stage_id = "model_05_option_expression.option_chain_data_acquisition"
         with tempfile.TemporaryDirectory() as raw_tmp, patch(
             "trading_manager_tasks.stage_reconcile.discover_stage_receipts",
             return_value=(),

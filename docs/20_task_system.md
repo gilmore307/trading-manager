@@ -48,8 +48,8 @@ Failures should become durable evidence, not chat-only notes. Ordinary runtime, 
 
 ## Model Research Run Cycle
 
-Model research tasks are grouped by data reuse and decision-cycle ownership, not by a
-linear Layer 1 through Layer 10 loop.
+Model research tasks are grouped by data reuse and decision-cycle ownership, not
+by the retired ten-layer loop.
 
 The public task list is a task-fact projection over scheduler state. It shows
 completed history, failures, and one current executable or review task. Future
@@ -57,48 +57,38 @@ blocked stages remain internal workflow dependencies and must not appear as
 independent Tasks rows. When the current task is fold-scoped, its month
 coverage remains child partition evidence under that one task.
 
-1. Foundation substrate. Build reusable market, sector, and fold-scoped
-   global/sector event inputs for each historical window. This covers Layer 1,
-   Layer 2, and the global or sector-scoped Layer 4 event-observation substrate.
-   The Layer 4 event substrate is still collected per fold because the accepted
-   event observation pool can change across folds; researching AAPL must not
-   require redownloading the same reusable market, sector, macro, or global
-   event evidence for NVDA.
-2. Target substrate. Materialize target-specific source and feature evidence
-   only when a downstream run needs it. This includes target state, target-local
-   event slices, option-expression inputs, and other target-scoped source or
-   feature rows. If the selected target lacks reviewed target-local bar
-   artifacts for a fold, manager prepares bounded `01_feed_alpaca_bars` requests
-   for that target and dispatches them through the autonomous provider gate; the
-   Layer 3 `m03_target_state_vector_data_acquisition` materializer then consumes those local
-   artifacts without direct provider access. For targets whose metadata leaves
-   listed options applicable, manager also prepares `trading_data.option_chain_state_source`,
-   the shared SQL source/cache that Layer 3 can reduce into target-level
-   option-chain state. Crypto and confirmed no-listed-options targets skip that
-   source and carry no Layer 3+ option stages or payload items. Layer 9
-   option-expression feature generation reuses the same shared source later when
-   it exists and does not own an independent option-chain download route. Replay
-   option-feature repair uses the same source/table contract, but only after
-   replay advances through Layer 8 and emits an option-expression signal whose
-   exact timestamp lacks Layer 9 candidates. It must not precompute option
-   downloads for every frozen equity bar. These tasks prepare what the live
-   components would have been able to inspect, but they do not select a fixed
-   trade target for replay.
-3. Live-flow replay. Replay simulates the real system under a historical
+1. Foundation substrate. Build reusable M01 background-context source/feature
+   evidence and fold-scoped M03 event-state observation inputs. M03 event
+   substrate is collected per fold because M06-governed event-family attributes
+   and accepted event-observation pools can change across folds.
+2. Target substrate. Materialize M02 target-state source and feature evidence
+   only when a selected target needs it. If the selected target lacks reviewed
+   target-local bar artifacts for a fold, manager prepares bounded
+   `01_feed_alpaca_bars` requests for that target and dispatches them through the
+   autonomous provider gate; the existing `m03_target_state_vector_data_acquisition`
+   materializer remains the migration-source implementation detail consumed by
+   current M02.
+3. Option-expression substrate. For targets whose metadata leaves listed
+   options applicable, manager prepares `trading_data.option_chain_state_source`
+   under the M05 option-expression stage
+   `model_05_option_expression.option_chain_data_acquisition`. Crypto and
+   confirmed no-listed-options targets skip the option source/feature stages but
+   still retain M05 model-generation stages so the model can learn and emit
+   no-option/not-applicable states.
+4. Live-flow replay. Replay simulates the real system under a historical
    point-in-time background. Components may scan the eligible candidate pool,
    choose no target, choose one target, or choose a target combination. Replay
    must not be framed as "run this already selected symbol through the stack"
    unless the request is an explicit diagnostic repair scenario.
-4. Failure attribution and Layer 10. After replay settlement and before
-   evaluation judgment, a separate attribution task investigates misses,
-   residuals, overblocks, underblocks, bad expressions, and event/co-event
-   explanations. Layer 10 starts here; it must not run as a pre-replay
-   data-acquisition or feature-generation stage. The same component boundary is
-   needed in live operation after real decisions settle.
-5. Evaluation. Evaluation consumes replay traces and attribution packets to
+5. Residual event governance. M06 owns residual event intervention,
+   overblock/underblock, missed-event, and underlying-vs-option failure
+   attribution after M04/M05 thesis formation. Its event-family attributes are
+   applied by M03 and passed through to M04/M05 as state, but M06 itself is not a
+   pre-replay provider data-acquisition lane.
+6. Evaluation. Evaluation consumes replay traces and attribution packets to
    score the candidate component bundle against baselines, calibration,
    stability, leakage, portfolio behavior, and failure explanations.
-6. Promotion and lifecycle handoff. Promotion produces accepted/rejected/deferred
+7. Promotion and lifecycle handoff. Promotion produces accepted/rejected/deferred
    evidence for a model bundle. Management of already promoted models belongs to
    the runtime component lifecycle owner, not to manager activation.
 
@@ -111,7 +101,7 @@ activate promoted models directly.
 Trading Economics calendar handling has one accepted source route:
 
 1. Canonical source: reviewed TE calendar payloads under `trading-storage/storage/01_source_data/monthly_backfill/trading_economics_calendar_web/YYYY-MM/runs/<run_id>/`. These files are append-only protected and Git-recoverable.
-2. Derived materializations: SQL rows, runtime receipts, control-plane filtered artifacts, and dashboard read models are rebuildable operational/materialized state, not the source of truth. TE macro rows should stay out of `m10_event_risk_governor_data_acquisition` and dashboard event markers until Layer 10 explicitly promotes macro events into the accepted event-risk/attention pool.
+2. Derived materializations: SQL rows, runtime receipts, control-plane filtered artifacts, and dashboard read models are rebuildable operational/materialized state, not the source of truth. TE macro rows should stay out of residual-event governance materializations and dashboard event markers until the accepted M06/event-governance route promotes macro events into the event-risk/attention pool.
 
 Manager workflows may schedule the bounded recent/future Trading Economics calendar refresh into canonical storage source rows. They must not record TE website URLs as source references, must not write TE macro rows into `m10_event_risk_governor_data_acquisition`, and must not silently merge public web-search fallback rows into TE-origin source data.
 

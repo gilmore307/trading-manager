@@ -1424,10 +1424,17 @@ def _public_stage_name(stage_id: object, stage_type: object) -> str:
 
 
 MODEL_NAME_BY_LAYER_KEY = {
-    f"layer_{int(meta['layer']):02d}_{meta['slug']}": str(meta["model_name"])
+    f"model_{int(meta['layer']):02d}_{meta['slug']}": str(meta["model_name"])
     for meta in LAYER_METADATA
 }
-MODEL_NAME_BY_LAYER_KEY["layer_10_event_risk_governor"] = "EventRiskGovernor"
+MODEL_NAME_BY_LAYER_KEY.update(
+    {
+        "layer_01_market_regime": "MarketRegimeModel",
+        "layer_02_sector_context": "SectorContextModel",
+        "layer_03_target_state_vector": "TargetStateVectorModel",
+        "layer_10_event_risk_governor": "EventRiskGovernor",
+    }
+)
 
 
 def _spaced_model_name(model_name: str) -> str:
@@ -1440,6 +1447,8 @@ def _model_task_label(layer_key: str, layer: int | None = None) -> str:
     model_name = MODEL_NAME_BY_LAYER_KEY.get(layer_key)
     if model_name:
         model_label = _spaced_model_name(model_name)
+        if layer_key.startswith("model_") and layer is not None:
+            return f"M{layer:02d} {model_label}"
         if layer is not None:
             return f"Layer {layer} {model_label}"
         return model_label

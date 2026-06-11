@@ -17,12 +17,12 @@ from typing import Any, Literal, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError, fetch_task_summary
 from .failure_register import accepted_failure_request_ids_from_register
-from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageCoverageStatus = Literal["blocked", "partial_ready", "ready", "failed"]
-DEFAULT_STAGE_COVERAGE_PATH = DEFAULT_STORAGE_ROOT / "runtime" / "stage_coverage" / "layer_01_market_regime_data_acquisition_2016-01.json"
-OPTION_CHAIN_SOURCE_STAGE_ID = "layer_03_target_state_vector.option_chain_data_acquisition"
+DEFAULT_STAGE_COVERAGE_PATH = DEFAULT_STORAGE_ROOT / "runtime" / "stage_coverage" / "model_01_background_context_data_acquisition_2016-01.json"
+OPTION_CHAIN_SOURCE_STAGE_ID = "model_05_option_expression.option_chain_data_acquisition"
 OPTION_CHAIN_TARGET_COMPONENT_ID = "option_chain_state_source"
 OPTION_CHAIN_REQUEST_KIND = "option_chain_snapshot"
 
@@ -72,10 +72,8 @@ def _row_text(row: Mapping[str, Any]) -> str:
 
 
 def _model_layer_for_stage(stage_id: str) -> str:
-    if stage_id == "layer_01_market_regime.data_acquisition":
+    if stage_id == "model_01_background_context.data_acquisition":
         return LAYER_ONE_MODEL_LAYER
-    if stage_id == "layer_02_sector_context.data_acquisition":
-        return LAYER_TWO_MODEL_LAYER
     if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
         return OPTION_CHAIN_SOURCE_STAGE_ID
     raise TaskSystemError(f"unsupported stage coverage gate: {stage_id}")
@@ -205,7 +203,7 @@ def summarize_stage_coverage_from_rows(
 
 def collect_stage_coverage(
     *,
-    stage_id: str = "layer_01_market_regime.data_acquisition",
+    stage_id: str = "model_01_background_context.data_acquisition",
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     expected_count: int | None = None,
@@ -238,7 +236,7 @@ def write_stage_coverage(report: StageCoverageReport, *, output: TextIO) -> None
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check manager task-summary coverage for a workflow stage.")
-    parser.add_argument("--stage-id", default="layer_01_market_regime.data_acquisition")
+    parser.add_argument("--stage-id", default="model_01_background_context.data_acquisition")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--expected-count", type=int)

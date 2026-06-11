@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.model_training_state import workflow_state_path_for_month
-from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 from trading_manager_tasks.source_existing_bootstrap import build_source_coverages_from_counts, run_source_existing_bootstrap
 
 
@@ -17,8 +17,7 @@ def _symbols(model_layer: str) -> tuple[str, ...]:
 class SourceExistingBootstrapTests(unittest.TestCase):
     def test_builds_ready_stage_coverage_from_existing_source_rows(self) -> None:
         layer_one = _symbols(LAYER_ONE_MODEL_LAYER)
-        layer_two = _symbols(LAYER_TWO_MODEL_LAYER)
-        m01 = {"2016-01": {symbol: 10 for symbol in (*layer_one, *layer_two)}}
+        m01 = {"2016-01": {symbol: 10 for symbol in layer_one}}
         source_03 = {"2016-01": {"AAPL": 20}}
         source_10 = {"2016-01": 3}
 
@@ -32,9 +31,8 @@ class SourceExistingBootstrapTests(unittest.TestCase):
 
         self.assertFalse(warnings)
         self.assertEqual({coverage.stage_id for coverage in stage_coverages}, {
-            "layer_01_market_regime.data_acquisition",
-            "layer_02_sector_context.data_acquisition",
-            "layer_03_target_state_vector.data_acquisition",
+            "model_01_background_context.data_acquisition",
+            "model_02_target_state.data_acquisition",
         })
         self.assertTrue(all(coverage.ready for coverage in stage_coverages))
         self.assertTrue(event_coverages[0].ready)
@@ -44,8 +42,7 @@ class SourceExistingBootstrapTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             layer_one = _symbols(LAYER_ONE_MODEL_LAYER)
-            layer_two = _symbols(LAYER_TWO_MODEL_LAYER)
-            m01 = {"2016-01": {symbol: 10 for symbol in (*layer_one, *layer_two)}}
+            m01 = {"2016-01": {symbol: 10 for symbol in layer_one}}
             source_03 = {"2016-01": {"AAPL": 20}}
             summary = run_source_existing_bootstrap(
                 start_month="2016-01",
@@ -66,10 +63,10 @@ class SourceExistingBootstrapTests(unittest.TestCase):
 
         self.assertEqual(summary.provider_calls, 0)
         self.assertEqual(summary.bootstrapped_months, ("2016-01",))
-        self.assertEqual(by_stage["layer_01_market_regime.data_acquisition"]["status"], "succeeded")
-        self.assertEqual(by_stage["layer_02_sector_context.data_acquisition"]["status"], "succeeded")
-        self.assertEqual(by_stage["layer_03_target_state_vector.data_acquisition"]["status"], "succeeded")
-        self.assertEqual(by_stage["layer_01_market_regime.feature_generation"]["status"], "ready")
+        self.assertEqual(by_stage["model_01_background_context.data_acquisition"]["status"], "succeeded")
+        self.assertEqual(by_stage["model_02_target_state.data_acquisition"]["status"], "succeeded")
+        self.assertEqual(by_stage["model_01_background_context.feature_generation"]["status"], "ready")
+        self.assertEqual(by_stage["model_02_target_state.feature_generation"]["status"], "ready")
         self.assertFalse(payload["model_activation_performed"])
         self.assertFalse(payload["broker_execution_performed"])
         self.assertTrue(bootstrap_latest_exists)

@@ -463,12 +463,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2020-07",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                                "stage_id": "model_05_option_expression.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "ready",
-                                "blockers": ["upstream_layer_08_model_evaluation_complete"],
+                                "blockers": ["upstream_model_04_model_generation_complete"],
                                 "last_reason": "stage execution started by manager stage executor",
                                 "started_at_utc": "2026-05-22T12:48:38Z",
                             }
@@ -481,8 +481,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             write_task_progress_node(
                 progress_root=runtime / "task_progress",
                 worker_id="month_ingest_worker_1",
-                task_uid="2020-07..2020-12:layer_03_target_state_vector.option_chain_data_acquisition",
-                stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+                task_uid="2020-07..2020-12:model_05_option_expression.option_chain_data_acquisition",
+                stage_id="model_05_option_expression.option_chain_data_acquisition",
                 node_id="stage_started",
                 node_label="Stage process started",
             )
@@ -498,7 +498,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T13:00:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_05_option_expression")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["blocker_count"], 0)

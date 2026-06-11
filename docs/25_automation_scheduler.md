@@ -62,37 +62,38 @@ inputs may retain compatibility fields such as `month_ingest_workers`, but they
 must not open multiple month lanes or project parallel month work into Tasks.
 
 The service completes one fold's full run cycle before opening the next fold.
-Layer 1-9 completion is only the pre-replay boundary; it unlocks Replay, Layer
-10 Event Risk Governor attribution, Model Evaluation, Model Promotion, and
-Model Maintenance. Until that lifecycle emits maintenance/readiness evidence,
-the next fold and the next target stay internal workflow dependencies because
-Layer 10 may update the event-observation pool used by later Layer 4 folds.
+M01-M06 generation is the pre-replay boundary; it unlocks replay, M06-linked
+residual-event governance checks, model evaluation, promotion review, and
+maintenance/readiness handoff. Until that lifecycle emits maintenance/readiness
+evidence, the next fold and next target stay internal workflow dependencies.
 
-Layer 2 feature generation prepares sector/context features only. It does not fetch ETF holdings or materialize target-candidate holdings. Downstream Layer 3 target-state feature generation consumes target-local evidence and accepted target-context mappings; historical replay candidate coverage comes from the fixed historical candidate-universe table and matching replay bars rather than the mutable realtime total pool or current ETF holdings.
+M01 background-context acquisition is the only reusable provider stage in the
+foundation path. M03 event-state observation inputs are fold-scoped local
+materializations, because accepted event families and M06-governed event
+attributes can differ across folds.
 
-Layer 3 target-state materialization remains a local source-stage command: it
-turns reviewed target-local `01_feed_alpaca_bars` artifacts into
-`m03_target_state_vector_data_acquisition` and does not call providers. When a target fold is
-blocked only by `layer_03_target_local_feed_artifacts_ready`, the scheduler may
-prepare and dispatch bounded target-local Alpaca bar requests for the selected
-target through the same autonomous provider controls used by Layer 1/2. Once
-those feed artifacts exist, the normal safe offline L3 materialization stage
-continues.
+M02 target-state materialization remains a local source-stage command. It turns
+reviewed target-local `01_feed_alpaca_bars` artifacts into
+`m03_target_state_vector_data_acquisition` migration-source rows and does not
+call providers directly. When a target fold is blocked only by
+`model_02_target_local_feed_artifacts_ready`, the scheduler may prepare and
+dispatch bounded target-local Alpaca bar requests for the selected target
+through the autonomous provider controls. Once those feed artifacts exist, the
+normal safe offline M02 materialization stage continues.
 
-Layer 3 option context is not a separate contract route. The shared
+M05 option-expression owns option-chain source acquisition. The shared
 `trading_data.option_chain_state_source` table owns contract-level ThetaData
-option-chain rows. Layer 3 feature generation reads it only as an optional
-target-level option-chain reducer input, while Layer 9 reuses the same source to
-derive option-expression candidate rows. Scheduler adds this source stage only
-when the selected target's metadata leaves listed options applicable. Targets
-marked as `crypto_spot` or confirmed no-listed-options do not get a Layer 3
-option-chain stage, Layer 3 option payload fields, or Layer 9 option-expression
-stages.
+option-chain rows. Scheduler adds
+`model_05_option_expression.option_chain_data_acquisition` only when the
+selected target's metadata leaves listed options applicable. Targets marked as
+`crypto_spot` or confirmed no-listed-options skip the option source/feature
+stages, but M05 model generation still runs so no-option/not-applicable states
+are represented in training.
 
-Source-existing bootstrap may seed Layer 3 data acquisition from durable
-`m03_target_state_vector_data_acquisition` rows for the selected target. That prevents a clean
-control-plane reset from redownloading target-local bars when the accepted source
-surface already covers the month.
+Source-existing bootstrap may seed M02 data acquisition from durable
+`m03_target_state_vector_data_acquisition` rows for the selected target. That
+prevents a clean control-plane reset from redownloading target-local bars when
+the accepted source surface already covers the month.
 
 ## Model Group Reruns
 
@@ -128,15 +129,30 @@ The runtime queue can be prepared from reviewed target context mappings:
 PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --write
 ```
 
-## Event-Risk Lane
+## Residual Event Governance
 
-Layer 10 is part of the historical-modeling service boundary, but it starts after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or deviations. It must not appear as a pre-replay data-acquisition or feature-generation stage. Post-replay work has two scheduler steps: replay failure triage identifies failed fills, missed winners, and other residual rows; Layer 10 EventRiskGovernor attribution then consumes that triage plus reviewed point-in-time event observations or candidates. If the event evidence is missing, the scheduler backs off and prepares bounded event-feed backfill task keys for the failure scope without provider calls. Once event observations are materialized, Layer 10 may inspect target selection misses, portfolio combinations, Layer 4 event-risk behavior, Layer 5 alpha errors, Layer 6/7/8 position-management choices, Layer 9 option-expression drag, and event/co-event explanations.
+M06 is the residual-event governance model. It learns intervention,
+overblock/underblock, missed-event, and underlying-vs-option failure attribution
+after M04/M05 thesis formation and replay settlement. It does not appear as a
+pre-replay provider data-acquisition lane.
 
-Layer 10 owns the temporal-attention promotion staging loop inside the same attribution run. It writes event-focus proposals, deterministic temporal-attention candidate rows, same-family occurrence scans, bias-association packets, event-strategy promotion reviews, and any accepted temporal-attention pool entries as Layer 10 artifacts. Co-event/confounder, point-in-time leakage, base-rate/control, and association-strength gates are deterministic. Codex CLI, when invoked, is a final `event-strategy-promotion-review` guard over a compact packet only; it must not calculate the base gates, call providers, activate models, or mutate broker/account/order state.
+M06 owns event-family attributes that describe where an event primarily acts,
+including cases where option prices are affected more strongly than the
+underlying price. M03 applies those attributes point-in-time as event state and
+passes them through to M04/M05. M04 consumes the state for trade/no-trade
+utility; M05 consumes it for option-expression suitability.
 
-Layer 10 must separate model failure time from impact exposure time. Event attribution uses `impact_exposure_time`, the earliest known time the adverse or missed impact began to appear, as the causal cutoff; `decision_time` is only a marked fallback and cannot pass the deterministic temporal-attention gate by itself. Impact severity is target-normalized when possible using expected move, volatility, ATR, or an equivalent target context, because the same raw move can represent different severity across instruments.
+M06 attribution must separate model failure time from impact exposure time.
+Event attribution uses `impact_exposure_time`, the earliest known time the
+adverse or missed impact began to appear, as the causal cutoff; `decision_time`
+is only a marked fallback. Impact severity is target-normalized when possible
+using expected move, volatility, ATR, or an equivalent target context.
 
-Event-family packets do not have to prove a linear directional relationship. Layer 10 treats pre-release and post-release evidence as two phases of the same event lifecycle. Before formal release, earnings, filings, guidance, and scheduled macro releases describe point-in-time risk-state change when the event appears; they are not predictions of the undisclosed result. After the release is available point-in-time, the same event family enters the post-release impact stage. Accepted packets hand Layer 4 a phase-aware state overlay such as `event_pre_release_risk_state_change` or `event_post_release_impact_state` for downstream state composition.
+Event-family packets do not have to prove a linear directional relationship.
+Scheduled releases, filings, earnings, macro events, and market-structure events
+can have pre-release risk-state and post-release impact phases. Accepted packets
+hand M03 a phase-aware state overlay, which downstream M04/M05 consume through
+normal model state rather than ad hoc scheduler rules.
 
 ## Dashboard Refresh Events
 

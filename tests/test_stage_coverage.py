@@ -7,7 +7,7 @@ from pathlib import Path
 
 from trading_manager_tasks.model_training_state import advance_workflow_state
 from trading_manager_tasks.control_plane import TaskSystemError
-from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 from trading_manager_tasks.stage_coverage import summarize_stage_coverage_from_rows
 
 
@@ -53,7 +53,7 @@ def _option_chain_summary_row(request_id: str, *, ready: bool = False, failed: b
         "request_id": request_id,
         "request_kind": "option_chain_snapshot",
         "target_component_id": "option_chain_state_source",
-        "parameter_ref": f"storage://trading-manager/runtime/layer_03_target_state_vector/option_chain_state_source/2016-01/{request_id}/task_key.json",
+        "parameter_ref": f"storage://trading-manager/runtime/model_05_option_expression/option_chain_state_source/2016-01/{request_id}/task_key.json",
         "expected_outputs": ["trading_data.option_chain_state_source"],
         "task_status": status,
         "latest_run_status": "failed" if failed else ("succeeded" if ready else None),
@@ -71,7 +71,7 @@ class StageCoverageTests(unittest.TestCase):
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
             expected_count=19,
@@ -88,7 +88,7 @@ class StageCoverageTests(unittest.TestCase):
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
             expected_count=19,
@@ -98,15 +98,15 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.ready_count, 19)
         self.assertTrue(report.can_unlock_downstream)
 
-    def test_layer_one_stage_coverage_ignores_layer_two_rows_for_same_month(self):
+    def test_stage_coverage_ignores_rows_outside_m01_request_universe(self):
         rows = [
             *[_summary_row(symbol, ready=True) for symbol in _symbols(LAYER_ONE_MODEL_LAYER)],
-            *[_summary_row(symbol) for symbol in _symbols(LAYER_TWO_MODEL_LAYER)],
+            _summary_row("XLK"),
         ]
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
             expected_count=19,
@@ -116,25 +116,25 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.ready_count, 19)
         self.assertEqual(report.pending_count, 0)
 
-    def test_layer_two_stage_coverage_uses_sector_context_universe(self):
-        layer_two_symbols = _symbols(LAYER_TWO_MODEL_LAYER)
+    def test_m01_stage_coverage_uses_background_context_universe(self):
+        layer_one_symbols = _symbols(LAYER_ONE_MODEL_LAYER)
         rows = [
-            *[_summary_row(symbol, ready=True) for symbol in layer_two_symbols[:2]],
-            *[_summary_row(symbol) for symbol in layer_two_symbols[2:]],
-            _summary_row("SPY", ready=True),
+            *[_summary_row(symbol, ready=True) for symbol in layer_one_symbols[:2]],
+            *[_summary_row(symbol) for symbol in layer_one_symbols[2:]],
+            _summary_row("XLK", ready=True),
         ]
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_02_sector_context.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
-            expected_count=len(layer_two_symbols),
+            expected_count=len(layer_one_symbols),
         )
 
-        self.assertEqual(report.observed_count, len(layer_two_symbols))
+        self.assertEqual(report.observed_count, len(layer_one_symbols))
         self.assertEqual(report.ready_count, 2)
-        self.assertEqual(report.pending_count, len(layer_two_symbols) - 2)
+        self.assertEqual(report.pending_count, len(layer_one_symbols) - 2)
         self.assertEqual(report.status, "partial_ready")
 
     def test_failed_coverage_blocks_downstream_unlock(self):
@@ -142,7 +142,7 @@ class StageCoverageTests(unittest.TestCase):
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
             expected_count=2,
@@ -159,7 +159,7 @@ class StageCoverageTests(unittest.TestCase):
         with self.assertRaisesRegex(TaskSystemError, "agent failure review"):
             summarize_stage_coverage_from_rows(
                 rows,
-                stage_id="layer_01_market_regime.data_acquisition",
+                stage_id="model_01_background_context.data_acquisition",
                 start_month="2016-01",
                 end_month="2016-01",
                 expected_count=2,
@@ -171,7 +171,7 @@ class StageCoverageTests(unittest.TestCase):
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
             expected_count=2,
@@ -187,7 +187,7 @@ class StageCoverageTests(unittest.TestCase):
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
             expected_count=2,
@@ -208,7 +208,7 @@ class StageCoverageTests(unittest.TestCase):
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
             expected_count=2,
@@ -229,7 +229,7 @@ class StageCoverageTests(unittest.TestCase):
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_01_market_regime.data_acquisition",
+            stage_id="model_01_background_context.data_acquisition",
             start_month="2016-01",
             end_month="2016-01",
             expected_count=2,
@@ -256,7 +256,7 @@ class StageCoverageTests(unittest.TestCase):
 
         report = summarize_stage_coverage_from_rows(
             rows,
-            stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+            stage_id="model_05_option_expression.option_chain_data_acquisition",
             start_month="2016-01",
             end_month="2016-06",
             expected_count=1,
@@ -276,7 +276,7 @@ class StageCoverageTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_01_market_regime.data_acquisition",
+                        "stage_id": "model_01_background_context.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
                         "expected_count": 19,
@@ -301,15 +301,15 @@ class StageCoverageTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=storage,
                 state_path=tmp / "workflow_state.json",
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
                 stage_coverage_reports=[report_path],
                 write=False,
             )
 
             stages = {stage.stage_id: stage for stage in state.stages}
-            self.assertEqual(stages["layer_01_market_regime.data_acquisition"].status, "ready")
-            self.assertIn("3/19", stages["layer_01_market_regime.data_acquisition"].last_reason or "")
-            self.assertEqual(stages["layer_01_market_regime.feature_generation"].status, "blocked")
+            self.assertEqual(stages["model_01_background_context.data_acquisition"].status, "ready")
+            self.assertIn("3/19", stages["model_01_background_context.data_acquisition"].last_reason or "")
+            self.assertEqual(stages["model_01_background_context.feature_generation"].status, "blocked")
 
     def test_accepted_failure_coverage_report_completes_stage_and_unlocks_feature_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -321,7 +321,7 @@ class StageCoverageTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_01_market_regime.data_acquisition",
+                        "stage_id": "model_01_background_context.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
                         "expected_count": 19,
@@ -349,15 +349,15 @@ class StageCoverageTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=storage,
                 state_path=tmp / "workflow_state.json",
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
                 stage_coverage_reports=[report_path],
                 write=False,
             )
 
             stages = {stage.stage_id: stage for stage in state.stages}
-            self.assertEqual(stages["layer_01_market_regime.data_acquisition"].status, "succeeded")
-            self.assertIn("reviewed failed", stages["layer_01_market_regime.data_acquisition"].last_reason or "")
-            self.assertEqual(stages["layer_01_market_regime.feature_generation"].status, "ready")
+            self.assertEqual(stages["model_01_background_context.data_acquisition"].status, "succeeded")
+            self.assertIn("reviewed failed", stages["model_01_background_context.data_acquisition"].last_reason or "")
+            self.assertEqual(stages["model_01_background_context.feature_generation"].status, "ready")
 
     def test_complete_coverage_report_completes_stage_and_unlocks_feature_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -369,7 +369,7 @@ class StageCoverageTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_01_market_regime.data_acquisition",
+                        "stage_id": "model_01_background_context.data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-01",
                         "expected_count": 19,
@@ -394,14 +394,14 @@ class StageCoverageTests(unittest.TestCase):
                 end_month="2016-01",
                 storage_root=storage,
                 state_path=tmp / "workflow_state.json",
-                approved_stage_refs=["layer_01_market_regime.data_acquisition=approval://layer1"],
+                approved_stage_refs=["model_01_background_context.data_acquisition=approval://layer1"],
                 stage_coverage_reports=[report_path],
                 write=False,
             )
 
             stages = {stage.stage_id: stage for stage in state.stages}
-            self.assertEqual(stages["layer_01_market_regime.data_acquisition"].status, "succeeded")
-            self.assertEqual(stages["layer_01_market_regime.feature_generation"].status, "ready")
+            self.assertEqual(stages["model_01_background_context.data_acquisition"].status, "succeeded")
+            self.assertEqual(stages["model_01_background_context.feature_generation"].status, "ready")
 
 
 if __name__ == "__main__":

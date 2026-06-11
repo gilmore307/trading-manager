@@ -27,7 +27,7 @@ from .model_training_state import advance_workflow_state, resolve_workflow_state
 from .request_payloads import DEFAULT_STORAGE_ROOT as DEFAULT_MANAGER_STORAGE_ROOT
 from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, reconcile_lock_ref
 from .stage_coverage import StageCoverageReport, collect_stage_coverage, write_stage_coverage
-from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
+from .monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 from .option_chain_source_acquisition import REQUEST_KIND as OPTION_CHAIN_REQUEST_KIND
 from .option_chain_source_acquisition import SOURCE_ID as OPTION_CHAIN_SOURCE_ID
 from .option_chain_source_acquisition import STAGE_ID as OPTION_CHAIN_SOURCE_STAGE_ID
@@ -38,8 +38,7 @@ from .storage_paths import data_storage_root
 DEFAULT_COMPONENT_STORAGE_ROOT = data_storage_root()
 DEFAULT_COVERAGE_OUTPUT_ROOT = DEFAULT_MANAGER_STORAGE_ROOT / "runtime" / "stage_coverage"
 SUPPORTED_PROVIDER_STAGE_IDS = (
-    "layer_01_market_regime.data_acquisition",
-    "layer_02_sector_context.data_acquisition",
+    "model_01_background_context.data_acquisition",
     OPTION_CHAIN_SOURCE_STAGE_ID,
 )
 RETRYABLE_PROVIDER_FAILURE_PATTERNS: tuple[tuple[tuple[str, ...], str], ...] = (
@@ -120,10 +119,8 @@ class StageReconcileSummary:
 
 
 def _model_layer_for_stage(stage_id: str) -> str:
-    if stage_id == "layer_01_market_regime.data_acquisition":
+    if stage_id == "model_01_background_context.data_acquisition":
         return LAYER_ONE_MODEL_LAYER
-    if stage_id == "layer_02_sector_context.data_acquisition":
-        return LAYER_TWO_MODEL_LAYER
     if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
         return OPTION_CHAIN_SOURCE_STAGE_ID
     raise TaskSystemError(f"unsupported provider stage reconcile: {stage_id}")

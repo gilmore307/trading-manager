@@ -38,7 +38,7 @@ DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 30
 DEFAULT_STAGE_PROGRESS_STALL_SECONDS = 60 * 10
 DEFAULT_STAGE_PROGRESS_POLL_SECONDS = 5.0
 LONG_DATABASE_STAGE_IDS = {
-    "layer_09_option_expression.feature_generation",
+    "model_05_option_expression.feature_generation",
 }
 SAFE_OFFLINE_STAGE_TYPES = {
     "data_acquisition",
@@ -115,9 +115,9 @@ def _stage_progress_worker_id(*, start_month: str, end_month: str) -> str:
 
 
 def _stage_progress_unit_label(stage: StageProgress) -> str:
-    if stage.stage_id == "layer_04_event_failure_risk.data_acquisition":
+    if stage.stage_id == "model_03_event_state.data_acquisition":
         return "event substrate"
-    if stage.stage_id == "layer_03_target_state_vector.option_chain_data_acquisition":
+    if stage.stage_id == "model_05_option_expression.option_chain_data_acquisition":
         return "option source"
     return progress_contract_for_stage(stage.stage_id, fallback_unit_label="stage step")["unit_label"]
 
