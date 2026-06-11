@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,6 +21,7 @@ from .agent_error_handler import (
     call_agent_runner,
     write_json_artifact,
 )
+from .failure_register import fetch_failure_register_rows
 
 AGENT_REPAIR_CLOSURE_RECEIPT_CONTRACT = "agent_repair_closure_receipt"
 DEFAULT_MANAGER_REPO_ROOT = Path("/root/projects/trading-manager")
@@ -43,6 +45,12 @@ FORBIDDEN_AUTOMATION_TERMS = (
     "buying_power",
     "funds",
 )
+STAGE_REF_RE = re.compile(
+    r"stage\s+([A-Za-z0-9_.-]+)(?:\s+stage)?\s+(?:command|progress\s+stalled)",
+    re.IGNORECASE,
+)
+PROVIDER_STAGE_RE = re.compile(r"provider\s+stage\s+([A-Za-z0-9_.-]+)\s+has", re.IGNORECASE)
+OPEN_FAILURE_STATUSES = {"observed", "auto_repair_required", "agent_review_required", "retry_required", "unresolved"}
 
 
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
@@ -110,6 +118,58 @@ def _parse_stdout_payload(diagnosis: Mapping[str, Any]) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _control_plane_root(candidate: ClosureCandidate) -> Path:
+    runtime_root = candidate.request_dir.parent.parent
+    return runtime_root.parent if runtime_root.name == "runtime" else runtime_root
+
+
+def _stage_id_from_request(request: Mapping[str, Any]) -> str | None:
+    for field in ("summary", "error_scope"):
+        text = str(request.get(field) or "")
+        match = STAGE_REF_RE.search(text)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _provider_stage_id_from_request(request: Mapping[str, Any]) -> str | None:
+    text = str(request.get("summary") or "")
+    match = PROVIDER_STAGE_RE.search(text)
+    return match.group(1) if match else None
+
+
+def _successful_retry_receipt(control_plane_root: Path, stage_id: str) -> dict[str, Any] | None:
+    receipt_dir = control_plane_root / "runtime" / "model_training_stage_receipts" / stage_id.replace(".", "__")
+    if not receipt_dir.exists():
+        return None
+    for path in sorted(receipt_dir.glob("*.json"), reverse=True):
+        receipt = _load_json(path)
+        if str(receipt.get("status") or "").lower() != "succeeded":
+            continue
+        runs = receipt.get("runs")
+        if isinstance(runs, list) and runs:
+            if not any(isinstance(run, Mapping) and str(run.get("status") or "").lower() == "succeeded" for run in runs):
+                continue
+        return {
+            "path": str(path),
+            "completed_at_utc": receipt.get("completed_at") or receipt.get("completed_at_utc") or receipt.get("updated_utc"),
+        }
+    return None
+
+
+def _provider_failures_resolved(request: Mapping[str, Any]) -> bool:
+    if str(request.get("error_scope") or "") != "server.provider_stage_failure_register":
+        return False
+    stage_id = _provider_stage_id_from_request(request)
+    if not stage_id:
+        return False
+    try:
+        rows = fetch_failure_register_rows(stage_id=stage_id)
+    except Exception:
+        return False
+    return bool(rows) and not any(str(row.get("failure_status") or "") in OPEN_FAILURE_STATUSES for row in rows)
 
 
 def _payload_text(*values: object) -> str:
@@ -386,8 +446,17 @@ def close_agent_repair(
     closure_status = "not_closed"
 
     if diagnosis.get("status") != "completed":
-        closure_status = "pending"
-        blockers.append("agent diagnosis is not completed")
+        stage_id = _stage_id_from_request(request)
+        retry_receipt = _successful_retry_receipt(_control_plane_root(candidate), stage_id) if stage_id else None
+        if retry_receipt:
+            closure_status = "closed"
+            actions.append({"action": "retry_receipt_observed", "stage_id": stage_id, "status": "completed", "receipt": retry_receipt})
+        elif _provider_failures_resolved(request):
+            closure_status = "closed"
+            actions.append({"action": "failure_register_resolved", "status": "completed"})
+        else:
+            closure_status = "pending"
+            blockers.append("agent diagnosis is not completed")
     elif not payload:
         blockers.append("completed diagnosis did not contain parseable JSON stdout")
     elif not _diagnosis_repaired(payload):

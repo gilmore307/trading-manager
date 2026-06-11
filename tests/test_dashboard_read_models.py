@@ -11,9 +11,12 @@ from unittest.mock import patch
 
 from trading_manager_tasks.dashboard_read_models import (
     _agent_errors_for_task,
+    _apply_agent_repair_closure_receipt,
     _attach_task_error_context,
     _close_global_nonblocking_agent_errors,
+    _agent_error_summary,
     _mark_superseded_agent_errors,
+    _stage_id_from_error_row,
     _task_error_intervention_status,
     build_historical_task_progress_summary,
 )
@@ -118,6 +121,100 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(by_ref["ERR-000003"]["handling_status"], "closed")
         self.assertEqual(by_ref["ERR-000003"]["dashboard_severity"], "notice")
         self.assertEqual(by_ref["ERR-000004"]["handling_status"], "open")
+
+    def test_stage_id_from_error_row_accepts_current_stage_wording(self):
+        command_row = {
+            "summary": "model training stage model_05_option_expression.feature_generation stage command returned non-zero status",
+            "error_scope": "server.model_training_stage",
+        }
+        stalled_row = {
+            "summary": "model training stage model_02_target_state.feature_generation stage progress stalled for timeout_seconds=600",
+            "error_scope": "server.model_training_stage",
+        }
+
+        self.assertEqual(_stage_id_from_error_row(command_row), "model_05_option_expression.feature_generation")
+        self.assertEqual(_stage_id_from_error_row(stalled_row), "model_02_target_state.feature_generation")
+
+    def test_blocked_closure_does_not_reopen_already_closed_repair(self):
+        repair_status, handling_status = _apply_agent_repair_closure_receipt(
+            "repaired",
+            "closed",
+            {"closure_status": "blocked", "blockers": ["exact retry is not applicable"]},
+        )
+
+        self.assertEqual(repair_status, "repaired")
+        self.assertEqual(handling_status, "closed")
+
+    def test_supersedes_legacy_layer_nine_option_expression_errors(self):
+        rows = [
+            {
+                "error_ref": "ERR-000003",
+                "repair_status": "unknown",
+                "handling_status": "open",
+                "dashboard_severity": "error",
+                "summary": "model training stage layer_09_option_expression.data_acquisition command returned non-zero status",
+            }
+        ]
+        tasks = [{"task_id": "model_05_option_expression"}]
+
+        updated = _mark_superseded_agent_errors(rows, tasks)
+
+        self.assertEqual(updated[0]["repair_status"], "superseded")
+        self.assertEqual(updated[0]["handling_status"], "closed")
+        self.assertEqual(updated[0]["dashboard_severity"], "notice")
+
+    def test_supersedes_python_library_replay_option_source_errors(self):
+        rows = [
+            {
+                "error_ref": "ERR-000021",
+                "error_kind": "model_group_replay_option_source_acquisition_failed",
+                "repair_status": "blocked",
+                "handling_status": "open",
+                "dashboard_severity": "error",
+                "root_cause": "option-chain source default still selected the Python-library transport; accepted contract requires Terminal REST",
+            }
+        ]
+
+        updated = _mark_superseded_agent_errors(rows, [])
+
+        self.assertEqual(updated[0]["repair_status"], "superseded")
+        self.assertEqual(updated[0]["handling_status"], "closed")
+        self.assertEqual(updated[0]["dashboard_severity"], "notice")
+
+    def test_agent_error_summary_filters_foreign_absolute_artifact_paths(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            agent_root = storage_root / "runtime" / "agent_error_handling"
+            agent_root.mkdir(parents=True, exist_ok=True)
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 26,
+                        "error_ref": "ERR-000026",
+                        "error_fingerprint": "errfp_foreign_tmp",
+                        "request_id": "erragent_foreign_tmp",
+                        "request_path": "/tmp/tm-storage/runtime/agent_error_handling/erragent_foreign_tmp/server_error_agent_request.json",
+                        "diagnosis_path": "/tmp/tm-storage/runtime/agent_error_handling/erragent_foreign_tmp/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.scheduler_daemon",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.scheduler_progress",
+                        "error_kind": "scheduler_progress_stalled",
+                        "severity": "warning",
+                        "summary": "historical scheduler made no progress",
+                        "occurred_at_utc": "2026-06-11T06:10:58Z",
+                        "created_at_utc": "2026-06-11T06:10:58Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            rows = _agent_error_summary(storage_root)
+
+        self.assertEqual(rows, [])
 
     def test_supersedes_retired_m05_option_data_acquisition_errors(self):
         rows = [

@@ -187,6 +187,74 @@ class AgentRepairClosureTests(unittest.TestCase):
             self.assertEqual(receipt["closure_status"], "pending")
             self.assertFalse(candidate.receipt_path.exists())
 
+    def test_incomplete_diagnosis_closes_when_retry_receipt_succeeded(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            control_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            root = control_root / "runtime" / "agent_error_handling"
+            candidate = self._write_candidate(
+                root,
+                request_overrides={
+                    "error_scope": "server.model_training_stage",
+                    "summary": "model training stage model_05_option_expression.feature_generation stage command returned non-zero status",
+                },
+            )
+            diagnosis = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
+            diagnosis["status"] = "queued"
+            diagnosis["stderr"] = "agent call not requested"
+            candidate.diagnosis_path.write_text(json.dumps(diagnosis), encoding="utf-8")
+            receipt_dir = control_root / "runtime" / "model_training_stage_receipts" / "model_05_option_expression__feature_generation"
+            receipt_dir.mkdir(parents=True)
+            (receipt_dir / "2026-06-11T124916.000000+0000.receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "component_completion_receipt",
+                        "manager_stage_id": "model_05_option_expression.feature_generation",
+                        "status": "succeeded",
+                        "completed_at": "2026-06-11T12:49:16Z",
+                        "runs": [{"status": "succeeded", "return_code": 0}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            receipt = close_agent_repair(candidate)
+
+            self.assertEqual(receipt["closure_status"], "closed")
+            self.assertTrue(candidate.receipt_path.exists())
+            self.assertEqual(receipt["actions"][0]["action"], "retry_receipt_observed")
+
+    def test_incomplete_provider_diagnosis_closes_when_failure_register_resolved(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp) / "storage" / "02_control_plane" / "runtime" / "agent_error_handling"
+            candidate = self._write_candidate(
+                root,
+                request_overrides={
+                    "error_scope": "server.provider_stage_failure_register",
+                    "error_kind": "provider_stage_requests_failed",
+                    "summary": "provider stage layer_03_target_state_vector.option_chain_data_acquisition has 10 failed request(s) requiring automatic repair",
+                },
+            )
+            diagnosis = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
+            diagnosis["status"] = "queued"
+            diagnosis["stderr"] = "agent call not requested"
+            candidate.diagnosis_path.write_text(json.dumps(diagnosis), encoding="utf-8")
+            resolved_rows = [
+                {
+                    "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                    "failure_status": "corrected",
+                }
+            ]
+
+            with unittest.mock.patch(
+                "trading_manager_tasks.agent_repair_closure.fetch_failure_register_rows",
+                return_value=resolved_rows,
+            ):
+                receipt = close_agent_repair(candidate)
+
+            self.assertEqual(receipt["closure_status"], "closed")
+            self.assertTrue(candidate.receipt_path.exists())
+            self.assertEqual(receipt["actions"][0]["action"], "failure_register_resolved")
+
     def test_discovers_request_without_diagnosis_for_recovery(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)

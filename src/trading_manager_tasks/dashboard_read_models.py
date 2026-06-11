@@ -93,7 +93,10 @@ CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
 MAX_AGENT_ERROR_SUMMARY_ROWS = 50
-STAGE_FAILURE_RE = re.compile(r"stage\s+([A-Za-z0-9_.-]+)\s+command", re.IGNORECASE)
+STAGE_REF_RE = re.compile(
+    r"stage\s+([A-Za-z0-9_.-]+)(?:\s+stage)?\s+(?:command|progress\s+stalled)",
+    re.IGNORECASE,
+)
 FOLD_LABEL_RE = re.compile(r"^(\d{4})-fold([1-9]\d*)$")
 TASK_STAGE_SORT_ORDER = {
     "data_acquisition": 10,
@@ -308,6 +311,8 @@ def _apply_agent_repair_closure_receipt(
     if closure_status == "closed":
         return "repaired", "closed"
     if closure_status == "blocked":
+        if handling_status in {"closed", "no_action_required"}:
+            return repair_status, handling_status
         return "blocked", "open"
     return repair_status, handling_status
 
@@ -325,6 +330,19 @@ def _agent_repair_closure_text(closure_receipt: Mapping[str, Any]) -> str | None
             closure_receipt.get("blockers") or closure_receipt.get("summary") or "agent repair closure receipt blocked",
         )
     return None
+
+
+def _absolute_ref_outside_storage_root(ref: object, *, storage_root: Path) -> bool:
+    if not isinstance(ref, str) or not ref.strip():
+        return False
+    path = Path(ref)
+    if not path.is_absolute():
+        return False
+    try:
+        path.resolve().relative_to(storage_root.resolve())
+    except ValueError:
+        return True
+    return False
 
 
 def _agent_payload_text(value: object, fallback: object = None) -> str | None:
@@ -380,7 +398,7 @@ def _agent_error_handling_status(
 def _stage_id_from_error_row(row: Mapping[str, Any]) -> str | None:
     for field in ("summary", "error_scope"):
         text = str(row.get(field) or "")
-        match = STAGE_FAILURE_RE.search(text)
+        match = STAGE_REF_RE.search(text)
         if match:
             return match.group(1)
     return None
@@ -441,6 +459,11 @@ def _agent_error_summary(
         return []
     summary_rows: list[dict[str, Any]] = []
     for row in rows[-limit:]:
+        if _absolute_ref_outside_storage_root(row.get("request_path"), storage_root=storage_root) or _absolute_ref_outside_storage_root(
+            row.get("diagnosis_path"),
+            storage_root=storage_root,
+        ):
+            continue
         diagnosis_path = _resolve_stage_ref_path(row.get("diagnosis_path"), storage_root=storage_root)
         diagnosis: dict[str, Any] = {}
         if diagnosis_path is not None and diagnosis_path.exists():
@@ -539,6 +562,29 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
             updated["retry_recommendation"] = (
                 "Superseded by shared model_05_option_expression.option_chain_data_acquisition; "
                 "current M05 option-expression features are generated from option_chain_state_source."
+            )
+            updated_rows.append(updated)
+        elif str(row.get("handling_status") or "") != "closed" and "layer_09_option_expression." in text:
+            updated = dict(row)
+            updated["repair_status"] = "superseded"
+            updated["handling_status"] = "closed"
+            updated["dashboard_severity"] = "notice"
+            updated["retry_recommendation"] = (
+                "Superseded by model_05_option_expression and the current option-expression source contract."
+            )
+            updated_rows.append(updated)
+        elif (
+            str(row.get("handling_status") or "") != "closed"
+            and str(row.get("error_kind") or "") == "model_group_replay_option_source_acquisition_failed"
+            and "python-library" in text.lower()
+            and "terminal rest" in text.lower()
+        ):
+            updated = dict(row)
+            updated["repair_status"] = "superseded"
+            updated["handling_status"] = "closed"
+            updated["dashboard_severity"] = "notice"
+            updated["retry_recommendation"] = (
+                "Superseded by the current Terminal REST option-source acquisition contract."
             )
             updated_rows.append(updated)
         else:
