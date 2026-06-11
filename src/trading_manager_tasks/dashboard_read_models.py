@@ -529,8 +529,8 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
             updated_rows.append(updated)
         elif (
             str(row.get("handling_status") or "") != "closed"
-            and "layer_09_option_expression.data_acquisition" in text
-            and "layer_09_option_expression.data_acquisition" not in current_task_ids
+            and "model_05_option_expression.data_acquisition" in text
+            and "model_05_option_expression.data_acquisition" not in current_task_ids
         ):
             updated = dict(row)
             updated["repair_status"] = "superseded"
@@ -538,7 +538,7 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
             updated["dashboard_severity"] = "notice"
             updated["retry_recommendation"] = (
                 "Superseded by shared model_05_option_expression.option_chain_data_acquisition; "
-                "current Layer 9 option-expression features are generated from option_chain_state_source."
+                "current M05 option-expression features are generated from option_chain_state_source."
             )
             updated_rows.append(updated)
         else:
@@ -2368,7 +2368,13 @@ def _instrument_scope_for_task(layer: object) -> str:
         return "market_context_proxy_panel"
     if layer_number == 2:
         return "sector_context_proxy_panel"
-    if layer_number in {3, 4, 5, 6, 7}:
+    if layer_number in {3, 4}:
+        return "target_underlying_evidence"
+    if layer_number == 5:
+        return "option_expression_or_underlying_fallback"
+    if layer_number == 6:
+        return "residual_event_governance"
+    if layer_number == 7:
         return "target_underlying_evidence"
     if layer_number == 8:
         return "underlying_action_plan"

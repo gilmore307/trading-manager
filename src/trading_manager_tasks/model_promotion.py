@@ -56,24 +56,17 @@ class ModelPromotionTarget:
 
 
 MODEL_PROMOTION_TARGETS: tuple[ModelPromotionTarget, ...] = (
-    ModelPromotionTarget("layer_01_market_regime", "market_regime_model", "MarketRegimeModel", "market_context_state", "market_regime_model"),
-    ModelPromotionTarget("layer_02_sector_context", "sector_context_model", "SectorContextModel", "sector_context_state", "sector_context_model"),
-    ModelPromotionTarget("layer_03_target_state_vector", "target_state_vector_model", "TargetStateVectorModel", "target_context_state", "target_state_vector_model"),
-    ModelPromotionTarget("layer_04_event_failure_risk", "event_failure_risk_model", "EventFailureRiskModel", "event_failure_risk_vector", "event_failure_risk_model"),
-    ModelPromotionTarget("layer_05_alpha_confidence", "alpha_confidence_model", "AlphaConfidenceModel", "alpha_confidence_vector", "alpha_confidence_model"),
-    ModelPromotionTarget("layer_06_dynamic_risk_policy", "dynamic_risk_policy_model", "DynamicRiskPolicyModel", "dynamic_risk_policy_state", "dynamic_risk_policy_model"),
-    ModelPromotionTarget("layer_07_position_projection", "position_projection_model", "PositionProjectionModel", "position_projection_vector", "position_projection_model"),
-    ModelPromotionTarget("layer_08_underlying_action", "underlying_action_model", "UnderlyingActionModel", "underlying_action_plan", "underlying_action_model"),
-    ModelPromotionTarget("layer_09_option_expression", "option_expression_model", "OptionExpressionModel", "option_expression_plan", "option_expression_model"),
-    ModelPromotionTarget("model_06_residual_event_governance", "event_risk_governor", "EventRiskGovernor", "event_context_vector", "event_risk_governor"),
+    ModelPromotionTarget("model_01_background_context", "background_context_model", "BackgroundContextModel", "background_context_state", "background_context_model"),
+    ModelPromotionTarget("model_02_target_state", "target_state_model", "TargetStateModel", "target_context_state", "target_state_model"),
+    ModelPromotionTarget("model_03_event_state", "event_state_model", "EventStateModel", "event_state_vector", "event_state_model"),
+    ModelPromotionTarget("model_04_unified_decision", "unified_decision_model", "UnifiedDecisionModel", "unified_decision_vector", "unified_decision_model"),
+    ModelPromotionTarget("model_05_option_expression", "option_expression_model", "OptionExpressionModel", "option_expression_plan", "option_expression_model"),
+    ModelPromotionTarget("model_06_residual_event_governance", "residual_event_governance_model", "ResidualEventGovernanceModel", "event_risk_intervention", "residual_event_governance_model"),
 )
 
 TARGETS_BY_MODEL_ID = {target.model_id: target for target in MODEL_PROMOTION_TARGETS}
 TARGETS_BY_LAYER_ID = {target.layer_id: target for target in MODEL_PROMOTION_TARGETS}
-TARGETS_BY_PHYSICAL_MODEL_ID = {
-    f"model_{int(target.layer_id.split('_')[1]):02d}_{target.layer_id.split('_', 2)[2]}": target
-    for target in MODEL_PROMOTION_TARGETS
-}
+TARGETS_BY_PHYSICAL_MODEL_ID = {target.layer_id: target for target in MODEL_PROMOTION_TARGETS}
 
 def promotion_target(value: str) -> ModelPromotionTarget:
     """Return the canonical model promotion target for a model or layer id."""

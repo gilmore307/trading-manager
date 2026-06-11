@@ -19,13 +19,13 @@ class SourceExistingBootstrapTests(unittest.TestCase):
         layer_one = _symbols(LAYER_ONE_MODEL_LAYER)
         m01 = {"2016-01": {symbol: 10 for symbol in layer_one}}
         source_03 = {"2016-01": {"AAPL": 20}}
-        source_10 = {"2016-01": 3}
+        source_06 = {"2016-01": 3}
 
         stage_coverages, event_coverages, warnings = build_source_coverages_from_counts(
             months=("2016-01",),
             m01_counts=m01,
             source_03_counts=source_03,
-            source_10_counts=source_10,
+            source_06_counts=source_06,
             selected_target_symbol="AAPL",
         )
 
@@ -51,7 +51,7 @@ class SourceExistingBootstrapTests(unittest.TestCase):
                 storage_root=storage_root,
                 m01_counts=m01,
                 source_03_counts=source_03,
-                source_10_counts={"2016-01": 0},
+                source_06_counts={"2016-01": 0},
                 write=True,
             )
             state_path = workflow_state_path_for_month("2016-01", root=storage_root / "runtime")
@@ -83,7 +83,7 @@ class SourceExistingBootstrapTests(unittest.TestCase):
                 storage_root=storage_root,
                 m01_counts=m01,
                 source_03_counts={},
-                source_10_counts={},
+                source_06_counts={},
                 write=True,
             )
             state_path = workflow_state_path_for_month("2016-01", root=storage_root / "runtime")

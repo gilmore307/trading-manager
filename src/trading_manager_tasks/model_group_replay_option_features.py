@@ -1,10 +1,10 @@
 """Manager lifecycle for replay option-feature repair.
 
 Replay must advance like live operation: first run the replay clock through
-Layers 1-8, then request option data only when Layer 8 emits a Layer 9
-option-expression signal. This controller consumes that replay backoff, acquires
+M01-M04, then request option data only when M04 emits an M05 option-expression
+signal. This controller consumes that replay backoff, acquires
 the regular-session historical option source day windows for emitted signal dates,
-generates Layer 9 features from the shared cache, and lets scheduler retry
+generates M05 features from the shared cache, and lets scheduler retry
 replay on the next drain step.
 """
 
@@ -21,7 +21,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from .control_plane import persist_manager_requests
-from .layer_nine_feature_stage import execute_layer_nine_feature_stage
+from .m05_option_expression_feature_stage import execute_m05_option_expression_feature_stage
 from .model_group_replay import (
     DEFAULT_REPLAY_CONTRACT_ID,
     _completed_training_fold,
@@ -47,7 +47,7 @@ REPLAY_OPTION_FEATURE_STAGE_ID = "model_group.replay_option_features"
 DEFAULT_OPTION_SOURCE_SCHEMA = "trading_data"
 DEFAULT_OPTION_SOURCE_TABLE = "option_chain_state_source"
 DEFAULT_OPTION_FEATURE_SCHEMA = "trading_data"
-DEFAULT_OPTION_FEATURE_TABLE = "m09_option_expression_feature_generation"
+DEFAULT_OPTION_FEATURE_TABLE = "m05_option_expression_feature_generation"
 REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED = "replay_option_feature_acquisition_required"
 REPLAY_OPTION_FEATURE_BACKOFF_REASON = "model_group_replay_option_feature_acquisition_required"
 OPTION_SOURCE_UNAVAILABLE_SNAPSHOT_TYPE = "source_unavailable"
@@ -237,13 +237,13 @@ def run_model_group_replay_option_features_for_replay_backoff(
                 )
 
         for month in sorted(months_to_generate):
-            generated = execute_layer_nine_feature_stage(start_month=month, end_month=month)
+            generated = execute_m05_option_expression_feature_stage(start_month=month, end_month=month)
             generated_summaries.append(generated.summary_row())
             if generated.status != "succeeded":
                 return _decision(
                     decision_status="backoff",
                     reason_code="model_group_replay_option_feature_generation_failed",
-                    reason=generated.reason or "Layer 9 option feature generation failed",
+                    reason=generated.reason or "M05 option feature generation failed",
                     selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
                     provider_calls=provider_calls,
                     dispatch_performed=provider_calls > 0,
@@ -439,7 +439,7 @@ def _persist_option_source_unavailable_markers(
                 "option_surface_status": "option_source_unavailable",
                 "asset_expression_route": "option_expression_unfilled",
                 "provider_error": provider_error,
-                "signal_source": "layer_08_underlying_action.handoff_to_layer_9",
+                "signal_source": "model_04_unified_decision.handoff_to_model_05",
             },
             "feature_quality_diagnostics": {
                 "has_required_fields": False,

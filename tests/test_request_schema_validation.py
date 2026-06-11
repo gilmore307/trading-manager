@@ -34,10 +34,10 @@ class RequestSchemaValidationTests(unittest.TestCase):
 
     def test_model_promotion_preview_validates_and_normalizes_to_manager_request(self) -> None:
         request = build_model_promotion_review_request(
-            model="event_failure_risk_model",
-            candidate_ref="trading-model://promotion-candidates/mpcand_event_failure",
-            evaluation_run_refs=["trading-model://eval-runs/mdevrun_event_failure"],
-            evidence_refs=["storage://trading-model/evidence/event_failure.json"],
+            model="event_state_model",
+            candidate_ref="trading-model://promotion-candidates/mpcand_event_state",
+            evaluation_run_refs=["trading-model://eval-runs/mdevrun_event_state"],
+            evidence_refs=["storage://trading-model/evidence/event_state.json"],
             priority="high",
         )
 

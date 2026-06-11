@@ -9,13 +9,9 @@ This file owns shared naming rules for model-layer source, feature, and model su
 | 1 | MarketRegimeModel | `market_regime_model` | `trading_model.m01_market_regime_model_generation` |
 | 2 | SectorContextModel | `sector_context_model` | `trading_model.m02_sector_context_model_generation` |
 | 3 | TargetStateVectorModel | `target_state_vector_model` | `trading_model.m03_target_state_vector_model_generation` |
-| 4 | EventFailureRiskModel | `event_failure_risk_model` | `trading_model.m04_event_failure_risk_model_generation` |
-| 5 | AlphaConfidenceModel | `alpha_confidence_model` | `trading_model.m05_alpha_confidence_model_generation` |
-| 6 | DynamicRiskPolicyModel | `dynamic_risk_policy_model` | `trading_model.m06_dynamic_risk_policy_model_generation` |
-| 7 | PositionProjectionModel | `position_projection_model` | `trading_model.m07_position_projection_model_generation` |
-| 8 | UnderlyingActionModel | `underlying_action_model` | `trading_model.m08_underlying_action_model_generation` |
-| 9 | TradingGuidanceModel / OptionExpressionModel | `option_expression_model` | `trading_model.m09_option_expression_model_generation` |
-| 10 | EventRiskGovernor / EventIntelligenceOverlay | `event_risk_governor` | `trading_model.m10_event_risk_governor_model_generation` |
+| 4 | UnifiedDecisionModel | `unified_decision_model` | `trading_model.m04_unified_decision_model_generation` |
+| 5 | OptionExpressionModel | `option_expression_model` | `trading_model.m05_option_expression_model_generation` |
+| 6 | ResidualEventGovernanceModel | `residual_event_governance_model` | `trading_model.m06_residual_event_governance_model_generation` |
 
 ## Stable Id Rule
 
@@ -62,10 +58,10 @@ trading_data.m02_sector_context_feature_generation
 trading_data.m03_target_state_vector_data_acquisition
 trading_data.m03_target_state_vector_feature_generation
 trading_data.option_chain_state_source
-trading_data.m09_option_expression_feature_generation
-trading_data.m09_option_expression_data_acquisition_contract_path
-trading_data.m10_event_risk_governor_data_acquisition
-trading_data.m10_event_risk_governor_feature_generation
+trading_data.m05_option_expression_feature_generation
+trading_data.m05_option_expression_data_acquisition_contract_path
+trading_data.m06_residual_event_governance_data_acquisition
+trading_data.m06_residual_event_governance_feature_generation
 ```
 
 The table prefix is not automatic proof of business authority. The registered row and accepted boundary decide ownership.
@@ -75,7 +71,7 @@ The table prefix is not automatic proof of business authority. The registered ro
 Layer-owned model score tokens use compact numeric prefixes only when the token is part of a reviewed layer contract:
 
 ```text
-1_* 2_* 3_* 4_* 5_* 6_* 7_* 8_* 9_* 10_*
+1_* 2_* 3_* 4_* 5_* 6_*
 ```
 
 Generic ids, refs, timestamps, run metadata, receipt metadata, and registry fields stay generic.
@@ -87,13 +83,9 @@ Core scalar score tokens that are shared across repositories belong in `state_ve
 - Layer 1 conditions downstream work; it does not rank sectors, targets, strategies, positions, options, or actions.
 - Layer 2 conditions target construction; it does not select final symbols or actions.
 - Layer 3 builds target context; it does not emit alpha, exposure, option choice, or action.
-- Layer 4 consumes only accepted event/strategy-failure evidence; it does not discover raw event families or trade.
-- Layer 5 estimates adjusted alpha confidence; it does not size positions or choose instruments.
-- Layer 6 produces dynamic risk policy state; it does not size positions, choose instruments, or emit broker orders.
-- Layer 7 projects abstract holding state; it does not emit broker orders.
-- Layer 8 produces offline direct-underlying thesis; it does not route orders or select option contracts.
-- Layer 9 produces optional offline guidance/option-expression plans; it does not execute or mutate broker/account state.
-- M06 produces event-risk governance/intervention evidence from the Layer 8 direct-underlying thesis, with Layer 9 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
+- Layer 4 produces the unified direct-underlying decision thesis; it does not route orders or mutate broker/account state.
+- Layer 5 produces optional offline option-expression plans; it does not execute or mutate broker/account state.
+- Layer 6 produces residual event governance/intervention evidence from the M04 thesis, with M05 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
 
 ## Registry Review Checklist
 

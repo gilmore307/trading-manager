@@ -1,8 +1,8 @@
-"""Layer 9 option-expression feature-stage adapter.
+"""M05 option-expression feature-stage adapter.
 
-Layer 9 no longer owns provider acquisition. It derives option-expression
+M05 does not own provider acquisition. It derives option-expression
 features from the shared ``option_chain_state_source`` cache that is prepared
-before Layer 3.
+before option-expression feature generation.
 """
 
 from __future__ import annotations
@@ -20,17 +20,18 @@ from typing import Any, Mapping, TextIO
 from .control_plane import TaskSystemError
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
-DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_09_option_expression" / "feature_generation"
+DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_05_option_expression" / "feature_generation"
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = Path("/root/projects/trading-manager/.venv/bin/python")
-FEATURE_STAGE_ID = "layer_09_option_expression.feature_generation"
+FEATURE_STAGE_ID = "model_05_option_expression.feature_generation"
 SOURCE_TABLE = "option_chain_state_source"
+FEATURE_STAGE_CONTRACT_TYPE = "manager_model_05_option_expression_feature_generation_stage"
 
 
 @dataclass(frozen=True)
-class LayerNineFeatureStageSummary:
-    """Result for the Layer 9 option-expression feature-generation adapter."""
+class M05OptionExpressionFeatureStageSummary:
+    """Result for the M05 option-expression feature-generation adapter."""
 
     contract_type: str
     stage_id: str
@@ -71,7 +72,7 @@ def _exclusive_month_start(month: str) -> str:
 
 def _write_missing_option_source_receipt(*, start_month: str, end_month: str, output_root: Path) -> Path:
     output_root.mkdir(parents=True, exist_ok=True)
-    receipt_path = output_root / f"layer_09_option_expression_feature_generation_option_source_unavailable_receipt_{start_month}.json"
+    receipt_path = output_root / f"model_05_option_expression_feature_generation_option_source_unavailable_receipt_{start_month}.json"
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     receipt = {
         "contract_type": "component_completion_receipt",
@@ -82,12 +83,12 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ou
         "completed_at": now,
         "runs": [
             {
-                "run_id": f"layer_09_option_expression_feature_generation_option_source_unavailable_{start_month}",
+                "run_id": f"model_05_option_expression_feature_generation_option_source_unavailable_{start_month}",
                 "status": "failed",
                 "output_refs": ["sql:trading_data.option_chain_state_source:coverage_missing"],
                 "row_counts": {
                     "option_chain_state_source_rows_available": 0,
-                    "m09_option_expression_feature_generation_rows_generated": 0,
+                    "m05_option_expression_feature_generation_rows_generated": 0,
                 },
             }
         ],
@@ -97,7 +98,7 @@ def _write_missing_option_source_receipt(*, start_month: str, end_month: str, ou
         "broker_execution_performed": False,
         "storage_lifecycle_mutation_performed": False,
         "reason": (
-            "The current fold has no option_chain_state_source rows. Layer 9 feature generation "
+            "The current fold has no option_chain_state_source rows. M05 feature generation "
             "must wait for shared option-chain source acquisition instead of continuing with fallback rows."
         ),
         "evidence_refs": ["sql:trading_data.option_chain_state_source:coverage_missing"],
@@ -157,14 +158,14 @@ def option_source_row_count(
             return int((row or {}).get("row_count") or 0)
 
 
-def execute_layer_nine_feature_stage(
+def execute_m05_option_expression_feature_stage(
     *,
     start_month: str,
     end_month: str,
     output_root: Path = DEFAULT_RECEIPT_ROOT,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
-) -> LayerNineFeatureStageSummary:
-    """Execute Layer 9 option-expression feature generation through the correct reviewed path."""
+) -> M05OptionExpressionFeatureStageSummary:
+    """Execute M05 option-expression feature generation through the reviewed path."""
 
     if option_source_row_count(start_month=start_month, end_month=end_month) <= 0:
         receipt_path = _write_missing_option_source_receipt(
@@ -172,8 +173,8 @@ def execute_layer_nine_feature_stage(
             end_month=end_month,
             output_root=output_root,
         )
-        return LayerNineFeatureStageSummary(
-            contract_type="manager_layer_09_option_expression_feature_generation_stage",
+        return M05OptionExpressionFeatureStageSummary(
+            contract_type=FEATURE_STAGE_CONTRACT_TYPE,
             stage_id=FEATURE_STAGE_ID,
             start_month=start_month,
             end_month=end_month,
@@ -187,7 +188,7 @@ def execute_layer_nine_feature_stage(
     command = (
         python_executable,
         "-m",
-        "data_feature.m09_option_expression_feature_generation",
+        "data_feature.m05_option_expression_feature_generation",
         "--source-table",
         SOURCE_TABLE,
         "--source-start",
@@ -195,7 +196,7 @@ def execute_layer_nine_feature_stage(
         "--source-end",
         _exclusive_month_start(end_month),
         "--run-id",
-        f"m09_option_expression_feature_generation_{start_month}",
+        f"m05_option_expression_feature_generation_{start_month}",
     )
     result = subprocess.run(
         list(command),
@@ -210,49 +211,50 @@ def execute_layer_nine_feature_stage(
         print(result.stdout, end="", file=sys.stderr)
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
-    return LayerNineFeatureStageSummary(
-        contract_type="manager_layer_09_option_expression_feature_generation_stage",
+    return M05OptionExpressionFeatureStageSummary(
+        contract_type=FEATURE_STAGE_CONTRACT_TYPE,
         stage_id=FEATURE_STAGE_ID,
         start_month=start_month,
         end_month=end_month,
         status=status,
-        mode="trading_data_m09_sql_generation_from_shared_option_source",
+        mode="trading_data_m05_sql_generation_from_shared_option_source",
         receipt_path=None,
         command=command,
         return_code=result.returncode,
-        reason=None if result.returncode == 0 else "trading-data m09 feature generator returned non-zero status",
+        reason=None if result.returncode == 0 else "trading-data M05 feature generator returned non-zero status",
     )
 
 
-def write_layer_nine_feature_stage_summary(summary: LayerNineFeatureStageSummary, *, output: TextIO) -> None:
+def write_m05_option_expression_feature_stage_summary(summary: M05OptionExpressionFeatureStageSummary, *, output: TextIO) -> None:
     json.dump(summary.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Execute Layer 9 option-expression feature generation with reviewed no-provider skip support.")
+    parser = argparse.ArgumentParser(description="Execute M05 option-expression feature generation with reviewed no-provider skip support.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_RECEIPT_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
     args = parser.parse_args(argv)
-    summary = execute_layer_nine_feature_stage(
+    summary = execute_m05_option_expression_feature_stage(
         start_month=args.start_month,
         end_month=args.end_month,
         output_root=args.output_root,
         trading_data_root=args.trading_data_root,
     )
-    write_layer_nine_feature_stage_summary(summary, output=sys.stdout)
+    write_m05_option_expression_feature_stage_summary(summary, output=sys.stdout)
     return 0 if summary.status == "succeeded" else 1
 
 
 __all__ = [
     "FEATURE_STAGE_ID",
-    "LayerNineFeatureStageSummary",
-    "execute_layer_nine_feature_stage",
+    "FEATURE_STAGE_CONTRACT_TYPE",
+    "M05OptionExpressionFeatureStageSummary",
+    "execute_m05_option_expression_feature_stage",
     "option_source_row_count",
     "option_source_table_exists",
-    "write_layer_nine_feature_stage_summary",
+    "write_m05_option_expression_feature_stage_summary",
 ]
 
 

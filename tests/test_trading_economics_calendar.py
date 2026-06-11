@@ -8,7 +8,7 @@ from trading_manager_tasks.trading_economics_calendar import plan_historical_see
 
 
 class TradingEconomicsCalendarPlanningTests(unittest.TestCase):
-    def test_historical_seed_inventory_is_retired_without_source_10_task(self):
+    def test_historical_seed_inventory_is_retired_without_m06_source_task(self):
         with tempfile.TemporaryDirectory() as td:
             data_root = Path(td) / "trading-data"
             month_root = data_root / "storage" / "monthly_backfill" / "trading_economics_calendar_web" / "2016-01" / "runs"
@@ -36,7 +36,7 @@ class TradingEconomicsCalendarPlanningTests(unittest.TestCase):
             self.assertIsNone(summary.task_key_path)
             self.assertIsNone(summary.task_key_hash)
             self.assertFalse(summary.write_performed)
-            self.assertIn("not materialized into m10_event_risk_governor_data_acquisition", summary.retired_reason or "")
+            self.assertIn("not materialized into m06_residual_event_governance_data_acquisition", summary.retired_reason or "")
             self.assertFalse(summary.database_writes_performed)
             self.assertEqual(summary.provider_calls, 0)
 

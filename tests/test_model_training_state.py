@@ -372,7 +372,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             m05_feature = {stage.stage_id: stage for stage in state.stages}["model_05_option_expression.feature_generation"]
             self.assertEqual(m05_feature.status, "ready")
             self.assertIsNone(m05_feature.approval_gate_required)
-            self.assertTrue(any(token.endswith("execute_layer_nine_option_feature_generation.py") for token in m05_feature.command))
+            self.assertTrue(any(token.endswith("execute_m05_option_expression_feature_generation.py") for token in m05_feature.command))
 
     def test_layer_workflow_state_has_no_layer_local_post_generation_stages(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

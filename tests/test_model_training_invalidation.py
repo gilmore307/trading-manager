@@ -24,8 +24,8 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
                         "updated_utc": "old",
                         "stages": [
                             {"stage_id": "layer_03_target_state_vector.model_generation", "layer": 3, "status": "succeeded", "artifact_refs": []},
-                            {"stage_id": "layer_09_option_expression.model_evaluation", "layer": 9, "status": "ready", "artifact_refs": []},
-                            {"stage_id": "model_06_residual_event_governance.model_generation", "layer": 10, "status": "succeeded", "artifact_refs": ["old"]},
+                            {"stage_id": "model_05_option_expression.model_evaluation", "layer": 5, "status": "ready", "artifact_refs": []},
+                            {"stage_id": "model_06_residual_event_governance.model_generation", "layer": 6, "status": "succeeded", "artifact_refs": ["old"]},
                         ],
                     }
                 ),
@@ -38,10 +38,10 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
 
             self.assertEqual(summary.invalidated_stage_count, 1)
             self.assertEqual(by_stage["layer_03_target_state_vector.model_generation"]["status"], "succeeded")
-            self.assertEqual(by_stage["layer_09_option_expression.model_evaluation"]["status"], "ready")
+            self.assertEqual(by_stage["model_05_option_expression.model_evaluation"]["status"], "ready")
             self.assertEqual(by_stage["model_06_residual_event_governance.model_generation"]["status"], "failed")
             self.assertIn("rebuild_from_residual_event_governance_required", by_stage["model_06_residual_event_governance.model_generation"]["last_reason"])
-            self.assertIn("manager://stale_downstream_from_layer_10_event_source_rebuild_required", by_stage["model_06_residual_event_governance.model_generation"]["artifact_refs"])
+            self.assertIn("manager://stale_downstream_from_m06_residual_event_source_rebuild_required", by_stage["model_06_residual_event_governance.model_generation"]["artifact_refs"])
 
     def test_dry_run_does_not_write(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -49,7 +49,7 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
             runtime = tmp / "runtime"
             runtime.mkdir()
             state_path = runtime / "model_training_fold_state_2016-01_2016-06.json"
-            original = {"stages": [{"stage_id": "model_06_residual_event_governance.data_acquisition", "layer": 10, "status": "succeeded", "artifact_refs": []}]}
+            original = {"stages": [{"stage_id": "model_06_residual_event_governance.data_acquisition", "layer": 6, "status": "succeeded", "artifact_refs": []}]}
             state_path.write_text(json.dumps(original), encoding="utf-8")
 
             summary = invalidate_layer_downstream_outputs(runtime_root=runtime, write=False)

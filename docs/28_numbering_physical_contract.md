@@ -1,25 +1,21 @@
 # Current Numbering and Physical-Name Contract
 
-This file records the active numbering rule for manager-facing docs, scripts, and registry rows.
+This file records the active numbering rule for manager-facing docs, scripts, SQL table names, storage paths, and registry rows.
 
-## Current Layer Numbers
+## Current Model Numbers
 
-| Layer | Boundary | Physical token family |
+| Model | Boundary | Physical token family |
 |---|---|---|
-| 1 | MarketRegimeModel | `layer_01_market_regime`, `market_regime_model`, `m01_market_regime_model_generation`, `model_01_market_regime` |
-| 2 | SectorContextModel | `layer_02_sector_context`, `sector_context_model`, `m02_sector_context_model_generation`, `model_02_sector_context` |
-| 3 | TargetStateVectorModel | `layer_03_target_state_vector`, `target_state_vector_model`, `model_03_target_state_vector` |
-| 4 | EventFailureRiskModel | `layer_04_event_failure_risk`, `event_failure_risk_model`, `model_04_event_failure_risk` |
-| 5 | AlphaConfidenceModel | `layer_05_alpha_confidence`, `alpha_confidence_model`, `model_05_alpha_confidence` |
-| 6 | DynamicRiskPolicyModel | `layer_06_dynamic_risk_policy`, `dynamic_risk_policy_model`, `model_06_dynamic_risk_policy` |
-| 7 | PositionProjectionModel | `layer_07_position_projection`, `position_projection_model`, `model_07_position_projection` |
-| 8 | UnderlyingActionModel | `layer_08_underlying_action`, `underlying_action_model`, `model_08_underlying_action` |
-| 9 | OptionExpressionModel | `layer_09_option_expression`, `option_expression_model`, `model_09_option_expression` |
-| 10 | EventRiskGovernor | `model_06_residual_event_governance`, `event_risk_governor`, `model_06_residual_event_governance` |
+| M01 | BackgroundContextModel | `model_01_background_context`, `background_context_model`, `background_context_state` |
+| M02 | TargetStateModel | `model_02_target_state`, `target_state_model`, `target_context_state` |
+| M03 | EventStateModel | `model_03_event_state`, `event_state_model`, `event_state_vector` |
+| M04 | UnifiedDecisionModel | `model_04_unified_decision`, `unified_decision_model`, `unified_decision_vector` |
+| M05 | OptionExpressionModel | `model_05_option_expression`, `option_expression_model`, `option_expression_plan` |
+| M06 | ResidualEventGovernanceModel | `model_06_residual_event_governance`, `residual_event_governance_model`, `event_risk_intervention` |
 
 ## Rule
 
-Active docs, code, tests, scripts, and registry rows use the current 10-layer physical tokens above. Immutable SQL migration history may contain older text because migrations are audit records.
+Active docs, code, tests, scripts, SQL table names, storage paths, and registry rows use the current M01-M06 physical tokens above. Immutable SQL migration history may contain older text because migrations are audit records.
 
 ## Review Check
 

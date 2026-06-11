@@ -1040,12 +1040,12 @@ class SchedulerDaemonTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_09_option_expression.model_generation",
+                                "stage_id": "model_05_option_expression.model_generation",
                                 "stage_type": "model_generation",
-                                "layer": 9,
-                                "layer_key": "layer_09_option_expression",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "blocked",
-                                "last_reason": "waiting for layer_09_option_expression.feature_or_input_ready",
+                                "last_reason": "waiting for model_05_option_expression.feature_or_input_ready",
                             }
                         ],
                     }

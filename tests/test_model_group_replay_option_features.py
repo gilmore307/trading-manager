@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from trading_manager_tasks.layer_nine_feature_stage import LayerNineFeatureStageSummary
+from trading_manager_tasks.m05_option_expression_feature_stage import M05OptionExpressionFeatureStageSummary
 from trading_manager_tasks.model_group_replay_option_features import (
     ReplayOptionFeatureRequirement,
     replay_option_feature_requirements_from_replay_decision,
@@ -116,10 +116,10 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=True),
                 patch(
-                    "trading_manager_tasks.model_group_replay_option_features.execute_layer_nine_feature_stage",
-                    return_value=LayerNineFeatureStageSummary(
-                        contract_type="manager_layer_09_option_expression_feature_generation_stage",
-                        stage_id="layer_09_option_expression.feature_generation",
+                    "trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage",
+                    return_value=M05OptionExpressionFeatureStageSummary(
+                        contract_type="manager_model_05_option_expression_feature_generation_stage",
+                        stage_id="model_05_option_expression.feature_generation",
                         start_month="2021-01",
                         end_month="2021-01",
                         status="succeeded",

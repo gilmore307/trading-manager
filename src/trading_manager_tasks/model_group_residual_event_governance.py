@@ -1616,7 +1616,7 @@ def _load_event_candidates(*, storage_root: Path, fold_scope: Mapping[str, str])
         payload = _load_optional_json_object(observation_path) or {}
         raw_events.extend(_events_from_observation_payload(payload, source_ref=str(observation_path)))
     input_dir = storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month)
-    for filename in ("m10_event_risk_governor_data_acquisition_task_key.json", "source_10_task_key.json"):
+    for filename in ("m06_residual_event_governance_data_acquisition_task_key.json", "source_06_task_key.json"):
         task_key_path = input_dir / filename
         checked_paths.append(str(task_key_path))
         if task_key_path.exists():
@@ -1698,7 +1698,7 @@ def _events_from_m06_sql(params: Mapping[str, Any], *, source_ref: str) -> list[
         clauses.append("available_time < %s")
         values.append(params["end"])
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
-    statement = f"SELECT {', '.join(M06_SQL_EVENT_FIELDS)} FROM trading_data.m10_event_risk_governor_data_acquisition{where} ORDER BY available_time, event_id"
+    statement = f"SELECT {', '.join(M06_SQL_EVENT_FIELDS)} FROM trading_data.m06_residual_event_governance_data_acquisition{where} ORDER BY available_time, event_id"
     try:
         import psycopg  # type: ignore
         from psycopg.rows import dict_row  # type: ignore

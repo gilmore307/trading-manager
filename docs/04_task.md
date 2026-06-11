@@ -31,7 +31,7 @@ The resident historical scheduler is the normal path for no-broker historical mo
 5. **Event-risk governance lane**
    - Keep M06 as post-replay residual event-risk attribution within the historical service boundary; it starts after concentrated replay exposes failures, residuals, misses, or deviations.
    - Admit realtime observation families only after review.
-   - Let Layer 4 consume only accepted evidence packets and Layer 9 compose optional offline guidance/expression context.
+   - Let Layer 4 consume only accepted evidence packets and M05 compose optional offline guidance/expression context.
 
 ## Standing Gates
 

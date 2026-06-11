@@ -276,8 +276,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "progression_mode": "conditional_option_expression_after_underlying_intent",
         "candidate_axis": "target_symbol;six_month_window;minute_timestamp;option_contract_bucket",
         "candidate_progression_policy": "train option-expression and explicit no-option/not-applicable states after M04 direct-underlying intent exists; live/replay invocation remains conditional",
-        "data_surface": "m09_option_expression_feature_generation migration-source rows derived from shared option_chain_state_source after M04 intent",
-        "feature_cli": "trading-data-m09-option-expression-feature-generation",
+        "data_surface": "m05_option_expression_feature_generation migration-source rows derived from shared option_chain_state_source after M04 intent",
+        "feature_cli": "trading-data-m05-option-expression-feature-generation",
     },
     {
         "layer": 6,
@@ -354,8 +354,8 @@ FEATURE_MODULES: dict[str, str] = {
     "trading-data-m01-market-regime-feature-generation": "data_feature.m01_market_regime_feature_generation.from_feed_artifacts",
     "trading-data-m02-sector-context-feature-generation": "data_feature.m02_sector_context_feature_generation.from_feed_artifacts",
     "trading-data-m03-target-state-vector-feature-generation": "data_feature.m03_target_state_vector_feature_generation",
-    "trading-data-m10-event-risk-governor-feature-generation": "data_feature.m10_event_risk_governor_feature_generation",
-    "trading-data-m09-option-expression-feature-generation": "data_feature.m09_option_expression_feature_generation",
+    "trading-data-m06-residual-event-governance-feature-generation": "data_feature.m06_residual_event_governance_feature_generation",
+    "trading-data-m05-option-expression-feature-generation": "data_feature.m05_option_expression_feature_generation",
 }
 
 
@@ -382,11 +382,11 @@ def feature_command(feature_cli: str | None) -> list[str]:
             "${START_MONTH}",
             "--write",
         ]
-    if feature_cli == "trading-data-m09-option-expression-feature-generation":
+    if feature_cli == "trading-data-m05-option-expression-feature-generation":
         return [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/execute_layer_nine_option_feature_generation.py",
+            "scripts/tasks/execute_m05_option_expression_feature_generation.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -395,7 +395,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-m01-market-regime-feature-generation", "trading-data-m02-sector-context-feature-generation"}:
         command.extend(["--month", "${START_MONTH}"])
-    if feature_cli in {"trading-data-m03-target-state-vector-feature-generation", "trading-data-m10-event-risk-governor-feature-generation"}:
+    if feature_cli in {"trading-data-m03-target-state-vector-feature-generation", "trading-data-m06-residual-event-governance-feature-generation"}:
         command.extend([
             "--source-start",
             "${START_MONTH_START_ET}",

@@ -27,9 +27,9 @@ scheduler should select no historical work while realtime trading, market-data
 ingestion, broker gates, account freshness, and C08 model-group comparison are
 competing for host capacity.
 
-## D006 - The model stack has ten current layers
+## D006 - The model stack has six current models
 
-Manager recognizes the current Layer 1-10 stack: MarketRegime, SectorContext, TargetStateVector, EventFailureRisk, AlphaConfidence, DynamicRiskPolicy, PositionProjection, UnderlyingAction, OptionExpression, and EventRiskGovernor.
+Manager recognizes the current M01-M06 stack: BackgroundContext, TargetState, EventState, UnifiedDecision, OptionExpression, and ResidualEventGovernance.
 
 ## D007 - Reusable foundation catch-up is priority
 
@@ -39,9 +39,9 @@ Historical training uses the six-month fold as the public first-class work unit 
 
 The scheduler must finish one fold's full run cycle before opening the next fold. Completion means Layer 1-9 pre-replay model work, model replay, M06 Residual Event Governance attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. M06 can update the event-observation pool used by later Layer 4 folds, so starting the next fold after Layer 1-9 alone is invalid.
 
-## D008 - Layer 9 is optional trading guidance/expression
+## D008 - M05 is optional trading guidance/expression
 
-Layer 9 may produce optional offline trading-guidance records and option-expression plans from the Layer 8 direct-underlying thesis and point-in-time option context when available. It is not an event-risk governor and does not execute trades or mutate broker/account state.
+M05 may produce optional offline trading-guidance records and option-expression plans from the M04 direct-underlying thesis and point-in-time option context when available. It is not an event-risk governor and does not execute trades or mutate broker/account state.
 
 ## D009 - Layer 4 consumes only accepted event-failure evidence
 
@@ -59,7 +59,7 @@ normal review and acceptance route completes.
 
 ## D010 - M06 remains post-replay residual event-risk governance
 
-M06 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It must not run as a pre-replay data-acquisition or feature-generation stage. Layer 9 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
+M06 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It must not run as a pre-replay data-acquisition or feature-generation stage. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Agent model review is advisory and blinded
 
@@ -125,7 +125,7 @@ Only `not_in_upstream_features` and `residual_after_upstream_conditioning` may s
 
 ## D211 - Startup abnormality scope is narrow
 
-Layer 9 / Activity Bridge startup abnormality evidence is limited to compact point-in-time detector references in these families:
+M05 / Activity Bridge startup abnormality evidence is limited to compact point-in-time detector references in these families:
 
 ```text
 price_action_pattern
@@ -134,7 +134,7 @@ microstructure_liquidity_disruption
 option_derivatives_abnormality
 ```
 
-Ordinary bar, volume, spread, liquidity, target-state, option-expression, M06 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into Layer 9 evidence.
+Ordinary bar, volume, spread, liquidity, target-state, option-expression, M06 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into M05 evidence.
 
 ## D212 - Layer 3 candidate selection is policy-based
 

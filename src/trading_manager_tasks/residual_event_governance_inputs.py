@@ -1,6 +1,6 @@
 """Safe M06 event-risk input materialization.
 
-This module builds ``m10_event_risk_governor_data_acquisition`` rows only from already-saved local
+This module builds ``m06_residual_event_governance_data_acquisition`` rows only from already-saved local
 Layer 2 bar SQL receipts. It may run the trading-data equity abnormal activity
 source-detector, but it performs no provider calls, no model activation, no
 broker execution, and no storage lifecycle mutation.
@@ -29,8 +29,8 @@ DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_06_residual_event_governance" / "input_materialization"
-DETECTOR_SOURCE = "m10_event_risk_governor_data_acquisition.equity_abnormal_activity"
-SOURCE = "m10_event_risk_governor_data_acquisition"
+DETECTOR_SOURCE = "m06_residual_event_governance_data_acquisition.equity_abnormal_activity"
+SOURCE = "m06_residual_event_governance_data_acquisition"
 REQUIRED_EVENT_FEED_ARTIFACTS = {
     "alpaca_news": "equity_news.csv",
     "gdelt_news": "gdelt_article.csv",
@@ -278,7 +278,7 @@ def _run_detector(
     event_count = 0
     status = "prepared"
     if write:
-        command = [sys.executable, "-m", "data_source.m10_event_risk_governor_data_acquisition.equity_abnormal_activity", str(task_key_path), "--run-id", f"{run_id}_{symbol.lower()}"]
+        command = [sys.executable, "-m", "data_source.m06_residual_event_governance_data_acquisition.equity_abnormal_activity", str(task_key_path), "--run-id", f"{run_id}_{symbol.lower()}"]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs" / "detectors"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -512,7 +512,7 @@ def _write_source_task_key(
         "manager_stage_id": "model_06_residual_event_governance.data_acquisition",
         "source_policy": "local_event_index_over_source_detector_outputs_no_provider_calls",
     }
-    path = output_dir / "m10_event_risk_governor_data_acquisition_task_key.json"
+    path = output_dir / "m06_residual_event_governance_data_acquisition_task_key.json"
     path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
@@ -599,12 +599,12 @@ def materialize_residual_event_governance_inputs_inputs(
     source_receipt_path: str | None = None
     source_event_count = len(events)
     if write:
-        command = [sys.executable, "-m", "data_source.m10_event_risk_governor_data_acquisition", str(source_task_key_path), "--run-id", run_id]
+        command = [sys.executable, "-m", "data_source.m06_residual_event_governance_data_acquisition", str(source_task_key_path), "--run-id", run_id]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
-        (log_dir / "m10_event_risk_governor_data_acquisition.stdout.log").write_text(result.stdout, encoding="utf-8")
-        (log_dir / "m10_event_risk_governor_data_acquisition.stderr.log").write_text(result.stderr, encoding="utf-8")
+        (log_dir / "m06_residual_event_governance_data_acquisition.stdout.log").write_text(result.stdout, encoding="utf-8")
+        (log_dir / "m06_residual_event_governance_data_acquisition.stderr.log").write_text(result.stderr, encoding="utf-8")
         if result.returncode != 0:
             raise TaskSystemError(f"{SOURCE} materialization failed: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
@@ -637,7 +637,7 @@ def write_summary(summary: ResidualEventGovernanceInputMaterialization, *, outpu
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize M06 m10_event_risk_governor_data_acquisition rows from local reviewed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize M06 m06_residual_event_governance_data_acquisition rows from local reviewed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

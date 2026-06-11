@@ -16,18 +16,14 @@ from trading_manager_tasks.model_promotion import (
 
 class ModelPromotionRequestTests(unittest.TestCase):
     def test_all_model_layers_use_one_request_kind(self):
-        self.assertEqual(len(MODEL_PROMOTION_TARGETS), 10)
+        self.assertEqual(len(MODEL_PROMOTION_TARGETS), 6)
         self.assertEqual({target.model_id for target in MODEL_PROMOTION_TARGETS}, {
-            "market_regime_model",
-            "sector_context_model",
-            "target_state_vector_model",
-            "event_failure_risk_model",
-            "alpha_confidence_model",
-            "dynamic_risk_policy_model",
-            "position_projection_model",
-            "underlying_action_model",
+            "background_context_model",
+            "target_state_model",
+            "event_state_model",
+            "unified_decision_model",
             "option_expression_model",
-            "event_risk_governor",
+            "residual_event_governance_model",
         })
 
         requests = build_model_promotion_review_requests(
@@ -40,7 +36,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
 
     def test_builds_valid_manager_request_for_any_model_layer(self):
         request = build_model_promotion_review_request(
-            model="layer_09_option_expression",
+            model="model_05_option_expression",
             candidate_ref="trading-model://promotion-candidates/mpcand_example",
             evaluation_run_refs=["trading-model://eval-runs/mdevrun_example"],
             evidence_refs=["storage://trading-model/evidence/example.json"],
@@ -52,7 +48,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertEqual(normalized["request_kind"], "model_promotion_review")
         self.assertEqual(normalized["priority"], "high")
         self.assertEqual(request["model_id"], "option_expression_model")
-        self.assertEqual(request["model_layer"], "layer_09_option_expression")
+        self.assertEqual(request["model_layer"], "model_05_option_expression")
         self.assertEqual(request["output_contract"], "option_expression_plan")
         self.assertEqual(request["candidate_ref"], "trading-model://promotion-candidates/mpcand_example")
         self.assertEqual(request["evaluation_run_refs"], ["trading-model://eval-runs/mdevrun_example"])
@@ -73,17 +69,17 @@ class ModelPromotionRequestTests(unittest.TestCase):
         )
 
         self.assertEqual(request["model_id"], "option_expression_model")
-        self.assertEqual(request["model_layer"], "layer_09_option_expression")
+        self.assertEqual(request["model_layer"], "model_05_option_expression")
         self.assertEqual(request["evidence_component_id"], "option_expression_model")
 
     def test_accepts_physical_model_table_ids_from_workflow_commands(self):
         request = build_model_promotion_review_request(
-            model="model_01_market_regime",
+            model="model_01_background_context",
             candidate_ref="trading-model://promotion-candidates/mpcand_example",
         )
 
-        self.assertEqual(request["model_id"], "market_regime_model")
-        self.assertEqual(request["model_layer"], "layer_01_market_regime")
+        self.assertEqual(request["model_id"], "background_context_model")
+        self.assertEqual(request["model_layer"], "model_01_background_context")
 
     def test_rejects_unknown_model_target(self):
         with self.assertRaises(TaskSystemError):
@@ -94,7 +90,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
 
     def test_write_jsonl_keeps_single_entrypoint_shape(self):
         request = build_model_promotion_review_request(
-            model="market_regime_model",
+            model="background_context_model",
             candidate_ref="trading-model://promotion-candidates/mpcand_example",
         )
         buffer = io.StringIO()
@@ -104,7 +100,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
         payload = json.loads(buffer.getvalue())
         self.assertEqual(payload["request_kind"], "model_promotion_review")
         self.assertEqual(payload["target_component_kind"], "evaluation_service")
-        self.assertTrue(payload["parameter_ref"].startswith("storage://trading-manager/model_promotion/market_regime_model/"))
+        self.assertTrue(payload["parameter_ref"].startswith("storage://trading-manager/model_promotion/background_context_model/"))
 
 
 if __name__ == "__main__":

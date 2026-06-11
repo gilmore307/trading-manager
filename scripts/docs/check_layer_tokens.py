@@ -15,17 +15,13 @@ if str(SRC_ROOT) not in sys.path:
 
 from trading_manager_tasks.registry_values import registry_payload
 
-LAYER_REGISTRY_IDS = (
-    (1, ("MarketRegimeModel",), "mlv_L1MR001", "trm_MRM001", "dki_MRMV001", "trm_MCS001"),
-    (2, ("SectorContextModel",), "mlv_L2SC001", "trm_SCM001", "trm_M2S001", "trm_SCS001"),
-    (3, ("TargetStateVectorModel",), "mlv_L3TSV01", "trm_TSVMI01", "trm_M3TSV01", "trm_TSV001"),
-    (4, ("EventFailureRiskModel",), "mlv_L4EFR001", "trm_EFRM001", "trm_MEFR001", "trm_EFRV001"),
-    (5, ("AlphaConfidenceModel",), "mlv_L5AC001", "trm_ACM001", "trm_MAC001", "trm_ASV001"),
-    (6, ("DynamicRiskPolicyModel",), "mlv_L6DRP001", "trm_DRPM001", "trm_M6DRP01", "trm_DRPS001"),
-    (7, ("PositionProjectionModel",), "mlv_L7PP001", "trm_TPM001", "trm_MTP001", "trm_TSVEC01"),
-    (8, ("UnderlyingActionModel",), "mlv_L8UA001", "trm_UAM001", "trm_M7UAM01", "trm_UAP001"),
-    (9, ("OptionExpressionModel",), "mlv_L9OE001", "trm_OEM001", "trm_M7OEM01", "trm_OEP001"),
-    (10, ("EventRiskGovernor",), "mlv_L10ERG001", "trm_ERG001", "trm_M9ERG01", "trm_ERI001"),
+MODEL_REGISTRY_IDS = (
+    (1, ("BackgroundContextModel",), "trm_M1BC001", "trm_BCM001", "trm_BCS001"),
+    (2, ("TargetStateModel",), "trm_M2TS001", "trm_TSM002", "trm_TSV001"),
+    (3, ("EventStateModel",), "trm_M3ES001", "trm_ESM001", "trm_ESV001"),
+    (4, ("UnifiedDecisionModel",), "trm_M4UD001", "trm_UDM001", "trm_UDV001"),
+    (5, ("OptionExpressionModel",), "trm_M5OE002", "trm_OEM001", "trm_OEP001"),
+    (6, ("ResidualEventGovernanceModel",), "trm_M6REG001", "trm_REGM001", "trm_ERI001"),
 )
 
 FILES_TO_CHECK = (
@@ -57,17 +53,16 @@ def current_registry_text() -> str:
     )
 
 
-def layers() -> tuple[tuple[int, tuple[str, ...], str, str, str, str], ...]:
+def layers() -> tuple[tuple[int, tuple[str, ...], str, str, str], ...]:
     return tuple(
         (
             number,
             boundaries,
-            registry_payload(layer_id),
+            registry_payload(physical_model_id),
             registry_payload(stable_model_id),
-            registry_payload(model_token_id),
-            registry_payload(handoff_id),
+            registry_payload(output_id),
         )
-        for number, boundaries, layer_id, stable_model_id, model_token_id, handoff_id in LAYER_REGISTRY_IDS
+        for number, boundaries, physical_model_id, stable_model_id, output_id in MODEL_REGISTRY_IDS
     )
 
 
@@ -76,23 +71,27 @@ def main() -> int:
     registry = current_registry_text()
 
     layer_rows = layers()
-    for number, boundaries, layer_token, stable_model_id, model_token, handoff in layer_rows:
+    for number, boundaries, physical_model_id, stable_model_id, output_contract in layer_rows:
         architecture = texts["docs/02_architecture.md"]
         numbering = texts["docs/28_numbering_physical_contract.md"]
         promotion = texts["src/trading_manager_tasks/model_promotion.py"]
         for rel, text in texts.items():
-            required_tokens = (layer_token, stable_model_id) if rel == "src/trading_manager_tasks/model_promotion.py" else (layer_token, model_token)
+            required_tokens = (
+                (physical_model_id, stable_model_id)
+                if rel == "src/trading_manager_tasks/model_promotion.py"
+                else (physical_model_id, stable_model_id, output_contract)
+            )
             for token in required_tokens:
                 if token not in text:
                     fail(f"{rel} missing {token}")
-        for value in (*boundaries, handoff):
+        for value in (*boundaries, output_contract):
             if value not in architecture:
                 fail(f"docs/02_architecture.md missing {value}")
         if not all(boundary in numbering for boundary in boundaries):
             fail(f"docs/28_numbering_physical_contract.md missing one of {boundaries}")
         if not any(boundary in promotion for boundary in boundaries):
             fail(f"model_promotion.py missing one of {boundaries}")
-        for token in (layer_token, stable_model_id, model_token):
+        for token in (physical_model_id, stable_model_id, output_contract):
             if token not in registry:
                 fail(f"scripts/registry/current.csv missing {token}")
 

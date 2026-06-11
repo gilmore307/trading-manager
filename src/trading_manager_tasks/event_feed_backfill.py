@@ -1,7 +1,7 @@
 """M06 event-feed backfill preparation helpers.
 
 This module prepares the reviewed local feed artifacts required by the M06
-`m10_event_risk_governor_data_acquisition` coverage gate. It only writes manager task-key files;
+`m06_residual_event_governance_data_acquisition` coverage gate. It only writes manager task-key files;
 it does not call providers, activate models, submit broker orders, mutate
 accounts, or write dashboard read models.
 """

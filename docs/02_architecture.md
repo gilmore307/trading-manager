@@ -1,6 +1,6 @@
 # Architecture
 
-This file is the manager-side map of the current Layer 1-10 stack. It is a routing and boundary guide, not the model-design authority.
+This file is the manager-side map of the current M01-M06 model stack. It is a routing and boundary guide, not the model-design authority.
 
 ## Module Map
 
@@ -12,36 +12,32 @@ This file is the manager-side map of the current Layer 1-10 stack. It is a routi
 
 ## Stack Map
 
-| Layer | Boundary | Physical token family | Main concept | Manager-facing handoff | Hard boundary |
+| Model | Boundary | Physical token family | Main concept | Manager-facing handoff | Hard boundary |
 |---|---|---|---|---|---|
-| 1 | `MarketRegimeModel` | `layer_01_market_regime`, `market_regime_model`, `m01_market_regime_model_generation`, `model_01_market_regime` | Broad-market context | `market_context_state` | No sector/target/action choice. |
-| 2 | `SectorContextModel` | `layer_02_sector_context`, `sector_context_model`, `m02_sector_context_model_generation`, `model_02_sector_context` | Sector/industry context | `sector_context_state` | No final symbol/action choice. |
-| 3 | `TargetStateVectorModel` | `layer_03_target_state_vector`, `target_state_vector_model`, `model_03_target_state_vector` | Anonymous target context and candidate ranking | `target_context_state`, `target_handoff_rank` | No alpha, exposure, option, position sizing, or final action. |
-| 4 | `EventFailureRiskModel` | `layer_04_event_failure_risk`, `event_failure_risk_model`, `model_04_event_failure_risk` | Reviewed event/strategy-failure conditioning | `event_failure_risk_vector` | Consumes only accepted evidence packets; no action or execution. |
-| 5 | `AlphaConfidenceModel` | `layer_05_alpha_confidence`, `alpha_confidence_model`, `model_05_alpha_confidence` | Calibrated alpha confidence | `alpha_confidence_vector` | No exposure, option contract, or order. |
-| 6 | `DynamicRiskPolicyModel` | `layer_06_dynamic_risk_policy`, `dynamic_risk_policy_model`, `model_06_dynamic_risk_policy` | Dynamic risk-budget and premium-policy state from global market regime, systemic event risk, alpha quality, and portfolio context | `dynamic_risk_policy_state` | Not an execution hard-limit gate and not order permission. |
-| 7 | `PositionProjectionModel` | `layer_07_position_projection`, `position_projection_model`, `model_07_position_projection` | Abstract holding-state projection under Layer 6 risk policy | `position_projection_vector` | No buy/sell/hold order. |
-| 8 | `UnderlyingActionModel` | `layer_08_underlying_action`, `underlying_action_model`, `model_08_underlying_action` | Offline underlying thesis | `underlying_action_plan` | Not broker routing or order construction. |
-| 9 | `OptionExpressionModel` | `layer_09_option_expression`, `option_expression_model`, `model_09_option_expression` | Optional offline option-expression context from the Layer 8 thesis | `option_expression_plan` | Not execution and not broker/account mutation. |
-| 10 | `EventRiskGovernor` | `model_06_residual_event_governance`, `event_risk_governor`, `model_06_residual_event_governance` | Residual event-risk governance over the Layer 8 direct-underlying thesis, with Layer 9 context optional | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
+| M01 | `BackgroundContextModel` | `model_01_background_context`, `background_context_model` | Broad market, sector, and industry background context | `background_context_state` | No target/action/option/event-family choice. |
+| M02 | `TargetStateModel` | `model_02_target_state`, `target_state_model` | Anonymous target state and tradability context | `target_context_state` | No final action, sizing, or option contract. |
+| M03 | `EventStateModel` | `model_03_event_state`, `event_state_model` | Accepted event-family exposure, uncertainty, and event-conditioned response context | `event_state_vector` | Does not mutate event-family identity, impact-window definitions, or action policy. |
+| M04 | `UnifiedDecisionModel` | `model_04_unified_decision`, `unified_decision_model` | Direct-underlying utility decision, no-trade probability, exposure intent, and action heads | `unified_decision_vector` | Not broker routing, order construction, or account mutation. |
+| M05 | `OptionExpressionModel` | `model_05_option_expression`, `option_expression_model` | Conditional option-expression context after M04 direct-underlying intent | `option_expression_plan` | Not execution and not broker/account mutation. |
+| M06 | `ResidualEventGovernanceModel` | `model_06_residual_event_governance`, `residual_event_governance_model` | Residual event governance over the M04/M05 decision context after replay evidence | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
 
 ## Physical Surface Rule
 
-Active code, scripts, registry rows, and docs should use the current layer numbers above. SQL migration history is append-only audit material and is not rewritten by documentation cleanup.
+Active code, scripts, registry rows, SQL table names, storage paths, and docs should use the current M01-M06 model numbers above. SQL migration history is append-only audit material and is not rewritten by documentation cleanup.
 
 ## Event Path Rule
 
 M06 may inspect residual event evidence and abnormal activity only after
 concentrated live-flow replay has exposed failures, residuals, misses, or path
-deviations. It is not a pre-replay input stage. Layer 4 may consume only Layer
-10 evidence packets that passed point-in-time checks, non-overlap checks,
-matched-control review, leakage review, and agent/manager acceptance.
+deviations. It is not a pre-replay input stage. M03/M04 may consume only
+accepted event evidence packets that passed point-in-time checks, non-overlap
+checks, matched-control review, leakage review, and agent/manager acceptance.
 
-Layer 9 remains the optional base guidance/expression layer. It should not directly absorb event anomalies as alpha or duplicate M06 residual evidence.
+M05 remains the optional option-expression layer. It should not directly absorb event anomalies as alpha or duplicate M06 residual evidence.
 
 ## Layer 3 Candidate Policy
 
-Layer 3 candidate generation is rule-fixed, not final-ticker-fixed. Live routing should build candidates from the reviewed realtime total-symbol pool, target metadata, current hot/liquid market-wide names, and point-in-time liquidity, spread, data-quality, and optional optionability filters. Promotion replay uses the fixed `historical_candidate_universe.csv` table seeded from the current realtime pool plus BTC, ETH, and SOL; it is stable replay scope, not point-in-time historical market-wide ranking evidence. A same-day candidate-universe freeze may be used for route smoke checks, but replay execution backs off until the accepted post-close readiness time so the final pool is not frozen during an active session. Layer 3 may rank the anonymous candidate-policy batch for target handoff, but downstream layers still own alpha confidence, action, sizing, option expression, and execution.
+M02 candidate generation is rule-fixed, not final-ticker-fixed. Live routing should build candidates from the reviewed realtime total-symbol pool, target metadata, current hot/liquid market-wide names, and point-in-time liquidity, spread, data-quality, and optional optionability filters. Promotion replay uses the fixed `historical_candidate_universe.csv` table seeded from the current realtime pool plus BTC, ETH, and SOL; it is stable replay scope, not point-in-time historical market-wide ranking evidence. A same-day candidate-universe freeze may be used for route smoke checks, but replay execution backs off until the accepted post-close readiness time so the final pool is not frozen during an active session. M02 may rank the anonymous candidate-policy batch for target handoff, but downstream models still own decision, option expression, residual event governance, and execution review.
 
 Manager may schedule target-major substrate work because routing symbols only prepare data samples. That scheduling choice does not select the replay target. Live-flow replay must run the component graph against the fixed historical candidate pool, allowing components to choose no target, one target, or a target combination. A fixed-symbol run is a diagnostic repair scenario, not ordinary promotion evidence.
 

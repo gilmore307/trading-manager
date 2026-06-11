@@ -119,28 +119,28 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(by_ref["ERR-000003"]["dashboard_severity"], "notice")
         self.assertEqual(by_ref["ERR-000004"]["handling_status"], "open")
 
-    def test_supersedes_retired_layer_nine_option_data_acquisition_errors(self):
+    def test_supersedes_retired_m05_option_data_acquisition_errors(self):
         rows = [
             {
                 "error_ref": "ERR-000005",
                 "repair_status": "blocked",
                 "handling_status": "open",
                 "dashboard_severity": "warning",
-                "summary": "provider stage layer_09_option_expression.data_acquisition has failed requests",
-                "root_cause": "old layer_09_option_expression.data_acquisition route failed before current shared source route",
+                "summary": "provider stage model_05_option_expression.data_acquisition has failed requests",
+                "root_cause": "old model_05_option_expression.data_acquisition route failed before current shared source route",
             },
             {
                 "error_ref": "ERR-000006",
                 "repair_status": "repaired",
                 "handling_status": "closed",
                 "dashboard_severity": "notice",
-                "summary": "provider stage layer_09_option_expression.data_acquisition was already closed",
-                "root_cause": "old layer_09_option_expression.data_acquisition route already has a closure receipt",
+                "summary": "provider stage model_05_option_expression.data_acquisition was already closed",
+                "root_cause": "old model_05_option_expression.data_acquisition route already has a closure receipt",
             }
         ]
         task_timeline = [
             {"task_id": "layer_03_target_state_vector.option_chain_data_acquisition"},
-            {"task_id": "layer_09_option_expression.feature_generation"},
+            {"task_id": "model_05_option_expression.feature_generation"},
         ]
 
         updated = _mark_superseded_agent_errors(rows, task_timeline)
@@ -1530,10 +1530,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_09_option_expression.feature_generation",
+                                "stage_id": "model_05_option_expression.feature_generation",
                                 "stage_type": "feature_generation",
-                                "layer": 9,
-                                "layer_key": "layer_09_option_expression",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "target_symbol_six_month",
@@ -1564,12 +1564,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         tasks = payload["chart_payload"]["task_timeline"]
         layer_one = next(task for task in tasks if task["layer"] == 1)
         layer_eight = next(task for task in tasks if task["layer"] == 8)
-        layer_nine = next(task for task in tasks if task["layer"] == 9)
+        model_five = next(task for task in tasks if task["task_id"] == "model_05_option_expression")
         self.assertEqual(layer_one["target_scope"], "market_context_panel")
         self.assertEqual(layer_one["instrument_scope"], "market_context_proxy_panel")
         self.assertEqual(layer_eight["target_scope"], "target_symbol")
         self.assertEqual(layer_eight["instrument_scope"], "underlying_action_plan")
-        self.assertEqual(layer_nine["instrument_scope"], "option_expression_or_underlying_fallback")
+        self.assertEqual(model_five["instrument_scope"], "option_expression_or_underlying_fallback")
         self.assertEqual(payload["chart_payload"]["target_queue"]["enabled_targets"], ["AAPL", "NVDA"])
 
     def test_model_generation_progress_uses_dataset_splits_without_rows(self):
@@ -2922,13 +2922,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            receipt_dir = runtime / "model_training_stage_receipts" / "layer_09_option_expression__model_generation__train"
+            receipt_dir = runtime / "model_training_stage_receipts" / "model_05_option_expression__model_generation__train"
             receipt_dir.mkdir(parents=True, exist_ok=True)
             (receipt_dir / "2026-05-18T141000.000000+0000.receipt.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "component_completion_receipt",
-                        "manager_stage_id": "layer_09_option_expression.model_generation.train",
+                        "manager_stage_id": "model_05_option_expression.model_generation.train",
                         "status": "succeeded",
                         "completed_at": "2026-05-18T14:10:00Z",
                         "runs": [{"status": "succeeded", "return_code": 0}],
@@ -2953,7 +2953,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage layer_09_option_expression.model_generation.train command returned non-zero status",
+                        "summary": "model training stage model_05_option_expression.model_generation.train command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-18T14:02:00Z",
                         "created_at_utc": "2026-05-18T14:02:00Z",
@@ -3998,7 +3998,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer": 8,
                                 "layer_key": "layer_03_target_state_vector",
                                 "status": "not_applicable",
-                                "last_reason": "no Layer 9 training-eligible underlying minutes ready for option-expression acquisition",
+                                "last_reason": "no M05 training-eligible underlying minutes ready for option-expression acquisition",
                             },
                         ],
                     }
@@ -4028,7 +4028,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertFalse(any(task["layer"] == 5 and task["stage_type"] == "model_task" for task in task_timeline))
         real_skip = next(task for task in task_timeline if task["task_id"] == "layer_03_target_state_vector")
         self.assertEqual(real_skip["task_state"], "skipped")
-        self.assertIn("no Layer 9 training-eligible", real_skip["reason"])
+        self.assertIn("no M05 training-eligible", real_skip["reason"])
 
     def test_planned_task_timeline_uses_service_target_symbol(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize M06 m10_event_risk_governor_data_acquisition rows from local reviewed artifacts."""
+"""Materialize M06 m06_residual_event_governance_data_acquisition rows from local reviewed artifacts."""
 
 from __future__ import annotations
 
