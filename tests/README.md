@@ -47,6 +47,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_monthly_backfill.py`
 - `test_nasdaq_earnings_baseline.py`
 - `test_option_chain_source_acquisition.py`
+- `test_post_model_schema.py`
 - `test_provider_dispatch.py`
 - `test_realtime_shadow_handoff.py`
 - `test_request_handoff.py`
