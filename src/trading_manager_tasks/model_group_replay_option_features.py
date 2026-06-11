@@ -237,7 +237,11 @@ def run_model_group_replay_option_features_for_replay_backoff(
                 )
 
         for month in sorted(months_to_generate):
-            generated = execute_m05_option_expression_feature_stage(start_month=month, end_month=month)
+            generated = execute_m05_option_expression_feature_stage(
+                start_month=month,
+                end_month=month,
+                target_symbol=selected_target_symbol,
+            )
             generated_summaries.append(generated.summary_row())
             if generated.status != "succeeded":
                 return _decision(

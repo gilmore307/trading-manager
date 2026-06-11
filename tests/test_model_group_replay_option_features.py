@@ -141,7 +141,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, "executed")
         self.assertEqual(decision.reason_code, "model_group_replay_option_feature_repair_executed")
         self.assertEqual(decision.provider_calls, 0)
-        generate.assert_called_once_with(start_month="2021-01", end_month="2021-01")
+        generate.assert_called_once_with(start_month="2021-01", end_month="2021-01", target_symbol="AAPL")
 
     def test_extracts_requirements_from_replay_backoff_sample(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")

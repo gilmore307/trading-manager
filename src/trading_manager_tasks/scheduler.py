@@ -1001,6 +1001,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one scheduler tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one scheduler tick.")
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the month-scoped manager runtime checkpoint.")
+    parser.add_argument(
+        "--allow-post-foundation-model-stages",
+        action="store_true",
+        help="Use the full fold-scoped post-foundation workflow plan for model and provider stages.",
+    )
     parser.add_argument("--disable-market-hours-protection", action="store_true", help="Allow historical training during regular US equity market hours while no production model is active. Provider, promotion, and broker gates remain hard.")
     parser.add_argument("--live-runtime-mode", action="store_true", help="Pause historical model tasks because live runtime and C08 realtime model comparison have priority.")
     parser.add_argument("--min-available-memory-mb", type=int, default=DEFAULT_MIN_AVAILABLE_MEMORY_MB)
@@ -1034,6 +1040,8 @@ def main(argv: list[str] | None = None) -> int:
         provider_stage_next_limit=args.provider_stage_next_limit,
         provider_stage_max_workers=args.provider_stage_max_workers,
         selected_target_symbol=args.target_symbol,
+        state_path=args.state_path,
+        foundation_catch_up_only=not args.allow_post_foundation_model_stages,
     )
     write_scheduler_decision(decision, output=sys.stdout)
     return 0

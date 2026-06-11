@@ -15,6 +15,7 @@ from trading_manager_tasks.model_training_workflow import (
     MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
     build_model_training_workflow_plan,
+    model_script,
 )
 from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
 
@@ -192,6 +193,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn(MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID, stages)
         self.assertIn("scripts/tasks/prepare_option_chain_source_acquisition.py", stages[MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID].command)
         self.assertIn(MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER, stages["model_05_option_expression.feature_generation"].blockers)
+        self.assertIn("--target-symbol", stages["model_05_option_expression.feature_generation"].command)
+        self.assertIn("AAPL", stages["model_05_option_expression.feature_generation"].command)
         self.assertIn("model_05_option_expression.feature_or_input_ready", stages["model_05_option_expression.model_generation.train"].blockers)
 
     def test_m05_no_option_target_skips_option_source_but_keeps_model_generation(self) -> None:
@@ -289,6 +292,20 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         m02_generation = next(stage for stage in plan.layers[1].stages if stage.stage_type == "model_generation")
         self.assertIn("selected_target_symbol_required", m02_generation.blockers)
         self.assertTrue(m02_generation.dataset_unit.target_required)
+
+    def test_m02_model_generation_uses_database_backed_current_route(self) -> None:
+        command = model_script(2, "target_state", "generate")
+
+        self.assertIn("--from-database", command)
+        self.assertIn("--source-start", command)
+        self.assertIn("--source-end", command)
+
+    def test_m06_model_generation_uses_database_backed_current_route(self) -> None:
+        command = model_script(6, "residual_event_governance", "generate")
+
+        self.assertIn("--from-database", command)
+        self.assertIn("--source-start", command)
+        self.assertIn("--source-end", command)
 
 
 if __name__ == "__main__":

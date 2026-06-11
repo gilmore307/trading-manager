@@ -10,12 +10,14 @@ from types import SimpleNamespace
 
 from trading_manager_tasks.model_training_workflow import BASE_STACK_LAYER_COUNT
 from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
+from trading_manager_tasks import scheduler
 from trading_manager_tasks.scheduler import (
     ResourceSnapshot,
     SchedulerConfig,
     _execute_autonomous_provider_stage,
     is_regular_us_equity_trading_day,
     live_runtime_historical_task_gate,
+    main as scheduler_main,
     market_hours_gate,
     resource_gate,
     run_scheduler_once,
@@ -291,6 +293,32 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(decision.selected_work, "model_05_option_expression.option_chain_data_acquisition")
         self.assertFalse(execute_provider_stage.call_args.kwargs["foundation_catch_up_only"])
         self.assertEqual(execute_provider_stage.call_args.kwargs["state_path"], state_path)
+
+    def test_scheduler_cli_passes_fold_state_path_and_post_foundation_scope(self):
+        fake_decision = SimpleNamespace(summary_row=lambda: {"decision_status": "ready"})
+        state_path = Path("/tmp/model_training_fold_state_aapl_2016-01_2016-06.json")
+
+        with patch.object(scheduler, "run_scheduler_once", return_value=fake_decision) as run_mock, patch.object(
+            scheduler, "write_scheduler_decision"
+        ):
+            status = scheduler_main(
+                [
+                    "--start-month",
+                    "2016-01",
+                    "--end-month",
+                    "2016-06",
+                    "--target-symbol",
+                    "AAPL",
+                    "--state-path",
+                    str(state_path),
+                    "--allow-post-foundation-model-stages",
+                    "--execute-autonomous-provider-stages",
+                ]
+            )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(run_mock.call_args.kwargs["state_path"], state_path)
+        self.assertFalse(run_mock.call_args.kwargs["foundation_catch_up_only"])
 
     def test_option_chain_provider_execution_advances_full_target_workflow(self):
         state = SimpleNamespace(

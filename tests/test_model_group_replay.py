@@ -44,6 +44,15 @@ class ModelGroupReplayTests(unittest.TestCase):
     def _write_completed_fold(self, storage_root: Path) -> None:
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True)
+        artifact_path = (
+            storage_root.parent
+            / "03_model_artifacts"
+            / "runtime"
+            / "model_05_alpha_confidence"
+            / "after_cost_alpha_model_aapl_2016-01_2016-06.json"
+        )
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        artifact_path.write_text('{"contract_type":"current_replay_placeholder_after_cost_alpha_model"}\n', encoding="utf-8")
         stages = []
         for layer in range(1, 7):
             for split_name in ("train", "validation", "test"):
@@ -148,7 +157,9 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
             self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2016-06", decision.command)
-            self.assertNotIn("--after-cost-alpha-model-json", decision.command)
+            self.assertIn("--after-cost-alpha-model-json", decision.command)
+            alpha_ref = decision.command[decision.command.index("--after-cost-alpha-model-json") + 1]
+            self.assertTrue(alpha_ref.endswith("after_cost_alpha_model_aapl_2016-01_2016-06.json"))
             self.assertIn("--initial-capital-usd", decision.command)
             self.assertEqual(decision.command[decision.command.index("--initial-capital-usd") + 1], "25000.0")
             self.assertNotIn("--option-feature-database-url", decision.command)
@@ -523,11 +534,14 @@ class ModelGroupReplayTests(unittest.TestCase):
             )
             receipt_root = dataset_root / "replay_execution_runs" / "compatible_run"
             receipt_root.mkdir(parents=True)
+            decision_rows_path = receipt_root / "decision_rows.jsonl"
+            decision_rows_path.write_text('{"decision_id":"decision_1"}\n', encoding="utf-8")
             (receipt_root / "replay_execution_receipt.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "compatible_run",
+                        "decision_rows_ref": str(decision_rows_path),
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
                         "pre_replay_target_refs": ["XLK"],
                         "target_refs": ["AAPL"],

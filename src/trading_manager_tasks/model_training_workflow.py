@@ -314,7 +314,7 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
         "python3",
         f"/root/projects/trading-model/scripts/models/{physical_model_key}/{script_name}",
     ]
-    if layer in {4, 5} and verb == "generate":
+    if layer in {2, 4, 5, 6} and verb == "generate":
         command.extend([
             "--from-database",
             "--source-start",
@@ -359,7 +359,7 @@ FEATURE_MODULES: dict[str, str] = {
 }
 
 
-def feature_command(feature_cli: str | None) -> list[str]:
+def feature_command(feature_cli: str | None, *, selected_target_symbol: str | None = None) -> list[str]:
     if feature_cli is None:
         return ["manager-internal", "no-dedicated-trading-data-feature-stage"]
     if feature_cli == "manager-model-03-event-state-feature-generation":
@@ -383,7 +383,7 @@ def feature_command(feature_cli: str | None) -> list[str]:
             "--write",
         ]
     if feature_cli == "trading-data-m05-option-expression-feature-generation":
-        return [
+        command = [
             "PYTHONPATH=src",
             "python3",
             "scripts/tasks/execute_m05_option_expression_feature_generation.py",
@@ -392,6 +392,9 @@ def feature_command(feature_cli: str | None) -> list[str]:
             "--end-month",
             "${END_MONTH}",
         ]
+        if selected_target_symbol:
+            command.extend(["--target-symbol", selected_target_symbol])
+        return command
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-m01-market-regime-feature-generation", "trading-data-m02-sector-context-feature-generation"}:
         command.extend(["--month", "${START_MONTH}"])
@@ -728,7 +731,7 @@ def _build_layer_workflow(
     generate = model_script(layer, slug, "generate")
     evaluate = model_script(layer, slug, "evaluate")
     review = model_script(layer, slug, "review")
-    feature = feature_command(meta.get("feature_cli"))
+    feature = feature_command(meta.get("feature_cli"), selected_target_symbol=selected_target_symbol)
     maintenance = maintenance_command(layer, slug)
     dataset_unit = _dataset_unit_for_layer(
         layer=layer,

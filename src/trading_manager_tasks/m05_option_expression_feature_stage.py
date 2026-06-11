@@ -26,6 +26,7 @@ DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
 DEFAULT_PYTHON_EXECUTABLE = Path("/root/projects/trading-manager/.venv/bin/python")
 FEATURE_STAGE_ID = "model_05_option_expression.feature_generation"
 SOURCE_TABLE = "option_chain_state_source"
+FEATURE_TABLE = "m05_option_expression_feature_generation"
 FEATURE_STAGE_CONTRACT_TYPE = "manager_model_05_option_expression_feature_generation_stage"
 
 
@@ -134,6 +135,7 @@ def option_source_row_count(
     *,
     start_month: str,
     end_month: str,
+    target_symbol: str | None = None,
     database_url: str | None = None,
     source_schema: str = "trading_data",
     source_table: str = SOURCE_TABLE,
@@ -145,14 +147,57 @@ def option_source_row_count(
         return 0
     with psycopg.connect(_database_url(database_url), row_factory=dict_row) as conn:
         with conn.cursor() as cursor:
+            where = [
+                "snapshot_time >= %s",
+                "snapshot_time < %s",
+            ]
+            params: list[str] = [_month_start(start_month), _exclusive_month_start(end_month)]
+            if target_symbol:
+                where.append("underlying = %s")
+                params.append(target_symbol.strip().upper())
             cursor.execute(
                 f"""
                 SELECT COUNT(*) AS row_count
                 FROM {source_schema}.{source_table}
-                WHERE snapshot_time::timestamptz >= %s::timestamptz
-                  AND snapshot_time::timestamptz < %s::timestamptz
+                WHERE {" AND ".join(where)}
                 """,
-                (_month_start(start_month), _exclusive_month_start(end_month)),
+                params,
+            )
+            row = cursor.fetchone()
+            return int((row or {}).get("row_count") or 0)
+
+
+def feature_row_count(
+    *,
+    start_month: str,
+    end_month: str,
+    target_symbol: str | None = None,
+    database_url: str | None = None,
+    target_schema: str = "trading_data",
+    target_table: str = FEATURE_TABLE,
+) -> int:
+    import psycopg  # type: ignore
+    from psycopg.rows import dict_row  # type: ignore
+
+    if not option_source_table_exists(database_url=database_url, source_schema=target_schema, source_table=target_table):
+        return 0
+    with psycopg.connect(_database_url(database_url), row_factory=dict_row) as conn:
+        with conn.cursor() as cursor:
+            where = [
+                "snapshot_time >= %s",
+                "snapshot_time < %s",
+            ]
+            params: list[str] = [_month_start(start_month), _exclusive_month_start(end_month)]
+            if target_symbol:
+                where.append("underlying = %s")
+                params.append(target_symbol.strip().upper())
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) AS row_count
+                FROM {target_schema}.{target_table}
+                WHERE {" AND ".join(where)}
+                """,
+                params,
             )
             row = cursor.fetchone()
             return int((row or {}).get("row_count") or 0)
@@ -162,12 +207,14 @@ def execute_m05_option_expression_feature_stage(
     *,
     start_month: str,
     end_month: str,
+    target_symbol: str | None = None,
     output_root: Path = DEFAULT_RECEIPT_ROOT,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
 ) -> M05OptionExpressionFeatureStageSummary:
     """Execute M05 option-expression feature generation through the reviewed path."""
 
-    if option_source_row_count(start_month=start_month, end_month=end_month) <= 0:
+    source_rows = option_source_row_count(start_month=start_month, end_month=end_month, target_symbol=target_symbol)
+    if source_rows <= 0:
         receipt_path = _write_missing_option_source_receipt(
             start_month=start_month,
             end_month=end_month,
@@ -182,6 +229,18 @@ def execute_m05_option_expression_feature_stage(
             mode="option_source_coverage_missing",
             receipt_path=str(receipt_path),
             reason="current fold option source coverage is missing; run shared option-chain source acquisition before feature generation",
+        )
+    existing_feature_rows = feature_row_count(start_month=start_month, end_month=end_month, target_symbol=target_symbol)
+    if existing_feature_rows >= source_rows:
+        return M05OptionExpressionFeatureStageSummary(
+            contract_type=FEATURE_STAGE_CONTRACT_TYPE,
+            stage_id=FEATURE_STAGE_ID,
+            start_month=start_month,
+            end_month=end_month,
+            status="succeeded",
+            mode="existing_target_feature_coverage_reused",
+            receipt_path=None,
+            reason=f"existing M05 feature coverage reused: {existing_feature_rows}/{source_rows} rows",
         )
 
     python_executable = str(DEFAULT_PYTHON_EXECUTABLE if DEFAULT_PYTHON_EXECUTABLE.exists() else Path(sys.executable))
@@ -198,6 +257,8 @@ def execute_m05_option_expression_feature_stage(
         "--run-id",
         f"m05_option_expression_feature_generation_{start_month}",
     )
+    if target_symbol:
+        command = (*command, "--underlying", target_symbol)
     result = subprocess.run(
         list(command),
         cwd=trading_data_root,
@@ -234,12 +295,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Execute M05 option-expression feature generation with reviewed no-provider skip support.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
+    parser.add_argument("--target-symbol")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_RECEIPT_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
     args = parser.parse_args(argv)
     summary = execute_m05_option_expression_feature_stage(
         start_month=args.start_month,
         end_month=args.end_month,
+        target_symbol=args.target_symbol,
         output_root=args.output_root,
         trading_data_root=args.trading_data_root,
     )
@@ -250,8 +313,10 @@ def main(argv: list[str] | None = None) -> int:
 __all__ = [
     "FEATURE_STAGE_ID",
     "FEATURE_STAGE_CONTRACT_TYPE",
+    "FEATURE_TABLE",
     "M05OptionExpressionFeatureStageSummary",
     "execute_m05_option_expression_feature_stage",
+    "feature_row_count",
     "option_source_row_count",
     "option_source_table_exists",
     "write_m05_option_expression_feature_stage_summary",

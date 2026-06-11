@@ -38,6 +38,7 @@ DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 30
 DEFAULT_STAGE_PROGRESS_STALL_SECONDS = 60 * 10
 DEFAULT_STAGE_PROGRESS_POLL_SECONDS = 5.0
 LONG_DATABASE_STAGE_IDS = {
+    "model_02_target_state.feature_generation",
     "model_05_option_expression.feature_generation",
 }
 SAFE_OFFLINE_STAGE_TYPES = {

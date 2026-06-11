@@ -103,6 +103,23 @@ def run_model_group_replay_if_ready(
     candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
+    after_cost_alpha_model_path = _after_cost_alpha_model_path(storage_root=storage_root, training_fold=training_fold)
+    if not after_cost_alpha_model_path.exists():
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_after_cost_alpha_model_missing",
+            reason="fold-scoped after-cost alpha model artifact is required for replay Layer 5 inference",
+            selected_work="model_group.replay",
+            command=[],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+                "required_next_step": "train or restore the fold-scoped after-cost alpha model artifact before replay",
+            },
+        )
     replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
     resolved_candidate_universe_path = candidate_universe_path or _historical_candidate_universe_path(storage_root)
     fixed_candidate_universe_symbols = _fixed_historical_candidate_symbols(resolved_candidate_universe_path)
@@ -121,6 +138,8 @@ def run_model_group_replay_if_ready(
         run_id,
         "--candidate-model-ref",
         candidate_model_ref,
+        "--after-cost-alpha-model-json",
+        str(after_cost_alpha_model_path),
         "--progress-path",
         str(progress_path),
         "--initial-capital-usd",
@@ -148,6 +167,7 @@ def run_model_group_replay_if_ready(
                 "expected_replay_months": expected_months,
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
+                "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
                 "replay_plan_equity_symbol_count": len(replay_plan_equity_symbols),
                 "candidate_universe_path": str(resolved_candidate_universe_path),
                 "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
@@ -174,6 +194,7 @@ def run_model_group_replay_if_ready(
                 "expected_replay_months": expected_months,
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
+                "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
                 "candidate_universe_path": str(resolved_candidate_universe_path),
                 "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
                 "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
@@ -325,6 +346,7 @@ def run_model_group_replay_if_ready(
             "ready_replay_months_before": len(ready_months),
             "ready_replay_months_after": len(refreshed_ready_months),
             "option_feature_database_configured": bool(option_feature_database_url),
+            "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
             "candidate_universe_path": str(resolved_candidate_universe_path),
             "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
             "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
@@ -392,6 +414,14 @@ def _database_url() -> str | None:
     if DEFAULT_DB_URL_FILE.exists():
         return DEFAULT_DB_URL_FILE.read_text(encoding="utf-8").strip()
     return None
+
+
+def _after_cost_alpha_model_path(*, storage_root: Path, training_fold: Mapping[str, Any]) -> Path:
+    target_symbol = str(training_fold.get("target_symbol") or "").strip().lower()
+    start_month = str(training_fold.get("start_month") or "").strip()
+    end_month = str(training_fold.get("end_month") or "").strip()
+    filename = f"after_cost_alpha_model_{target_symbol}_{start_month}_{end_month}.json"
+    return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / filename
 
 
 def _validated_initial_capital_usd(value: float) -> float:
@@ -625,10 +655,17 @@ def _compatible_replay_run_ids(*, dataset_root: Path, training_fold: Mapping[str
             continue
         if not _replay_receipt_scope_status(replay_receipt=receipt, training_fold=training_fold)["compatible"]:
             continue
+        if not _replay_receipt_decision_rows_exist(receipt):
+            continue
         run_id = str(receipt.get("replay_execution_run_id") or receipt_path.parent.name).strip()
         if run_id:
             run_ids.add(run_id)
     return run_ids
+
+
+def _replay_receipt_decision_rows_exist(replay_receipt: Mapping[str, Any]) -> bool:
+    decision_rows_ref = str(replay_receipt.get("decision_rows_ref") or "").strip()
+    return bool(decision_rows_ref) and Path(decision_rows_ref).exists()
 
 
 def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
