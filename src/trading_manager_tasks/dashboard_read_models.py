@@ -4352,22 +4352,32 @@ def _model_group_lifecycle_tasks_for_visible_folds(
         selected_target_symbol=selected_target_symbol,
     )
     artifact_fold = _replay_manifest_fold_window(manifest)
+    if artifact_fold is not None and artifact_fold not in seen_windows:
+        artifact_fold = None
     if artifact_fold is None and completed_fold is not None:
         artifact_fold = (completed_fold[0], completed_fold[1])
     if artifact_fold is None and visible_periods and dataset_root.exists():
         _period, start_month, end_month = visible_periods[0]
         artifact_fold = (start_month, end_month)
+    rendered_periods = [
+        period
+        for period in visible_periods
+        if artifact_fold is None or (period[1], period[2]) >= artifact_fold
+    ]
+    rendered_fallback_for_mismatch = False
+    if not rendered_periods:
+        rendered_periods = visible_periods
+        rendered_fallback_for_mismatch = True
+
     tasks: list[dict[str, Any]] = []
-    for _period, start_month, end_month in visible_periods:
-        if artifact_fold is not None and (start_month, end_month) < artifact_fold:
-            continue
+    for _period, start_month, end_month in rendered_periods:
         pre_replay_complete = _pre_replay_fold_complete(
             storage_root=storage_root,
             start_month=start_month,
             end_month=end_month,
             selected_target_symbol=selected_target_symbol,
         )
-        use_lifecycle_artifacts = artifact_fold == (start_month, end_month)
+        use_lifecycle_artifacts = artifact_fold == (start_month, end_month) or rendered_fallback_for_mismatch
         tasks.extend(
             _model_group_replay_timeline_tasks(
                 storage_root=storage_root,
