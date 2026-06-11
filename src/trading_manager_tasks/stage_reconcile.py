@@ -29,10 +29,10 @@ from .request_payloads import DEFAULT_STORAGE_ROOT as DEFAULT_MANAGER_STORAGE_RO
 from .scheduler_locks import DEFAULT_LOCKS_DIR, acquire_scheduler_lock, reconcile_lock_ref
 from .stage_coverage import StageCoverageReport, collect_stage_coverage, write_stage_coverage
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
-from .option_chain_source_acquisition import REQUEST_KIND as OPTION_CHAIN_REQUEST_KIND
 from .option_chain_source_acquisition import SOURCE_ID as OPTION_CHAIN_SOURCE_ID
 from .option_chain_source_acquisition import STAGE_ID as OPTION_CHAIN_SOURCE_STAGE_ID
 from .option_chain_source_acquisition import TARGET_COMPONENT_ID as OPTION_CHAIN_TARGET_COMPONENT_ID
+from .option_chain_request_match import is_current_option_chain_request
 from .request_payloads import storage_uri_to_local_path
 from .storage_paths import data_storage_root
 
@@ -157,14 +157,9 @@ def discover_stage_receipts(
     if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
         refs: list[StageReceiptRef] = []
         for row in fetch_manager_requests(database_url=database_url):
-            if row.get("target_component_id") != OPTION_CHAIN_TARGET_COMPONENT_ID or row.get("request_kind") != OPTION_CHAIN_REQUEST_KIND:
+            if not is_current_option_chain_request(row, start_month=start_month, end_month=end_month):
                 continue
             request_id = str(row.get("request_id") or "")
-            if not request_id.startswith("mgrreq_option_chain_window_"):
-                continue
-            text = " ".join(str(row.get(key) or "") for key in ("request_id", "parameter_ref"))
-            if start_month not in text and end_month not in text:
-                continue
             task_key_path = storage_uri_to_local_path(str(row.get("parameter_ref") or ""), storage_root=manager_storage_root)
             if not task_key_path.exists():
                 continue

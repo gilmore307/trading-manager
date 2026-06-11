@@ -18,6 +18,7 @@ from typing import Any, Literal, Mapping, Sequence, TextIO
 from .control_plane import TaskSystemError, fetch_task_summary
 from .failure_register import accepted_failure_request_ids_from_register
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
+from .option_chain_request_match import is_current_option_chain_request
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
 StageCoverageStatus = Literal["blocked", "partial_ready", "ready", "failed"]
@@ -91,15 +92,7 @@ def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
 
 def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str) -> bool:
     if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
-        if row.get("target_component_id") != OPTION_CHAIN_TARGET_COMPONENT_ID:
-            return False
-        if row.get("request_kind") != OPTION_CHAIN_REQUEST_KIND:
-            return False
-        request_id = str(row.get("request_id") or "")
-        if not request_id.startswith("mgrreq_option_chain_window_"):
-            return False
-        text = _row_text(row)
-        return start_month in text or end_month in text
+        return is_current_option_chain_request(row, start_month=start_month, end_month=end_month)
     if row.get("target_component_id") != "01_feed_alpaca_bars":
         return False
     if row.get("request_kind") != "data_backfill_month":

@@ -98,6 +98,42 @@ def _write_connection_refused_receipt(root: Path, *, symbol: str = "SPY", month:
     return path
 
 
+def _write_option_chain_task(
+    manager_root: Path,
+    component_root: Path,
+    *,
+    model_layer: str,
+    request_id: str,
+    month: str = "2021-06",
+    status: str = "succeeded",
+) -> str:
+    output_root = component_root / model_layer / "option_chain_state_source" / month / request_id
+    output_root.mkdir(parents=True, exist_ok=True)
+    (output_root / "completion_receipt.json").write_text(
+        json.dumps(
+            {
+                "task_id": request_id,
+                "source": "option_chain_state_source",
+                "runs": [
+                    {
+                        "run_id": f"{request_id}_provider_20260611T000000Z",
+                        "status": status,
+                        "outputs": ["trading_data.option_chain_state_source"] if status == "succeeded" else [],
+                        "row_counts": {"option_chain_state_source": 5} if status == "succeeded" else {},
+                        "error": None if status == "succeeded" else {"type": "ThetaDataOptionSelectionSnapshotError", "message": "request returned HTTP 478: HTTP Error 478: 478"},
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    task_path = manager_root / "runtime" / model_layer / "option_chain_state_source" / month / request_id / "task_key.json"
+    task_path.parent.mkdir(parents=True, exist_ok=True)
+    task_path.write_text(json.dumps({"output_root": str(output_root), "params": {"underlying": "AAPL"}}) + "\n", encoding="utf-8")
+    return f"storage://trading-manager/runtime/{model_layer}/option_chain_state_source/{month}/{request_id}/task_key.json"
+
+
 def _coverage(stage_id: str = "model_01_background_context.data_acquisition") -> StageCoverageReport:
     return StageCoverageReport(
         contract_type="manager_stage_coverage",
@@ -244,6 +280,64 @@ class StageReconcileTests(unittest.TestCase):
 
         self.assertEqual(rows, ())
 
+    def test_option_chain_reconcile_discovers_only_current_fold_start_month_requests(self) -> None:
+        stage_id = "model_05_option_expression.option_chain_data_acquisition"
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            current_id = "mgrreq_option_chain_window_aapl_2021_01_2021_06_01_0930"
+            stale_id = "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700"
+            current_task_key = root / "runtime/model_05_option_expression/option_chain_state_source/2021-01" / current_id / "task_key.json"
+            stale_task_key = root / "runtime/layer_03_target_state_vector/option_chain_state_source/2021-06" / stale_id / "task_key.json"
+            current_receipt = root / "component/model_05_option_expression/option_chain_state_source/2021-01" / current_id / "completion_receipt.json"
+            stale_receipt = root / "component/layer_03_target_state_vector/option_chain_state_source/2021-06" / stale_id / "completion_receipt.json"
+            for task_key, receipt in ((current_task_key, current_receipt), (stale_task_key, stale_receipt)):
+                task_key.parent.mkdir(parents=True, exist_ok=True)
+                receipt.parent.mkdir(parents=True, exist_ok=True)
+                task_key.write_text(
+                    json.dumps({"output_root": str(receipt.parent), "params": {"underlying": "AAPL"}}) + "\n",
+                    encoding="utf-8",
+                )
+                receipt.write_text(
+                    json.dumps(
+                        {
+                            "runs": [
+                                {
+                                    "run_id": f"{task_key.parent.name}_run",
+                                    "status": "succeeded",
+                                    "started_at": "2026-06-11T00:00:00Z",
+                                    "completed_at": "2026-06-11T00:00:01Z",
+                                }
+                            ]
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            rows = [
+                {
+                    "request_id": current_id,
+                    "request_kind": "option_chain_snapshot",
+                    "target_component_id": "option_chain_state_source",
+                    "parameter_ref": f"storage://trading-manager/runtime/model_05_option_expression/option_chain_state_source/2021-01/{current_id}/task_key.json",
+                },
+                {
+                    "request_id": stale_id,
+                    "request_kind": "option_chain_snapshot",
+                    "target_component_id": "option_chain_state_source",
+                    "parameter_ref": f"storage://trading-manager/runtime/layer_03_target_state_vector/option_chain_state_source/2021-06/{stale_id}/task_key.json",
+                },
+            ]
+            with patch("trading_manager_tasks.stage_reconcile.fetch_manager_requests", return_value=rows):
+                refs = discover_stage_receipts(
+                    stage_id=stage_id,
+                    start_month="2021-01",
+                    end_month="2021-06",
+                    manager_storage_root=root,
+                    component_storage_root=root / "component",
+                )
+
+        self.assertEqual([ref.request_id for ref in refs], [current_id])
+
     def test_provider_html_status_errors_generate_retry_required_proposals(self) -> None:
         status, kind, note = classify_provider_failure(
             'AuthenticationError: <!doctype html><html><head><title>HTTP Status 500 - Internal Server Error</title></head></html>'
@@ -276,6 +370,59 @@ class StageReconcileTests(unittest.TestCase):
             )
 
         self.assertEqual(rows, ())
+
+    def test_option_chain_reconcile_ignores_stale_layer_three_requests(self) -> None:
+        current_request_id = "mgrreq_option_chain_window_aapl_2021_06_2021_06_14_0930"
+        stale_request_id = "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700"
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            manager_root = root / "manager"
+            component_root = root / "data"
+            current_ref = _write_option_chain_task(
+                manager_root,
+                component_root,
+                model_layer="model_05_option_expression",
+                request_id=current_request_id,
+            )
+            stale_ref = _write_option_chain_task(
+                manager_root,
+                component_root,
+                model_layer="layer_03_target_state_vector",
+                request_id=stale_request_id,
+                status="failed",
+            )
+            rows = [
+                {
+                    "request_id": stale_request_id,
+                    "request_kind": "option_chain_snapshot",
+                    "target_component_id": "option_chain_state_source",
+                    "parameter_ref": stale_ref,
+                },
+                {
+                    "request_id": current_request_id,
+                    "request_kind": "option_chain_snapshot",
+                    "target_component_id": "option_chain_state_source",
+                    "parameter_ref": current_ref,
+                },
+            ]
+
+            with patch("trading_manager_tasks.stage_reconcile.fetch_manager_requests", return_value=rows):
+                refs = discover_stage_receipts(
+                    stage_id="model_05_option_expression.option_chain_data_acquisition",
+                    start_month="2021-01",
+                    end_month="2021-06",
+                    component_storage_root=component_root,
+                    manager_storage_root=manager_root,
+                )
+                failure_rows = propose_failure_register_rows(
+                    refs,
+                    stage_id="model_05_option_expression.option_chain_data_acquisition",
+                    start_month="2021-01",
+                    end_month="2021-06",
+                )
+
+        self.assertEqual([ref.request_id for ref in refs], [current_request_id])
+        self.assertEqual(failure_rows, ())
 
     def test_reconcile_can_write_failure_proposal_without_accepting_failure(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch(

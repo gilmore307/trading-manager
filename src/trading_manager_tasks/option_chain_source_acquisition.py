@@ -21,6 +21,7 @@ from typing import Any, Iterable, Mapping, Sequence, TextIO
 from zoneinfo import ZoneInfo
 
 from .control_plane import TaskSystemError, fetch_manager_requests, persist_manager_requests
+from .option_chain_request_match import is_current_option_chain_request
 from .provider_dispatch import ProviderDispatchItem, ProviderDispatchSummary, select_provider_worker_count
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root
@@ -425,13 +426,7 @@ def prepare_option_chain_source_acquisition(
 
 
 def _matches_request(row: Mapping[str, Any], *, start_month: str, end_month: str) -> bool:
-    if row.get("target_component_id") != TARGET_COMPONENT_ID or row.get("request_kind") != REQUEST_KIND:
-        return False
-    request_id = str(row.get("request_id") or "")
-    if not request_id.startswith("mgrreq_option_chain_window_"):
-        return False
-    text = " ".join(str(row.get(key) or "") for key in ("request_id", "parameter_ref"))
-    return start_month in text or end_month in text
+    return is_current_option_chain_request(row, start_month=start_month, end_month=end_month)
 
 
 def request_rows(*, start_month: str, end_month: str, request_ids: Sequence[str] = (), database_url: str | None = None) -> list[dict[str, Any]]:
@@ -647,6 +642,7 @@ __all__ = [
     "TARGET_COMPONENT_ID",
     "OptionChainSourceReview",
     "dispatch_option_chain_source_acquisition",
+    "is_current_option_chain_request",
     "is_regular_us_equity_trading_day",
     "iter_regular_trading_days",
     "manager_requests_from_review",

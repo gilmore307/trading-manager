@@ -5,6 +5,7 @@ import unittest
 from trading_manager_tasks.option_chain_source_acquisition import (
     _runtime_task_key,
     build_option_chain_source_review,
+    is_current_option_chain_request,
     manager_requests_from_review,
     request_previews_for_replay_decision_times,
     request_previews_for_fold,
@@ -56,6 +57,22 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertEqual(runtime_key["manager_controls"]["max_time_window"], "1d")
         self.assertEqual(runtime_key["manager_controls"]["rate_limit_policy_ref"], "thetadata_python_library_serial_session")
         self.assertEqual(runtime_key["params"]["thetadata_transport"], "python_library")
+
+    def test_current_request_matching_uses_fold_start_month_not_end_month(self) -> None:
+        current = {
+            "request_id": "mgrreq_option_chain_window_aapl_2021_01_2021_06_01_0930",
+            "request_kind": "option_chain_snapshot",
+            "target_component_id": "option_chain_state_source",
+            "parameter_ref": "storage://trading-manager/runtime/model_05_option_expression/option_chain_state_source/2021-01/mgrreq_option_chain_window_aapl_2021_01_2021_06_01_0930/task_key.json",
+        }
+        stale_end_month = {
+            **current,
+            "request_id": "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700",
+            "parameter_ref": "storage://trading-manager/runtime/layer_03_target_state_vector/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700/task_key.json",
+        }
+
+        self.assertTrue(is_current_option_chain_request(current, start_month="2021-01", end_month="2021-06"))
+        self.assertFalse(is_current_option_chain_request(stale_end_month, start_month="2021-01", end_month="2021-06"))
 
     def test_replay_decision_requests_regular_session_day_window(self) -> None:
         previews = request_previews_for_replay_decision_times(

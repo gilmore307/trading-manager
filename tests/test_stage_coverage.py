@@ -266,6 +266,32 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.ready_request_ids, (window_request,))
         self.assertEqual(report.status, "ready")
 
+    def test_option_chain_coverage_excludes_stale_end_month_layer_three_requests(self):
+        current_request = "mgrreq_option_chain_window_aapl_2021_01_2021_06_01_0930"
+        stale_end_month_request = "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700"
+        rows = [
+            {
+                **_option_chain_summary_row(current_request, ready=True),
+                "parameter_ref": "storage://trading-manager/runtime/model_05_option_expression/option_chain_state_source/2021-01/mgrreq_option_chain_window_aapl_2021_01_2021_06_01_0930/task_key.json",
+            },
+            {
+                **_option_chain_summary_row(stale_end_month_request, failed=True),
+                "parameter_ref": "storage://trading-manager/runtime/layer_03_target_state_vector/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700/task_key.json",
+            },
+        ]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="model_05_option_expression.option_chain_data_acquisition",
+            start_month="2021-01",
+            end_month="2021-06",
+            expected_count=1,
+        )
+
+        self.assertEqual(report.observed_count, 1)
+        self.assertEqual(report.failed_request_ids, ())
+        self.assertEqual(report.ready_request_ids, (current_request,))
+
     def test_partial_coverage_report_does_not_complete_workflow_stage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
