@@ -878,7 +878,7 @@ def _decision_instrument_scope(row: Mapping[str, Any]) -> str:
 
 
 def _decision_expression_type(row: Mapping[str, Any]) -> str:
-    value = _first_text(row, "decision_expression_type", "9_resolved_expression_type", "resolved_expression_type", "expression_type")
+    value = _first_text(row, "decision_expression_type", "5_resolved_expression_type", "resolved_expression_type", "expression_type")
     if value in {"long_call", "long_put", "underlying_only_expression", "underlying_only", "no_option_expression"}:
         return "underlying_only" if value == "underlying_only_expression" else value
     return "unknown" if not value else "other"

@@ -148,7 +148,7 @@ class RegistryHelperTests(unittest.TestCase):
             "full_run_cycle_promotion_gate",
             "gated_provider_call",
             "historical_modeling_boundary",
-            "layer_3_candidate_selection_policy",
+            "m03_candidate_selection_policy",
             "local_resumable_runtime_state",
             "manager_control_plane",
             "manager_scheduler_decision_loop",
@@ -833,7 +833,7 @@ class RegistryHelperTests(unittest.TestCase):
         focus_runner = rows["MODEL_04_EVENT_FAILURE_RISK_M06_FOCUS_POOL_INPUTS_BUILD"]
         self.assertEqual(focus_runner["kind"], "script")
         self.assertIn("build_layer4_focus_pool_inputs.py", focus_runner["path"])
-        self.assertIn("layer10_focus_pool_inputs.py", focus_runner["path"])
+        self.assertIn("m06_residual_event_governance_focus_pool_inputs.py", focus_runner["path"])
         self.assertIn("review_ready_not_promotion_approved", focus_runner["applies_to"])
 
         self.assertEqual(rows["LAYER4_EVENT_FEATURE_POLICY"]["payload"], "layer4_event_feature_policy")
@@ -1010,7 +1010,7 @@ class RegistryHelperTests(unittest.TestCase):
         policy = rows["EXECUTION_RUNTIME_COMPONENT_GRAPH_POLICY"]
         self.assertIn("same_components_live_and_replay_different_adapters", policy["payload"])
         self.assertIn("evaluation_calls_execution_graph", policy["payload"])
-        self.assertIn("layer10_failure_explanation_only", policy["payload"])
+        self.assertIn("m06_residual_event_governance_failure_explanation_only", policy["payload"])
         self.assertIn("separate_crypto_and_equity_options_accounts", policy["payload"])
         self.assertIn("no_cross_account_netting", policy["payload"])
         self.assertIn("Replay is a fixed historical evaluation mechanism", policy["note"])
@@ -1242,8 +1242,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("price_action", rows["EVENT_CATEGORY_TYPE_VALUES"]["payload"])
         self.assertIn("false_breakout", rows["PRICE_ACTION_EVENT_TYPES"]["payload"])
         self.assertIn("model_06_residual_event_governance_event_not_new_model_layer", rows["PRICE_ACTION_EVENT_LAYER_POLICY"]["payload"])
-        self.assertIn("10_event_presence_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
-        self.assertIn("10_event_target_relevance_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("6_event_presence_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("6_event_target_relevance_score_<horizon>", rows["EVENT_CONTEXT_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertEqual(rows["ALPHA_CONFIDENCE_MODEL"]["payload"], "alpha_confidence_model")
         self.assertEqual(rows["MODEL_05_ALPHA_CONFIDENCE"]["payload"], "model_05_alpha_confidence")
         self.assertEqual(rows["ALPHA_CONFIDENCE_VECTOR"]["payload"], "alpha_confidence_vector")
@@ -1385,7 +1385,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("reduce_or_flatten_review", rows["RESIDUAL_EVENT_GOVERNANCE_INTERVENTION_ACTIONS"]["payload"])
         self.assertIn("dataset_snapshot_ref", rows["MODEL_PROMOTION_READINESS_CHECKLIST"]["payload"])
         self.assertIn("calibration_report_ref", rows["MODEL_PROMOTION_READINESS_CHECKLIST"]["payload"])
-        self.assertIn("layer_2_deferred", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
+        self.assertIn("m02_target_state_deferred", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertEqual(rows["MODEL_PROMOTION_REVIEW"]["payload"], "model_promotion_review")
         self.assertIn("every model layer", rows["MODEL_PROMOTION_REVIEW"]["note"])
         self.assertIn("manager_schedules_only", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
@@ -1407,9 +1407,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("max_loss_usd", rows["TRADE_RISK_CAP_REQUIRED_FIELDS"]["payload"])
         self.assertIn("long_option_premium_defined_risk", rows["TRADE_RISK_CAP_ENFORCEMENT_MODES"]["payload"])
         self.assertIn("warn_only_not_allowed", rows["TRADE_RISK_CAP_FAILURE_POLICY"]["payload"])
-        self.assertIn("layer_1_deferred_after_real_evaluation", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
-        self.assertIn("layer_3_real_production_eval_substrate_deferred_upstream_dependencies_and_calibration", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
-        self.assertIn("layer_8_agent_reviewed_deferred_no_production_eval_substrate", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
+        self.assertIn("m01_background_context_deferred_after_real_evaluation", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
+        self.assertIn("m03_event_state_deferred_no_production_eval_substrate", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
+        self.assertIn("m06_residual_event_governance_deferred_no_production_eval_substrate", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertIn("M01:background_context_model:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
         self.assertIn("M06:residual_event_governance_model:no_persisted_decision_receipt", rows["MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS"]["payload"])
         self.assertEqual(rows["CURRENT_MODEL_CHAIN_RECEIPT"]["payload"], "current_model_chain_receipt")
@@ -1425,8 +1425,8 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("underlying_action_plan_ref", rows["CURRENT_MODEL_CHAIN_RETIRED_FIELD_GUARD"]["payload"])
         self.assertIn("event_context_vector_ref", rows["CURRENT_MODEL_CHAIN_RETIRED_FIELD_GUARD"]["payload"])
-        self.assertEqual(rows["REVIEW_LAYERS_03_10_PROMOTION_ACCEPTANCE"]["kind"], "script")
-        self.assertIn("review_layers_03_10_promotion_acceptance.py", rows["REVIEW_LAYERS_03_10_PROMOTION_ACCEPTANCE"]["path"])
+        self.assertEqual(rows["REVIEW_CURRENT_MODEL_PROMOTION_ACCEPTANCE"]["kind"], "script")
+        self.assertIn("review_current_model_promotion_acceptance.py", rows["REVIEW_CURRENT_MODEL_PROMOTION_ACCEPTANCE"]["path"])
         self.assertEqual(rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["kind"], "script")
         self.assertIn("review_target_state_vector_production_substrate.py", rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["path"])
         expected_layer_script_paths = {
@@ -1486,9 +1486,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("anonymous_target_candidate_builder", rows["M02_SECTOR_CONTEXT_DATA_ACQUISITION"]["applies_to"])
         self.assertNotIn("model_03_target_state_vector", rows["M02_SECTOR_CONTEXT_DATA_ACQUISITION"]["applies_to"])
         self.assertNotIn("sector_context_model", rows["M02_SECTOR_CONTEXT_DATA_ACQUISITION"]["applies_to"])
-        self.assertIn("layer_3_real_eval_deferred_upstream_layer_1_2_not_active_and_calibration_missing", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
-        self.assertIn("layers_4_10_missing_production_eval_run_labels_metrics", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
-        self.assertIn("layer_6_dynamic_risk_policy_physical_implementation_pending", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
+        self.assertIn("m03_event_state_deferred_missing_upstream_activation_and_calibration", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
+        self.assertIn("m04_m06_missing_production_eval_run_labels_metrics", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
+        self.assertIn("m06_residual_event_governance_physical_evaluation_pending", rows["MODEL_PROMOTION_ACCEPTANCE_BLOCKERS"]["payload"])
         self.assertIn("data_source_model_input_design_closed", rows["TRADING_DATA_STACK_ACCEPTANCE_STATUS"]["payload"])
         self.assertIn("default_next_regular_us_session_open_after_as_of_date", rows["ETF_HOLDINGS_AVAILABLE_TIME_POLICY"]["payload"])
         self.assertEqual(rows["EQUITY_ABNORMAL_ACTIVITY_MODEL_STANDARD"]["payload"], "equity_abnormal_activity_conservative")
@@ -2574,27 +2574,27 @@ class RegistryHelperTests(unittest.TestCase):
             "TARGET_OPTION_CHAIN_STATE": "target_option_chain_state",
             "TARGET_OPTION_FLOW_PRESSURE_STATE": "target_option_flow_pressure_state",
             "TARGET_SHORT_EXPIRY_PRESSURE_OVERLAY": "target_short_expiry_pressure_overlay",
-            "EVENT_PRESENCE_SCORE_BY_HORIZON": "10_event_presence_score_<horizon>",
-            "EVENT_TIMING_PROXIMITY_SCORE_BY_HORIZON": "10_event_timing_proximity_score_<horizon>",
-            "EVENT_INTENSITY_SCORE_BY_HORIZON": "10_event_intensity_score_<horizon>",
-            "EVENT_DIRECTION_BIAS_SCORE_BY_HORIZON": "10_event_direction_bias_score_<horizon>",
-            "EVENT_CONTEXT_ALIGNMENT_SCORE_BY_HORIZON": "10_event_context_alignment_score_<horizon>",
-            "EVENT_UNCERTAINTY_SCORE_BY_HORIZON": "10_event_uncertainty_score_<horizon>",
-            "EVENT_GAP_RISK_SCORE_BY_HORIZON": "10_event_gap_risk_score_<horizon>",
-            "EVENT_REVERSAL_RISK_SCORE_BY_HORIZON": "10_event_reversal_risk_score_<horizon>",
-            "EVENT_LIQUIDITY_DISRUPTION_SCORE_BY_HORIZON": "10_event_liquidity_disruption_score_<horizon>",
-            "EVENT_CONTAGION_RISK_SCORE_BY_HORIZON": "10_event_contagion_risk_score_<horizon>",
-            "EVENT_CONTEXT_QUALITY_SCORE_BY_HORIZON": "10_event_context_quality_score_<horizon>",
-            "EVENT_MARKET_IMPACT_SCORE_BY_HORIZON": "10_event_market_impact_score_<horizon>",
-            "EVENT_SECTOR_IMPACT_SCORE_BY_HORIZON": "10_event_sector_impact_score_<horizon>",
-            "EVENT_INDUSTRY_IMPACT_SCORE_BY_HORIZON": "10_event_industry_impact_score_<horizon>",
-            "EVENT_THEME_FACTOR_IMPACT_SCORE_BY_HORIZON": "10_event_theme_factor_impact_score_<horizon>",
-            "EVENT_PEER_GROUP_IMPACT_SCORE_BY_HORIZON": "10_event_peer_group_impact_score_<horizon>",
-            "EVENT_SYMBOL_IMPACT_SCORE_BY_HORIZON": "10_event_symbol_impact_score_<horizon>",
-            "EVENT_MICROSTRUCTURE_IMPACT_SCORE_BY_HORIZON": "10_event_microstructure_impact_score_<horizon>",
-            "EVENT_SCOPE_CONFIDENCE_SCORE_BY_HORIZON": "10_event_scope_confidence_score_<horizon>",
-            "EVENT_SCOPE_ESCALATION_RISK_SCORE_BY_HORIZON": "10_event_scope_escalation_risk_score_<horizon>",
-            "EVENT_TARGET_RELEVANCE_SCORE_BY_HORIZON": "10_event_target_relevance_score_<horizon>",
+            "EVENT_PRESENCE_SCORE_BY_HORIZON": "6_event_presence_score_<horizon>",
+            "EVENT_TIMING_PROXIMITY_SCORE_BY_HORIZON": "6_event_timing_proximity_score_<horizon>",
+            "EVENT_INTENSITY_SCORE_BY_HORIZON": "6_event_intensity_score_<horizon>",
+            "EVENT_DIRECTION_BIAS_SCORE_BY_HORIZON": "6_event_direction_bias_score_<horizon>",
+            "EVENT_CONTEXT_ALIGNMENT_SCORE_BY_HORIZON": "6_event_context_alignment_score_<horizon>",
+            "EVENT_UNCERTAINTY_SCORE_BY_HORIZON": "6_event_uncertainty_score_<horizon>",
+            "EVENT_GAP_RISK_SCORE_BY_HORIZON": "6_event_gap_risk_score_<horizon>",
+            "EVENT_REVERSAL_RISK_SCORE_BY_HORIZON": "6_event_reversal_risk_score_<horizon>",
+            "EVENT_LIQUIDITY_DISRUPTION_SCORE_BY_HORIZON": "6_event_liquidity_disruption_score_<horizon>",
+            "EVENT_CONTAGION_RISK_SCORE_BY_HORIZON": "6_event_contagion_risk_score_<horizon>",
+            "EVENT_CONTEXT_QUALITY_SCORE_BY_HORIZON": "6_event_context_quality_score_<horizon>",
+            "EVENT_MARKET_IMPACT_SCORE_BY_HORIZON": "6_event_market_impact_score_<horizon>",
+            "EVENT_SECTOR_IMPACT_SCORE_BY_HORIZON": "6_event_sector_impact_score_<horizon>",
+            "EVENT_INDUSTRY_IMPACT_SCORE_BY_HORIZON": "6_event_industry_impact_score_<horizon>",
+            "EVENT_THEME_FACTOR_IMPACT_SCORE_BY_HORIZON": "6_event_theme_factor_impact_score_<horizon>",
+            "EVENT_PEER_GROUP_IMPACT_SCORE_BY_HORIZON": "6_event_peer_group_impact_score_<horizon>",
+            "EVENT_SYMBOL_IMPACT_SCORE_BY_HORIZON": "6_event_symbol_impact_score_<horizon>",
+            "EVENT_MICROSTRUCTURE_IMPACT_SCORE_BY_HORIZON": "6_event_microstructure_impact_score_<horizon>",
+            "EVENT_SCOPE_CONFIDENCE_SCORE_BY_HORIZON": "6_event_scope_confidence_score_<horizon>",
+            "EVENT_SCOPE_ESCALATION_RISK_SCORE_BY_HORIZON": "6_event_scope_escalation_risk_score_<horizon>",
+            "EVENT_TARGET_RELEVANCE_SCORE_BY_HORIZON": "6_event_target_relevance_score_<horizon>",
             "EVENT_RESPONSE_STRENGTH_SCORE_BY_HORIZON": "4_event_response_strength_score_<horizon>",
             "EVENT_RESPONSE_DIRECTION_SCORE_BY_HORIZON": "4_event_response_direction_score_<horizon>",
             "EVENT_RESPONSE_UNCERTAINTY_SCORE_BY_HORIZON": "4_event_response_uncertainty_score_<horizon>",
@@ -2897,7 +2897,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(registry_payload("trm_L2XES001"), "cross_etf_summary")
         self.assertEqual(registry_payload("trm_L2TCP001"), "target_context_profile")
         self.assertEqual(registry_payload("trm_M6DRP01"), "model_06_dynamic_risk_policy")
-        self.assertEqual(registry_payload("mlv_L10ERG001"), "model_06_residual_event_governance")
+        self.assertEqual(registry_payload("mlv_M06REG001"), "model_06_residual_event_governance")
         self.assertTrue(registry_value("out_TL2CTX001", "path").endswith("layer_02_target_context_mapping.csv"))
 
     def test_require_item_by_id_throws_for_missing_item(self):
@@ -3102,7 +3102,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("historical_model_decision_handoff", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
         self.assertIn("current_model_component_route", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
-        self.assertNotIn("layers_1_10", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
+        self.assertNotIn("models_01_06", rows["EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT"]["applies_to"])
         self.assertEqual(
             rows["EXECUTION_MODEL_DECISION_COMPONENT_INPUT"]["payload"],
             "execution_model_decision_component_input",
@@ -3139,7 +3139,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("current_model_component_route", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
         self.assertIn("execution unit is component", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["note"])
-        self.assertNotIn("layers_1_10", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
+        self.assertNotIn("models_01_06", rows["MODEL_REALTIME_DECISION_ROUTE_PLAN"]["applies_to"])
         self.assertEqual(
             rows["MODEL_REALTIME_DECISION_COMPONENT_ROUTE"]["payload"],
             "model_realtime_decision_component_route",

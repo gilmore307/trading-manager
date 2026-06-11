@@ -495,7 +495,7 @@ def _build_attribution_rows(
             impact_profile["impact_exposure_time"],
             replay_month=str(triage_row.get("replay_month") or ""),
         )
-        row_id = f"l10_event_attr_{index:08d}"
+        row_id = f"l6_event_attr_{index:08d}"
         rows.append(
             {
                 "contract_type": RESIDUAL_EVENT_GOVERNANCE_ATTRIBUTION_ROW_CONTRACT_TYPE,
@@ -645,7 +645,7 @@ def _build_event_focus_proposals(
     )
     proposals: list[dict[str, Any]] = []
     for group in ranked[:max_proposals]:
-        proposal_id = "l10_event_focus_" + _stable_token(group["event_ref"], group["target_symbol"], group["failure_type"])
+        proposal_id = "l6_event_focus_" + _stable_token(group["event_ref"], group["target_symbol"], group["failure_type"])
         support_count = len(group["source_decision_ids"])
         event_summary = dict(event_summaries_by_ref.get(str(group["event_ref"]), {}))
         failure_attention_reason = (

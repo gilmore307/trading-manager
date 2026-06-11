@@ -82,8 +82,14 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "ResidualEventGovernanceModel",
             ],
         )
-        self.assertFalse(any("layer_09_option_expression" in stage.stage_id for layer in plan.layers for stage in layer.stages))
-        self.assertFalse(any("layer_10_event_risk_governor" in stage.stage_id for layer in plan.layers for stage in layer.stages))
+        current_layer_keys = {layer.layer_key for layer in plan.layers}
+        self.assertTrue(
+            all(
+                any(stage.stage_id.startswith(f"{layer_key}.") for layer_key in current_layer_keys)
+                for layer in plan.layers
+                for stage in layer.stages
+            )
+        )
 
     def test_foundation_catch_up_only_exposes_m01_and_m03_input_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

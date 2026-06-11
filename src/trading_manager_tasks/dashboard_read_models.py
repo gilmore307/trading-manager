@@ -515,8 +515,8 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
         text = " ".join(str(row.get(field) or "") for field in ("summary", "root_cause", "retry_recommendation"))
         if (
             has_current_residual_event_governance
-            and "layer_09_event_risk_governor" in text
-            and "layer_09_event_risk_governor.data_acquisition" not in current_task_ids
+            and "m06_residual_event_governance" in text
+            and "m06_residual_event_governance.data_acquisition" not in current_task_ids
         ):
             updated = dict(row)
             updated["repair_status"] = "superseded"

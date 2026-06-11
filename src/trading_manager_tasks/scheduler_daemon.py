@@ -1026,7 +1026,7 @@ class ModelWorkerTargetSelection:
 
 
 def load_model_worker_target_queue(path: Path = DEFAULT_TARGET_QUEUE_PATH) -> tuple[str, ...]:
-    """Load the ordered Layer 3+ target-training queue from JSON runtime policy."""
+    """Load the ordered M03+ target-training queue from JSON runtime policy."""
 
     if not path.exists():
         return ()
@@ -1061,7 +1061,7 @@ def select_model_worker_target(
     selected_target_symbol: str | None = None,
     target_queue_path: Path = DEFAULT_TARGET_QUEUE_PATH,
 ) -> ModelWorkerTargetSelection | None:
-    """Select the next target and fold for Layer 3+ model-worker training.
+    """Select the next target and fold for M03+ model-worker training.
 
     A pinned target keeps current behavior. Without a pinned target, manager
     reads the ordered runtime target queue and skips any target whose
@@ -1411,7 +1411,7 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
     known_nonprogress_reasons = {
         "waiting_for_next_training_fold_to_complete",
         "model_group_lifecycle_holds_fold_lane",
-        "model_group_layer_10_event_evidence_missing",
+        "model_group_m06_event_evidence_missing",
         "model_group_residual_event_evidence_missing",
         "model_group_m06_event_evidence_missing",
     }
@@ -2286,7 +2286,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one daemon tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one daemon tick.")
     parser.add_argument("--month-ingest-workers", type=int, default=DEFAULT_MONTH_INGEST_WORKERS, help="Compatibility option retained for older service env files; historical runtime advances one month at a time.")
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M03+ six-month dataset units.")
     parser.add_argument("--target-queue-path", type=Path, default=DEFAULT_TARGET_QUEUE_PATH, help="Ordered JSON target queue used when --target-symbol is omitted.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")

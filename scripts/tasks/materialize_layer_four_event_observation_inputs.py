@@ -52,7 +52,7 @@ def main() -> int:
         "event_observation_scope": "global_sector_fold_substrate",
         "event_observation_state": "no_reviewed_event_observations",
         "event_failure_risk_default": "no_reviewed_event_failure_risk",
-        "layer_10_prior_attribution_required_for_non_empty_layer_4_event_risk": True,
+        "m06_residual_event_governance_prior_attribution_required_for_non_empty_layer_4_event_risk": True,
         "event_feed_coverage": event_feed_coverage,
         EVENT_FEED_ROW_COVERAGE: event_feed_row_coverage,
         "missing_event_feed_artifacts": missing_artifacts,

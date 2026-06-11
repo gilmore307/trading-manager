@@ -246,7 +246,7 @@ class StageCoverageTests(unittest.TestCase):
 
     def test_option_chain_coverage_uses_shared_window_requests_not_stale_layer_nine_snapshots(self):
         window_request = "mgrreq_option_chain_window_aapl_2016_01_2016_01_05_0930"
-        stale_snapshot = "mgrreq_layer9_option_snapshot_aapl_2016_01_2016_01_05_09_30_00_05_00_old"
+        stale_snapshot = "mgrreq_m05_option_snapshot_aapl_2016_01_2016_01_05_09_30_00_05_00_old"
         stale_day_request = "mgrreq_option_chain_day_aapl_2016_01_2016_01_05"
         rows = [
             _option_chain_summary_row(window_request, ready=True),

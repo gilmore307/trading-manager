@@ -3273,7 +3273,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             {
                                 "diagnosis_status": "completed",
                                 "repair": {"repair_status": "not_supported"},
-                                "root_cause": "model training stage layer_09_event_risk_governor.data_acquisition command returned non-zero status",
+                                "root_cause": "model training stage m06_residual_event_governance.data_acquisition command returned non-zero status",
                                 "retry_recommendation": "manual review",
                             }
                         ),
@@ -3300,7 +3300,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage layer_09_event_risk_governor.data_acquisition command returned non-zero status",
+                        "summary": "model training stage m06_residual_event_governance.data_acquisition command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-18T10:41:07Z",
                         "created_at_utc": "2026-05-18T10:41:07Z",
