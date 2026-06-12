@@ -10,6 +10,8 @@ from pathlib import Path
 
 from trading_manager_tasks.model_group_evaluation import (
     _decision_variable_schema_diagnostics,
+    _is_filled_trade_row,
+    _scored_rows,
     _temporal_stability_diagnostics,
     run_model_group_evaluation_if_ready,
 )
@@ -546,6 +548,36 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         self.assertEqual(diagnostics["coverage"]["decision_intended_side"]["values"]["flat"], 1)
         self.assertEqual(diagnostics["coverage"]["decision_intended_action"]["values"]["no_trade"], 1)
         self.assertEqual(diagnostics["coverage"]["decision_disposition"]["values"]["rejected"], 1)
+
+    def test_suitable_missing_option_path_rows_are_skipped_unscored_and_unfilled(self):
+        rows = [
+            {
+                "decision_id": "missing_option_path",
+                "realized_return": 0.0,
+                "baseline_return": 0.0,
+                "cost": 0.0,
+                "outcome_label": None,
+                "prediction_score": 0.99,
+                "action": "trade",
+                "decision_status": "suitable",
+                "fill_status": "simulated_rejected",
+                "selected_option_contract_ref": "AAPL_2021-01-15_C_100",
+                "option_contract_path_status": "missing",
+                "4_resolved_underlying_action_type": "open_long",
+            }
+        ]
+
+        diagnostics = _decision_variable_schema_diagnostics(
+            decision_rows=rows,
+            net_returns=[0.0],
+            baseline_returns=[0.0],
+            costs=[0.0],
+        )
+
+        self.assertFalse(_is_filled_trade_row(rows[0]))
+        self.assertEqual(_scored_rows(rows, [0.0], [0.0], [0.0]), [])
+        self.assertEqual(diagnostics["coverage"]["decision_disposition"]["values"]["skipped"], 1)
+        self.assertNotIn("accepted", diagnostics["coverage"]["decision_disposition"]["values"])
 
 
 if __name__ == "__main__":

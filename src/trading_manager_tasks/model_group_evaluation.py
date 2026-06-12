@@ -957,15 +957,19 @@ def _decision_disposition(row: Mapping[str, Any], *, intended_action: str) -> st
         return explicit
     status = _first_text(row, "decision_status", "status")
     fill_status = _first_text(row, "fill_status", "replay_fill_status")
-    if status in {"accepted", "approved", "filled", "executed", "suitable"} or fill_status in {"filled", "simulated_filled"}:
-        return "accepted"
     if status in {"rejected", "rejected_entry_thesis"}:
         return "rejected"
+    if fill_status in {"not_filled", "simulated_rejected"}:
+        return "skipped"
+    if status in {"accepted", "approved", "filled", "executed"} or fill_status in {"filled", "simulated_filled"}:
+        return "accepted"
+    if status in {"suitable", "continue_to_expression_review"}:
+        return "deferred"
     if status == "deferred":
         return "deferred"
     if status == "blocked" or status.startswith("blocked_"):
         return "blocked"
-    if intended_action in {"no_trade", "watch", "maintain"} or fill_status in {"not_filled", "simulated_rejected"}:
+    if intended_action in {"no_trade", "watch", "maintain"}:
         return "skipped"
     return "unknown"
 
@@ -1642,6 +1646,8 @@ def _is_filled_trade_row(row: Mapping[str, Any]) -> bool:
     fill_status = str(row.get("fill_status") or "").strip().lower()
     if fill_status in {"simulated_filled", "filled", "executed"}:
         return True
+    if fill_status in {"not_filled", "simulated_rejected", "rejected", "cancelled", "canceled"}:
+        return False
     action = str(row.get("action") or row.get("decision") or row.get("decision_action") or "").strip().lower()
     return action not in {"", "hold", "skip", "no_trade", "reject_entry_thesis", "defer_entry_thesis", "simulated_rejected"}
 
@@ -2407,6 +2413,8 @@ def _float(row: Mapping[str, Any], *names: str, default: float = 0.0) -> float:
 
 
 def _label(row: Mapping[str, Any]) -> int | None:
+    if _has_missing_option_contract_path(row):
+        return None
     value = row.get("outcome_label", row.get("label", row.get("realized_label")))
     text = str(value).strip().lower()
     if text in {"1", "true", "positive", "win", "profitable", "up", "success"}:
@@ -2417,6 +2425,12 @@ def _label(row: Mapping[str, Any]) -> int | None:
     if math.isfinite(realized):
         return 1 if realized > 0 else 0
     return None
+
+
+def _has_missing_option_contract_path(row: Mapping[str, Any]) -> bool:
+    selected_option = str(row.get("selected_option_contract_ref") or "").strip()
+    path_status = str(row.get("option_contract_path_status") or "").strip().lower()
+    return bool(selected_option) and path_status == "missing"
 
 
 def _score(row: Mapping[str, Any]) -> float | None:
