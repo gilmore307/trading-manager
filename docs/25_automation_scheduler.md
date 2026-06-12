@@ -90,6 +90,14 @@ selected target's metadata leaves listed options applicable. Targets marked as
 stages, but M05 model generation still runs so no-option/not-applicable states
 are represented in training.
 
+Replay-selected listed option contracts require a second source boundary after
+M05 has chosen a concrete contract. `model_group.replay_contract_paths` reads
+the replay decision rows, prepares the bounded
+`m05_option_expression_data_acquisition_contract_path` task key, and only calls
+ThetaData selected-contract tracking when the explicit provider-acquisition gate
+is enabled. Clean replay must retry after those path rows exist before treating
+listed-option decisions as executable fills.
+
 Source-existing bootstrap may seed M02 data acquisition from durable
 `m03_target_state_vector_data_acquisition` rows for the selected target. That
 prevents a clean control-plane reset from redownloading target-local bars when

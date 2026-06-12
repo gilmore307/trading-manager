@@ -68,6 +68,13 @@ repeating the same provider request. It must not derive option downloads from
 all equity bars, and it must not perform broker/order/fill/account mutation,
 production model activation, or promoted-roster changes.
 
+After replay has M05 features and selects concrete listed option contracts, the
+separate `model_group.replay_contract_paths` stage prepares
+`m05_option_expression_data_acquisition_contract_path` requests from those
+decision rows. This selected-contract tracking source is provider-gated and
+market-data-only; it writes option path rows for replay settlement, then the
+daemon retries `model_group.replay` from the same lifecycle.
+
 ## Lock Contract
 
 Schema: `schemas/scheduler_lock.schema.json`.
