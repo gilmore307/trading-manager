@@ -173,7 +173,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
 
-    def test_plan_passes_fixed_historical_candidate_universe_equity_subset_with_available_bars(self):
+    def test_plan_passes_fixed_historical_candidate_universe_without_symbol_override(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -181,7 +181,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             dataset_root = self._write_dataset(storage_root)
             self._write_completed_fold(storage_root)
             fixed_universe = tmp / "historical_candidate_universe.csv"
-            self._write_fixed_equity_universe(fixed_universe, ["AAPL", "MSFT", "NVDA", "BTC"])
+            self._write_fixed_equity_universe(fixed_universe, ["AAPL", "MSFT", "BTC"])
             plan_path = dataset_root / "feed_acquisition_plan.csv"
             with plan_path.open("a", newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
@@ -202,16 +202,49 @@ class ModelGroupReplayTests(unittest.TestCase):
 
             self.assertIsNotNone(decision)
             assert decision is not None
-            pairs = [
-                decision.command[index + 1]
-                for index, value in enumerate(decision.command)
-                if value == "--equity-symbol"
-            ]
-            self.assertEqual(pairs, ["AAPL", "MSFT"])
+            self.assertNotIn("--equity-symbol", decision.command)
+            self.assertIn("--candidate-universe-path", decision.command)
+            self.assertEqual(
+                decision.command[decision.command.index("--candidate-universe-path") + 1],
+                str(fixed_universe),
+            )
             self.assertEqual(decision.execution_summary["equity_symbol_pool_symbol_count"], 2)
-            self.assertEqual(decision.execution_summary["fixed_candidate_universe_symbol_count"], 4)
-            self.assertEqual(decision.execution_summary["fixed_equity_candidate_symbol_count"], 3)
+            self.assertEqual(decision.execution_summary["fixed_candidate_universe_symbol_count"], 3)
+            self.assertEqual(decision.execution_summary["fixed_equity_candidate_symbol_count"], 2)
+            self.assertEqual(decision.execution_summary["materialized_equity_candidate_symbol_count"], 2)
             self.assertEqual(decision.execution_summary["candidate_universe_source_policy"], "fixed_current_snapshot_historical_candidate_universe")
+
+    def test_plan_blocks_when_fixed_candidate_universe_bars_are_incomplete(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            fixed_universe = tmp / "historical_candidate_universe.csv"
+            self._write_fixed_equity_universe(fixed_universe, ["AAPL", "MSFT"])
+            plan_path = dataset_root / "feed_acquisition_plan.csv"
+            with plan_path.open("a", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
+                writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "AAPL"})
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                candidate_universe_path=fixed_universe,
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_candidate_bar_coverage_incomplete")
+            self.assertEqual(decision.execution_summary["missing_equity_candidate_symbol_count"], 1)
+            self.assertEqual(decision.execution_summary["missing_equity_candidate_symbols_sample"], ["MSFT"])
 
     def test_execution_blocks_current_day_candidate_universe_before_post_close_ready_time(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -494,6 +527,61 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "pre_replay_target_refs": ["XLK"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
+                        "validation_status": "passed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_replay_executed")
+
+    def test_diagnostic_symbol_override_replay_does_not_unlock_canonical_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            (dataset_root / "replay_progress.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "diagnostic_run", "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "diagnostic_run", "month": "2021-02", "status": "completed"}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            receipt_root = dataset_root / "replay_execution_runs" / "diagnostic_run"
+            receipt_root.mkdir(parents=True)
+            decision_rows_path = receipt_root / "decision_rows.jsonl"
+            decision_rows_path.write_text('{"decision_id":"decision_1"}\n', encoding="utf-8")
+            (receipt_root / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": "diagnostic_run",
+                        "decision_rows_ref": str(decision_rows_path),
+                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "pre_replay_target_refs": ["XLK"],
+                        "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "override",
+                        "candidate_handoff_source": "explicit_candidate_symbols_override",
+                        "candidate_handoff_symbols": ["AAPL"],
                         "validation_status": "passed",
                     }
                 )
