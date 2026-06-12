@@ -1420,9 +1420,10 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
     known_nonprogress_reasons = {
         "waiting_for_next_training_fold_to_complete",
         "model_group_lifecycle_holds_fold_lane",
+        "model_group_evaluation_complete",
+        "model_group_evaluation_executed",
         "model_group_m06_event_evidence_missing",
         "model_group_residual_event_evidence_missing",
-        "model_group_m06_event_evidence_missing",
     }
     return state.last_work_selection_reason in known_nonprogress_reasons or state.last_reason_code in known_nonprogress_reasons
 
@@ -2034,7 +2035,11 @@ def run_daemon_loop(
                                 start_month=active_start_month,
                                 end_month=active_end_month,
                                 last_next_internal_stage="model_group_evaluation",
-                                last_work_selection_reason="model_group_evaluation_ready",
+                                last_work_selection_reason=(
+                                    "model_group_evaluation_complete"
+                                    if evaluation_decision.decision_status == "executed"
+                                    else "model_group_evaluation_ready"
+                                ),
                                 updated_utc=completed,
                             )
                             refresh_needed = refresh_needed or evaluation_decision.decision_status == "executed"
@@ -2227,6 +2232,16 @@ def run_daemon_loop(
                             append_decision_log(decision_log_path, evaluation_decision)
                             completed = utc_now_iso()
                             state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=evaluation_decision)
+                            state = replace(
+                                state,
+                                last_next_internal_stage="model_group_evaluation",
+                                last_work_selection_reason=(
+                                    "model_group_evaluation_complete"
+                                    if evaluation_decision.decision_status == "executed"
+                                    else "model_group_evaluation_ready"
+                                ),
+                                updated_utc=completed,
+                            )
                             refresh_needed = refresh_needed or evaluation_decision.decision_status == "executed"
                             should_continue_drain = should_continue_drain or _decision_should_continue_drain(evaluation_decision, advanced_month=False)
                             decisions_this_cycle += 1

@@ -337,6 +337,35 @@ class SchedulerDaemonTests(unittest.TestCase):
                 self.assertIsNone(updated.last_stall_agent_error_ref)
                 handler.assert_not_called()
 
+    def test_scheduler_progress_stall_ignores_completed_model_group_evaluation(self):
+        for reason_code, work_selection_reason in (
+            ("model_group_evaluation_executed", "model_group_evaluation_ready"),
+            (None, "model_group_evaluation_complete"),
+        ):
+            with self.subTest(reason_code=reason_code, work_selection_reason=work_selection_reason):
+                state = SchedulerDaemonState(
+                    start_month="2025-12",
+                    end_month="2025-12",
+                    last_decision_status="executed",
+                    last_reason_code=reason_code,
+                    last_work_selection_reason=work_selection_reason,
+                    last_progress_utc="2026-01-01T00:00:00+00:00",
+                )
+                with tempfile.TemporaryDirectory() as raw_tmp, patch(
+                    "trading_manager_tasks.scheduler_daemon.handle_server_error"
+                ) as handler:
+                    tmp = Path(raw_tmp)
+                    updated = handle_scheduler_progress_stall(
+                        state,
+                        storage_root=tmp / "storage",
+                        state_path=tmp / "runtime" / "state.json",
+                        decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                        stall_seconds=600,
+                    )
+
+                self.assertIsNone(updated.last_stall_agent_error_ref)
+                handler.assert_not_called()
+
     def test_replay_option_feature_failure_routes_server_error_agent(self):
         decision = SchedulerDecision(
             contract_type="manager_scheduler_decision",
@@ -1882,6 +1911,7 @@ class SchedulerDaemonTests(unittest.TestCase):
 
             evaluation.assert_called()
             self.assertEqual(state.last_next_internal_stage, "model_group_evaluation")
+            self.assertEqual(state.last_work_selection_reason, "model_group_evaluation_complete")
             log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_evaluation_executed"])
 
