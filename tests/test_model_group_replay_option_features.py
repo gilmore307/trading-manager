@@ -105,7 +105,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         return dataset_root
 
     def test_generates_layer_nine_features_when_source_rows_are_ready(self) -> None:
-        requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")
+        requirement = ReplayOptionFeatureRequirement("MSFT", "2021-01-04T16:00:00-05:00", "2021-01")
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True, exist_ok=True)
@@ -114,6 +114,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=True),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage",
@@ -141,7 +142,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, "executed")
         self.assertEqual(decision.reason_code, "model_group_replay_option_feature_repair_executed")
         self.assertEqual(decision.provider_calls, 0)
-        generate.assert_called_once_with(start_month="2021-01", end_month="2021-01", target_symbol="AAPL")
+        generate.assert_called_once_with(start_month="2021-01", end_month="2021-01", target_symbol="MSFT")
 
     def test_extracts_requirements_from_replay_backoff_sample(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")
@@ -202,6 +203,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
             ):
                 decision = run_model_group_replay_option_features_for_replay_backoff(
@@ -228,6 +230,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
@@ -267,6 +270,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",

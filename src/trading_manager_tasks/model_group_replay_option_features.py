@@ -103,10 +103,27 @@ def run_model_group_replay_option_features_for_replay_backoff(
         )
 
     limit = len(requirements) if provider_acquisition_limit is None else max(1, provider_acquisition_limit)
-    batch = requirements[:limit]
+    batch = _feature_missing_requirements(database_url=db_url, requirements=requirements, limit=limit)
+    if not batch:
+        return _decision(
+            decision_status="executed",
+            reason_code="model_group_replay_option_features_already_ready",
+            reason="all replay option feature requirements already have generated feature rows; scheduler can retry replay",
+            selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
+            execution_summary=_summary(
+                contract_id=contract_id,
+                dataset_root=dataset_root,
+                training_fold=training_fold,
+                missing=(),
+                batch=(),
+                source_missing=(),
+                source_ready=(),
+                required_next_step="retry model_group.replay from the same replay clock",
+            ),
+        )
     source_missing = [item for item in batch if not _source_rows_available(database_url=db_url, requirement=item)]
     source_ready = [item for item in batch if item not in source_missing]
-    months_to_generate = {item.month for item in source_ready}
+    feature_targets_to_generate = {(item.month, item.target_ref) for item in source_ready}
     provider_calls = 0
     dispatch_summary: dict[str, Any] | None = None
     generated_summaries: list[dict[str, Any]] = []
@@ -175,7 +192,11 @@ def run_model_group_replay_option_features_for_replay_backoff(
                     )
                     provider_calls += dispatch.provider_calls
                     dispatch_summary = dispatch.summary_row()
-                    months_to_generate.add(month)
+                    feature_targets_to_generate.update(
+                        (item.month, item.target_ref)
+                        for item in source_missing
+                        if item.month == month
+                    )
             except Exception as exc:
                 provider_error = f"{type(exc).__name__}: {exc}"
                 if _provider_error_means_source_unavailable(provider_error):
@@ -236,11 +257,11 @@ def run_model_group_replay_option_features_for_replay_backoff(
                     ),
                 )
 
-        for month in sorted(months_to_generate):
+        for month, target_ref in sorted(feature_targets_to_generate):
             generated = execute_m05_option_expression_feature_stage(
                 start_month=month,
                 end_month=month,
-                target_symbol=selected_target_symbol,
+                target_symbol=target_ref,
             )
             generated_summaries.append(generated.summary_row())
             if generated.status != "succeeded":
@@ -400,6 +421,64 @@ def _source_rows_available(*, database_url: str, requirement: ReplayOptionFeatur
                 (requirement.target_ref, requirement.timestamp),
             )
             return cursor.fetchone() is not None
+
+
+def _feature_missing_requirements(
+    *,
+    database_url: str,
+    requirements: Sequence[ReplayOptionFeatureRequirement],
+    limit: int,
+) -> tuple[ReplayOptionFeatureRequirement, ...]:
+    if not requirements:
+        return ()
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+    import psycopg  # type: ignore
+    from psycopg.rows import dict_row  # type: ignore
+
+    with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT to_regclass(%s) AS table_ref", (f"{DEFAULT_OPTION_FEATURE_SCHEMA}.{DEFAULT_OPTION_FEATURE_TABLE}",))
+            exists = cursor.fetchone()
+            if not exists or exists.get("table_ref") is None:
+                return tuple(requirements[:limit])
+            cursor.execute(
+                """
+                CREATE TEMP TABLE replay_option_feature_requirement_filter (
+                  ordinal INTEGER NOT NULL,
+                  underlying TEXT NOT NULL,
+                  snapshot_time TIMESTAMPTZ NOT NULL
+                ) ON COMMIT DROP
+                """
+            )
+            cursor.executemany(
+                """
+                INSERT INTO replay_option_feature_requirement_filter (
+                  ordinal,
+                  underlying,
+                  snapshot_time
+                )
+                VALUES (%s, %s, %s::timestamptz)
+                """,
+                [(index, item.target_ref, item.timestamp) for index, item in enumerate(requirements)],
+            )
+            cursor.execute(
+                """
+                SELECT r.ordinal
+                FROM replay_option_feature_requirement_filter AS r
+                WHERE NOT EXISTS (
+                  SELECT 1
+                  FROM trading_data.model_05_option_expression_feature_generation AS f
+                  WHERE f.underlying = r.underlying
+                    AND f.snapshot_time = r.snapshot_time
+                )
+                ORDER BY r.ordinal ASC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            ordinals = [int(row["ordinal"]) for row in cursor.fetchall()]
+    return tuple(requirements[index] for index in ordinals)
 
 
 def _persist_replay_option_source_requests(
