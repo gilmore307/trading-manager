@@ -812,12 +812,21 @@ def _compatible_replay_run_ids(*, dataset_root: Path, training_fold: Mapping[str
             continue
         if not _replay_receipt_scope_status(replay_receipt=receipt, training_fold=training_fold)["compatible"]:
             continue
+        if not _replay_receipt_full_completion_scope(receipt):
+            continue
         if not _replay_receipt_decision_rows_exist(receipt):
             continue
         run_id = str(receipt.get("replay_execution_run_id") or receipt_path.parent.name).strip()
         if run_id:
             run_ids.add(run_id)
     return run_ids
+
+
+def _replay_receipt_full_completion_scope(replay_receipt: Mapping[str, Any]) -> bool:
+    completion_scope = str(replay_receipt.get("replay_completion_scope") or "").strip()
+    if completion_scope:
+        return completion_scope == "full_candidate_universe" and replay_receipt.get("max_decision_rows") is None
+    return replay_receipt.get("max_decision_rows") is None
 
 
 def _replay_receipt_decision_rows_exist(replay_receipt: Mapping[str, Any]) -> bool:

@@ -214,6 +214,71 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.execution_summary["materialized_equity_candidate_symbol_count"], 2)
             self.assertEqual(decision.execution_summary["candidate_universe_source_policy"], "fixed_current_snapshot_historical_candidate_universe")
 
+    def test_bounded_replay_receipt_does_not_satisfy_full_replay_completion(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            fixed_universe = tmp / "historical_candidate_universe.csv"
+            self._write_fixed_equity_universe(fixed_universe, ["AAPL"])
+            plan_path = dataset_root / "feed_acquisition_plan.csv"
+            with plan_path.open("a", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
+                writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "AAPL"})
+
+            run_id = "bounded_run"
+            (dataset_root / "replay_progress.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-02", "status": "completed"}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            receipt_root = dataset_root / "replay_execution_runs" / run_id
+            receipt_root.mkdir(parents=True)
+            decision_rows_path = receipt_root / "decision_rows.jsonl"
+            decision_rows_path.write_text("{}\n", encoding="utf-8")
+            (receipt_root / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": run_id,
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "decision_rows_ref": str(decision_rows_path),
+                        "max_decision_rows": 5000,
+                        "replay_completion_scope": "bounded_diagnostic",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                candidate_universe_path=fixed_universe,
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "ready")
+            self.assertEqual(decision.execution_summary["ready_replay_months"], 0)
+
     def test_plan_blocks_when_fixed_candidate_universe_bars_are_incomplete(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
