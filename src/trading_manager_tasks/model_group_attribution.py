@@ -25,6 +25,7 @@ from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler
 NEW_YORK = ZoneInfo("America/New_York")
 FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE = "post_replay_failure_triage_receipt"
 FAILURE_TRIAGE_ROW_CONTRACT_TYPE = "post_replay_failure_triage_row"
+LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
 
 
 def run_model_group_post_replay_attribution_if_ready(
@@ -42,6 +43,8 @@ def run_model_group_post_replay_attribution_if_ready(
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     replay_receipt = _latest_replay_execution_receipt(dataset_root)
     if replay_receipt is None:
+        return None
+    if not _replay_receipt_uses_current_candidate_handoff(replay_receipt):
         return None
     expected_months = _expected_replay_months(dataset_root)
     replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "")
@@ -70,7 +73,6 @@ def run_model_group_post_replay_attribution_if_ready(
     if max_attribution_rows is not None:
         command.extend(["--max-attribution-rows", str(max_attribution_rows)])
 
-    attribution_rows = tuple(_build_attribution_rows(decision_rows_path, max_rows=max_attribution_rows))
     if not execute:
         return _decision(
             now=now,
@@ -83,10 +85,11 @@ def run_model_group_post_replay_attribution_if_ready(
                 "contract_id": contract_id,
                 "dataset_root": str(dataset_root),
                 "decision_rows_ref": str(decision_rows_path),
-                "expected_failure_triage_rows": len(attribution_rows),
+                "expected_failure_triage_rows": "not_counted_during_readiness_probe",
             },
         )
 
+    attribution_rows = tuple(_build_attribution_rows(decision_rows_path, max_rows=max_attribution_rows))
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
         lock_scope="promotion",
@@ -375,6 +378,24 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
     return dict(receipt)
 
 
+def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -> bool:
+    target_refs = _string_set(receipt.get("target_refs") or receipt.get("pre_replay_target_refs"))
+    asset_class_counts = receipt.get("asset_class_counts")
+    if not isinstance(asset_class_counts, Mapping):
+        asset_class_counts = {}
+    has_equity_or_option_scope = (
+        bool(target_refs)
+        or int(asset_class_counts.get("us_equity") or 0) > 0
+        or int(asset_class_counts.get("us_option") or 0) > 0
+    )
+    if not has_equity_or_option_scope:
+        return True
+    return (
+        str(receipt.get("candidate_handoff_status") or "") == "available"
+        and str(receipt.get("candidate_handoff_source") or "") == LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE
+    )
+
+
 def _latest_complete_failure_triage_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
     triage_root = dataset_root / "post_replay_failure_triage_runs"
     if not triage_root.exists():
@@ -468,6 +489,15 @@ def _csv_rows(path: Path) -> list[dict[str, str]]:
         return []
     with path.open("r", encoding="utf-8", newline="") as handle:
         return [dict(row) for row in csv.DictReader(handle)]
+
+
+def _string_set(value: Any) -> set[str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return {stripped.upper()} if stripped else set()
+    if isinstance(value, (list, tuple, set)):
+        return {str(item).strip().upper() for item in value if str(item).strip()}
+    return set()
 
 
 def _int_field(row: Mapping[str, Any], key: str) -> int | None:

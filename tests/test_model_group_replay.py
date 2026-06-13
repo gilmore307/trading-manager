@@ -53,6 +53,39 @@ class ModelGroupReplayTests(unittest.TestCase):
         )
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
         artifact_path.write_text('{"contract_type":"current_replay_placeholder_after_cost_alpha_model"}\n', encoding="utf-8")
+        (
+            storage_root.parent
+            / "01_source_data"
+            / "monthly_backfill"
+            / "alpaca_bars"
+            / "AAPL"
+            / "2016-01"
+        ).mkdir(parents=True, exist_ok=True)
+        target_candidates_path = (
+            storage_root
+            / "runtime"
+            / "layer_03_target_state_vector"
+            / "input_materialization"
+            / "2016_01_2016_06"
+            / "target_candidates.jsonl"
+        )
+        target_candidates_path.parent.mkdir(parents=True, exist_ok=True)
+        target_candidates_path.write_text(
+            json.dumps(
+                {
+                    "target_candidate_id": "tcand_fixture_aapl",
+                    "fold_id": "fold_2016-01_2016-06",
+                    "fold_start_month": "2016-01",
+                    "fold_end_month": "2016-06",
+                    "routing_symbol_ref": "AAPL",
+                    "audit_symbol_ref": "AAPL",
+                    "candidate_eligibility_state": "eligible",
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         stages = []
         for layer in range(1, 7):
             for split_name in ("train", "validation", "test"):
@@ -109,7 +142,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
-                    "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
                     "candidate_handoff_symbols": ["AAPL"],
                     "initial_capital_usd": initial_capital_usd,
                     "initial_capital": {"amount": initial_capital_usd, "currency": "USD"},
@@ -165,6 +198,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertNotIn("--option-feature-database-url", decision.command)
             self.assertTrue(decision.execution_summary["option_feature_database_configured"])
             self.assertEqual(decision.execution_summary["initial_capital_usd"], 25000.0)
+            self.assertTrue(decision.command[decision.command.index("--candidate-universe-path") + 1].endswith("target_candidates.jsonl"))
             self.assertEqual(decision.execution_summary["replay_execution_receipt"]["initial_capital_usd"], 25000.0)
             self.assertEqual(
                 decision.execution_summary["replay_execution_receipt"]["candidate_model_ref"],
@@ -253,7 +287,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
                         "decision_rows_ref": str(decision_rows_path),
                         "max_decision_rows": 5000,
                         "replay_completion_scope": "bounded_diagnostic",
@@ -700,7 +734,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
                         "candidate_handoff_symbols": ["AAPL"],
                         "validation_status": "passed",
                     }

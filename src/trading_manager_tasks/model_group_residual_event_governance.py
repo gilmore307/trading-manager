@@ -38,6 +38,7 @@ EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_CONTRACT_TYPE = "model_06_residual_event_go
 EVENT_STRATEGY_PROMOTION_REVIEW_CONTRACT_TYPE = "event_strategy_promotion_review"
 ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE = "model_06_residual_event_governance_temporal_attention_pool_entry"
 EVENT_INTERPRETATION_CONTRACT_TYPE = "event_interpretation"
+LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
 LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES = {"event_interpretation_v1"}
 COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
 ACCEPTED_REVIEW_STATUSES = {"accepted", "reviewed_accepted", "approved", "reviewed"}
@@ -187,9 +188,6 @@ def run_model_group_residual_event_governance_if_ready(
     if not force and _latest_residual_event_governance_receipt(dataset_root, decision_rows_ref=decision_rows_ref) is not None:
         return None
 
-    triage_rows = tuple(_load_jsonl_objects(triage_rows_path))
-    fold_scope = _fold_scope(dataset_root=dataset_root, triage_rows=triage_rows)
-    event_candidates, event_source_summary = _load_event_candidates(storage_root=storage_root, fold_scope=fold_scope)
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     command = [
         python_executable,
@@ -199,6 +197,52 @@ def run_model_group_residual_event_governance_if_ready(
         "--storage-root",
         str(storage_root),
     ]
+    if not execute:
+        fold_scope = _fold_scope_from_dataset(dataset_root)
+        event_source_summary = _event_candidate_readiness_summary(storage_root=storage_root, fold_scope=fold_scope)
+        if not event_source_summary["event_evidence_available"]:
+            return _decision(
+                now=now,
+                decision_status="backoff",
+                reason_code="model_group_residual_event_evidence_missing",
+                reason="post-replay failure triage is ready, but M06 has no local point-in-time event observations or candidates to attribute",
+                command=command,
+                execution_summary={
+                    "contract_id": contract_id,
+                    "dataset_root": str(dataset_root),
+                    "failure_triage_receipt_ref": str(triage_receipt_path),
+                    "triage_rows_ref": str(triage_rows_path),
+                    "fold_scope": fold_scope,
+                    "event_source_summary": event_source_summary,
+                    "event_feed_backfill_preparation": None,
+                    "required_next_action": "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
+                },
+            )
+        return _decision(
+            now=now,
+            decision_status="ready",
+            reason_code="model_group_residual_event_governance_ready",
+            reason="post-replay M06 event attribution is ready to run over triaged failures and PIT event candidates",
+            command=command,
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "failure_triage_receipt_ref": str(triage_receipt_path),
+                "triage_rows_ref": str(triage_rows_path),
+                "fold_scope": fold_scope,
+                "event_source_summary": event_source_summary,
+                "event_candidate_count": "not_counted_during_readiness_probe",
+                "expected_attribution_rows": "not_counted_during_readiness_probe",
+                "expected_event_focus_proposal_count": "not_counted_during_readiness_probe",
+                "expected_temporal_attention_candidate_count": "not_counted_during_readiness_probe",
+                "expected_event_family_occurrence_count": "not_counted_during_readiness_probe",
+                "expected_event_family_bias_association_packet_count": "not_counted_during_readiness_probe",
+            },
+        )
+
+    triage_rows = tuple(_load_jsonl_objects(triage_rows_path))
+    fold_scope = _fold_scope(dataset_root=dataset_root, triage_rows=triage_rows)
+    event_candidates, event_source_summary = _load_event_candidates(storage_root=storage_root, fold_scope=fold_scope)
 
     if not event_candidates:
         event_feed_backfill_preparation = None
@@ -246,28 +290,6 @@ def run_model_group_residual_event_governance_if_ready(
         event_family_occurrence_scan_ref=None,
         event_family_bias_association_packets_ref=None,
     )
-    if not execute:
-        return _decision(
-            now=now,
-            decision_status="ready",
-            reason_code="model_group_residual_event_governance_ready",
-            reason="post-replay M06 event attribution is ready to run over triaged failures and PIT event candidates",
-            command=command,
-            execution_summary={
-                "contract_id": contract_id,
-                "dataset_root": str(dataset_root),
-                "failure_triage_receipt_ref": str(triage_receipt_path),
-                "triage_rows_ref": str(triage_rows_path),
-                "fold_scope": fold_scope,
-                "event_candidate_count": len(event_candidates),
-                "expected_attribution_rows": len(attribution_rows),
-                "expected_event_focus_proposal_count": len(event_focus_proposals),
-                "expected_temporal_attention_candidate_count": len(attention_evidence["temporal_attention_candidates"]),
-                "expected_event_family_occurrence_count": len(attention_evidence["event_family_occurrence_scan_rows"]),
-                "expected_event_family_bias_association_packet_count": len(attention_evidence["event_family_bias_association_packets"]),
-            },
-        )
-
     run_id = "post_replay_residual_event_governance_" + now.strftime("%Y%m%dT%H%M%SZ")
     output_root = dataset_root / "post_replay_attribution_runs" / run_id
     attribution_rows_path = output_root / "residual_event_governance_rows.jsonl"
@@ -1872,7 +1894,44 @@ def _latest_failure_triage_receipt(dataset_root: Path) -> tuple[Path | None, dic
         dataset_root / "post_replay_failure_triage_runs",
         "post_replay_failure_triage_receipt.json",
         accepted_statuses=COMPLETE_STATUSES,
-        predicate=lambda receipt: str(receipt.get("contract_type") or "") == FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE,
+        predicate=lambda receipt: str(receipt.get("contract_type") or "") == FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE
+        and _failure_triage_receipt_uses_current_replay_handoff(dataset_root, receipt),
+    )
+
+
+def _failure_triage_receipt_uses_current_replay_handoff(dataset_root: Path, receipt: Mapping[str, Any]) -> bool:
+    decision_rows_ref = str(receipt.get("decision_rows_ref") or "").strip()
+    if not decision_rows_ref:
+        return False
+    replay_root = dataset_root / "replay_execution_runs"
+    if not replay_root.exists():
+        return False
+    for receipt_path in sorted(replay_root.glob("*/replay_execution_receipt.json")):
+        replay_receipt = _load_optional_json_object(receipt_path)
+        if replay_receipt is None:
+            continue
+        if str(replay_receipt.get("decision_rows_ref") or "") != decision_rows_ref:
+            continue
+        if _replay_receipt_uses_current_candidate_handoff(replay_receipt):
+            return True
+    return False
+
+
+def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -> bool:
+    target_refs = _string_set(receipt.get("target_refs") or receipt.get("pre_replay_target_refs"))
+    asset_class_counts = receipt.get("asset_class_counts")
+    if not isinstance(asset_class_counts, Mapping):
+        asset_class_counts = {}
+    has_equity_or_option_scope = (
+        bool(target_refs)
+        or int(asset_class_counts.get("us_equity") or 0) > 0
+        or int(asset_class_counts.get("us_option") or 0) > 0
+    )
+    if not has_equity_or_option_scope:
+        return True
+    return (
+        str(receipt.get("candidate_handoff_status") or "") == "available"
+        and str(receipt.get("candidate_handoff_source") or "") == LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE
     )
 
 
@@ -1936,6 +1995,66 @@ def _fold_scope(*, dataset_root: Path, triage_rows: Sequence[Mapping[str, Any]])
     if not months:
         return {"start_month": "unknown", "end_month": "unknown"}
     return {"start_month": months[0], "end_month": months[-1]}
+
+
+def _fold_scope_from_dataset(dataset_root: Path) -> dict[str, str]:
+    months = sorted(_unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month"))
+    if not months:
+        return {"start_month": "unknown", "end_month": "unknown"}
+    return {"start_month": months[0], "end_month": months[-1]}
+
+
+def _event_candidate_readiness_summary(*, storage_root: Path, fold_scope: Mapping[str, str]) -> dict[str, Any]:
+    checked_paths: list[str] = []
+    evidence_refs: list[str] = []
+    start_month = str(fold_scope.get("start_month") or "")
+    end_month = str(fold_scope.get("end_month") or "")
+
+    observation_path = storage_root / "runtime" / "layer_04_event_observation_inputs" / f"{start_month}_{end_month}.json"
+    checked_paths.append(str(observation_path))
+    observation_payload = _load_optional_json_object(observation_path) if observation_path.exists() else None
+    if observation_payload is not None and _observation_payload_has_event_refs(observation_payload):
+        evidence_refs.append(str(observation_path))
+
+    input_dir = storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month)
+    materialization_receipt_path = input_dir / "materialization_receipt.json"
+    for filename in ("m06_residual_event_governance_data_acquisition_task_key.json", "source_06_task_key.json"):
+        task_key_path = input_dir / filename
+        checked_paths.append(str(task_key_path))
+        if not task_key_path.exists():
+            continue
+        payload = _load_optional_json_object(task_key_path) or {}
+        params = payload.get("params") if isinstance(payload.get("params"), Mapping) else {}
+        events = params.get("events") if isinstance(params, Mapping) else None
+        if isinstance(events, list) and any(isinstance(item, Mapping) for item in events):
+            evidence_refs.append(str(task_key_path))
+        elif _materialization_receipt_ready(materialization_receipt_path):
+            evidence_refs.append(str(materialization_receipt_path))
+
+    return {
+        "checked_paths": checked_paths,
+        "evidence_refs": sorted(set(evidence_refs)),
+        "event_evidence_available": bool(evidence_refs),
+        "raw_event_count": "not_counted_during_readiness_probe",
+        "standardized_event_candidate_count": "not_counted_during_readiness_probe",
+    }
+
+
+def _observation_payload_has_event_refs(payload: Mapping[str, Any]) -> bool:
+    for key in (
+        "reviewed_event_interpretations",
+        "event_interpretations",
+        "accepted_event_interpretations",
+        "event_failure_evidence_packets",
+        "reviewed_event_interpretation_refs",
+        "event_interpretation_refs",
+        "accepted_event_interpretation_refs",
+        "event_failure_evidence_packet_refs",
+    ):
+        value = payload.get(key)
+        if isinstance(value, list) and bool(value):
+            return True
+    return False
 
 
 def _target_symbol_from_triage(triage_rows: Sequence[Mapping[str, Any]]) -> str:
@@ -2065,6 +2184,15 @@ def _string_list(value: Any) -> list[str]:
     if isinstance(value, (list, tuple, set)):
         return [str(item) for item in value if str(item).strip()]
     return []
+
+
+def _string_set(value: Any) -> set[str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return {stripped.upper()} if stripped else set()
+    if isinstance(value, (list, tuple, set)):
+        return {str(item).strip().upper() for item in value if str(item).strip()}
+    return set()
 
 
 def _score(row: Mapping[str, Any], *keys: str, default: float) -> float:

@@ -822,8 +822,12 @@ def _build_layer_workflow(
     )
 
     stages: list[WorkflowStage] = []
+    fold_span_ready = _month_span_count(start_month, end_month) == ROLLING_FOLD_SIZE_MONTHS
     has_monthly_input_stage = layer in BASE_INPUT_STAGE_LAYERS
-    include_input_stage = has_monthly_input_stage and (not foundation_catch_up_only or layer in FOUNDATION_CATCH_UP_LAYERS)
+    include_input_stage = has_monthly_input_stage and (
+        layer in FOUNDATION_CATCH_UP_LAYERS
+        or (not foundation_catch_up_only and (fold_span_ready or layer in (1, 2, 3)))
+    )
     if layer == 5 and include_input_stage and target_option_overlay_required:
         option_source_command = [
             "PYTHONPATH=src",
@@ -876,7 +880,8 @@ def _build_layer_workflow(
                 provider_calls_allowed=layer == 1,
             )
         )
-        if meta.get("feature_cli") is not None:
+        feature_stage_applicable = layer in MONTHLY_SUBSTRATE_LAYERS or fold_span_ready
+        if meta.get("feature_cli") is not None and feature_stage_applicable:
             stages.append(
                 WorkflowStage(
                     stage_id=f"{key}.feature_generation",
@@ -897,7 +902,7 @@ def _build_layer_workflow(
                     provider_calls_allowed=False,
                 )
             )
-    elif layer == 5 and meta.get("feature_cli") is not None and not foundation_catch_up_only and target_option_overlay_required:
+    elif layer == 5 and meta.get("feature_cli") is not None and not foundation_catch_up_only and fold_span_ready and target_option_overlay_required:
         stages.append(
             WorkflowStage(
                 stage_id=f"{key}.feature_generation",
@@ -922,6 +927,25 @@ def _build_layer_workflow(
             )
         )
     if foundation_catch_up_only:
+        return LayerWorkflow(
+            layer=layer,
+            layer_key=key,
+            model_name=str(meta["model_name"]),
+            depends_on_layers=tuple(meta["depends_on_layers"]),
+            progression_mode=str(meta["progression_mode"]),
+            candidate_axis=str(meta["candidate_axis"]),
+            candidate_progression_policy=str(meta["candidate_progression_policy"]),
+            dataset_unit=dataset_unit,
+            data_surface=str(meta["data_surface"]),
+            feature_command=feature,
+            model_generate_command=generate,
+            model_evaluate_command=evaluate,
+            promotion_review_command=review,
+            maintenance_command=maintenance,
+            stages=tuple(stages),
+        )
+
+    if not fold_span_ready:
         return LayerWorkflow(
             layer=layer,
             layer_key=key,

@@ -57,6 +57,12 @@ class SourceExistingBootstrapTests(unittest.TestCase):
             state_path = workflow_state_path_for_month("2016-01", root=storage_root / "runtime")
             payload = json.loads(state_path.read_text(encoding="utf-8"))
             by_stage = {stage["stage_id"]: stage for stage in payload["stages"]}
+            stage_types = {stage["stage_type"] for stage in payload["stages"]}
+            all_blockers = {
+                blocker
+                for stage in payload["stages"]
+                for blocker in stage.get("blockers", [])
+            }
             report_root = storage_root / "runtime" / "source_existing_bootstrap"
             bootstrap_latest_exists = (report_root / "latest.json").exists()
             bootstrap_timestamp_reports = list(report_root.glob("source_existing_bootstrap_*.json"))
@@ -66,7 +72,9 @@ class SourceExistingBootstrapTests(unittest.TestCase):
         self.assertEqual(by_stage["model_01_background_context.data_acquisition"]["status"], "succeeded")
         self.assertEqual(by_stage["model_02_target_state.data_acquisition"]["status"], "succeeded")
         self.assertEqual(by_stage["model_01_background_context.feature_generation"]["status"], "ready")
-        self.assertEqual(by_stage["model_02_target_state.feature_generation"]["status"], "ready")
+        self.assertNotIn("model_02_target_state.feature_generation", by_stage)
+        self.assertNotIn("model_generation", stage_types)
+        self.assertNotIn("rolling_fold_4_1_1_split_required", all_blockers)
         self.assertFalse(payload["model_activation_performed"])
         self.assertFalse(payload["broker_execution_performed"])
         self.assertTrue(bootstrap_latest_exists)

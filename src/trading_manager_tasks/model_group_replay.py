@@ -36,7 +36,8 @@ DEFAULT_REPLAY_INITIAL_CAPITAL_USD = 25_000.0
 REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED = "replay_option_feature_acquisition_required"
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
-CANDIDATE_UNIVERSE_SOURCE_POLICY = "fixed_current_snapshot_historical_candidate_universe"
+LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
+FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE = "fixed_current_snapshot_historical_candidate_universe"
 REPLAY_CANDIDATE_UNIVERSE_CLOSE_READY_TIME = time(16, 15)
 
 
@@ -183,9 +184,13 @@ def run_model_group_replay_if_ready(
                 },
             )
     replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
-    resolved_candidate_universe_path = candidate_universe_path or _historical_candidate_universe_path(storage_root)
-    fixed_candidate_universe_symbols = _fixed_historical_candidate_symbols(resolved_candidate_universe_path)
-    fixed_equity_universe_symbols = _fixed_historical_candidate_symbols(resolved_candidate_universe_path, asset_class="us_equity")
+    target_handoff_path = _target_candidate_handoff_path(storage_root=storage_root, training_fold=training_fold)
+    resolved_candidate_universe_path = candidate_universe_path or target_handoff_path
+    if not resolved_candidate_universe_path.exists():
+        return None
+    candidate_universe_source_policy = _candidate_universe_source_policy(resolved_candidate_universe_path)
+    fixed_candidate_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path)
+    fixed_equity_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path, asset_class="us_equity")
     materialized_equity_symbols = replay_plan_equity_symbols | _canonical_alpaca_source_symbols(storage_root)
     missing_equity_candidate_symbols = tuple(sorted(fixed_equity_universe_symbols - materialized_equity_symbols))
     initial_capital_usd = _validated_initial_capital_usd(initial_capital_usd)
@@ -239,7 +244,7 @@ def run_model_group_replay_if_ready(
                 "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
-                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+                "candidate_universe_source_policy": candidate_universe_source_policy,
                 "required_next_step": "refresh the frozen replay dataset with Alpaca bars for the fixed historical equity candidate universe before fold replay",
             },
         )
@@ -271,7 +276,7 @@ def run_model_group_replay_if_ready(
                 "missing_equity_candidate_symbols_sample": sample,
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
-                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+                "candidate_universe_source_policy": candidate_universe_source_policy,
                 "required_next_step": "run the gated replay candidate Alpaca bars acquisition for the fixed historical candidate universe before canonical replay",
             },
         )
@@ -298,7 +303,7 @@ def run_model_group_replay_if_ready(
                 "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
-                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+                "candidate_universe_source_policy": candidate_universe_source_policy,
             },
         )
 
@@ -327,7 +332,7 @@ def run_model_group_replay_if_ready(
                 "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
-                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+                "candidate_universe_source_policy": candidate_universe_source_policy,
                 "required_next_step": "rerun the TradingView refresh and fixed candidate-universe build after the market close before executing replay",
             },
         )
@@ -389,7 +394,7 @@ def run_model_group_replay_if_ready(
                     "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
                     "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                     "initial_capital_usd": initial_capital_usd,
-                    "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+                    "candidate_universe_source_policy": candidate_universe_source_policy,
                     "runner_returncode": exc.returncode,
                     "runner_stdout": exc.stdout,
                     "runner_stderr": exc.stderr,
@@ -428,7 +433,7 @@ def run_model_group_replay_if_ready(
                 "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
-                "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+                "candidate_universe_source_policy": candidate_universe_source_policy,
             },
         )
     refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_ids={str(receipt.get("replay_execution_run_id") or run_id)})
@@ -454,7 +459,7 @@ def run_model_group_replay_if_ready(
             "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
             "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
             "initial_capital_usd": initial_capital_usd,
-            "candidate_universe_source_policy": CANDIDATE_UNIVERSE_SOURCE_POLICY,
+            "candidate_universe_source_policy": candidate_universe_source_policy,
             "replay_execution_receipt": receipt,
         },
     )
@@ -579,6 +584,39 @@ def _validated_initial_capital_usd(value: float) -> float:
 def _historical_candidate_universe_path(storage_root: Path) -> Path:
     trading_storage_root = storage_root.parent.parent
     return trading_storage_root / "main" / "shared" / "historical_candidate_universe.csv"
+
+
+def _target_candidate_handoff_path(*, storage_root: Path, training_fold: Mapping[str, Any]) -> Path:
+    start_month = str(training_fold.get("start_month") or "").strip()
+    end_month = str(training_fold.get("end_month") or "").strip()
+    fold_key = f"{start_month.replace('-', '_')}_{end_month.replace('-', '_')}"
+    return storage_root / "runtime" / "layer_03_target_state_vector" / "input_materialization" / fold_key / "target_candidates.jsonl"
+
+
+def _candidate_universe_source_policy(path: Path) -> str:
+    if path.suffix.lower() == ".jsonl":
+        return LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE
+    return FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE
+
+
+def _candidate_universe_symbols(path: Path, *, asset_class: str | None = None) -> set[str]:
+    if path.suffix.lower() == ".jsonl":
+        return _target_candidate_handoff_symbols(path, asset_class=asset_class)
+    return _fixed_historical_candidate_symbols(path, asset_class=asset_class)
+
+
+def _target_candidate_handoff_symbols(path: Path, *, asset_class: str | None = None) -> set[str]:
+    if asset_class is not None and asset_class != "us_equity":
+        return set()
+    symbols: set[str] = set()
+    for row in _jsonl_rows(path):
+        status = str(row.get("candidate_eligibility_state") or "eligible").strip().lower()
+        if status not in {"eligible", "active", "accepted"}:
+            continue
+        symbol = str(row.get("routing_symbol_ref") or row.get("audit_symbol_ref") or row.get("target_symbol") or "").strip().upper()
+        if re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
+            symbols.add(symbol)
+    return symbols
 
 
 def _canonical_alpaca_source_symbols(storage_root: Path) -> set[str]:
@@ -854,13 +892,10 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     if has_equity_or_option_scope:
         candidate_handoff_status = str(replay_receipt.get("candidate_handoff_status") or "")
         candidate_handoff_source = str(replay_receipt.get("candidate_handoff_source") or "")
-        if candidate_handoff_status != "available" or candidate_handoff_source not in {
-            "fixed_current_snapshot_historical_candidate_universe",
-            "layer_02_target_candidate_handoff",
-        }:
+        if candidate_handoff_status != "available" or candidate_handoff_source != LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE:
             return {
                 "compatible": False,
-                "reason": "equity/options replay receipt missing canonical fixed historical candidate universe evidence",
+                "reason": "equity/options replay receipt missing canonical Layer 2 target-candidate handoff evidence",
             }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
@@ -895,6 +930,20 @@ def _csv_rows(path: Path) -> list[dict[str, str]]:
         return []
     with path.open("r", encoding="utf-8", newline="") as handle:
         return [dict(row) for row in csv.DictReader(handle)]
+
+
+def _jsonl_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            if isinstance(payload, Mapping):
+                rows.append(dict(payload))
+    return rows
 
 
 __all__ = [

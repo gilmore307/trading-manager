@@ -160,6 +160,9 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
                     "pre_replay_target_refs": ["AAPL"],
                     "target_refs": ["AAPL"],
+                    "asset_class_counts": {"us_equity": 1},
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
                     "decision_rows_ref": str(decision_rows_path),
                 }
             )

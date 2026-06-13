@@ -1730,10 +1730,17 @@ def run_daemon_loop(
         end_month=end_month,
         resume_month_cursor=advance_month_on_complete,
     )
+    if auto_select_next_work:
+        state = apply_auto_work_selection(
+            state,
+            storage_root=storage_root,
+            default_start_month=start_month,
+            default_end_month=end_month,
+        )
     if source_existing_bootstrap:
         run_source_existing_bootstrap(
-            start_month=start_month,
-            end_month=completed_historical_month_cutoff(),
+            start_month=state.start_month,
+            end_month=state.end_month,
             selected_target_symbol=selected_target_symbol,
             storage_root=storage_root,
             database_url=source_bootstrap_database_url,

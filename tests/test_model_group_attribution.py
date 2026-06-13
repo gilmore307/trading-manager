@@ -75,6 +75,9 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 {
                     "contract_type": "evaluation_replay_execution_run",
                     "created_at_utc": "2026-05-28T00:00:00+00:00",
+                    "asset_class_counts": {"us_equity": 1},
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
                     "decision_rows_ref": str(decision_rows_path),
                 }
             )

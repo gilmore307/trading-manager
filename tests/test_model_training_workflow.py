@@ -148,6 +148,25 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", stage.command)
         self.assertIn("--target-symbol", stage.command)
 
+    def test_monthly_target_input_plan_does_not_emit_fold_model_generation_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            _write_target_feed_artifact(root, symbol="AAPL", month="2016-01")
+            plan = build_model_training_workflow_plan(
+                storage_root=root,
+                trading_storage_root=root,
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        stages = [stage for layer in plan.layers for stage in layer.stages]
+        self.assertNotIn("model_02_target_state.feature_generation", {stage.stage_id for stage in stages})
+        self.assertNotIn("model_05_option_expression.feature_generation", {stage.stage_id for stage in stages})
+        self.assertFalse(any(stage.stage_type == "model_generation" for stage in stages))
+        self.assertFalse(any("rolling_fold_4_1_1_split_required" in stage.blockers for stage in stages))
+
     def test_m02_target_state_blocks_without_target_local_feed_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(

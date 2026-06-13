@@ -55,6 +55,7 @@ RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES = {
     "post_replay_residual_event_governance_receipt",
     "model_06_residual_event_governance_event_attribution_receipt",
 }
+LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
 M06_COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
 
 
@@ -150,13 +151,6 @@ def run_model_group_evaluation_if_ready(
         "--storage-root",
         str(storage_root),
     ]
-    rows = tuple(_load_jsonl_objects(decision_rows_path))
-    attribution_rows = tuple(_load_jsonl_objects(attribution_rows_path))
-    check_summary = _evaluation_check_summary(
-        rows=rows,
-        attribution_rows=attribution_rows,
-        attribution_receipt=attribution_receipt,
-    )
 
     if not execute:
         return _decision(
@@ -171,9 +165,20 @@ def run_model_group_evaluation_if_ready(
                 "dataset_root": str(dataset_root),
                 "training_fold": training_fold,
                 "expected_checks": list(MODEL_GROUP_EVALUATION_CHECKS),
-                "ready_checks": check_summary["ready_checks"],
+                "ready_checks": list(MODEL_GROUP_EVALUATION_CHECKS),
+                "replay_execution_receipt_ref": str(replay_receipt_path),
+                "residual_event_governance_receipt_ref": str(attribution_receipt_path),
+                "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
             },
         )
+
+    rows = tuple(_load_jsonl_objects(decision_rows_path))
+    attribution_rows = tuple(_load_jsonl_objects(attribution_rows_path))
+    check_summary = _evaluation_check_summary(
+        rows=rows,
+        attribution_rows=attribution_rows,
+        attribution_receipt=attribution_receipt,
+    )
 
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
@@ -2106,6 +2111,24 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         return {
             "compatible": False,
             "reason": "replay receipt used deterministic crypto placeholder policy instead of completed fold model artifacts",
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+        }
+    asset_class_counts = replay_receipt.get("asset_class_counts")
+    if not isinstance(asset_class_counts, Mapping):
+        asset_class_counts = {}
+    has_equity_or_option_scope = (
+        any(ref for ref in target_refs)
+        or int(asset_class_counts.get("us_equity") or 0) > 0
+        or int(asset_class_counts.get("us_option") or 0) > 0
+    )
+    if has_equity_or_option_scope and (
+        str(replay_receipt.get("candidate_handoff_status") or "") != "available"
+        or str(replay_receipt.get("candidate_handoff_source") or "") != LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE
+    ):
+        return {
+            "compatible": False,
+            "reason": "replay receipt used static or diagnostic candidates instead of Layer 2 target-candidate handoff",
             "candidate_model_ref": candidate_model_ref,
             "receipt_target_refs": sorted(target_refs),
         }

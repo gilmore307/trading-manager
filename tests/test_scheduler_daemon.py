@@ -150,6 +150,9 @@ class SchedulerDaemonTests(unittest.TestCase):
                     "candidate_model_ref": model_ref,
                     "pre_replay_target_refs": ["AAPL"],
                     "target_refs": ["AAPL"],
+                    "asset_class_counts": {"us_equity": 1},
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
                     "candidate_fold_id": fold_id,
                     "validation_status": "passed",
                     "created_at_utc": "2026-05-28T00:00:00Z",
@@ -1528,8 +1531,8 @@ class SchedulerDaemonTests(unittest.TestCase):
                     config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
                 )
 
-        self.assertEqual(state.last_work_selection_reason, "model_group_replay_ready")
-        self.assertEqual(state.last_next_internal_stage, "evaluation_worker_1")
+        self.assertEqual(state.last_work_selection_reason, "model_group_replay_dataset_ready")
+        self.assertEqual(state.last_next_internal_stage, "model_group_replay_dataset")
         self.assertEqual(state.start_month, "2016-01")
         self.assertEqual(state.end_month, "2016-06")
         handler.assert_not_called()
@@ -1760,6 +1763,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         bootstrap.assert_called_once()
         _, kwargs = bootstrap.call_args
         self.assertEqual(kwargs["start_month"], "2016-01")
+        self.assertEqual(kwargs["end_month"], "2016-01")
         self.assertEqual(kwargs["selected_target_symbol"], "AAPL")
         self.assertTrue(kwargs["write"])
 
