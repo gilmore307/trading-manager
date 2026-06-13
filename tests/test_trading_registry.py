@@ -1189,6 +1189,7 @@ class RegistryHelperTests(unittest.TestCase):
         compact_contracts = rows["STORAGE_LIFECYCLE_GAP_COMPACT_CONTRACTS"]
         self.assertIn("storage_replay_execution_compact_manifest", compact_contracts["payload"])
         self.assertIn("storage_te_recent_refresh_compact_manifest", compact_contracts["payload"])
+        self.assertIn("storage_te_monthly_source_provenance_manifest", compact_contracts["payload"])
         self.assertIn("storage_realtime_monitor_rolling_summary", compact_contracts["payload"])
         self.assertIn("storage_task_key_compact_manifest", compact_contracts["payload"])
 
@@ -1197,6 +1198,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("apply_flag=--apply-lifecycle-gap-actions", action_defaults["payload"])
         self.assertIn("retain_recent_replay_runs=3", action_defaults["payload"])
         self.assertIn("retain_recent_te_refresh_runs=24", action_defaults["payload"])
+        self.assertIn("retain_recent_te_monthly_runs=24", action_defaults["payload"])
         self.assertIn("retain_recent_realtime_loops=100", action_defaults["payload"])
 
         maintenance_run = rows["STORAGE_SCHEDULED_MAINTENANCE_RUN"]
@@ -2280,13 +2282,19 @@ class RegistryHelperTests(unittest.TestCase):
 
         te_retention = registry["TRADING_ECONOMICS_APPEND_ONLY_RETENTION_POLICY"]
         self.assertIn("canonical_te_source_no_delete_candidates", te_retention["payload"])
+        self.assertIn("active_te_source_layout_saved_cleaned_only", te_retention["payload"])
+        self.assertIn("te_run_side_products_completion_receipt_request_manifest_rolling_retention", te_retention["payload"])
         self.assertIn("te_side_products_compact_compress_or_delete_after_provenance", te_retention["payload"])
         self.assertIn("formal_te_capture_replaces_provisional_fallback", te_retention["payload"])
         self.assertIn("trading-storage/docs/04_task.md", te_retention["path"])
         self.assertIn("trading-storage/docs/22_storage_maintenance_playbook.md", te_retention["path"])
+        self.assertIn("trading-storage/scripts/lifecycle/consolidate_trading_economics_source.py", te_retention["path"])
         self.assertIn("te_side_products", te_retention["applies_to"])
+        self.assertIn("te_monthly_source_provenance", te_retention["applies_to"])
         self.assertIn("provisional_macro_release_web_search", te_retention["applies_to"])
-        self.assertIn("must not be deleted or pruned", te_retention["note"])
+        self.assertIn("saved/ and cleaned/ must not be deleted or pruned", te_retention["note"])
+        self.assertIn("completion_receipt.json and request_manifest.json files are side products", te_retention["note"])
+        self.assertIn("storage_te_monthly_source_provenance_manifest", te_retention["note"])
         self.assertIn("may be compacted", te_retention["note"])
         self.assertIn("after formal TE capture", te_retention["note"])
 
