@@ -293,6 +293,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("REPLAY_SECTOR_COVERAGE_TAGS", rows)
         self.assertNotIn("REPLAY_EVENT_COVERAGE_TAGS", rows)
         self.assertNotIn("REPLAY_TRAINING_EXCLUSION_REASON", rows)
+        candidate_input = rows["EVALUATION_REPLAY_CANDIDATE_UNIVERSE_INPUT_POLICY"]
+        self.assertIn(
+            "candidate_handoff_source=layer_02_target_candidate_handoff|fixed_current_snapshot_historical_candidate_universe",
+            candidate_input["payload"],
+        )
+        self.assertIn("target_candidates.jsonl", candidate_input["payload"])
+        self.assertIn("canonical Layer 2 target-candidate handoff", candidate_input["note"])
         initial_capital = rows["EVALUATION_REPLAY_INITIAL_CAPITAL_USD"]
         self.assertEqual(initial_capital["payload_format"], "decimal")
         self.assertEqual(initial_capital["payload"], "25000.0")
@@ -2148,6 +2155,7 @@ class RegistryHelperTests(unittest.TestCase):
         historical_script = registry["BUILD_HISTORICAL_CANDIDATE_UNIVERSE"]
         self.assertEqual(historical_script["kind"], "script")
         self.assertEqual(historical_script["path"], "trading-data/scripts/data/build_historical_candidate_universe.py")
+
         self.assertIn("historical_candidate_universe", historical_script["applies_to"])
         self.assertIn("crypto_spot", historical_script["applies_to"])
         self.assertNotIn("reviewed_symbol_addition", historical_script["applies_to"])
@@ -2174,6 +2182,19 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["kind"], kind)
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("equity_total_symbol_pool", registry[key]["applies_to"])
+
+    def test_calendar_maintenance_skip_te_default_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            registry = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        boundary = registry["CALENDAR_MAINTENANCE_REFRESH_BOUNDARY"]
+        self.assertIn("timer_default_skip_trading_economics=true", boundary["payload"])
+        self.assertIn("skip_trading_economics", boundary["applies_to"])
+        self.assertIn("--skip-trading-economics by default", boundary["note"])
+
+        script = registry["RUN_CALENDAR_MAINTENANCE_REFRESH"]
+        self.assertIn("skip_trading_economics", script["applies_to"])
+        self.assertIn("--skip-trading-economics", script["note"])
 
     def test_target_layer2_context_mapping_shared_csv_is_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
