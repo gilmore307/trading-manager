@@ -83,6 +83,16 @@ before it can affect a live block, reduce, exit, or human-review path.
 Evaluation may use attribution evidence, but evaluation must not silently invent
 attribution labels inside promotion scoring.
 
+M04/M05 boundary attribution is a manager-side diagnostic helper for this
+failure-attribution lane. `scripts/tasks/build_model_group_layer_attribution.py`
+reads an existing replay `decision_rows.jsonl` and writes compact cohort, score
+bin, tail-loss, and optional M05 unfilled-filter summaries. It is fixed-input
+evidence only: it must not call providers, mutate SQL or storage source data,
+change promotion decisions, relax option filters, retrain models, activate
+models, or write active configs. Its role is to decide the next bounded
+counterfactual or repair question when promotion fails due to overblocking,
+underblocking, option-expression drag, alpha calibration, or drawdown.
+
 ## M06 / Layer 4 Rule
 
 M06 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
@@ -90,6 +100,7 @@ M06 event-risk research may propose a promotion packet. Layer 4 may consume only
 ## Useful Commands
 
 ```bash
-PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model option_expression_model --candidate-ref trading-model://promotion-candidates/mpcand_example
-PYTHONPATH=src python3 scripts/tasks/build_agent_model_promotion_decision.py --promotion-request-ref manager_request://model-promotion/example --decision-status defer --decision-reason "missing production calibration evidence"
+PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/plan_model_promotion_review.py --model option_expression_model --candidate-ref trading-model://promotion-candidates/mpcand_example
+PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/build_agent_model_promotion_decision.py --promotion-request-ref manager_request://model-promotion/example --decision-status defer --decision-reason "missing production calibration evidence"
+PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/build_model_group_layer_attribution.py --decision-rows /path/to/decision_rows.jsonl --output-dir /path/to/diagnostic_run
 ```
