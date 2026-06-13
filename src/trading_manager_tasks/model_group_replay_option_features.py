@@ -291,12 +291,43 @@ def replay_option_feature_requirements_from_replay_decision(
     if replay_decision.reason_code != REPLAY_OPTION_FEATURE_BACKOFF_REASON:
         return ()
     payload = _option_feature_payload_from_replay_decision(replay_decision)
+    artifact_requirements = _option_feature_requirements_from_artifact(payload)
+    if artifact_requirements:
+        return artifact_requirements
     sample = payload.get("sample") if isinstance(payload, Mapping) else None
     if not isinstance(sample, Sequence):
         return ()
+    return _option_feature_requirements_from_items(sample)
+
+
+def _option_feature_requirements_from_artifact(payload: Mapping[str, Any]) -> tuple[ReplayOptionFeatureRequirement, ...]:
+    artifact_ref = str(payload.get("requirements_artifact_ref") or "").strip()
+    if not artifact_ref:
+        return ()
+    path = Path(artifact_ref)
+    if not path.exists():
+        return ()
+    items: list[Mapping[str, Any]] = []
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, Mapping):
+                items.append(parsed)
+    return _option_feature_requirements_from_items(items)
+
+
+def _option_feature_requirements_from_items(
+    items: Sequence[Any],
+) -> tuple[ReplayOptionFeatureRequirement, ...]:
     requirements: list[ReplayOptionFeatureRequirement] = []
     seen: set[tuple[str, str]] = set()
-    for item in sample:
+    for item in items:
         if not isinstance(item, Mapping):
             continue
         target = str(item.get("target_ref") or item.get("underlying") or "").upper()

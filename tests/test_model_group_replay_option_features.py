@@ -148,6 +148,50 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         parsed = replay_option_feature_requirements_from_replay_decision(self._replay_backoff(requirement))
         self.assertEqual(parsed, (requirement,))
 
+    def test_extracts_requirements_from_replay_backoff_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact = Path(tmp) / "option_feature_requirements.jsonl"
+            artifact.write_text(
+                "\n".join(
+                    [
+                        json.dumps({"target_ref": "AAPL", "timestamp": "2021-01-04T16:00:00-05:00"}),
+                        json.dumps({"target_ref": "MSFT", "timestamp": "2021-02-05T16:00:00-05:00"}),
+                        json.dumps({"target_ref": "AAPL", "timestamp": "2021-01-04T16:00:00-05:00"}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            payload = {
+                "missing_count": 3,
+                "requirements_artifact_ref": str(artifact),
+                "sample": [{"target_ref": "TSLA", "timestamp": "2021-03-01T16:00:00-05:00"}],
+            }
+            reason = "ValueError: replay_option_feature_acquisition_required: " + json.dumps(payload, sort_keys=True)
+            decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-01-01T00:00:00+00:00",
+                now_et="2025-12-31T19:00:00-05:00",
+                decision_status="backoff",
+                reason_code="model_group_replay_option_feature_acquisition_required",
+                reason=reason,
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work="model_group.replay",
+                command=[],
+                execution_summary={"runner_stderr": reason},
+            )
+
+            parsed = replay_option_feature_requirements_from_replay_decision(decision)
+
+        self.assertEqual(
+            parsed,
+            (
+                ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01"),
+                ReplayOptionFeatureRequirement("MSFT", "2021-02-05T16:00:00-05:00", "2021-02"),
+            ),
+        )
+
     def test_requires_provider_gate_when_source_rows_are_missing(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")
         with tempfile.TemporaryDirectory() as raw_tmp:
