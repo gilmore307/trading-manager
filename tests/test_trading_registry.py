@@ -2183,18 +2183,46 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("equity_total_symbol_pool", registry[key]["applies_to"])
 
-    def test_calendar_maintenance_skip_te_default_is_registered(self):
+    def test_calendar_maintenance_release_fetch_schedule_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         boundary = registry["CALENDAR_MAINTENANCE_REFRESH_BOUNDARY"]
-        self.assertIn("timer_default_skip_trading_economics=true", boundary["payload"])
-        self.assertIn("skip_trading_economics", boundary["applies_to"])
-        self.assertIn("--skip-trading-economics by default", boundary["note"])
+        self.assertIn("timer_cadence=daily_0615_host_local_randomized_15m", boundary["payload"])
+        self.assertIn("te_release_fetch_one_shot_schedule", boundary["payload"])
+        self.assertIn("te_release_fetch_schedule", boundary["applies_to"])
+        self.assertIn("skipped_no_new_or_changed_rows", boundary["applies_to"])
+        self.assertIn("--schedule-te-release-fetches", boundary["note"])
 
         script = registry["RUN_CALENDAR_MAINTENANCE_REFRESH"]
-        self.assertIn("skip_trading_economics", script["applies_to"])
-        self.assertIn("--skip-trading-economics", script["note"])
+        self.assertIn("te_release_fetch_schedule", script["applies_to"])
+        self.assertIn("write_only_changed_monthly_buckets", script["applies_to"])
+        self.assertIn("skipped_no_new_or_changed_rows", script["applies_to"])
+        self.assertIn("one-shot TE release-fetch scheduling", script["note"])
+
+        te_fetch_script = registry["RUN_TRADING_ECONOMICS_RECENT_CALENDAR_REFRESH"]
+        self.assertIn("write_only_changed_monthly_buckets", te_fetch_script["applies_to"])
+        self.assertIn("skipped_no_new_or_changed_rows", te_fetch_script["applies_to"])
+        self.assertIn("skipped_no_new_or_changed_rows", te_fetch_script["note"])
+
+        schedule_policy = registry["TRADING_ECONOMICS_RELEASE_FETCH_SCHEDULE_POLICY"]
+        self.assertIn("default_delay_minutes=2", schedule_policy["payload"])
+        self.assertIn("max_count=48", schedule_policy["payload"])
+        self.assertIn("future_fetch_only", schedule_policy["payload"])
+        self.assertIn("One-shot TE release-fetch scheduler", schedule_policy["note"])
+
+        service = registry["TRADING_DATA_CALENDAR_MAINTENANCE_SYSTEMD_SERVICE"]
+        self.assertEqual(service["payload"], "trading-data-calendar-maintenance.service")
+        self.assertEqual(
+            service["path"],
+            "trading-data/deploy/systemd/trading-data-calendar-maintenance.service",
+        )
+        self.assertIn("--schedule-te-release-fetches", service["note"])
+
+        timer = registry["TRADING_DATA_CALENDAR_MAINTENANCE_SYSTEMD_TIMER"]
+        self.assertEqual(timer["payload"], "trading-data-calendar-maintenance.timer")
+        self.assertIn("daily_0615_host_local_randomized_15m", timer["applies_to"])
+        self.assertIn("06:15 host-local", timer["note"])
 
     def test_target_layer2_context_mapping_shared_csv_is_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
