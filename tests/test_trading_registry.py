@@ -298,6 +298,18 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(initial_capital["payload"], "25000.0")
         self.assertIn("replay equity-path diagnostics", initial_capital["note"])
         self.assertIn("not broker account state", initial_capital["note"])
+        completion_scope = rows["EVALUATION_REPLAY_COMPLETION_SCOPE_POLICY"]
+        self.assertIn("replay_completion_scope=full_candidate_universe|bounded_diagnostic", completion_scope["payload"])
+        self.assertIn("max_decision_rows=null_required_for_full_candidate_universe", completion_scope["payload"])
+        self.assertIn("Bounded diagnostic receipts", completion_scope["note"])
+        self.assertEqual(rows["EVALUATION_REPLAY_COMPLETION_SCOPE_FULL_CANDIDATE_UNIVERSE"]["kind"], "status_value")
+        self.assertEqual(rows["EVALUATION_REPLAY_COMPLETION_SCOPE_FULL_CANDIDATE_UNIVERSE"]["payload"], "full_candidate_universe")
+        self.assertEqual(rows["EVALUATION_REPLAY_COMPLETION_SCOPE_BOUNDED_DIAGNOSTIC"]["kind"], "status_value")
+        self.assertEqual(rows["EVALUATION_REPLAY_COMPLETION_SCOPE_BOUNDED_DIAGNOSTIC"]["payload"], "bounded_diagnostic")
+        acquisition_policy = rows["EVALUATION_REPLAY_FIXED_CANDIDATE_SOURCE_ACQUISITION_POLICY"]
+        self.assertIn("include_fixed_candidate_alpaca_bars", acquisition_policy["payload"])
+        self.assertIn("storage_source_root=trading-storage/storage/01_source_data", acquisition_policy["payload"])
+        self.assertIn("canonical_historical_source_data", acquisition_policy["payload"])
         self.assertIn(
             "prepare_replay_dataset.py",
             rows["TRADING_EVALUATION_PREPARE_REPLAY_DATASET"]["path"],
