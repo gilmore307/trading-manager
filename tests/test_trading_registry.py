@@ -316,7 +316,18 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("requirements_artifact_ref", requirements_artifact["applies_to"])
         backoff_policy = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_BACKOFF_PAYLOAD_POLICY"]
         self.assertIn("requirements_artifact_ref=option_feature_requirements.jsonl", backoff_policy["payload"])
+        self.assertIn(
+            "option_feature_requirement_policy=point_in_time_candidate_handoff_allows_on_demand_option_feature_requirements|static_candidate_universe_does_not_authorize_provider_acquisition",
+            backoff_policy["payload"],
+        )
+        self.assertIn("option_feature_requirement_policy", backoff_policy["applies_to"])
         self.assertIn("first consumes the full requirements_artifact_ref", backoff_policy["note"])
+        replay_option_policy = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_POLICY"]
+        self.assertIn(
+            "point_in_time_candidate_handoff_allows_on_demand_option_feature_requirements",
+            replay_option_policy["payload"],
+        )
+        self.assertIn("option_feature_requirement_policy", replay_option_policy["applies_to"])
         requirements_ref = rows["OPTION_FEATURE_REQUIREMENTS_ARTIFACT_REF"]
         self.assertEqual(requirements_ref["kind"], "path_field")
         self.assertEqual(requirements_ref["payload"], "requirements_artifact_ref")
