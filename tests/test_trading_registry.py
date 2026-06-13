@@ -1156,6 +1156,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(summary["kind"], "artifact_type")
         self.assertEqual(summary["payload"], "storage_scheduled_maintenance_summary")
         self.assertIn("reads manager fold-state files directly", summary["note"])
+        self.assertIn("storage_lifecycle_gap_finding", summary["applies_to"])
+        self.assertIn("storage_lifecycle_gap_action_summary", summary["applies_to"])
+        self.assertIn("storage_lifecycle_gap_action_receipt", summary["applies_to"])
 
         service = rows["STORAGE_MAINTENANCE_SYSTEMD_UNITS"]
         self.assertEqual(service["kind"], "systemd_unit")
@@ -1165,7 +1168,41 @@ class RegistryHelperTests(unittest.TestCase):
         boundary = rows["STORAGE_MAINTENANCE_BACKUP_DELETE_BOUNDARY_POLICY"]
         self.assertIn("storage_reads_manager_fold_state", boundary["payload"])
         self.assertIn("storage_executes_backup_archive_delete", boundary["payload"])
+        self.assertIn("storage_executes_state_triggered_lifecycle_gap_actions", boundary["payload"])
+        self.assertIn("default_gap_actions_report_only", boundary["payload"])
+        self.assertIn("--apply-lifecycle-gap-actions", boundary["note"])
         self.assertIn("No manager backup/cleanup signal, request, or plan is required", boundary["note"])
+
+        gap_finding = rows["STORAGE_LIFECYCLE_GAP_FINDING"]
+        self.assertEqual(gap_finding["payload"], "storage_lifecycle_gap_finding")
+        self.assertIn("mutation_performed=false", gap_finding["note"])
+
+        gap_action_summary = rows["STORAGE_LIFECYCLE_GAP_ACTION_SUMMARY"]
+        self.assertEqual(gap_action_summary["payload"], "storage_lifecycle_gap_action_summary")
+        self.assertIn("delete", gap_action_summary["applies_to"])
+        self.assertIn("rolling_retention", gap_action_summary["applies_to"])
+
+        gap_action_receipt = rows["STORAGE_LIFECYCLE_GAP_ACTION_RECEIPT"]
+        self.assertEqual(gap_action_receipt["payload"], "storage_lifecycle_gap_action_receipt")
+        self.assertIn("compact_ref", gap_action_receipt["note"])
+
+        compact_contracts = rows["STORAGE_LIFECYCLE_GAP_COMPACT_CONTRACTS"]
+        self.assertIn("storage_replay_execution_compact_manifest", compact_contracts["payload"])
+        self.assertIn("storage_te_recent_refresh_compact_manifest", compact_contracts["payload"])
+        self.assertIn("storage_realtime_monitor_rolling_summary", compact_contracts["payload"])
+        self.assertIn("storage_task_key_compact_manifest", compact_contracts["payload"])
+
+        action_defaults = rows["STORAGE_LIFECYCLE_GAP_ACTION_DEFAULTS"]
+        self.assertIn("compact_output_root=storage/90_lifecycle/maintenance/compact_contracts", action_defaults["payload"])
+        self.assertIn("apply_flag=--apply-lifecycle-gap-actions", action_defaults["payload"])
+        self.assertIn("retain_recent_replay_runs=3", action_defaults["payload"])
+        self.assertIn("retain_recent_te_refresh_runs=24", action_defaults["payload"])
+        self.assertIn("retain_recent_realtime_loops=100", action_defaults["payload"])
+
+        maintenance_run = rows["STORAGE_SCHEDULED_MAINTENANCE_RUN"]
+        self.assertIn("storage_lifecycle_gap_action_receipt", maintenance_run["applies_to"])
+        self.assertIn("compact_contract", maintenance_run["applies_to"])
+        self.assertIn("--apply-lifecycle-gap-actions", maintenance_run["note"])
 
     def test_data_feed_and_data_source_rows_are_separated(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
