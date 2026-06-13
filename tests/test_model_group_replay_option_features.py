@@ -115,7 +115,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
                 patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
-                patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=True),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=(requirement,)),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage",
                     return_value=M05OptionExpressionFeatureStageSummary(
@@ -204,7 +204,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
                 patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
-                patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=()),
             ):
                 decision = run_model_group_replay_option_features_for_replay_backoff(
                     self._replay_backoff(requirement),
@@ -231,7 +231,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
                 patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
-                patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=()),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
                     return_value={"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930"]},
@@ -271,7 +271,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
                 patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
-                patch("trading_manager_tasks.model_group_replay_option_features._source_rows_available", return_value=False),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=()),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
                     return_value={"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930"]},

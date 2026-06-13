@@ -121,8 +121,9 @@ def run_model_group_replay_option_features_for_replay_backoff(
                 required_next_step="retry model_group.replay from the same replay clock",
             ),
         )
-    source_missing = [item for item in batch if not _source_rows_available(database_url=db_url, requirement=item)]
-    source_ready = [item for item in batch if item not in source_missing]
+    source_ready = list(_source_ready_requirements(database_url=db_url, requirements=batch))
+    source_ready_keys = set(source_ready)
+    source_missing = [item for item in batch if item not in source_ready_keys]
     feature_targets_to_generate = {(item.month, item.target_ref) for item in source_ready}
     provider_calls = 0
     dispatch_summary: dict[str, Any] | None = None
@@ -401,6 +402,16 @@ def _database_url(explicit: str | None = None) -> str | None:
 
 
 def _source_rows_available(*, database_url: str, requirement: ReplayOptionFeatureRequirement) -> bool:
+    return bool(_source_ready_requirements(database_url=database_url, requirements=(requirement,)))
+
+
+def _source_ready_requirements(
+    *,
+    database_url: str,
+    requirements: Sequence[ReplayOptionFeatureRequirement],
+) -> tuple[ReplayOptionFeatureRequirement, ...]:
+    if not requirements:
+        return ()
     import psycopg  # type: ignore
     from psycopg.rows import dict_row  # type: ignore
 
@@ -409,18 +420,43 @@ def _source_rows_available(*, database_url: str, requirement: ReplayOptionFeatur
             cursor.execute("SELECT to_regclass(%s) AS table_ref", (f"{DEFAULT_OPTION_SOURCE_SCHEMA}.{DEFAULT_OPTION_SOURCE_TABLE}",))
             exists = cursor.fetchone()
             if not exists or exists.get("table_ref") is None:
-                return False
+                return ()
+            cursor.execute(
+                """
+                CREATE TEMP TABLE replay_option_source_requirement_filter (
+                  ordinal INTEGER NOT NULL,
+                  underlying TEXT NOT NULL,
+                  snapshot_time TIMESTAMPTZ NOT NULL
+                ) ON COMMIT DROP
+                """
+            )
+            cursor.executemany(
+                """
+                INSERT INTO replay_option_source_requirement_filter (
+                  ordinal,
+                  underlying,
+                  snapshot_time
+                )
+                VALUES (%s, %s, %s::timestamptz)
+                """,
+                [(index, item.target_ref, item.timestamp) for index, item in enumerate(requirements)],
+            )
             cursor.execute(
                 f"""
-                SELECT 1
-                FROM "{DEFAULT_OPTION_SOURCE_SCHEMA}"."{DEFAULT_OPTION_SOURCE_TABLE}"
-                WHERE "underlying" = %s
-                  AND "snapshot_time" = %s::timestamptz
-                LIMIT 1
-                """,
-                (requirement.target_ref, requirement.timestamp),
+                SELECT r.ordinal
+                FROM replay_option_source_requirement_filter AS r
+                WHERE EXISTS (
+                  SELECT 1
+                  FROM "{DEFAULT_OPTION_SOURCE_SCHEMA}"."{DEFAULT_OPTION_SOURCE_TABLE}" AS s
+                  WHERE s."underlying" = r.underlying
+                    AND s."snapshot_time" = r.snapshot_time
+                )
+                GROUP BY r.ordinal
+                ORDER BY r.ordinal ASC
+                """
             )
-            return cursor.fetchone() is not None
+            ordinals = [int(row["ordinal"]) for row in cursor.fetchall()]
+    return tuple(requirements[index] for index in ordinals)
 
 
 def _feature_missing_requirements(
