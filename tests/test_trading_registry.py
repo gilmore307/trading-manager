@@ -2128,21 +2128,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(artifact["payload"], "trading-storage/main/shared/equity_total_symbol_pool.csv")
         self.assertEqual(artifact["path"], "/root/projects/trading-storage/main/shared/equity_total_symbol_pool.csv")
         self.assertIn("calendar_maintenance", artifact["applies_to"])
-        self.assertIn("reviewed symbol addition", artifact["note"])
-
-        additions_artifact = registry["EQUITY_TOTAL_SYMBOL_POOL_REVIEWED_ADDITIONS_SHARED_CSV"]
-        self.assertEqual(additions_artifact["kind"], "shared_artifact")
-        self.assertEqual(
-            additions_artifact["payload"],
-            "trading-storage/main/shared/equity_total_symbol_pool_reviewed_additions.csv",
-        )
-        self.assertIn("reviewed_symbol_addition", additions_artifact["applies_to"])
-        self.assertIn("point-in-time leakage", additions_artifact["note"])
-
-        status_values = registry["EQUITY_TOTAL_SYMBOL_POOL_REVIEWED_ADDITION_STATUS_VALUES"]
-        self.assertIn("active_reviewed_symbol_addition", status_values["payload"])
-        self.assertIn("reviewed_addition_reason=new_listing_high_attention", status_values["payload"])
-        self.assertIn("reviewed_symbol_addition", status_values["applies_to"])
+        self.assertIn("TradingView source-rank", artifact["note"])
 
         historical_artifact = registry["HISTORICAL_CANDIDATE_UNIVERSE_SHARED_CSV"]
         self.assertEqual(historical_artifact["kind"], "shared_artifact")
@@ -2150,12 +2136,13 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("historical_candidate_universe", historical_artifact["applies_to"])
         self.assertIn("crypto_context_anchor", historical_artifact["applies_to"])
         self.assertIn("not point-in-time historical", historical_artifact["note"])
+        self.assertNotIn("reviewed_symbol_addition", historical_artifact["applies_to"])
 
         script = registry["BUILD_EQUITY_TOTAL_SYMBOL_POOL"]
         self.assertEqual(script["kind"], "script")
         self.assertEqual(script["path"], "trading-data/scripts/data/build_equity_total_symbol_pool.py")
         self.assertIn("tradingview_screener_snapshot", script["applies_to"])
-        self.assertIn("reviewed_symbol_addition", script["applies_to"])
+        self.assertNotIn("reviewed_symbol_addition", script["applies_to"])
         self.assertIn("preserves observed inactive rows", script["note"])
 
         historical_script = registry["BUILD_HISTORICAL_CANDIDATE_UNIVERSE"]
@@ -2163,7 +2150,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(historical_script["path"], "trading-data/scripts/data/build_historical_candidate_universe.py")
         self.assertIn("historical_candidate_universe", historical_script["applies_to"])
         self.assertIn("crypto_spot", historical_script["applies_to"])
-        self.assertIn("skips dated reviewed symbol additions", historical_script["note"])
+        self.assertNotIn("reviewed_symbol_addition", historical_script["applies_to"])
 
         fetch_script = registry["FETCH_TRADINGVIEW_EQUITY_SCREENER"]
         self.assertEqual(fetch_script["kind"], "script")
@@ -2172,7 +2159,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         refresh_script = registry["REFRESH_EQUITY_TOTAL_SYMBOL_POOL_FROM_TRADINGVIEW"]
         self.assertEqual(refresh_script["kind"], "script")
-        self.assertIn("reviewed_symbol_addition", refresh_script["applies_to"])
+        self.assertNotIn("reviewed_symbol_addition", refresh_script["applies_to"])
         self.assertIn("uncertain optionability", refresh_script["note"])
 
         expected_pool_fields = {
@@ -2182,16 +2169,11 @@ class RegistryHelperTests(unittest.TestCase):
             "DOLLAR_VOLUME_RANK": ("field", "dollar_volume_rank"),
             "MARKET_CAP_RANK": ("field", "market_cap_rank"),
             "SOURCE_REFS": ("field", "source_refs"),
-            "REVIEWED_ADDITION_ELIGIBILITY_START_DATE": ("temporal_field", "eligibility_start_date"),
-            "REVIEWED_ADDITION_REASON": ("field", "reviewed_addition_reason"),
         }
         for key, (kind, payload) in expected_pool_fields.items():
             self.assertEqual(registry[key]["kind"], kind)
             self.assertEqual(registry[key]["payload"], payload)
-            if key in {"REVIEWED_ADDITION_ELIGIBILITY_START_DATE", "REVIEWED_ADDITION_REASON"}:
-                self.assertIn("reviewed_symbol_addition", registry[key]["applies_to"])
-            else:
-                self.assertIn("equity_total_symbol_pool", registry[key]["applies_to"])
+            self.assertIn("equity_total_symbol_pool", registry[key]["applies_to"])
 
     def test_target_layer2_context_mapping_shared_csv_is_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
