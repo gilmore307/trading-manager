@@ -2190,26 +2190,56 @@ class RegistryHelperTests(unittest.TestCase):
         boundary = registry["CALENDAR_MAINTENANCE_REFRESH_BOUNDARY"]
         self.assertIn("timer_cadence=daily_0615_host_local_randomized_15m", boundary["payload"])
         self.assertIn("te_release_fetch_one_shot_schedule", boundary["payload"])
+        self.assertIn("te_release_poll_until_actual", boundary["payload"])
+        self.assertIn("provisional_macro_release_web_search_fallback", boundary["payload"])
         self.assertIn("te_release_fetch_schedule", boundary["applies_to"])
+        self.assertIn("te_release_poll", boundary["applies_to"])
+        self.assertIn("provisional_macro_release_web_search", boundary["applies_to"])
         self.assertIn("skipped_no_new_or_changed_rows", boundary["applies_to"])
         self.assertIn("--schedule-te-release-fetches", boundary["note"])
 
         script = registry["RUN_CALENDAR_MAINTENANCE_REFRESH"]
         self.assertIn("te_release_fetch_schedule", script["applies_to"])
+        self.assertIn("te_release_poll", script["applies_to"])
+        self.assertIn("provisional_macro_release_web_search", script["applies_to"])
         self.assertIn("write_only_changed_monthly_buckets", script["applies_to"])
         self.assertIn("skipped_no_new_or_changed_rows", script["applies_to"])
-        self.assertIn("one-shot TE release-fetch scheduling", script["note"])
+        self.assertIn("release polling", script["note"])
 
         te_fetch_script = registry["RUN_TRADING_ECONOMICS_RECENT_CALENDAR_REFRESH"]
+        self.assertIn("te_release_poll", te_fetch_script["applies_to"])
+        self.assertIn("provisional_macro_release_web_search", te_fetch_script["applies_to"])
         self.assertIn("write_only_changed_monthly_buckets", te_fetch_script["applies_to"])
         self.assertIn("skipped_no_new_or_changed_rows", te_fetch_script["applies_to"])
-        self.assertIn("skipped_no_new_or_changed_rows", te_fetch_script["note"])
+        self.assertIn("--release-poll-until-value", te_fetch_script["note"])
+        self.assertIn("merge fallback into TE-origin rows", te_fetch_script["note"])
 
         schedule_policy = registry["TRADING_ECONOMICS_RELEASE_FETCH_SCHEDULE_POLICY"]
-        self.assertIn("default_delay_minutes=2", schedule_policy["payload"])
+        self.assertIn("default_delay_seconds=0", schedule_policy["payload"])
         self.assertIn("max_count=48", schedule_policy["payload"])
         self.assertIn("future_fetch_only", schedule_policy["payload"])
+        self.assertIn("poll_interval_seconds=5", schedule_policy["payload"])
+        self.assertIn("poll_timeout_seconds=60", schedule_policy["payload"])
+        self.assertIn("fallback_web_search_after_timeout", schedule_policy["payload"])
         self.assertIn("One-shot TE release-fetch scheduler", schedule_policy["note"])
+        self.assertIn("provisional web-search fallback evidence", schedule_policy["note"])
+
+        poll_policy = registry["TRADING_ECONOMICS_RELEASE_POLL_FALLBACK_POLICY"]
+        self.assertIn("release_poll_until_value", poll_policy["payload"])
+        self.assertIn("fallback_requested", poll_policy["payload"])
+        self.assertIn("provisional_realtime_decision_fallback", poll_policy["payload"])
+        self.assertIn("separate from canonical TE source rows", poll_policy["note"])
+
+        fallback_artifact = registry["PROVISIONAL_MACRO_RELEASE_WEB_SEARCH"]
+        self.assertEqual(fallback_artifact["kind"], "artifact_type")
+        self.assertEqual(fallback_artifact["payload"], "provisional_macro_release_web_search")
+        self.assertIn("realtime_decision_fallback", fallback_artifact["applies_to"])
+        self.assertIn("must not merge into TE-origin rows", fallback_artifact["note"])
+
+        fallback_receipt = registry["PROVISIONAL_MACRO_RELEASE_WEB_SEARCH_RECEIPT"]
+        self.assertEqual(fallback_receipt["kind"], "artifact_type")
+        self.assertEqual(fallback_receipt["payload"], "provisional_macro_release_web_search_receipt")
+        self.assertIn("fallback_status", fallback_receipt["note"])
 
         service = registry["TRADING_DATA_CALENDAR_MAINTENANCE_SYSTEMD_SERVICE"]
         self.assertEqual(service["payload"], "trading-data-calendar-maintenance.service")
@@ -2218,6 +2248,7 @@ class RegistryHelperTests(unittest.TestCase):
             "trading-data/deploy/systemd/trading-data-calendar-maintenance.service",
         )
         self.assertIn("--schedule-te-release-fetches", service["note"])
+        self.assertIn("poll for formal actual values", service["note"])
 
         timer = registry["TRADING_DATA_CALENDAR_MAINTENANCE_SYSTEMD_TIMER"]
         self.assertEqual(timer["payload"], "trading-data-calendar-maintenance.timer")
