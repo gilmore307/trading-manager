@@ -13,6 +13,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 
 DEFAULT_TAIL_ROW_LIMIT = 20
+DEFAULT_HIGH_SCORE_THRESHOLD = 0.8
 
 
 def build_model_group_layer_attribution(
@@ -26,6 +27,7 @@ def build_model_group_layer_attribution(
     run_id: str | None = None,
     now_utc: datetime | None = None,
     tail_row_limit: int = DEFAULT_TAIL_ROW_LIMIT,
+    high_score_threshold: float = DEFAULT_HIGH_SCORE_THRESHOLD,
 ) -> dict[str, Any]:
     """Write a compact attribution report and supporting CSVs.
 
@@ -58,12 +60,26 @@ def build_model_group_layer_attribution(
         score_bin_rows=score_bin_rows,
     )
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
+    tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
+        rows=rows,
+        counterfactual_summary=counterfactual_summary,
+        decision_rows_path=decision_rows_path,
+        m05_unfilled_diagnostics_path=m05_unfilled_diagnostics_path,
+        output_dir=output_dir,
+        high_score_threshold=high_score_threshold,
+        now_utc=now,
+    )
 
     _write_csv(output_dir / "m04_m05_cohorts.csv", cohort_rows)
     _write_csv(output_dir / "filled_score_bins.csv", score_bin_rows)
     _write_csv(output_dir / "tail_loss_rows.csv", tail_rows)
     _write_csv(output_dir / "top_gain_rows.csv", top_gain_rows)
     _write_csv(output_dir / "row_counterfactual_attribution.csv", counterfactual_rows)
+    _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
+    (output_dir / "high_score_filled_tail_loss_attribution_packet.json").write_text(
+        json.dumps(tail_loss_packet, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     if m05_unfilled_summary["source_status"] == "available":
         _write_csv(output_dir / "m05_unfilled_filter_reasons.csv", m05_unfilled_summary["filter_reason_rows"])
 
@@ -84,6 +100,11 @@ def build_model_group_layer_attribution(
         "tail_loss_rows_ref": str(output_dir / "tail_loss_rows.csv"),
         "top_gain_rows_ref": str(output_dir / "top_gain_rows.csv"),
         "row_counterfactual_attribution_ref": str(output_dir / "row_counterfactual_attribution.csv"),
+        "high_score_filled_tail_loss_attribution_packet_ref": str(
+            output_dir / "high_score_filled_tail_loss_attribution_packet.json"
+        ),
+        "high_score_filled_tail_loss_matches_ref": str(output_dir / "high_score_filled_tail_loss_matches.csv"),
+        "high_score_filled_tail_loss_summary": tail_loss_packet["headline"],
         "row_counterfactual_summary": counterfactual_summary,
         "counterfactual_gate_sweep_summary": gate_sweep_summary,
         "m05_unfilled_summary": {
@@ -732,6 +753,331 @@ def _int(value: Any) -> int:
         return 0
 
 
+def _high_score_tail_loss_attribution_packet(
+    *,
+    rows: Sequence[Mapping[str, Any]],
+    counterfactual_summary: Mapping[str, Any],
+    decision_rows_path: Path,
+    m05_unfilled_diagnostics_path: Path | None,
+    output_dir: Path,
+    high_score_threshold: float,
+    now_utc: datetime,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    filled = [row for row in rows if row.get("fill_status") == "simulated_filled"]
+    loss_rows = [
+        row
+        for row in filled
+        if _float(row.get("prediction_score")) >= high_score_threshold and _float(row.get("realized_return")) < 0
+    ]
+    control_rows = [
+        row
+        for row in filled
+        if _float(row.get("prediction_score")) >= high_score_threshold and _float(row.get("realized_return")) >= 0
+    ]
+    matched_rows = [_matched_tail_loss_row(loss_row, control_rows) for loss_row in loss_rows]
+    matched_comparison_count = _matched_comparison_count(matched_rows)
+    classification_summary = _tail_loss_classification_summary(
+        filled=filled,
+        loss_rows=loss_rows,
+        control_rows=control_rows,
+        matched_rows=matched_rows,
+        counterfactual_summary=counterfactual_summary,
+    )
+    requires_evidence_summary = _requires_evidence_summary(classification_summary)
+    packet = {
+        "contract_type": "model_group_high_score_filled_tail_loss_attribution_packet",
+        "generated_at_utc": now_utc.isoformat(),
+        "source_scope": {
+            "decision_rows_ref": str(decision_rows_path),
+            "m05_unfilled_diagnostics_ref": str(m05_unfilled_diagnostics_path) if m05_unfilled_diagnostics_path else "",
+            "fixed_input_only": True,
+            "provider_call_performed": False,
+            "broker_execution_performed": False,
+            "account_mutation_performed": False,
+            "sql_mutation_performed": False,
+            "storage_source_mutation_performed": False,
+            "model_activation_performed": False,
+            "active_model_config_written": False,
+        },
+        "cohort_definition": {
+            "high_score_threshold": high_score_threshold,
+            "loss_predicate": "fill_status=simulated_filled and prediction_score>=threshold and realized_return<0",
+            "control_predicate": "fill_status=simulated_filled and prediction_score>=threshold and realized_return>=0",
+        },
+        "headline": {
+            "filled_count": len(filled),
+            "high_score_filled_loss_count": len(loss_rows),
+            "high_score_filled_control_count": len(control_rows),
+            "filled_good_bad_score_gap": counterfactual_summary.get("filled_good_bad_score_gap"),
+            "execution_connection_mismatch_count": counterfactual_summary.get("execution_connection_mismatch_count"),
+            "sample_sufficiency_status": (counterfactual_summary.get("sample_sufficiency_status") or {}).get("status"),
+            "matched_comparison_count": matched_comparison_count,
+            "tail_loss_row_count": len(matched_rows),
+        },
+        "classification_summary": classification_summary,
+        "requires_evidence_summary": requires_evidence_summary,
+        "matched_comparison_rows_ref": str(output_dir / "high_score_filled_tail_loss_matches.csv"),
+        "implementation_limits": [
+            "No bid/ask, order-book depth, IV, Greeks, or venue fill-priority fields are available in replay decision rows.",
+            "No point-in-time feature trace timestamps are available for feature-timing or leakage attribution.",
+            "No event/regime overlay evidence is consumed by this packet; event miss classification remains M06-owned.",
+            "Matched controls are nearest fixed-input comparisons, not causal counterfactual trades.",
+        ],
+    }
+    return packet, matched_rows
+
+
+def _matched_tail_loss_row(loss_row: Mapping[str, Any], control_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    control_row, match_quality = _match_control_row(loss_row, control_rows)
+    loss_contract = _parse_option_contract(str(loss_row.get("selected_option_contract_ref") or ""))
+    control_contract = _parse_option_contract(str((control_row or {}).get("selected_option_contract_ref") or ""))
+    loss_m04 = _m04_diagnostics(loss_row)
+    control_m04 = _m04_diagnostics(control_row or {})
+    loss_scores = loss_m04.get("dominant_horizon_scores") or {}
+    control_scores = control_m04.get("dominant_horizon_scores") or {}
+    loss_return = _float(loss_row.get("realized_return"))
+    control_return = _float((control_row or {}).get("realized_return"))
+    label_return_disagreement = _label_return_disagreement(loss_row) or (
+        _label_return_disagreement(control_row or {}) if control_row else False
+    )
+    primary_failure_class, secondary_failure_classes, requires_evidence_codes = _tail_loss_row_classification(
+        loss_row=loss_row,
+        control_row=control_row,
+        loss_contract=loss_contract,
+        control_contract=control_contract,
+        label_return_disagreement=label_return_disagreement,
+    )
+    return {
+        "loss_decision_id": str(loss_row.get("decision_id") or ""),
+        "control_decision_id": str((control_row or {}).get("decision_id") or ""),
+        "loss_timestamp": str(loss_row.get("timestamp") or ""),
+        "control_timestamp": str((control_row or {}).get("timestamp") or ""),
+        "match_quality": match_quality,
+        "loss_prediction_score": _round(_float(loss_row.get("prediction_score"))),
+        "control_prediction_score": _round(_float((control_row or {}).get("prediction_score"))),
+        "score_delta": _round(_float(loss_row.get("prediction_score")) - _float((control_row or {}).get("prediction_score"))),
+        "loss_m05_alpha_score": _round(_float(_m05_diagnostics(loss_row).get("resolved_alpha_score"))),
+        "control_m05_alpha_score": _round(_float(_m05_diagnostics(control_row or {}).get("resolved_alpha_score"))),
+        "trade_intensity_delta": _round(_float(loss_scores.get("trade_intensity_score")) - _float(control_scores.get("trade_intensity_score"))),
+        "loss_realized_return": _round(loss_return),
+        "control_realized_return": _round(control_return),
+        "return_delta": _round(loss_return - control_return),
+        "loss_outcome_label": _text(loss_row.get("outcome_label")),
+        "control_outcome_label": _text((control_row or {}).get("outcome_label")),
+        "loss_contract_ref": str(loss_row.get("selected_option_contract_ref") or ""),
+        "control_contract_ref": str((control_row or {}).get("selected_option_contract_ref") or ""),
+        "loss_contract_underlying": loss_contract.get("underlying", ""),
+        "loss_contract_expiry": loss_contract.get("expiry", ""),
+        "loss_contract_option_side": loss_contract.get("option_side", ""),
+        "loss_contract_strike": loss_contract.get("strike", ""),
+        "loss_contract_dte": _contract_dte(loss_row, loss_contract),
+        "control_contract_underlying": control_contract.get("underlying", ""),
+        "control_contract_expiry": control_contract.get("expiry", ""),
+        "control_contract_option_side": control_contract.get("option_side", ""),
+        "control_contract_strike": control_contract.get("strike", ""),
+        "control_contract_dte": _contract_dte(control_row or {}, control_contract),
+        "same_target_ref": str(loss_row.get("target_ref") or "") == str((control_row or {}).get("target_ref") or ""),
+        "same_m04_state": _m04_state(loss_row) == _m04_state(control_row or {}),
+        "same_m05_state": _m05_state(loss_row) == _m05_state(control_row or {}),
+        "same_contract_family": _same_contract_family(loss_contract, control_contract),
+        "label_return_disagreement": label_return_disagreement,
+        "primary_failure_class": primary_failure_class,
+        "secondary_failure_classes": ";".join(secondary_failure_classes),
+        "requires_evidence_codes": ";".join(requires_evidence_codes),
+    }
+
+
+def _match_control_row(
+    loss_row: Mapping[str, Any],
+    control_rows: Sequence[Mapping[str, Any]],
+) -> tuple[Mapping[str, Any] | None, str]:
+    if not control_rows:
+        return None, "unmatched"
+    loss_contract = _parse_option_contract(str(loss_row.get("selected_option_contract_ref") or ""))
+    loss_month = str(loss_row.get("timestamp") or "")[:7]
+
+    def score(control_row: Mapping[str, Any]) -> tuple[int, float, int, str]:
+        control_contract = _parse_option_contract(str(control_row.get("selected_option_contract_ref") or ""))
+        same_target = str(loss_row.get("target_ref") or "") == str(control_row.get("target_ref") or "")
+        same_m04 = _m04_state(loss_row) == _m04_state(control_row)
+        same_m05 = _m05_state(loss_row) == _m05_state(control_row)
+        same_score_bin = _score_bin(loss_row) == _score_bin(control_row)
+        same_month = loss_month == str(control_row.get("timestamp") or "")[:7]
+        same_contract_family = _same_contract_family(loss_contract, control_contract)
+        quality_points = sum((same_target, same_m04, same_m05, same_score_bin, same_month, same_contract_family))
+        score_distance = abs(_float(loss_row.get("prediction_score")) - _float(control_row.get("prediction_score")))
+        time_distance = abs(_timestamp_sort_value(loss_row) - _timestamp_sort_value(control_row))
+        return (-quality_points, score_distance, time_distance, str(control_row.get("decision_id") or ""))
+
+    best = sorted(control_rows, key=score)[0]
+    if str(loss_row.get("target_ref") or "") == str(best.get("target_ref") or "") and loss_month == str(best.get("timestamp") or "")[:7]:
+        quality = "same_target_month_nearest_score"
+    elif str(loss_row.get("target_ref") or "") == str(best.get("target_ref") or ""):
+        quality = "same_target_nearest_score"
+    elif _m04_state(loss_row) == _m04_state(best) and _m05_state(loss_row) == _m05_state(best):
+        quality = "same_layer_state_only"
+    else:
+        quality = "weak_nearest_score"
+    return best, quality
+
+
+def _timestamp_sort_value(row: Mapping[str, Any]) -> int:
+    text = str(row.get("timestamp") or "")
+    digits = "".join(char for char in text if char.isdigit())
+    try:
+        return int(digits[:14])
+    except ValueError:
+        return 0
+
+
+def _parse_option_contract(contract_ref: str) -> dict[str, str]:
+    parts = contract_ref.split("_")
+    if len(parts) < 4:
+        return {}
+    return {
+        "underlying": parts[0],
+        "expiry": parts[1],
+        "option_side": parts[2],
+        "strike": parts[3],
+    }
+
+
+def _contract_dte(row: Mapping[str, Any], contract: Mapping[str, str]) -> int | None:
+    expiry = contract.get("expiry")
+    timestamp = str(row.get("timestamp") or "")[:10]
+    if not expiry or not timestamp:
+        return None
+    try:
+        expiry_date = datetime.fromisoformat(expiry).date()
+        timestamp_date = datetime.fromisoformat(timestamp).date()
+    except ValueError:
+        return None
+    return (expiry_date - timestamp_date).days
+
+
+def _same_contract_family(left: Mapping[str, str], right: Mapping[str, str]) -> bool:
+    if not left or not right:
+        return False
+    return left.get("underlying") == right.get("underlying") and left.get("option_side") == right.get("option_side")
+
+
+def _label_return_disagreement(row: Mapping[str, Any]) -> bool:
+    label = _text(row.get("outcome_label"))
+    realized_return = _float(row.get("realized_return"))
+    return (label == "1" and realized_return < 0) or (label == "0" and realized_return > 0)
+
+
+def _tail_loss_row_classification(
+    *,
+    loss_row: Mapping[str, Any],
+    control_row: Mapping[str, Any] | None,
+    loss_contract: Mapping[str, str],
+    control_contract: Mapping[str, str],
+    label_return_disagreement: bool,
+) -> tuple[str, list[str], list[str]]:
+    secondary: list[str] = ["model_overconfidence"]
+    requires = [
+        "feature_timing_or_leakage_requires_pit_feature_trace",
+        "liquidity_spread_fill_realism_requires_bid_ask_depth_and_fill_model",
+        "regime_event_miss_requires_m06_event_overlay",
+    ]
+    if label_return_disagreement:
+        return "label_target_definition", secondary, requires
+    if _contract_dte(loss_row, loss_contract) is None:
+        secondary.append("option_selection_mechanics_unknown_contract_parse")
+    elif _contract_dte(loss_row, loss_contract) is not None and _contract_dte(loss_row, loss_contract) <= 7:
+        secondary.append("short_dte_option_selection_mechanics")
+    if control_row and _same_contract_family(loss_contract, control_contract):
+        secondary.append("same_contract_family_control_available")
+    return "model_overconfidence", secondary, requires
+
+
+def _tail_loss_classification_summary(
+    *,
+    filled: Sequence[Mapping[str, Any]],
+    loss_rows: Sequence[Mapping[str, Any]],
+    control_rows: Sequence[Mapping[str, Any]],
+    matched_rows: Sequence[Mapping[str, Any]],
+    counterfactual_summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    score_gap = counterfactual_summary.get("filled_good_bad_score_gap")
+    sample_status = (counterfactual_summary.get("sample_sufficiency_status") or {}).get("status")
+    execution_mismatch_count = int(counterfactual_summary.get("execution_connection_mismatch_count") or 0)
+    label_disagreements = sum(1 for row in matched_rows if row.get("label_return_disagreement") is True)
+    short_dte_losses = sum(
+        1
+        for row in matched_rows
+        if row.get("loss_contract_dte") not in (None, "") and _int(row.get("loss_contract_dte")) <= 7
+    )
+    classification = {
+        "label_target_definition": {
+            "status": "supported" if label_disagreements else "not_supported_by_current_evidence",
+            "evidence_count": label_disagreements,
+        },
+        "feature_timing_or_leakage": {
+            "status": "unknown_requires_evidence",
+            "requires_evidence_codes": ["pit_feature_trace", "feature_generation_clock", "leakage_check_rows"],
+        },
+        "data_insufficiency": {
+            "status": "supported" if sample_status == "sample_limited" else "not_supported_by_current_evidence",
+            "reason_codes": (counterfactual_summary.get("sample_sufficiency_status") or {}).get("reason_codes", []),
+        },
+        "option_selection_mechanics": {
+            "status": "weakly_supported" if short_dte_losses else "unknown_requires_evidence",
+            "high_score_loss_short_dte_count": short_dte_losses,
+        },
+        "liquidity_spread_fill_realism": {
+            "status": "unknown_requires_evidence",
+            "requires_evidence_codes": ["bid_ask_spread", "quote_depth", "slippage_model", "partial_fill_simulation"],
+        },
+        "regime_event_miss": {
+            "status": "unknown_requires_evidence",
+            "requires_evidence_codes": ["m06_event_overlay", "regime_state", "co_event_controls"],
+        },
+        "model_overconfidence": {
+            "status": "supported"
+            if loss_rows and score_gap is not None and abs(float(score_gap)) < 0.02
+            else "not_supported_by_current_evidence",
+            "high_score_loss_count": len(loss_rows),
+            "filled_good_bad_score_gap": score_gap,
+        },
+        "promotion_gate_weakness": {
+            "status": "supported" if loss_rows and sample_status == "sample_limited" else "not_supported_by_current_evidence",
+            "reason_codes": ["high_score_losses_under_sample_limited_evidence"] if loss_rows and sample_status == "sample_limited" else [],
+        },
+        "execution_replay_artifact": {
+            "status": "supported" if execution_mismatch_count else "not_supported_by_current_evidence",
+            "execution_connection_mismatch_count": execution_mismatch_count,
+        },
+    }
+    classification["cohort_counts"] = {
+        "filled_count": len(filled),
+        "high_score_filled_loss_count": len(loss_rows),
+        "high_score_filled_control_count": len(control_rows),
+        "matched_comparison_count": _matched_comparison_count(matched_rows),
+        "tail_loss_row_count": len(matched_rows),
+    }
+    classification["match_quality_counts"] = dict(Counter(str(row.get("match_quality") or "") for row in matched_rows))
+    classification["primary_failure_class_counts"] = dict(
+        Counter(str(row.get("primary_failure_class") or "") for row in matched_rows)
+    )
+    return classification
+
+
+def _matched_comparison_count(rows: Sequence[Mapping[str, Any]]) -> int:
+    return sum(1 for row in rows if row.get("match_quality") != "unmatched" and row.get("control_decision_id"))
+
+
+def _requires_evidence_summary(classification_summary: Mapping[str, Any]) -> dict[str, Any]:
+    output: dict[str, Any] = {}
+    for name, item in classification_summary.items():
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("status") == "unknown_requires_evidence":
+            output[name] = item.get("requires_evidence_codes", [])
+    return output
+
+
 def _verdict(
     *,
     rows: Sequence[Mapping[str, Any]],
@@ -817,6 +1163,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--counterfactual-gate-sweep", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument("--tail-row-limit", type=int, default=DEFAULT_TAIL_ROW_LIMIT)
+    parser.add_argument("--high-score-threshold", type=float, default=DEFAULT_HIGH_SCORE_THRESHOLD)
     args = parser.parse_args(argv)
     report = build_model_group_layer_attribution(
         decision_rows_path=args.decision_rows,
@@ -827,6 +1174,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         counterfactual_gate_sweep_path=args.counterfactual_gate_sweep,
         run_id=args.run_id,
         tail_row_limit=args.tail_row_limit,
+        high_score_threshold=args.high_score_threshold,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

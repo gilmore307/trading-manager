@@ -87,8 +87,9 @@ M04/M05 boundary attribution is a manager-side diagnostic helper for this
 failure-attribution lane. `scripts/tasks/build_model_group_layer_attribution.py`
 reads an existing replay `decision_rows.jsonl` and writes compact cohort, score
 bin, tail-loss, optional M05 unfilled-filter, gate-sweep, and row-level
-counterfactual summaries. It separates weak replay evidence into three explicit
-diagnostic classes:
+counterfactual summaries. It also writes a focused high-score filled tail-loss
+packet that compares high-score losing fills with matched high-score non-loss
+fills. It separates weak replay evidence into three explicit diagnostic classes:
 
 - data insufficiency, such as too few filled option rows, sparse score bins, or
   missing point-in-time option candidates;
@@ -101,10 +102,13 @@ diagnostic classes:
 It is fixed-input evidence only: it must not call providers, mutate SQL or
 storage source data, change promotion decisions, relax option filters, retrain
 models, activate models, or write active configs. Gate-sweep rows are diagnostic
-counterfactual evidence, not threshold-selection authority. The tool's role is
-to decide the next bounded counterfactual or repair question when promotion
-fails due to overblocking, underblocking, option-expression drag, alpha
-calibration, or drawdown.
+counterfactual evidence, not threshold-selection authority. High-score tail-loss
+classification must not invent causes from missing evidence: feature timing,
+liquidity/spread/fill realism, and regime/event miss remain
+`unknown_requires_evidence` unless the fixed replay rows contain the needed
+point-in-time evidence. The tool's role is to decide the next bounded
+counterfactual or repair question when promotion fails due to overblocking,
+underblocking, option-expression drag, alpha calibration, or drawdown.
 
 ## M06 / Layer 4 Rule
 
@@ -115,5 +119,5 @@ M06 event-risk research may propose a promotion packet. Layer 4 may consume only
 ```bash
 PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/plan_model_promotion_review.py --model option_expression_model --candidate-ref trading-model://promotion-candidates/mpcand_example
 PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/build_agent_model_promotion_decision.py --promotion-request-ref manager_request://model-promotion/example --decision-status defer --decision-reason "missing production calibration evidence"
-PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/build_model_group_layer_attribution.py --decision-rows /path/to/decision_rows.jsonl --output-dir /path/to/diagnostic_run --m05-unfilled-diagnostics /path/to/m05_unfilled_diagnostics.csv --counterfactual-gate-sweep /path/to/counterfactual_gate_sweep.csv
+PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/build_model_group_layer_attribution.py --decision-rows /path/to/decision_rows.jsonl --output-dir /path/to/diagnostic_run --m05-unfilled-diagnostics /path/to/m05_unfilled_diagnostics.csv --counterfactual-gate-sweep /path/to/counterfactual_gate_sweep.csv --high-score-threshold 0.8
 ```

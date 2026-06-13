@@ -154,11 +154,76 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 report["verdict"]["root_cause_status"],
                 "multiple_root_causes_supported:data_insufficiency,execution_connection_failure,model_mechanism_defect",
             )
+            self.assertEqual(report["high_score_filled_tail_loss_summary"]["high_score_filled_loss_count"], 1)
+            self.assertEqual(report["high_score_filled_tail_loss_summary"]["high_score_filled_control_count"], 1)
+            packet_path = Path(report["high_score_filled_tail_loss_attribution_packet_ref"])
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+            self.assertEqual(packet["contract_type"], "model_group_high_score_filled_tail_loss_attribution_packet")
+            self.assertEqual(packet["classification_summary"]["model_overconfidence"]["status"], "supported")
+            self.assertEqual(packet["classification_summary"]["data_insufficiency"]["status"], "supported")
+            self.assertEqual(
+                packet["classification_summary"]["feature_timing_or_leakage"]["status"],
+                "unknown_requires_evidence",
+            )
+            self.assertEqual(
+                packet["classification_summary"]["liquidity_spread_fill_realism"]["status"],
+                "unknown_requires_evidence",
+            )
+            self.assertEqual(packet["classification_summary"]["regime_event_miss"]["status"], "unknown_requires_evidence")
             self.assertTrue((output_dir / "layer_attribution_report.json").exists())
             self.assertTrue((output_dir / "m04_m05_cohorts.csv").exists())
             self.assertTrue((output_dir / "filled_score_bins.csv").exists())
             self.assertTrue((output_dir / "tail_loss_rows.csv").exists())
             self.assertTrue((output_dir / "row_counterfactual_attribution.csv").exists())
+            self.assertTrue((output_dir / "high_score_filled_tail_loss_matches.csv").exists())
+
+    def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            rows = [
+                _row("r1", "accepted", "simulated_filled", 0, 0.83, -0.6, "open_long", "long", "passed", "listed_option_contract"),
+            ]
+            rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            packet_path = Path(report["high_score_filled_tail_loss_attribution_packet_ref"])
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+            self.assertEqual(packet["headline"]["high_score_filled_loss_count"], 1)
+            self.assertEqual(packet["headline"]["high_score_filled_control_count"], 0)
+            self.assertEqual(packet["headline"]["matched_comparison_count"], 0)
+            self.assertEqual(packet["headline"]["tail_loss_row_count"], 1)
+            self.assertEqual(packet["classification_summary"]["cohort_counts"]["matched_comparison_count"], 0)
+            self.assertEqual(packet["classification_summary"]["match_quality_counts"]["unmatched"], 1)
+
+    def test_tail_loss_packet_keeps_numeric_zero_label_for_disagreement(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            rows = [
+                _row("r1", "accepted", "simulated_filled", 0, 0.83, -0.6, "open_long", "long", "passed", "listed_option_contract"),
+                _row("r2", "accepted", "simulated_filled", 0, 0.84, 0.4, "open_long", "long", "passed", "listed_option_contract"),
+            ]
+            rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            packet_path = Path(report["high_score_filled_tail_loss_attribution_packet_ref"])
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+            self.assertEqual(packet["headline"]["matched_comparison_count"], 1)
+            self.assertEqual(packet["classification_summary"]["label_target_definition"]["status"], "supported")
+            self.assertEqual(packet["classification_summary"]["label_target_definition"]["evidence_count"], 1)
 
 
 def _row(
