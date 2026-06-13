@@ -310,6 +310,20 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("include_fixed_candidate_alpaca_bars", acquisition_policy["payload"])
         self.assertIn("storage_source_root=trading-storage/storage/01_source_data", acquisition_policy["payload"])
         self.assertIn("canonical_historical_source_data", acquisition_policy["payload"])
+        requirements_artifact = rows["EVALUATION_REPLAY_OPTION_FEATURE_REQUIREMENTS"]
+        self.assertEqual(requirements_artifact["payload"], "replay_option_feature_requirements")
+        self.assertIn("option_feature_requirements.jsonl", requirements_artifact["applies_to"])
+        self.assertIn("requirements_artifact_ref", requirements_artifact["applies_to"])
+        backoff_policy = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_BACKOFF_PAYLOAD_POLICY"]
+        self.assertIn("requirements_artifact_ref=option_feature_requirements.jsonl", backoff_policy["payload"])
+        self.assertIn("first consumes the full requirements_artifact_ref", backoff_policy["note"])
+        requirements_ref = rows["OPTION_FEATURE_REQUIREMENTS_ARTIFACT_REF"]
+        self.assertEqual(requirements_ref["kind"], "path_field")
+        self.assertEqual(requirements_ref["payload"], "requirements_artifact_ref")
+        generator_validation = rows["EVALUATION_REPLAY_MODEL_GENERATOR_OUTPUT_VALIDATION_POLICY"]
+        self.assertIn("validate_output=true_default", generator_validation["payload"])
+        self.assertIn("replay_internal_adapter_may_pass_validate_output=false", generator_validation["payload"])
+        self.assertIn("canonical_model_generation_keeps_validation_enabled", generator_validation["payload"])
         self.assertIn(
             "prepare_replay_dataset.py",
             rows["TRADING_EVALUATION_PREPARE_REPLAY_DATASET"]["path"],
@@ -2321,6 +2335,10 @@ class RegistryHelperTests(unittest.TestCase):
             "quarantine_candidate",
             "replay_dataset_preparation",
             "replay_freeze_gate",
+            "replay_completion_scope",
+            "promotion_replay",
+            "diagnostic_run",
+            "canonical_completion",
             "retention_class",
             "storage_lifecycle",
             "state_signal_type",
