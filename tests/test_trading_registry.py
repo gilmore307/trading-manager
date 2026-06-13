@@ -2241,6 +2241,18 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(fallback_receipt["payload"], "provisional_macro_release_web_search_receipt")
         self.assertIn("fallback_status", fallback_receipt["note"])
 
+        te_retention = registry["TRADING_ECONOMICS_APPEND_ONLY_RETENTION_POLICY"]
+        self.assertIn("canonical_te_source_no_delete_candidates", te_retention["payload"])
+        self.assertIn("te_side_products_compact_compress_or_delete_after_provenance", te_retention["payload"])
+        self.assertIn("formal_te_capture_replaces_provisional_fallback", te_retention["payload"])
+        self.assertIn("trading-storage/docs/04_task.md", te_retention["path"])
+        self.assertIn("trading-storage/docs/22_storage_maintenance_playbook.md", te_retention["path"])
+        self.assertIn("te_side_products", te_retention["applies_to"])
+        self.assertIn("provisional_macro_release_web_search", te_retention["applies_to"])
+        self.assertIn("must not be deleted or pruned", te_retention["note"])
+        self.assertIn("may be compacted", te_retention["note"])
+        self.assertIn("after formal TE capture", te_retention["note"])
+
         service = registry["TRADING_DATA_CALENDAR_MAINTENANCE_SYSTEMD_SERVICE"]
         self.assertEqual(service["payload"], "trading-data-calendar-maintenance.service")
         self.assertEqual(
