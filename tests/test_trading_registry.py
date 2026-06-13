@@ -547,6 +547,17 @@ class RegistryHelperTests(unittest.TestCase):
         triage_row = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_ROW"]
         self.assertEqual(triage_row["payload"], "post_replay_failure_triage_row")
 
+        layer_attribution_report = rows["MANAGER_MODEL_GROUP_LAYER_ATTRIBUTION_REPORT"]
+        self.assertEqual(layer_attribution_report["payload"], "model_group_layer_attribution_report")
+        self.assertIn("model_group_layer_attribution.py", layer_attribution_report["path"])
+        self.assertIn("model-mechanism defect", layer_attribution_report["note"])
+        self.assertIn("without provider calls", layer_attribution_report["note"])
+
+        row_counterfactual = rows["MANAGER_MODEL_GROUP_ROW_COUNTERFACTUAL_ATTRIBUTION"]
+        self.assertEqual(row_counterfactual["payload"], "row_counterfactual_attribution")
+        self.assertIn("row_counterfactual_bucket", row_counterfactual["applies_to"])
+        self.assertIn("not threshold-selection", row_counterfactual["note"])
+
         residual_event_governance_receipt = rows["MANAGER_POST_REPLAY_M06_EVENT_ATTRIBUTION_RECEIPT"]
         self.assertEqual(residual_event_governance_receipt["payload"], "post_replay_residual_event_governance_receipt")
         self.assertIn("provider calls", residual_event_governance_receipt["note"])
@@ -702,6 +713,29 @@ class RegistryHelperTests(unittest.TestCase):
         triage_script = rows["MODEL_GROUP_POST_REPLAY_FAILURE_TRIAGE_RUN"]
         self.assertEqual(triage_script["kind"], "script")
         self.assertIn("run_model_group_post_replay_attribution.py", triage_script["path"])
+
+        layer_attribution_script = rows["MODEL_GROUP_LAYER_ATTRIBUTION_BUILD"]
+        self.assertEqual(layer_attribution_script["kind"], "script")
+        self.assertIn("build_model_group_layer_attribution.py", layer_attribution_script["path"])
+        self.assertIn("no_provider_calls", layer_attribution_script["applies_to"])
+
+        layer_attribution_surfaces = rows["MANAGER_MODEL_GROUP_LAYER_ATTRIBUTION_SURFACES"]
+        self.assertIn("layer_attribution_report.json", layer_attribution_surfaces["payload"])
+        self.assertIn("row_counterfactual_attribution.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("counterfactual_gate_sweep_ref", layer_attribution_surfaces["payload"])
+        self.assertIn("not be treated as threshold selection", layer_attribution_surfaces["note"])
+
+        self.assertEqual(rows["ROW_COUNTERFACTUAL_BUCKET"]["payload"], "row_counterfactual_bucket")
+        layer_bucket_payloads = {
+            "MODEL_GROUP_LAYER_ATTRIBUTION_DATA_INSUFFICIENCY": "data_insufficiency",
+            "MODEL_GROUP_LAYER_ATTRIBUTION_EXECUTION_CONNECTION_FAILURE": "execution_connection_failure",
+            "MODEL_GROUP_LAYER_ATTRIBUTION_MODEL_MECHANISM_DEFECT": "model_mechanism_defect",
+            "MODEL_GROUP_LAYER_ATTRIBUTION_NOT_DIAGNOSTIC": "not_diagnostic",
+        }
+        for key, payload in layer_bucket_payloads.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("row_counterfactual_bucket", rows[key]["applies_to"])
 
         residual_event_governance_script = rows["MODEL_GROUP_M06_EVENT_ATTRIBUTION_RUN"]
         self.assertEqual(residual_event_governance_script["kind"], "script")
@@ -2489,9 +2523,11 @@ class RegistryHelperTests(unittest.TestCase):
             "m06_residual_event_governance_fold_completion",
             "m06_residual_event_governance_fold_completion_summary",
             "manager_residual_event_governance_input_materialization",
+            "failure_attribution_boundary",
             "focus_pool_status",
             "model_realtime_decision_component_route_status",
             "model_realtime_decision_route_plan_readiness",
+            "model_group.layer_attribution",
             "ready_signal",
             "one_shot_replay_acquisition",
             "production_completion_status",
@@ -2505,6 +2541,7 @@ class RegistryHelperTests(unittest.TestCase):
             "diagnostic_run",
             "canonical_completion",
             "retention_class",
+            "row_counterfactual_bucket",
             "storage_lifecycle",
             "state_signal_type",
             "target_state_vector_model",

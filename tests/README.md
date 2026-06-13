@@ -35,6 +35,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_layer_three_target_state.py`
 - `test_model_group_attribution.py`
 - `test_model_group_evaluation.py`
+- `test_model_group_layer_attribution.py`
 - `test_model_group_replay.py`
 - `test_model_group_replay_contract_paths.py`
 - `test_model_group_replay_dataset.py`
