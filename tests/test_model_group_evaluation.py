@@ -9,6 +9,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from trading_manager_tasks.model_group_evaluation import (
+    _build_promotion_eligibility_decision,
+    _build_promotion_review_packet,
+    _build_settlement_run,
     _decision_variable_schema_diagnostics,
     _is_filled_trade_row,
     _scored_rows,
@@ -330,6 +333,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertIn("eval_action_class", variable_diagnostics["normalized_row_samples"][0])
             self.assertIn("scorecards", metrics)
             self.assertFalse(settlement["gate_failures"])
+            self.assertEqual(metrics["high_score_tail_risk_diagnostics"]["high_score_filled_loss_count"], 0)
             self.assertFalse(metrics["evaluation_disagreement_report"]["promotion_gate_basis"]["auroc_is_hard_gate"])
             self.assertIn("score_decile_return", metrics["scorecards"]["ranking_calibration"])
             self.assertEqual(metrics["scorecards"]["selection_quality"]["taken_good_count"], 20)
@@ -581,6 +585,164 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         self.assertEqual(_scored_rows(rows, [0.0], [0.0], [0.0]), [])
         self.assertEqual(diagnostics["coverage"]["decision_disposition"]["values"]["skipped"], 1)
         self.assertNotIn("accepted", diagnostics["coverage"]["decision_disposition"]["values"])
+
+    def test_high_score_tail_loss_overconfidence_blocks_promotion_settlement(self):
+        rows = []
+        for index in range(6):
+            rows.append(
+                {
+                    "decision_id": f"loss{index}",
+                    "timestamp": f"2021-01-0{index + 1}T16:00:00-05:00",
+                    "realized_return": -0.20,
+                    "baseline_return": 0.0,
+                    "cost": 0.0,
+                    "outcome_label": 0,
+                    "prediction_score": 0.84,
+                    "action": "trade",
+                    "decision_status": "approved",
+                    "fill_status": "simulated_filled",
+                    "resolved_action_side": "long",
+                    "4_resolved_underlying_action_type": "open_long",
+                    "selected_option_contract_ref": "AAPL_2021-01-08_C_130",
+                }
+            )
+        for index in range(6):
+            rows.append(
+                {
+                    "decision_id": f"win{index}",
+                    "timestamp": f"2021-02-0{index + 1}T16:00:00-05:00",
+                    "realized_return": 0.25,
+                    "baseline_return": 0.0,
+                    "cost": 0.0,
+                    "outcome_label": 1,
+                    "prediction_score": 0.841,
+                    "action": "trade",
+                    "decision_status": "approved",
+                    "fill_status": "simulated_filled",
+                    "resolved_action_side": "long",
+                    "4_resolved_underlying_action_type": "open_long",
+                    "selected_option_contract_ref": "AAPL_2021-02-05_C_130",
+                }
+            )
+        for index in range(12):
+            rows.append(
+                {
+                    "decision_id": f"skip{index}",
+                    "timestamp": f"2021-03-{index + 1:02d}T16:00:00-05:00",
+                    "realized_return": 0.0,
+                    "baseline_return": 0.0,
+                    "cost": 0.0,
+                    "outcome_label": 0,
+                    "prediction_score": 0.2,
+                    "action": "skip",
+                    "decision_status": "rejected",
+                    "fill_status": "simulated_rejected",
+                    "resolved_action_side": "flat",
+                    "4_resolved_underlying_action_type": "no_trade",
+                }
+            )
+
+        settlement = _build_settlement_run(
+            fold_id="fold_tail",
+            target_symbol="AAPL",
+            candidate_model_ref="storage://candidate/tail-risk",
+            replay_contract_ref="trading-evaluation/replays/promotion_replay_candidate_policy.json",
+            replay_result_ref="storage://replay/tail-risk",
+            decision_rows=rows,
+            created_at_utc="2026-06-13T20:00:00+00:00",
+        )
+
+        diagnostics = settlement["metrics"]["high_score_tail_risk_diagnostics"]
+        self.assertIn("high_score_tail_loss_overconfidence", settlement["gate_failures"])
+        self.assertIn("high_score_tail_loss_sample_limited", settlement["gate_failures"])
+        self.assertEqual(diagnostics["model_overconfidence_status"], "failed")
+        self.assertEqual(diagnostics["option_selection_mechanics_status"], "weakly_supported")
+        self.assertEqual(diagnostics["short_dte_tail_loss_count"], 6)
+        self.assertEqual(diagnostics["minimum_short_dte_tail_loss_count"], 5)
+        self.assertEqual(diagnostics["sample_sufficiency_status"], "sample_limited")
+
+        packet = _build_promotion_review_packet(
+            settlement=settlement,
+            settlement_ref="/tmp/fold_settlement_run.json",
+            benchmark_contract_ref="trading-evaluation/replays/promotion_replay_candidate_policy.json",
+            residual_event_governance_ref="/tmp/post_replay_attribution_receipt.json",
+            created_at_utc="2026-06-13T20:00:00+00:00",
+        )
+
+        self.assertEqual(packet["recommendation"], "insufficient_evidence")
+        self.assertIn("high_score_tail_loss_overconfidence", packet["material_regressions"])
+        self.assertTrue(
+            any("feature_timing_or_leakage evidence" in followup for followup in packet["required_followups"])
+        )
+
+        eligibility = _build_promotion_eligibility_decision(
+            settlement=settlement,
+            review=packet,
+            settlement_ref="/tmp/fold_settlement_run.json",
+            review_ref="/tmp/promotion_evaluation_review.json",
+            replay_contract_ref="trading-evaluation/replays/promotion_replay_candidate_policy.json",
+            created_at_utc="2026-06-13T20:00:00+00:00",
+        )
+
+        self.assertEqual(eligibility["guardrail_status"], "failed")
+        self.assertEqual(eligibility["decision_status"], "rejected")
+
+    def test_high_score_tail_loss_inverted_score_gap_blocks_even_with_sufficient_sample(self):
+        rows = []
+        for index in range(6):
+            rows.append(
+                {
+                    "decision_id": f"inverted_loss{index}",
+                    "timestamp": f"2021-04-{index + 1:02d}T16:00:00-04:00",
+                    "realized_return": -0.10,
+                    "baseline_return": 0.0,
+                    "cost": 0.0,
+                    "outcome_label": 0,
+                    "prediction_score": 0.90,
+                    "action": "trade",
+                    "decision_status": "approved",
+                    "fill_status": "simulated_filled",
+                    "resolved_action_side": "long",
+                    "4_resolved_underlying_action_type": "open_long",
+                    "selected_option_contract_ref": "AAPL_2021-04-30_C_130",
+                }
+            )
+        for index in range(194):
+            rows.append(
+                {
+                    "decision_id": f"inverted_win{index}",
+                    "timestamp": "2021-05-03T16:00:00-04:00",
+                    "realized_return": 0.01,
+                    "baseline_return": 0.0,
+                    "cost": 0.0,
+                    "outcome_label": 1,
+                    "prediction_score": 0.70,
+                    "action": "trade",
+                    "decision_status": "approved",
+                    "fill_status": "simulated_filled",
+                    "resolved_action_side": "long",
+                    "4_resolved_underlying_action_type": "open_long",
+                    "selected_option_contract_ref": "AAPL_2021-05-21_C_130",
+                }
+            )
+
+        settlement = _build_settlement_run(
+            fold_id="fold_inverted_tail",
+            target_symbol="AAPL",
+            candidate_model_ref="storage://candidate/inverted-tail-risk",
+            replay_contract_ref="trading-evaluation/replays/promotion_replay_candidate_policy.json",
+            replay_result_ref="storage://replay/inverted-tail-risk",
+            decision_rows=rows,
+            created_at_utc="2026-06-13T20:00:00+00:00",
+        )
+
+        diagnostics = settlement["metrics"]["high_score_tail_risk_diagnostics"]
+        self.assertIn("high_score_tail_loss_overconfidence", settlement["gate_failures"])
+        self.assertNotIn("high_score_tail_loss_sample_limited", settlement["gate_failures"])
+        self.assertLess(diagnostics["filled_good_bad_score_gap"], 0)
+        self.assertEqual(diagnostics["filled_count"], 200)
+        self.assertEqual(diagnostics["sample_sufficiency_status"], "sufficient_for_this_diagnostic")
+        self.assertEqual(diagnostics["option_selection_mechanics_status"], "not_supported_by_current_evidence")
 
 
 if __name__ == "__main__":

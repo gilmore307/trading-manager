@@ -48,6 +48,11 @@ FEATURE_DIAGNOSTIC_SAMPLE_LIMIT = 160
 FEATURE_DIAGNOSTIC_POINT_LIMIT = 80
 DECISION_VARIABLE_SAMPLE_LIMIT = 12
 INTENDED_OPERATING_THRESHOLD = 0.70
+HIGH_SCORE_TAIL_RISK_THRESHOLD = 0.80
+MIN_HIGH_SCORE_TAIL_LOSS_COUNT = 5
+MIN_TAIL_RISK_FILLED_SAMPLE = 200
+MAX_HIGH_SCORE_GOOD_BAD_SCORE_GAP = 0.02
+SHORT_DTE_TAIL_LOSS_DAYS = 7
 MAX_ACCEPTABLE_MAX_DRAWDOWN = -0.30
 MAX_ACCEPTABLE_BAD_FILL_RATE = 0.55
 MAX_ACCEPTABLE_MODEL_MISSED_WINNER_RATE = 0.45
@@ -348,6 +353,10 @@ def _build_settlement_run(
         calibration_diagnostics=calibration_diagnostics,
         economic_diagnostics=economic_diagnostics,
     )
+    high_score_tail_risk_diagnostics = _high_score_tail_risk_diagnostics(
+        decision_rows=decision_rows,
+        net_returns=net_returns,
+    )
     disagreement_report = _evaluation_disagreement_report(
         auroc=auroc,
         scorecards=scorecards,
@@ -377,6 +386,7 @@ def _build_settlement_run(
         gate_failures.append("bad_fill_rate_too_high")
     if (scorecards.get("selection_quality", {}).get("model_missed_winner_rate") or 0.0) > MAX_ACCEPTABLE_MODEL_MISSED_WINNER_RATE:
         gate_failures.append("model_missed_winner_rate_too_high")
+    gate_failures.extend(high_score_tail_risk_diagnostics["gate_failures"])
     settlement_id = f"settlement_{_stable_token(fold_id, candidate_model_ref, replay_contract_ref, replay_result_ref)}"
     metrics = {
         "contract_type": "fold_settlement_metric",
@@ -432,6 +442,7 @@ def _build_settlement_run(
         "evaluation_disagreement_report": disagreement_report,
         "temporal_stability_diagnostics": temporal_stability_diagnostics,
         "baseline_comparison_diagnostics": baseline_comparison_diagnostics,
+        "high_score_tail_risk_diagnostics": high_score_tail_risk_diagnostics,
         "uncertainty_diagnostics": {
             "available": False,
             "reason": "block bootstrap confidence intervals require multiple completed comparable folds",
@@ -1152,6 +1163,85 @@ def _economic_diagnostics(*, net_returns: Sequence[float], realized_returns: Seq
     }
 
 
+def _high_score_tail_risk_diagnostics(
+    *,
+    decision_rows: Sequence[Mapping[str, Any]],
+    net_returns: Sequence[float],
+) -> dict[str, Any]:
+    filled_rows: list[dict[str, Any]] = []
+    for row, net_return in zip(decision_rows, net_returns, strict=True):
+        if not _is_filled_trade_row(row):
+            continue
+        score = _score(row)
+        label = _label(row)
+        if score is None or label is None:
+            continue
+        filled_rows.append(
+            {
+                "score": float(score),
+                "label": int(label),
+                "net_return": float(net_return),
+                "dte": _selected_option_contract_dte(row),
+            }
+        )
+    high_score_rows = [row for row in filled_rows if row["score"] >= HIGH_SCORE_TAIL_RISK_THRESHOLD]
+    high_score_losses = [row for row in high_score_rows if row["net_return"] < 0]
+    high_score_controls = [row for row in high_score_rows if row["net_return"] >= 0]
+    filled_good_score = _mean(row["score"] for row in filled_rows if row["label"] == 1)
+    filled_bad_score = _mean(row["score"] for row in filled_rows if row["label"] == 0)
+    good_bad_score_gap = None if filled_good_score is None or filled_bad_score is None else filled_good_score - filled_bad_score
+    short_dte_losses = [
+        row for row in high_score_losses if row["dte"] is not None and row["dte"] <= SHORT_DTE_TAIL_LOSS_DAYS
+    ]
+    gate_failures: list[str] = []
+    material_regressions: list[str] = []
+    if (
+        len(high_score_losses) >= MIN_HIGH_SCORE_TAIL_LOSS_COUNT
+        and good_bad_score_gap is not None
+        and good_bad_score_gap < MAX_HIGH_SCORE_GOOD_BAD_SCORE_GAP
+    ):
+        gate_failures.append("high_score_tail_loss_overconfidence")
+        material_regressions.append("high-score filled losses are not sufficiently separated below filled winners by score")
+    if len(high_score_losses) >= MIN_HIGH_SCORE_TAIL_LOSS_COUNT and len(filled_rows) < MIN_TAIL_RISK_FILLED_SAMPLE:
+        gate_failures.append("high_score_tail_loss_sample_limited")
+        material_regressions.append("high-score tail losses occurred under sample-limited filled-trade evidence")
+    option_selection_status = (
+        "weakly_supported"
+        if len(short_dte_losses) >= MIN_HIGH_SCORE_TAIL_LOSS_COUNT
+        else "not_supported_by_current_evidence"
+    )
+    if option_selection_status == "weakly_supported":
+        material_regressions.append("high-score filled losses concentrate in short-DTE option selections")
+    return {
+        "contract_type": "high_score_tail_risk_diagnostic",
+        "high_score_threshold": HIGH_SCORE_TAIL_RISK_THRESHOLD,
+        "filled_count": len(filled_rows),
+        "minimum_required_filled_count": MIN_TAIL_RISK_FILLED_SAMPLE,
+        "sample_sufficiency_status": "sample_limited" if len(filled_rows) < MIN_TAIL_RISK_FILLED_SAMPLE else "sufficient_for_this_diagnostic",
+        "high_score_filled_count": len(high_score_rows),
+        "high_score_filled_loss_count": len(high_score_losses),
+        "high_score_filled_control_count": len(high_score_controls),
+        "minimum_high_score_tail_loss_count": MIN_HIGH_SCORE_TAIL_LOSS_COUNT,
+        "filled_good_bad_score_gap": _round_metric(good_bad_score_gap) if good_bad_score_gap is not None else None,
+        "minimum_required_good_bad_score_gap": MAX_HIGH_SCORE_GOOD_BAD_SCORE_GAP,
+        "short_dte_tail_loss_count": len(short_dte_losses),
+        "minimum_short_dte_tail_loss_count": MIN_HIGH_SCORE_TAIL_LOSS_COUNT,
+        "short_dte_days": SHORT_DTE_TAIL_LOSS_DAYS,
+        "model_overconfidence_status": (
+            "failed" if "high_score_tail_loss_overconfidence" in gate_failures else "not_supported_by_current_evidence"
+        ),
+        "option_selection_mechanics_status": option_selection_status,
+        "execution_replay_artifact_status": "not_assessed_here",
+        "unknown_requires_evidence": {
+            "feature_timing_or_leakage": ["pit_feature_trace", "feature_generation_clock", "leakage_check_rows"],
+            "liquidity_spread_fill_realism": ["bid_ask_spread", "quote_depth", "slippage_model", "partial_fill_simulation"],
+            "regime_event_miss": ["m06_event_overlay", "regime_state", "co_event_controls"],
+        },
+        "gate_failures": gate_failures,
+        "material_regressions": material_regressions,
+    }
+
+
 def _data_integrity_diagnostics(
     *,
     raw_decision_rows: Sequence[Mapping[str, Any]],
@@ -1639,6 +1729,13 @@ def _round_metric(value: float) -> float:
     return round(float(value), 6)
 
 
+def _mean(values: Iterable[float]) -> float | None:
+    values_tuple = tuple(values)
+    if not values_tuple:
+        return None
+    return sum(values_tuple) / len(values_tuple)
+
+
 def _finite_float(value: Any) -> float | None:
     try:
         parsed = float(value)
@@ -1655,6 +1752,21 @@ def _is_filled_trade_row(row: Mapping[str, Any]) -> bool:
         return False
     action = str(row.get("action") or row.get("decision") or row.get("decision_action") or "").strip().lower()
     return action not in {"", "hold", "skip", "no_trade", "reject_entry_thesis", "defer_entry_thesis", "simulated_rejected"}
+
+
+def _selected_option_contract_dte(row: Mapping[str, Any]) -> int | None:
+    contract_ref = str(row.get("selected_option_contract_ref") or row.get("selected_contract_ref") or "").strip()
+    parts = contract_ref.split("_")
+    if len(parts) < 2:
+        return None
+    try:
+        expiry = datetime.fromisoformat(parts[1]).date()
+    except ValueError:
+        return None
+    timestamp = _parse_datetime(row.get("timestamp") or row.get("decision_timestamp"))
+    if timestamp is None:
+        return None
+    return (expiry - timestamp.date()).days
 
 
 def _build_promotion_review(
@@ -1720,6 +1832,16 @@ def _build_promotion_review_packet(
     blocking_issues = []
     if gate_failures:
         blocking_issues.append("settlement gate failures: " + ", ".join(gate_failures))
+    high_score_tail_risk = metrics.get("high_score_tail_risk_diagnostics")
+    tail_risk_followups: list[str] = []
+    tail_risk_regressions: list[str] = []
+    if isinstance(high_score_tail_risk, Mapping):
+        tail_risk_regressions = _string_list(high_score_tail_risk.get("material_regressions"))
+        unknown_evidence = high_score_tail_risk.get("unknown_requires_evidence")
+        if isinstance(unknown_evidence, Mapping):
+            for cause_name, evidence_codes in unknown_evidence.items():
+                codes = ", ".join(_string_list(evidence_codes))
+                tail_risk_followups.append(f"attach {cause_name} evidence: {codes}")
     blocking_issues.extend(
         [
             "missing anonymous comparison model result on the same benchmark contract",
@@ -1758,6 +1880,7 @@ def _build_promotion_review_packet(
             "baseline_return_total": metrics.get("baseline_return_total"),
             "excess_return_total": metrics.get("excess_return_total"),
             "max_drawdown": metrics.get("max_drawdown"),
+            "high_score_tail_risk_diagnostics": high_score_tail_risk,
             "hit_rate": metrics.get("hit_rate"),
             "payoff_ratio": metrics.get("payoff_ratio"),
             "turnover_proxy_count": metrics.get("turnover_proxy_count"),
@@ -1780,13 +1903,14 @@ def _build_promotion_review_packet(
             "evaluation_disagreement_report": metrics.get("evaluation_disagreement_report"),
         },
         "material_improvements": [f"settlement row count {metrics.get('decision_row_count')} is available"],
-        "material_regressions": gate_failures,
+        "material_regressions": gate_failures + tail_risk_regressions,
         "blocking_issues": blocking_issues,
         "required_followups": [
             "provide blinded model_a/model_b comparison evidence on the frozen replay contract",
             "attach candidate config and rollback refs before shadow-readiness review",
             "attach first-run/query-count evidence for this candidate lineage",
-        ],
+        ]
+        + tail_risk_followups,
         "rationale": (
             f"settlement rows={metrics.get('decision_row_count')}; AUROC={metrics.get('auroc')}; "
             f"excess_return_total={metrics.get('excess_return_total')}; max_drawdown={metrics.get('max_drawdown')}; "
@@ -1978,7 +2102,10 @@ def _build_promotion_eligibility_decision(
     replay_contract_ref: str,
     created_at_utc: str,
 ) -> dict[str, Any]:
-    decision_status = _promotion_decision_status(review.get("recommendation"))
+    decision_status = _promotion_decision_status(
+        review.get("recommendation"),
+        hard_guardrail_status=review.get("hard_guardrail_status"),
+    )
     return {
         "contract_type": "promotion_eligibility_decision",
         "promotion_eligibility_decision_id": f"promelig_{_stable_token(settlement.get('fold_id'), settlement_ref, decision_status)}",
@@ -2006,10 +2133,14 @@ def _build_promotion_eligibility_decision(
     }
 
 
-def _promotion_decision_status(recommendation: Any) -> str:
-    if recommendation == "eligible_for_shadow":
+def _promotion_decision_status(recommendation: Any, *, hard_guardrail_status: Any = None) -> str:
+    guardrail_status = str(hard_guardrail_status or "").strip().lower()
+    if guardrail_status == "failed":
+        return "rejected"
+    recommendation_status = str(recommendation or "").strip().lower()
+    if recommendation_status == "eligible_for_shadow":
         return "eligible"
-    if recommendation == "failed":
+    if recommendation_status == "failed":
         return "rejected"
     return "deferred"
 
