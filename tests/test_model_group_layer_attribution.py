@@ -184,6 +184,8 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "suspect_parameter_counterfactual_report.json").exists())
             self.assertTrue((output_dir / "m04_component_diagnostics.csv").exists())
             self.assertTrue((output_dir / "m05_selection_mechanics.csv").exists())
+            self.assertTrue((output_dir / "m04_variant_counterfactual.csv").exists())
+            self.assertTrue((output_dir / "m05_dte_policy_sensitivity.csv").exists())
             self.assertTrue((output_dir / "m04_m05_mechanism_review_report.json").exists())
             self.assertIn("parameter_replay_review_summary", report)
             self.assertIn("parameter_replay_review_report_ref", report)
@@ -192,6 +194,8 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             mechanism_report = json.loads((output_dir / "m04_m05_mechanism_review_report.json").read_text(encoding="utf-8"))
             self.assertEqual(mechanism_report["contract_type"], "model_group_m04_m05_mechanism_review_report")
             self.assertIn("threshold_selection", mechanism_report["forbidden_uses"])
+            self.assertEqual(mechanism_report["m04_variant_counterfactual_ref"], "m04_variant_counterfactual.csv")
+            self.assertEqual(mechanism_report["m05_dte_policy_sensitivity_ref"], "m05_dte_policy_sensitivity.csv")
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -315,7 +319,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     "passed",
                     "listed_option_contract" if filled else "option_expression_unfilled",
                 )
-                row["timestamp"] = f"2021-03-{(index % 28) + 1:02d}T16:00:00-05:00"
+                row["timestamp"] = f"2021-03-{(index // 24) + 1:02d}T{index % 24:02d}:00:00-05:00"
                 row["feature_momentum_30d"] = value
                 scores = row["model_layer_diagnostics"]["model_04_unified_decision"]["dominant_horizon_scores"]
                 scores["action_direction_score"] = value
@@ -323,10 +327,46 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 scores["trade_intensity_score"] = value
                 rows.append(row)
             rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+            m05_path = tmp / "m05_unfilled.csv"
+            with m05_path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=[
+                        "timestamp",
+                        "outcome_label",
+                        "underlying_return",
+                        "asset_expression_route",
+                        "selected_contract_ref",
+                        "candidate_count_before_filter",
+                        "candidate_count_after_filter",
+                        "eligible_candidate_count",
+                        "top_contract_fit_score",
+                        "plan_reason_codes",
+                        "fail_reason_counts",
+                    ],
+                )
+                writer.writeheader()
+                for row in rows[60:]:
+                    writer.writerow(
+                        {
+                            "timestamp": row["timestamp"],
+                            "outcome_label": "1",
+                            "underlying_return": "0.02",
+                            "asset_expression_route": "option_expression_unfilled",
+                            "selected_contract_ref": "",
+                            "candidate_count_before_filter": "4",
+                            "candidate_count_after_filter": "0",
+                            "eligible_candidate_count": "0",
+                            "top_contract_fit_score": "0.18",
+                            "plan_reason_codes": "no_contract_passed_hard_filter;dte_outside_policy_range",
+                            "fail_reason_counts": "{'dte_outside_policy_range': 4}",
+                        }
+                    )
 
             report = build_model_group_layer_attribution(
                 decision_rows_path=rows_path,
                 output_dir=output_dir,
+                m05_unfilled_diagnostics_path=m05_path,
                 now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
             )
 
@@ -373,11 +413,33 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue(
                 any(
                     row["execution_expression_state"] == "expression_unfilled"
-                    and row["option_feasibility_state"] in {"expression_evidence_missing", "expression_evidence_ambiguous"}
+                    and row["option_feasibility_state"] == "hard_filter_zero_eligible"
                     and row["selected_expression_type"] == "underlying_only_expression"
                     for row in selection_rows
                 )
             )
+            with (output_dir / "m04_variant_counterfactual.csv").open(encoding="utf-8") as handle:
+                variant_rows = {
+                    (row["variant_name"], row["subset_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                variant_rows[("inverse_trade_intensity", "m04_open_m05_pass_filled")]["diagnostic_status"],
+                "aligned_with_realized_return",
+            )
+            self.assertIn(
+                "inverse_trade_intensity",
+                report["m04_m05_mechanism_review_summary"]["m04_open_filled_aligned_variants"],
+            )
+            with (output_dir / "m05_dte_policy_sensitivity.csv").open(encoding="utf-8") as handle:
+                dte_rows = {
+                    (row["sensitivity_case"], row["primary_filter_reason"]): row
+                    for row in csv.DictReader(handle)
+            }
+            dte_primary = dte_rows[("dte_primary_hard_filter", "dte_outside_policy_range")]
+            self.assertEqual(dte_primary["diagnostic_status"], "dte_policy_pressure_supported")
+            self.assertEqual(dte_primary["positive_label_count"], "30")
+            self.assertEqual(report["m04_m05_mechanism_review_summary"]["m05_dte_primary_positive_label_count"], 30)
 
     def test_suspect_parameter_counterfactual_keeps_header_when_no_suspects(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

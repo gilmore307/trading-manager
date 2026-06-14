@@ -103,6 +103,49 @@ M05_SELECTION_MECHANICS_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+M04_VARIANT_COUNTERFACTUAL_FIELDNAMES = [
+    "variant_name",
+    "subset_name",
+    "formula",
+    "expected_direction",
+    "diagnostic_status",
+    "reason_codes",
+    "row_count",
+    "filled_count",
+    "value_mean",
+    "label_spearman",
+    "return_spearman",
+    "high_minus_low_label_rate",
+    "high_minus_low_return_per_row",
+    "low_bucket_fill_rate",
+    "high_bucket_fill_rate",
+    "high_minus_low_fill_rate",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
+M05_DTE_POLICY_SENSITIVITY_FIELDNAMES = [
+    "sensitivity_case",
+    "selected_expression_type",
+    "primary_filter_reason",
+    "diagnostic_status",
+    "reason_codes",
+    "row_count",
+    "positive_label_count",
+    "label_rate",
+    "underlying_return_total",
+    "positive_underlying_return_total",
+    "candidate_count_before_filter_mean",
+    "candidate_count_after_filter_mean",
+    "eligible_candidate_count_mean",
+    "dte_fail_count_mean",
+    "non_dte_fail_count_mean",
+    "dte_fail_share_mean",
+    "top_contract_fit_score_mean",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -151,9 +194,13 @@ def build_model_group_layer_attribution(
     parameter_review = _parameter_replay_review(rows)
     m04_component_rows = _m04_component_diagnostic_rows(rows)
     m05_selection_rows = _m05_selection_mechanics_rows(rows, counterfactual_rows)
+    m04_variant_rows = _m04_variant_counterfactual_rows(rows)
+    m05_dte_sensitivity_rows = _m05_dte_policy_sensitivity_rows(rows, counterfactual_rows)
     mechanism_review_report = _m04_m05_mechanism_review_report(
         m04_component_rows=m04_component_rows,
         m05_selection_rows=m05_selection_rows,
+        m04_variant_rows=m04_variant_rows,
+        m05_dte_sensitivity_rows=m05_dte_sensitivity_rows,
     )
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
     tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
@@ -189,6 +236,16 @@ def build_model_group_layer_attribution(
         output_dir / "m05_selection_mechanics.csv",
         m05_selection_rows,
         fieldnames=M05_SELECTION_MECHANICS_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "m04_variant_counterfactual.csv",
+        m04_variant_rows,
+        fieldnames=M04_VARIANT_COUNTERFACTUAL_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "m05_dte_policy_sensitivity.csv",
+        m05_dte_sensitivity_rows,
+        fieldnames=M05_DTE_POLICY_SENSITIVITY_FIELDNAMES,
     )
     (output_dir / "parameter_replay_review_report.json").write_text(
         json.dumps(parameter_review["report"], indent=2, sort_keys=True) + "\n",
@@ -244,6 +301,8 @@ def build_model_group_layer_attribution(
         "suspect_parameter_counterfactual_summary": parameter_review["suspect_counterfactual_summary"],
         "m04_component_diagnostics_ref": str(output_dir / "m04_component_diagnostics.csv"),
         "m05_selection_mechanics_ref": str(output_dir / "m05_selection_mechanics.csv"),
+        "m04_variant_counterfactual_ref": str(output_dir / "m04_variant_counterfactual.csv"),
+        "m05_dte_policy_sensitivity_ref": str(output_dir / "m05_dte_policy_sensitivity.csv"),
         "m04_m05_mechanism_review_report_ref": str(output_dir / "m04_m05_mechanism_review_report.json"),
         "m04_m05_mechanism_review_summary": mechanism_review_report["summary"],
         "counterfactual_gate_sweep_summary": gate_sweep_summary,
@@ -1743,10 +1802,308 @@ def _counterfactual_metric_mean(rows: Sequence[Mapping[str, Any]], key: str) -> 
     )
 
 
+def _m04_variant_counterfactual_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    subsets = {
+        "m04_open_m05_pass": tuple(
+            row for row in rows if _m04_state(row) == "open_long/long" and _m05_state(row) == "alpha_passed"
+        ),
+        "m04_open_m05_pass_filled": tuple(
+            row
+            for row in rows
+            if _m04_state(row) == "open_long/long"
+            and _m05_state(row) == "alpha_passed"
+            and row.get("fill_status") == "simulated_filled"
+        ),
+    }
+    output: list[dict[str, Any]] = []
+    variants = _m04_variant_definitions()
+    for variant_name, formula in variants:
+        for subset_name, subset_rows in subsets.items():
+            pairs = tuple(_m04_variant_pairs(subset_rows, variant_name))
+            stats = _parameter_subset_stats(pairs)
+            status, reason_codes = _m04_variant_status(subset_name=subset_name, stats=stats)
+            output.append(
+                {
+                    "variant_name": variant_name,
+                    "subset_name": subset_name,
+                    "formula": formula,
+                    "expected_direction": "higher_is_better",
+                    "diagnostic_status": status,
+                    "reason_codes": ";".join(reason_codes),
+                    "row_count": stats["row_count"],
+                    "filled_count": sum(1 for _value, row in pairs if row.get("fill_status") == "simulated_filled"),
+                    "value_mean": _round(stats["value_mean"]),
+                    "label_spearman": _round(stats["label_spearman"]),
+                    "return_spearman": _round(stats["return_spearman"]),
+                    "high_minus_low_label_rate": _round(stats["high_minus_low_label_rate"]),
+                    "high_minus_low_return_per_row": _round(stats["high_minus_low_return_per_row"]),
+                    "low_bucket_fill_rate": _round(stats["low_bucket_fill_rate"]),
+                    "high_bucket_fill_rate": _round(stats["high_bucket_fill_rate"]),
+                    "high_minus_low_fill_rate": _round(stats["high_minus_low_fill_rate"]),
+                    "threshold_selection_performed": False,
+                    "retraining_performed": False,
+                    "fixed_input_only": True,
+                }
+            )
+    return output
+
+
+def _m04_variant_definitions() -> tuple[tuple[str, str], ...]:
+    return (
+        (
+            "current_horizon_rank_proxy",
+            "action_confidence_score + 0.35 * trade_intensity_score - 0.25 * no_trade_probability_score",
+        ),
+        (
+            "risk_adjusted_intensity",
+            "trade_intensity_score * action_confidence_score * entry_quality_score * (1 - downside_risk_score)",
+        ),
+        (
+            "expected_return_intensity_product",
+            "expected_return_score * trade_intensity_score",
+        ),
+        (
+            "trade_intensity_margin",
+            "trade_intensity_score - minimum_trade_intensity",
+        ),
+        (
+            "inverse_trade_intensity",
+            "1 - trade_intensity_score",
+        ),
+        (
+            "deemphasized_intensity_quality",
+            "action_confidence_score + entry_quality_score + expected_return_score - downside_risk_score - no_trade_probability_score",
+        ),
+    )
+
+
+def _m04_variant_pairs(rows: Sequence[Mapping[str, Any]], variant_name: str) -> Iterable[tuple[float, Mapping[str, Any]]]:
+    for row in rows:
+        value = _m04_variant_value(row, variant_name)
+        if value is not None:
+            yield value, row
+
+
+def _m04_variant_value(row: Mapping[str, Any], variant_name: str) -> float | None:
+    scores = _m04_component_scores(row)
+    action_confidence = _finite_float(scores.get("action_confidence_score"))
+    trade_intensity = _finite_float(scores.get("trade_intensity_score"))
+    entry_quality = _finite_float(scores.get("entry_quality_score"))
+    expected_return = _finite_float(scores.get("expected_return_score"))
+    downside_risk = _finite_float(scores.get("downside_risk_score"))
+    no_trade_probability = _finite_float(scores.get("no_trade_probability_score"))
+    minimum_trade_intensity = _minimum_trade_intensity(row, scores)
+    if variant_name == "current_horizon_rank_proxy":
+        if action_confidence is None or trade_intensity is None or no_trade_probability is None:
+            return None
+        return action_confidence + 0.35 * trade_intensity - 0.25 * no_trade_probability
+    if variant_name == "risk_adjusted_intensity":
+        if None in (trade_intensity, action_confidence, entry_quality, downside_risk):
+            return None
+        return trade_intensity * action_confidence * entry_quality * (1.0 - downside_risk)
+    if variant_name == "expected_return_intensity_product":
+        if expected_return is None or trade_intensity is None:
+            return None
+        return expected_return * trade_intensity
+    if variant_name == "trade_intensity_margin":
+        if trade_intensity is None or minimum_trade_intensity is None:
+            return None
+        return trade_intensity - minimum_trade_intensity
+    if variant_name == "inverse_trade_intensity":
+        if trade_intensity is None:
+            return None
+        return 1.0 - trade_intensity
+    if variant_name == "deemphasized_intensity_quality":
+        if None in (action_confidence, entry_quality, expected_return, downside_risk, no_trade_probability):
+            return None
+        return action_confidence + entry_quality + expected_return - downside_risk - no_trade_probability
+    return None
+
+
+def _minimum_trade_intensity(row: Mapping[str, Any], scores: Mapping[str, Any]) -> float | None:
+    for value in (
+        scores.get("minimum_trade_intensity"),
+        row.get("entry_minimum_trade_intensity"),
+        row.get("minimum_trade_intensity"),
+    ):
+        parsed = _finite_float(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _m04_variant_status(*, subset_name: str, stats: Mapping[str, Any]) -> tuple[str, list[str]]:
+    if int(stats["row_count"] or 0) < MIN_PARAMETER_FILLED_COUNT:
+        return "sample_limited", ["subset_count_below_minimum"]
+    if _aligned_useful_supported(
+        expected_direction=1,
+        return_correlation=stats["return_spearman"],
+        return_spread=stats["high_minus_low_return_per_row"],
+    ):
+        return "aligned_with_realized_return", [f"{subset_name}_return_correlation_and_spread_align"]
+    if _aligned_inversion_supported(
+        expected_direction=1,
+        return_correlation=stats["return_spearman"],
+        return_spread=stats["high_minus_low_return_per_row"],
+    ):
+        return "still_inverted_against_realized_return", [f"{subset_name}_return_correlation_and_spread_inverted"]
+    return "weak_or_mixed", [f"{subset_name}_weak_or_mixed_variant_signal"]
+
+
+def _m05_dte_policy_sensitivity_rows(
+    rows: Sequence[Mapping[str, Any]],
+    counterfactual_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    row_by_decision_id = {str(row.get("decision_id") or ""): row for row in rows}
+    hard_filter_rows = [
+        row
+        for row in counterfactual_rows
+        if row.get("intended_model_trade") is True
+        and row.get("execution_expression_state") == "expression_unfilled"
+        and row.get("option_feasibility_state") == "hard_filter_zero_eligible"
+        and row.get("expression_join_status") == "matched"
+    ]
+    cases: list[tuple[str, Sequence[Mapping[str, Any]]]] = [
+        ("all_hard_filter_zero_eligible", hard_filter_rows),
+        (
+            "dte_present_hard_filter",
+            [row for row in hard_filter_rows if _filter_reason_count(row, "dte_outside_policy_range") > 0],
+        ),
+        (
+            "dte_primary_hard_filter",
+            [row for row in hard_filter_rows if row.get("primary_filter_reason") == "dte_outside_policy_range"],
+        ),
+        (
+            "positive_dte_primary_hard_filter",
+            [
+                row
+                for row in hard_filter_rows
+                if row.get("primary_filter_reason") == "dte_outside_policy_range"
+                and str(row.get("outcome_label")) == "1"
+            ],
+        ),
+    ]
+    output: list[dict[str, Any]] = []
+    for case_name, case_rows in cases:
+        groups: dict[tuple[str, str], list[Mapping[str, Any]]] = defaultdict(list)
+        for counterfactual in case_rows:
+            decision_row = row_by_decision_id.get(str(counterfactual.get("decision_id") or ""), {})
+            groups[(_selected_expression_type(decision_row), str(counterfactual.get("primary_filter_reason") or ""))].append(
+                counterfactual
+            )
+        if not groups:
+            output.append(_m05_dte_policy_sensitivity_row(case_name, "", "", []))
+            continue
+        for (expression_type, filter_reason), group_rows in sorted(
+            groups.items(),
+            key=lambda item: (-len(item[1]), item[0]),
+        ):
+            output.append(_m05_dte_policy_sensitivity_row(case_name, expression_type, filter_reason, group_rows))
+    return output
+
+
+def _m05_dte_policy_sensitivity_row(
+    case_name: str,
+    expression_type: str,
+    filter_reason: str,
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    dte_fail_counts = [_filter_reason_count(row, "dte_outside_policy_range") for row in rows]
+    non_dte_fail_counts = [_non_dte_filter_count(row) for row in rows]
+    before_filter_counts = [
+        _float(row.get("candidate_count_before_filter"))
+        for row in rows
+        if row.get("candidate_count_before_filter") not in (None, "")
+    ]
+    status, reason_codes = _m05_dte_policy_sensitivity_status(
+        rows=rows,
+        dte_fail_counts=dte_fail_counts,
+        non_dte_fail_counts=non_dte_fail_counts,
+    )
+    row_count = len(rows)
+    positive_rows = [row for row in rows if str(row.get("outcome_label")) == "1"]
+    dte_share_values = []
+    for dte_count, non_dte_count in zip(dte_fail_counts, non_dte_fail_counts, strict=True):
+        total = dte_count + non_dte_count
+        if total > 0:
+            dte_share_values.append(dte_count / total)
+    return {
+        "sensitivity_case": case_name,
+        "selected_expression_type": expression_type,
+        "primary_filter_reason": filter_reason,
+        "diagnostic_status": status,
+        "reason_codes": ";".join(reason_codes),
+        "row_count": row_count,
+        "positive_label_count": len(positive_rows),
+        "label_rate": _round(len(positive_rows) / row_count) if row_count else None,
+        "underlying_return_total": _round(sum(_float(row.get("underlying_return")) for row in rows)),
+        "positive_underlying_return_total": _round(sum(_float(row.get("underlying_return")) for row in positive_rows)),
+        "candidate_count_before_filter_mean": _round(_mean(before_filter_counts)),
+        "candidate_count_after_filter_mean": _counterfactual_metric_mean(rows, "candidate_count_after_filter"),
+        "eligible_candidate_count_mean": _counterfactual_metric_mean(rows, "eligible_candidate_count"),
+        "dte_fail_count_mean": _round(_mean(float(value) for value in dte_fail_counts)),
+        "non_dte_fail_count_mean": _round(_mean(float(value) for value in non_dte_fail_counts)),
+        "dte_fail_share_mean": _round(_mean(dte_share_values)),
+        "top_contract_fit_score_mean": _counterfactual_metric_mean(rows, "top_contract_fit_score"),
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+
+
+def _m05_dte_policy_sensitivity_status(
+    *,
+    rows: Sequence[Mapping[str, Any]],
+    dte_fail_counts: Sequence[int],
+    non_dte_fail_counts: Sequence[int],
+) -> tuple[str, list[str]]:
+    if len(rows) < MIN_PARAMETER_FILLED_COUNT:
+        return "sample_limited", ["subset_count_below_minimum"]
+    positive_count = sum(1 for row in rows if str(row.get("outcome_label")) == "1")
+    dte_present_count = sum(1 for count in dte_fail_counts if count > 0)
+    if positive_count <= 0 or dte_present_count <= 0:
+        return "not_dte_driven", ["no_positive_dte_filtered_rows"]
+    overlapping_count = sum(1 for count in non_dte_fail_counts if count > 0)
+    if overlapping_count >= len(rows) * 0.75:
+        return "dte_overlaps_other_filters", ["dte_failures_mostly_overlap_other_filter_failures"]
+    return "dte_policy_pressure_supported", ["positive_rows_with_dte_hard_filter_pressure"]
+
+
+def _filter_reason_count(row: Mapping[str, Any], reason_code: str) -> int:
+    counts = _counterfactual_filter_reason_counts(row)
+    return int(counts.get(reason_code) or 0)
+
+
+def _non_dte_filter_count(row: Mapping[str, Any]) -> int:
+    counts = _counterfactual_filter_reason_counts(row)
+    return sum(count for reason, count in counts.items() if reason != "dte_outside_policy_range")
+
+
+def _counterfactual_filter_reason_counts(row: Mapping[str, Any]) -> dict[str, int]:
+    raw = row.get("filter_reason_counts")
+    if isinstance(raw, Mapping):
+        return {str(reason): int(count) for reason, count in raw.items()}
+    try:
+        parsed = json.loads(str(raw or "{}"))
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(parsed, Mapping):
+        return {}
+    output: dict[str, int] = {}
+    for reason, count in parsed.items():
+        try:
+            output[str(reason)] = int(count)
+        except (TypeError, ValueError):
+            continue
+    return output
+
+
 def _m04_m05_mechanism_review_report(
     *,
     m04_component_rows: Sequence[Mapping[str, Any]],
     m05_selection_rows: Sequence[Mapping[str, Any]],
+    m04_variant_rows: Sequence[Mapping[str, Any]],
+    m05_dte_sensitivity_rows: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     m04_inverted = [
         str(row.get("component_name"))
@@ -1765,12 +2122,36 @@ def _m04_m05_mechanism_review_report(
     hard_filter_positive_unfilled = [
         row for row in m05_positive_unfilled if row.get("option_feasibility_state") == "hard_filter_zero_eligible"
     ]
+    aligned_variants = [
+        str(row.get("variant_name"))
+        for row in m04_variant_rows
+        if row.get("subset_name") == "m04_open_m05_pass_filled"
+        and row.get("diagnostic_status") == "aligned_with_realized_return"
+    ]
+    still_inverted_variants = [
+        str(row.get("variant_name"))
+        for row in m04_variant_rows
+        if row.get("subset_name") == "m04_open_m05_pass_filled"
+        and row.get("diagnostic_status") == "still_inverted_against_realized_return"
+    ]
+    dte_primary_rows = [
+        row
+        for row in m05_dte_sensitivity_rows
+        if row.get("sensitivity_case") == "dte_primary_hard_filter"
+        and row.get("primary_filter_reason") == "dte_outside_policy_range"
+    ]
+    dte_positive_label_count = sum(int(row.get("positive_label_count") or 0) for row in dte_primary_rows)
     summary = {
         "contract_type": "model_group_m04_m05_mechanism_review_summary",
         "m04_open_filled_inverted_components": sorted(set(m04_inverted)),
         "m04_open_filled_inverted_component_count": len(set(m04_inverted)),
+        "m04_open_filled_aligned_variants": sorted(set(aligned_variants)),
+        "m04_open_filled_aligned_variant_count": len(set(aligned_variants)),
+        "m04_open_filled_still_inverted_variants": sorted(set(still_inverted_variants)),
+        "m04_open_filled_still_inverted_variant_count": len(set(still_inverted_variants)),
         "m05_open_pass_positive_unfilled_group_count": len(m05_positive_unfilled),
         "m05_hard_filter_positive_unfilled_group_count": len(hard_filter_positive_unfilled),
+        "m05_dte_primary_positive_label_count": dte_positive_label_count,
         "primary_followup": _m04_m05_primary_followup(m04_inverted, hard_filter_positive_unfilled),
         "threshold_selection_performed": False,
         "retraining_performed": False,
@@ -1781,6 +2162,8 @@ def _m04_m05_mechanism_review_report(
         "summary": summary,
         "m04_component_diagnostics_ref": "m04_component_diagnostics.csv",
         "m05_selection_mechanics_ref": "m05_selection_mechanics.csv",
+        "m04_variant_counterfactual_ref": "m04_variant_counterfactual.csv",
+        "m05_dte_policy_sensitivity_ref": "m05_dte_policy_sensitivity.csv",
         "review_role": "fixed_replay_m04_m05_mechanism_triage_only",
         "forbidden_uses": [
             "causal_feature_importance_claim",

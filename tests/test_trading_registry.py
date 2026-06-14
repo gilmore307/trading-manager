@@ -570,6 +570,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(mechanism_review["payload"], "model_group_m04_m05_mechanism_review_report")
         self.assertIn("m04_component_diagnostics", mechanism_review["applies_to"])
         self.assertIn("m05_selection_mechanics", mechanism_review["applies_to"])
+        self.assertIn("m04_variant_counterfactual", mechanism_review["applies_to"])
+        self.assertIn("m05_dte_policy_sensitivity", mechanism_review["applies_to"])
         self.assertIn("without changing weights filters thresholds", mechanism_review["note"])
 
         residual_event_governance_receipt = rows["MANAGER_POST_REPLAY_M06_EVENT_ATTRIBUTION_RECEIPT"]
@@ -744,6 +746,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("suspect_parameter_counterfactual_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("m04_component_diagnostics.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m05_selection_mechanics.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("m04_variant_counterfactual.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("m05_dte_policy_sensitivity.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m04_m05_mechanism_review_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_attribution_packet.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_matches.csv", layer_attribution_surfaces["payload"])
@@ -2597,7 +2601,9 @@ class RegistryHelperTests(unittest.TestCase):
             "model_realtime_decision_route_plan_readiness",
             "model_group.layer_attribution",
             "m04_component_diagnostics",
+            "m04_variant_counterfactual",
             "m04_m05_mechanism_review",
+            "m05_dte_policy_sensitivity",
             "m05_selection_mechanics",
             "ready_signal",
             "one_shot_replay_acquisition",
