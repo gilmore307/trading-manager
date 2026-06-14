@@ -566,6 +566,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("suspect_parameter_counterfactual", suspect_parameter_counterfactual["applies_to"])
         self.assertIn("without threshold selection", suspect_parameter_counterfactual["note"])
 
+        mechanism_review = rows["MANAGER_MODEL_GROUP_M04_M05_MECHANISM_REVIEW_REPORT"]
+        self.assertEqual(mechanism_review["payload"], "model_group_m04_m05_mechanism_review_report")
+        self.assertIn("m04_component_diagnostics", mechanism_review["applies_to"])
+        self.assertIn("m05_selection_mechanics", mechanism_review["applies_to"])
+        self.assertIn("without changing weights filters thresholds", mechanism_review["note"])
+
         residual_event_governance_receipt = rows["MANAGER_POST_REPLAY_M06_EVENT_ATTRIBUTION_RECEIPT"]
         self.assertEqual(residual_event_governance_receipt["payload"], "post_replay_residual_event_governance_receipt")
         self.assertIn("provider calls", residual_event_governance_receipt["note"])
@@ -736,6 +742,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("categorical_parameter_replay_review.csv", layer_attribution_surfaces["payload"])
         self.assertIn("suspect_parameter_counterfactual.csv", layer_attribution_surfaces["payload"])
         self.assertIn("suspect_parameter_counterfactual_report.json", layer_attribution_surfaces["payload"])
+        self.assertIn("m04_component_diagnostics.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("m05_selection_mechanics.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("m04_m05_mechanism_review_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_attribution_packet.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_matches.csv", layer_attribution_surfaces["payload"])
         self.assertIn("counterfactual_gate_sweep_ref", layer_attribution_surfaces["payload"])

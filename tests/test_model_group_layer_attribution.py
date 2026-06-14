@@ -182,9 +182,16 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "categorical_parameter_replay_review.csv").exists())
             self.assertTrue((output_dir / "suspect_parameter_counterfactual.csv").exists())
             self.assertTrue((output_dir / "suspect_parameter_counterfactual_report.json").exists())
+            self.assertTrue((output_dir / "m04_component_diagnostics.csv").exists())
+            self.assertTrue((output_dir / "m05_selection_mechanics.csv").exists())
+            self.assertTrue((output_dir / "m04_m05_mechanism_review_report.json").exists())
             self.assertIn("parameter_replay_review_summary", report)
             self.assertIn("parameter_replay_review_report_ref", report)
             self.assertIn("suspect_parameter_counterfactual_summary", report)
+            self.assertIn("m04_m05_mechanism_review_summary", report)
+            mechanism_report = json.loads((output_dir / "m04_m05_mechanism_review_report.json").read_text(encoding="utf-8"))
+            self.assertEqual(mechanism_report["contract_type"], "model_group_m04_m05_mechanism_review_report")
+            self.assertIn("threshold_selection", mechanism_report["forbidden_uses"])
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -348,6 +355,29 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertFalse(counterfactual_report["retraining_performed"])
             self.assertIn("threshold_selection", counterfactual_report["forbidden_uses"])
             self.assertFalse(report["suspect_parameter_counterfactual_summary"]["threshold_selection_performed"])
+            with (output_dir / "m04_component_diagnostics.csv").open(encoding="utf-8") as handle:
+                component_rows = {
+                    (row["component_name"], row["subset_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                component_rows[("trade_intensity_score", "m04_open_m05_pass_filled")]["diagnostic_status"],
+                "inverted_against_expected_direction",
+            )
+            self.assertIn(
+                "trade_intensity_score",
+                report["m04_m05_mechanism_review_summary"]["m04_open_filled_inverted_components"],
+            )
+            with (output_dir / "m05_selection_mechanics.csv").open(encoding="utf-8") as handle:
+                selection_rows = list(csv.DictReader(handle))
+            self.assertTrue(
+                any(
+                    row["execution_expression_state"] == "expression_unfilled"
+                    and row["option_feasibility_state"] in {"expression_evidence_missing", "expression_evidence_ambiguous"}
+                    and row["selected_expression_type"] == "underlying_only_expression"
+                    for row in selection_rows
+                )
+            )
 
     def test_suspect_parameter_counterfactual_keeps_header_when_no_suspects(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -403,6 +433,11 @@ def _row(
         "decision_id": decision_id,
         "timestamp": f"2021-01-0{decision_id[-1]}T16:00:00-05:00",
         "decision_status": decision_status,
+        "decision_expression_type": (
+            "long_call"
+            if route == "listed_option_contract"
+            else "underlying_only_expression" if route == "option_expression_unfilled" else "no_option_expression"
+        ),
         "fill_status": fill_status,
         "outcome_label": outcome_label,
         "prediction_score": prediction_score,

@@ -57,6 +57,52 @@ SUSPECT_PARAMETER_COUNTERFACTUAL_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+M04_COMPONENT_DIAGNOSTIC_FIELDNAMES = [
+    "component_name",
+    "subset_name",
+    "expected_direction",
+    "diagnostic_status",
+    "reason_codes",
+    "row_count",
+    "filled_count",
+    "value_mean",
+    "label_spearman",
+    "return_spearman",
+    "high_minus_low_label_rate",
+    "high_minus_low_return_per_row",
+    "low_bucket_fill_rate",
+    "high_bucket_fill_rate",
+    "high_minus_low_fill_rate",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
+M05_SELECTION_MECHANICS_FIELDNAMES = [
+    "m04_state",
+    "m05_state",
+    "execution_expression_state",
+    "option_feasibility_state",
+    "selected_expression_type",
+    "primary_filter_reason",
+    "row_count",
+    "filled_count",
+    "filled_good_count",
+    "filled_bad_count",
+    "label_rate",
+    "mean_prediction_score",
+    "net_return_total",
+    "return_per_row",
+    "filled_hit_rate",
+    "positive_label_count",
+    "positive_underlying_return_total",
+    "candidate_count_before_filter_mean",
+    "candidate_count_after_filter_mean",
+    "eligible_candidate_count_mean",
+    "top_contract_fit_score_mean",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -103,6 +149,12 @@ def build_model_group_layer_attribution(
         score_bin_rows=score_bin_rows,
     )
     parameter_review = _parameter_replay_review(rows)
+    m04_component_rows = _m04_component_diagnostic_rows(rows)
+    m05_selection_rows = _m05_selection_mechanics_rows(rows, counterfactual_rows)
+    mechanism_review_report = _m04_m05_mechanism_review_report(
+        m04_component_rows=m04_component_rows,
+        m05_selection_rows=m05_selection_rows,
+    )
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
     tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
         rows=rows,
@@ -128,6 +180,16 @@ def build_model_group_layer_attribution(
         parameter_review["suspect_counterfactual_rows"],
         fieldnames=SUSPECT_PARAMETER_COUNTERFACTUAL_FIELDNAMES,
     )
+    _write_csv(
+        output_dir / "m04_component_diagnostics.csv",
+        m04_component_rows,
+        fieldnames=M04_COMPONENT_DIAGNOSTIC_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "m05_selection_mechanics.csv",
+        m05_selection_rows,
+        fieldnames=M05_SELECTION_MECHANICS_FIELDNAMES,
+    )
     (output_dir / "parameter_replay_review_report.json").write_text(
         json.dumps(parameter_review["report"], indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -138,6 +200,10 @@ def build_model_group_layer_attribution(
     )
     (output_dir / "high_score_filled_tail_loss_attribution_packet.json").write_text(
         json.dumps(tail_loss_packet, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "m04_m05_mechanism_review_report.json").write_text(
+        json.dumps(mechanism_review_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     if m05_unfilled_summary["source_status"] == "available":
@@ -176,6 +242,10 @@ def build_model_group_layer_attribution(
             output_dir / "suspect_parameter_counterfactual_report.json"
         ),
         "suspect_parameter_counterfactual_summary": parameter_review["suspect_counterfactual_summary"],
+        "m04_component_diagnostics_ref": str(output_dir / "m04_component_diagnostics.csv"),
+        "m05_selection_mechanics_ref": str(output_dir / "m05_selection_mechanics.csv"),
+        "m04_m05_mechanism_review_report_ref": str(output_dir / "m04_m05_mechanism_review_report.json"),
+        "m04_m05_mechanism_review_summary": mechanism_review_report["summary"],
         "counterfactual_gate_sweep_summary": gate_sweep_summary,
         "m05_unfilled_summary": {
             key: value for key, value in m05_unfilled_summary.items() if key != "filter_reason_rows"
@@ -869,7 +939,7 @@ def _categorical_parameter_values(row: Mapping[str, Any]) -> dict[str, str]:
         "fill_status": _text(row.get("fill_status")),
         "asset_expression_route": _text(row.get("asset_expression_route")),
         "option_contract_path_status": _text(row.get("option_contract_path_status")),
-        "selected_option_expression_type": _text(row.get("selected_option_expression_type")),
+        "selected_option_expression_type": _selected_expression_type(row),
         "model_04.resolved_underlying_action_type": _text(m04.get("resolved_underlying_action_type")),
         "model_04.resolved_action_side": _text(m04.get("resolved_action_side")),
         "model_04.dominant_horizon": _text(m04.get("dominant_horizon")),
@@ -1465,6 +1535,274 @@ def _suspect_parameter_counterfactual_report(rows: Sequence[Mapping[str, Any]]) 
             "broker_or_account_authority",
         ],
     }
+
+
+def _m04_component_diagnostic_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    components = [
+        "action_direction_score",
+        "expected_return_score",
+        "trade_intensity_score",
+        "action_confidence_score",
+        "entry_quality_score",
+        "downside_risk_score",
+        "no_trade_probability_score",
+    ]
+    subsets = {
+        "all_rows": tuple(rows),
+        "m04_open": tuple(row for row in rows if _m04_state(row) == "open_long/long"),
+        "m04_open_m05_pass": tuple(
+            row for row in rows if _m04_state(row) == "open_long/long" and _m05_state(row) == "alpha_passed"
+        ),
+        "m04_open_m05_pass_filled": tuple(
+            row
+            for row in rows
+            if _m04_state(row) == "open_long/long"
+            and _m05_state(row) == "alpha_passed"
+            and row.get("fill_status") == "simulated_filled"
+        ),
+    }
+    output: list[dict[str, Any]] = []
+    for component in components:
+        expected_direction = _m04_component_expected_direction(component)
+        for subset_name, subset_rows in subsets.items():
+            pairs = tuple(_m04_component_pairs(subset_rows, component))
+            stats = _parameter_subset_stats(pairs)
+            status, reason_codes = _m04_component_diagnostic_status(
+                expected_direction=expected_direction,
+                subset_name=subset_name,
+                stats=stats,
+            )
+            output.append(
+                {
+                    "component_name": component,
+                    "subset_name": subset_name,
+                    "expected_direction": _direction_text(expected_direction),
+                    "diagnostic_status": status,
+                    "reason_codes": ";".join(reason_codes),
+                    "row_count": stats["row_count"],
+                    "filled_count": sum(1 for _value, row in pairs if row.get("fill_status") == "simulated_filled"),
+                    "value_mean": _round(stats["value_mean"]),
+                    "label_spearman": _round(stats["label_spearman"]),
+                    "return_spearman": _round(stats["return_spearman"]),
+                    "high_minus_low_label_rate": _round(stats["high_minus_low_label_rate"]),
+                    "high_minus_low_return_per_row": _round(stats["high_minus_low_return_per_row"]),
+                    "low_bucket_fill_rate": _round(stats["low_bucket_fill_rate"]),
+                    "high_bucket_fill_rate": _round(stats["high_bucket_fill_rate"]),
+                    "high_minus_low_fill_rate": _round(stats["high_minus_low_fill_rate"]),
+                    "threshold_selection_performed": False,
+                    "retraining_performed": False,
+                    "fixed_input_only": True,
+                }
+            )
+    return output
+
+
+def _m04_component_pairs(rows: Sequence[Mapping[str, Any]], component: str) -> Iterable[tuple[float, Mapping[str, Any]]]:
+    for row in rows:
+        scores = _m04_component_scores(row)
+        parsed = _finite_float(scores.get(component))
+        if parsed is not None:
+            yield parsed, row
+
+
+def _m04_component_scores(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    return _m04_diagnostics(row).get("dominant_horizon_scores") or {}
+
+
+def _m04_component_expected_direction(component: str) -> int | None:
+    if component in {"downside_risk_score", "no_trade_probability_score"}:
+        return -1
+    return 1
+
+
+def _m04_component_diagnostic_status(
+    *,
+    expected_direction: int | None,
+    subset_name: str,
+    stats: Mapping[str, Any],
+) -> tuple[str, list[str]]:
+    if int(stats["row_count"] or 0) < MIN_PARAMETER_FILLED_COUNT:
+        return "sample_limited", ["subset_count_below_minimum"]
+    if _aligned_inversion_supported(
+        expected_direction=expected_direction,
+        return_correlation=stats["return_spearman"],
+        return_spread=stats["high_minus_low_return_per_row"],
+    ):
+        return "inverted_against_expected_direction", [f"{subset_name}_return_correlation_and_spread_inverted"]
+    if _aligned_useful_supported(
+        expected_direction=expected_direction,
+        return_correlation=stats["return_spearman"],
+        return_spread=stats["high_minus_low_return_per_row"],
+    ):
+        return "aligned_with_expected_direction", [f"{subset_name}_return_correlation_and_spread_align"]
+    return "weak_or_mixed", [f"{subset_name}_weak_or_mixed_component_signal"]
+
+
+def _aligned_useful_supported(
+    *,
+    expected_direction: int | None,
+    return_correlation: Any,
+    return_spread: Any,
+) -> bool:
+    if expected_direction is None or return_correlation is None or return_spread is None:
+        return False
+    aligned_correlation = float(return_correlation) if expected_direction != -1 else -float(return_correlation)
+    aligned_spread = float(return_spread) if expected_direction != -1 else -float(return_spread)
+    return aligned_correlation >= MIN_PARAMETER_ABS_CORRELATION and aligned_spread >= MIN_PARAMETER_RETURN_SPREAD
+
+
+def _m05_selection_mechanics_rows(
+    rows: Sequence[Mapping[str, Any]],
+    counterfactual_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    counterfactual_by_decision_id = {str(row.get("decision_id") or ""): row for row in counterfactual_rows}
+    groups: dict[tuple[str, str, str, str, str, str], list[tuple[Mapping[str, Any], Mapping[str, Any]]]] = defaultdict(list)
+    for row in rows:
+        counterfactual = counterfactual_by_decision_id.get(str(row.get("decision_id") or ""), {})
+        key = (
+            _m04_state(row),
+            _m05_state(row),
+            _expression_state(row),
+            str(counterfactual.get("option_feasibility_state") or ""),
+            _selected_expression_type(row),
+            str(counterfactual.get("primary_filter_reason") or ""),
+        )
+        groups[key].append((row, counterfactual))
+
+    output: list[dict[str, Any]] = []
+    for (m04_state, m05_state, expression_state, feasibility_state, expression_type, filter_reason), grouped in sorted(
+        groups.items(),
+        key=lambda item: (-len(item[1]), item[0]),
+    ):
+        group_rows = [row for row, _counterfactual in grouped]
+        group_counterfactuals = [counterfactual for _row, counterfactual in grouped]
+        output.append(
+            {
+                "m04_state": m04_state,
+                "m05_state": m05_state,
+                "execution_expression_state": expression_state,
+                "option_feasibility_state": feasibility_state,
+                "selected_expression_type": expression_type,
+                "primary_filter_reason": filter_reason,
+                **_summary(group_rows),
+                "positive_label_count": sum(1 for row in group_rows if str(row.get("outcome_label")) == "1"),
+                "positive_underlying_return_total": _round(
+                    sum(
+                        _float(counterfactual.get("underlying_return"))
+                        for row, counterfactual in grouped
+                        if str(row.get("outcome_label")) == "1"
+                    )
+                ),
+                "candidate_count_before_filter_mean": _counterfactual_metric_mean(
+                    group_counterfactuals,
+                    "candidate_count_before_filter",
+                ),
+                "candidate_count_after_filter_mean": _counterfactual_metric_mean(
+                    group_counterfactuals,
+                    "candidate_count_after_filter",
+                ),
+                "eligible_candidate_count_mean": _counterfactual_metric_mean(
+                    group_counterfactuals,
+                    "eligible_candidate_count",
+                ),
+                "top_contract_fit_score_mean": _counterfactual_metric_mean(
+                    group_counterfactuals,
+                    "top_contract_fit_score",
+                ),
+                "threshold_selection_performed": False,
+                "retraining_performed": False,
+                "fixed_input_only": True,
+            }
+        )
+    return output
+
+
+def _selected_expression_type(row: Mapping[str, Any]) -> str:
+    for key in (
+        "selected_option_expression_type",
+        "decision_expression_type",
+        "5_resolved_expression_type",
+        "resolved_expression_type",
+        "expression_type",
+    ):
+        value = str(row.get(key) or "").strip()
+        if value == "underlying_only":
+            return "underlying_only_expression"
+        if value:
+            return value
+    return ""
+
+
+def _counterfactual_metric_mean(rows: Sequence[Mapping[str, Any]], key: str) -> float | None:
+    return _round(
+        _mean(
+            _float(row.get(key))
+            for row in rows
+            if row.get("expression_join_status") == "matched" and row.get(key) not in (None, "")
+        )
+    )
+
+
+def _m04_m05_mechanism_review_report(
+    *,
+    m04_component_rows: Sequence[Mapping[str, Any]],
+    m05_selection_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    m04_inverted = [
+        str(row.get("component_name"))
+        for row in m04_component_rows
+        if row.get("subset_name") == "m04_open_m05_pass_filled"
+        and row.get("diagnostic_status") == "inverted_against_expected_direction"
+    ]
+    m05_positive_unfilled = [
+        row
+        for row in m05_selection_rows
+        if row.get("m04_state") == "open_long/long"
+        and row.get("m05_state") == "alpha_passed"
+        and row.get("execution_expression_state") == "expression_unfilled"
+        and int(row.get("positive_label_count") or 0) > 0
+    ]
+    hard_filter_positive_unfilled = [
+        row for row in m05_positive_unfilled if row.get("option_feasibility_state") == "hard_filter_zero_eligible"
+    ]
+    summary = {
+        "contract_type": "model_group_m04_m05_mechanism_review_summary",
+        "m04_open_filled_inverted_components": sorted(set(m04_inverted)),
+        "m04_open_filled_inverted_component_count": len(set(m04_inverted)),
+        "m05_open_pass_positive_unfilled_group_count": len(m05_positive_unfilled),
+        "m05_hard_filter_positive_unfilled_group_count": len(hard_filter_positive_unfilled),
+        "primary_followup": _m04_m05_primary_followup(m04_inverted, hard_filter_positive_unfilled),
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+    return {
+        "contract_type": "model_group_m04_m05_mechanism_review_report",
+        "summary": summary,
+        "m04_component_diagnostics_ref": "m04_component_diagnostics.csv",
+        "m05_selection_mechanics_ref": "m05_selection_mechanics.csv",
+        "review_role": "fixed_replay_m04_m05_mechanism_triage_only",
+        "forbidden_uses": [
+            "causal_feature_importance_claim",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+    }
+
+
+def _m04_m05_primary_followup(
+    m04_inverted_components: Sequence[str],
+    hard_filter_positive_unfilled_rows: Sequence[Mapping[str, Any]],
+) -> str:
+    if len(set(m04_inverted_components)) >= 2 and hard_filter_positive_unfilled_rows:
+        return "m04_component_and_m05_filter_joint_review"
+    if len(set(m04_inverted_components)) >= 2:
+        return "m04_component_weight_or_direction_review"
+    if hard_filter_positive_unfilled_rows:
+        return "m05_option_expression_filter_review"
+    return "more_fixed_replay_evidence_required"
 
 
 def _spearman(left: Sequence[float], right: Sequence[float]) -> float | None:

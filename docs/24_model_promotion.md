@@ -92,8 +92,12 @@ bin, tail-loss, optional M05 unfilled-filter, gate-sweep, row-level
 counterfactual, and parameter-level replay summaries. It also writes a
 parameter replay-review report, a suspect-parameter counterfactual report, and a
 focused high-score filled tail-loss packet that compares high-score losing fills
-with matched high-score non-loss fills. It separates weak replay evidence into
-three explicit diagnostic classes:
+with matched high-score non-loss fills. For suspect parameters, it also writes a
+fixed-input M04/M05 mechanism review with `m04_component_diagnostics.csv`,
+`m05_selection_mechanics.csv`, and `m04_m05_mechanism_review_report.json` so the
+repair question can distinguish M04 component weighting/direction from M05
+option-expression filter or filled-subset selection mechanics. It separates weak
+replay evidence into three explicit diagnostic classes:
 
 - data insufficiency, such as too few filled option rows, sparse score bins, or
   missing point-in-time option candidates;
@@ -114,6 +118,10 @@ Suspect-parameter counterfactual rows may triage the next repair question into
 filled-subset selection effect, parameter direction/definition inversion, or M04
 component weight/direction follow-up, but they must not rewrite parameters or
 select thresholds.
+M04/M05 mechanism review rows may identify inverted M04 component behavior inside
+the M04-open/M05-pass/filled subset or positive-label M04-open/M05-pass rows lost
+to option-expression filters, but they remain diagnostic-only and cannot change
+weights, option filters, or promotion gates.
 High-score tail-loss classification must not invent causes from missing
 evidence: feature timing, liquidity/spread/fill realism, and regime/event miss remain
 `unknown_requires_evidence` unless the fixed replay rows contain the needed
