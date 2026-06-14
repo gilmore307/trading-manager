@@ -90,9 +90,10 @@ failure-attribution lane. `scripts/tasks/build_model_group_layer_attribution.py`
 reads an existing replay `decision_rows.jsonl` and writes compact cohort, score
 bin, tail-loss, optional M05 unfilled-filter, gate-sweep, row-level
 counterfactual, and parameter-level replay summaries. It also writes a
-parameter replay-review report plus a focused high-score filled tail-loss packet
-that compares high-score losing fills with matched high-score non-loss fills. It
-separates weak replay evidence into three explicit diagnostic classes:
+parameter replay-review report, a suspect-parameter counterfactual report, and a
+focused high-score filled tail-loss packet that compares high-score losing fills
+with matched high-score non-loss fills. It separates weak replay evidence into
+three explicit diagnostic classes:
 
 - data insufficiency, such as too few filled option rows, sparse score bins, or
   missing point-in-time option candidates;
@@ -109,6 +110,10 @@ parameter-level bucket rows are diagnostic evidence, not threshold-selection
 authority. Parameter-level replay review may classify a parameter as
 directionally useful, weak/sample-limited, or suspect/requires redesign from
 fixed replay correlation and bucket spreads, but it must not claim causality.
+Suspect-parameter counterfactual rows may triage the next repair question into
+filled-subset selection effect, parameter direction/definition inversion, or M04
+component weight/direction follow-up, but they must not rewrite parameters or
+select thresholds.
 High-score tail-loss classification must not invent causes from missing
 evidence: feature timing, liquidity/spread/fill realism, and regime/event miss remain
 `unknown_requires_evidence` unless the fixed replay rows contain the needed

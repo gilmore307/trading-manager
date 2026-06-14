@@ -20,6 +20,43 @@ MIN_PARAMETER_UNIQUE_VALUES = 3
 MIN_PARAMETER_FILLED_COUNT = 30
 MIN_PARAMETER_ABS_CORRELATION = 0.08
 MIN_PARAMETER_RETURN_SPREAD = 0.01
+MIN_PARAMETER_LABEL_RATE_SPREAD = 0.05
+MIN_PARAMETER_FILL_RATE_SPREAD = 0.15
+SUSPECT_PARAMETER_COUNTERFACTUAL_FIELDNAMES = [
+    "parameter_name",
+    "parameter_family",
+    "expected_direction",
+    "primary_followup_mode",
+    "reason_codes",
+    "all_row_inversion_supported",
+    "filled_only_inversion_supported",
+    "all_label_inversion_supported",
+    "filled_subset_selection_effect_supported",
+    "m04_open_filled_inversion_supported",
+    "m04_family_suspect_parameter_count",
+    "sample_count",
+    "filled_count",
+    "nonfilled_count",
+    "m04_open_count",
+    "m04_open_filled_count",
+    "value_mean",
+    "filled_value_mean",
+    "nonfilled_value_mean",
+    "label_spearman",
+    "return_spearman",
+    "filled_return_spearman",
+    "m04_open_filled_return_spearman",
+    "high_minus_low_label_rate",
+    "high_minus_low_return_per_row",
+    "filled_high_minus_low_return_per_row",
+    "m04_open_filled_high_minus_low_return_per_row",
+    "low_bucket_fill_rate",
+    "high_bucket_fill_rate",
+    "high_minus_low_fill_rate",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -86,8 +123,17 @@ def build_model_group_layer_attribution(
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
     _write_csv(output_dir / "parameter_bucket_metrics.csv", parameter_review["bucket_rows"])
     _write_csv(output_dir / "categorical_parameter_replay_review.csv", parameter_review["categorical_rows"])
+    _write_csv(
+        output_dir / "suspect_parameter_counterfactual.csv",
+        parameter_review["suspect_counterfactual_rows"],
+        fieldnames=SUSPECT_PARAMETER_COUNTERFACTUAL_FIELDNAMES,
+    )
     (output_dir / "parameter_replay_review_report.json").write_text(
         json.dumps(parameter_review["report"], indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "suspect_parameter_counterfactual_report.json").write_text(
+        json.dumps(parameter_review["suspect_counterfactual_report"], indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     (output_dir / "high_score_filled_tail_loss_attribution_packet.json").write_text(
@@ -125,6 +171,11 @@ def build_model_group_layer_attribution(
         "parameter_bucket_metrics_ref": str(output_dir / "parameter_bucket_metrics.csv"),
         "categorical_parameter_replay_review_ref": str(output_dir / "categorical_parameter_replay_review.csv"),
         "parameter_replay_review_summary": parameter_review["summary"],
+        "suspect_parameter_counterfactual_ref": str(output_dir / "suspect_parameter_counterfactual.csv"),
+        "suspect_parameter_counterfactual_report_ref": str(
+            output_dir / "suspect_parameter_counterfactual_report.json"
+        ),
+        "suspect_parameter_counterfactual_summary": parameter_review["suspect_counterfactual_summary"],
         "counterfactual_gate_sweep_summary": gate_sweep_summary,
         "m05_unfilled_summary": {
             key: value for key, value in m05_unfilled_summary.items() if key != "filter_reason_rows"
@@ -748,13 +799,22 @@ def _parameter_replay_review(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any
         bucket_rows.extend(parameter_bucket_rows)
     for parameter_name, pairs in sorted(categorical_values.items()):
         categorical_rows.extend(_categorical_parameter_review_rows(parameter_name, pairs))
+    suspect_counterfactual_rows = _suspect_parameter_counterfactual_rows(parameter_rows, numeric_values)
+    suspect_counterfactual_summary = _suspect_parameter_counterfactual_summary(suspect_counterfactual_rows)
 
     return {
-        "report": _parameter_review_report(parameter_rows, categorical_rows),
+        "report": _parameter_review_report(
+            parameter_rows,
+            categorical_rows,
+            suspect_counterfactual_summary=suspect_counterfactual_summary,
+        ),
         "summary": _parameter_review_summary(parameter_rows),
         "parameter_rows": parameter_rows,
         "bucket_rows": bucket_rows,
         "categorical_rows": categorical_rows,
+        "suspect_counterfactual_rows": suspect_counterfactual_rows,
+        "suspect_counterfactual_summary": suspect_counterfactual_summary,
+        "suspect_counterfactual_report": _suspect_parameter_counterfactual_report(suspect_counterfactual_rows),
     }
 
 
@@ -1090,6 +1150,8 @@ def _parameter_review_summary(parameter_rows: Sequence[Mapping[str, Any]]) -> di
 def _parameter_review_report(
     parameter_rows: Sequence[Mapping[str, Any]],
     categorical_rows: Sequence[Mapping[str, Any]],
+    *,
+    suspect_counterfactual_summary: Mapping[str, Any],
 ) -> dict[str, Any]:
     return {
         "contract_type": "model_group_parameter_replay_review_report",
@@ -1097,8 +1159,304 @@ def _parameter_review_report(
         "numeric_parameter_rows_ref": "parameter_replay_review.csv",
         "numeric_parameter_bucket_rows_ref": "parameter_bucket_metrics.csv",
         "categorical_parameter_rows_ref": "categorical_parameter_replay_review.csv",
+        "suspect_parameter_counterfactual_rows_ref": "suspect_parameter_counterfactual.csv",
+        "suspect_parameter_counterfactual_report_ref": "suspect_parameter_counterfactual_report.json",
+        "suspect_parameter_counterfactual_summary": suspect_counterfactual_summary,
         "categorical_parameter_count": len({row.get("parameter_name") for row in categorical_rows}),
         "review_role": "fixed_replay_association_diagnostic_only",
+        "forbidden_uses": [
+            "causal_feature_importance_claim",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+    }
+
+
+def _suspect_parameter_counterfactual_rows(
+    parameter_rows: Sequence[Mapping[str, Any]],
+    numeric_values: Mapping[str, Sequence[tuple[float, Mapping[str, Any]]]],
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    m04_suspect_count = sum(
+        1
+        for row in parameter_rows
+        if row.get("classification") == "suspect_requires_redesign"
+        and _parameter_family(str(row.get("parameter_name") or "")) == "model_04_unified_decision"
+    )
+    for parameter_row in parameter_rows:
+        if parameter_row.get("classification") != "suspect_requires_redesign":
+            continue
+        parameter_name = str(parameter_row.get("parameter_name") or "")
+        pairs = tuple(numeric_values.get(parameter_name) or ())
+        if not pairs:
+            continue
+        output.append(
+            _suspect_parameter_counterfactual_row(
+                parameter_name=parameter_name,
+                parameter_row=parameter_row,
+                pairs=pairs,
+                m04_suspect_count=m04_suspect_count,
+            )
+        )
+    return output
+
+
+def _suspect_parameter_counterfactual_row(
+    *,
+    parameter_name: str,
+    parameter_row: Mapping[str, Any],
+    pairs: Sequence[tuple[float, Mapping[str, Any]]],
+    m04_suspect_count: int,
+) -> dict[str, Any]:
+    expected_direction = _expected_parameter_direction(parameter_name)
+    all_stats = _parameter_subset_stats(pairs)
+    filled_pairs = tuple((value, row) for value, row in pairs if row.get("fill_status") == "simulated_filled")
+    nonfilled_pairs = tuple((value, row) for value, row in pairs if row.get("fill_status") != "simulated_filled")
+    filled_stats = _parameter_subset_stats(filled_pairs)
+    nonfilled_stats = _parameter_subset_stats(nonfilled_pairs)
+    m04_open_pairs = tuple((value, row) for value, row in pairs if _m04_state(row) == "open_long/long")
+    m04_open_filled_pairs = tuple(
+        (value, row)
+        for value, row in pairs
+        if _m04_state(row) == "open_long/long" and row.get("fill_status") == "simulated_filled"
+    )
+    m04_open_stats = _parameter_subset_stats(m04_open_pairs)
+    m04_open_filled_stats = _parameter_subset_stats(m04_open_filled_pairs)
+    all_inversion = _aligned_inversion_supported(
+        expected_direction=expected_direction,
+        return_correlation=all_stats["return_spearman"],
+        return_spread=all_stats["high_minus_low_return_per_row"],
+    )
+    filled_inversion = _aligned_inversion_supported(
+        expected_direction=expected_direction,
+        return_correlation=filled_stats["return_spearman"],
+        return_spread=filled_stats["high_minus_low_return_per_row"],
+    )
+    m04_open_filled_inversion = _aligned_inversion_supported(
+        expected_direction=expected_direction,
+        return_correlation=m04_open_filled_stats["return_spearman"],
+        return_spread=m04_open_filled_stats["high_minus_low_return_per_row"],
+    )
+    label_inversion = _aligned_label_inversion_supported(
+        expected_direction=expected_direction,
+        label_correlation=all_stats["label_spearman"],
+        label_spread=all_stats["high_minus_low_label_rate"],
+    )
+    fill_rate_spread = all_stats["high_minus_low_fill_rate"]
+    selection_effect = (
+        filled_inversion
+        and not label_inversion
+        and (
+            not all_inversion
+            or (
+                fill_rate_spread is not None
+                and abs(float(fill_rate_spread)) >= MIN_PARAMETER_FILL_RATE_SPREAD
+            )
+        )
+    )
+    parameter_family = _parameter_family(parameter_name)
+    primary_mode, reason_codes = _suspect_parameter_primary_mode(
+        parameter_family=parameter_family,
+        all_inversion=all_inversion,
+        filled_inversion=filled_inversion,
+        label_inversion=label_inversion,
+        selection_effect=selection_effect,
+        m04_open_filled_inversion=m04_open_filled_inversion,
+        m04_suspect_count=m04_suspect_count,
+    )
+    return {
+        "parameter_name": parameter_name,
+        "parameter_family": parameter_family,
+        "expected_direction": parameter_row.get("expected_direction"),
+        "primary_followup_mode": primary_mode,
+        "reason_codes": ";".join(reason_codes),
+        "all_row_inversion_supported": all_inversion,
+        "filled_only_inversion_supported": filled_inversion,
+        "all_label_inversion_supported": label_inversion,
+        "filled_subset_selection_effect_supported": selection_effect,
+        "m04_open_filled_inversion_supported": m04_open_filled_inversion,
+        "m04_family_suspect_parameter_count": m04_suspect_count if parameter_family == "model_04_unified_decision" else 0,
+        "sample_count": all_stats["row_count"],
+        "filled_count": filled_stats["row_count"],
+        "nonfilled_count": nonfilled_stats["row_count"],
+        "m04_open_count": m04_open_stats["row_count"],
+        "m04_open_filled_count": m04_open_filled_stats["row_count"],
+        "value_mean": _round(all_stats["value_mean"]),
+        "filled_value_mean": _round(filled_stats["value_mean"]),
+        "nonfilled_value_mean": _round(nonfilled_stats["value_mean"]),
+        "label_spearman": _round(all_stats["label_spearman"]),
+        "return_spearman": _round(all_stats["return_spearman"]),
+        "filled_return_spearman": _round(filled_stats["return_spearman"]),
+        "m04_open_filled_return_spearman": _round(m04_open_filled_stats["return_spearman"]),
+        "high_minus_low_label_rate": _round(all_stats["high_minus_low_label_rate"]),
+        "high_minus_low_return_per_row": _round(all_stats["high_minus_low_return_per_row"]),
+        "filled_high_minus_low_return_per_row": _round(filled_stats["high_minus_low_return_per_row"]),
+        "m04_open_filled_high_minus_low_return_per_row": _round(
+            m04_open_filled_stats["high_minus_low_return_per_row"]
+        ),
+        "low_bucket_fill_rate": _round(all_stats["low_bucket_fill_rate"]),
+        "high_bucket_fill_rate": _round(all_stats["high_bucket_fill_rate"]),
+        "high_minus_low_fill_rate": _round(fill_rate_spread),
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+
+
+def _parameter_subset_stats(pairs: Sequence[tuple[float, Mapping[str, Any]]]) -> dict[str, Any]:
+    if not pairs:
+        return {
+            "row_count": 0,
+            "label_spearman": None,
+            "return_spearman": None,
+            "value_mean": None,
+            "high_minus_low_label_rate": None,
+            "high_minus_low_return_per_row": None,
+            "low_bucket_fill_rate": None,
+            "high_bucket_fill_rate": None,
+            "high_minus_low_fill_rate": None,
+        }
+    values = [value for value, _row in pairs]
+    rows = [row for _value, row in pairs]
+    buckets = _numeric_parameter_bucket_rows("parameter_subset", pairs, bucket_count=DEFAULT_PARAMETER_BUCKET_COUNT)
+    low_bucket, high_bucket = _edge_buckets(buckets)
+    label_spread = None
+    return_spread = None
+    fill_rate_spread = None
+    low_bucket_fill_rate = None
+    high_bucket_fill_rate = None
+    if low_bucket is not None and high_bucket is not None:
+        label_spread = _none_subtract(high_bucket.get("label_rate"), low_bucket.get("label_rate"))
+        return_spread = _none_subtract(high_bucket.get("return_per_row"), low_bucket.get("return_per_row"))
+        low_bucket_fill_rate = _fill_rate_from_summary(low_bucket)
+        high_bucket_fill_rate = _fill_rate_from_summary(high_bucket)
+        fill_rate_spread = _none_subtract(high_bucket_fill_rate, low_bucket_fill_rate)
+    return {
+        "row_count": len(pairs),
+        "label_spearman": _spearman(values, [_float(row.get("outcome_label")) for row in rows]),
+        "return_spearman": _spearman(values, [_float(row.get("realized_return")) for row in rows]),
+        "value_mean": _mean(values),
+        "high_minus_low_label_rate": label_spread,
+        "high_minus_low_return_per_row": return_spread,
+        "low_bucket_fill_rate": low_bucket_fill_rate,
+        "high_bucket_fill_rate": high_bucket_fill_rate,
+        "high_minus_low_fill_rate": fill_rate_spread,
+    }
+
+
+def _fill_rate_from_summary(row: Mapping[str, Any]) -> float | None:
+    row_count = int(row.get("row_count") or 0)
+    if row_count <= 0:
+        return None
+    return _float(row.get("filled_count")) / row_count
+
+
+def _aligned_inversion_supported(
+    *,
+    expected_direction: int | None,
+    return_correlation: Any,
+    return_spread: Any,
+) -> bool:
+    if expected_direction is None or return_correlation is None or return_spread is None:
+        return False
+    aligned_correlation = float(return_correlation) if expected_direction != -1 else -float(return_correlation)
+    aligned_spread = float(return_spread) if expected_direction != -1 else -float(return_spread)
+    return aligned_correlation <= -MIN_PARAMETER_ABS_CORRELATION and aligned_spread <= -MIN_PARAMETER_RETURN_SPREAD
+
+
+def _aligned_label_inversion_supported(
+    *,
+    expected_direction: int | None,
+    label_correlation: Any,
+    label_spread: Any,
+) -> bool:
+    if expected_direction is None or label_correlation is None or label_spread is None:
+        return False
+    aligned_correlation = float(label_correlation) if expected_direction != -1 else -float(label_correlation)
+    aligned_spread = float(label_spread) if expected_direction != -1 else -float(label_spread)
+    return aligned_correlation <= -MIN_PARAMETER_ABS_CORRELATION and aligned_spread <= -MIN_PARAMETER_LABEL_RATE_SPREAD
+
+
+def _suspect_parameter_primary_mode(
+    *,
+    parameter_family: str,
+    all_inversion: bool,
+    filled_inversion: bool,
+    label_inversion: bool,
+    selection_effect: bool,
+    m04_open_filled_inversion: bool,
+    m04_suspect_count: int,
+) -> tuple[str, list[str]]:
+    if (
+        parameter_family == "model_04_unified_decision"
+        and filled_inversion
+        and m04_open_filled_inversion
+        and m04_suspect_count >= 2
+    ):
+        return "m04_component_weight_or_direction_issue", [
+            "multiple_m04_score_components_inverted_in_filled_subset",
+            "m04_open_filled_subset_inversion_supported",
+        ]
+    if selection_effect:
+        return "filled_subset_selection_effect", [
+            "filled_subset_inversion_without_all_row_inversion",
+            "fill_or_label_distribution_differs_across_parameter_buckets",
+        ]
+    if all_inversion and label_inversion:
+        return "parameter_definition_or_direction_inversion", [
+            "all_row_return_and_label_direction_inverted",
+        ]
+    if filled_inversion:
+        return "filled_subset_unisolated_inversion", [
+            "filled_subset_inversion_supported",
+            "all_row_or_label_evidence_not_inverted",
+        ]
+    return "not_isolated_sample_limited", ["suspect_parameter_review_needs_more_evidence"]
+
+
+def _suspect_parameter_counterfactual_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    mode_counts = Counter(str(row.get("primary_followup_mode") or "unknown") for row in rows)
+    return {
+        "contract_type": "model_group_suspect_parameter_counterfactual_summary",
+        "suspect_parameter_count": len(rows),
+        "primary_followup_mode_counts": dict(mode_counts),
+        "filled_subset_selection_effect_parameters": [
+            str(row.get("parameter_name"))
+            for row in rows
+            if row.get("primary_followup_mode") == "filled_subset_selection_effect"
+        ],
+        "m04_component_weight_or_direction_issue_parameters": [
+            str(row.get("parameter_name"))
+            for row in rows
+            if row.get("primary_followup_mode") == "m04_component_weight_or_direction_issue"
+        ],
+        "parameter_definition_or_direction_inversion_parameters": [
+            str(row.get("parameter_name"))
+            for row in rows
+            if row.get("primary_followup_mode") == "parameter_definition_or_direction_inversion"
+        ],
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+        "interpretation_limits": [
+            "This counterfactual compares fixed replay subsets only and is not a causal parameter-importance claim.",
+            "Filled-only inversion can indicate selection effects, option-expression mechanics, or M04 score behavior.",
+            "Primary follow-up modes are repair triage labels, not automatic model redesign approval.",
+        ],
+    }
+
+
+def _suspect_parameter_counterfactual_report(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    return {
+        "contract_type": "model_group_suspect_parameter_counterfactual_report",
+        "summary": _suspect_parameter_counterfactual_summary(rows),
+        "suspect_parameter_counterfactual_rows_ref": "suspect_parameter_counterfactual.csv",
+        "review_role": "fixed_replay_suspect_parameter_triage_only",
+        "fixed_input_only": True,
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
         "forbidden_uses": [
             "causal_feature_importance_claim",
             "threshold_selection",
@@ -1583,18 +1941,18 @@ def _mean(values: Iterable[float]) -> float | None:
     return sum(values_tuple) / len(values_tuple)
 
 
-def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
+def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], *, fieldnames: Sequence[str] | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if not rows:
+    if not rows and not fieldnames:
         path.write_text("", encoding="utf-8")
         return
-    fieldnames: list[str] = []
+    output_fieldnames: list[str] = list(fieldnames or [])
     for row in rows:
         for key in row:
-            if key not in fieldnames:
-                fieldnames.append(key)
+            if key not in output_fieldnames:
+                output_fieldnames.append(key)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=output_fieldnames)
         writer.writeheader()
         for row in rows:
             writer.writerow(row)

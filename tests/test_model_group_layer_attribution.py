@@ -180,8 +180,11 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "parameter_replay_review_report.json").exists())
             self.assertTrue((output_dir / "parameter_bucket_metrics.csv").exists())
             self.assertTrue((output_dir / "categorical_parameter_replay_review.csv").exists())
+            self.assertTrue((output_dir / "suspect_parameter_counterfactual.csv").exists())
+            self.assertTrue((output_dir / "suspect_parameter_counterfactual_report.json").exists())
             self.assertIn("parameter_replay_review_summary", report)
             self.assertIn("parameter_replay_review_report_ref", report)
+            self.assertIn("suspect_parameter_counterfactual_summary", report)
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -281,6 +284,107 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             review_report = json.loads((output_dir / "parameter_replay_review_report.json").read_text(encoding="utf-8"))
             self.assertEqual(review_report["contract_type"], "model_group_parameter_replay_review_report")
             self.assertIn("threshold_selection", review_report["forbidden_uses"])
+
+    def test_suspect_parameter_counterfactual_separates_selection_and_m04_modes(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            rows = []
+            for index in range(90):
+                value = index / 89
+                filled = index < 60
+                high_value = value >= 0.5
+                profitable_fill = filled and not high_value
+                row = _row(
+                    f"s{index}",
+                    "accepted" if filled else "suitable",
+                    "simulated_filled" if filled else "simulated_rejected",
+                    1 if (profitable_fill or not filled) else 0,
+                    0.5,
+                    0.03 if profitable_fill else -0.03 if filled else 0.0,
+                    "open_long",
+                    "long",
+                    "passed",
+                    "listed_option_contract" if filled else "option_expression_unfilled",
+                )
+                row["timestamp"] = f"2021-03-{(index % 28) + 1:02d}T16:00:00-05:00"
+                row["feature_momentum_30d"] = value
+                scores = row["model_layer_diagnostics"]["model_04_unified_decision"]["dominant_horizon_scores"]
+                scores["action_direction_score"] = value
+                scores["expected_return_score"] = value
+                scores["trade_intensity_score"] = value
+                rows.append(row)
+            rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            with (output_dir / "suspect_parameter_counterfactual.csv").open(encoding="utf-8") as handle:
+                counterfactual_rows = {
+                    row["parameter_name"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                counterfactual_rows["feature_momentum_30d"]["primary_followup_mode"],
+                "filled_subset_selection_effect",
+            )
+            self.assertEqual(
+                counterfactual_rows[
+                    "model_layer_diagnostics.model_04_unified_decision.dominant_horizon_scores.trade_intensity_score"
+                ]["primary_followup_mode"],
+                "m04_component_weight_or_direction_issue",
+            )
+            counterfactual_report = json.loads(
+                (output_dir / "suspect_parameter_counterfactual_report.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                counterfactual_report["contract_type"],
+                "model_group_suspect_parameter_counterfactual_report",
+            )
+            self.assertFalse(counterfactual_report["retraining_performed"])
+            self.assertIn("threshold_selection", counterfactual_report["forbidden_uses"])
+            self.assertFalse(report["suspect_parameter_counterfactual_summary"]["threshold_selection_performed"])
+
+    def test_suspect_parameter_counterfactual_keeps_header_when_no_suspects(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            rows = []
+            for index in range(60):
+                value = index / 59
+                row = _row(
+                    f"n{index}",
+                    "accepted",
+                    "simulated_filled",
+                    1 if value >= 0.5 else 0,
+                    value,
+                    0.03 if value >= 0.5 else -0.03,
+                    "open_long",
+                    "long",
+                    "passed",
+                    "listed_option_contract",
+                )
+                row["timestamp"] = f"2021-04-{(index % 28) + 1:02d}T16:00:00-05:00"
+                row["feature_momentum_30d"] = value
+                rows.append(row)
+            rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            with (output_dir / "suspect_parameter_counterfactual.csv").open(encoding="utf-8") as handle:
+                header = handle.readline().strip()
+            self.assertIn("parameter_name", header)
+            self.assertIn("primary_followup_mode", header)
+            self.assertEqual(report["suspect_parameter_counterfactual_summary"]["suspect_parameter_count"], 0)
 
 
 def _row(

@@ -558,6 +558,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("row_counterfactual_bucket", row_counterfactual["applies_to"])
         self.assertIn("not threshold-selection", row_counterfactual["note"])
 
+        suspect_parameter_counterfactual = rows["MANAGER_MODEL_GROUP_SUSPECT_PARAMETER_COUNTERFACTUAL_REPORT"]
+        self.assertEqual(
+            suspect_parameter_counterfactual["payload"],
+            "model_group_suspect_parameter_counterfactual_report",
+        )
+        self.assertIn("suspect_parameter_counterfactual", suspect_parameter_counterfactual["applies_to"])
+        self.assertIn("without threshold selection", suspect_parameter_counterfactual["note"])
+
         residual_event_governance_receipt = rows["MANAGER_POST_REPLAY_M06_EVENT_ATTRIBUTION_RECEIPT"]
         self.assertEqual(residual_event_governance_receipt["payload"], "post_replay_residual_event_governance_receipt")
         self.assertIn("provider calls", residual_event_governance_receipt["note"])
@@ -726,10 +734,23 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("parameter_replay_review_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("parameter_bucket_metrics.csv", layer_attribution_surfaces["payload"])
         self.assertIn("categorical_parameter_replay_review.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("suspect_parameter_counterfactual.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("suspect_parameter_counterfactual_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_attribution_packet.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_matches.csv", layer_attribution_surfaces["payload"])
         self.assertIn("counterfactual_gate_sweep_ref", layer_attribution_surfaces["payload"])
         self.assertIn("not be treated as threshold selection", layer_attribution_surfaces["note"])
+
+        suspect_followup_payloads = {
+            "MODEL_GROUP_SUSPECT_PARAMETER_FILLED_SUBSET_SELECTION_EFFECT": "filled_subset_selection_effect",
+            "MODEL_GROUP_SUSPECT_PARAMETER_DEFINITION_OR_DIRECTION_INVERSION": "parameter_definition_or_direction_inversion",
+            "MODEL_GROUP_SUSPECT_PARAMETER_M04_COMPONENT_WEIGHT_OR_DIRECTION_ISSUE": "m04_component_weight_or_direction_issue",
+            "MODEL_GROUP_SUSPECT_PARAMETER_FILLED_SUBSET_UNISOLATED_INVERSION": "filled_subset_unisolated_inversion",
+            "MODEL_GROUP_SUSPECT_PARAMETER_NOT_ISOLATED_SAMPLE_LIMITED": "not_isolated_sample_limited",
+        }
+        for key, payload in suspect_followup_payloads.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
 
         tail_gate_payloads = {
             "MODEL_GROUP_EVALUATION_GATE_HIGH_SCORE_TAIL_LOSS_OVERCONFIDENCE": "high_score_tail_loss_overconfidence",
