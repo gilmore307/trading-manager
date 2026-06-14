@@ -761,6 +761,28 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "status_value")
             self.assertEqual(rows[key]["payload"], payload)
 
+        m04_component_status_payloads = {
+            "MODEL_GROUP_M04_COMPONENT_DIAGNOSTIC_ALIGNED_WITH_EXPECTED_DIRECTION": "aligned_with_expected_direction",
+            "MODEL_GROUP_M04_COMPONENT_DIAGNOSTIC_INVERTED_AGAINST_EXPECTED_DIRECTION": "inverted_against_expected_direction",
+            "MODEL_GROUP_M04_COMPONENT_DIAGNOSTIC_SAMPLE_LIMITED": "sample_limited",
+            "MODEL_GROUP_M04_COMPONENT_DIAGNOSTIC_WEAK_OR_MIXED": "weak_or_mixed",
+        }
+        for key, payload in m04_component_status_payloads.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("m04_component_diagnostics", rows[key]["applies_to"])
+
+        mechanism_followup_payloads = {
+            "MODEL_GROUP_M04_M05_MECHANISM_FOLLOWUP_JOINT_REVIEW": "m04_component_and_m05_filter_joint_review",
+            "MODEL_GROUP_M04_M05_MECHANISM_FOLLOWUP_M04_REVIEW": "m04_component_weight_or_direction_review",
+            "MODEL_GROUP_M04_M05_MECHANISM_FOLLOWUP_M05_REVIEW": "m05_option_expression_filter_review",
+            "MODEL_GROUP_M04_M05_MECHANISM_FOLLOWUP_MORE_EVIDENCE_REQUIRED": "more_fixed_replay_evidence_required",
+        }
+        for key, payload in mechanism_followup_payloads.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("m04_m05_mechanism_review", rows[key]["applies_to"])
+
         tail_gate_payloads = {
             "MODEL_GROUP_EVALUATION_GATE_HIGH_SCORE_TAIL_LOSS_OVERCONFIDENCE": "high_score_tail_loss_overconfidence",
             "MODEL_GROUP_EVALUATION_GATE_HIGH_SCORE_TAIL_LOSS_SAMPLE_LIMITED": "high_score_tail_loss_sample_limited",
@@ -2574,6 +2596,9 @@ class RegistryHelperTests(unittest.TestCase):
             "model_realtime_decision_component_route_status",
             "model_realtime_decision_route_plan_readiness",
             "model_group.layer_attribution",
+            "m04_component_diagnostics",
+            "m04_m05_mechanism_review",
+            "m05_selection_mechanics",
             "ready_signal",
             "one_shot_replay_acquisition",
             "production_completion_status",
@@ -2590,6 +2615,7 @@ class RegistryHelperTests(unittest.TestCase):
             "row_counterfactual_bucket",
             "storage_lifecycle",
             "state_signal_type",
+            "suspect_parameter_counterfactual",
             "target_state_vector_model",
             "temporal_attention_pool",
             "temporal_attention_focus_pool",
