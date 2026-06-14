@@ -186,6 +186,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "m05_selection_mechanics.csv").exists())
             self.assertTrue((output_dir / "m04_variant_counterfactual.csv").exists())
             self.assertTrue((output_dir / "m05_dte_policy_sensitivity.csv").exists())
+            self.assertTrue((output_dir / "m05_hard_filter_overlap.csv").exists())
             self.assertTrue((output_dir / "m04_m05_mechanism_review_report.json").exists())
             self.assertIn("parameter_replay_review_summary", report)
             self.assertIn("parameter_replay_review_report_ref", report)
@@ -196,6 +197,34 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertIn("threshold_selection", mechanism_report["forbidden_uses"])
             self.assertEqual(mechanism_report["m04_variant_counterfactual_ref"], "m04_variant_counterfactual.csv")
             self.assertEqual(mechanism_report["m05_dte_policy_sensitivity_ref"], "m05_dte_policy_sensitivity.csv")
+            self.assertEqual(mechanism_report["m05_hard_filter_overlap_ref"], "m05_hard_filter_overlap.csv")
+            with (output_dir / "m04_component_diagnostics.csv").open(encoding="utf-8") as handle:
+                component_rows = {
+                    (row["component_name"], row["subset_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                component_rows[("materiality_adjusted_action_score", "all_rows")]["diagnostic_status"],
+                "missing_component_coverage",
+            )
+            with (output_dir / "m04_variant_counterfactual.csv").open(encoding="utf-8") as handle:
+                variant_rows = {
+                    (row["variant_name"], row["subset_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                variant_rows[("current_horizon_rank_proxy", "m04_open_m05_pass")]["diagnostic_status"],
+                "missing_component_coverage",
+            )
+            with (output_dir / "m05_hard_filter_overlap.csv").open(encoding="utf-8") as handle:
+                overlap_rows = list(csv.DictReader(handle))
+            self.assertTrue(
+                any(
+                    row["overlap_group"] == "dte_overlaps_other_filters"
+                    and row["filter_reason_set"] == "delta_outside_policy_range;dte_outside_policy_range"
+                    for row in overlap_rows
+                )
+            )
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -440,6 +469,14 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(dte_primary["diagnostic_status"], "dte_policy_pressure_supported")
             self.assertEqual(dte_primary["positive_label_count"], "30")
             self.assertEqual(report["m04_m05_mechanism_review_summary"]["m05_dte_primary_positive_label_count"], 30)
+            with (output_dir / "m05_hard_filter_overlap.csv").open(encoding="utf-8") as handle:
+                overlap_rows = {
+                    row["overlap_group"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(overlap_rows["dte_isolated"]["positive_label_count"], "30")
+            self.assertEqual(report["m04_m05_mechanism_review_summary"]["m05_dte_isolated_positive_label_count"], 30)
+            self.assertEqual(report["m04_m05_mechanism_review_summary"]["m05_dte_overlap_positive_label_count"], 0)
 
     def test_suspect_parameter_counterfactual_keeps_header_when_no_suspects(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

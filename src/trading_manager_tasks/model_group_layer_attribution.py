@@ -15,6 +15,7 @@ from typing import Any, Iterable, Mapping, Sequence
 DEFAULT_TAIL_ROW_LIMIT = 20
 DEFAULT_HIGH_SCORE_THRESHOLD = 0.8
 DEFAULT_PARAMETER_BUCKET_COUNT = 5
+DEFAULT_MIN_TRADE_INTENSITY = 0.05
 MIN_PARAMETER_SAMPLE_COUNT = 50
 MIN_PARAMETER_UNIQUE_VALUES = 3
 MIN_PARAMETER_FILLED_COUNT = 30
@@ -146,6 +147,25 @@ M05_DTE_POLICY_SENSITIVITY_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+M05_HARD_FILTER_OVERLAP_FIELDNAMES = [
+    "overlap_group",
+    "selected_expression_type",
+    "primary_filter_reason",
+    "filter_reason_set",
+    "filter_reason_count",
+    "row_count",
+    "positive_label_count",
+    "label_rate",
+    "underlying_return_total",
+    "positive_underlying_return_total",
+    "candidate_count_before_filter_mean",
+    "candidate_count_after_filter_mean",
+    "eligible_candidate_count_mean",
+    "top_contract_fit_score_mean",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -196,11 +216,13 @@ def build_model_group_layer_attribution(
     m05_selection_rows = _m05_selection_mechanics_rows(rows, counterfactual_rows)
     m04_variant_rows = _m04_variant_counterfactual_rows(rows)
     m05_dte_sensitivity_rows = _m05_dte_policy_sensitivity_rows(rows, counterfactual_rows)
+    m05_hard_filter_overlap_rows = _m05_hard_filter_overlap_rows(rows, counterfactual_rows)
     mechanism_review_report = _m04_m05_mechanism_review_report(
         m04_component_rows=m04_component_rows,
         m05_selection_rows=m05_selection_rows,
         m04_variant_rows=m04_variant_rows,
         m05_dte_sensitivity_rows=m05_dte_sensitivity_rows,
+        m05_hard_filter_overlap_rows=m05_hard_filter_overlap_rows,
     )
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
     tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
@@ -246,6 +268,11 @@ def build_model_group_layer_attribution(
         output_dir / "m05_dte_policy_sensitivity.csv",
         m05_dte_sensitivity_rows,
         fieldnames=M05_DTE_POLICY_SENSITIVITY_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "m05_hard_filter_overlap.csv",
+        m05_hard_filter_overlap_rows,
+        fieldnames=M05_HARD_FILTER_OVERLAP_FIELDNAMES,
     )
     (output_dir / "parameter_replay_review_report.json").write_text(
         json.dumps(parameter_review["report"], indent=2, sort_keys=True) + "\n",
@@ -303,6 +330,7 @@ def build_model_group_layer_attribution(
         "m05_selection_mechanics_ref": str(output_dir / "m05_selection_mechanics.csv"),
         "m04_variant_counterfactual_ref": str(output_dir / "m04_variant_counterfactual.csv"),
         "m05_dte_policy_sensitivity_ref": str(output_dir / "m05_dte_policy_sensitivity.csv"),
+        "m05_hard_filter_overlap_ref": str(output_dir / "m05_hard_filter_overlap.csv"),
         "m04_m05_mechanism_review_report_ref": str(output_dir / "m04_m05_mechanism_review_report.json"),
         "m04_m05_mechanism_review_summary": mechanism_review_report["summary"],
         "counterfactual_gate_sweep_summary": gate_sweep_summary,
@@ -1601,6 +1629,7 @@ def _m04_component_diagnostic_rows(rows: Sequence[Mapping[str, Any]]) -> list[di
         "action_direction_score",
         "expected_return_score",
         "trade_intensity_score",
+        "materiality_adjusted_action_score",
         "action_confidence_score",
         "entry_quality_score",
         "downside_risk_score",
@@ -1628,6 +1657,7 @@ def _m04_component_diagnostic_rows(rows: Sequence[Mapping[str, Any]]) -> list[di
             stats = _parameter_subset_stats(pairs)
             status, reason_codes = _m04_component_diagnostic_status(
                 expected_direction=expected_direction,
+                subset_input_count=len(subset_rows),
                 subset_name=subset_name,
                 stats=stats,
             )
@@ -1665,7 +1695,15 @@ def _m04_component_pairs(rows: Sequence[Mapping[str, Any]], component: str) -> I
 
 
 def _m04_component_scores(row: Mapping[str, Any]) -> Mapping[str, Any]:
-    return _m04_diagnostics(row).get("dominant_horizon_scores") or {}
+    scores = dict(_m04_diagnostics(row).get("dominant_horizon_scores") or {})
+    if "materiality_adjusted_action_score" not in scores:
+        derived = _materiality_adjusted_action_score(
+            scores,
+            minimum_trade_intensity=_minimum_trade_intensity(row, scores),
+        )
+        if derived is not None:
+            scores["materiality_adjusted_action_score"] = derived
+    return scores
 
 
 def _m04_component_expected_direction(component: str) -> int | None:
@@ -1677,9 +1715,12 @@ def _m04_component_expected_direction(component: str) -> int | None:
 def _m04_component_diagnostic_status(
     *,
     expected_direction: int | None,
+    subset_input_count: int,
     subset_name: str,
     stats: Mapping[str, Any],
 ) -> tuple[str, list[str]]:
+    if subset_input_count > 0 and int(stats["row_count"] or 0) == 0:
+        return "missing_component_coverage", [f"{subset_name}_required_component_missing_from_replay_rows"]
     if int(stats["row_count"] or 0) < MIN_PARAMETER_FILLED_COUNT:
         return "sample_limited", ["subset_count_below_minimum"]
     if _aligned_inversion_supported(
@@ -1821,7 +1862,11 @@ def _m04_variant_counterfactual_rows(rows: Sequence[Mapping[str, Any]]) -> list[
         for subset_name, subset_rows in subsets.items():
             pairs = tuple(_m04_variant_pairs(subset_rows, variant_name))
             stats = _parameter_subset_stats(pairs)
-            status, reason_codes = _m04_variant_status(subset_name=subset_name, stats=stats)
+            status, reason_codes = _m04_variant_status(
+                subset_input_count=len(subset_rows),
+                subset_name=subset_name,
+                stats=stats,
+            )
             output.append(
                 {
                     "variant_name": variant_name,
@@ -1852,11 +1897,15 @@ def _m04_variant_definitions() -> tuple[tuple[str, str], ...]:
     return (
         (
             "current_horizon_rank_proxy",
-            "action_confidence_score + 0.35 * trade_intensity_score - 0.25 * no_trade_probability_score",
+            "action_confidence_score + 0.35 * materiality_adjusted_action_score - 0.25 * no_trade_probability_score",
         ),
         (
             "risk_adjusted_intensity",
             "trade_intensity_score * action_confidence_score * entry_quality_score * (1 - downside_risk_score)",
+        ),
+        (
+            "materiality_adjusted_action_score",
+            "materiality_gate(trade_intensity_score, minimum_trade_intensity) * action_confidence_score * entry_quality_score * (1 - downside_risk_score) * (1 - no_trade_probability_score)",
         ),
         (
             "expected_return_intensity_product",
@@ -1893,14 +1942,20 @@ def _m04_variant_value(row: Mapping[str, Any], variant_name: str) -> float | Non
     downside_risk = _finite_float(scores.get("downside_risk_score"))
     no_trade_probability = _finite_float(scores.get("no_trade_probability_score"))
     minimum_trade_intensity = _minimum_trade_intensity(row, scores)
+    materiality_adjusted_action = _materiality_adjusted_action_score(
+        scores,
+        minimum_trade_intensity=minimum_trade_intensity,
+    )
     if variant_name == "current_horizon_rank_proxy":
-        if action_confidence is None or trade_intensity is None or no_trade_probability is None:
+        if action_confidence is None or materiality_adjusted_action is None or no_trade_probability is None:
             return None
-        return action_confidence + 0.35 * trade_intensity - 0.25 * no_trade_probability
+        return action_confidence + 0.35 * materiality_adjusted_action - 0.25 * no_trade_probability
     if variant_name == "risk_adjusted_intensity":
         if None in (trade_intensity, action_confidence, entry_quality, downside_risk):
             return None
         return trade_intensity * action_confidence * entry_quality * (1.0 - downside_risk)
+    if variant_name == "materiality_adjusted_action_score":
+        return materiality_adjusted_action
     if variant_name == "expected_return_intensity_product":
         if expected_return is None or trade_intensity is None:
             return None
@@ -1920,6 +1975,39 @@ def _m04_variant_value(row: Mapping[str, Any], variant_name: str) -> float | Non
     return None
 
 
+def _materiality_adjusted_action_score(
+    scores: Mapping[str, Any],
+    *,
+    minimum_trade_intensity: float | None = None,
+) -> float | None:
+    trade_intensity = _finite_float(scores.get("trade_intensity_score"))
+    action_confidence = _finite_float(scores.get("action_confidence_score"))
+    entry_quality = _finite_float(scores.get("entry_quality_score"))
+    downside_risk = _finite_float(scores.get("downside_risk_score"))
+    no_trade_probability = _finite_float(scores.get("no_trade_probability_score"))
+    if None in (trade_intensity, action_confidence, entry_quality, downside_risk, no_trade_probability):
+        return None
+    if minimum_trade_intensity is None:
+        minimum_trade_intensity = _finite_float(scores.get("minimum_trade_intensity"))
+    materiality_gate = _materiality_gate(
+        trade_intensity,
+        minimum_trade_intensity if minimum_trade_intensity is not None else DEFAULT_MIN_TRADE_INTENSITY,
+    )
+    return (
+        materiality_gate
+        * action_confidence
+        * entry_quality
+        * (1.0 - downside_risk)
+        * (1.0 - no_trade_probability)
+    )
+
+
+def _materiality_gate(trade_intensity: float, minimum_trade_intensity: float) -> float:
+    if minimum_trade_intensity <= 0.0:
+        return 1.0 if trade_intensity > 0.0 else 0.0
+    return max(0.0, min(1.0, trade_intensity / minimum_trade_intensity))
+
+
 def _minimum_trade_intensity(row: Mapping[str, Any], scores: Mapping[str, Any]) -> float | None:
     for value in (
         scores.get("minimum_trade_intensity"),
@@ -1932,7 +2020,14 @@ def _minimum_trade_intensity(row: Mapping[str, Any], scores: Mapping[str, Any]) 
     return None
 
 
-def _m04_variant_status(*, subset_name: str, stats: Mapping[str, Any]) -> tuple[str, list[str]]:
+def _m04_variant_status(
+    *,
+    subset_input_count: int,
+    subset_name: str,
+    stats: Mapping[str, Any],
+) -> tuple[str, list[str]]:
+    if subset_input_count > 0 and int(stats["row_count"] or 0) == 0:
+        return "missing_component_coverage", [f"{subset_name}_required_variant_inputs_missing_from_replay_rows"]
     if int(stats["row_count"] or 0) < MIN_PARAMETER_FILLED_COUNT:
         return "sample_limited", ["subset_count_below_minimum"]
     if _aligned_useful_supported(
@@ -2098,12 +2193,107 @@ def _counterfactual_filter_reason_counts(row: Mapping[str, Any]) -> dict[str, in
     return output
 
 
+def _m05_hard_filter_overlap_rows(
+    rows: Sequence[Mapping[str, Any]],
+    counterfactual_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    row_by_decision_id = {str(row.get("decision_id") or ""): row for row in rows}
+    hard_filter_rows = [
+        row
+        for row in counterfactual_rows
+        if row.get("intended_model_trade") is True
+        and row.get("execution_expression_state") == "expression_unfilled"
+        and row.get("option_feasibility_state") == "hard_filter_zero_eligible"
+        and row.get("expression_join_status") == "matched"
+    ]
+    groups: dict[tuple[str, str, str, str], list[Mapping[str, Any]]] = defaultdict(list)
+    for counterfactual in hard_filter_rows:
+        decision_row = row_by_decision_id.get(str(counterfactual.get("decision_id") or ""), {})
+        reason_set = tuple(sorted(_counterfactual_filter_reason_counts(counterfactual)))
+        reason_set_text = ";".join(reason_set)
+        key = (
+            _hard_filter_overlap_group(reason_set),
+            _selected_expression_type(decision_row),
+            str(counterfactual.get("primary_filter_reason") or ""),
+            reason_set_text,
+        )
+        groups[key].append(counterfactual)
+    if not groups:
+        return [
+            _m05_hard_filter_overlap_row(
+                overlap_group="no_hard_filter_zero_eligible_rows",
+                expression_type="",
+                primary_filter_reason="",
+                filter_reason_set="",
+                rows=[],
+            )
+        ]
+    return [
+        _m05_hard_filter_overlap_row(
+            overlap_group=overlap_group,
+            expression_type=expression_type,
+            primary_filter_reason=primary_filter_reason,
+            filter_reason_set=filter_reason_set,
+            rows=group_rows,
+        )
+        for (overlap_group, expression_type, primary_filter_reason, filter_reason_set), group_rows in sorted(
+            groups.items(),
+            key=lambda item: (-len(item[1]), item[0]),
+        )
+    ]
+
+
+def _hard_filter_overlap_group(reason_set: Sequence[str]) -> str:
+    reasons = set(reason_set)
+    if not reasons:
+        return "missing_filter_reason"
+    if reasons == {"dte_outside_policy_range"}:
+        return "dte_isolated"
+    if "dte_outside_policy_range" in reasons:
+        return "dte_overlaps_other_filters"
+    if len(reasons) == 1:
+        return "single_non_dte_filter"
+    return "multi_non_dte_filter_overlap"
+
+
+def _m05_hard_filter_overlap_row(
+    *,
+    overlap_group: str,
+    expression_type: str,
+    primary_filter_reason: str,
+    filter_reason_set: str,
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    row_count = len(rows)
+    positive_rows = [row for row in rows if str(row.get("outcome_label")) == "1"]
+    return {
+        "overlap_group": overlap_group,
+        "selected_expression_type": expression_type,
+        "primary_filter_reason": primary_filter_reason,
+        "filter_reason_set": filter_reason_set,
+        "filter_reason_count": len([reason for reason in filter_reason_set.split(";") if reason]),
+        "row_count": row_count,
+        "positive_label_count": len(positive_rows),
+        "label_rate": _round(len(positive_rows) / row_count) if row_count else None,
+        "underlying_return_total": _round(sum(_float(row.get("underlying_return")) for row in rows)),
+        "positive_underlying_return_total": _round(sum(_float(row.get("underlying_return")) for row in positive_rows)),
+        "candidate_count_before_filter_mean": _counterfactual_metric_mean(rows, "candidate_count_before_filter"),
+        "candidate_count_after_filter_mean": _counterfactual_metric_mean(rows, "candidate_count_after_filter"),
+        "eligible_candidate_count_mean": _counterfactual_metric_mean(rows, "eligible_candidate_count"),
+        "top_contract_fit_score_mean": _counterfactual_metric_mean(rows, "top_contract_fit_score"),
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+
+
 def _m04_m05_mechanism_review_report(
     *,
     m04_component_rows: Sequence[Mapping[str, Any]],
     m05_selection_rows: Sequence[Mapping[str, Any]],
     m04_variant_rows: Sequence[Mapping[str, Any]],
     m05_dte_sensitivity_rows: Sequence[Mapping[str, Any]],
+    m05_hard_filter_overlap_rows: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     m04_inverted = [
         str(row.get("component_name"))
@@ -2152,6 +2342,15 @@ def _m04_m05_mechanism_review_report(
         "m05_open_pass_positive_unfilled_group_count": len(m05_positive_unfilled),
         "m05_hard_filter_positive_unfilled_group_count": len(hard_filter_positive_unfilled),
         "m05_dte_primary_positive_label_count": dte_positive_label_count,
+        "m05_hard_filter_overlap_counts": _m05_hard_filter_overlap_counts(m05_hard_filter_overlap_rows),
+        "m05_dte_isolated_positive_label_count": _m05_hard_filter_overlap_positive_count(
+            m05_hard_filter_overlap_rows,
+            overlap_group="dte_isolated",
+        ),
+        "m05_dte_overlap_positive_label_count": _m05_hard_filter_overlap_positive_count(
+            m05_hard_filter_overlap_rows,
+            overlap_group="dte_overlaps_other_filters",
+        ),
         "primary_followup": _m04_m05_primary_followup(m04_inverted, hard_filter_positive_unfilled),
         "threshold_selection_performed": False,
         "retraining_performed": False,
@@ -2164,6 +2363,7 @@ def _m04_m05_mechanism_review_report(
         "m05_selection_mechanics_ref": "m05_selection_mechanics.csv",
         "m04_variant_counterfactual_ref": "m04_variant_counterfactual.csv",
         "m05_dte_policy_sensitivity_ref": "m05_dte_policy_sensitivity.csv",
+        "m05_hard_filter_overlap_ref": "m05_hard_filter_overlap.csv",
         "review_role": "fixed_replay_m04_m05_mechanism_triage_only",
         "forbidden_uses": [
             "causal_feature_importance_claim",
@@ -2173,6 +2373,25 @@ def _m04_m05_mechanism_review_report(
             "broker_or_account_authority",
         ],
     }
+
+
+def _m05_hard_filter_overlap_counts(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    counts: Counter[str] = Counter()
+    for row in rows:
+        counts[str(row.get("overlap_group") or "unknown")] += int(row.get("row_count") or 0)
+    return dict(counts)
+
+
+def _m05_hard_filter_overlap_positive_count(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    overlap_group: str,
+) -> int:
+    return sum(
+        int(row.get("positive_label_count") or 0)
+        for row in rows
+        if row.get("overlap_group") == overlap_group
+    )
 
 
 def _m04_m05_primary_followup(

@@ -572,6 +572,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("m05_selection_mechanics", mechanism_review["applies_to"])
         self.assertIn("m04_variant_counterfactual", mechanism_review["applies_to"])
         self.assertIn("m05_dte_policy_sensitivity", mechanism_review["applies_to"])
+        self.assertIn("m05_hard_filter_overlap", mechanism_review["applies_to"])
         self.assertIn("without changing weights filters thresholds", mechanism_review["note"])
 
         residual_event_governance_receipt = rows["MANAGER_POST_REPLAY_M06_EVENT_ATTRIBUTION_RECEIPT"]
@@ -748,6 +749,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("m05_selection_mechanics.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m04_variant_counterfactual.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m05_dte_policy_sensitivity.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("m05_hard_filter_overlap.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m04_m05_mechanism_review_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_attribution_packet.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_matches.csv", layer_attribution_surfaces["payload"])
@@ -770,11 +772,24 @@ class RegistryHelperTests(unittest.TestCase):
             "MODEL_GROUP_M04_COMPONENT_DIAGNOSTIC_INVERTED_AGAINST_EXPECTED_DIRECTION": "inverted_against_expected_direction",
             "MODEL_GROUP_M04_COMPONENT_DIAGNOSTIC_SAMPLE_LIMITED": "sample_limited",
             "MODEL_GROUP_M04_COMPONENT_DIAGNOSTIC_WEAK_OR_MIXED": "weak_or_mixed",
+            "MODEL_GROUP_M04_COMPONENT_DIAGNOSTIC_MISSING_COMPONENT_COVERAGE": "missing_component_coverage",
         }
         for key, payload in m04_component_status_payloads.items():
             self.assertEqual(rows[key]["kind"], "status_value")
             self.assertEqual(rows[key]["payload"], payload)
             self.assertIn("m04_component_diagnostics", rows[key]["applies_to"])
+
+        m04_variant_status_payloads = {
+            "MODEL_GROUP_M04_VARIANT_COUNTERFACTUAL_ALIGNED": "aligned_with_realized_return",
+            "MODEL_GROUP_M04_VARIANT_COUNTERFACTUAL_STILL_INVERTED": "still_inverted_against_realized_return",
+            "MODEL_GROUP_M04_VARIANT_COUNTERFACTUAL_SAMPLE_LIMITED": "sample_limited",
+            "MODEL_GROUP_M04_VARIANT_COUNTERFACTUAL_WEAK_OR_MIXED": "weak_or_mixed",
+            "MODEL_GROUP_M04_VARIANT_COUNTERFACTUAL_MISSING_COMPONENT_COVERAGE": "missing_component_coverage",
+        }
+        for key, payload in m04_variant_status_payloads.items():
+            self.assertEqual(rows[key]["kind"], "status_value")
+            self.assertEqual(rows[key]["payload"], payload)
+            self.assertIn("m04_variant_counterfactual", rows[key]["applies_to"])
 
         mechanism_followup_payloads = {
             "MODEL_GROUP_M04_M05_MECHANISM_FOLLOWUP_JOINT_REVIEW": "m04_component_and_m05_filter_joint_review",
@@ -1450,8 +1465,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["UNIFIED_DECISION_VECTOR"]["payload"], "unified_decision_vector")
         self.assertEqual(rows["UNIFIED_DECISION_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn("4_edge_direction_score_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("4_materiality_adjusted_action_score_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("4_action_confidence_score_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("4_resolved_underlying_action_type", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("4_resolved_materiality_adjusted_action_score", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
         self.assertIn("4_resolved_reason_codes", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
         self.assertIn("open_long", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
         self.assertIn("bearish_underlying_path_but_no_short_allowed", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
@@ -2604,6 +2621,7 @@ class RegistryHelperTests(unittest.TestCase):
             "m04_variant_counterfactual",
             "m04_m05_mechanism_review",
             "m05_dte_policy_sensitivity",
+            "m05_hard_filter_overlap",
             "m05_selection_mechanics",
             "ready_signal",
             "one_shot_replay_acquisition",
