@@ -176,6 +176,12 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "tail_loss_rows.csv").exists())
             self.assertTrue((output_dir / "row_counterfactual_attribution.csv").exists())
             self.assertTrue((output_dir / "high_score_filled_tail_loss_matches.csv").exists())
+            self.assertTrue((output_dir / "parameter_replay_review.csv").exists())
+            self.assertTrue((output_dir / "parameter_replay_review_report.json").exists())
+            self.assertTrue((output_dir / "parameter_bucket_metrics.csv").exists())
+            self.assertTrue((output_dir / "categorical_parameter_replay_review.csv").exists())
+            self.assertIn("parameter_replay_review_summary", report)
+            self.assertIn("parameter_replay_review_report_ref", report)
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -224,6 +230,57 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(packet["headline"]["matched_comparison_count"], 1)
             self.assertEqual(packet["classification_summary"]["label_target_definition"]["status"], "supported")
             self.assertEqual(packet["classification_summary"]["label_target_definition"]["evidence_count"], 1)
+
+    def test_parameter_replay_review_classifies_useful_and_inverted_parameters(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            rows = []
+            for index in range(60):
+                value = index / 59
+                profitable = index >= 30
+                row = _row(
+                    f"p{index}",
+                    "accepted",
+                    "simulated_filled",
+                    1 if profitable else 0,
+                    0.5,
+                    0.03 if profitable else -0.03,
+                    "open_long",
+                    "long",
+                    "passed",
+                    "listed_option_contract",
+                )
+                row["timestamp"] = f"2021-02-{(index % 28) + 1:02d}T16:00:00-05:00"
+                row["feature_momentum_7d"] = value
+                row["model_layer_diagnostics"]["model_05_alpha_confidence"]["resolved_alpha_score"] = 1 - value
+                rows.append(row)
+            rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            with (output_dir / "parameter_replay_review.csv").open(encoding="utf-8") as handle:
+                parameter_rows = {
+                    row["parameter_name"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(parameter_rows["feature_momentum_7d"]["classification"], "directionally_useful")
+            self.assertEqual(
+                parameter_rows["model_layer_diagnostics.model_05_alpha_confidence.resolved_alpha_score"]["classification"],
+                "suspect_requires_redesign",
+            )
+            self.assertIn(
+                "model_layer_diagnostics.model_05_alpha_confidence.resolved_alpha_score",
+                report["parameter_replay_review_summary"]["suspect_requires_redesign_parameters"],
+            )
+            review_report = json.loads((output_dir / "parameter_replay_review_report.json").read_text(encoding="utf-8"))
+            self.assertEqual(review_report["contract_type"], "model_group_parameter_replay_review_report")
+            self.assertIn("threshold_selection", review_report["forbidden_uses"])
 
 
 def _row(

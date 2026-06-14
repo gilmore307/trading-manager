@@ -14,6 +14,12 @@ from typing import Any, Iterable, Mapping, Sequence
 
 DEFAULT_TAIL_ROW_LIMIT = 20
 DEFAULT_HIGH_SCORE_THRESHOLD = 0.8
+DEFAULT_PARAMETER_BUCKET_COUNT = 5
+MIN_PARAMETER_SAMPLE_COUNT = 50
+MIN_PARAMETER_UNIQUE_VALUES = 3
+MIN_PARAMETER_FILLED_COUNT = 30
+MIN_PARAMETER_ABS_CORRELATION = 0.08
+MIN_PARAMETER_RETURN_SPREAD = 0.01
 
 
 def build_model_group_layer_attribution(
@@ -59,6 +65,7 @@ def build_model_group_layer_attribution(
         counterfactual_rows=counterfactual_rows,
         score_bin_rows=score_bin_rows,
     )
+    parameter_review = _parameter_replay_review(rows)
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
     tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
         rows=rows,
@@ -76,6 +83,13 @@ def build_model_group_layer_attribution(
     _write_csv(output_dir / "top_gain_rows.csv", top_gain_rows)
     _write_csv(output_dir / "row_counterfactual_attribution.csv", counterfactual_rows)
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
+    _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
+    _write_csv(output_dir / "parameter_bucket_metrics.csv", parameter_review["bucket_rows"])
+    _write_csv(output_dir / "categorical_parameter_replay_review.csv", parameter_review["categorical_rows"])
+    (output_dir / "parameter_replay_review_report.json").write_text(
+        json.dumps(parameter_review["report"], indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     (output_dir / "high_score_filled_tail_loss_attribution_packet.json").write_text(
         json.dumps(tail_loss_packet, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -106,6 +120,11 @@ def build_model_group_layer_attribution(
         "high_score_filled_tail_loss_matches_ref": str(output_dir / "high_score_filled_tail_loss_matches.csv"),
         "high_score_filled_tail_loss_summary": tail_loss_packet["headline"],
         "row_counterfactual_summary": counterfactual_summary,
+        "parameter_replay_review_ref": str(output_dir / "parameter_replay_review.csv"),
+        "parameter_replay_review_report_ref": str(output_dir / "parameter_replay_review_report.json"),
+        "parameter_bucket_metrics_ref": str(output_dir / "parameter_bucket_metrics.csv"),
+        "categorical_parameter_replay_review_ref": str(output_dir / "categorical_parameter_replay_review.csv"),
+        "parameter_replay_review_summary": parameter_review["summary"],
         "counterfactual_gate_sweep_summary": gate_sweep_summary,
         "m05_unfilled_summary": {
             key: value for key, value in m05_unfilled_summary.items() if key != "filter_reason_rows"
@@ -709,6 +728,434 @@ def _sample_sufficiency_status(*, filled_count: int, score_bin_rows: Sequence[Ma
         "minimum_required_bin_count": 30,
         "reason_codes": reason_codes,
     }
+
+
+def _parameter_replay_review(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    numeric_values: dict[str, list[tuple[float, Mapping[str, Any]]]] = defaultdict(list)
+    categorical_values: dict[str, list[tuple[str, Mapping[str, Any]]]] = defaultdict(list)
+    for row in rows:
+        for name, value in _numeric_parameter_values(row).items():
+            numeric_values[name].append((value, row))
+        for name, value in _categorical_parameter_values(row).items():
+            categorical_values[name].append((value, row))
+
+    parameter_rows: list[dict[str, Any]] = []
+    bucket_rows: list[dict[str, Any]] = []
+    categorical_rows: list[dict[str, Any]] = []
+    for parameter_name, pairs in sorted(numeric_values.items()):
+        parameter_row, parameter_bucket_rows = _numeric_parameter_review_row(parameter_name, pairs, total_row_count=len(rows))
+        parameter_rows.append(parameter_row)
+        bucket_rows.extend(parameter_bucket_rows)
+    for parameter_name, pairs in sorted(categorical_values.items()):
+        categorical_rows.extend(_categorical_parameter_review_rows(parameter_name, pairs))
+
+    return {
+        "report": _parameter_review_report(parameter_rows, categorical_rows),
+        "summary": _parameter_review_summary(parameter_rows),
+        "parameter_rows": parameter_rows,
+        "bucket_rows": bucket_rows,
+        "categorical_rows": categorical_rows,
+    }
+
+
+def _numeric_parameter_values(row: Mapping[str, Any]) -> dict[str, float]:
+    output: dict[str, float] = {}
+    for key, value in row.items():
+        if key.startswith("feature_") or key in {
+            "prediction_score",
+            "entry_minimum_alpha_confidence",
+            "entry_minimum_trade_intensity",
+            "bar_close",
+        }:
+            parsed = _finite_float(value)
+            if parsed is not None:
+                output[key] = parsed
+    output.update(
+        _flatten_numeric_parameters(
+            row.get("model_layer_diagnostics") or {},
+            prefix="model_layer_diagnostics",
+        )
+    )
+    return {
+        key: value
+        for key, value in output.items()
+        if not _parameter_name_is_outcome_or_id(key)
+    }
+
+
+def _flatten_numeric_parameters(value: Any, *, prefix: str) -> dict[str, float]:
+    if isinstance(value, Mapping):
+        output: dict[str, float] = {}
+        for child_key, child_value in value.items():
+            output.update(_flatten_numeric_parameters(child_value, prefix=f"{prefix}.{child_key}"))
+        return output
+    parsed = _finite_float(value)
+    return {prefix: parsed} if parsed is not None else {}
+
+
+def _parameter_name_is_outcome_or_id(name: str) -> bool:
+    lowered = name.lower()
+    forbidden = ("realized", "return_source", "outcome", "label", "next_", "_ref", "_id")
+    return any(token in lowered for token in forbidden)
+
+
+def _categorical_parameter_values(row: Mapping[str, Any]) -> dict[str, str]:
+    diagnostics = row.get("model_layer_diagnostics") or {}
+    m04 = diagnostics.get("model_04_unified_decision") or {}
+    m05 = diagnostics.get("model_05_alpha_confidence") or {}
+    return {
+        "decision_action": _text(row.get("decision_action") or row.get("action")),
+        "decision_status": _text(row.get("decision_status")),
+        "fill_status": _text(row.get("fill_status")),
+        "asset_expression_route": _text(row.get("asset_expression_route")),
+        "option_contract_path_status": _text(row.get("option_contract_path_status")),
+        "selected_option_expression_type": _text(row.get("selected_option_expression_type")),
+        "model_04.resolved_underlying_action_type": _text(m04.get("resolved_underlying_action_type")),
+        "model_04.resolved_action_side": _text(m04.get("resolved_action_side")),
+        "model_04.dominant_horizon": _text(m04.get("dominant_horizon")),
+        "model_05.alpha_gate_status": _text(m05.get("alpha_gate_status")),
+    }
+
+
+def _numeric_parameter_review_row(
+    parameter_name: str,
+    pairs: Sequence[tuple[float, Mapping[str, Any]]],
+    *,
+    total_row_count: int,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    values = [value for value, _row in pairs]
+    rows = [row for _value, row in pairs]
+    buckets = _numeric_parameter_bucket_rows(parameter_name, pairs, bucket_count=DEFAULT_PARAMETER_BUCKET_COUNT)
+    expected_direction = _expected_parameter_direction(parameter_name)
+    label_correlation = _spearman(values, [_float(row.get("outcome_label")) for row in rows])
+    return_correlation = _spearman(values, [_float(row.get("realized_return")) for row in rows])
+    filled_pairs = [(value, row) for value, row in pairs if row.get("fill_status") == "simulated_filled"]
+    filled_return_correlation = _spearman(
+        [value for value, _row in filled_pairs],
+        [_float(row.get("realized_return")) for _value, row in filled_pairs],
+    )
+    filled_buckets = _numeric_parameter_bucket_rows(
+        parameter_name,
+        filled_pairs,
+        bucket_count=DEFAULT_PARAMETER_BUCKET_COUNT,
+    )
+    low_bucket, high_bucket = _edge_buckets(buckets)
+    low_filled_bucket, high_filled_bucket = _edge_buckets(filled_buckets)
+    return_spread = None
+    label_rate_spread = None
+    filled_return_spread = None
+    if low_bucket is not None and high_bucket is not None:
+        return_spread = _none_subtract(high_bucket.get("return_per_row"), low_bucket.get("return_per_row"))
+        label_rate_spread = _none_subtract(high_bucket.get("label_rate"), low_bucket.get("label_rate"))
+    if low_filled_bucket is not None and high_filled_bucket is not None:
+        filled_return_spread = _none_subtract(
+            high_filled_bucket.get("return_per_row"),
+            low_filled_bucket.get("return_per_row"),
+        )
+    classification, reason_codes = _numeric_parameter_classification(
+        expected_direction=expected_direction,
+        sample_count=len(pairs),
+        unique_count=len(set(values)),
+        filled_count=len(filled_pairs),
+        return_correlation=return_correlation,
+        return_spread=return_spread,
+        filled_return_correlation=filled_return_correlation,
+        filled_return_spread=filled_return_spread,
+    )
+    return (
+        {
+            "parameter_name": parameter_name,
+            "parameter_family": _parameter_family(parameter_name),
+            "expected_direction": _direction_text(expected_direction),
+            "classification": classification,
+            "reason_codes": ";".join(reason_codes),
+            "sample_count": len(pairs),
+            "non_null_count": len(pairs),
+            "missing_rate": _round(1 - (len(pairs) / total_row_count)) if total_row_count else None,
+            "filled_count": len(filled_pairs),
+            "unique_value_count": len(set(values)),
+            "value_min": _round(min(values)) if values else None,
+            "value_max": _round(max(values)) if values else None,
+            "value_mean": _round(_mean(values)),
+            "label_spearman": _round(label_correlation),
+            "return_spearman": _round(return_correlation),
+            "filled_return_spearman": _round(filled_return_correlation),
+            "high_minus_low_return_per_row": _round(return_spread),
+            "filled_high_minus_low_return_per_row": _round(filled_return_spread),
+            "high_minus_low_label_rate": _round(label_rate_spread),
+            "fixed_input_only": True,
+            "threshold_selection_performed": False,
+        },
+        buckets,
+    )
+
+
+def _numeric_parameter_bucket_rows(
+    parameter_name: str,
+    pairs: Sequence[tuple[float, Mapping[str, Any]]],
+    *,
+    bucket_count: int,
+) -> list[dict[str, Any]]:
+    if not pairs:
+        return []
+    ordered = sorted(pairs, key=lambda item: item[0])
+    groups: list[list[tuple[float, Mapping[str, Any]]]] = []
+    for bucket_index in range(bucket_count):
+        start = round(bucket_index * len(ordered) / bucket_count)
+        end = round((bucket_index + 1) * len(ordered) / bucket_count)
+        group = ordered[start:end]
+        if group:
+            groups.append(group)
+    output: list[dict[str, Any]] = []
+    for index, group in enumerate(groups, start=1):
+        values = [value for value, _row in group]
+        group_rows = [row for _value, row in group]
+        summary = _summary(group_rows)
+        output.append(
+            {
+                "parameter_name": parameter_name,
+                "bucket_index": index,
+                "bucket_count": len(groups),
+                "value_min": _round(min(values)),
+                "value_max": _round(max(values)),
+                "value_mean": _round(_mean(values)),
+                **summary,
+            }
+        )
+    return output
+
+
+def _edge_buckets(bucket_rows: Sequence[Mapping[str, Any]]) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+    if len(bucket_rows) < 2:
+        return None, None
+    return bucket_rows[0], bucket_rows[-1]
+
+
+def _none_subtract(left: Any, right: Any) -> float | None:
+    if left is None or right is None:
+        return None
+    return float(left) - float(right)
+
+
+def _numeric_parameter_classification(
+    *,
+    expected_direction: int | None,
+    sample_count: int,
+    unique_count: int,
+    filled_count: int,
+    return_correlation: float | None,
+    return_spread: float | None,
+    filled_return_correlation: float | None,
+    filled_return_spread: float | None,
+) -> tuple[str, list[str]]:
+    reason_codes: list[str] = []
+    if sample_count < MIN_PARAMETER_SAMPLE_COUNT:
+        reason_codes.append("sample_count_below_minimum")
+    if unique_count < MIN_PARAMETER_UNIQUE_VALUES:
+        return "not_reviewable", ["unique_value_count_below_minimum"]
+    if filled_count < MIN_PARAMETER_FILLED_COUNT:
+        reason_codes.append("filled_sample_below_minimum")
+    if reason_codes:
+        return "weak_or_sample_limited", reason_codes
+    if return_correlation is None or return_spread is None:
+        return "weak_or_sample_limited", ["insufficient_numeric_variation"]
+    aligned_correlation = return_correlation if expected_direction != -1 else -return_correlation
+    aligned_spread = return_spread if expected_direction != -1 else -return_spread
+    aligned_filled_correlation = (
+        None
+        if filled_return_correlation is None
+        else filled_return_correlation if expected_direction != -1 else -filled_return_correlation
+    )
+    aligned_filled_spread = (
+        None
+        if filled_return_spread is None
+        else filled_return_spread if expected_direction != -1 else -filled_return_spread
+    )
+    if expected_direction is None:
+        if abs(return_correlation) >= MIN_PARAMETER_ABS_CORRELATION and abs(return_spread) >= MIN_PARAMETER_RETURN_SPREAD:
+            return "empirical_signal_present_direction_unassigned", ["expected_direction_not_registered"]
+        return "weak_or_sample_limited", ["weak_empirical_signal_or_unassigned_direction"]
+    if aligned_correlation >= MIN_PARAMETER_ABS_CORRELATION and aligned_spread >= MIN_PARAMETER_RETURN_SPREAD:
+        return "directionally_useful", ["return_correlation_and_bucket_spread_align"]
+    if aligned_correlation <= -MIN_PARAMETER_ABS_CORRELATION and aligned_spread <= -MIN_PARAMETER_RETURN_SPREAD:
+        return "suspect_requires_redesign", ["return_correlation_and_bucket_spread_inverted"]
+    if (
+        aligned_filled_correlation is not None
+        and aligned_filled_spread is not None
+        and aligned_filled_correlation <= -MIN_PARAMETER_ABS_CORRELATION
+        and aligned_filled_spread <= -MIN_PARAMETER_RETURN_SPREAD
+    ):
+        return "suspect_requires_redesign", ["filled_return_correlation_and_bucket_spread_inverted"]
+    if (
+        aligned_filled_correlation is not None
+        and aligned_filled_spread is not None
+        and aligned_filled_correlation >= MIN_PARAMETER_ABS_CORRELATION
+        and aligned_filled_spread >= MIN_PARAMETER_RETURN_SPREAD
+    ):
+        return "directionally_useful", ["filled_return_correlation_and_bucket_spread_align"]
+    return "weak_or_sample_limited", ["weak_or_mixed_replay_signal"]
+
+
+def _expected_parameter_direction(parameter_name: str) -> int | None:
+    lowered = parameter_name.lower()
+    if "downside_risk" in lowered or "cost" in lowered:
+        return -1
+    positive_tokens = (
+        "prediction_score",
+        "alpha",
+        "confidence",
+        "expected_return",
+        "trade_intensity",
+        "entry_quality",
+        "action_direction",
+        "momentum",
+        "volume_rank",
+        "feature_coverage",
+        "signed_edge",
+    )
+    if any(token in lowered for token in positive_tokens):
+        return 1
+    return None
+
+
+def _direction_text(direction: int | None) -> str:
+    if direction == 1:
+        return "higher_expected_better"
+    if direction == -1:
+        return "higher_expected_worse"
+    return "unassigned"
+
+
+def _parameter_family(parameter_name: str) -> str:
+    if parameter_name.startswith("feature_"):
+        return "top_level_feature"
+    if "model_04_unified_decision" in parameter_name:
+        return "model_04_unified_decision"
+    if "model_05_alpha_confidence" in parameter_name:
+        return "model_05_alpha_confidence"
+    if parameter_name in {"prediction_score", "entry_minimum_alpha_confidence", "entry_minimum_trade_intensity"}:
+        return "replay_decision_parameter"
+    return "other"
+
+
+def _categorical_parameter_review_rows(
+    parameter_name: str,
+    pairs: Sequence[tuple[str, Mapping[str, Any]]],
+) -> list[dict[str, Any]]:
+    groups: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for value, row in pairs:
+        groups[value or "missing"].append(row)
+    output: list[dict[str, Any]] = []
+    for value, group_rows in sorted(groups.items(), key=lambda item: (-len(item[1]), item[0])):
+        output.append(
+            {
+                "parameter_name": parameter_name,
+                "parameter_value": value,
+                **_summary(group_rows),
+                "fixed_input_only": True,
+                "threshold_selection_performed": False,
+            }
+        )
+    return output
+
+
+def _parameter_review_summary(parameter_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    counts = Counter(str(row.get("classification") or "unknown") for row in parameter_rows)
+    top_suspect = [
+        str(row.get("parameter_name"))
+        for row in parameter_rows
+        if row.get("classification") == "suspect_requires_redesign"
+    ][:10]
+    top_useful = [
+        str(row.get("parameter_name"))
+        for row in parameter_rows
+        if row.get("classification") == "directionally_useful"
+    ][:10]
+    return {
+        "contract_type": "model_group_parameter_replay_review_summary",
+        "parameter_count": len(parameter_rows),
+        "classification_counts": dict(counts),
+        "directionally_useful_parameters": top_useful,
+        "suspect_requires_redesign_parameters": top_suspect,
+        "fixed_input_only": True,
+        "threshold_selection_performed": False,
+        "interpretation_limits": [
+            "Correlation and bucket spreads are replay diagnostics, not causal feature attribution.",
+            "Sparse filled-option rows can make parameter classifications sample-limited.",
+            "Unassigned-direction parameters require model-owner interpretation before redesign.",
+        ],
+    }
+
+
+def _parameter_review_report(
+    parameter_rows: Sequence[Mapping[str, Any]],
+    categorical_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "contract_type": "model_group_parameter_replay_review_report",
+        "summary": _parameter_review_summary(parameter_rows),
+        "numeric_parameter_rows_ref": "parameter_replay_review.csv",
+        "numeric_parameter_bucket_rows_ref": "parameter_bucket_metrics.csv",
+        "categorical_parameter_rows_ref": "categorical_parameter_replay_review.csv",
+        "categorical_parameter_count": len({row.get("parameter_name") for row in categorical_rows}),
+        "review_role": "fixed_replay_association_diagnostic_only",
+        "forbidden_uses": [
+            "causal_feature_importance_claim",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+    }
+
+
+def _spearman(left: Sequence[float], right: Sequence[float]) -> float | None:
+    if len(left) != len(right) or len(left) < 2:
+        return None
+    left_ranks = _ranks(left)
+    right_ranks = _ranks(right)
+    return _pearson(left_ranks, right_ranks)
+
+
+def _ranks(values: Sequence[float]) -> list[float]:
+    indexed = sorted(enumerate(values), key=lambda item: item[1])
+    ranks = [0.0] * len(values)
+    index = 0
+    while index < len(indexed):
+        end = index + 1
+        while end < len(indexed) and indexed[end][1] == indexed[index][1]:
+            end += 1
+        average_rank = (index + end + 1) / 2
+        for original_index, _value in indexed[index:end]:
+            ranks[original_index] = average_rank
+        index = end
+    return ranks
+
+
+def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
+    if len(left) != len(right) or len(left) < 2:
+        return None
+    left_mean = sum(left) / len(left)
+    right_mean = sum(right) / len(right)
+    numerator = sum((lvalue - left_mean) * (rvalue - right_mean) for lvalue, rvalue in zip(left, right, strict=True))
+    left_denominator = sum((value - left_mean) ** 2 for value in left)
+    right_denominator = sum((value - right_mean) ** 2 for value in right)
+    denominator = (left_denominator * right_denominator) ** 0.5
+    if denominator == 0:
+        return None
+    return numerator / denominator
+
+
+def _finite_float(value: Any) -> float | None:
+    try:
+        if value in (None, ""):
+            return None
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed or parsed in (float("inf"), float("-inf")):
+        return None
+    return parsed
 
 
 def _counterfactual_gate_sweep_summary(path: Path | None) -> dict[str, Any]:

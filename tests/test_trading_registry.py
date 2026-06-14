@@ -722,6 +722,10 @@ class RegistryHelperTests(unittest.TestCase):
         layer_attribution_surfaces = rows["MANAGER_MODEL_GROUP_LAYER_ATTRIBUTION_SURFACES"]
         self.assertIn("layer_attribution_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("row_counterfactual_attribution.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("parameter_replay_review.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("parameter_replay_review_report.json", layer_attribution_surfaces["payload"])
+        self.assertIn("parameter_bucket_metrics.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("categorical_parameter_replay_review.csv", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_attribution_packet.json", layer_attribution_surfaces["payload"])
         self.assertIn("high_score_filled_tail_loss_matches.csv", layer_attribution_surfaces["payload"])
         self.assertIn("counterfactual_gate_sweep_ref", layer_attribution_surfaces["payload"])
