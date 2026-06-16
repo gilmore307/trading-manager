@@ -2402,6 +2402,34 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("provisional_realtime_decision_fallback", poll_policy["payload"])
         self.assertIn("separate from canonical TE source rows", poll_policy["note"])
 
+        symbols_file_default = registry["TRADING_DATA_CALENDAR_SYMBOLS_FILE_DEFAULT"]
+        self.assertEqual(symbols_file_default["kind"], "config")
+        self.assertIn("TRADING_DATA_CALENDAR_SYMBOLS_FILE", symbols_file_default["payload"])
+        self.assertIn("equity_total_symbol_pool.symbols.txt", symbols_file_default["payload"])
+        self.assertIn("calendar_symbols_file", symbols_file_default["applies_to"])
+        self.assertIn("does not authorize symbol-pool mutation", symbols_file_default["note"])
+
+        poll_status_values = {
+            "TRADING_ECONOMICS_RELEASE_POLL_PLANNED_REQUIRES_EXECUTE_LIVE_FETCH": "planned_requires_execute_live_fetch",
+            "TRADING_ECONOMICS_RELEASE_POLL_RELEASED_VALUE_AVAILABLE": "te_released_value_available",
+            "TRADING_ECONOMICS_RELEASE_POLL_FALLBACK_REQUESTED": "fallback_requested",
+            "TRADING_ECONOMICS_RELEASE_POLL_TIMED_OUT_WITHOUT_RELEASED_VALUE": "timed_out_without_released_value",
+        }
+        for key, payload in poll_status_values.items():
+            self.assertEqual(registry[key]["kind"], "status_value")
+            self.assertEqual(registry[key]["payload"], payload)
+            self.assertIn("te_release_poll_status", registry[key]["applies_to"])
+
+        fallback_status_values = {
+            "TRADING_ECONOMICS_RELEASE_FALLBACK_SUCCEEDED": "succeeded",
+            "TRADING_ECONOMICS_RELEASE_FALLBACK_FAILED": "failed",
+        }
+        for key, payload in fallback_status_values.items():
+            self.assertEqual(registry[key]["kind"], "status_value")
+            self.assertEqual(registry[key]["payload"], payload)
+            self.assertIn("te_release_fallback_status", registry[key]["applies_to"])
+            self.assertIn("macro-release web-search fallback", registry[key]["note"])
+
         fallback_artifact = registry["PROVISIONAL_MACRO_RELEASE_WEB_SEARCH"]
         self.assertEqual(fallback_artifact["kind"], "artifact_type")
         self.assertEqual(fallback_artifact["payload"], "provisional_macro_release_web_search")
@@ -2652,6 +2680,8 @@ class RegistryHelperTests(unittest.TestCase):
             "state_signal_type",
             "suspect_parameter_counterfactual",
             "target_state_vector_model",
+            "te_release_fallback_status",
+            "te_release_poll_status",
             "temporal_attention_pool",
             "temporal_attention_focus_pool",
             "trading-storage",
