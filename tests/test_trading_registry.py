@@ -812,6 +812,16 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertIn("promotion_result", rows[key]["applies_to"])
             self.assertIn("agent_model_promotion_decision", rows[key]["applies_to"])
 
+        readiness_probe_fields = rows["MANAGER_MODEL_GROUP_READINESS_PROBE_COUNT_FIELDS"]
+        self.assertEqual(readiness_probe_fields["kind"], "config")
+        self.assertIn("expected_failure_triage_rows", readiness_probe_fields["payload"])
+        self.assertIn("expected_temporal_attention_candidate_count", readiness_probe_fields["payload"])
+        self.assertIn("standardized_event_candidate_count", readiness_probe_fields["payload"])
+        readiness_probe_sentinel = rows["MANAGER_MODEL_GROUP_READINESS_PROBE_NOT_COUNTED"]
+        self.assertEqual(readiness_probe_sentinel["kind"], "status_value")
+        self.assertEqual(readiness_probe_sentinel["payload"], "not_counted_during_readiness_probe")
+        self.assertIn("readiness_probe_count", readiness_probe_sentinel["applies_to"])
+
         self.assertEqual(rows["ROW_COUNTERFACTUAL_BUCKET"]["payload"], "row_counterfactual_bucket")
         layer_bucket_payloads = {
             "MODEL_GROUP_LAYER_ATTRIBUTION_DATA_INSUFFICIENCY": "data_insufficiency",
@@ -2629,6 +2639,7 @@ class RegistryHelperTests(unittest.TestCase):
             "production_route_decision",
             "production_route_review_status",
             "quarantine_candidate",
+            "readiness_probe_count",
             "replay_dataset_preparation",
             "replay_freeze_gate",
             "replay_completion_scope",
