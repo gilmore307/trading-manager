@@ -387,6 +387,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(requirements_artifact["payload"], "replay_option_feature_requirements")
         self.assertIn("option_feature_requirements.jsonl", requirements_artifact["applies_to"])
         self.assertIn("requirements_artifact_ref", requirements_artifact["applies_to"])
+        drain_status = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_DRAIN_STATUS"]
+        self.assertEqual(drain_status["kind"], "artifact_type")
+        self.assertEqual(drain_status["payload"], "manager_model_group_replay_option_feature_drain_status")
+        self.assertIn("drain_model_group_replay_option_features.py", drain_status["path"])
+        self.assertIn("drain_status", drain_status["applies_to"])
         backoff_policy = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_BACKOFF_PAYLOAD_POLICY"]
         self.assertIn("requirements_artifact_ref=option_feature_requirements.jsonl", backoff_policy["payload"])
         self.assertIn(
