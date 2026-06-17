@@ -378,6 +378,8 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
             continue
         if "current_deterministic_crypto_policy" in str(receipt.get("candidate_model_ref") or ""):
             continue
+        if not _replay_receipt_full_completion_scope(receipt):
+            continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt.get("generated_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt_path, receipt))
     if not candidates:
@@ -402,6 +404,13 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
         str(receipt.get("candidate_handoff_status") or "") == "available"
         and str(receipt.get("candidate_handoff_source") or "") in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
     )
+
+
+def _replay_receipt_full_completion_scope(receipt: Mapping[str, Any]) -> bool:
+    completion_scope = str(receipt.get("replay_completion_scope") or "").strip()
+    if completion_scope:
+        return completion_scope == "full_candidate_universe" and receipt.get("max_decision_rows") is None
+    return receipt.get("max_decision_rows") is None
 
 
 def _latest_complete_replay_review_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:

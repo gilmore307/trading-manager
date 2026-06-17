@@ -1911,6 +1911,8 @@ def _replay_review_receipt_uses_current_replay_handoff(dataset_root: Path, recei
             continue
         if str(replay_receipt.get("decision_rows_ref") or "") != decision_rows_ref:
             continue
+        if not _replay_receipt_full_completion_scope(replay_receipt):
+            continue
         if _replay_receipt_uses_current_candidate_handoff(replay_receipt):
             return True
     return False
@@ -1932,6 +1934,13 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
         str(receipt.get("candidate_handoff_status") or "") == "available"
         and str(receipt.get("candidate_handoff_source") or "") in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
     )
+
+
+def _replay_receipt_full_completion_scope(receipt: Mapping[str, Any]) -> bool:
+    completion_scope = str(receipt.get("replay_completion_scope") or "").strip()
+    if completion_scope:
+        return completion_scope == "full_candidate_universe" and receipt.get("max_decision_rows") is None
+    return receipt.get("max_decision_rows") is None
 
 
 def _latest_residual_event_governance_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:

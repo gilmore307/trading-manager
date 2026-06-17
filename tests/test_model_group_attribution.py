@@ -132,6 +132,22 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_review_ready")
             self.assertFalse((dataset_root / "post_replay_review_runs").exists())
 
+    def test_bounded_replay_receipt_does_not_unlock_replay_review(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+            receipt_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "replay_execution_receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["max_decision_rows"] = 5000
+            receipt["replay_completion_scope"] = "bounded_diagnostic"
+            receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
+
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
+
+            self.assertIsNone(decision)
+
     def test_skips_when_attribution_receipt_already_exists(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
