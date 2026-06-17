@@ -2361,22 +2361,26 @@ class RegistryHelperTests(unittest.TestCase):
 
         boundary = registry["CALENDAR_MAINTENANCE_REFRESH_BOUNDARY"]
         self.assertIn("timer_cadence=daily_0615_host_local_randomized_15m", boundary["payload"])
-        self.assertIn("te_release_fetch_one_shot_schedule", boundary["payload"])
+        self.assertIn("te_release_fetch_queue", boundary["payload"])
+        self.assertIn("single_release_fetch_worker", boundary["payload"])
         self.assertIn("te_release_poll_until_actual", boundary["payload"])
         self.assertIn("provisional_macro_release_web_search_fallback", boundary["payload"])
-        self.assertIn("te_release_fetch_schedule", boundary["applies_to"])
+        self.assertIn("te_release_fetch_queue", boundary["applies_to"])
+        self.assertIn("te_release_fetcher", boundary["applies_to"])
         self.assertIn("te_release_poll", boundary["applies_to"])
         self.assertIn("provisional_macro_release_web_search", boundary["applies_to"])
         self.assertIn("skipped_no_new_or_changed_rows", boundary["applies_to"])
-        self.assertIn("--schedule-te-release-fetches", boundary["note"])
+        self.assertIn("--queue-te-release-fetches", boundary["note"])
+        self.assertNotIn("systemd-run", boundary["note"])
 
         script = registry["RUN_CALENDAR_MAINTENANCE_REFRESH"]
         self.assertIn("te_release_fetch_schedule", script["applies_to"])
+        self.assertIn("te_release_fetch_queue", script["applies_to"])
         self.assertIn("te_release_poll", script["applies_to"])
         self.assertIn("provisional_macro_release_web_search", script["applies_to"])
         self.assertIn("write_only_changed_monthly_buckets", script["applies_to"])
         self.assertIn("skipped_no_new_or_changed_rows", script["applies_to"])
-        self.assertIn("release polling", script["note"])
+        self.assertIn("release-fetch queue updates", script["note"])
 
         te_fetch_script = registry["RUN_TRADING_ECONOMICS_RECENT_CALENDAR_REFRESH"]
         self.assertIn("te_release_poll", te_fetch_script["applies_to"])
@@ -2389,12 +2393,23 @@ class RegistryHelperTests(unittest.TestCase):
         schedule_policy = registry["TRADING_ECONOMICS_RELEASE_FETCH_SCHEDULE_POLICY"]
         self.assertIn("default_delay_seconds=0", schedule_policy["payload"])
         self.assertIn("max_count=48", schedule_policy["payload"])
+        self.assertIn("queue_path=trading_economics_calendar_web/_manifests/release_fetch_queue.json", schedule_policy["payload"])
+        self.assertIn("single_systemd_timer=trading-data-te-release-fetch.timer", schedule_policy["payload"])
+        self.assertIn("single_fetcher=trading-data-te-release-fetch.service", schedule_policy["payload"])
         self.assertIn("future_fetch_only", schedule_policy["payload"])
         self.assertIn("poll_interval_seconds=5", schedule_policy["payload"])
         self.assertIn("poll_timeout_seconds=60", schedule_policy["payload"])
         self.assertIn("fallback_web_search_after_timeout", schedule_policy["payload"])
-        self.assertIn("One-shot TE release-fetch scheduler", schedule_policy["note"])
+        self.assertIn("single trading-data-te-release-fetch timer", schedule_policy["note"])
         self.assertIn("provisional web-search fallback evidence", schedule_policy["note"])
+        self.assertNotIn("systemd_run", schedule_policy["payload"])
+
+        release_fetcher = registry["RUN_TRADING_ECONOMICS_RELEASE_FETCHER"]
+        self.assertEqual(release_fetcher["kind"], "script")
+        self.assertIn("run_trading_economics_release_fetcher.py", release_fetcher["path"])
+        self.assertIn("te_release_fetch_queue", release_fetcher["applies_to"])
+        self.assertIn("te_release_fetcher", release_fetcher["applies_to"])
+        self.assertIn("Single shared TE release-fetch worker", release_fetcher["note"])
 
         poll_policy = registry["TRADING_ECONOMICS_RELEASE_POLL_FALLBACK_POLICY"]
         self.assertIn("release_poll_until_value", poll_policy["payload"])
@@ -2465,13 +2480,23 @@ class RegistryHelperTests(unittest.TestCase):
             service["path"],
             "trading-data/deploy/systemd/trading-data-calendar-maintenance.service",
         )
-        self.assertIn("--schedule-te-release-fetches", service["note"])
-        self.assertIn("poll for formal actual values", service["note"])
+        self.assertIn("--queue-te-release-fetches", service["note"])
+        self.assertIn("separate single fetcher service", service["note"])
 
         timer = registry["TRADING_DATA_CALENDAR_MAINTENANCE_SYSTEMD_TIMER"]
         self.assertEqual(timer["payload"], "trading-data-calendar-maintenance.timer")
         self.assertIn("daily_0615_host_local_randomized_15m", timer["applies_to"])
         self.assertIn("06:15 host-local", timer["note"])
+
+        release_fetch_service = registry["TRADING_DATA_TE_RELEASE_FETCH_SYSTEMD_SERVICE"]
+        self.assertEqual(release_fetch_service["payload"], "trading-data-te-release-fetch.service")
+        self.assertIn("te_release_fetch_queue", release_fetch_service["applies_to"])
+        self.assertIn("single shared Trading Economics release fetcher", release_fetch_service["note"])
+
+        release_fetch_timer = registry["TRADING_DATA_TE_RELEASE_FETCH_SYSTEMD_TIMER"]
+        self.assertEqual(release_fetch_timer["payload"], "trading-data-te-release-fetch.timer")
+        self.assertIn("one_minute_fetch_cadence", release_fetch_timer["applies_to"])
+        self.assertIn("single shared TE release fetcher once per minute", release_fetch_timer["note"])
 
     def test_target_layer2_context_mapping_shared_csv_is_registered(self):
         shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
