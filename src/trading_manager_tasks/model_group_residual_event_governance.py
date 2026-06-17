@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 from .event_feed_backfill import prepare_event_feed_backfill
 from .model_group_attribution import REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE, REPLAY_REVIEW_ROW_CONTRACT_TYPE
-from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID
+from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
@@ -38,7 +38,6 @@ EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_CONTRACT_TYPE = "model_06_residual_event_go
 EVENT_STRATEGY_PROMOTION_REVIEW_CONTRACT_TYPE = "event_strategy_promotion_review"
 ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE = "model_06_residual_event_governance_temporal_attention_pool_entry"
 EVENT_INTERPRETATION_CONTRACT_TYPE = "event_interpretation"
-LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
 LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES = {"event_interpretation_v1"}
 COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
 ACCEPTED_REVIEW_STATUSES = {"accepted", "reviewed_accepted", "approved", "reviewed"}
@@ -1931,7 +1930,7 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
         return True
     return (
         str(receipt.get("candidate_handoff_status") or "") == "available"
-        and str(receipt.get("candidate_handoff_source") or "") == LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE
+        and str(receipt.get("candidate_handoff_source") or "") in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
     )
 
 

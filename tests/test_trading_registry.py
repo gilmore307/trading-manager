@@ -360,11 +360,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("REPLAY_TRAINING_EXCLUSION_REASON", rows)
         candidate_input = rows["EVALUATION_REPLAY_CANDIDATE_UNIVERSE_INPUT_POLICY"]
         self.assertIn(
-            "candidate_handoff_source=layer_02_target_candidate_handoff|fixed_current_snapshot_historical_candidate_universe",
+            "candidate_handoff_source=fixed_current_snapshot_historical_candidate_universe",
             candidate_input["payload"],
         )
-        self.assertIn("target_candidates.jsonl", candidate_input["payload"])
-        self.assertIn("canonical Layer 2 target-candidate handoff", candidate_input["note"])
+        self.assertIn("historical_candidate_universe.csv", candidate_input["payload"])
+        self.assertIn("target_candidate_handoff_forbidden_for_canonical_replay", candidate_input["payload"])
+        self.assertIn("fixed historical candidate-universe artifact", candidate_input["note"])
         initial_capital = rows["EVALUATION_REPLAY_INITIAL_CAPITAL_USD"]
         self.assertEqual(initial_capital["payload_format"], "decimal")
         self.assertEqual(initial_capital["payload"], "25000.0")
@@ -389,14 +390,14 @@ class RegistryHelperTests(unittest.TestCase):
         backoff_policy = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_BACKOFF_PAYLOAD_POLICY"]
         self.assertIn("requirements_artifact_ref=option_feature_requirements.jsonl", backoff_policy["payload"])
         self.assertIn(
-            "option_feature_requirement_policy=point_in_time_candidate_handoff_allows_on_demand_option_feature_requirements|static_candidate_universe_does_not_authorize_provider_acquisition",
+            "option_feature_requirement_policy=fixed_historical_candidate_universe_allows_replay_option_feature_requirements",
             backoff_policy["payload"],
         )
         self.assertIn("option_feature_requirement_policy", backoff_policy["applies_to"])
         self.assertIn("first consumes the full requirements_artifact_ref", backoff_policy["note"])
         replay_option_policy = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_POLICY"]
         self.assertIn(
-            "point_in_time_candidate_handoff_allows_on_demand_option_feature_requirements",
+            "fixed_historical_candidate_universe_allows_replay_option_feature_requirements",
             replay_option_policy["payload"],
         )
         self.assertIn("option_feature_requirement_policy", replay_option_policy["applies_to"])

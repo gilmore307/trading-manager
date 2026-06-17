@@ -38,6 +38,7 @@ NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
 FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE = "fixed_current_snapshot_historical_candidate_universe"
+CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES = {FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE}
 REPLAY_CANDIDATE_UNIVERSE_CLOSE_READY_TIME = time(16, 15)
 
 
@@ -184,11 +185,48 @@ def run_model_group_replay_if_ready(
                 },
             )
     replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
-    target_handoff_path = _target_candidate_handoff_path(storage_root=storage_root, training_fold=training_fold)
-    resolved_candidate_universe_path = candidate_universe_path or target_handoff_path
+    default_candidate_universe_path = _historical_candidate_universe_path(storage_root)
+    resolved_candidate_universe_path = candidate_universe_path or default_candidate_universe_path
     if not resolved_candidate_universe_path.exists():
-        return None
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_candidate_universe_missing",
+            reason="canonical fixed historical candidate universe is required for live-like replay target selection",
+            selected_work="model_group.replay",
+            command=[],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "candidate_universe_path": str(resolved_candidate_universe_path),
+                "default_candidate_universe_path": str(default_candidate_universe_path),
+                "candidate_universe_source_policy": FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE,
+                "explicit_candidate_universe_override": candidate_universe_path is not None,
+                "required_next_step": "build or restore trading-storage/main/shared/historical_candidate_universe.csv before canonical replay",
+            },
+        )
     candidate_universe_source_policy = _candidate_universe_source_policy(resolved_candidate_universe_path)
+    if candidate_universe_source_policy not in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES:
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_candidate_universe_not_canonical",
+            reason="canonical replay must use the fixed historical candidate universe, not a training-fold target handoff",
+            selected_work="model_group.replay",
+            command=[],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "candidate_universe_path": str(resolved_candidate_universe_path),
+                "default_candidate_universe_path": str(default_candidate_universe_path),
+                "candidate_universe_source_policy": candidate_universe_source_policy,
+                "accepted_candidate_universe_sources": sorted(CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES),
+                "explicit_candidate_universe_override": candidate_universe_path is not None,
+                "required_next_step": "rerun replay with trading-storage/main/shared/historical_candidate_universe.csv so target selection uses the full trading pool",
+            },
+        )
     fixed_candidate_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path)
     fixed_equity_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path, asset_class="us_equity")
     materialized_equity_symbols = replay_plan_equity_symbols | _canonical_alpaca_source_symbols(storage_root)
@@ -892,10 +930,13 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     if has_equity_or_option_scope:
         candidate_handoff_status = str(replay_receipt.get("candidate_handoff_status") or "")
         candidate_handoff_source = str(replay_receipt.get("candidate_handoff_source") or "")
-        if candidate_handoff_status != "available" or candidate_handoff_source != LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE:
+        if (
+            candidate_handoff_status != "available"
+            or candidate_handoff_source not in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
+        ):
             return {
                 "compatible": False,
-                "reason": "equity/options replay receipt missing canonical Layer 2 target-candidate handoff evidence",
+                "reason": "equity/options replay receipt missing canonical fixed historical candidate-universe evidence",
             }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 

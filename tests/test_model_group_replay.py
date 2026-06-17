@@ -44,6 +44,7 @@ class ModelGroupReplayTests(unittest.TestCase):
     def _write_completed_fold(self, storage_root: Path) -> None:
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
         state_path.parent.mkdir(parents=True)
+        self._write_fixed_equity_universe(self._default_fixed_universe_path(storage_root), ["AAPL"])
         artifact_path = (
             storage_root.parent
             / "03_model_artifacts"
@@ -120,6 +121,7 @@ class ModelGroupReplayTests(unittest.TestCase):
         runner.write_text(
             textwrap.dedent(
                 """
+                import csv
                 import json
                 import sys
                 from pathlib import Path
@@ -127,6 +129,19 @@ class ModelGroupReplayTests(unittest.TestCase):
                 run_id = sys.argv[sys.argv.index("--run-id") + 1]
                 candidate_model_ref = sys.argv[sys.argv.index("--candidate-model-ref") + 1]
                 initial_capital_usd = float(sys.argv[sys.argv.index("--initial-capital-usd") + 1])
+                candidate_universe_path = Path(sys.argv[sys.argv.index("--candidate-universe-path") + 1])
+                candidate_symbols = []
+                if candidate_universe_path.suffix == ".csv":
+                    with candidate_universe_path.open("r", encoding="utf-8", newline="") as handle:
+                        for row in csv.DictReader(handle):
+                            symbol = str(row.get("symbol") or "").strip().upper()
+                            status = str(row.get("replay_candidate_status") or "active").strip().lower()
+                            if symbol and status == "active":
+                                candidate_symbols.append(symbol)
+                    candidate_source = "fixed_current_snapshot_historical_candidate_universe"
+                else:
+                    candidate_symbols = ["AAPL"]
+                    candidate_source = "layer_02_target_candidate_handoff"
                 progress_path = Path(sys.argv[sys.argv.index("--progress-path") + 1])
                 progress_path.parent.mkdir(parents=True, exist_ok=True)
                 rows = [
@@ -142,8 +157,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
-                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
-                    "candidate_handoff_symbols": ["AAPL"],
+                    "candidate_handoff_source": candidate_source,
+                    "candidate_handoff_symbols": candidate_symbols,
                     "initial_capital_usd": initial_capital_usd,
                     "initial_capital": {"amount": initial_capital_usd, "currency": "USD"},
                     "decision_row_count": 2,
@@ -154,6 +169,9 @@ class ModelGroupReplayTests(unittest.TestCase):
             encoding="utf-8",
         )
         return runner
+
+    def _default_fixed_universe_path(self, storage_root: Path) -> Path:
+        return storage_root.parent.parent / "main" / "shared" / "historical_candidate_universe.csv"
 
     def _write_fixed_equity_universe(self, path: Path, symbols: list[str], *, freeze_as_of_date: str = "") -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -198,8 +216,12 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertNotIn("--option-feature-database-url", decision.command)
             self.assertTrue(decision.execution_summary["option_feature_database_configured"])
             self.assertEqual(decision.execution_summary["initial_capital_usd"], 25000.0)
-            self.assertTrue(decision.command[decision.command.index("--candidate-universe-path") + 1].endswith("target_candidates.jsonl"))
+            self.assertTrue(decision.command[decision.command.index("--candidate-universe-path") + 1].endswith("historical_candidate_universe.csv"))
             self.assertEqual(decision.execution_summary["replay_execution_receipt"]["initial_capital_usd"], 25000.0)
+            self.assertEqual(
+                decision.execution_summary["replay_execution_receipt"]["candidate_handoff_source"],
+                "fixed_current_snapshot_historical_candidate_universe",
+            )
             self.assertEqual(
                 decision.execution_summary["replay_execution_receipt"]["candidate_model_ref"],
                 "storage://trading-manager/model_group/aapl/2016-01_2016-06",
@@ -248,6 +270,67 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.execution_summary["materialized_equity_candidate_symbol_count"], 2)
             self.assertEqual(decision.execution_summary["candidate_universe_source_policy"], "fixed_current_snapshot_historical_candidate_universe")
 
+    def test_default_replay_candidate_universe_missing_blocks_instead_of_using_target_handoff(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            self._default_fixed_universe_path(storage_root).unlink()
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_candidate_universe_missing")
+            self.assertTrue(decision.execution_summary["candidate_universe_path"].endswith("historical_candidate_universe.csv"))
+
+    def test_explicit_training_target_handoff_does_not_run_canonical_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            handoff_path = (
+                storage_root
+                / "runtime"
+                / "layer_03_target_state_vector"
+                / "input_materialization"
+                / "2016_01_2016_06"
+                / "target_candidates.jsonl"
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                candidate_universe_path=handoff_path,
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_candidate_universe_not_canonical")
+            self.assertEqual(
+                decision.execution_summary["candidate_universe_source_policy"],
+                "layer_02_target_candidate_handoff",
+            )
+
     def test_bounded_replay_receipt_does_not_satisfy_full_replay_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -287,7 +370,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                         "decision_rows_ref": str(decision_rows_path),
                         "max_decision_rows": 5000,
                         "replay_completion_scope": "bounded_diagnostic",
@@ -734,7 +817,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                         "candidate_handoff_symbols": ["AAPL"],
                         "validation_status": "passed",
                     }

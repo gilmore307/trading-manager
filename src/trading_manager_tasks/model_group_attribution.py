@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
-from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID
+from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
@@ -26,7 +26,6 @@ from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler
 NEW_YORK = ZoneInfo("America/New_York")
 REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE = "post_replay_review_receipt"
 REPLAY_REVIEW_ROW_CONTRACT_TYPE = "post_replay_review_row"
-LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
 
 
 def run_model_group_replay_review_if_ready(
@@ -401,7 +400,7 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
         return True
     return (
         str(receipt.get("candidate_handoff_status") or "") == "available"
-        and str(receipt.get("candidate_handoff_source") or "") == LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE
+        and str(receipt.get("candidate_handoff_source") or "") in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
     )
 
 

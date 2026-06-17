@@ -152,7 +152,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
-                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                    "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                     "candidate_fold_id": fold_id,
                     "validation_status": "passed",
                     "created_at_utc": "2026-05-28T00:00:00Z",

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
-from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID
+from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
 from .model_training_workflow import base_stack_model_generation_splits_complete
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
@@ -60,7 +60,6 @@ RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES = {
     "post_replay_residual_event_governance_receipt",
     "model_06_residual_event_governance_event_attribution_receipt",
 }
-LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
 M06_COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
 
 
@@ -2298,11 +2297,11 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     )
     if has_equity_or_option_scope and (
         str(replay_receipt.get("candidate_handoff_status") or "") != "available"
-        or str(replay_receipt.get("candidate_handoff_source") or "") != LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE
+        or str(replay_receipt.get("candidate_handoff_source") or "") not in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
     ):
         return {
             "compatible": False,
-            "reason": "replay receipt used static or diagnostic candidates instead of Layer 2 target-candidate handoff",
+            "reason": "replay receipt did not use the canonical fixed historical candidate universe",
             "candidate_model_ref": candidate_model_ref,
             "receipt_target_refs": sorted(target_refs),
         }
