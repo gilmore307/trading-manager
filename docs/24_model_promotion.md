@@ -54,20 +54,20 @@ For the first accepted model bundle, evaluation may set `first_model_bootstrap =
 
 ## Failure Attribution Boundary
 
-Failure attribution is a first-class task between replay and evaluation. It is not the same as evaluation and it is not limited to M06 event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, and event/co-event explanations.
+Replay review is the first-class task between replay and M06. It is not the same as evaluation and it is not limited to event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, and the component-funnel layer where the replay first diverged. M06 runs after replay review and owns event/co-event explanations.
 
-Replay-derived failure triage is only the first bookkeeping step. A
-`post_replay_failure_triage_receipt` may identify failed fills, missed winners,
+Replay review is only the first post-replay diagnostic step. A
+`post_replay_review_receipt` may identify failed fills, missed winners,
 and other candidate failure rows, but it does not satisfy M06
 EventRiskGovernor attribution. M06 attribution requires a separate receipt
-produced by the event-risk route with failure-scope triage, point-in-time event
+produced by the event-risk route with replay-review scope, point-in-time event
 observations or candidates, event-evidence refs, and control/co-event/confounder
-analysis. Evaluation must not treat generic failure triage rows as completed
+analysis. Evaluation must not treat generic replay review rows as completed
 M06 event attribution.
 
 The manager-owned historical workflow therefore has two explicit post-replay
-steps before evaluation: first `post_replay_failure_triage`, then
-`residual_event_governance`. If failure triage is ready but no reviewed
+steps before evaluation: first `model_group.replay_review`, then
+`residual_event_governance`. If replay review is ready but no reviewed
 point-in-time event evidence exists, M06 must back off and prepare the
 bounded event-feed backfill task keys needed to materialize event observations;
 that preparation is not itself attribution and does not call providers.

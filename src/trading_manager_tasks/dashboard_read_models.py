@@ -3647,7 +3647,7 @@ def _attribution_ready_count(attribution_artifacts: Mapping[str, Any] | None, *,
         "attributed_failure_count",
         "resolved_failure_count",
         "attributed_decision_count",
-        "processed_failure_count",
+        "processed_replay_review_row_count",
         "ready_count",
     ):
         if key in receipt:
@@ -3878,8 +3878,8 @@ def _is_residual_event_governance_receipt(receipt: Mapping[str, Any]) -> bool:
         return False
     if _int_field(receipt, "event_observation_count") <= 0 and _int_field(receipt, "event_candidate_count") <= 0:
         return False
-    triage_status = str(receipt.get("failure_scope_triage_status") or receipt.get("triage_status") or "")
-    if triage_status not in {"succeeded", "complete", "completed", "passed"}:
+    replay_review_status = str(receipt.get("replay_review_scope_status") or receipt.get("replay_review_status") or "")
+    if replay_review_status not in {"succeeded", "complete", "completed", "passed"}:
         return False
     control_status = str(receipt.get("control_analysis_status") or receipt.get("controls_status") or "")
     return control_status in {"succeeded", "complete", "completed", "passed"}

@@ -80,15 +80,19 @@ coverage remains child partition evidence under that one task.
    choose no target, choose one target, or choose a target combination. Replay
    must not be framed as "run this already selected symbol through the stack"
    unless the request is an explicit diagnostic repair scenario.
-5. Residual event governance. M06 owns residual event intervention,
+5. Replay review. Replay review owns the first post-replay component-funnel
+   review over missed winners, bad fills, target-selection misses,
+   overblock/underblock behavior, and option-expression drag. It prepares
+   replay-review rows for M06 and evaluation, but it is not event attribution.
+6. Residual event governance. M06 owns residual event intervention,
    overblock/underblock, missed-event, and underlying-vs-option failure
    attribution after M04/M05 thesis formation. Its event-family attributes are
    applied by M03 and passed through to M04/M05 as state, but M06 itself is not a
    pre-replay provider data-acquisition lane.
-6. Evaluation. Evaluation consumes replay traces and attribution packets to
+7. Evaluation. Evaluation consumes replay traces, replay-review rows, and attribution packets to
    score the candidate component bundle against baselines, calibration,
    stability, leakage, portfolio behavior, and failure explanations.
-7. Promotion and lifecycle handoff. Promotion produces accepted/rejected/deferred
+8. Promotion and lifecycle handoff. Promotion produces accepted/rejected/deferred
    evidence for a model bundle. Management of already promoted models belongs to
    the runtime component lifecycle owner, not to manager activation.
 

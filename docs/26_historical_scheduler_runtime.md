@@ -115,21 +115,21 @@ Target-substrate checkpoints are data-preparation state, not parallel public
 task lanes; they do not force replay to trade that target.
 
 Fold progression is serial. After a fold finishes M01-M06 model work, the
-scheduler holds the fold lane until model replay, residual-event governance
-attribution, model evaluation, model promotion, and maintenance/readiness
+scheduler holds the fold lane until model replay, replay review,
+residual-event governance attribution, model evaluation, model promotion, and maintenance/readiness
 handoff complete. It must not start the next fold or rotate to another target
 while that model-group lifecycle is still open.
 
 Replay is run-cycle scoped. It simulates the frozen live component graph against the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. Replay does not start from a preselected symbol except in explicit diagnostic repair scenarios.
 
-Failure attribution is a separate task between replay and evaluation. M06
-residual-event governance starts at this boundary for settled replay evidence
-and must not run as a pre-replay provider input stage. Attribution may inspect
-target selection misses, portfolio combinations, event/co-event explanations,
-underlying-vs-option failure locus, option-expression drag, and
-overblock/underblock behavior.
+Replay review is a separate task between replay and M06. It inspects target
+selection misses, portfolio combinations, underlying-vs-option failure locus,
+option-expression drag, overblock/underblock behavior, and the component-funnel
+layer where replay first diverged. M06 residual-event governance starts after
+replay review for event/co-event explanations and must not run as a pre-replay
+provider input stage.
 
-Evaluation consumes replay and attribution evidence. Promotion review must wait for the candidate bundle's replay, attribution, and evaluation evidence; single-layer checks and target-substrate runs remain diagnostic until the full run cycle closes.
+Evaluation consumes replay, replay-review, and attribution evidence. Promotion review must wait for the candidate bundle's replay, replay-review, attribution, and evaluation evidence; single-layer checks and target-substrate runs remain diagnostic until the full run cycle closes.
 
 ## Safety Evidence
 

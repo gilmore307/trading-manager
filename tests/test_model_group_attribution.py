@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from trading_manager_tasks.model_group_attribution import run_model_group_post_replay_attribution_if_ready
+from trading_manager_tasks.model_group_attribution import run_model_group_replay_review_if_ready
 from trading_manager_tasks.model_group_residual_event_governance import _event_effect_profile, run_model_group_residual_event_governance_if_ready
 
 
@@ -86,34 +86,34 @@ class ModelGroupAttributionTests(unittest.TestCase):
         )
         return dataset_root
 
-    def test_writes_post_replay_failure_triage_receipt_and_rows(self):
+    def test_writes_post_replay_review_receipt_and_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_replay_dataset(storage_root)
 
-            decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root)
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
 
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "executed")
-            self.assertEqual(decision.reason_code, "model_group_post_replay_failure_triage_executed")
-            receipt_paths = list((dataset_root / "post_replay_failure_triage_runs").glob("*/post_replay_failure_triage_receipt.json"))
+            self.assertEqual(decision.reason_code, "model_group_replay_review_executed")
+            receipt_paths = list((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json"))
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
-            self.assertEqual(receipt["contract_type"], "post_replay_failure_triage_receipt")
-            self.assertEqual(receipt["triaged_failure_count"], 3)
+            self.assertEqual(receipt["contract_type"], "post_replay_review_receipt")
+            self.assertEqual(receipt["reviewed_failure_count"], 3)
             self.assertEqual(receipt["residual_event_governance_status"], "not_performed")
             self.assertIs(receipt["event_evidence_consumed"], False)
             self.assertEqual(receipt["decision_rows_ref"], str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"))
             rows = [
                 json.loads(line)
-                for line in Path(receipt["triage_rows_ref"]).read_text(encoding="utf-8").splitlines()
+                for line in Path(receipt["review_rows_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
             self.assertEqual([row["source_decision_id"] for row in rows], ["filled_loss", "filled_under_baseline", "rejected_winner"])
-            self.assertEqual(rows[0]["contract_type"], "post_replay_failure_triage_row")
+            self.assertEqual(rows[0]["contract_type"], "post_replay_review_row")
             self.assertEqual(rows[0]["replay_month"], "2021-01")
             self.assertEqual(rows[0]["target_symbol"], "BTC")
 
@@ -124,13 +124,13 @@ class ModelGroupAttributionTests(unittest.TestCase):
             storage_root.mkdir(parents=True)
             dataset_root = self._write_replay_dataset(storage_root)
 
-            decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root, execute=False)
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root, execute=False)
 
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "ready")
-            self.assertEqual(decision.reason_code, "model_group_post_replay_failure_triage_ready")
-            self.assertFalse((dataset_root / "post_replay_failure_triage_runs").exists())
+            self.assertEqual(decision.reason_code, "model_group_replay_review_ready")
+            self.assertFalse((dataset_root / "post_replay_review_runs").exists())
 
     def test_skips_when_attribution_receipt_already_exists(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -138,13 +138,13 @@ class ModelGroupAttributionTests(unittest.TestCase):
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_replay_dataset(storage_root)
-            receipt_root = dataset_root / "post_replay_failure_triage_runs" / "existing"
+            receipt_root = dataset_root / "post_replay_review_runs" / "existing"
             receipt_root.mkdir(parents=True)
             decision_rows_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
-            (receipt_root / "post_replay_failure_triage_receipt.json").write_text(
+            (receipt_root / "post_replay_review_receipt.json").write_text(
                 json.dumps(
                     {
-                        "contract_type": "post_replay_failure_triage_receipt",
+                        "contract_type": "post_replay_review_receipt",
                         "decision_rows_ref": str(decision_rows_path),
                         "status": "succeeded",
                     }
@@ -153,7 +153,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root)
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
 
             self.assertIsNone(decision)
 
@@ -163,8 +163,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_replay_dataset(storage_root)
-            triage_decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root)
-            self.assertIsNotNone(triage_decision)
+            review_decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
+            self.assertIsNotNone(review_decision)
             observation_root = storage_root / "runtime" / "layer_04_event_observation_inputs"
             observation_root.mkdir(parents=True)
             (observation_root / "2021-01_2021-02.json").write_text(
@@ -346,8 +346,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_replay_dataset(storage_root)
-            triage_decision = run_model_group_post_replay_attribution_if_ready(storage_root=storage_root)
-            self.assertIsNotNone(triage_decision)
+            review_decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
+            self.assertIsNotNone(review_decision)
 
             decision = run_model_group_residual_event_governance_if_ready(storage_root=storage_root)
 

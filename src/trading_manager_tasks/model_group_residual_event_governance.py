@@ -1,8 +1,8 @@
 """Post-replay M06 ResidualEventGovernance attribution.
 
-This module is the real M06 boundary between replay failure triage and
-model-group evaluation. It consumes replay failure triage rows plus local
-point-in-time event observations or candidates, writes standardized event
+This module is the M06 boundary after replay review and before model-group
+evaluation. It consumes replay review rows plus local point-in-time event
+observations or candidates, writes standardized event
 interpretation evidence, applies basic co-event/control/leakage checks, and
 emits a M06 attribution receipt. It performs no provider calls, no broker
 mutation, and no model activation.
@@ -22,7 +22,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 from .event_feed_backfill import prepare_event_feed_backfill
-from .model_group_attribution import FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE, FAILURE_TRIAGE_ROW_CONTRACT_TYPE
+from .model_group_attribution import REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE, REPLAY_REVIEW_ROW_CONTRACT_TYPE
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
@@ -175,15 +175,15 @@ def run_model_group_residual_event_governance_if_ready(
     codex_timeout_seconds: int = EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS,
     max_agent_review_packets: int = MAX_EVENT_STRATEGY_REVIEW_PACKETS,
 ) -> SchedulerDecision | None:
-    """Run M06 attribution when replay triage and PIT event evidence exist."""
+    """Run M06 attribution when replay review and PIT event evidence exist."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
-    triage_receipt_path, triage_receipt = _latest_failure_triage_receipt(dataset_root)
-    if triage_receipt_path is None or triage_receipt is None:
+    review_receipt_path, review_receipt = _latest_replay_review_receipt(dataset_root)
+    if review_receipt_path is None or review_receipt is None:
         return None
-    decision_rows_ref = str(triage_receipt.get("decision_rows_ref") or "")
-    triage_rows_path = Path(str(triage_receipt.get("triage_rows_ref") or ""))
-    if not decision_rows_ref or not triage_rows_path.exists():
+    decision_rows_ref = str(review_receipt.get("decision_rows_ref") or "")
+    review_rows_path = Path(str(review_receipt.get("review_rows_ref") or ""))
+    if not decision_rows_ref or not review_rows_path.exists():
         return None
     if not force and _latest_residual_event_governance_receipt(dataset_root, decision_rows_ref=decision_rows_ref) is not None:
         return None
@@ -205,13 +205,13 @@ def run_model_group_residual_event_governance_if_ready(
                 now=now,
                 decision_status="backoff",
                 reason_code="model_group_residual_event_evidence_missing",
-                reason="post-replay failure triage is ready, but M06 has no local point-in-time event observations or candidates to attribute",
+                reason="replay review is ready, but M06 has no local point-in-time event observations or candidates to attribute",
                 command=command,
                 execution_summary={
                     "contract_id": contract_id,
                     "dataset_root": str(dataset_root),
-                    "failure_triage_receipt_ref": str(triage_receipt_path),
-                    "triage_rows_ref": str(triage_rows_path),
+                    "replay_review_receipt_ref": str(review_receipt_path),
+                    "review_rows_ref": str(review_rows_path),
                     "fold_scope": fold_scope,
                     "event_source_summary": event_source_summary,
                     "event_feed_backfill_preparation": None,
@@ -222,13 +222,13 @@ def run_model_group_residual_event_governance_if_ready(
             now=now,
             decision_status="ready",
             reason_code="model_group_residual_event_governance_ready",
-            reason="post-replay M06 event attribution is ready to run over triaged failures and PIT event candidates",
+            reason="post-replay M06 event attribution is ready to run over replay-reviewed failures and PIT event candidates",
             command=command,
             execution_summary={
                 "contract_id": contract_id,
                 "dataset_root": str(dataset_root),
-                "failure_triage_receipt_ref": str(triage_receipt_path),
-                "triage_rows_ref": str(triage_rows_path),
+                "replay_review_receipt_ref": str(review_receipt_path),
+                "review_rows_ref": str(review_rows_path),
                 "fold_scope": fold_scope,
                 "event_source_summary": event_source_summary,
                 "event_candidate_count": "not_counted_during_readiness_probe",
@@ -240,13 +240,13 @@ def run_model_group_residual_event_governance_if_ready(
             },
         )
 
-    triage_rows = tuple(_load_jsonl_objects(triage_rows_path))
-    fold_scope = _fold_scope(dataset_root=dataset_root, triage_rows=triage_rows)
+    review_rows = tuple(_load_jsonl_objects(review_rows_path))
+    fold_scope = _fold_scope(dataset_root=dataset_root, review_rows=review_rows)
     event_candidates, event_source_summary = _load_event_candidates(storage_root=storage_root, fold_scope=fold_scope)
 
     if not event_candidates:
         event_feed_backfill_preparation = None
-        target_symbol = _target_symbol_from_triage(triage_rows)
+        target_symbol = _target_symbol_from_review_rows(review_rows)
         if execute and target_symbol == "AAPL":
             backfill_summary = prepare_event_feed_backfill(
                 start_month=fold_scope["start_month"],
@@ -260,13 +260,13 @@ def run_model_group_residual_event_governance_if_ready(
             now=now,
             decision_status="backoff",
             reason_code="model_group_residual_event_evidence_missing",
-            reason="post-replay failure triage is ready, but M06 has no local point-in-time event observations or candidates to attribute",
+            reason="replay review is ready, but M06 has no local point-in-time event observations or candidates to attribute",
             command=command,
             execution_summary={
                 "contract_id": contract_id,
                 "dataset_root": str(dataset_root),
-                "failure_triage_receipt_ref": str(triage_receipt_path),
-                "triage_rows_ref": str(triage_rows_path),
+                "replay_review_receipt_ref": str(review_receipt_path),
+                "review_rows_ref": str(review_rows_path),
                 "fold_scope": fold_scope,
                 "event_source_summary": event_source_summary,
                 "event_feed_backfill_preparation": event_feed_backfill_preparation,
@@ -274,7 +274,7 @@ def run_model_group_residual_event_governance_if_ready(
             },
         )
 
-    attribution_rows, control_report = _build_attribution_rows(triage_rows=triage_rows, event_candidates=event_candidates, created_at_utc=now.isoformat())
+    attribution_rows, control_report = _build_attribution_rows(review_rows=review_rows, event_candidates=event_candidates, created_at_utc=now.isoformat())
     event_focus_proposals = _build_event_focus_proposals(
         attribution_rows=attribution_rows,
         residual_event_governance_receipt_ref=None,
@@ -362,8 +362,8 @@ def run_model_group_residual_event_governance_if_ready(
             "created_at_utc": now.isoformat(),
             "completed_at_utc": now.isoformat(),
             "decision_rows_ref": decision_rows_ref,
-            "failure_triage_receipt_ref": str(triage_receipt_path),
-            "triage_rows_ref": str(triage_rows_path),
+            "replay_review_receipt_ref": str(review_receipt_path),
+            "review_rows_ref": str(review_rows_path),
             "attribution_rows_ref": str(attribution_rows_path),
             "event_interpretations_ref": str(event_interpretations_path),
             "event_focus_proposals_ref": str(event_focus_proposals_path),
@@ -376,13 +376,13 @@ def run_model_group_residual_event_governance_if_ready(
             "event_evidence_consumed": True,
             "event_observation_count": sum(1 for candidate in event_candidates if candidate["observation_status"] == "accepted_observation"),
             "event_candidate_count": len(event_candidates),
-            "failure_scope_triage_status": "passed",
+            "replay_review_scope_status": "passed",
             "control_analysis_status": "passed",
             "co_event_handling_status": "passed",
             "confounder_analysis_status": "passed",
             "leakage_status": "passed",
             "upstream_overlap_status": "residual_after_upstream_conditioning",
-            "processed_failure_count": len(triage_rows),
+            "processed_replay_review_row_count": len(review_rows),
             "attribution_row_count": len(attribution_rows),
             "event_focus_proposal_count": len(event_focus_proposals),
             "temporal_attention_candidate_count": len(attention_evidence["temporal_attention_candidates"]),
@@ -406,7 +406,7 @@ def run_model_group_residual_event_governance_if_ready(
         now=now,
         decision_status="executed",
         reason_code="model_group_residual_event_governance_executed",
-        reason="executed post-replay M06 ResidualEventGovernance attribution over triaged failures and PIT event candidates",
+        reason="executed post-replay M06 ResidualEventGovernance attribution over replay-reviewed rows and PIT event candidates",
         command=command,
         execution_summary={
             "contract_id": contract_id,
@@ -483,7 +483,7 @@ def _compact_backfill_preparation(summary: Any) -> dict[str, Any]:
 
 def _build_attribution_rows(
     *,
-    triage_rows: Sequence[Mapping[str, Any]],
+    review_rows: Sequence[Mapping[str, Any]],
     event_candidates: Sequence[Mapping[str, Any]],
     created_at_utc: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -491,8 +491,8 @@ def _build_attribution_rows(
     attributed = 0
     confounded = 0
     no_attribution = 0
-    for index, triage_row in enumerate(triage_rows, start=1):
-        matched = _matching_event_candidates(triage_row, event_candidates)
+    for index, review_row in enumerate(review_rows, start=1):
+        matched = _matching_event_candidates(review_row, event_candidates)
         if not matched:
             status = "no_attribution"
             no_attribution += 1
@@ -511,11 +511,11 @@ def _build_attribution_rows(
             dominant = matched[0]
             incremental_score = 0.65
             confidence = 0.65
-        decision_time = str(triage_row.get("decision_time") or "")
-        impact_profile = _impact_profile_from_triage(triage_row, decision_time=decision_time)
+        decision_time = str(review_row.get("decision_time") or "")
+        impact_profile = _impact_profile_from_review_row(review_row, decision_time=decision_time)
         window_start, window_end = _impact_search_window(
             impact_profile["impact_exposure_time"],
-            replay_month=str(triage_row.get("replay_month") or ""),
+            replay_month=str(review_row.get("replay_month") or ""),
         )
         row_id = f"l6_event_attr_{index:08d}"
         rows.append(
@@ -523,12 +523,12 @@ def _build_attribution_rows(
                 "contract_type": RESIDUAL_EVENT_GOVERNANCE_ATTRIBUTION_ROW_CONTRACT_TYPE,
                 "stage_id": "model_group.residual_event_governance",
                 "attribution_id": row_id,
-                "source_triage_row_contract_type": str(triage_row.get("contract_type") or FAILURE_TRIAGE_ROW_CONTRACT_TYPE),
-                "source_triage_attribution_id": triage_row.get("attribution_id"),
-                "source_decision_id": triage_row.get("source_decision_id"),
-                "failure_type": triage_row.get("failure_type"),
-                "target_symbol": triage_row.get("target_symbol"),
-                "replay_month": triage_row.get("replay_month"),
+                "source_replay_review_row_contract_type": str(review_row.get("contract_type") or REPLAY_REVIEW_ROW_CONTRACT_TYPE),
+                "source_replay_review_id": review_row.get("review_id") or review_row.get("attribution_id"),
+                "source_decision_id": review_row.get("source_decision_id"),
+                "failure_type": review_row.get("failure_type"),
+                "target_symbol": review_row.get("target_symbol"),
+                "replay_month": review_row.get("replay_month"),
                 "decision_time": decision_time or None,
                 "impact_exposure_time": impact_profile["impact_exposure_time"],
                 "impact_onset_time": impact_profile["impact_onset_time"],
@@ -564,7 +564,7 @@ def _build_attribution_rows(
     control_report = {
         "contract_type": "model_06_residual_event_governance_control_coevent_leakage_report",
         "status": "passed",
-        "triage_row_count": len(triage_rows),
+        "review_row_count": len(review_rows),
         "event_candidate_count": len(event_candidates),
         "attributed_count": attributed,
         "confounded_count": confounded,
@@ -576,9 +576,9 @@ def _build_attribution_rows(
         "upstream_overlap_status": "residual_after_upstream_conditioning",
         "same_fold_layer_4_mutation_performed": False,
         "notes": [
-            "M06 attribution consumes post-replay residual triage rows; it does not create same-fold Layer 4 inputs.",
+            "M06 attribution consumes post-replay review rows; it does not create same-fold Layer 4 inputs.",
             "Rows with multiple matching events are marked confounded until a later promotion packet proves incremental value.",
-            "M06 uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay triage row provides an impact clock.",
+            "M06 uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay review row provides an impact clock.",
         ],
     }
     return rows, control_report
@@ -610,7 +610,7 @@ def _build_event_focus_proposals(
                 "event_ref": event_ref,
                 "target_symbol": target_symbol,
                 "failure_type": failure_type,
-                "source_triage_attribution_ids": [],
+                "source_replay_review_ids": [],
                 "source_decision_ids": [],
                 "replay_months": set(),
                 "event_interpretation_refs": set(),
@@ -628,7 +628,7 @@ def _build_event_focus_proposals(
                 "impact_magnitude_abs_returns": [],
             },
         )
-        group["source_triage_attribution_ids"].append(row.get("source_triage_attribution_id"))
+        group["source_replay_review_ids"].append(row.get("source_replay_review_id"))
         group["source_decision_ids"].append(row.get("source_decision_id"))
         if row.get("replay_month"):
             group["replay_months"].add(str(row.get("replay_month")))
@@ -693,7 +693,7 @@ def _build_event_focus_proposals(
                 "failure_type": group["failure_type"],
                 "supporting_failure_count": support_count,
                 "source_decision_ids": _compact_strings(group["source_decision_ids"], limit=50),
-                "source_triage_attribution_ids": _compact_strings(group["source_triage_attribution_ids"], limit=50),
+                "source_replay_review_ids": _compact_strings(group["source_replay_review_ids"], limit=50),
                 "replay_months": sorted(group["replay_months"]),
                 "failure_window_start": min(group["failure_window_starts"]) if group["failure_window_starts"] else None,
                 "failure_window_end": max(group["failure_window_ends"]) if group["failure_window_ends"] else None,
@@ -858,7 +858,7 @@ def _build_event_family_attention_evidence(
                 "supporting_scores": [],
                 "supporting_confidences": [],
                 "source_decision_ids": set(),
-                "source_triage_attribution_ids": set(),
+                "source_replay_review_ids": set(),
             },
         )
         group["event_refs"].add(event_ref)
@@ -883,7 +883,7 @@ def _build_event_family_attention_evidence(
         group["supporting_confidences"].extend(stats["supporting_confidences"])
         group["co_event_group_ids"].update(stats["co_event_group_ids"])
         group["source_decision_ids"].update(stats["source_decision_ids"])
-        group["source_triage_attribution_ids"].update(stats["source_triage_attribution_ids"])
+        group["source_replay_review_ids"].update(stats["source_replay_review_ids"])
         _increment_count(group["event_temporal_form_counts"], row["event_temporal_form"])
         _increment_count(group["event_schedule_type_counts"], row["event_schedule_type"])
         _increment_count(group["event_instance_observation_role_counts"], row["event_instance_observation_role"])
@@ -1047,7 +1047,7 @@ def _build_event_family_attention_evidence(
                 "source_event_refs": sorted(group["source_event_refs"])[:50],
                 "supporting_proposal_ids": sorted(item for item in group["supporting_proposal_ids"] if item)[:50],
                 "source_decision_ids": sorted(group["source_decision_ids"])[:50],
-                "source_triage_attribution_ids": sorted(group["source_triage_attribution_ids"])[:50],
+                "source_replay_review_ids": sorted(group["source_replay_review_ids"])[:50],
                 "event_family_occurrence_scan_ref": event_family_occurrence_scan_ref,
                 "allowed_model_use": ["temporal_attention_pool", "event_family_scouting", "layer_4_state_overlay_candidate"],
                 "blocked_model_use": [] if deterministic_gate_status == "passed" else ["accepted_temporal_attention_pool", "layer_4_promotion"],
@@ -1091,8 +1091,8 @@ def _event_ref_failure_stats(
             item["supporting_confidences"].append(_safe_float(row.get("attribution_confidence_score")))
             if str(row.get("source_decision_id") or ""):
                 item["source_decision_ids"].add(str(row["source_decision_id"]))
-            if str(row.get("source_triage_attribution_id") or ""):
-                item["source_triage_attribution_ids"].add(str(row["source_triage_attribution_id"]))
+            if str(row.get("source_replay_review_id") or ""):
+                item["source_replay_review_ids"].add(str(row["source_replay_review_id"]))
             _increment_count(item["impact_onset_basis_counts"], row.get("impact_onset_basis"))
             _increment_count(item["impact_scope_type_counts"], row.get("impact_scope_type"))
             if row.get("impact_normalized_severity_score") is not None:
@@ -1117,7 +1117,7 @@ def _empty_event_ref_stats() -> dict[str, Any]:
         "supporting_scores": [],
         "supporting_confidences": [],
         "source_decision_ids": set(),
-        "source_triage_attribution_ids": set(),
+        "source_replay_review_ids": set(),
         "leakage_violation_count": 0,
         "impact_cutoff_violation_count": 0,
         "impact_onset_basis_counts": {},
@@ -1584,11 +1584,11 @@ def _string_choice(value: Any, fallback: Any, *, allowed: set[str] | None) -> st
     return text
 
 
-def _matching_event_candidates(triage_row: Mapping[str, Any], candidates: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    target_symbol = str(triage_row.get("target_symbol") or "").strip().upper()
-    replay_month = str(triage_row.get("replay_month") or "").strip()
-    decision_time = str(triage_row.get("decision_time") or "").strip()
-    impact_profile = _impact_profile_from_triage(triage_row, decision_time=decision_time)
+def _matching_event_candidates(review_row: Mapping[str, Any], candidates: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    target_symbol = str(review_row.get("target_symbol") or "").strip().upper()
+    replay_month = str(review_row.get("replay_month") or "").strip()
+    decision_time = str(review_row.get("decision_time") or "").strip()
+    impact_profile = _impact_profile_from_review_row(review_row, decision_time=decision_time)
     start, end = _impact_search_window_datetimes(impact_profile["impact_exposure_time"], replay_month=replay_month)
     matched: list[Mapping[str, Any]] = []
     for candidate in candidates:
@@ -1889,17 +1889,17 @@ def _is_event_interpretation(row: Mapping[str, Any]) -> bool:
     )
 
 
-def _latest_failure_triage_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
+def _latest_replay_review_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
     return _latest_receipt(
-        dataset_root / "post_replay_failure_triage_runs",
-        "post_replay_failure_triage_receipt.json",
+        dataset_root / "post_replay_review_runs",
+        "post_replay_review_receipt.json",
         accepted_statuses=COMPLETE_STATUSES,
-        predicate=lambda receipt: str(receipt.get("contract_type") or "") == FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE
-        and _failure_triage_receipt_uses_current_replay_handoff(dataset_root, receipt),
+        predicate=lambda receipt: str(receipt.get("contract_type") or "") == REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE
+        and _replay_review_receipt_uses_current_replay_handoff(dataset_root, receipt),
     )
 
 
-def _failure_triage_receipt_uses_current_replay_handoff(dataset_root: Path, receipt: Mapping[str, Any]) -> bool:
+def _replay_review_receipt_uses_current_replay_handoff(dataset_root: Path, receipt: Mapping[str, Any]) -> bool:
     decision_rows_ref = str(receipt.get("decision_rows_ref") or "").strip()
     if not decision_rows_ref:
         return False
@@ -1988,8 +1988,8 @@ def _latest_receipt(
     return path, dict(receipt)
 
 
-def _fold_scope(*, dataset_root: Path, triage_rows: Sequence[Mapping[str, Any]]) -> dict[str, str]:
-    months = sorted({str(row.get("replay_month") or "") for row in triage_rows if str(row.get("replay_month") or "")})
+def _fold_scope(*, dataset_root: Path, review_rows: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    months = sorted({str(row.get("replay_month") or "") for row in review_rows if str(row.get("replay_month") or "")})
     if not months:
         months = sorted(_unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month"))
     if not months:
@@ -2057,9 +2057,9 @@ def _observation_payload_has_event_refs(payload: Mapping[str, Any]) -> bool:
     return False
 
 
-def _target_symbol_from_triage(triage_rows: Sequence[Mapping[str, Any]]) -> str:
+def _target_symbol_from_review_rows(review_rows: Sequence[Mapping[str, Any]]) -> str:
     counts: dict[str, int] = {}
-    for row in triage_rows:
+    for row in review_rows:
         symbol = str(row.get("target_symbol") or "").strip().upper()
         if not symbol:
             continue
@@ -2100,22 +2100,22 @@ def _impact_search_window_datetimes(impact_exposure_time: str | None, *, replay_
     return parsed - EVENT_WINDOW_BEFORE, parsed
 
 
-def _impact_profile_from_triage(triage_row: Mapping[str, Any], *, decision_time: str) -> dict[str, Any]:
-    impact_exposure_time = str(triage_row.get("impact_exposure_time") or triage_row.get("impact_onset_time") or decision_time or "").strip()
-    onset_basis = str(triage_row.get("impact_onset_basis") or "").strip()
+def _impact_profile_from_review_row(review_row: Mapping[str, Any], *, decision_time: str) -> dict[str, Any]:
+    impact_exposure_time = str(review_row.get("impact_exposure_time") or review_row.get("impact_onset_time") or decision_time or "").strip()
+    onset_basis = str(review_row.get("impact_onset_basis") or "").strip()
     if not onset_basis:
         onset_basis = "source_impact_clock" if impact_exposure_time and impact_exposure_time != decision_time else "decision_time_fallback"
     return {
         "impact_exposure_time": impact_exposure_time or None,
-        "impact_onset_time": str(triage_row.get("impact_onset_time") or impact_exposure_time or "").strip() or None,
+        "impact_onset_time": str(review_row.get("impact_onset_time") or impact_exposure_time or "").strip() or None,
         "impact_onset_basis": onset_basis,
-        "impact_scope_type": str(triage_row.get("impact_scope_type") or "target").strip() or "target",
-        "impact_direction": str(triage_row.get("impact_direction") or "unknown").strip() or "unknown",
-        "impact_raw_return_delta": _nullable_float(triage_row.get("impact_raw_return_delta")),
-        "impact_magnitude_abs_return": _nullable_float(triage_row.get("impact_magnitude_abs_return")),
-        "impact_normalization_denominator": _nullable_float(triage_row.get("impact_normalization_denominator")),
-        "impact_normalized_severity_score": _nullable_float(triage_row.get("impact_normalized_severity_score")),
-        "impact_severity_basis": str(triage_row.get("impact_severity_basis") or "unknown").strip() or "unknown",
+        "impact_scope_type": str(review_row.get("impact_scope_type") or "target").strip() or "target",
+        "impact_direction": str(review_row.get("impact_direction") or "unknown").strip() or "unknown",
+        "impact_raw_return_delta": _nullable_float(review_row.get("impact_raw_return_delta")),
+        "impact_magnitude_abs_return": _nullable_float(review_row.get("impact_magnitude_abs_return")),
+        "impact_normalization_denominator": _nullable_float(review_row.get("impact_normalization_denominator")),
+        "impact_normalized_severity_score": _nullable_float(review_row.get("impact_normalized_severity_score")),
+        "impact_severity_basis": str(review_row.get("impact_severity_basis") or "unknown").strip() or "unknown",
     }
 
 

@@ -322,7 +322,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                     end_month="2025-12",
                     last_decision_status="backoff",
                     last_reason_code=reason_code,
-                    last_work_selection_reason="model_group_post_replay_attribution_ready",
+                    last_work_selection_reason="model_group_replay_review_ready",
                     last_progress_utc="2026-01-01T00:00:00+00:00",
                 )
                 with tempfile.TemporaryDirectory() as raw_tmp, patch(
@@ -1798,7 +1798,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             self.assertEqual(len(log_rows), 1)
             self.assertEqual(log_rows[0]["provider_calls"], 0)
 
-    def test_daemon_dispatches_post_replay_attribution_after_scheduler_tick(self):
+    def test_daemon_dispatches_replay_review_after_scheduler_tick(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             state_path = tmp / "runtime" / "state.json"
@@ -1817,26 +1817,26 @@ class SchedulerDaemonTests(unittest.TestCase):
                 command=[],
                 next_internal_stage="historical_training_work_loop",
             )
-            attribution_decision = SchedulerDecision(
+            replay_review_decision = SchedulerDecision(
                 contract_type="manager_scheduler_decision",
                 now_utc="2026-05-28T00:00:01+00:00",
                 now_et="2026-05-27T20:00:01-04:00",
                 decision_status="executed",
-                reason_code="model_group_post_replay_failure_triage_executed",
-                reason="executed post-replay failure triage",
+                reason_code="model_group_replay_review_executed",
+                reason="executed replay review",
                 market_protection_active=False,
                 resource_pressure_active=False,
-                selected_work="model_group.post_replay_failure_triage",
+                selected_work="model_group.replay_review",
                 command=[],
-                next_internal_stage="post_replay_failure_triage",
+                next_internal_stage="replay_review",
             )
 
             with patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=scheduler_decision), patch(
                 "trading_manager_tasks.scheduler_daemon.run_model_group_replay_if_ready", return_value=None
             ), patch(
-                "trading_manager_tasks.scheduler_daemon.run_model_group_post_replay_attribution_if_ready",
-                return_value=attribution_decision,
-            ) as attribution:
+                "trading_manager_tasks.scheduler_daemon.run_model_group_replay_review_if_ready",
+                return_value=replay_review_decision,
+            ) as replay_review:
                 state = run_daemon_loop(
                     start_month="2016-01",
                     end_month="2016-01",
@@ -1852,10 +1852,10 @@ class SchedulerDaemonTests(unittest.TestCase):
                     config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
                 )
 
-            attribution.assert_called()
-            self.assertEqual(state.last_next_internal_stage, "post_replay_failure_triage")
+            replay_review.assert_called()
+            self.assertEqual(state.last_next_internal_stage, "replay_review")
             log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_post_replay_failure_triage_executed"])
+            self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_replay_review_executed"])
 
     def test_daemon_dispatches_model_group_evaluation_after_attribution(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -1893,7 +1893,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             with patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=scheduler_decision), patch(
                 "trading_manager_tasks.scheduler_daemon.run_model_group_replay_if_ready", return_value=None
             ), patch(
-                "trading_manager_tasks.scheduler_daemon.run_model_group_post_replay_attribution_if_ready", return_value=None
+                "trading_manager_tasks.scheduler_daemon.run_model_group_replay_review_if_ready", return_value=None
             ), patch(
                 "trading_manager_tasks.scheduler_daemon.run_model_group_evaluation_if_ready",
                 return_value=evaluation_decision,

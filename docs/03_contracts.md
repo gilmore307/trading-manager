@@ -176,6 +176,7 @@ layer_XX.feature_generation
 layer_XX.model_generation
 layer_XX.model_evaluation
 layer_XX.replay_execution
+layer_XX.replay_review
 layer_XX.post_replay_attribution
 layer_XX.fold_settlement
 layer_XX.promotion_review

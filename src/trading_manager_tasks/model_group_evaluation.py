@@ -2439,8 +2439,8 @@ def _is_residual_event_governance_receipt(receipt: Mapping[str, Any]) -> bool:
     event_candidate_count = _safe_int(receipt.get("event_candidate_count"))
     if (event_observation_count or 0) <= 0 and (event_candidate_count or 0) <= 0:
         return False
-    triage_status = str(receipt.get("failure_scope_triage_status") or receipt.get("triage_status") or "")
-    if triage_status not in {"succeeded", "complete", "completed", "passed"}:
+    replay_review_status = str(receipt.get("replay_review_scope_status") or receipt.get("replay_review_status") or "")
+    if replay_review_status not in {"succeeded", "complete", "completed", "passed"}:
         return False
     control_status = str(receipt.get("control_analysis_status") or receipt.get("controls_status") or "")
     if control_status not in {"succeeded", "complete", "completed", "passed"}:

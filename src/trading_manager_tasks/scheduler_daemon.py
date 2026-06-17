@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
-from .model_group_attribution import run_model_group_post_replay_attribution_if_ready
+from .model_group_attribution import run_model_group_replay_review_if_ready
 from .model_group_evaluation import run_model_group_evaluation_if_ready
 from .model_group_residual_event_governance import run_model_group_residual_event_governance_if_ready
 from .model_group_replay_option_features import run_model_group_replay_option_features_for_replay_backoff
@@ -1420,6 +1420,7 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
     known_nonprogress_reasons = {
         "waiting_for_next_training_fold_to_complete",
         "model_group_lifecycle_holds_fold_lane",
+        "model_group_replay_dataset_acquisition_required",
         "model_group_evaluation_complete",
         "model_group_evaluation_executed",
         "model_group_m06_event_evidence_missing",
@@ -1781,7 +1782,7 @@ def run_daemon_loop(
                             selected_target_symbol=selected_target_symbol,
                             execute=False,
                         )
-                        attribution_probe = run_model_group_post_replay_attribution_if_ready(
+                        replay_review_probe = run_model_group_replay_review_if_ready(
                             storage_root=storage_root,
                             execute=False,
                         )
@@ -1798,7 +1799,7 @@ def run_daemon_loop(
                             lifecycle_block is not None
                             or replay_dataset_probe is not None
                             or replay_probe is not None
-                            or attribution_probe is not None
+                            or replay_review_probe is not None
                             or residual_event_governance_probe is not None
                             or evaluation_probe is not None
                         )
@@ -1980,28 +1981,28 @@ def run_daemon_loop(
                                     storage_root=storage_root,
                                     decision_log_path=decision_log_path,
                                 )
-                        attribution_decision = run_model_group_post_replay_attribution_if_ready(
+                        replay_review_decision = run_model_group_replay_review_if_ready(
                             storage_root=storage_root,
                             execute=execute_model_group_attribution,
                         )
-                        if attribution_decision is not None:
-                            append_decision_log(decision_log_path, attribution_decision)
+                        if replay_review_decision is not None:
+                            append_decision_log(decision_log_path, replay_review_decision)
                             completed = utc_now_iso()
-                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=attribution_decision)
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_review_decision)
                             state = replace(
                                 state,
                                 start_month=active_start_month,
                                 end_month=active_end_month,
-                                last_next_internal_stage="post_replay_attribution",
-                                last_work_selection_reason="model_group_post_replay_attribution_ready",
+                                last_next_internal_stage="replay_review",
+                                last_work_selection_reason="model_group_replay_review_ready",
                                 updated_utc=completed,
                             )
-                            refresh_needed = refresh_needed or attribution_decision.decision_status == "executed"
-                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(attribution_decision, advanced_month=False)
+                            refresh_needed = refresh_needed or replay_review_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_review_decision, advanced_month=False)
                             decisions_this_cycle += 1
                             if output is not None:
-                                row = attribution_decision.summary_row()
-                                row["worker_id"] = "post_replay_attribution_worker_1"
+                                row = replay_review_decision.summary_row()
+                                row["worker_id"] = "replay_review_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
                         residual_event_governance_decision = run_model_group_residual_event_governance_if_ready(
@@ -2198,20 +2199,20 @@ def run_daemon_loop(
                                     storage_root=storage_root,
                                     decision_log_path=decision_log_path,
                                 )
-                        attribution_decision = run_model_group_post_replay_attribution_if_ready(
+                        replay_review_decision = run_model_group_replay_review_if_ready(
                             storage_root=storage_root,
                             execute=execute_model_group_attribution,
                         )
-                        if attribution_decision is not None:
-                            append_decision_log(decision_log_path, attribution_decision)
+                        if replay_review_decision is not None:
+                            append_decision_log(decision_log_path, replay_review_decision)
                             completed = utc_now_iso()
-                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=attribution_decision)
-                            refresh_needed = refresh_needed or attribution_decision.decision_status == "executed"
-                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(attribution_decision, advanced_month=False)
+                            state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_review_decision)
+                            refresh_needed = refresh_needed or replay_review_decision.decision_status == "executed"
+                            should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_review_decision, advanced_month=False)
                             decisions_this_cycle += 1
                             if output is not None:
-                                row = attribution_decision.summary_row()
-                                row["worker_id"] = "post_replay_attribution_worker_1"
+                                row = replay_review_decision.summary_row()
+                                row["worker_id"] = "replay_review_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
                         residual_event_governance_decision = run_model_group_residual_event_governance_if_ready(
@@ -2328,7 +2329,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dashboard-refresh-service-unit", default=DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT, help="systemd service unit to start for event-driven dashboard read-model refresh.")
     parser.add_argument("--disable-model-group-replay-dataset", action="store_true", help="Disable automatic model-group replay dataset preparation, acquisition, and freeze admission.")
     parser.add_argument("--disable-model-group-replay", action="store_true", help="Disable automatic side-effect-free model-group replay dispatch.")
-    parser.add_argument("--disable-model-group-attribution", action="store_true", help="Disable automatic post-replay failure triage and M06 event attribution dispatch.")
+    parser.add_argument("--disable-model-group-attribution", action="store_true", help="Disable automatic replay review and M06 event attribution dispatch.")
     parser.add_argument("--disable-model-group-evaluation", action="store_true", help="Disable automatic side-effect-free model-group evaluation evidence build.")
     parser.add_argument("--disable-source-existing-bootstrap", action="store_true", help="Disable startup source-existing bootstrap. Default service startup inspects source tables and seeds workflow acquisition state so existing source data is reused.")
     parser.add_argument("--source-bootstrap-database-url", help="Database URL for startup source-existing bootstrap; defaults to OpenClaw database resolution.")

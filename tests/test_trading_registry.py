@@ -605,12 +605,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(zero_sql_status["kind"], "status_value")
         self.assertEqual(zero_sql_status["payload"], "skipped_zero_sql_bar_rows")
 
-        triage_receipt = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_RECEIPT"]
-        self.assertEqual(triage_receipt["payload"], "post_replay_failure_triage_receipt")
-        self.assertIn("not M06", triage_receipt["note"])
+        review_receipt = rows["MANAGER_REPLAY_REVIEW_RECEIPT"]
+        self.assertEqual(review_receipt["payload"], "post_replay_review_receipt")
+        self.assertIn("not M06", review_receipt["note"])
 
-        triage_row = rows["MANAGER_POST_REPLAY_FAILURE_TRIAGE_ROW"]
-        self.assertEqual(triage_row["payload"], "post_replay_failure_triage_row")
+        review_row = rows["MANAGER_REPLAY_REVIEW_ROW"]
+        self.assertEqual(review_row["payload"], "post_replay_review_row")
 
         layer_attribution_report = rows["MANAGER_MODEL_GROUP_LAYER_ATTRIBUTION_REPORT"]
         self.assertEqual(layer_attribution_report["payload"], "model_group_layer_attribution_report")
@@ -686,7 +686,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("layer_4_state_overlay_candidate", attention_pool_entry["applies_to"])
 
         runtime_surfaces = rows["MANAGER_POST_REPLAY_ATTRIBUTION_RUNTIME_SURFACES"]
-        self.assertIn("post_replay_failure_triage_runs", runtime_surfaces["payload"])
+        self.assertIn("post_replay_review_runs", runtime_surfaces["payload"])
         self.assertIn("event_focus_proposals.jsonl", runtime_surfaces["payload"])
         self.assertIn("temporal_attention_candidate_pool.jsonl", runtime_surfaces["payload"])
         self.assertIn("event_family_occurrence_scan.jsonl", runtime_surfaces["payload"])
@@ -792,9 +792,9 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "status_value")
             self.assertEqual(rows[key]["payload"], payload)
 
-        triage_script = rows["MODEL_GROUP_POST_REPLAY_FAILURE_TRIAGE_RUN"]
-        self.assertEqual(triage_script["kind"], "script")
-        self.assertIn("run_model_group_post_replay_attribution.py", triage_script["path"])
+        review_script = rows["MODEL_GROUP_REPLAY_REVIEW_RUN"]
+        self.assertEqual(review_script["kind"], "script")
+        self.assertIn("run_model_group_replay_review.py", review_script["path"])
 
         layer_attribution_script = rows["MODEL_GROUP_LAYER_ATTRIBUTION_BUILD"]
         self.assertEqual(layer_attribution_script["kind"], "script")
@@ -879,7 +879,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         readiness_probe_fields = rows["MANAGER_MODEL_GROUP_READINESS_PROBE_COUNT_FIELDS"]
         self.assertEqual(readiness_probe_fields["kind"], "config")
-        self.assertIn("expected_failure_triage_rows", readiness_probe_fields["payload"])
+        self.assertIn("expected_replay_review_rows", readiness_probe_fields["payload"])
         self.assertIn("expected_temporal_attention_candidate_count", readiness_probe_fields["payload"])
         self.assertIn("standardized_event_candidate_count", readiness_probe_fields["payload"])
         readiness_probe_sentinel = rows["MANAGER_MODEL_GROUP_READINESS_PROBE_NOT_COUNTED"]

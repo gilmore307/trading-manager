@@ -1,10 +1,11 @@
-"""Manager-owned post-replay failure triage execution.
+"""Manager-owned replay review execution.
 
-This step is local, replay-derived bookkeeping. It converts replay failure/miss
-rows into durable triage units for later attribution work. It is deliberately
-not M06 ResidualEventGovernance event attribution because it does not consume
-point-in-time event observations, event candidates, controls, co-events, or
-confounder evidence.
+Replay review is the local, replay-derived review task that runs immediately
+after model-group replay and before M06 ResidualEventGovernance attribution. It
+converts replay failure/miss rows into durable review units and records the
+ledger contract for later hierarchical component analysis. It is deliberately
+not M06 event attribution because it does not consume point-in-time event
+observations, event candidates, controls, co-events, or confounder evidence.
 """
 
 from __future__ import annotations
@@ -23,22 +24,22 @@ from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
 
 NEW_YORK = ZoneInfo("America/New_York")
-FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE = "post_replay_failure_triage_receipt"
-FAILURE_TRIAGE_ROW_CONTRACT_TYPE = "post_replay_failure_triage_row"
+REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE = "post_replay_review_receipt"
+REPLAY_REVIEW_ROW_CONTRACT_TYPE = "post_replay_review_row"
 LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
 
 
-def run_model_group_post_replay_attribution_if_ready(
+def run_model_group_replay_review_if_ready(
     *,
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     contract_id: str = DEFAULT_REPLAY_CONTRACT_ID,
     execute: bool = True,
     python_executable: str = sys.executable,
-    max_attribution_rows: int | None = None,
+    max_review_rows: int | None = None,
     now_utc: datetime | None = None,
     force: bool = False,
 ) -> SchedulerDecision | None:
-    """Run one post-replay failure triage dispatch when replay is complete."""
+    """Run one replay review task when replay is complete."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     replay_receipt = _latest_replay_execution_receipt(dataset_root)
@@ -54,58 +55,58 @@ def run_model_group_post_replay_attribution_if_ready(
     decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
     if not decision_rows_path.exists():
         return None
-    if not force and _latest_complete_failure_triage_receipt(dataset_root, decision_rows_ref=str(decision_rows_path)) is not None:
+    if not force and _latest_complete_replay_review_receipt(dataset_root, decision_rows_ref=str(decision_rows_path)) is not None:
         return None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
-    run_id = "post_replay_failure_triage_" + now.strftime("%Y%m%dT%H%M%SZ")
-    output_root = dataset_root / "post_replay_failure_triage_runs" / run_id
-    triage_rows_path = output_root / "failure_triage_rows.jsonl"
-    receipt_path = output_root / "post_replay_failure_triage_receipt.json"
+    run_id = "post_replay_review_" + now.strftime("%Y%m%dT%H%M%SZ")
+    output_root = dataset_root / "post_replay_review_runs" / run_id
+    review_rows_path = output_root / "replay_review_rows.jsonl"
+    receipt_path = output_root / "post_replay_review_receipt.json"
     command = [
         python_executable,
-        "scripts/tasks/run_model_group_post_replay_attribution.py",
+        "scripts/tasks/run_model_group_replay_review.py",
         "--contract-id",
         contract_id,
         "--storage-root",
         str(storage_root),
     ]
-    if max_attribution_rows is not None:
-        command.extend(["--max-attribution-rows", str(max_attribution_rows)])
+    if max_review_rows is not None:
+        command.extend(["--max-review-rows", str(max_review_rows)])
 
     if not execute:
         return _decision(
             now=now,
             decision_status="ready",
-            reason_code="model_group_post_replay_failure_triage_ready",
-            reason="model-group replay is complete; post-replay failure triage is ready",
-            selected_work="model_group.post_replay_failure_triage",
+            reason_code="model_group_replay_review_ready",
+            reason="model-group replay is complete; replay review is ready",
+            selected_work="model_group.replay_review",
             command=command,
             execution_summary={
                 "contract_id": contract_id,
                 "dataset_root": str(dataset_root),
                 "decision_rows_ref": str(decision_rows_path),
-                "expected_failure_triage_rows": "not_counted_during_readiness_probe",
+                "expected_replay_review_rows": "not_counted_during_readiness_probe",
             },
         )
 
-    attribution_rows = tuple(_build_attribution_rows(decision_rows_path, max_rows=max_attribution_rows))
+    review_rows = tuple(_build_review_rows(decision_rows_path, max_rows=max_review_rows))
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
         lock_scope="promotion",
-        lock_key=f"lock:model_group_post_replay_failure_triage:{contract_id}",
-        lock_path=str(storage_root / "runtime" / "locks" / "model_group" / f"{contract_id}.post_replay_failure_triage.lock"),
+        lock_key=f"lock:model_group_replay_review:{contract_id}",
+        lock_path=str(storage_root / "runtime" / "locks" / "model_group" / f"{contract_id}.replay_review.lock"),
         model_id="model_group",
         candidate_ref=contract_id,
     )
     with acquire_scheduler_lock(lock_ref):
         output_root.mkdir(parents=True, exist_ok=True)
-        _write_jsonl(triage_rows_path, attribution_rows)
+        _write_jsonl(review_rows_path, review_rows)
         receipt = {
-            "contract_type": FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE,
+            "contract_type": REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE,
             "status": "succeeded",
-            "stage_id": "model_group.post_replay_failure_triage",
-            "model_surface": "post_replay_failure_triage",
+            "stage_id": "model_group.replay_review",
+            "model_surface": "post_replay_review",
             "run_id": run_id,
             "contract_id": contract_id,
             "created_at_utc": now.isoformat(),
@@ -115,10 +116,13 @@ def run_model_group_post_replay_attribution_if_ready(
             "replay_execution_receipt_ref": str(dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json")
             if replay_run_id
             else None,
-            "triage_rows_ref": str(triage_rows_path),
-            "expected_failure_count": len(attribution_rows),
-            "triaged_failure_count": len(attribution_rows),
-            "processed_failure_count": len(attribution_rows),
+            "review_rows_ref": str(review_rows_path),
+            "expected_review_count": len(review_rows),
+            "reviewed_failure_count": len(review_rows),
+            "processed_review_count": len(review_rows),
+            "review_sequence": ["eligibility_ledger", "decision_ledger", "outcome_ledger"],
+            "review_scope": "post_replay_component_funnel_review",
+            "cause_family_contract": ["data_insufficiency", "execution_connection_failure", "model_mechanism_defect"],
             "residual_event_governance_status": "not_performed",
             "event_evidence_consumed": False,
             "event_observation_count": 0,
@@ -133,17 +137,17 @@ def run_model_group_post_replay_attribution_if_ready(
     return _decision(
         now=now,
         decision_status="executed",
-        reason_code="model_group_post_replay_failure_triage_executed",
-        reason="executed side-effect-free post-replay failure triage over replay failures and missed opportunities",
-        selected_work="model_group.post_replay_failure_triage",
+        reason_code="model_group_replay_review_executed",
+        reason="executed side-effect-free replay review over replay failures and missed opportunities",
+        selected_work="model_group.replay_review",
         command=command,
         execution_summary={
             "contract_id": contract_id,
             "dataset_root": str(dataset_root),
             "decision_rows_ref": str(decision_rows_path),
-            "post_replay_failure_triage_receipt": str(receipt_path),
-            "triage_rows_ref": str(triage_rows_path),
-            "triaged_failure_count": len(attribution_rows),
+            "post_replay_review_receipt": str(receipt_path),
+            "review_rows_ref": str(review_rows_path),
+            "reviewed_failure_count": len(review_rows),
             "residual_event_governance_status": "not_performed",
         },
     )
@@ -171,7 +175,7 @@ def _decision(
         resource_pressure_active=False,
         selected_work=selected_work,
         command=command,
-        next_internal_stage="post_replay_failure_triage",
+        next_internal_stage="replay_review",
         provider_calls=0,
         dispatch_performed=False,
         model_activation_performed=False,
@@ -181,12 +185,12 @@ def _decision(
         lock_plan=scheduler_lock_plan(
             month=None,
             selected_work=selected_work,
-            next_internal_stage="post_replay_failure_triage",
+            next_internal_stage="replay_review",
         ),
     )
 
 
-def _build_attribution_rows(decision_rows_path: Path, *, max_rows: int | None) -> Iterable[dict[str, Any]]:
+def _build_review_rows(decision_rows_path: Path, *, max_rows: int | None) -> Iterable[dict[str, Any]]:
     count = 0
     for index, row in enumerate(_load_jsonl_objects(decision_rows_path), start=1):
         if not _replay_row_needs_attribution(row):
@@ -194,10 +198,10 @@ def _build_attribution_rows(decision_rows_path: Path, *, max_rows: int | None) -
         count += 1
         if max_rows is not None and count > max_rows:
             break
-        yield _attribution_row(row, decision_index=index, attribution_index=count)
+        yield _review_row(row, decision_index=index, review_index=count)
 
 
-def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution_index: int) -> dict[str, Any]:
+def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: int) -> dict[str, Any]:
     fill_status = str(row.get("fill_status") or "")
     decision_status = str(row.get("decision_status") or "")
     outcome_label = _int_field(row, "outcome_label")
@@ -212,9 +216,9 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
     decision_time = _decision_time(row)
     impact_profile = _impact_profile(row, failure_type=failure_type, decision_time=decision_time)
     return {
-        "contract_type": FAILURE_TRIAGE_ROW_CONTRACT_TYPE,
-        "stage_id": "model_group.post_replay_failure_triage",
-        "attribution_id": f"l10_attr_{attribution_index:08d}",
+        "contract_type": REPLAY_REVIEW_ROW_CONTRACT_TYPE,
+        "stage_id": "model_group.replay_review",
+        "review_id": f"replay_review_{review_index:08d}",
         "source_decision_id": source_id,
         "source_decision_index": decision_index,
         "decision_time": decision_time,
@@ -228,8 +232,13 @@ def _attribution_row(row: Mapping[str, Any], *, decision_index: int, attribution
         "impact_normalization_denominator": impact_profile["impact_normalization_denominator"],
         "impact_normalized_severity_score": impact_profile["impact_normalized_severity_score"],
         "impact_severity_basis": impact_profile["impact_severity_basis"],
-        "triage_status": "triaged",
+        "review_status": "reviewed",
         "failure_type": failure_type,
+        "cause_family": "model_mechanism_defect",
+        "cause_family_basis": "replay row was visible and locally reviewable; event attribution is deferred to M06",
+        "eligibility_ledger_status": "reviewable_from_replay_row",
+        "decision_ledger_status": "reviewable_from_replay_row",
+        "outcome_ledger_status": "reviewable_from_replay_row",
         "replay_month": _replay_month(row),
         "target_symbol": _target_symbol(row),
         "fill_status": fill_status,
@@ -396,12 +405,12 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
     )
 
 
-def _latest_complete_failure_triage_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
-    triage_root = dataset_root / "post_replay_failure_triage_runs"
-    if not triage_root.exists():
+def _latest_complete_replay_review_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
+    review_root = dataset_root / "post_replay_review_runs"
+    if not review_root.exists():
         return None
     candidates: list[tuple[str, Mapping[str, Any]]] = []
-    for receipt_path in sorted(triage_root.glob("*/post_replay_failure_triage_receipt.json")):
+    for receipt_path in sorted(review_root.glob("*/post_replay_review_receipt.json")):
         receipt = _load_optional_json_object(receipt_path)
         if receipt is None:
             continue
@@ -409,7 +418,7 @@ def _latest_complete_failure_triage_receipt(dataset_root: Path, *, decision_rows
         if status not in {"succeeded", "complete", "completed"}:
             continue
         contract_type = str(receipt.get("contract_type") or "")
-        if contract_type != FAILURE_TRIAGE_RECEIPT_CONTRACT_TYPE:
+        if contract_type != REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE:
             continue
         if str(receipt.get("decision_rows_ref") or "") != decision_rows_ref:
             continue
@@ -519,4 +528,8 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
-__all__ = ["run_model_group_post_replay_attribution_if_ready"]
+__all__ = [
+    "REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE",
+    "REPLAY_REVIEW_ROW_CONTRACT_TYPE",
+    "run_model_group_replay_review_if_ready",
+]

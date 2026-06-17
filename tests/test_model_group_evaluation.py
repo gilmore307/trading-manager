@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import shutil
 import tempfile
 import unittest
 from datetime import UTC, datetime
@@ -211,7 +212,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "event_evidence_consumed": True,
                     "event_observation_count": 1,
                     "event_candidate_count": 1,
-                    "failure_scope_triage_status": "passed",
+                    "replay_review_scope_status": "passed",
                     "control_analysis_status": "passed",
                 }
             )
@@ -220,27 +221,29 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         )
         return dataset_root
 
-    def test_ignores_replay_failure_triage_as_residual_event_governance(self):
+    def test_ignores_replay_review_as_residual_event_governance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_ready_replay_and_attribution(storage_root)
             self._write_completed_fold(storage_root)
-            attribution_receipt = next((dataset_root / "post_replay_attribution_runs").glob("*/post_replay_attribution_receipt.json"))
-            attribution_rows = attribution_receipt.parent / "failure_attribution_rows.jsonl"
-            attribution_rows.write_text(
-                json.dumps({"contract_type": "post_replay_failure_triage_row", "triage_status": "triaged"}) + "\n",
+            shutil.rmtree(dataset_root / "post_replay_attribution_runs")
+            review_root = dataset_root / "post_replay_review_runs" / "post_replay_review_fixture"
+            review_root.mkdir(parents=True)
+            review_rows = review_root / "replay_review_rows.jsonl"
+            review_rows.write_text(
+                json.dumps({"contract_type": "post_replay_review_row", "review_status": "reviewed"}) + "\n",
                 encoding="utf-8",
             )
-            attribution_receipt.write_text(
+            (review_root / "post_replay_review_receipt.json").write_text(
                 json.dumps(
                     {
-                        "contract_type": "post_replay_failure_triage_receipt",
+                        "contract_type": "post_replay_review_receipt",
                         "status": "succeeded",
                         "created_at_utc": "2026-05-28T00:00:01+00:00",
                         "decision_rows_ref": str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"),
-                        "triage_rows_ref": str(attribution_rows),
+                        "review_rows_ref": str(review_rows),
                         "residual_event_governance_status": "not_performed",
                         "event_evidence_consumed": False,
                         "event_observation_count": 0,
@@ -392,7 +395,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "event_evidence_consumed": True,
                         "event_observation_count": 1,
                         "event_candidate_count": 2,
-                        "failure_scope_triage_status": "passed",
+                        "replay_review_scope_status": "passed",
                         "control_analysis_status": "passed",
                     }
                 )

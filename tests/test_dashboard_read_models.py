@@ -319,7 +319,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "event_candidate_count": 1,
                     "event_focus_proposals_ref": str(proposals_path),
                     "event_focus_proposal_count": 1,
-                    "failure_scope_triage_status": "passed",
+                    "replay_review_scope_status": "passed",
                     "control_analysis_status": "passed",
                 }
             )
