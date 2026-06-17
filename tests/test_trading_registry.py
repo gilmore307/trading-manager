@@ -612,6 +612,14 @@ class RegistryHelperTests(unittest.TestCase):
         review_row = rows["MANAGER_REPLAY_REVIEW_ROW"]
         self.assertEqual(review_row["payload"], "post_replay_review_row")
 
+        decision_variable_policy = rows["MANAGER_MODEL_GROUP_DECISION_VARIABLE_SCHEMA_POLICY"]
+        self.assertIn("unfilled_decisions_use_replay_opportunity_return", decision_variable_policy["payload"])
+        self.assertIn("missed_opportunity_return", decision_variable_policy["payload"])
+        self.assertIn("replay_opportunity_excess_return", decision_variable_policy["payload"])
+        self.assertIn("next_bar_close", decision_variable_policy["payload"])
+        self.assertIn("missed_opportunity_diagnostic", decision_variable_policy["applies_to"])
+        self.assertIn("Unfilled decisions", decision_variable_policy["note"])
+
         layer_attribution_report = rows["MANAGER_MODEL_GROUP_LAYER_ATTRIBUTION_REPORT"]
         self.assertEqual(layer_attribution_report["payload"], "model_group_layer_attribution_report")
         self.assertIn("model_group_layer_attribution.py", layer_attribution_report["path"])
