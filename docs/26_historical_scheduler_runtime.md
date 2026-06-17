@@ -55,9 +55,12 @@ clock advances through the current component graph using only point-in-time
 evidence. If replay emits an M05 option-expression signal and lacks the matching
 point-in-time candidates, replay backs off with
 `model_group_replay_option_feature_acquisition_required`; the daemon then runs
-`model_group.replay_option_features` only for the emitted sample timestamps,
-prepares the matching regular-session option-chain source day windows, dispatches
-bounded historical ThetaData calls only when
+`model_group.replay_option_features` only for the emitted timestamps from the
+backoff payload or its full `requirements_artifact_ref`. The callable
+`scripts/tasks/drain_model_group_replay_option_features.py` is the bounded
+operator entrypoint for draining a large replay requirements artifact without
+rerunning replay between batches. It prepares the matching regular-session
+option-chain source day windows, dispatches bounded historical ThetaData calls only when
 `--execute-autonomous-provider-stages` is enabled, generates M05 features from
 `trading_data.option_chain_state_source`, and retries replay from the same
 lifecycle. If the bounded provider request deterministically reports unavailable
