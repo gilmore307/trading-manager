@@ -262,6 +262,47 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertNotIn("trading-" + "strategy", row["payload"])
             self.assertNotIn("trading-" + "strategy", row["path"])
 
+    def test_dashboard_replay_decision_detail_fields_include_model_evidence(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        detail_fields = rows["DASHBOARD_REPLAY_DECISION_DETAIL_FIELDS"]
+        payload_fields = set(detail_fields["payload"].split(";"))
+        expected_fields = {
+            "model_layer",
+            "model_surface",
+            "model_output_ref",
+            "evidence_refs[].model_layer",
+            "evidence_refs[].model_surface",
+            "evidence_refs[].model_output_ref",
+            "evidence_refs[].evidence_ref",
+            "evidence_refs[].input_ref",
+            "evidence_refs[].ref",
+            "evidence_refs[].status",
+            "evidence_refs[].score",
+            "evidence_refs[].reason_codes",
+            "decision_trace[].component_id",
+            "decision_trace[].component_label",
+            "decision_trace[].reason_codes",
+            "decision_trace[].model_layer",
+            "decision_trace[].model_surface",
+            "decision_trace[].model_output_ref",
+            "decision_trace[].evidence_refs[].model_layer",
+            "decision_trace[].evidence_refs[].model_surface",
+            "decision_trace[].evidence_refs[].model_output_ref",
+            "decision_trace[].evidence_refs[].evidence_ref",
+            "decision_trace[].evidence_refs[].input_ref",
+            "decision_trace[].evidence_refs[].ref",
+            "decision_trace[].evidence_refs[].status",
+            "decision_trace[].evidence_refs[].score",
+            "decision_trace[].evidence_refs[].reason_codes",
+        }
+
+        self.assertLessEqual(expected_fields, payload_fields)
+        self.assertIn("model_layer", detail_fields["applies_to"])
+        self.assertIn("evidence_refs", detail_fields["applies_to"])
+        self.assertIn("component-first decision trace", detail_fields["note"])
+
     def test_trading_evaluation_contract_rows_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
