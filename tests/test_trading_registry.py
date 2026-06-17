@@ -33,6 +33,30 @@ def create_row(**overrides):
 
 
 class RegistryHelperTests(unittest.TestCase):
+    def test_registry_current_csv_rows_match_header_shape(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            reader = csv.reader(csv_file)
+            header = next(reader)
+            expected_columns = len(header)
+            malformed = [
+                (line_number, len(row))
+                for line_number, row in enumerate(reader, start=2)
+                if len(row) != expected_columns
+            ]
+
+        self.assertEqual([], malformed)
+
+    def test_registry_current_csv_has_unique_ids_and_keys(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+
+        for column in ("id", "key"):
+            counts: dict[str, int] = {}
+            for row in rows:
+                counts[row[column]] = counts.get(row[column], 0) + 1
+            duplicates = sorted(value for value, count in counts.items() if count > 1)
+            self.assertEqual([], duplicates, column)
+
     def test_registry_kind_files_match_sql_constraint_and_current_rows(self):
         schema = Path("scripts/registry/sql/trading_registry.sql").read_text()
         constraint = re.search(
@@ -2355,7 +2379,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("equity_total_symbol_pool", registry[key]["applies_to"])
 
-    def test_calendar_maintenance_release_fetch_schedule_is_registered(self):
+    def test_calendar_maintenance_release_fetch_queue_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
 
@@ -2374,7 +2398,6 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("systemd-run", boundary["note"])
 
         script = registry["RUN_CALENDAR_MAINTENANCE_REFRESH"]
-        self.assertIn("te_release_fetch_schedule", script["applies_to"])
         self.assertIn("te_release_fetch_queue", script["applies_to"])
         self.assertIn("te_release_poll", script["applies_to"])
         self.assertIn("provisional_macro_release_web_search", script["applies_to"])
@@ -2390,19 +2413,22 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("--release-poll-until-value", te_fetch_script["note"])
         self.assertIn("merge fallback into TE-origin rows", te_fetch_script["note"])
 
-        schedule_policy = registry["TRADING_ECONOMICS_RELEASE_FETCH_SCHEDULE_POLICY"]
-        self.assertIn("default_delay_seconds=0", schedule_policy["payload"])
-        self.assertIn("max_count=48", schedule_policy["payload"])
-        self.assertIn("queue_path=trading_economics_calendar_web/_manifests/release_fetch_queue.json", schedule_policy["payload"])
-        self.assertIn("single_systemd_timer=trading-data-te-release-fetch.timer", schedule_policy["payload"])
-        self.assertIn("single_fetcher=trading-data-te-release-fetch.service", schedule_policy["payload"])
-        self.assertIn("future_fetch_only", schedule_policy["payload"])
-        self.assertIn("poll_interval_seconds=5", schedule_policy["payload"])
-        self.assertIn("poll_timeout_seconds=60", schedule_policy["payload"])
-        self.assertIn("fallback_web_search_after_timeout", schedule_policy["payload"])
-        self.assertIn("single trading-data-te-release-fetch timer", schedule_policy["note"])
-        self.assertIn("provisional web-search fallback evidence", schedule_policy["note"])
-        self.assertNotIn("systemd_run", schedule_policy["payload"])
+        queue_policy = registry["TRADING_ECONOMICS_RELEASE_FETCH_QUEUE_POLICY"]
+        self.assertIn("trading_economics_release_fetch_queue", queue_policy["payload"])
+        self.assertIn("default_delay_seconds=0", queue_policy["payload"])
+        self.assertIn("max_count=48", queue_policy["payload"])
+        self.assertIn("queue_path=trading_economics_calendar_web/_manifests/release_fetch_queue.json", queue_policy["payload"])
+        self.assertIn("single_systemd_timer=trading-data-te-release-fetch.timer", queue_policy["payload"])
+        self.assertIn("single_fetcher=trading-data-te-release-fetch.service", queue_policy["payload"])
+        self.assertIn("future_fetch_only", queue_policy["payload"])
+        self.assertIn("poll_interval_seconds=5", queue_policy["payload"])
+        self.assertIn("poll_timeout_seconds=60", queue_policy["payload"])
+        self.assertIn("fallback_web_search_after_timeout", queue_policy["payload"])
+        self.assertIn("te_release_fetch_queue", queue_policy["applies_to"])
+        self.assertNotIn("te_release_fetch_schedule", queue_policy["applies_to"])
+        self.assertIn("single trading-data-te-release-fetch timer", queue_policy["note"])
+        self.assertIn("provisional web-search fallback evidence", queue_policy["note"])
+        self.assertNotIn("systemd_run", queue_policy["payload"])
 
         release_fetcher = registry["RUN_TRADING_ECONOMICS_RELEASE_FETCHER"]
         self.assertEqual(release_fetcher["kind"], "script")
