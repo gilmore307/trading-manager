@@ -211,6 +211,15 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
         failure_type = "filled_negative_or_underperforming_outcome"
     else:
         failure_type = "rejected_positive_missed_opportunity"
+    path_scope = _path_scope(row)
+    candidate_set_scope = _candidate_set_scope(row)
+    miss_attribution_layer = _miss_attribution_layer(row, filled=filled)
+    miss_review_scope = _miss_review_scope(
+        filled=filled,
+        path_conditioning_policy=_path_conditioning_policy(row),
+        candidate_set_scope=candidate_set_scope,
+        miss_attribution_layer=miss_attribution_layer,
+    )
     source_id = str(row.get("decision_id") or row.get("replay_decision_id") or f"decision_row_{decision_index}")
     decision_time = _decision_time(row)
     impact_profile = _impact_profile(row, failure_type=failure_type, decision_time=decision_time)
@@ -238,6 +247,11 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
         "eligibility_ledger_status": "reviewable_from_replay_row",
         "decision_ledger_status": "reviewable_from_replay_row",
         "outcome_ledger_status": "reviewable_from_replay_row",
+        "path_conditioning_policy": _path_conditioning_policy(row),
+        "path_scope": path_scope,
+        "candidate_set_scope": candidate_set_scope,
+        "miss_attribution_layer": miss_attribution_layer,
+        "miss_review_scope": miss_review_scope,
         "replay_month": _replay_month(row),
         "target_symbol": _target_symbol(row),
         "fill_status": fill_status,
@@ -248,7 +262,7 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
         "attribution_basis": (
             "filled decision lost money or underperformed baseline"
             if filled
-            else "rejected decision missed a positive next outcome"
+            else "path-conditioned non-taken decision missed a positive next outcome"
         ),
     }
 
@@ -351,6 +365,65 @@ def _target_symbol(row: Mapping[str, Any]) -> str | None:
     return None
 
 
+def _path_conditioning_policy(row: Mapping[str, Any]) -> str:
+    value = _first_text(row, ("path_conditioning_policy", "replay_path_conditioning_policy"))
+    return value or "upstream_selected_path_only"
+
+
+def _path_scope(row: Mapping[str, Any]) -> str:
+    value = _first_text(row, ("path_scope", "replay_path_scope"))
+    if value:
+        return value
+    target = _target_symbol(row)
+    if target:
+        return f"selected_target:{target}"
+    return "selected_path:unknown"
+
+
+def _candidate_set_scope(row: Mapping[str, Any]) -> str:
+    value = _first_text(row, ("candidate_set_scope", "replay_candidate_set_scope"))
+    if value:
+        return value
+    if _first_text(row, ("selected_option_contract_ref", "selected_contract_ref")):
+        return "selected_target_selected_option_contract_path"
+    instrument_scope = str(row.get("decision_instrument_scope") or "").strip()
+    if instrument_scope == "listed_option_contract":
+        return "selected_target_option_expression_candidates"
+    if instrument_scope == "underlying_equity":
+        return "selected_target_underlying_decision"
+    return "selected_path_current_decision_set"
+
+
+def _miss_attribution_layer(row: Mapping[str, Any], *, filled: bool) -> str:
+    value = _first_text(row, ("miss_attribution_layer", "replay_miss_attribution_layer"))
+    if value:
+        return value
+    if filled:
+        return "taken_decision"
+    if _first_text(row, ("selected_option_contract_ref", "selected_contract_ref")):
+        return "model_05_option_expression"
+    instrument_scope = str(row.get("decision_instrument_scope") or "").strip()
+    if instrument_scope == "underlying_equity":
+        return "model_04_unified_decision"
+    return "current_decision_layer"
+
+
+def _miss_review_scope(
+    *,
+    filled: bool,
+    path_conditioning_policy: str,
+    candidate_set_scope: str,
+    miss_attribution_layer: str,
+) -> str:
+    if filled:
+        return "taken_decision"
+    if path_conditioning_policy in {"global_hindsight_oracle", "unconditioned_global_universe", "best_path_hindsight"}:
+        return "not_path_conditioned"
+    if candidate_set_scope.startswith("global_") or miss_attribution_layer in {"global_hindsight_oracle", "best_path_hindsight"}:
+        return "not_path_conditioned"
+    return "path_conditioned_current_scope"
+
+
 def _replay_row_needs_attribution(row: Mapping[str, Any]) -> bool:
     fill_status = str(row.get("fill_status") or "")
     decision_status = str(row.get("decision_status") or "")
@@ -364,7 +437,17 @@ def _replay_row_needs_attribution(row: Mapping[str, Any]) -> bool:
         if realized_return is not None and realized_return <= baseline_return:
             return True
         return False
-    return outcome_label == 1
+    if outcome_label != 1:
+        return False
+    return (
+        _miss_review_scope(
+            filled=False,
+            path_conditioning_policy=_path_conditioning_policy(row),
+            candidate_set_scope=_candidate_set_scope(row),
+            miss_attribution_layer=_miss_attribution_layer(row, filled=False),
+        )
+        == "path_conditioned_current_scope"
+    )
 
 
 def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | None:

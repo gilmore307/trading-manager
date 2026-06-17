@@ -56,6 +56,16 @@ For the first accepted model bundle, evaluation may set `first_model_bootstrap =
 
 Replay review is the first-class task between replay and M06. It is not the same as evaluation and it is not limited to event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, and the component-funnel layer where the replay first diverged. M06 runs after replay review and owns event/co-event explanations.
 
+Replay review is path-conditioned. A miss is reviewable only inside the
+information and upstream selection path the replay row actually observed. If an
+upstream layer selected the wrong sector, later layers continue inside that
+selected sector; if a target layer selected the wrong target, option-expression
+review continues inside that selected target. Global hindsight winners may be
+reported as separate oracle diagnostics, but they must not become
+`missed_good`, model-missed-winner, or post-replay review rows for downstream
+layers unless their candidate set was point-in-time feasible inside the current
+selected path.
+
 Replay review is only the first post-replay diagnostic step. A
 `post_replay_review_receipt` may identify failed fills, missed winners,
 and other candidate failure rows, but it does not satisfy M06

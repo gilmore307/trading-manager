@@ -538,6 +538,9 @@ def _decision_variable_schema_diagnostics(
         "decision_confidence_band",
         "replay_fill_status",
         "replay_execution_mode",
+        "path_conditioning_policy",
+        "candidate_set_scope",
+        "miss_attribution_layer",
         "eval_outcome_label",
         "eval_economic_class",
         "eval_action_class",
@@ -588,7 +591,7 @@ def _decision_variable_schema_diagnostics(
         "label_definition": {
             "eval_outcome_label": "legacy outcome_label/label/realized_label when present, otherwise replay_cost_adjusted_return > 0",
             "eval_economic_class": "accepted decisions use replay_excess_return; unfilled decisions use replay_opportunity_excess_return",
-            "eval_action_class": "based on decision_disposition, decision_agency, and accepted-or-opportunity excess return",
+            "eval_action_class": "based on decision_disposition, decision_agency, path-conditioned miss scope, and accepted-or-opportunity excess return",
         },
         "feature_namespace_leakage_status": "warning" if feature_leakage_columns else "passed",
         "feature_namespace_leakage_columns": feature_leakage_columns,
@@ -855,6 +858,19 @@ def _normalized_decision_variable_row(
     agency, agency_detail = _decision_agency(row, disposition=disposition, intended_action=intended_action)
     replay_fill_status = _replay_fill_status(row)
     replay_execution_mode = _replay_execution_mode(row)
+    path_conditioning_policy = _path_conditioning_policy(row)
+    candidate_set_scope = _candidate_set_scope(row)
+    miss_attribution_layer = _miss_attribution_layer(
+        row,
+        disposition=disposition,
+        instrument_scope=_decision_instrument_scope(row),
+    )
+    miss_review_scope = _miss_review_scope(
+        disposition=disposition,
+        path_conditioning_policy=path_conditioning_policy,
+        candidate_set_scope=candidate_set_scope,
+        miss_attribution_layer=miss_attribution_layer,
+    )
     eval_outcome_label = _label(row)
     replay_excess_return = net_return - baseline_return
     is_unfilled_decision = disposition in {"skipped", "rejected", "deferred", "blocked"}
@@ -880,6 +896,11 @@ def _normalized_decision_variable_row(
         "decision_confidence_band": _confidence_band(_score(row)),
         "replay_fill_status": replay_fill_status,
         "replay_execution_mode": replay_execution_mode,
+        "path_conditioning_policy": path_conditioning_policy,
+        "path_scope": _path_scope(row),
+        "candidate_set_scope": candidate_set_scope,
+        "miss_attribution_layer": miss_attribution_layer,
+        "miss_review_scope": miss_review_scope,
         "replay_realized_return": _round_metric(net_return + cost),
         "replay_baseline_return": _round_metric(baseline_return),
         "replay_excess_return": _round_metric(replay_excess_return),
@@ -889,7 +910,12 @@ def _normalized_decision_variable_row(
         "replay_opportunity_excess_return": _round_metric(opportunity_excess_return) if opportunity_excess_return is not None else None,
         "eval_outcome_label": eval_outcome_label,
         "eval_economic_class": _eval_economic_class(net_return=classification_net_return, excess_return=classification_excess_return),
-        "eval_action_class": _eval_action_class(disposition=disposition, agency=agency, excess_return=classification_excess_return),
+        "eval_action_class": _eval_action_class(
+            disposition=disposition,
+            agency=agency,
+            excess_return=classification_excess_return,
+            miss_review_scope=miss_review_scope,
+        ),
     }
 
 
@@ -936,6 +962,67 @@ def _decision_instrument_scope(row: Mapping[str, Any]) -> str:
     if "option" in instrument_ref or "_c" in instrument_ref or "_p" in instrument_ref:
         return "option"
     return "unknown"
+
+
+def _path_conditioning_policy(row: Mapping[str, Any]) -> str:
+    explicit = _first_text(row, "path_conditioning_policy", "replay_path_conditioning_policy")
+    if explicit:
+        return explicit
+    return "upstream_selected_path_only"
+
+
+def _path_scope(row: Mapping[str, Any]) -> str:
+    explicit = _first_text(row, "path_scope", "replay_path_scope")
+    if explicit:
+        return explicit
+    target = _first_text(row, "target_ref", "target_symbol", "symbol", "instrument_ref")
+    if target:
+        return f"selected_target:{target.split('-')[0].upper()}"
+    return "selected_path:unknown"
+
+
+def _candidate_set_scope(row: Mapping[str, Any]) -> str:
+    explicit = _first_text(row, "candidate_set_scope", "replay_candidate_set_scope")
+    if explicit:
+        return explicit
+    if _first_text(row, "selected_option_contract_ref", "selected_contract_ref"):
+        return "selected_target_selected_option_contract_path"
+    expression_type = _decision_expression_type(row)
+    if expression_type in {"long_call", "long_put"}:
+        return "selected_target_option_expression_candidates"
+    instrument_scope = _decision_instrument_scope(row)
+    if instrument_scope == "underlying":
+        return "selected_target_underlying_decision"
+    return "selected_path_current_decision_set"
+
+
+def _miss_attribution_layer(row: Mapping[str, Any], *, disposition: str, instrument_scope: str) -> str:
+    explicit = _first_text(row, "miss_attribution_layer", "replay_miss_attribution_layer")
+    if explicit:
+        return explicit
+    if disposition == "accepted":
+        return "taken_decision"
+    if _first_text(row, "selected_option_contract_ref", "selected_contract_ref") or instrument_scope == "option":
+        return "model_05_option_expression"
+    if instrument_scope == "underlying":
+        return "model_04_unified_decision"
+    return "current_decision_layer"
+
+
+def _miss_review_scope(
+    *,
+    disposition: str,
+    path_conditioning_policy: str,
+    candidate_set_scope: str,
+    miss_attribution_layer: str,
+) -> str:
+    if disposition == "accepted":
+        return "taken_decision"
+    if path_conditioning_policy in {"global_hindsight_oracle", "unconditioned_global_universe", "best_path_hindsight"}:
+        return "not_path_conditioned"
+    if candidate_set_scope.startswith("global_") or miss_attribution_layer in {"global_hindsight_oracle", "best_path_hindsight"}:
+        return "not_path_conditioned"
+    return "path_conditioned_current_scope"
 
 
 def _decision_expression_type(row: Mapping[str, Any]) -> str:
@@ -1085,14 +1172,16 @@ def _eval_economic_class(*, net_return: float, excess_return: float) -> str:
     return "unknown"
 
 
-def _eval_action_class(*, disposition: str, agency: str, excess_return: float) -> str:
+def _eval_action_class(*, disposition: str, agency: str, excess_return: float, miss_review_scope: str) -> str:
     if disposition == "accepted":
         return "taken_good" if excess_return > 0 else "taken_bad"
     if disposition in {"skipped", "rejected", "deferred"}:
+        if excess_return > 0 and miss_review_scope != "path_conditioned_current_scope":
+            return "unscored_global_good"
         return "missed_good" if excess_return > 0 else "avoided_bad"
     if disposition == "blocked":
         return "blocked_good" if excess_return > 0 else "blocked_bad"
-    if agency != "unknown" and excess_return > 0:
+    if agency != "unknown" and excess_return > 0 and miss_review_scope == "path_conditioned_current_scope":
         return "missed_good"
     return "ambiguous"
 

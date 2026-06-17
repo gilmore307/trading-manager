@@ -64,6 +64,17 @@ class ModelGroupAttributionTests(unittest.TestCase):
                     ),
                     json.dumps({"decision_id": "filled_under_baseline", "decision_status": "approved", "outcome_label": 1, "realized_return": 0.01, "baseline_return": 0.02, "month": "2021-01"}),
                     json.dumps({"decision_id": "rejected_winner", "decision_status": "rejected", "outcome_label": 1, "month": "2021-02"}),
+                    json.dumps(
+                        {
+                            "decision_id": "global_hindsight_winner",
+                            "decision_status": "rejected",
+                            "outcome_label": 1,
+                            "month": "2021-02",
+                            "path_conditioning_policy": "global_hindsight_oracle",
+                            "candidate_set_scope": "global_candidate_universe",
+                            "miss_attribution_layer": "global_hindsight_oracle",
+                        }
+                    ),
                     json.dumps({"decision_id": "good_fill", "fill_status": "simulated_filled", "outcome_label": 1, "realized_return": 0.04, "baseline_return": 0.02, "month": "2021-02"}),
                 ]
             )
@@ -116,6 +127,9 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(rows[0]["contract_type"], "post_replay_review_row")
             self.assertEqual(rows[0]["replay_month"], "2021-01")
             self.assertEqual(rows[0]["target_symbol"], "BTC")
+            self.assertEqual(rows[2]["path_conditioning_policy"], "upstream_selected_path_only")
+            self.assertEqual(rows[2]["miss_review_scope"], "path_conditioned_current_scope")
+            self.assertEqual(rows[2]["candidate_set_scope"], "selected_path_current_decision_set")
 
     def test_ready_without_execute_does_not_write_receipt(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
