@@ -556,6 +556,55 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         self.assertEqual(diagnostics["coverage"]["decision_intended_action"]["values"]["no_trade"], 1)
         self.assertEqual(diagnostics["coverage"]["decision_disposition"]["values"]["rejected"], 1)
 
+    def test_rejected_entry_thesis_uses_market_path_for_missed_opportunity(self):
+        rows = [
+            {
+                "decision_id": "missed_up_move",
+                "realized_return": 0.0,
+                "baseline_return": 0.0,
+                "cost": 0.0,
+                "outcome_label": 1,
+                "prediction_score": 0.8,
+                "decision_action": "reject_entry_thesis",
+                "action": "reject_entry_thesis",
+                "decision_status": "rejected",
+                "fill_status": "simulated_rejected",
+                "bar_close": 100.0,
+                "next_bar_close": 105.0,
+            },
+            {
+                "decision_id": "avoided_down_move",
+                "realized_return": 0.0,
+                "baseline_return": 0.0,
+                "cost": 0.0,
+                "outcome_label": 0,
+                "prediction_score": 0.2,
+                "decision_action": "reject_entry_thesis",
+                "action": "reject_entry_thesis",
+                "decision_status": "rejected",
+                "fill_status": "simulated_rejected",
+                "bar_close": 100.0,
+                "next_bar_close": 95.0,
+            },
+        ]
+
+        diagnostics = _decision_variable_schema_diagnostics(
+            decision_rows=rows,
+            net_returns=[0.0, 0.0],
+            baseline_returns=[0.0, 0.0],
+            costs=[0.0, 0.0],
+        )
+
+        self.assertEqual(diagnostics["coverage"]["eval_action_class"]["values"]["missed_good"], 1)
+        self.assertEqual(diagnostics["coverage"]["eval_action_class"]["values"]["avoided_bad"], 1)
+        missed_sample = diagnostics["normalized_row_samples"][0]
+        self.assertEqual(missed_sample["replay_cost_adjusted_return"], 0.0)
+        self.assertEqual(missed_sample["replay_excess_return"], 0.0)
+        self.assertEqual(missed_sample["replay_opportunity_return"], 0.05)
+        self.assertEqual(missed_sample["replay_opportunity_excess_return"], 0.05)
+        self.assertEqual(missed_sample["eval_economic_class"], "positive_excess")
+        self.assertEqual(missed_sample["eval_action_class"], "missed_good")
+
     def test_suitable_missing_option_path_rows_are_skipped_unscored_and_unfilled(self):
         rows = [
             {

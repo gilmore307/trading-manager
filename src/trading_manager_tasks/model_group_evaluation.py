@@ -588,8 +588,8 @@ def _decision_variable_schema_diagnostics(
         "status": status,
         "label_definition": {
             "eval_outcome_label": "legacy outcome_label/label/realized_label when present, otherwise replay_cost_adjusted_return > 0",
-            "eval_economic_class": "based on replay_excess_return and replay_cost_adjusted_return",
-            "eval_action_class": "based on decision_disposition, decision_agency, and replay_excess_return",
+            "eval_economic_class": "accepted decisions use replay_excess_return; unfilled decisions use replay_opportunity_excess_return",
+            "eval_action_class": "based on decision_disposition, decision_agency, and accepted-or-opportunity excess return",
         },
         "feature_namespace_leakage_status": "warning" if feature_leakage_columns else "passed",
         "feature_namespace_leakage_columns": feature_leakage_columns,
@@ -858,6 +858,15 @@ def _normalized_decision_variable_row(
     replay_execution_mode = _replay_execution_mode(row)
     eval_outcome_label = _label(row)
     replay_excess_return = net_return - baseline_return
+    is_unfilled_decision = disposition in {"skipped", "rejected", "deferred", "blocked"}
+    opportunity_return = (
+        _opportunity_return(row, fallback_net_return=net_return, cost=cost, intended_side=intended_side)
+        if is_unfilled_decision
+        else None
+    )
+    opportunity_excess_return = opportunity_return - baseline_return if opportunity_return is not None else None
+    classification_net_return = opportunity_return if opportunity_return is not None else net_return
+    classification_excess_return = opportunity_excess_return if opportunity_excess_return is not None else replay_excess_return
     return {
         "decision_id": str(row.get("decision_id") or row.get("replay_decision_id") or ""),
         "decision_asof_ts": str(row.get("asof_ts") or row.get("timestamp") or row.get("decision_timestamp") or ""),
@@ -877,11 +886,45 @@ def _normalized_decision_variable_row(
         "replay_excess_return": _round_metric(replay_excess_return),
         "replay_cost": _round_metric(cost),
         "replay_cost_adjusted_return": _round_metric(net_return),
-        "replay_opportunity_return": _round_metric(net_return) if disposition in {"skipped", "rejected", "deferred", "blocked"} else None,
+        "replay_opportunity_return": _round_metric(opportunity_return) if opportunity_return is not None else None,
+        "replay_opportunity_excess_return": _round_metric(opportunity_excess_return) if opportunity_excess_return is not None else None,
         "eval_outcome_label": eval_outcome_label,
-        "eval_economic_class": _eval_economic_class(net_return=net_return, excess_return=replay_excess_return),
-        "eval_action_class": _eval_action_class(disposition=disposition, agency=agency, excess_return=replay_excess_return),
+        "eval_economic_class": _eval_economic_class(net_return=classification_net_return, excess_return=classification_excess_return),
+        "eval_action_class": _eval_action_class(disposition=disposition, agency=agency, excess_return=classification_excess_return),
     }
+
+
+def _opportunity_return(
+    row: Mapping[str, Any],
+    *,
+    fallback_net_return: float,
+    cost: float,
+    intended_side: str,
+) -> float:
+    explicit = _first_float(
+        row,
+        "opportunity_return",
+        "candidate_opportunity_return",
+        "missed_opportunity_return",
+        "replay_opportunity_return",
+    )
+    if explicit is not None:
+        return explicit
+
+    option_entry = _first_float(row, "option_entry_price", "selected_option_entry_price")
+    option_exit = _first_float(row, "option_exit_price", "selected_option_exit_price")
+    if option_entry is not None and option_exit is not None and option_entry > 0:
+        return (option_exit - option_entry) / option_entry - cost
+
+    underlying_entry = _first_float(row, "bar_close", "underlying_entry_price", "entry_underlying_price")
+    underlying_exit = _first_float(row, "next_bar_close", "underlying_exit_price", "exit_underlying_price")
+    if underlying_entry is not None and underlying_exit is not None and underlying_entry > 0:
+        gross_return = (underlying_exit - underlying_entry) / underlying_entry
+        if intended_side == "short":
+            gross_return = -gross_return
+        return gross_return - cost
+
+    return fallback_net_return
 
 
 def _decision_instrument_scope(row: Mapping[str, Any]) -> str:
@@ -2492,6 +2535,14 @@ def _first_text(row: Mapping[str, Any], *names: str) -> str:
         if text:
             return text
     return ""
+
+
+def _first_float(row: Mapping[str, Any], *names: str) -> float | None:
+    for name in names:
+        parsed = _finite_float(row.get(name))
+        if parsed is not None:
+            return parsed
+    return None
 
 
 def _normalize_side(value: str) -> str:
