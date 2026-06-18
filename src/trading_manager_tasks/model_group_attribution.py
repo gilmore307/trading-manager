@@ -28,6 +28,7 @@ from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler
 NEW_YORK = ZoneInfo("America/New_York")
 REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE = "post_replay_review_receipt"
 REPLAY_REVIEW_ROW_CONTRACT_TYPE = "post_replay_review_row"
+REPLAY_REVIEW_DATA_REQUIREMENT_CONTRACT_TYPE = "post_replay_review_data_requirement"
 
 
 def run_model_group_replay_review_if_ready(
@@ -61,9 +62,6 @@ def run_model_group_replay_review_if_ready(
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     run_id = "post_replay_review_" + now.strftime("%Y%m%dT%H%M%SZ")
-    output_root = dataset_root / "post_replay_review_runs" / run_id
-    review_rows_path = output_root / "replay_review_rows.jsonl"
-    receipt_path = output_root / "post_replay_review_receipt.json"
     command = [
         python_executable,
         "scripts/tasks/run_model_group_replay_review.py",
@@ -74,6 +72,35 @@ def run_model_group_replay_review_if_ready(
     ]
     if max_review_rows is not None:
         command.extend(["--max-review-rows", str(max_review_rows)])
+    requirements = tuple(_review_data_requirements(decision_rows_path, max_rows=max_review_rows))
+    if requirements:
+        requirements_root = dataset_root / "post_replay_review_requirements" / run_id
+        requirements_path = requirements_root / "replay_review_data_requirements.jsonl"
+        if execute:
+            requirements_root.mkdir(parents=True, exist_ok=True)
+            _write_jsonl(requirements_path, requirements)
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_review_data_required",
+            reason="replay review requires additional replay outcome data before hindsight scoring can be completed",
+            selected_work="model_group.replay_review",
+            command=command,
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "decision_rows_ref": str(decision_rows_path),
+                "requirements_artifact_ref": str(requirements_path) if execute else None,
+                "required_replay_review_data_count": len(requirements),
+                "required_data_kinds": sorted({kind for item in requirements for kind in item["required_data_kinds"]}),
+                "acquisition_routes": sorted({str(item["acquisition_route"]) for item in requirements}),
+                "resume_stage_id": "model_group.replay",
+                "required_next_step": "repair or acquire the required replay outcome data through the replay-owned provider-gated stages, then rerun model_group.replay and model_group.replay_review",
+            },
+        )
+    output_root = dataset_root / "post_replay_review_runs" / run_id
+    review_rows_path = output_root / "replay_review_rows.jsonl"
+    receipt_path = output_root / "post_replay_review_receipt.json"
 
     if not execute:
         return _decision(
@@ -202,13 +229,109 @@ def _build_review_rows(decision_rows_path: Path, *, max_rows: int | None) -> Ite
         yield _review_row(row, decision_index=index, review_index=count)
 
 
+def _review_data_requirements(decision_rows_path: Path, *, max_rows: int | None) -> Iterable[dict[str, Any]]:
+    count = 0
+    for index, row in enumerate(_load_jsonl_objects(decision_rows_path), start=1):
+        if not _replay_row_needs_attribution(row):
+            continue
+        count += 1
+        if max_rows is not None and count > max_rows:
+            break
+        requirement = _review_data_requirement(row, decision_index=index, decision_rows_path=decision_rows_path)
+        if requirement is not None:
+            yield requirement
+
+
+def _review_data_requirement(row: Mapping[str, Any], *, decision_index: int, decision_rows_path: Path) -> dict[str, Any] | None:
+    fill_status = str(row.get("fill_status") or "")
+    decision_status = str(row.get("decision_status") or "")
+    filled = fill_status == "simulated_filled" or decision_status in {"filled", "approved", "executed"}
+    decision_time = _decision_time(row)
+    missing_fields: list[str] = []
+    required_data_kinds: list[str] = []
+    if not _has_material_future_outcome_window(row, decision_time=decision_time):
+        missing_fields.append("future_outcome_window")
+        required_data_kinds.append("replay_outcome_window_materialization")
+    if filled and _filled_realized_return(row) is None:
+        missing_fields.append("realized_return")
+        required_data_kinds.append("replay_realized_return_materialization")
+    if not filled and _opportunity_return(row) is None:
+        missing_fields.append("replay_opportunity_return")
+        required_data_kinds.append("replay_missed_opportunity_return_materialization")
+    if not missing_fields:
+        return None
+    source_id = str(row.get("decision_id") or row.get("replay_decision_id") or f"decision_row_{decision_index}")
+    return {
+        "contract_type": REPLAY_REVIEW_DATA_REQUIREMENT_CONTRACT_TYPE,
+        "stage_id": "model_group.replay_review",
+        "source_decision_id": source_id,
+        "source_decision_index": decision_index,
+        "decision_rows_ref": str(decision_rows_path),
+        "target_symbol": _target_symbol(row),
+        "replay_month": _replay_month(row),
+        "decision_time": decision_time,
+        "fill_status": fill_status,
+        "decision_status": decision_status,
+        "missing_fields": _dedupe_text(missing_fields),
+        "required_data_kinds": _dedupe_text(required_data_kinds),
+        "acquisition_route": _review_data_acquisition_route(row),
+        "selected_option_contract_ref": _first_text(row, ("selected_option_contract_ref", "selected_contract_ref")),
+        "path_conditioning_policy": _path_conditioning_policy(row),
+        "candidate_set_scope": _candidate_set_scope(row),
+        "miss_attribution_layer": _miss_attribution_layer(row, filled=filled),
+    }
+
+
+def _has_material_future_outcome_window(row: Mapping[str, Any], *, decision_time: str | None) -> bool:
+    explicit = _first_text(
+        row,
+        (
+            "future_outcome_window",
+            "outcome_window",
+            "replay_outcome_window",
+            "label_window",
+            "holding_window",
+        ),
+    )
+    if explicit:
+        return True
+    exit_time = _first_text(
+        row,
+        (
+            "exit_time",
+            "next_timestamp",
+            "label_time",
+            "outcome_time",
+            "selected_option_exit_time",
+            "underlying_exit_time",
+        ),
+    )
+    return bool(decision_time and exit_time)
+
+
+def _filled_realized_return(row: Mapping[str, Any]) -> float | None:
+    value = _safe_float(row.get("realized_return"))
+    if value is not None:
+        return value
+    return _opportunity_return(row)
+
+
+def _review_data_acquisition_route(row: Mapping[str, Any]) -> str:
+    selected_contract = _first_text(row, ("selected_option_contract_ref", "selected_contract_ref"))
+    if selected_contract and str(row.get("option_contract_path_status") or "").strip().lower() != "available":
+        return "model_group.replay_contract_paths"
+    if _target_symbol(row):
+        return "model_group.replay_dataset_or_replay_rerun"
+    return "replay_row_contract_repair"
+
+
 def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: int) -> dict[str, Any]:
     fill_status = str(row.get("fill_status") or "")
     decision_status = str(row.get("decision_status") or "")
     outcome_label = _int_field(row, "outcome_label")
-    realized_return = _safe_float(row.get("realized_return"))
-    baseline_return = _safe_float(row.get("baseline_return")) or 0.0
     filled = fill_status == "simulated_filled" or decision_status in {"filled", "approved", "executed"}
+    realized_return = _filled_realized_return(row) if filled else _safe_float(row.get("realized_return"))
+    baseline_return = _safe_float(row.get("baseline_return")) or 0.0
     if filled:
         failure_type = "filled_negative_or_underperforming_outcome"
     else:

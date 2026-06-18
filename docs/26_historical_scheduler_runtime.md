@@ -78,6 +78,19 @@ decision rows. This selected-contract tracking source is provider-gated and
 market-data-only; it writes option path rows for replay settlement, then the
 daemon retries `model_group.replay` from the same lifecycle.
 
+Replay review also participates in the same replay-owned repair loop. Before it
+writes `post_replay_review_receipt`, it checks whether reviewable decision rows
+have enough future outcome and return data to quantify `available_action`,
+`best_available_action_by_future_outcome`, and
+`regret_to_best_available`. If not, it writes
+`replay_review_data_requirements.jsonl` and backs off with
+`model_group_replay_review_data_required`. When those requirements point to
+selected option contract paths, the daemon hands them to
+`model_group.replay_contract_paths` under the existing provider gates; replay
+and replay review are then retried from the same lifecycle. Replay review itself
+does not call providers, mutate broker/account/order state, activate models, or
+expand the point-in-time candidate set.
+
 ## Lock Contract
 
 Schema: `schemas/scheduler_lock.schema.json`.

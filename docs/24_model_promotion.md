@@ -86,6 +86,13 @@ observations or candidates, event-evidence refs, and control/co-event/confounder
 analysis. Evaluation must not treat generic replay review rows as completed
 M06 event attribution.
 
+Replay review must not complete when reviewable rows lack the future outcome or
+return data needed to quantify hindsight grading. In that case it emits
+`post_replay_review_data_requirement` rows under
+`post_replay_review_requirements/.../replay_review_data_requirements.jsonl` and
+backs off. Those requirement rows are acquisition or replay-repair inputs only;
+they are not reviewed failures and they do not satisfy downstream attribution.
+
 The manager-owned historical workflow therefore has two explicit post-replay
 steps before evaluation: first `model_group.replay_review`, then M06 Event Risk
 Governor attribution (`model_group.residual_event_governance`). If replay review is ready but no reviewed

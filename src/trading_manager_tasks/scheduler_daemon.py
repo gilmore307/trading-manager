@@ -26,6 +26,7 @@ from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH
 from .model_group_attribution import run_model_group_replay_review_if_ready
 from .model_group_evaluation import run_model_group_evaluation_if_ready
 from .model_group_residual_event_governance import run_model_group_residual_event_governance_if_ready
+from .model_group_replay_contract_paths import run_model_group_replay_contract_paths
 from .model_group_replay_option_features import run_model_group_replay_option_features_for_replay_backoff
 from .model_group_replay_dataset import run_model_group_replay_dataset_if_ready
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_replay_if_ready
@@ -1520,6 +1521,32 @@ def handle_replay_option_feature_failure(
     )
 
 
+def _run_replay_review_data_requirement_handoff(
+    replay_review_decision: SchedulerDecision,
+    *,
+    storage_root: Path,
+    execute: bool,
+    execute_provider_acquisition: bool,
+    limit: int | None,
+) -> SchedulerDecision | None:
+    if replay_review_decision.reason_code != "model_group_replay_review_data_required":
+        return None
+    summary = replay_review_decision.execution_summary or {}
+    routes = {str(route) for route in summary.get("acquisition_routes") or ()}
+    if "model_group.replay_contract_paths" not in routes:
+        return None
+    decision_rows_ref = str(summary.get("decision_rows_ref") or "").strip()
+    if not decision_rows_ref:
+        return None
+    return run_model_group_replay_contract_paths(
+        decision_rows_ref=Path(decision_rows_ref),
+        storage_root=storage_root,
+        execute=execute,
+        execute_provider_acquisition=execute_provider_acquisition,
+        limit=limit,
+    )
+
+
 def refresh_dashboard_read_models(
     *,
     enabled: bool,
@@ -2005,6 +2032,33 @@ def run_daemon_loop(
                                 row["worker_id"] = "replay_review_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                            replay_review_data_decision = _run_replay_review_data_requirement_handoff(
+                                replay_review_decision,
+                                storage_root=storage_root,
+                                execute=execute_model_group_attribution,
+                                execute_provider_acquisition=execute_autonomous_provider_stages,
+                                limit=provider_stage_next_limit,
+                            )
+                            if replay_review_data_decision is not None:
+                                append_decision_log(decision_log_path, replay_review_data_decision)
+                                completed = utc_now_iso()
+                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_review_data_decision)
+                                state = replace(
+                                    state,
+                                    start_month=active_start_month,
+                                    end_month=active_end_month,
+                                    last_next_internal_stage="replay_review_data_requirement",
+                                    last_work_selection_reason="model_group_replay_review_data_required",
+                                    updated_utc=completed,
+                                )
+                                refresh_needed = refresh_needed or replay_review_data_decision.decision_status == "executed"
+                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_review_data_decision, advanced_month=False)
+                                decisions_this_cycle += 1
+                                if output is not None:
+                                    row = replay_review_data_decision.summary_row()
+                                    row["worker_id"] = "replay_review_data_worker_1"
+                                    output.write(json.dumps(row, sort_keys=True) + "\n")
+                                    output.flush()
                         residual_event_governance_decision = run_model_group_residual_event_governance_if_ready(
                             storage_root=storage_root,
                             execute=execute_model_group_attribution,
@@ -2215,6 +2269,25 @@ def run_daemon_loop(
                                 row["worker_id"] = "replay_review_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                            replay_review_data_decision = _run_replay_review_data_requirement_handoff(
+                                replay_review_decision,
+                                storage_root=storage_root,
+                                execute=execute_model_group_attribution,
+                                execute_provider_acquisition=execute_autonomous_provider_stages,
+                                limit=provider_stage_next_limit,
+                            )
+                            if replay_review_data_decision is not None:
+                                append_decision_log(decision_log_path, replay_review_data_decision)
+                                completed = utc_now_iso()
+                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_review_data_decision)
+                                refresh_needed = refresh_needed or replay_review_data_decision.decision_status == "executed"
+                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_review_data_decision, advanced_month=False)
+                                decisions_this_cycle += 1
+                                if output is not None:
+                                    row = replay_review_data_decision.summary_row()
+                                    row["worker_id"] = "replay_review_data_worker_1"
+                                    output.write(json.dumps(row, sort_keys=True) + "\n")
+                                    output.flush()
                         residual_event_governance_decision = run_model_group_residual_event_governance_if_ready(
                             storage_root=storage_root,
                             execute=execute_model_group_attribution,

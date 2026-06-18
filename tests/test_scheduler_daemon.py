@@ -42,6 +42,7 @@ from trading_manager_tasks.scheduler_daemon import (
     update_state_from_error,
     write_daemon_state,
     _run_model_worker_decision,
+    _run_replay_review_data_requirement_handoff,
 )
 
 
@@ -405,6 +406,58 @@ class SchedulerDaemonTests(unittest.TestCase):
             "replay option source/feature repair failed for emitted signal AAPL 2021-03-05T16:00:00-05:00",
         )
         self.assertIn("manager_request:mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930", call["evidence_refs"])
+
+    def test_replay_review_data_requirement_routes_selected_contract_paths(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            decision_rows = root / "decision_rows.jsonl"
+            decision_rows.write_text(
+                json.dumps(
+                    {
+                        "decision_id": "ed_1",
+                        "target_ref": "AAPL",
+                        "selected_option_contract_ref": "AAPL_2021-07-09_C_142",
+                        "option_contract_path_status": "missing",
+                        "replay_time_pointer": "2021-07-06T16:00:00-04:00",
+                        "next_timestamp": "2021-07-07T16:00:00-04:00",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            review_decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-06-18T00:00:00+00:00",
+                now_et="2026-06-17T20:00:00-04:00",
+                decision_status="backoff",
+                reason_code="model_group_replay_review_data_required",
+                reason="missing replay review data",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work="model_group.replay_review",
+                command=[],
+                next_internal_stage="replay_review",
+                execution_summary={
+                    "decision_rows_ref": str(decision_rows),
+                    "acquisition_routes": ["model_group.replay_contract_paths"],
+                },
+            )
+
+            decision = _run_replay_review_data_requirement_handoff(
+                review_decision,
+                storage_root=root / "storage" / "02_control_plane",
+                execute=True,
+                execute_provider_acquisition=False,
+                limit=None,
+            )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "model_group_replay_contract_path_provider_required")
+        self.assertEqual(decision.selected_work, "model_group.replay_contract_paths")
+        self.assertEqual(decision.provider_calls, 0)
+        self.assertEqual((decision.execution_summary or {})["resume_stage_id"], "model_group.replay")
 
     def test_lock_prevents_duplicate_daemon_instance(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

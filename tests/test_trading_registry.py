@@ -624,6 +624,13 @@ class RegistryHelperTests(unittest.TestCase):
         review_row = rows["MANAGER_REPLAY_REVIEW_ROW"]
         self.assertEqual(review_row["payload"], "post_replay_review_row")
 
+        review_requirement = rows["MANAGER_REPLAY_REVIEW_DATA_REQUIREMENT"]
+        self.assertEqual(review_requirement["kind"], "artifact_type")
+        self.assertEqual(review_requirement["payload"], "post_replay_review_data_requirement")
+        self.assertIn("replay_review_data_requirements.jsonl", review_requirement["applies_to"])
+        self.assertIn("model_group.replay_contract_paths", review_requirement["applies_to"])
+        self.assertIn("future outcome or return data", review_requirement["note"])
+
         available_action = rows["MANAGER_REPLAY_REVIEW_AVAILABLE_ACTION"]
         self.assertEqual(available_action["kind"], "field")
         self.assertEqual(available_action["payload"], "available_action")

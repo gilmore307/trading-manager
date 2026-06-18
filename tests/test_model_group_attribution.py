@@ -59,6 +59,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "outcome_label": 0,
                             "timestamp": "2021-01-05T11:00:00-05:00",
                             "impact_exposure_time": "2021-01-05T10:10:00-05:00",
+                            "future_outcome_window": "2021-01-05T11:00:00-05:00->2021-01-05T16:00:00-05:00",
+                            "realized_return": -0.01,
                             "target_expected_move_abs_return": 0.02,
                         }
                     ),
@@ -171,6 +173,48 @@ class ModelGroupAttributionTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "ready")
             self.assertEqual(decision.reason_code, "model_group_replay_review_ready")
+            self.assertFalse((dataset_root / "post_replay_review_runs").exists())
+
+    def test_missing_replay_review_outcome_data_writes_requirement_artifact(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+            decision_rows_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
+            rows = [
+                json.loads(line)
+                for line in decision_rows_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            for row in rows:
+                if row["decision_id"] == "rejected_winner":
+                    row.pop("replay_opportunity_return", None)
+                    row["selected_option_contract_ref"] = "AAPL_2021-02-05_C_140"
+                    row["option_contract_path_status"] = "missing"
+            decision_rows_path.write_text("\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n", encoding="utf-8")
+
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_review_data_required")
+            summary = decision.execution_summary or {}
+            self.assertEqual(summary["required_replay_review_data_count"], 1)
+            self.assertIn("replay_missed_opportunity_return_materialization", summary["required_data_kinds"])
+            self.assertEqual(summary["acquisition_routes"], ["model_group.replay_contract_paths"])
+            requirements_path = Path(summary["requirements_artifact_ref"])
+            requirements = [
+                json.loads(line)
+                for line in requirements_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(len(requirements), 1)
+            self.assertEqual(requirements[0]["contract_type"], "post_replay_review_data_requirement")
+            self.assertEqual(requirements[0]["source_decision_id"], "rejected_winner")
+            self.assertIn("replay_opportunity_return", requirements[0]["missing_fields"])
+            self.assertEqual(requirements[0]["acquisition_route"], "model_group.replay_contract_paths")
             self.assertFalse((dataset_root / "post_replay_review_runs").exists())
 
     def test_bounded_replay_receipt_does_not_unlock_replay_review(self):
@@ -323,7 +367,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(rows[0]["impact_exposure_time"], "2021-01-05T10:10:00-05:00")
             self.assertEqual(rows[0]["impact_onset_basis"], "source_impact_clock")
             self.assertEqual(rows[0]["impact_search_window_end"], "2021-01-05T10:10:00-05:00")
-            self.assertEqual(rows[0]["impact_normalized_severity_score"], 0.0)
+            self.assertEqual(rows[0]["impact_normalized_severity_score"], 0.5)
             self.assertEqual(receipt["event_focus_proposal_count"], 1)
             self.assertFalse(receipt["accepted_event_pool_mutation_performed"])
             self.assertTrue(receipt["temporal_attention_pool_mutation_performed"])
