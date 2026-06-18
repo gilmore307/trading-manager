@@ -13,6 +13,8 @@ from __future__ import annotations
 import csv
 import json
 import sys
+from collections.abc import Iterable as IterableABC
+from collections.abc import Mapping as MappingABC
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -223,6 +225,26 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
     source_id = str(row.get("decision_id") or row.get("replay_decision_id") or f"decision_row_{decision_index}")
     decision_time = _decision_time(row)
     impact_profile = _impact_profile(row, failure_type=failure_type, decision_time=decision_time)
+    opportunity_return = _opportunity_return(row)
+    available_actions = _available_actions(row, filled=filled, opportunity_return=opportunity_return)
+    chosen_action = _chosen_action(row, filled=filled)
+    best_available_action = _best_available_action_by_future_outcome(
+        row,
+        filled=filled,
+        available_actions=available_actions,
+        chosen_action=chosen_action,
+        realized_return=realized_return,
+        baseline_return=baseline_return,
+        opportunity_return=opportunity_return,
+    )
+    regret_to_best_available = _regret_to_best_available(
+        filled=filled,
+        chosen_action=chosen_action,
+        best_available_action=best_available_action,
+        realized_return=realized_return,
+        baseline_return=baseline_return,
+        opportunity_return=opportunity_return,
+    )
     return {
         "contract_type": REPLAY_REVIEW_ROW_CONTRACT_TYPE,
         "stage_id": "model_group.replay_review",
@@ -247,6 +269,10 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
         "eligibility_ledger_status": "reviewable_from_replay_row",
         "decision_ledger_status": "reviewable_from_replay_row",
         "outcome_ledger_status": "reviewable_from_replay_row",
+        "available_action": available_actions,
+        "future_outcome_window": _future_outcome_window(row, decision_time=decision_time),
+        "best_available_action_by_future_outcome": best_available_action,
+        "regret_to_best_available": regret_to_best_available,
         "path_conditioning_policy": _path_conditioning_policy(row),
         "path_scope": path_scope,
         "candidate_set_scope": candidate_set_scope,
@@ -265,6 +291,208 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
             else "path-conditioned non-taken decision missed a positive next outcome"
         ),
     }
+
+
+def _available_actions(row: Mapping[str, Any], *, filled: bool, opportunity_return: float | None) -> list[str]:
+    explicit = _explicit_available_actions(row)
+    if explicit:
+        return explicit
+    chosen_action = _chosen_action(row, filled=filled)
+    actions = [chosen_action]
+    if filled:
+        if _safe_float(row.get("baseline_return")) is not None:
+            actions.append("baseline_action")
+    elif opportunity_return is not None and _miss_review_scope(
+        filled=False,
+        path_conditioning_policy=_path_conditioning_policy(row),
+        candidate_set_scope=_candidate_set_scope(row),
+        miss_attribution_layer=_miss_attribution_layer(row, filled=False),
+    ) == "path_conditioned_current_scope":
+        actions.append("path_conditioned_take_opportunity")
+    return _dedupe_text(actions)
+
+
+def _explicit_available_actions(row: Mapping[str, Any]) -> list[str]:
+    for key in (
+        "available_action",
+        "available_actions",
+        "available_action_set",
+        "replay_available_action",
+        "replay_available_actions",
+        "point_in_time_available_action",
+        "point_in_time_available_actions",
+    ):
+        value = row.get(key)
+        actions = _normalize_action_list(value)
+        if actions:
+            return actions
+    return []
+
+
+def _normalize_action_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                return [text]
+            return _normalize_action_list(parsed)
+        if "," in text:
+            return _dedupe_text(part.strip() for part in text.split(","))
+        return [text]
+    if isinstance(value, MappingABC):
+        return [json.dumps(value, sort_keys=True)]
+    if isinstance(value, IterableABC):
+        normalized: list[str] = []
+        for item in value:
+            if isinstance(item, MappingABC):
+                normalized.append(json.dumps(item, sort_keys=True))
+            else:
+                text = str(item).strip()
+                if text:
+                    normalized.append(text)
+        return _dedupe_text(normalized)
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _dedupe_text(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        text = str(value).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        deduped.append(text)
+    return deduped
+
+
+def _chosen_action(row: Mapping[str, Any], *, filled: bool) -> str:
+    explicit = _first_text(
+        row,
+        (
+            "chosen_action",
+            "decision_action",
+            "action",
+            "selected_action",
+            "recommended_action",
+            "order_action",
+            "decision_disposition",
+        ),
+    )
+    if explicit:
+        return explicit
+    return "take_trade" if filled else "reject_or_no_trade"
+
+
+def _future_outcome_window(row: Mapping[str, Any], *, decision_time: str | None) -> str | None:
+    explicit = _first_text(
+        row,
+        (
+            "future_outcome_window",
+            "outcome_window",
+            "replay_outcome_window",
+            "label_window",
+            "holding_window",
+        ),
+    )
+    if explicit:
+        return explicit
+    exit_time = _first_text(
+        row,
+        (
+            "exit_time",
+            "next_timestamp",
+            "label_time",
+            "outcome_time",
+            "selected_option_exit_time",
+            "underlying_exit_time",
+        ),
+    )
+    if decision_time and exit_time:
+        return f"{decision_time}->{exit_time}"
+    return "replay_future_outcome_label"
+
+
+def _best_available_action_by_future_outcome(
+    row: Mapping[str, Any],
+    *,
+    filled: bool,
+    available_actions: list[str],
+    chosen_action: str,
+    realized_return: float | None,
+    baseline_return: float,
+    opportunity_return: float | None,
+) -> str:
+    explicit = _first_text(row, ("best_available_action_by_future_outcome", "best_available_action", "replay_best_available_action"))
+    if explicit and explicit in available_actions:
+        return explicit
+    if filled and "baseline_action" in available_actions and realized_return is not None and baseline_return > realized_return:
+        return "baseline_action"
+    if not filled and "path_conditioned_take_opportunity" in available_actions and opportunity_return is not None and opportunity_return > baseline_return:
+        return "path_conditioned_take_opportunity"
+    return chosen_action
+
+
+def _regret_to_best_available(
+    *,
+    filled: bool,
+    chosen_action: str,
+    best_available_action: str,
+    realized_return: float | None,
+    baseline_return: float,
+    opportunity_return: float | None,
+) -> float | None:
+    if best_available_action == chosen_action:
+        return 0.0
+    if filled:
+        if realized_return is None:
+            return None
+        return _round_metric(max(0.0, baseline_return - realized_return))
+    if opportunity_return is None:
+        return None
+    return _round_metric(max(0.0, opportunity_return - baseline_return))
+
+
+def _opportunity_return(row: Mapping[str, Any]) -> float | None:
+    explicit = _first_float(
+        row,
+        (
+            "opportunity_return",
+            "candidate_opportunity_return",
+            "missed_opportunity_return",
+            "replay_opportunity_return",
+        ),
+    )
+    if explicit is not None:
+        return explicit
+    option_entry = _first_float(row, ("option_entry_price", "selected_option_entry_price"))
+    option_exit = _first_float(row, ("option_exit_price", "selected_option_exit_price"))
+    if option_entry is not None and option_exit is not None and option_entry > 0:
+        return (option_exit - option_entry) / option_entry
+    underlying_entry = _first_float(row, ("bar_close", "underlying_entry_price", "entry_underlying_price"))
+    underlying_exit = _first_float(row, ("next_bar_close", "underlying_exit_price", "exit_underlying_price"))
+    if underlying_entry is not None and underlying_exit is not None and underlying_entry > 0:
+        return (underlying_exit - underlying_entry) / underlying_entry
+    return _safe_float(row.get("realized_return"))
+
+
+def _first_float(row: Mapping[str, Any], keys: tuple[str, ...]) -> float | None:
+    for key in keys:
+        value = _safe_float(row.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def _round_metric(value: float) -> float:
+    return round(value, 10)
 
 
 def _impact_profile(row: Mapping[str, Any], *, failure_type: str, decision_time: str | None) -> dict[str, Any]:

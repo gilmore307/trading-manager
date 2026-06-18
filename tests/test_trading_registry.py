@@ -632,6 +632,25 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("hindsight grading", available_action["note"])
         self.assertIn("must not expand this set", available_action["note"])
 
+        future_window = rows["MANAGER_REPLAY_REVIEW_FUTURE_OUTCOME_WINDOW"]
+        self.assertEqual(future_window["kind"], "field")
+        self.assertEqual(future_window["payload"], "future_outcome_window")
+        self.assertIn("post_replay_review_row", future_window["applies_to"])
+        self.assertIn("hindsight_grading", future_window["applies_to"])
+        self.assertIn("future outcome window", future_window["note"])
+
+        best_available = rows["MANAGER_REPLAY_REVIEW_BEST_AVAILABLE_ACTION_BY_FUTURE_OUTCOME"]
+        self.assertEqual(best_available["kind"], "field")
+        self.assertEqual(best_available["payload"], "best_available_action_by_future_outcome")
+        self.assertIn("post_replay_review_row", best_available["applies_to"])
+        self.assertIn("point-in-time available_action set", best_available["note"])
+
+        regret = rows["MANAGER_REPLAY_REVIEW_REGRET_TO_BEST_AVAILABLE"]
+        self.assertEqual(regret["kind"], "field")
+        self.assertEqual(regret["payload"], "regret_to_best_available")
+        self.assertIn("post_replay_review_row", regret["applies_to"])
+        self.assertIn("best available action", regret["note"])
+
         decision_variable_policy = rows["MANAGER_MODEL_GROUP_DECISION_VARIABLE_SCHEMA_POLICY"]
         self.assertIn("unfilled_decisions_use_replay_opportunity_return", decision_variable_policy["payload"])
         self.assertIn("missed_opportunity_return", decision_variable_policy["payload"])

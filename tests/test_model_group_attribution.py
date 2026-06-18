@@ -62,8 +62,27 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "target_expected_move_abs_return": 0.02,
                         }
                     ),
-                    json.dumps({"decision_id": "filled_under_baseline", "decision_status": "approved", "outcome_label": 1, "realized_return": 0.01, "baseline_return": 0.02, "month": "2021-01"}),
-                    json.dumps({"decision_id": "rejected_winner", "decision_status": "rejected", "outcome_label": 1, "month": "2021-02"}),
+                    json.dumps(
+                        {
+                            "decision_id": "filled_under_baseline",
+                            "decision_status": "approved",
+                            "outcome_label": 1,
+                            "realized_return": 0.01,
+                            "baseline_return": 0.02,
+                            "month": "2021-01",
+                            "future_outcome_window": "2021-01-06T10:00:00-05:00->2021-01-06T16:00:00-05:00",
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "decision_id": "rejected_winner",
+                            "decision_status": "rejected",
+                            "outcome_label": 1,
+                            "month": "2021-02",
+                            "future_outcome_window": "2021-02-03T10:00:00-05:00->2021-02-03T16:00:00-05:00",
+                            "replay_opportunity_return": 0.05,
+                        }
+                    ),
                     json.dumps(
                         {
                             "decision_id": "global_hindsight_winner",
@@ -127,6 +146,14 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(rows[0]["contract_type"], "post_replay_review_row")
             self.assertEqual(rows[0]["replay_month"], "2021-01")
             self.assertEqual(rows[0]["target_symbol"], "BTC")
+            self.assertEqual(rows[1]["available_action"], ["take_trade", "baseline_action"])
+            self.assertEqual(rows[1]["future_outcome_window"], "2021-01-06T10:00:00-05:00->2021-01-06T16:00:00-05:00")
+            self.assertEqual(rows[1]["best_available_action_by_future_outcome"], "baseline_action")
+            self.assertEqual(rows[1]["regret_to_best_available"], 0.01)
+            self.assertEqual(rows[2]["available_action"], ["reject_or_no_trade", "path_conditioned_take_opportunity"])
+            self.assertEqual(rows[2]["future_outcome_window"], "2021-02-03T10:00:00-05:00->2021-02-03T16:00:00-05:00")
+            self.assertEqual(rows[2]["best_available_action_by_future_outcome"], "path_conditioned_take_opportunity")
+            self.assertEqual(rows[2]["regret_to_best_available"], 0.05)
             self.assertEqual(rows[2]["path_conditioning_policy"], "upstream_selected_path_only")
             self.assertEqual(rows[2]["miss_review_scope"], "path_conditioned_current_scope")
             self.assertEqual(rows[2]["candidate_set_scope"], "selected_path_current_decision_set")
