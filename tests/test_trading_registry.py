@@ -654,6 +654,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("hindsight grading", available_action["note"])
         self.assertIn("must not expand this set", available_action["note"])
 
+        no_trade_action_policy = rows["MANAGER_REPLAY_REVIEW_NO_TRADE_ACTION_RETURN_POLICY"]
+        self.assertEqual(no_trade_action_policy["kind"], "config")
+        self.assertIn("no_trade_actions=reject_or_no_trade|no_trade|hold_cash|baseline_no_trade", no_trade_action_policy["payload"])
+        self.assertIn("reject_prefix_treated_as_no_trade", no_trade_action_policy["payload"])
+        self.assertIn("chosen_action_return", no_trade_action_policy["applies_to"])
+        self.assertIn("reject_entry_thesis", no_trade_action_policy["note"])
+        self.assertIn("baseline/no-trade", no_trade_action_policy["note"])
+
         future_window = rows["MANAGER_REPLAY_REVIEW_FUTURE_OUTCOME_WINDOW"]
         self.assertEqual(future_window["kind"], "field")
         self.assertEqual(future_window["payload"], "future_outcome_window")
