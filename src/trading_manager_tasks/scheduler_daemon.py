@@ -27,7 +27,11 @@ from .model_group_attribution import run_model_group_replay_review_if_ready
 from .model_group_evaluation import run_model_group_evaluation_if_ready
 from .model_group_residual_event_governance import run_model_group_residual_event_governance_if_ready
 from .model_group_replay_contract_paths import run_model_group_replay_contract_paths
-from .model_group_replay_option_features import run_model_group_replay_option_features_for_replay_backoff
+from .model_group_replay_option_features import (
+    latest_replay_option_feature_requirements_artifact,
+    replay_option_feature_backoff_for_requirements_artifact,
+    run_model_group_replay_option_features_for_replay_backoff,
+)
 from .model_group_replay_dataset import run_model_group_replay_dataset_if_ready
 from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_replay_if_ready
 from .model_training_state import advance_workflow_state
@@ -59,6 +63,7 @@ DEFAULT_INTERVAL_SECONDS = 300.0
 DEFAULT_STALE_LOCK_SECONDS = 6 * 60 * 60
 DEFAULT_DRAIN_MAX_STEPS = 50
 DEFAULT_DRAIN_MAX_SECONDS = 300.0
+DEFAULT_REPLAY_OPTION_FEATURE_REPAIR_LIMIT = 5000
 DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT = "trading-storage-dashboard-read-model-refresh.service"
 DEFAULT_SCHEDULER_PROGRESS_STALL_SECONDS = 60 * 10
 WORKFLOW_STATE_GLOB = "model_training_workflow_state_*.json"
@@ -1601,6 +1606,52 @@ def _decision_should_continue_drain(decision: SchedulerDecision, *, advanced_mon
     return False
 
 
+def _drain_replay_option_feature_backoff(
+    replay_decision: SchedulerDecision,
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+    execute: bool,
+    execute_provider_acquisition: bool,
+    provider_acquisition_limit: int,
+    feature_repair_limit: int,
+    max_steps: int,
+    max_seconds: float,
+) -> list[SchedulerDecision]:
+    decisions: list[SchedulerDecision] = []
+    started = time.monotonic()
+    for _ in range(max(1, max_steps)):
+        decision = run_model_group_replay_option_features_for_replay_backoff(
+            replay_decision,
+            storage_root=storage_root,
+            selected_target_symbol=selected_target_symbol,
+            execute=execute,
+            execute_provider_acquisition=execute_provider_acquisition,
+            provider_acquisition_limit=provider_acquisition_limit,
+            feature_repair_limit=feature_repair_limit,
+        )
+        if decision is None:
+            break
+        decisions.append(decision)
+        if decision.decision_status != "executed":
+            break
+        if decision.reason_code == "model_group_replay_option_features_already_ready":
+            break
+        if max_seconds > 0 and time.monotonic() - started >= max_seconds:
+            break
+    return decisions
+
+
+def _pending_replay_option_feature_backoff_decision(*, storage_root: Path) -> SchedulerDecision | None:
+    artifact = latest_replay_option_feature_requirements_artifact(
+        storage_root=storage_root,
+        contract_id=DEFAULT_REPLAY_CONTRACT_ID,
+    )
+    if artifact is None:
+        return None
+    return replay_option_feature_backoff_for_requirements_artifact(artifact)
+
+
 def update_state_from_error(
     state: SchedulerDaemonState,
     *,
@@ -1721,6 +1772,7 @@ def run_daemon_loop(
     execute_autonomous_provider_stages: bool = False,
     provider_stage_next_limit: int = 5,
     provider_stage_max_workers: int = 4,
+    replay_option_feature_repair_limit: int = DEFAULT_REPLAY_OPTION_FEATURE_REPAIR_LIMIT,
     month_ingest_workers: int = 1,
     selected_target_symbol: str | None = None,
     target_queue_path: Path = DEFAULT_TARGET_QUEUE_PATH,
@@ -1950,10 +2002,58 @@ def run_daemon_loop(
                                 row["worker_id"] = "replay_dataset_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                        replay_decision = run_model_group_replay_if_ready(
-                            storage_root=storage_root,
-                            selected_target_symbol=selected_target_symbol,
-                            execute=execute_model_group_replay,
+                        pending_replay_option_backoff = _pending_replay_option_feature_backoff_decision(storage_root=storage_root)
+                        retry_replay_after_pending_option_drain = True
+                        if pending_replay_option_backoff is not None:
+                            replay_option_feature_decisions = _drain_replay_option_feature_backoff(
+                                pending_replay_option_backoff,
+                                storage_root=storage_root,
+                                selected_target_symbol=selected_target_symbol,
+                                execute=execute_model_group_replay,
+                                execute_provider_acquisition=execute_autonomous_provider_stages,
+                                provider_acquisition_limit=provider_stage_next_limit,
+                                feature_repair_limit=replay_option_feature_repair_limit,
+                                max_steps=drain_max_steps,
+                                max_seconds=drain_max_seconds,
+                            )
+                            for replay_option_feature_decision in replay_option_feature_decisions:
+                                append_decision_log(decision_log_path, replay_option_feature_decision)
+                                completed = utc_now_iso()
+                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_option_feature_decision)
+                                state = replace(
+                                    state,
+                                    start_month=active_start_month,
+                                    end_month=active_end_month,
+                                    last_next_internal_stage="model_group_replay_option_features",
+                                    last_work_selection_reason="model_group_replay_option_feature_repair_ready",
+                                    updated_utc=completed,
+                                )
+                                refresh_needed = refresh_needed or replay_option_feature_decision.decision_status == "executed"
+                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_option_feature_decision, advanced_month=False)
+                                decisions_this_cycle += 1
+                                if output is not None:
+                                    row = replay_option_feature_decision.summary_row()
+                                    row["worker_id"] = "replay_option_feature_worker_1"
+                                    output.write(json.dumps(row, sort_keys=True) + "\n")
+                                    output.flush()
+                                handle_replay_option_feature_failure(
+                                    replay_option_feature_decision,
+                                    storage_root=storage_root,
+                                    decision_log_path=decision_log_path,
+                                )
+                            if replay_option_feature_decisions:
+                                retry_replay_after_pending_option_drain = (
+                                    replay_option_feature_decisions[-1].reason_code
+                                    == "model_group_replay_option_features_already_ready"
+                                )
+                        replay_decision = (
+                            run_model_group_replay_if_ready(
+                                storage_root=storage_root,
+                                selected_target_symbol=selected_target_symbol,
+                                execute=execute_model_group_replay,
+                            )
+                            if retry_replay_after_pending_option_drain
+                            else None
                         )
                         if replay_decision is not None:
                             append_decision_log(decision_log_path, replay_decision)
@@ -1975,15 +2075,18 @@ def run_daemon_loop(
                                 row["worker_id"] = "evaluation_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                            replay_option_feature_decision = run_model_group_replay_option_features_for_replay_backoff(
+                            replay_option_feature_decisions = _drain_replay_option_feature_backoff(
                                 replay_decision,
                                 storage_root=storage_root,
                                 selected_target_symbol=selected_target_symbol,
                                 execute=execute_model_group_replay,
                                 execute_provider_acquisition=execute_autonomous_provider_stages,
                                 provider_acquisition_limit=provider_stage_next_limit,
+                                feature_repair_limit=replay_option_feature_repair_limit,
+                                max_steps=drain_max_steps,
+                                max_seconds=drain_max_seconds,
                             )
-                            if replay_option_feature_decision is not None:
+                            for replay_option_feature_decision in replay_option_feature_decisions:
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
                                 completed = utc_now_iso()
                                 state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_option_feature_decision)
@@ -2211,10 +2314,50 @@ def run_daemon_loop(
                                 row["worker_id"] = "replay_dataset_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                        replay_decision = run_model_group_replay_if_ready(
-                            storage_root=storage_root,
-                            selected_target_symbol=selected_target_symbol,
-                            execute=execute_model_group_replay,
+                        pending_replay_option_backoff = _pending_replay_option_feature_backoff_decision(storage_root=storage_root)
+                        retry_replay_after_pending_option_drain = True
+                        if pending_replay_option_backoff is not None:
+                            replay_option_feature_decisions = _drain_replay_option_feature_backoff(
+                                pending_replay_option_backoff,
+                                storage_root=storage_root,
+                                selected_target_symbol=selected_target_symbol,
+                                execute=execute_model_group_replay,
+                                execute_provider_acquisition=execute_autonomous_provider_stages,
+                                provider_acquisition_limit=provider_stage_next_limit,
+                                feature_repair_limit=replay_option_feature_repair_limit,
+                                max_steps=drain_max_steps,
+                                max_seconds=drain_max_seconds,
+                            )
+                            for replay_option_feature_decision in replay_option_feature_decisions:
+                                append_decision_log(decision_log_path, replay_option_feature_decision)
+                                completed = utc_now_iso()
+                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_option_feature_decision)
+                                refresh_needed = refresh_needed or replay_option_feature_decision.decision_status == "executed"
+                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_option_feature_decision, advanced_month=False)
+                                decisions_this_cycle += 1
+                                if output is not None:
+                                    row = replay_option_feature_decision.summary_row()
+                                    row["worker_id"] = "replay_option_feature_worker_1"
+                                    output.write(json.dumps(row, sort_keys=True) + "\n")
+                                    output.flush()
+                                handle_replay_option_feature_failure(
+                                    replay_option_feature_decision,
+                                    storage_root=storage_root,
+                                    decision_log_path=decision_log_path,
+                                )
+                            if replay_option_feature_decisions:
+                                retry_replay_after_pending_option_drain = (
+                                    replay_option_feature_decisions[-1].reason_code
+                                    == "model_group_replay_option_features_already_ready"
+                                )
+                        replay_decision = (
+                            run_model_group_replay_if_ready(
+                                storage_root=storage_root,
+                                selected_target_symbol=selected_target_symbol,
+                                execute=execute_model_group_replay,
+                            )
+                            if retry_replay_after_pending_option_drain
+                            else None
                         )
                         if replay_decision is not None:
                             append_decision_log(decision_log_path, replay_decision)
@@ -2228,15 +2371,18 @@ def run_daemon_loop(
                                 row["worker_id"] = "evaluation_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                            replay_option_feature_decision = run_model_group_replay_option_features_for_replay_backoff(
+                            replay_option_feature_decisions = _drain_replay_option_feature_backoff(
                                 replay_decision,
                                 storage_root=storage_root,
                                 selected_target_symbol=selected_target_symbol,
                                 execute=execute_model_group_replay,
                                 execute_provider_acquisition=execute_autonomous_provider_stages,
                                 provider_acquisition_limit=provider_stage_next_limit,
+                                feature_repair_limit=replay_option_feature_repair_limit,
+                                max_steps=drain_max_steps,
+                                max_seconds=drain_max_seconds,
                             )
-                            if replay_option_feature_decision is not None:
+                            for replay_option_feature_decision in replay_option_feature_decisions:
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
                                 completed = utc_now_iso()
                                 state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_option_feature_decision)
@@ -2390,6 +2536,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Allow one bounded autonomous provider-dispatch/reconcile slice per tick when provider acquisition is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one daemon tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one daemon tick.")
+    parser.add_argument(
+        "--replay-option-feature-repair-limit",
+        type=int,
+        default=DEFAULT_REPLAY_OPTION_FEATURE_REPAIR_LIMIT,
+        help="Maximum local replay option-feature requirements to repair per drain batch. Provider calls still use --provider-stage-next-limit.",
+    )
     parser.add_argument("--month-ingest-workers", type=int, default=DEFAULT_MONTH_INGEST_WORKERS, help="Compatibility option retained for older service env files; historical runtime advances one month at a time.")
     parser.add_argument("--target-symbol", help="Required task-scope target symbol for M03+ six-month dataset units.")
     parser.add_argument("--target-queue-path", type=Path, default=DEFAULT_TARGET_QUEUE_PATH, help="Ordered JSON target queue used when --target-symbol is omitted.")
@@ -2435,6 +2587,7 @@ def main(argv: list[str] | None = None) -> int:
         execute_autonomous_provider_stages=args.execute_autonomous_provider_stages,
         provider_stage_next_limit=args.provider_stage_next_limit,
         provider_stage_max_workers=args.provider_stage_max_workers,
+        replay_option_feature_repair_limit=args.replay_option_feature_repair_limit,
         month_ingest_workers=args.month_ingest_workers,
         selected_target_symbol=args.target_symbol,
         target_queue_path=args.target_queue_path,
@@ -2464,6 +2617,7 @@ __all__ = [
     "DEFAULT_DECISION_LOG_PATH",
     "DEFAULT_DRAIN_MAX_SECONDS",
     "DEFAULT_DRAIN_MAX_STEPS",
+    "DEFAULT_REPLAY_OPTION_FEATURE_REPAIR_LIMIT",
     "DEFAULT_INTERVAL_SECONDS",
     "DEFAULT_LOCK_PATH",
     "DEFAULT_RUNTIME_DIR",

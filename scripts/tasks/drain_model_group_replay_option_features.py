@@ -28,6 +28,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--contract-id", default=DEFAULT_REPLAY_CONTRACT_ID)
     parser.add_argument("--target-symbol")
     parser.add_argument("--batch-size", type=int, default=100)
+    parser.add_argument(
+        "--feature-repair-limit",
+        type=int,
+        help="Maximum local feature requirements to repair per batch. Defaults to --batch-size.",
+    )
     parser.add_argument("--max-batches", type=int)
     parser.add_argument("--sleep-seconds", type=float, default=0.0)
     parser.add_argument("--status-jsonl", type=Path)
@@ -38,6 +43,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.batch_size <= 0:
         parser.error("--batch-size must be positive")
+    if args.feature_repair_limit is not None and args.feature_repair_limit <= 0:
+        parser.error("--feature-repair-limit must be positive when provided")
     if args.max_batches is not None and args.max_batches <= 0:
         parser.error("--max-batches must be positive when provided")
     if not args.requirements_artifact_ref.exists():
@@ -67,6 +74,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             execute=not args.plan_only,
             execute_provider_acquisition=args.execute_provider_acquisition,
             provider_acquisition_limit=args.batch_size,
+            feature_repair_limit=args.feature_repair_limit or args.batch_size,
             selected_target_symbol=args.target_symbol,
         )
         row = decision.summary_row() if decision is not None else None

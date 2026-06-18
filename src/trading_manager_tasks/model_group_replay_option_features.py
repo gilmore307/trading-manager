@@ -70,6 +70,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
     execute: bool = True,
     execute_provider_acquisition: bool = False,
     provider_acquisition_limit: int | None = 1,
+    feature_repair_limit: int | None = None,
     selected_target_symbol: str | None = None,
     database_url: str | None = None,
     lock_root: Path = DEFAULT_LOCK_ROOT,
@@ -102,8 +103,9 @@ def run_model_group_replay_option_features_for_replay_backoff(
             execution_summary={"contract_id": contract_id, "dataset_root": str(dataset_root), "training_fold": training_fold},
         )
 
-    limit = len(requirements) if provider_acquisition_limit is None else max(1, provider_acquisition_limit)
-    batch = _feature_missing_requirements(database_url=db_url, requirements=requirements, limit=limit)
+    feature_limit = len(requirements) if feature_repair_limit is None else max(1, feature_repair_limit)
+    provider_limit = len(requirements) if provider_acquisition_limit is None else max(1, provider_acquisition_limit)
+    batch = _feature_missing_requirements(database_url=db_url, requirements=requirements, limit=feature_limit)
     if not batch:
         return _decision(
             decision_status="executed",
@@ -129,6 +131,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
     dispatch_summary: dict[str, Any] | None = None
     generated_summaries: list[dict[str, Any]] = []
     source_request_ids_by_month: dict[str, list[str]] = {}
+    option_source_unavailable_count = 0
 
     if not execute:
         return _decision(
@@ -157,7 +160,122 @@ def run_model_group_replay_option_features_for_replay_backoff(
     )
     with acquire_scheduler_lock(lock_ref):
         if source_missing:
+            source_missing_for_provider = source_missing[:provider_limit]
+            source_missing_deferred = source_missing[provider_limit:]
             if not execute_provider_acquisition:
+                if source_ready:
+                    pass
+                else:
+                    return _decision(
+                        decision_status="backoff",
+                        reason_code="model_group_replay_option_source_acquisition_required",
+                        reason="replay option features require historical option-chain source acquisition",
+                        selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
+                        execution_summary=_summary(
+                            contract_id=contract_id,
+                            dataset_root=dataset_root,
+                            training_fold=training_fold,
+                            missing=requirements,
+                            batch=batch,
+                            source_missing=source_missing,
+                            source_ready=source_ready,
+                            required_next_step="enable autonomous provider acquisition for replay option source preparation",
+                        ),
+                    )
+            else:
+                source_request_ids_by_month = _persist_replay_option_source_requests(
+                    source_missing_for_provider,
+                    storage_root=storage_root,
+                )
+                try:
+                    for month, request_ids in source_request_ids_by_month.items():
+                        dispatch = dispatch_option_chain_source_acquisition(
+                            start_month=month,
+                            end_month=month,
+                            storage_root=storage_root,
+                            request_ids=tuple(request_ids),
+                            execute_provider_calls=True,
+                            continue_on_error=False,
+                            database_url=db_url,
+                            dynamic_workers=False,
+                            max_workers=1,
+                        )
+                        provider_calls += dispatch.provider_calls
+                        dispatch_summary = dispatch.summary_row()
+                    source_ready_after_provider = list(
+                        _source_ready_requirements(database_url=db_url, requirements=source_missing_for_provider)
+                    )
+                    source_ready_after_provider_keys = set(source_ready_after_provider)
+                    source_still_missing_after_provider = [
+                        item for item in source_missing_for_provider if item not in source_ready_after_provider_keys
+                    ]
+                    feature_targets_to_generate.update((item.month, item.target_ref) for item in source_ready_after_provider)
+                    if source_still_missing_after_provider:
+                        option_source_unavailable_count = _persist_option_source_unavailable_markers(
+                            source_still_missing_after_provider,
+                            database_url=db_url,
+                            provider_error="provider acquisition completed without option_chain_state_source rows",
+                        )
+                except Exception as exc:
+                    provider_error = f"{type(exc).__name__}: {exc}"
+                    if _provider_error_means_source_unavailable(provider_error):
+                        unavailable_count = _persist_option_source_unavailable_markers(
+                            source_missing_for_provider,
+                            database_url=db_url,
+                            provider_error=provider_error,
+                        )
+                        return _decision(
+                            decision_status="executed",
+                            reason_code="model_group_replay_option_source_unavailable_recorded",
+                            reason=(
+                                "recorded replay signal option-source unavailable marker(s); "
+                                "scheduler can retry replay from the same clock without repeating provider acquisition"
+                            ),
+                            selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
+                            provider_calls=provider_calls or sum(len(items) for items in source_request_ids_by_month.values()),
+                            dispatch_performed=True,
+                            execution_summary=_summary(
+                                contract_id=contract_id,
+                                dataset_root=dataset_root,
+                                training_fold=training_fold,
+                                missing=requirements,
+                                batch=batch,
+                                source_missing=source_missing,
+                                source_ready=source_ready,
+                                required_next_step="retry model_group.replay from the same replay clock; replay will use option_source_unavailable state",
+                                dispatch_summary=dispatch_summary,
+                                generated_summaries=generated_summaries,
+                                source_request_ids_by_month=source_request_ids_by_month,
+                                provider_acquisition_error=provider_error,
+                                option_source_unavailable_count=unavailable_count,
+                            ),
+                        )
+                    return _decision(
+                        decision_status="backoff",
+                        reason_code="model_group_replay_option_source_acquisition_failed",
+                        reason=provider_error,
+                        selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
+                        provider_calls=provider_calls,
+                        dispatch_performed=True,
+                        execution_summary=_summary(
+                            contract_id=contract_id,
+                            dataset_root=dataset_root,
+                            training_fold=training_fold,
+                            missing=requirements,
+                            batch=batch,
+                            source_missing=source_missing,
+                            source_ready=source_ready,
+                            required_next_step=(
+                                "route replay option source provider failure to server-error agent repair, "
+                                "then retry model_group.replay from the same replay clock"
+                            ),
+                            dispatch_summary=dispatch_summary,
+                            generated_summaries=generated_summaries,
+                            source_request_ids_by_month=source_request_ids_by_month,
+                            provider_acquisition_error=provider_error,
+                        ),
+                    )
+            if source_missing_deferred and not feature_targets_to_generate:
                 return _decision(
                     decision_status="backoff",
                     reason_code="model_group_replay_option_source_acquisition_required",
@@ -171,90 +289,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
                         batch=batch,
                         source_missing=source_missing,
                         source_ready=source_ready,
-                        required_next_step="enable autonomous provider acquisition for replay option source preparation",
-                    ),
-                )
-            source_request_ids_by_month = _persist_replay_option_source_requests(
-                source_missing,
-                storage_root=storage_root,
-            )
-            try:
-                for month, request_ids in source_request_ids_by_month.items():
-                    dispatch = dispatch_option_chain_source_acquisition(
-                        start_month=month,
-                        end_month=month,
-                        storage_root=storage_root,
-                        request_ids=tuple(request_ids),
-                        execute_provider_calls=True,
-                        continue_on_error=False,
-                        database_url=db_url,
-                        dynamic_workers=False,
-                        max_workers=1,
-                    )
-                    provider_calls += dispatch.provider_calls
-                    dispatch_summary = dispatch.summary_row()
-                    feature_targets_to_generate.update(
-                        (item.month, item.target_ref)
-                        for item in source_missing
-                        if item.month == month
-                    )
-            except Exception as exc:
-                provider_error = f"{type(exc).__name__}: {exc}"
-                if _provider_error_means_source_unavailable(provider_error):
-                    unavailable_count = _persist_option_source_unavailable_markers(
-                        source_missing,
-                        database_url=db_url,
-                        provider_error=provider_error,
-                    )
-                    return _decision(
-                        decision_status="executed",
-                        reason_code="model_group_replay_option_source_unavailable_recorded",
-                        reason=(
-                            "recorded replay signal option-source unavailable marker(s); "
-                            "scheduler can retry replay from the same clock without repeating provider acquisition"
-                        ),
-                        selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
-                        provider_calls=provider_calls or sum(len(items) for items in source_request_ids_by_month.values()),
-                        dispatch_performed=True,
-                        execution_summary=_summary(
-                            contract_id=contract_id,
-                            dataset_root=dataset_root,
-                            training_fold=training_fold,
-                            missing=requirements,
-                            batch=batch,
-                            source_missing=source_missing,
-                            source_ready=source_ready,
-                            required_next_step="retry model_group.replay from the same replay clock; replay will use option_source_unavailable state",
-                            dispatch_summary=dispatch_summary,
-                            generated_summaries=generated_summaries,
-                            source_request_ids_by_month=source_request_ids_by_month,
-                            provider_acquisition_error=provider_error,
-                            option_source_unavailable_count=unavailable_count,
-                        ),
-                    )
-                return _decision(
-                    decision_status="backoff",
-                    reason_code="model_group_replay_option_source_acquisition_failed",
-                    reason=provider_error,
-                    selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
-                    provider_calls=provider_calls,
-                    dispatch_performed=True,
-                    execution_summary=_summary(
-                        contract_id=contract_id,
-                        dataset_root=dataset_root,
-                        training_fold=training_fold,
-                        missing=requirements,
-                        batch=batch,
-                        source_missing=source_missing,
-                        source_ready=source_ready,
-                        required_next_step=(
-                            "route replay option source provider failure to server-error agent repair, "
-                            "then retry model_group.replay from the same replay clock"
-                        ),
-                        dispatch_summary=dispatch_summary,
-                        generated_summaries=generated_summaries,
-                        source_request_ids_by_month=source_request_ids_by_month,
-                        provider_acquisition_error=provider_error,
+                        required_next_step="continue bounded replay option source acquisition",
                     ),
                 )
 
@@ -286,6 +321,33 @@ def run_model_group_replay_option_features_for_replay_backoff(
                     ),
                 )
 
+        if option_source_unavailable_count and not feature_targets_to_generate:
+            return _decision(
+                decision_status="executed",
+                reason_code="model_group_replay_option_source_unavailable_recorded",
+                reason=(
+                    "recorded replay signal option-source unavailable marker(s) after provider acquisition "
+                    "completed without source rows"
+                ),
+                selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
+                provider_calls=provider_calls,
+                dispatch_performed=provider_calls > 0,
+                execution_summary=_summary(
+                    contract_id=contract_id,
+                    dataset_root=dataset_root,
+                    training_fold=training_fold,
+                    missing=requirements,
+                    batch=batch,
+                    source_missing=source_missing,
+                    source_ready=source_ready,
+                    required_next_step="retry model_group.replay from the same replay clock; replay will use option_source_unavailable state",
+                    dispatch_summary=dispatch_summary,
+                    generated_summaries=generated_summaries,
+                    source_request_ids_by_month=source_request_ids_by_month,
+                    option_source_unavailable_count=option_source_unavailable_count,
+                ),
+            )
+
     return _decision(
         decision_status="executed",
         reason_code="model_group_replay_option_feature_repair_executed",
@@ -301,8 +363,15 @@ def run_model_group_replay_option_features_for_replay_backoff(
             batch=batch,
             source_missing=source_missing,
             source_ready=source_ready,
+            required_next_step=(
+                "continue replay option feature drain before retrying model_group.replay"
+                if len(batch) < len(requirements)
+                else None
+            ),
             dispatch_summary=dispatch_summary,
             generated_summaries=generated_summaries,
+            source_request_ids_by_month=source_request_ids_by_month,
+            option_source_unavailable_count=option_source_unavailable_count,
         ),
     )
 
@@ -320,6 +389,45 @@ def replay_option_feature_requirements_from_replay_decision(
     if not isinstance(sample, Sequence):
         return ()
     return _option_feature_requirements_from_items(sample)
+
+
+def latest_replay_option_feature_requirements_artifact(
+    *,
+    storage_root: Path = DEFAULT_STORAGE_ROOT,
+    contract_id: str = DEFAULT_REPLAY_CONTRACT_ID,
+) -> Path | None:
+    runs_root = _replay_dataset_root(storage_root, contract_id) / "replay_execution_runs"
+    if not runs_root.exists():
+        return None
+    candidates = sorted(
+        runs_root.glob("*/option_feature_requirements.jsonl"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for artifact in candidates:
+        if not (artifact.parent / "replay_execution_receipt.json").exists():
+            return artifact
+    return None
+
+
+def replay_option_feature_backoff_for_requirements_artifact(requirements_artifact_ref: Path) -> SchedulerDecision:
+    payload = {"requirements_artifact_ref": str(requirements_artifact_ref)}
+    reason = f"{REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED}: {json.dumps(payload, sort_keys=True)}"
+    now = datetime.now(UTC)
+    return SchedulerDecision(
+        contract_type="manager_scheduler_decision",
+        now_utc=now.isoformat(),
+        now_et=now.astimezone(NEW_YORK).isoformat(),
+        decision_status="backoff",
+        reason_code=REPLAY_OPTION_FEATURE_BACKOFF_REASON,
+        reason=reason,
+        market_protection_active=False,
+        resource_pressure_active=False,
+        selected_work="model_group.replay",
+        command=[],
+        next_internal_stage="model_group.replay",
+        execution_summary={"runner_stderr": reason},
+    )
 
 
 def _option_feature_requirements_from_artifact(payload: Mapping[str, Any]) -> tuple[ReplayOptionFeatureRequirement, ...]:
@@ -738,6 +846,8 @@ def _summary(
 __all__ = [
     "REPLAY_OPTION_FEATURE_STAGE_ID",
     "ReplayOptionFeatureRequirement",
+    "latest_replay_option_feature_requirements_artifact",
+    "replay_option_feature_backoff_for_requirements_artifact",
     "replay_option_feature_requirements_from_replay_decision",
     "run_model_group_replay_option_features_for_replay_backoff",
 ]

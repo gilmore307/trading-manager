@@ -4,11 +4,14 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from trading_manager_tasks.m05_option_expression_feature_stage import M05OptionExpressionFeatureStageSummary
 from trading_manager_tasks.model_group_replay_option_features import (
     ReplayOptionFeatureRequirement,
+    latest_replay_option_feature_requirements_artifact,
+    replay_option_feature_backoff_for_requirements_artifact,
     replay_option_feature_requirements_from_replay_decision,
     run_model_group_replay_option_features_for_replay_backoff,
 )
@@ -144,6 +147,73 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         self.assertEqual(decision.provider_calls, 0)
         generate.assert_called_once_with(start_month="2021-01", end_month="2021-01", target_symbol="MSFT")
 
+    def test_feature_repair_limit_is_independent_from_provider_limit(self) -> None:
+        requirement = ReplayOptionFeatureRequirement("MSFT", "2021-01-04T16:00:00-05:00", "2021-01")
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True, exist_ok=True)
+            self._write_completed_fold(storage_root)
+            self._write_frozen_dataset(storage_root)
+
+            with (
+                patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=()) as missing,
+            ):
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    self._replay_backoff(requirement),
+                    storage_root=storage_root,
+                    selected_target_symbol="AAPL",
+                    execute=True,
+                    execute_provider_acquisition=True,
+                    provider_acquisition_limit=1,
+                    feature_repair_limit=250,
+                )
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(missing.call_args.kwargs["limit"], 250)
+
+    def test_generates_source_ready_features_before_provider_backoff(self) -> None:
+        ready = ReplayOptionFeatureRequirement("MSFT", "2021-01-04T16:00:00-05:00", "2021-01")
+        missing_source = ReplayOptionFeatureRequirement("TSLA", "2021-01-05T16:00:00-05:00", "2021-01")
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True, exist_ok=True)
+            self._write_completed_fold(storage_root)
+            self._write_frozen_dataset(storage_root)
+
+            with (
+                patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(ready, missing_source)),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=(ready,)),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage",
+                    return_value=M05OptionExpressionFeatureStageSummary(
+                        contract_type="manager_model_05_option_expression_feature_generation_stage",
+                        stage_id="model_05_option_expression.feature_generation",
+                        start_month="2021-01",
+                        end_month="2021-01",
+                        status="succeeded",
+                        mode="test",
+                        receipt_path=None,
+                    ),
+                ) as generate,
+            ):
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    self._replay_backoff(ready),
+                    storage_root=storage_root,
+                    selected_target_symbol="AAPL",
+                    execute=True,
+                    execute_provider_acquisition=False,
+                    feature_repair_limit=2,
+                )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "executed")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_feature_repair_executed")
+        self.assertEqual(decision.execution_summary["source_missing_count"], 1)
+        generate.assert_called_once_with(start_month="2021-01", end_month="2021-01", target_symbol="MSFT")
+
     def test_extracts_requirements_from_replay_backoff_sample(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")
         parsed = replay_option_feature_requirements_from_replay_decision(self._replay_backoff(requirement))
@@ -192,6 +262,37 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                 ReplayOptionFeatureRequirement("MSFT", "2021-02-05T16:00:00-05:00", "2021-02"),
             ),
         )
+
+    def test_latest_requirements_artifact_ignores_completed_replay_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            old_run = dataset_root / "replay_execution_runs" / "old_run"
+            new_run = dataset_root / "replay_execution_runs" / "new_run"
+            old_run.mkdir(parents=True)
+            new_run.mkdir(parents=True)
+            old_artifact = old_run / "option_feature_requirements.jsonl"
+            new_artifact = new_run / "option_feature_requirements.jsonl"
+            old_artifact.write_text("{}\n", encoding="utf-8")
+            new_artifact.write_text("{}\n", encoding="utf-8")
+            (new_run / "replay_execution_receipt.json").write_text("{}\n", encoding="utf-8")
+
+            selected = latest_replay_option_feature_requirements_artifact(storage_root=storage_root)
+
+        self.assertEqual(selected, old_artifact)
+
+    def test_synthetic_backoff_from_requirements_artifact_round_trips(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact = Path(tmp) / "option_feature_requirements.jsonl"
+            artifact.write_text(
+                json.dumps({"target_ref": "AAPL", "timestamp": "2021-01-04T16:00:00-05:00"}) + "\n",
+                encoding="utf-8",
+            )
+
+            decision = replay_option_feature_backoff_for_requirements_artifact(artifact)
+            parsed = replay_option_feature_requirements_from_replay_decision(decision)
+
+        self.assertEqual(parsed, (ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01"),))
 
     def test_requires_provider_gate_when_source_rows_are_missing(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")
@@ -300,6 +401,57 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         self.assertTrue(decision.dispatch_performed)
         self.assertEqual(decision.execution_summary["option_source_unavailable_count"], 1)
         persist_unavailable.assert_called_once()
+
+    def test_provider_success_without_source_rows_records_replay_sentinel(self) -> None:
+        requirement = ReplayOptionFeatureRequirement("ALAB", "2024-03-21T16:00:00-04:00", "2024-03")
+        dispatch_summary = SimpleNamespace(
+            provider_calls=1,
+            summary_row=lambda: {
+                "contract_type": "manager_provider_dispatch_summary",
+                "provider_calls": 1,
+                "dispatch_count": 1,
+            },
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True, exist_ok=True)
+            self._write_completed_fold(storage_root)
+            self._write_frozen_dataset(storage_root)
+
+            with (
+                patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", side_effect=((), ())),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
+                    return_value={"2024-03": ["mgrreq_option_chain_window_alab_2024_03_2024_03_21_0930"]},
+                ),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features.dispatch_option_chain_source_acquisition",
+                    return_value=dispatch_summary,
+                ),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._persist_option_source_unavailable_markers",
+                    return_value=1,
+                ) as persist_unavailable,
+                patch("trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage") as generate,
+            ):
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    self._replay_backoff(requirement),
+                    storage_root=storage_root,
+                    selected_target_symbol="AAPL",
+                    execute=True,
+                    execute_provider_acquisition=True,
+                )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "executed")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_source_unavailable_recorded")
+        self.assertEqual(decision.provider_calls, 1)
+        self.assertEqual(decision.execution_summary["option_source_unavailable_count"], 1)
+        persist_unavailable.assert_called_once()
+        generate.assert_not_called()
 
 
 if __name__ == "__main__":  # pragma: no cover
