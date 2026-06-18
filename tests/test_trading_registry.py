@@ -393,6 +393,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(requirements_artifact["payload"], "replay_option_feature_requirements")
         self.assertIn("option_feature_requirements.jsonl", requirements_artifact["applies_to"])
         self.assertIn("requirements_artifact_ref", requirements_artifact["applies_to"])
+        trace_audit = rows["EVALUATION_REPLAY_PORTFOLIO_TRACE_AUDIT"]
+        self.assertEqual(trace_audit["payload"], "candidate_policy_portfolio_trace_audit")
+        self.assertIn("build_replay_portfolio_trace_audit.py", trace_audit["path"])
+        self.assertIn("portfolio_trace_audit_summary.json", trace_audit["applies_to"])
+        self.assertIn("no provider calls", trace_audit["note"])
+        trace_row = rows["EVALUATION_REPLAY_PORTFOLIO_TRACE_AUDIT_ROW"]
+        self.assertEqual(trace_row["payload"], "candidate_policy_portfolio_trace_audit_row")
+        self.assertIn("portfolio_trace_rows.jsonl", trace_row["applies_to"])
+        self.assertIn("capital_selected_m05_count", trace_row["applies_to"])
+        trace_defaults = rows["EVALUATION_REPLAY_PORTFOLIO_TRACE_AUDIT_DEFAULTS"]
+        self.assertIn("max_trace_timestamps=20", trace_defaults["payload"])
+        self.assertIn("max_positions=5", trace_defaults["payload"])
+        self.assertIn("position_notional_fraction=0.20", trace_defaults["payload"])
+        trace_script = rows["TRADING_EVALUATION_BUILD_REPLAY_PORTFOLIO_TRACE_AUDIT"]
+        self.assertEqual(trace_script["kind"], "script")
+        self.assertIn("build_replay_portfolio_trace_audit.py", trace_script["path"])
+        self.assertIn("candidate_policy_portfolio_trace_audit", trace_script["applies_to"])
+        self.assertIn("no provider calls", trace_script["note"])
         drain_status = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_DRAIN_STATUS"]
         self.assertEqual(drain_status["kind"], "artifact_type")
         self.assertEqual(drain_status["payload"], "manager_model_group_replay_option_feature_drain_status")
