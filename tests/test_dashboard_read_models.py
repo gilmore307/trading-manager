@@ -1069,6 +1069,109 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["task_state"], "current")
         self.assertEqual(replay_task["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
 
+    def test_task_timeline_keeps_lifecycle_rows_visible_for_folds_before_current_artifact_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+
+            def write_completed_fold(start: str, end: str) -> None:
+                stages = []
+                for layer in range(1, 10):
+                    for split_name in ("train", "validation", "test"):
+                        stages.append(
+                            {
+                                "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                                "stage_type": "model_generation",
+                                "layer": layer,
+                                "layer_key": f"layer_{layer:02d}_fixture",
+                                "status": "succeeded",
+                                "dataset_split": {"split_name": split_name},
+                                "dataset_unit": {
+                                    "unit_kind": "six_month_target_fold",
+                                    "unit_months": 6,
+                                    "start_month": start,
+                                    "end_month": end,
+                                    "target_required": layer >= 3,
+                                    "target_symbol": "AAPL" if layer >= 3 else None,
+                                },
+                            }
+                        )
+                (runtime / f"model_training_fold_state_aapl_{start}_{end}.json").write_text(
+                    json.dumps(
+                        {
+                            "contract_type": "manager_model_training_workflow_state",
+                            "start_month": start,
+                            "end_month": end,
+                            "stages": stages,
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+            write_completed_fold("2016-01", "2016-06")
+            write_completed_fold("2016-07", "2016-12")
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            replay_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "candidate_fold_id": "fold_2016-07_2016-12",
+                        "fold_id": "fold_2016-07_2016-12",
+                        "freeze_status": "not_frozen",
+                        "feed_acquisition_count": 1,
+                        "available_feed_acquisition_count": 1,
+                        "missing_feed_acquisition_count": 0,
+                        "pre_replay_target_refs": ["AAPL"],
+                        "target_refs": ["AAPL"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T09:20:00Z")
+
+        fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
+        fold1_lifecycle_tasks = [task for task in fold1_tasks if str(task["task_id"]).startswith("model_group.")]
+        self.assertEqual(
+            [task["task_id"] for task in fold1_lifecycle_tasks],
+            [
+                "model_group.replay",
+                "model_group.model_06_residual_event_governance",
+                "model_group.evaluation",
+                "model_group.promotion",
+                "model_group.maintenance",
+            ],
+        )
+        self.assertTrue(all(task["task_state"] == "skipped" for task in fold1_lifecycle_tasks))
+        self.assertTrue(all(task["status"] == "not_applicable" for task in fold1_lifecycle_tasks))
+        self.assertTrue(
+            all(
+                task["detail"]["historical_lifecycle_scope_status"] == "not_attached_to_current_replay_artifact"
+                for task in fold1_lifecycle_tasks
+            )
+        )
+        self.assertTrue(
+            any(
+                task["month"] == "2016-fold2" and task["task_id"] == "model_group.replay" and task["status"] != "not_applicable"
+                for task in payload["chart_payload"]["task_timeline"]
+            )
+        )
+
     def test_model_group_replay_does_not_attach_stale_dataset_operations_to_later_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

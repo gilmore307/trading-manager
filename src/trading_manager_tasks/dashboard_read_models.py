@@ -4359,6 +4359,37 @@ def _model_group_replay_timeline_tasks(
     return tasks
 
 
+def _mark_historical_unattached_model_group_tasks(
+    tasks: list[dict[str, Any]],
+    *,
+    artifact_period: str,
+) -> list[dict[str, Any]]:
+    """Show lifecycle shape for old folds without making them active work."""
+
+    reason = (
+        f"Model-group lifecycle evidence is attached to {artifact_period}; "
+        "this older fold is retained as historical model-generation context."
+    )
+    for task in tasks:
+        task["task_state"] = "skipped"
+        task["status"] = "not_applicable"
+        task["reason"] = reason
+        task["blocker_count"] = 0
+        detail = task.get("detail")
+        if not isinstance(detail, dict):
+            detail = {}
+            task["detail"] = detail
+        detail["blockers"] = []
+        detail["historical_lifecycle_scope_status"] = "not_attached_to_current_replay_artifact"
+        detail["current_model_group_lifecycle_period"] = artifact_period
+        progress = detail.get("progress")
+        if isinstance(progress, dict):
+            progress["status"] = "not_applicable"
+            progress["can_unlock_downstream"] = True
+            progress["pending_count"] = 0
+    return tasks
+
+
 def _model_group_lifecycle_tasks_for_visible_folds(
     task_timeline: list[dict[str, Any]],
     *,
@@ -4409,11 +4440,7 @@ def _model_group_lifecycle_tasks_for_visible_folds(
     if artifact_fold is None and visible_periods and dataset_root.exists():
         _period, start_month, end_month = visible_periods[0]
         artifact_fold = (start_month, end_month)
-    rendered_periods = [
-        period
-        for period in visible_periods
-        if artifact_fold is None or (period[1], period[2]) >= artifact_fold
-    ]
+    rendered_periods = list(visible_periods)
     rendered_fallback_for_mismatch = False
     if not rendered_periods:
         rendered_periods = visible_periods
@@ -4427,19 +4454,24 @@ def _model_group_lifecycle_tasks_for_visible_folds(
             end_month=end_month,
             selected_target_symbol=selected_target_symbol,
         )
-        use_lifecycle_artifacts = artifact_fold == (start_month, end_month) or rendered_fallback_for_mismatch
-        tasks.extend(
-            _model_group_replay_timeline_tasks(
-                storage_root=storage_root,
-                generated_at_utc=generated_at_utc,
-                starting_sequence=len(task_timeline) + len(tasks),
-                selected_target_symbol=selected_target_symbol,
-                training_start_month=start_month,
-                training_end_month=end_month,
-                pre_replay_complete=pre_replay_complete,
-                use_lifecycle_artifacts=use_lifecycle_artifacts,
-            )
+        fold_window = (start_month, end_month)
+        use_lifecycle_artifacts = artifact_fold == fold_window or rendered_fallback_for_mismatch
+        fold_tasks = _model_group_replay_timeline_tasks(
+            storage_root=storage_root,
+            generated_at_utc=generated_at_utc,
+            starting_sequence=len(task_timeline) + len(tasks),
+            selected_target_symbol=selected_target_symbol,
+            training_start_month=start_month,
+            training_end_month=end_month,
+            pre_replay_complete=pre_replay_complete,
+            use_lifecycle_artifacts=use_lifecycle_artifacts,
         )
+        if artifact_fold is not None and fold_window < artifact_fold and not use_lifecycle_artifacts:
+            fold_tasks = _mark_historical_unattached_model_group_tasks(
+                fold_tasks,
+                artifact_period=_fold_period_label(*artifact_fold),
+            )
+        tasks.extend(fold_tasks)
     return tasks
 
 
