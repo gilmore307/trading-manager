@@ -190,6 +190,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             for row in rows:
                 if row["decision_id"] == "rejected_winner":
                     row.pop("replay_opportunity_return", None)
+                    row["realized_return"] = 0.0
                     row["selected_option_contract_ref"] = "AAPL_2021-02-05_C_140"
                     row["option_contract_path_status"] = "missing"
             decision_rows_path.write_text("\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n", encoding="utf-8")

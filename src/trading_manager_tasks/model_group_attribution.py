@@ -603,7 +603,7 @@ def _opportunity_return(row: Mapping[str, Any]) -> float | None:
     underlying_exit = _first_float(row, ("next_bar_close", "underlying_exit_price", "exit_underlying_price"))
     if underlying_entry is not None and underlying_exit is not None and underlying_entry > 0:
         return (underlying_exit - underlying_entry) / underlying_entry
-    return _safe_float(row.get("realized_return"))
+    return None
 
 
 def _first_float(row: Mapping[str, Any], keys: tuple[str, ...]) -> float | None:
