@@ -552,13 +552,20 @@ def _action_return(
     baseline_return: float,
     opportunity_return: float | None,
 ) -> float | None:
-    if action in {"reject_or_no_trade", "baseline_action"}:
+    if _is_no_trade_action(action) or action == "baseline_action":
         return baseline_return
     if action == "path_conditioned_take_opportunity":
         return opportunity_return
     if action == "take_trade":
         return realized_return if filled else opportunity_return
     return realized_return if filled else opportunity_return
+
+
+def _is_no_trade_action(action: str) -> bool:
+    normalized = action.strip().lower()
+    if normalized in {"reject_or_no_trade", "no_trade", "hold_cash", "baseline_no_trade"}:
+        return True
+    return normalized.startswith("reject")
 
 
 def _first_gap_component(

@@ -79,6 +79,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                     json.dumps(
                         {
                             "decision_id": "rejected_winner",
+                            "decision_action": "reject_entry_thesis",
                             "decision_status": "rejected",
                             "outcome_label": 1,
                             "month": "2021-02",
@@ -168,7 +169,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(rows[1]["first_gap_mechanism"], "execution_or_position_management")
             self.assertEqual(rows[1]["layer_attribution"]["chosen_action_return"], 0.01)
             self.assertEqual(rows[1]["layer_attribution"]["best_available_action_return"], 0.02)
-            self.assertEqual(rows[2]["available_action"], ["reject_or_no_trade", "path_conditioned_take_opportunity"])
+            self.assertEqual(rows[2]["available_action"], ["reject_entry_thesis", "path_conditioned_take_opportunity"])
             self.assertEqual(rows[2]["future_outcome_window"], "2021-02-03T10:00:00-05:00->2021-02-03T16:00:00-05:00")
             self.assertEqual(rows[2]["best_available_action_by_future_outcome"], "path_conditioned_take_opportunity")
             self.assertEqual(rows[2]["regret_to_best_available"], 0.05)
