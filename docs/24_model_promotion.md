@@ -77,6 +77,23 @@ set at timestamp `t`, how far the chosen action lagged that best available
 action, and which component first caused the gap through filtering, ranking,
 gating, sizing, timing, or execution.
 
+Each `post_replay_review_row` therefore carries both the action comparison and
+the first-gap attribution needed for operator review:
+
+- `chosen_action` and `available_action` record the point-in-time action set.
+- `chosen_action_return` and `best_available_action_return` record the
+  hindsight outcome assigned to the chosen and best available actions.
+- `best_available_action_by_future_outcome` and `regret_to_best_available`
+  quantify regret inside the action set.
+- `first_gap_component`, `first_gap_mechanism`, and `layer_attribution`
+  identify the first component-funnel gap without expanding beyond the observed
+  selected path.
+
+The `post_replay_review_receipt` embeds
+`post_replay_review_diagnostic_summary` so dashboard and operator surfaces can
+scan total regret, top regret rows, best-action counts, and first-gap
+component/mechanism counts before reruns or M06 attribution.
+
 Replay review is only the first post-replay diagnostic step. A
 `post_replay_review_receipt` may identify failed fills, missed winners,
 and other candidate failure rows, but it does not satisfy M06

@@ -47,8 +47,6 @@ def run_model_group_replay_review_if_ready(
     replay_receipt = _latest_replay_execution_receipt(dataset_root)
     if replay_receipt is None:
         return None
-    if not _replay_receipt_uses_current_candidate_handoff(replay_receipt):
-        return None
     expected_months = _expected_replay_months(dataset_root)
     replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "")
     ready_months = _ready_replay_months(dataset_root, replay_run_id=replay_run_id)
@@ -119,6 +117,8 @@ def run_model_group_replay_review_if_ready(
         )
 
     review_rows = tuple(_build_review_rows(decision_rows_path, max_rows=max_review_rows))
+    review_summary = _review_diagnostic_summary(review_rows)
+    completion_scope = "bounded_diagnostic" if max_review_rows is not None else "full_replay_review"
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
         lock_scope="promotion",
@@ -145,11 +145,14 @@ def run_model_group_replay_review_if_ready(
             if replay_run_id
             else None,
             "review_rows_ref": str(review_rows_path),
+            "replay_review_completion_scope": completion_scope,
+            "max_review_rows": max_review_rows,
             "expected_review_count": len(review_rows),
             "reviewed_failure_count": len(review_rows),
             "processed_review_count": len(review_rows),
             "review_sequence": ["eligibility_ledger", "decision_ledger", "outcome_ledger"],
             "review_scope": "post_replay_component_funnel_review",
+            "replay_review_diagnostic_summary": review_summary,
             "cause_family_contract": ["data_insufficiency", "execution_connection_failure", "model_mechanism_defect"],
             "residual_event_governance_status": "not_performed",
             "event_evidence_consumed": False,
@@ -176,6 +179,9 @@ def run_model_group_replay_review_if_ready(
             "post_replay_review_receipt": str(receipt_path),
             "review_rows_ref": str(review_rows_path),
             "reviewed_failure_count": len(review_rows),
+            "replay_review_completion_scope": completion_scope,
+            "max_review_rows": max_review_rows,
+            "replay_review_diagnostic_summary": review_summary,
             "residual_event_governance_status": "not_performed",
         },
     )
@@ -368,6 +374,51 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
         baseline_return=baseline_return,
         opportunity_return=opportunity_return,
     )
+    chosen_action_return = _action_return(
+        chosen_action,
+        filled=filled,
+        realized_return=realized_return,
+        baseline_return=baseline_return,
+        opportunity_return=opportunity_return,
+    )
+    best_available_action_return = _action_return(
+        best_available_action,
+        filled=filled,
+        realized_return=realized_return,
+        baseline_return=baseline_return,
+        opportunity_return=opportunity_return,
+    )
+    first_gap_component = _first_gap_component(
+        row,
+        filled=filled,
+        best_available_action=best_available_action,
+        chosen_action=chosen_action,
+        miss_attribution_layer=miss_attribution_layer,
+    )
+    first_gap_mechanism = _first_gap_mechanism(
+        row,
+        filled=filled,
+        best_available_action=best_available_action,
+        chosen_action=chosen_action,
+    )
+    layer_attribution = {
+        "first_gap_component": first_gap_component,
+        "first_gap_mechanism": first_gap_mechanism,
+        "miss_attribution_layer": miss_attribution_layer,
+        "miss_review_scope": miss_review_scope,
+        "candidate_set_scope": candidate_set_scope,
+        "chosen_action": chosen_action,
+        "best_available_action_by_future_outcome": best_available_action,
+        "chosen_action_return": chosen_action_return,
+        "best_available_action_return": best_available_action_return,
+        "regret_to_best_available": regret_to_best_available,
+        "attribution_basis": _layer_attribution_basis(
+            filled=filled,
+            best_available_action=best_available_action,
+            chosen_action=chosen_action,
+            miss_review_scope=miss_review_scope,
+        ),
+    }
     return {
         "contract_type": REPLAY_REVIEW_ROW_CONTRACT_TYPE,
         "stage_id": "model_group.replay_review",
@@ -393,9 +444,15 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
         "decision_ledger_status": "reviewable_from_replay_row",
         "outcome_ledger_status": "reviewable_from_replay_row",
         "available_action": available_actions,
+        "chosen_action": chosen_action,
         "future_outcome_window": _future_outcome_window(row, decision_time=decision_time),
         "best_available_action_by_future_outcome": best_available_action,
         "regret_to_best_available": regret_to_best_available,
+        "chosen_action_return": chosen_action_return,
+        "best_available_action_return": best_available_action_return,
+        "first_gap_component": first_gap_component,
+        "first_gap_mechanism": first_gap_mechanism,
+        "layer_attribution": layer_attribution,
         "path_conditioning_policy": _path_conditioning_policy(row),
         "path_scope": path_scope,
         "candidate_set_scope": candidate_set_scope,
@@ -416,6 +473,58 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
     }
 
 
+def _review_diagnostic_summary(review_rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    rows = list(review_rows)
+    regrets = [_safe_float(row.get("regret_to_best_available")) for row in rows]
+    material_regrets = [value for value in regrets if value is not None and value > 0]
+    total_regret = sum(material_regrets)
+    return {
+        "contract_type": "post_replay_review_diagnostic_summary",
+        "reviewed_row_count": len(rows),
+        "material_regret_row_count": len(material_regrets),
+        "total_regret_to_best_available": _round_metric(total_regret),
+        "mean_regret_to_best_available": _round_metric(total_regret / len(material_regrets)) if material_regrets else 0.0,
+        "max_regret_to_best_available": _round_metric(max(material_regrets)) if material_regrets else 0.0,
+        "best_available_action_counts": _count_text(row.get("best_available_action_by_future_outcome") for row in rows),
+        "first_gap_component_counts": _count_text(row.get("first_gap_component") for row in rows),
+        "first_gap_mechanism_counts": _count_text(row.get("first_gap_mechanism") for row in rows),
+        "miss_attribution_layer_counts": _count_text(row.get("miss_attribution_layer") for row in rows),
+        "top_regret_rows": _top_regret_rows(rows, limit=5),
+    }
+
+
+def _count_text(values: Iterable[Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        counts[text] = counts.get(text, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _top_regret_rows(rows: list[Mapping[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    ranked: list[tuple[float, Mapping[str, Any]]] = []
+    for row in rows:
+        regret = _safe_float(row.get("regret_to_best_available"))
+        if regret is None or regret <= 0:
+            continue
+        ranked.append((regret, row))
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return [
+        {
+            "source_decision_id": str(row.get("source_decision_id") or ""),
+            "replay_month": row.get("replay_month"),
+            "target_symbol": row.get("target_symbol"),
+            "first_gap_component": row.get("first_gap_component"),
+            "first_gap_mechanism": row.get("first_gap_mechanism"),
+            "best_available_action_by_future_outcome": row.get("best_available_action_by_future_outcome"),
+            "regret_to_best_available": _round_metric(regret),
+        }
+        for regret, row in ranked[:limit]
+    ]
+
+
 def _available_actions(row: Mapping[str, Any], *, filled: bool, opportunity_return: float | None) -> list[str]:
     explicit = _explicit_available_actions(row)
     if explicit:
@@ -433,6 +542,105 @@ def _available_actions(row: Mapping[str, Any], *, filled: bool, opportunity_retu
     ) == "path_conditioned_current_scope":
         actions.append("path_conditioned_take_opportunity")
     return _dedupe_text(actions)
+
+
+def _action_return(
+    action: str,
+    *,
+    filled: bool,
+    realized_return: float | None,
+    baseline_return: float,
+    opportunity_return: float | None,
+) -> float | None:
+    if action in {"reject_or_no_trade", "baseline_action"}:
+        return baseline_return
+    if action == "path_conditioned_take_opportunity":
+        return opportunity_return
+    if action == "take_trade":
+        return realized_return if filled else opportunity_return
+    return realized_return if filled else opportunity_return
+
+
+def _first_gap_component(
+    row: Mapping[str, Any],
+    *,
+    filled: bool,
+    best_available_action: str,
+    chosen_action: str,
+    miss_attribution_layer: str,
+) -> str:
+    explicit = _first_text(
+        row,
+        (
+            "first_gap_component",
+            "component_attribution",
+            "failure_component",
+            "first_failure_component",
+        ),
+    )
+    if explicit:
+        return explicit
+    if best_available_action == chosen_action:
+        return "no_gap"
+    if not filled:
+        return miss_attribution_layer
+    if best_available_action == "baseline_action":
+        return "execution_or_position_management"
+    return "taken_decision"
+
+
+def _first_gap_mechanism(
+    row: Mapping[str, Any],
+    *,
+    filled: bool,
+    best_available_action: str,
+    chosen_action: str,
+) -> str:
+    explicit = _first_text(
+        row,
+        (
+            "first_gap_mechanism",
+            "gap_mechanism",
+            "component_gap_mechanism",
+            "failure_mechanism",
+            "decision_gap_type",
+        ),
+    )
+    if explicit:
+        return explicit
+    if best_available_action == chosen_action:
+        return "no_gap"
+    decision_status = str(row.get("decision_status") or "").lower()
+    rejection_reason = str(row.get("rejection_reason") or row.get("gate_reason") or row.get("block_reason") or "").lower()
+    if not filled:
+        if "rank" in rejection_reason or "score" in rejection_reason:
+            return "ranking"
+        if "threshold" in rejection_reason or "gate" in rejection_reason or "block" in rejection_reason or decision_status in {"rejected", "blocked"}:
+            return "gate"
+        if "timing" in rejection_reason or "late" in rejection_reason or "early" in rejection_reason:
+            return "timing"
+        return "filtering"
+    if best_available_action == "baseline_action":
+        if "size" in rejection_reason or "sizing" in rejection_reason:
+            return "sizing"
+        if "fill" in rejection_reason or "slippage" in rejection_reason or "execution" in rejection_reason:
+            return "execution"
+        return "execution_or_position_management"
+    return "decision"
+
+
+def _layer_attribution_basis(
+    *,
+    filled: bool,
+    best_available_action: str,
+    chosen_action: str,
+    miss_review_scope: str,
+) -> str:
+    if best_available_action == chosen_action:
+        return "chosen action matched the best available action inside the point-in-time action set"
+    if not filled:
+        return f"missed opportunity was reviewable only within {miss_review_scope}"
+    return "filled action underperformed the available baseline action inside the point-in-time action set"
 
 
 def _explicit_available_actions(row: Mapping[str, Any]) -> list[str]:
@@ -814,6 +1022,8 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
             continue
         if not _replay_receipt_full_completion_scope(receipt):
             continue
+        if not _replay_receipt_uses_current_candidate_handoff(receipt):
+            continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt.get("generated_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt_path, receipt))
     if not candidates:
@@ -863,6 +1073,11 @@ def _latest_complete_replay_review_receipt(dataset_root: Path, *, decision_rows_
         if contract_type != REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE:
             continue
         if str(receipt.get("decision_rows_ref") or "") != decision_rows_ref:
+            continue
+        completion_scope = str(receipt.get("replay_review_completion_scope") or "").strip()
+        if completion_scope and completion_scope != "full_replay_review":
+            continue
+        if receipt.get("max_review_rows") is not None:
             continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt))

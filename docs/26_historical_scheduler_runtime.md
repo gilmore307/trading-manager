@@ -82,7 +82,10 @@ Replay review also participates in the same replay-owned repair loop. Before it
 writes `post_replay_review_receipt`, it checks whether reviewable decision rows
 have enough future outcome and return data to quantify `available_action`,
 `best_available_action_by_future_outcome`, and
-`regret_to_best_available`. If not, it writes
+`regret_to_best_available`. Completed review rows also materialize
+`first_gap_component`, `first_gap_mechanism`, `layer_attribution`, and a
+receipt-level diagnostic summary for dashboard scanning. If required outcome
+data is missing, replay review writes
 `replay_review_data_requirements.jsonl` and backs off with
 `model_group_replay_review_data_required`. When those requirements point to
 selected option contract paths, the daemon hands them to
@@ -90,6 +93,12 @@ selected option contract paths, the daemon hands them to
 and replay review are then retried from the same lifecycle. Replay review itself
 does not call providers, mutate broker/account/order state, activate models, or
 expand the point-in-time candidate set.
+
+Bounded smoke runs may use `--max-review-rows`. Those receipts must carry
+`replay_review_completion_scope=bounded_diagnostic` and `max_review_rows`; they
+are inspection artifacts only and must not satisfy full Replay Review, M06, or
+evaluation lifecycle gates. Only `replay_review_completion_scope=full_replay_review`
+with no row cap can unlock downstream stages.
 
 ## Lock Contract
 

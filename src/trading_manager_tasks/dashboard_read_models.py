@@ -15,7 +15,7 @@ import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, TextIO
+from typing import Any, Iterable, Mapping, TextIO
 
 from .model_training_state import advance_workflow_state
 from .model_training_workflow import (
@@ -3992,6 +3992,11 @@ def _latest_post_replay_review_artifacts(dataset_root: Path) -> dict[str, Any] |
             continue
         if str(receipt.get("contract_type") or "") != "post_replay_review_receipt":
             continue
+        completion_scope = str(receipt.get("replay_review_completion_scope") or "").strip()
+        if completion_scope and completion_scope != "full_replay_review":
+            continue
+        if receipt.get("max_review_rows") is not None:
+            continue
         if decision_rows_path is not None and str(receipt.get("decision_rows_ref") or "") != str(decision_rows_path):
             continue
         created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
@@ -3999,7 +4004,72 @@ def _latest_post_replay_review_artifacts(dataset_root: Path) -> dict[str, Any] |
     if not candidates:
         return None
     _created, receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
-    return {"receipt": dict(receipt), "receipt_refs": [str(receipt_path)]}
+    receipt_dict = dict(receipt)
+    return {
+        "receipt": receipt_dict,
+        "receipt_refs": [str(receipt_path)],
+        "diagnostic_summary": _post_replay_review_diagnostic_summary(receipt_dict),
+    }
+
+
+def _post_replay_review_diagnostic_summary(receipt: Mapping[str, Any]) -> dict[str, Any]:
+    summary = receipt.get("replay_review_diagnostic_summary")
+    if isinstance(summary, Mapping):
+        return dict(summary)
+    review_rows_ref = str(receipt.get("review_rows_ref") or "").strip()
+    rows = _load_jsonl_objects(Path(review_rows_ref)) if review_rows_ref else []
+    regrets = [_safe_float(row.get("regret_to_best_available")) for row in rows]
+    material_regrets = [value for value in regrets if value is not None and value > 0]
+    total_regret = sum(material_regrets)
+    return {
+        "contract_type": "post_replay_review_diagnostic_summary",
+        "reviewed_row_count": len(rows) or _int_field(receipt, "processed_review_count"),
+        "material_regret_row_count": len(material_regrets),
+        "total_regret_to_best_available": _round_replay_review_metric(total_regret),
+        "mean_regret_to_best_available": _round_replay_review_metric(total_regret / len(material_regrets)) if material_regrets else 0.0,
+        "max_regret_to_best_available": _round_replay_review_metric(max(material_regrets)) if material_regrets else 0.0,
+        "best_available_action_counts": _text_counts(row.get("best_available_action_by_future_outcome") for row in rows),
+        "first_gap_component_counts": _text_counts(row.get("first_gap_component") for row in rows),
+        "first_gap_mechanism_counts": _text_counts(row.get("first_gap_mechanism") for row in rows),
+        "miss_attribution_layer_counts": _text_counts(row.get("miss_attribution_layer") for row in rows),
+        "top_regret_rows": _top_replay_review_regret_rows(rows, limit=5),
+    }
+
+
+def _text_counts(values: Iterable[Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        counts[text] = counts.get(text, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _top_replay_review_regret_rows(rows: Iterable[Mapping[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    ranked: list[tuple[float, Mapping[str, Any]]] = []
+    for row in rows:
+        regret = _safe_float(row.get("regret_to_best_available"))
+        if regret is None or regret <= 0:
+            continue
+        ranked.append((regret, row))
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return [
+        {
+            "source_decision_id": str(row.get("source_decision_id") or ""),
+            "replay_month": row.get("replay_month"),
+            "target_symbol": row.get("target_symbol"),
+            "first_gap_component": row.get("first_gap_component"),
+            "first_gap_mechanism": row.get("first_gap_mechanism"),
+            "best_available_action_by_future_outcome": row.get("best_available_action_by_future_outcome"),
+            "regret_to_best_available": _round_replay_review_metric(regret),
+        }
+        for regret, row in ranked[:limit]
+    ]
+
+
+def _round_replay_review_metric(value: float) -> float:
+    return round(value, 10)
 
 
 def _latest_post_replay_attribution_artifacts(dataset_root: Path) -> dict[str, Any] | None:
@@ -4244,6 +4314,11 @@ def _model_group_replay_timeline_tasks(
     replay_complete = bool(replay_progress["can_unlock_downstream"])
     review_artifacts = _latest_post_replay_review_artifacts(dataset_root) if lifecycle_artifacts_allowed and replay_complete else None
     replay_review_complete = review_artifacts is not None
+    replay_review_diagnostic_summary = (
+        review_artifacts.get("diagnostic_summary")
+        if isinstance(review_artifacts, Mapping)
+        else None
+    )
     replay_review_progress = _replay_review_progress(
         dataset_root=dataset_root,
         review_artifacts=review_artifacts,
@@ -4417,6 +4492,11 @@ def _model_group_replay_timeline_tasks(
         blockers=[] if replay_complete else ["model_group.replay"],
         stage_type="replay_review",
         progress=replay_review_progress,
+        extra_detail={
+            "replay_review_diagnostic_summary": replay_review_diagnostic_summary,
+        }
+        if replay_review_diagnostic_summary
+        else None,
     )
 
     append_task(

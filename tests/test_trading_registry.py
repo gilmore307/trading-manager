@@ -631,6 +631,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("model_group.replay_contract_paths", review_requirement["applies_to"])
         self.assertIn("future outcome or return data", review_requirement["note"])
 
+        review_summary = rows["MANAGER_REPLAY_REVIEW_DIAGNOSTIC_SUMMARY"]
+        self.assertEqual(review_summary["kind"], "artifact_type")
+        self.assertEqual(review_summary["payload"], "post_replay_review_diagnostic_summary")
+        self.assertIn("first_gap_component_counts", review_summary["applies_to"])
+        self.assertIn("operator scanning", review_summary["note"])
+
         available_action = rows["MANAGER_REPLAY_REVIEW_AVAILABLE_ACTION"]
         self.assertEqual(available_action["kind"], "field")
         self.assertEqual(available_action["payload"], "available_action")
@@ -657,6 +663,35 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(regret["payload"], "regret_to_best_available")
         self.assertIn("post_replay_review_row", regret["applies_to"])
         self.assertIn("best available action", regret["note"])
+
+        chosen_return = rows["MANAGER_REPLAY_REVIEW_CHOSEN_ACTION_RETURN"]
+        self.assertEqual(chosen_return["payload"], "chosen_action_return")
+        self.assertIn("post_replay_review_row", chosen_return["applies_to"])
+
+        best_return = rows["MANAGER_REPLAY_REVIEW_BEST_AVAILABLE_ACTION_RETURN"]
+        self.assertEqual(best_return["payload"], "best_available_action_return")
+        self.assertIn("point-in-time available_action set", best_return["note"])
+
+        first_gap_component = rows["MANAGER_REPLAY_REVIEW_FIRST_GAP_COMPONENT"]
+        self.assertEqual(first_gap_component["payload"], "first_gap_component")
+        self.assertIn("component_funnel_review", first_gap_component["applies_to"])
+
+        first_gap_mechanism = rows["MANAGER_REPLAY_REVIEW_FIRST_GAP_MECHANISM"]
+        self.assertEqual(first_gap_mechanism["payload"], "first_gap_mechanism")
+        self.assertIn("filtering ranking gate sizing timing execution", first_gap_mechanism["note"])
+
+        layer_attribution = rows["MANAGER_REPLAY_REVIEW_LAYER_ATTRIBUTION"]
+        self.assertEqual(layer_attribution["payload"], "layer_attribution")
+        self.assertIn("without expanding the point-in-time action set", layer_attribution["note"])
+
+        completion_scope = rows["MANAGER_REPLAY_REVIEW_COMPLETION_SCOPE"]
+        self.assertEqual(completion_scope["payload"], "replay_review_completion_scope")
+        self.assertIn("full_replay_review", completion_scope["applies_to"])
+        self.assertIn("downstream lifecycle gates", completion_scope["note"])
+
+        max_review_rows = rows["MANAGER_REPLAY_REVIEW_MAX_REVIEW_ROWS"]
+        self.assertEqual(max_review_rows["payload"], "max_review_rows")
+        self.assertIn("bounded diagnostic row cap", max_review_rows["note"])
 
         decision_variable_policy = rows["MANAGER_MODEL_GROUP_DECISION_VARIABLE_SCHEMA_POLICY"]
         self.assertIn("unfilled_decisions_use_replay_opportunity_return", decision_variable_policy["payload"])

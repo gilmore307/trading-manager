@@ -4,6 +4,7 @@ import csv
 import json
 import tempfile
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from trading_manager_tasks.model_group_attribution import run_model_group_replay_review_if_ready
@@ -138,6 +139,17 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(receipt["reviewed_failure_count"], 3)
             self.assertEqual(receipt["residual_event_governance_status"], "not_performed")
             self.assertIs(receipt["event_evidence_consumed"], False)
+            self.assertEqual(receipt["replay_review_diagnostic_summary"]["reviewed_row_count"], 3)
+            self.assertEqual(receipt["replay_review_diagnostic_summary"]["material_regret_row_count"], 2)
+            self.assertEqual(receipt["replay_review_diagnostic_summary"]["total_regret_to_best_available"], 0.06)
+            self.assertEqual(
+                receipt["replay_review_diagnostic_summary"]["best_available_action_counts"],
+                {"baseline_action": 1, "path_conditioned_take_opportunity": 1, "take_trade": 1},
+            )
+            self.assertEqual(
+                receipt["replay_review_diagnostic_summary"]["first_gap_mechanism_counts"],
+                {"execution_or_position_management": 1, "gate": 1, "no_gap": 1},
+            )
             self.assertEqual(receipt["decision_rows_ref"], str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"))
             rows = [
                 json.loads(line)
@@ -152,10 +164,18 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(rows[1]["future_outcome_window"], "2021-01-06T10:00:00-05:00->2021-01-06T16:00:00-05:00")
             self.assertEqual(rows[1]["best_available_action_by_future_outcome"], "baseline_action")
             self.assertEqual(rows[1]["regret_to_best_available"], 0.01)
+            self.assertEqual(rows[1]["first_gap_component"], "execution_or_position_management")
+            self.assertEqual(rows[1]["first_gap_mechanism"], "execution_or_position_management")
+            self.assertEqual(rows[1]["layer_attribution"]["chosen_action_return"], 0.01)
+            self.assertEqual(rows[1]["layer_attribution"]["best_available_action_return"], 0.02)
             self.assertEqual(rows[2]["available_action"], ["reject_or_no_trade", "path_conditioned_take_opportunity"])
             self.assertEqual(rows[2]["future_outcome_window"], "2021-02-03T10:00:00-05:00->2021-02-03T16:00:00-05:00")
             self.assertEqual(rows[2]["best_available_action_by_future_outcome"], "path_conditioned_take_opportunity")
             self.assertEqual(rows[2]["regret_to_best_available"], 0.05)
+            self.assertEqual(rows[2]["chosen_action_return"], 0.0)
+            self.assertEqual(rows[2]["best_available_action_return"], 0.05)
+            self.assertEqual(rows[2]["first_gap_component"], "current_decision_layer")
+            self.assertEqual(rows[2]["first_gap_mechanism"], "gate")
             self.assertEqual(rows[2]["path_conditioning_policy"], "upstream_selected_path_only")
             self.assertEqual(rows[2]["miss_review_scope"], "path_conditioned_current_scope")
             self.assertEqual(rows[2]["candidate_set_scope"], "selected_path_current_decision_set")
@@ -233,6 +253,85 @@ class ModelGroupAttributionTests(unittest.TestCase):
             decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
 
             self.assertIsNone(decision)
+
+    def test_bounded_replay_review_receipt_does_not_lock_full_review(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+
+            bounded_decision = run_model_group_replay_review_if_ready(
+                storage_root=storage_root,
+                max_review_rows=1,
+                now_utc=datetime(2026, 6, 18, 11, 50, tzinfo=UTC),
+            )
+
+            self.assertIsNotNone(bounded_decision)
+            assert bounded_decision is not None
+            self.assertEqual(bounded_decision.decision_status, "executed")
+            bounded_receipt_path = next((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json"))
+            bounded_receipt = json.loads(bounded_receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(bounded_receipt["replay_review_completion_scope"], "bounded_diagnostic")
+            self.assertEqual(bounded_receipt["max_review_rows"], 1)
+
+            full_decision = run_model_group_replay_review_if_ready(
+                storage_root=storage_root,
+                now_utc=datetime(2026, 6, 18, 11, 51, tzinfo=UTC),
+            )
+
+            self.assertIsNotNone(full_decision)
+            assert full_decision is not None
+            self.assertEqual(full_decision.decision_status, "executed")
+            receipt_paths = list((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json"))
+            self.assertEqual(len(receipt_paths), 2)
+            full_receipts = [
+                json.loads(path.read_text(encoding="utf-8"))
+                for path in receipt_paths
+                if json.loads(path.read_text(encoding="utf-8")).get("replay_review_completion_scope") == "full_replay_review"
+            ]
+            self.assertEqual(len(full_receipts), 1)
+            self.assertEqual(full_receipts[0]["processed_review_count"], 3)
+
+    def test_newer_incompatible_replay_receipt_does_not_hide_latest_compatible_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+            incompatible_root = dataset_root / "replay_execution_runs" / "newer_incompatible_replay"
+            incompatible_root.mkdir(parents=True)
+            compatible_rows = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
+            (incompatible_root / "decision_rows.jsonl").write_text(
+                compatible_rows.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (incompatible_root / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "created_at_utc": "2026-06-18T12:30:00+00:00",
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                        "decision_rows_ref": str(incompatible_root / "decision_rows.jsonl"),
+                        "replay_completion_scope": "full_candidate_universe",
+                        "max_decision_rows": None,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(
+                decision.execution_summary["decision_rows_ref"],
+                str(compatible_rows),
+            )
 
     def test_skips_when_attribution_receipt_already_exists(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

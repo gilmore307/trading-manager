@@ -396,6 +396,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "contract_type": "post_replay_review_row",
                     "review_id": "review_fixture",
                     "review_status": "reviewed",
+                    "source_decision_id": "decision_fixture",
+                    "replay_month": "2021-01",
+                    "target_symbol": "AAPL",
+                    "best_available_action_by_future_outcome": "path_conditioned_take_opportunity",
+                    "regret_to_best_available": 0.04,
+                    "first_gap_component": "model_05_option_expression",
+                    "first_gap_mechanism": "gate",
+                    "miss_attribution_layer": "model_05_option_expression",
                 }
             )
             + "\n",
@@ -2584,6 +2592,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:56:00Z")
 
         maintenance_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.maintenance")
+        replay_review_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay_review")
+        replay_review_summary = replay_review_task["detail"]["replay_review_diagnostic_summary"]
+        self.assertEqual(replay_review_summary["reviewed_row_count"], 1)
+        self.assertEqual(replay_review_summary["total_regret_to_best_available"], 0.04)
+        self.assertEqual(replay_review_summary["first_gap_component_counts"], {"model_05_option_expression": 1})
+        self.assertEqual(replay_review_summary["top_regret_rows"][0]["source_decision_id"], "decision_fixture")
         self.assertEqual(maintenance_task["status"], "succeeded")
         self.assertEqual(maintenance_task["task_state"], "completed")
         self.assertEqual(maintenance_task["receipt_count"], 1)
