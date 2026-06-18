@@ -624,6 +624,14 @@ class RegistryHelperTests(unittest.TestCase):
         review_row = rows["MANAGER_REPLAY_REVIEW_ROW"]
         self.assertEqual(review_row["payload"], "post_replay_review_row")
 
+        available_action = rows["MANAGER_REPLAY_REVIEW_AVAILABLE_ACTION"]
+        self.assertEqual(available_action["kind"], "field")
+        self.assertEqual(available_action["payload"], "available_action")
+        self.assertIn("post_replay_review_row", available_action["applies_to"])
+        self.assertIn("point_in_time_decision_state", available_action["applies_to"])
+        self.assertIn("hindsight grading", available_action["note"])
+        self.assertIn("must not expand this set", available_action["note"])
+
         decision_variable_policy = rows["MANAGER_MODEL_GROUP_DECISION_VARIABLE_SCHEMA_POLICY"]
         self.assertIn("unfilled_decisions_use_replay_opportunity_return", decision_variable_policy["payload"])
         self.assertIn("missed_opportunity_return", decision_variable_policy["payload"])
