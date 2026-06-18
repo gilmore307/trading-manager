@@ -88,7 +88,11 @@ MODEL_GROUP_MAINTENANCE_DATA_KINDS = (
 )
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE = "fixed_current_snapshot_historical_candidate_universe"
-CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES = {FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE}
+LAYER_TWO_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
+CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES = {
+    FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE,
+    LAYER_TWO_TARGET_CANDIDATE_HANDOFF_SOURCE,
+}
 RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES = {
     "post_replay_residual_event_governance_receipt",
     "model_06_residual_event_governance_event_attribution_receipt",
@@ -948,6 +952,20 @@ def _is_transient_active_scheduler_backoff(status: HistoricalSchedulerStatus) ->
 
 
 def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[dict[str, Any]]) -> dict[str, Any] | None:
+    def model_group_current_task(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
+        model_group_tasks = [task for task in tasks if str(task.get("layer_key") or "") == "model_group"]
+        if not model_group_tasks:
+            return None
+        order = {
+            "model_group.replay": 10,
+            "model_group.replay_review": 20,
+            "model_group.model_06_event_risk_governor": 30,
+            "model_group.evaluation": 40,
+            "model_group.promotion": 50,
+            "model_group.maintenance": 60,
+        }
+        return max(model_group_tasks, key=lambda task: order.get(str(task.get("task_id") or ""), 0))
+
     review_tasks: list[dict[str, Any]] = []
     for task in task_timeline:
         task_status = str(task.get("status") or "").lower()
@@ -973,21 +991,21 @@ def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[d
         if str(task.get("task_state") or "") == "current":
             current_tasks.append(task)
     internal_stage = str(status.current_stage or "")
-    if status.lock.status == "active":
-        for task in current_tasks:
-            if str(task.get("layer_key") or "") == "model_group":
-                return task
     if status.lock.status == "active" and internal_stage:
         for task in current_tasks:
             if str(task.get("task_id") or "") == internal_stage:
                 return task
     if status.lock.status == "active":
+        model_group_task = model_group_current_task(current_tasks)
+        if model_group_task is not None:
+            return model_group_task
+    if status.lock.status == "active":
         for task in current_tasks:
             if str(task.get("layer_key") or "") != "model_group":
                 return task
-    for task in current_tasks:
-        if str(task.get("layer_key") or "") == "model_group":
-            return task
+    model_group_task = model_group_current_task(current_tasks)
+    if model_group_task is not None:
+        return model_group_task
     ready_tasks: list[dict[str, Any]] = []
     for task in task_timeline:
         if str(task.get("status") or "") == "ready":
@@ -1123,6 +1141,18 @@ def _owner_status(
                 "action_required",
                 "medium",
                 f"Historical workflow requires review at {label} for {period}.",
+            )
+        if task_status in {"rejected", "failed", "not_eligible", "ineligible"}:
+            if str(public_active_task.get("task_id") or "") == "model_group.promotion":
+                return (
+                    "complete",
+                    "info",
+                    f"Model Evaluation completed; Model Promotion is {task_status} for {period}.",
+                )
+            return (
+                "complete",
+                "info",
+                f"Historical workflow reached terminal status {task_status} at {label} for {period}.",
             )
         if status.lock.status == "active":
             return (
@@ -3583,6 +3613,16 @@ def _replay_month_operation_detail(dataset_root: Path) -> dict[str, Any] | None:
 
 
 def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | None:
+    latest = _latest_replay_execution_receipt_artifact(dataset_root)
+    return latest[1] if latest is not None else None
+
+
+def _latest_replay_execution_receipt_path(dataset_root: Path) -> Path | None:
+    latest = _latest_replay_execution_receipt_artifact(dataset_root)
+    return latest[0] if latest is not None else None
+
+
+def _latest_replay_execution_receipt_artifact(dataset_root: Path) -> tuple[Path, dict[str, Any]] | None:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
         return None
@@ -3599,8 +3639,8 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
         candidates.append((created, receipt_path, receipt))
     if not candidates:
         return None
-    _created, _receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
-    return dict(receipt)
+    _created, receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
+    return receipt_path, dict(receipt)
 
 
 def _replay_receipt_has_full_completion_scope(receipt: Mapping[str, Any]) -> bool:
@@ -3889,6 +3929,7 @@ def _latest_promotion_review_artifacts(
     *,
     residual_event_governance_receipt_ref: str | None,
     residual_event_governance_event_focus_proposals_ref: str | None = None,
+    replay_validation_ref: str | None = None,
 ) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
     if not review_root.exists():
@@ -3909,6 +3950,11 @@ def _latest_promotion_review_artifacts(
             if receipt is None:
                 continue
             if str(receipt.get("residual_event_governance_event_focus_proposals_ref") or "") != residual_event_governance_event_focus_proposals_ref:
+                continue
+        if replay_validation_ref is not None:
+            decision_replay_ref = str(decision.get("replay_validation_ref") or "")
+            receipt_replay_ref = str((receipt or {}).get("replay_execution_receipt_ref") or "")
+            if replay_validation_ref not in {decision_replay_ref, receipt_replay_ref}:
                 continue
         review_path = decision_path.parent / "promotion_evaluation_review.json"
         review = _load_optional_json_object(review_path)
@@ -4236,6 +4282,8 @@ def _model_group_replay_timeline_tasks(
         if attribution_artifacts and attribution_artifacts.get("receipt_refs")
         else None
     )
+    latest_replay_receipt_path = _latest_replay_execution_receipt_path(dataset_root)
+    latest_replay_receipt_ref = str(latest_replay_receipt_path) if latest_replay_receipt_path is not None else None
     promotion_artifacts = (
         _latest_promotion_review_artifacts(
             dataset_root,
@@ -4245,12 +4293,20 @@ def _model_group_replay_timeline_tasks(
         if lifecycle_artifacts_allowed and event_focus_complete
         else None
     )
+    if promotion_artifacts is None and lifecycle_artifacts_allowed and latest_replay_receipt_ref:
+        promotion_artifacts = _latest_promotion_review_artifacts(
+            dataset_root,
+            residual_event_governance_receipt_ref=None,
+            replay_validation_ref=latest_replay_receipt_ref,
+        )
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
     promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
     promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")
     promotion_complete = promotion_decision is not None
     promotion_eligible = promotion_decision_status == "eligible"
-    promotion_terminal_not_eligible = promotion_complete and not promotion_eligible
+    promotion_requires_review = promotion_decision_status == "review_required"
+    promotion_terminal_not_eligible = promotion_complete and not promotion_eligible and not promotion_requires_review
+    promotion_not_admitted = promotion_complete and not promotion_eligible
     readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root) if lifecycle_artifacts_allowed and promotion_eligible else None
     readiness_record = readiness_artifacts["readiness"] if readiness_artifacts else None
     readiness_complete = (
@@ -4408,7 +4464,7 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.promotion",
         label="Model Promotion",
-        task_state="completed" if promotion_complete else ("current" if evaluation_complete else "future"),
+        task_state="current" if promotion_terminal_not_eligible else ("completed" if promotion_complete else ("current" if evaluation_complete else "future")),
         status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if evaluation_complete else "blocked",
         reason=(
             str(promotion_decision.get("decision_reason") or "Promotion review completed.") if promotion_decision else
@@ -4430,24 +4486,24 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.maintenance",
         label="Model Maintenance",
-        task_state="completed" if readiness_complete else ("skipped" if promotion_terminal_not_eligible else ("current" if promotion_eligible else "future")),
-        status="succeeded" if readiness_complete else ("not_applicable" if promotion_terminal_not_eligible else ("ready" if promotion_eligible else "blocked")),
+        task_state="completed" if readiness_complete else ("skipped" if promotion_not_admitted else ("current" if promotion_eligible else "future")),
+        status="succeeded" if readiness_complete else ("not_applicable" if promotion_not_admitted else ("ready" if promotion_eligible else "blocked")),
         reason=(
             "Promotion readiness handoff is complete; execution can admit the promoted model group to market-hours shadow review."
             if readiness_complete
             else "Promotion review did not admit this candidate, so maintenance/shadow handoff is not applicable."
-            if promotion_terminal_not_eligible
+            if promotion_not_admitted
             else
             "Model-group candidate is eligible for maintenance handoff after promotion."
             if promotion_eligible
             else "Waiting for eligible model-group promotion before maintenance can run."
         ),
         receipt_refs=list(readiness_artifacts["receipt_refs"]) if readiness_artifacts else None,
-        blockers=[] if (promotion_eligible or promotion_terminal_not_eligible) else ["model_group.promotion"],
+        blockers=[] if (promotion_eligible or promotion_not_admitted) else ["model_group.promotion"],
         stage_type="maintenance",
         progress=(
             _model_group_maintenance_not_applicable_progress()
-            if promotion_terminal_not_eligible
+            if promotion_not_admitted
             else _model_group_maintenance_progress(
                 status="succeeded" if readiness_complete else ("ready" if promotion_eligible else "blocked"),
                 promotion_decision=promotion_decision,

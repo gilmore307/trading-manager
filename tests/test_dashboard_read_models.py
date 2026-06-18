@@ -329,12 +329,24 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "max_decision_rows": None,
                     "validation_status": "passed",
                 },
+                "layer2_handoff": {
+                    "contract_type": "evaluation_replay_execution_run",
+                    "replay_execution_run_id": "layer2_handoff",
+                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "target_refs": ["AAPL"],
+                    "asset_class_counts": {"us_equity": 1},
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                    "replay_completion_scope": "full_candidate_universe",
+                    "max_decision_rows": None,
+                    "validation_status": "passed",
+                },
             }.items():
                 run_root = replay_root / run_id
                 run_root.mkdir()
                 (run_root / "replay_execution_receipt.json").write_text(json.dumps(receipt) + "\n", encoding="utf-8")
 
-            self.assertEqual(_compatible_replay_run_ids(dataset_root=dataset_root), {"canonical"})
+            self.assertEqual(_compatible_replay_run_ids(dataset_root=dataset_root), {"canonical", "layer2_handoff"})
 
     def _write_post_replay_attribution_receipt(self, replay_root: Path) -> Path:
         receipt_root = replay_root / "post_replay_attribution_runs" / "fixture"
@@ -1485,7 +1497,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
                         "replay_completion_scope": "full_candidate_universe",
                         "max_decision_rows": None,
                         "validation_status": "passed",
@@ -2249,7 +2261,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
                         "replay_completion_scope": "full_candidate_universe",
                         "max_decision_rows": None,
                         "validation_status": "passed",
@@ -2337,6 +2349,125 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(maintenance_task["task_state"], "skipped")
         self.assertEqual(maintenance_task["detail"]["blockers"], [])
         self.assertEqual(maintenance_task["detail"]["progress"]["ready_count"], 4)
+
+    def test_model_group_promotion_rejected_is_public_terminal_task(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            review_root = replay_root / "promotion_review_runs" / "model_group_replay_fixture"
+            review_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 2,
+                        "available_feed_acquisition_count": 2,
+                        "missing_feed_acquisition_count": 0,
+                        "pre_replay_target_refs": ["AAPL"],
+                        "target_refs": ["AAPL"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "feed_acquisition_plan.csv").write_text(
+                "month\n2021-01\n2021-02\n",
+                encoding="utf-8",
+            )
+            replay_run = replay_root / "replay_execution_runs" / "model_group_replay_fixture"
+            replay_run.mkdir(parents=True, exist_ok=True)
+            (replay_run / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": "model_group_replay_fixture",
+                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "pre_replay_target_refs": ["AAPL"],
+                        "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "replay_completion_scope": "full_candidate_universe",
+                        "max_decision_rows": None,
+                        "validation_status": "passed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "replay_progress.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "model_group_replay_fixture", "month": "2021-01", "status": "completed"}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "model_group_replay_fixture", "month": "2021-02", "status": "completed"}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (review_root / "model_group_evaluation_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "model_group_evaluation_receipt",
+                        "status": "succeeded",
+                        "created_at_utc": "2026-05-22T12:50:00Z",
+                        "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (review_root / "promotion_evaluation_review.json").write_text(
+                json.dumps(
+                    {
+                        "recommendation": "failed",
+                        "blocking_issues": ["settlement gate failure: drawdown_too_severe"],
+                        "created_at_utc": "2026-05-22T12:50:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (review_root / "promotion_eligibility_decision.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "promotion_eligibility_decision",
+                        "decision_status": "rejected",
+                        "decision_reason": "Candidate failed drawdown guardrail.",
+                        "replay_validation_ref": str(replay_run / "replay_execution_receipt.json"),
+                        "created_at_utc": "2026-05-22T12:50:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            self._write_completed_pre_replay_fold(tmp / "storage" / "02_control_plane" / "runtime", symbol="AAPL")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:51:00Z")
+
+        promotion_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.promotion")
+        maintenance_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.maintenance")
+        self.assertEqual(promotion_task["status"], "rejected")
+        self.assertEqual(promotion_task["task_state"], "current")
+        self.assertEqual(promotion_task["detail"]["blockers"], ["settlement gate failure: drawdown_too_severe"])
+        self.assertEqual(payload["status"], "complete")
+        self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.promotion")
+        self.assertEqual(payload["chart_payload"]["active_task"]["task_label"], "Model Promotion")
+        self.assertEqual(payload["chart_payload"]["active_task"]["status"], "rejected")
+        self.assertIn("Model Evaluation completed; Model Promotion is rejected", payload["summary"])
+        self.assertNotIn("current public task is Model Replay", payload["summary"])
+        self.assertEqual(maintenance_task["status"], "not_applicable")
+        self.assertEqual(maintenance_task["task_state"], "skipped")
 
     def test_model_group_maintenance_completes_from_readiness_record(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
