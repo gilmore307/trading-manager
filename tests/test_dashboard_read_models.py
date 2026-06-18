@@ -15,6 +15,7 @@ from trading_manager_tasks.dashboard_read_models import (
     _attach_task_error_context,
     _close_global_nonblocking_agent_errors,
     _agent_error_summary,
+    _compatible_replay_run_ids,
     _mark_superseded_agent_errors,
     _model_group_replay_timeline_tasks,
     _stage_id_from_error_row,
@@ -289,6 +290,51 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         env.write_text("TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\n", encoding="utf-8")
         wrapper.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
         return service, env, wrapper
+
+    def test_dashboard_replay_run_filter_requires_canonical_full_universe_receipts(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            dataset_root = Path(raw_tmp) / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            replay_root = dataset_root / "replay_execution_runs"
+            replay_root.mkdir(parents=True)
+            for run_id, receipt in {
+                "legacy": {
+                    "contract_type": "evaluation_replay_execution_run",
+                    "replay_execution_run_id": "legacy",
+                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "target_refs": ["AAPL"],
+                    "asset_class_counts": {"us_equity": 1},
+                    "validation_status": "passed",
+                },
+                "bounded": {
+                    "contract_type": "evaluation_replay_execution_run",
+                    "replay_execution_run_id": "bounded",
+                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "target_refs": ["AAPL"],
+                    "asset_class_counts": {"us_equity": 1},
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                    "replay_completion_scope": "bounded_diagnostic",
+                    "max_decision_rows": 5000,
+                    "validation_status": "passed",
+                },
+                "canonical": {
+                    "contract_type": "evaluation_replay_execution_run",
+                    "replay_execution_run_id": "canonical",
+                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "target_refs": ["AAPL", "MSFT"],
+                    "asset_class_counts": {"us_equity": 2},
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                    "replay_completion_scope": "full_candidate_universe",
+                    "max_decision_rows": None,
+                    "validation_status": "passed",
+                },
+            }.items():
+                run_root = replay_root / run_id
+                run_root.mkdir()
+                (run_root / "replay_execution_receipt.json").write_text(json.dumps(receipt) + "\n", encoding="utf-8")
+
+            self.assertEqual(_compatible_replay_run_ids(dataset_root=dataset_root), {"canonical"})
 
     def _write_post_replay_attribution_receipt(self, replay_root: Path) -> Path:
         receipt_root = replay_root / "post_replay_attribution_runs" / "fixture"
@@ -1276,6 +1322,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "replay_completion_scope": "full_candidate_universe",
+                        "max_decision_rows": None,
                         "validation_status": "passed",
                         "generated_at_utc": "2026-05-22T12:30:00Z",
                         "decision_rows_ref": str(decision_rows_path),
@@ -2033,6 +2084,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "replay_completion_scope": "full_candidate_universe",
+                        "max_decision_rows": None,
                         "validation_status": "passed",
                     }
                 )
@@ -2153,6 +2209,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "replay_completion_scope": "full_candidate_universe",
+                        "max_decision_rows": None,
                         "validation_status": "passed",
                     }
                 )

@@ -85,6 +85,9 @@ MODEL_GROUP_MAINTENANCE_DATA_KINDS = (
     "promotion_readiness_record",
     "activation_guardrails",
 )
+CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
+FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE = "fixed_current_snapshot_historical_candidate_universe"
+CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES = {FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE}
 RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES = {
     "post_replay_residual_event_governance_receipt",
     "model_06_residual_event_governance_event_attribution_receipt",
@@ -3404,7 +3407,7 @@ def _compatible_replay_run_ids(*, dataset_root: Path) -> set[str]:
         receipt = _load_optional_json_object(receipt_path)
         if receipt is None:
             continue
-        if "current_deterministic_crypto_policy" in str(receipt.get("candidate_model_ref") or ""):
+        if not _replay_receipt_is_dashboard_compatible(receipt):
             continue
         run_id = str(receipt.get("replay_execution_run_id") or receipt_path.parent.name).strip()
         if run_id:
@@ -3583,12 +3586,45 @@ def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | Non
             continue
         if str(receipt.get("validation_status") or "") not in {"", "passed", "succeeded"}:
             continue
+        if not _replay_receipt_is_dashboard_compatible(receipt):
+            continue
         created = str(receipt.get("generated_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt_path, receipt))
     if not candidates:
         return None
     _created, _receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
     return dict(receipt)
+
+
+def _replay_receipt_has_full_completion_scope(receipt: Mapping[str, Any]) -> bool:
+    completion_scope = str(receipt.get("replay_completion_scope") or "").strip()
+    if completion_scope:
+        return completion_scope == "full_candidate_universe" and receipt.get("max_decision_rows") is None
+    return receipt.get("max_decision_rows") is None
+
+
+def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -> bool:
+    target_refs = _string_set(receipt.get("target_refs") or receipt.get("pre_replay_target_refs"))
+    asset_class_counts = receipt.get("asset_class_counts")
+    if not isinstance(asset_class_counts, Mapping):
+        asset_class_counts = {}
+    has_equity_or_option_scope = (
+        any(ref and ref not in CRYPTO_REPLAY_TARGET_REFS for ref in target_refs)
+        or _int_field(asset_class_counts, "us_equity") > 0
+        or _int_field(asset_class_counts, "us_option") > 0
+    )
+    if not has_equity_or_option_scope:
+        return True
+    return (
+        str(receipt.get("candidate_handoff_status") or "") == "available"
+        and str(receipt.get("candidate_handoff_source") or "") in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
+    )
+
+
+def _replay_receipt_is_dashboard_compatible(receipt: Mapping[str, Any]) -> bool:
+    if "current_deterministic_crypto_policy" in str(receipt.get("candidate_model_ref") or ""):
+        return False
+    return _replay_receipt_has_full_completion_scope(receipt) and _replay_receipt_uses_current_candidate_handoff(receipt)
 
 
 def _latest_replay_decision_rows_path(dataset_root: Path) -> Path | None:
