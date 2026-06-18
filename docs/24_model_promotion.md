@@ -66,6 +66,17 @@ reported as separate oracle diagnostics, but they must not become
 layers unless their candidate set was point-in-time feasible inside the current
 selected path.
 
+Replay review is hindsight grading over point-in-time available choices. It may
+use future realized returns, drawdown, slippage, missed opportunity, and related
+outcome windows to score each action that was actually available at decision
+time. Future outcomes are review labels, not replay inputs: they must not expand
+the candidate set, alter the point-in-time decision state, or create downstream
+training/scoring features without preserving timestamp boundaries. The core
+review question is which action later proved best within the `available_action`
+set at timestamp `t`, how far the chosen action lagged that best available
+action, and which component first caused the gap through filtering, ranking,
+gating, sizing, timing, or execution.
+
 Replay review is only the first post-replay diagnostic step. A
 `post_replay_review_receipt` may identify failed fills, missed winners,
 and other candidate failure rows, but it does not satisfy M06
