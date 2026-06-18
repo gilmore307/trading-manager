@@ -363,9 +363,15 @@ class RegistryHelperTests(unittest.TestCase):
             "candidate_handoff_source=fixed_current_snapshot_historical_candidate_universe",
             candidate_input["payload"],
         )
+        self.assertIn(
+            "target_candidate_handoff_source=layer_02_target_candidate_handoff",
+            candidate_input["payload"],
+        )
         self.assertIn("historical_candidate_universe.csv", candidate_input["payload"])
         self.assertIn("target_candidate_handoff_forbidden_for_canonical_replay", candidate_input["payload"])
+        self.assertIn("layer_02_target_candidate_handoff", candidate_input["applies_to"])
         self.assertIn("fixed historical candidate-universe artifact", candidate_input["note"])
+        self.assertIn("dashboard compatibility paths", candidate_input["note"])
         initial_capital = rows["EVALUATION_REPLAY_INITIAL_CAPITAL_USD"]
         self.assertEqual(initial_capital["payload_format"], "decimal")
         self.assertEqual(initial_capital["payload"], "25000.0")
