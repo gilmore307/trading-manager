@@ -1096,7 +1096,26 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
         fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2"]
-        self.assertEqual(len(fold1_tasks), 15)
+        self.assertEqual(len(fold1_tasks), 14)
+        self.assertEqual(
+            [task["task_label"] for task in fold1_tasks],
+            [
+                "Layer 01 Fixture",
+                "Layer 02 Fixture",
+                "Layer 03 Fixture",
+                "Layer 04 Fixture",
+                "Layer 05 Fixture",
+                "Layer 07 Fixture",
+                "Layer 08 Fixture",
+                "Layer 09 Fixture",
+                "Model Replay",
+                "Replay Review",
+                "M06 Event Risk Governor",
+                "Model Evaluation",
+                "Model Promotion",
+                "Model Maintenance",
+            ],
+        )
         self.assertTrue(fold2_tasks)
         blocked_fold2_tasks = [task for task in fold2_tasks if task["task_state"] == "blocked"]
         self.assertTrue(blocked_fold2_tasks)
@@ -1261,7 +1280,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         replay_task = next(task for task in tasks if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["task_state"], "future")
         self.assertEqual(replay_task["status"], "blocked")
-        self.assertEqual(replay_task["detail"]["blockers"], ["fold_models_01_06_model_generation_complete"])
+        self.assertEqual(replay_task["detail"]["blockers"], ["fold_models_01_05_model_generation_complete"])
         self.assertNotIn("replay_month_operation", replay_task["detail"])
         self.assertNotIn("Replay month 2025-12 is incomplete", replay_task["reason"])
         self.assertIn("Waiting for pre-replay Layer 1-9 model generation", replay_task["reason"])
@@ -4101,7 +4120,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             ],
         )
         self.assertTrue(all(task["task_state"] == "blocked" for task in lifecycle_tasks))
-        self.assertEqual(lifecycle_tasks[0]["detail"]["blockers"], ["fold_models_01_06_model_generation_complete"])
+        self.assertEqual(lifecycle_tasks[0]["detail"]["blockers"], ["fold_models_01_05_model_generation_complete"])
         fold_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]

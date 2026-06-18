@@ -1864,11 +1864,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["PROMOTION_STAGE_TYPE"]["payload"], "promotion_review")
         self.assertEqual(
             rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["payload"],
-            "pinned_models_01_06_generation_then_replay_and_residual_event_governance_complete",
+            "pinned_models_01_05_generation_then_replay_and_residual_event_governance_complete",
         )
         self.assertIn("all-or-nothing", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
         self.assertIn("residual-event governance attribution", rows["FOLD_STACK_PROMOTION_GATE_POLICY"]["note"])
-        self.assertIn("fold_models_01_06_model_generation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
+        self.assertIn("fold_models_01_05_model_generation_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertIn("residual_event_governance_attribution_complete_required", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertEqual(
             rows["MODEL_REPLAY_CANDIDATE_SELECTION_POLICY"]["payload"],
@@ -1904,7 +1904,7 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("model_01_03_historical_catch_up_to_current_required", rows["MODEL_TRAINING_WORKFLOW_CURRENT_BLOCKERS"]["payload"])
         self.assertIn("model_05_option_expression.option_chain_data_acquisition_complete", rows["MODEL_TRAINING_WORKFLOW_CURRENT_BLOCKERS"]["payload"])
-        self.assertIn("m01_m06_pre_replay_boundary", rows["MODEL_TRAINING_WORKFLOW_CURRENT_STACK_POLICY"]["payload"])
+        self.assertIn("m01_m05_pre_replay_boundary", rows["MODEL_TRAINING_WORKFLOW_CURRENT_STACK_POLICY"]["payload"])
         self.assertIn("live_trading_capacity_reserved", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("historical_worker_count_capacity_adaptive", rows["MANAGER_RESOURCE_BUDGET_POLICY"]["payload"])
         self.assertIn("pre_promotion_full_training_mode", rows["MANAGER_MARKET_HOURS_HISTORICAL_PAUSE_POLICY"]["payload"])

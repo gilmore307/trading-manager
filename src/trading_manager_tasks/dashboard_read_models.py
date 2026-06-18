@@ -2200,6 +2200,12 @@ def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
             continue
+        try:
+            layer = int(raw_stage.get("layer"))
+        except (TypeError, ValueError):
+            layer = 0
+        if layer == 6 and str(raw_stage.get("stage_type") or "") == "model_generation":
+            continue
         if _is_fold_dashboard_stage(raw_stage):
             visible.append(raw_stage)
     return visible
@@ -4266,7 +4272,7 @@ def _model_group_replay_timeline_tasks(
 
     replay_blockers: list[str] = []
     if not pre_replay_complete:
-        replay_blockers.append("fold_models_01_06_model_generation_complete")
+        replay_blockers.append("fold_models_01_05_model_generation_complete")
     elif manifest is None:
         replay_blockers.append("replay_dataset_preparation_manifest")
     elif not replay_scope_status["compatible"]:
