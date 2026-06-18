@@ -59,6 +59,8 @@ DEFAULT_RUNTIME_DIR = manager_storage_root() / "runtime"
 DEFAULT_STATE_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_state.json"
 DEFAULT_LOCK_PATH = DEFAULT_DAEMON_LOCK_PATH
 DEFAULT_DECISION_LOG_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_decisions.jsonl"
+DEFAULT_REPLAY_OPTION_FEATURE_DRAIN_STATUS_JSONL_PATH = DEFAULT_RUNTIME_DIR / "replay_option_feature_drain_status.jsonl"
+DEFAULT_REPLAY_OPTION_FEATURE_DRAIN_LATEST_JSON_PATH = DEFAULT_RUNTIME_DIR / "replay_option_feature_drain_latest.json"
 DEFAULT_INTERVAL_SECONDS = 300.0
 DEFAULT_STALE_LOCK_SECONDS = 6 * 60 * 60
 DEFAULT_DRAIN_MAX_STEPS = 50
@@ -1617,10 +1619,13 @@ def _drain_replay_option_feature_backoff(
     feature_repair_limit: int,
     max_steps: int,
     max_seconds: float,
+    status_jsonl_path: Path | None = None,
+    latest_status_json_path: Path | None = None,
 ) -> list[SchedulerDecision]:
     decisions: list[SchedulerDecision] = []
     started = time.monotonic()
-    for _ in range(max(1, max_steps)):
+    for step_index in range(1, max(1, max_steps) + 1):
+        step_started = time.monotonic()
         decision = run_model_group_replay_option_features_for_replay_backoff(
             replay_decision,
             storage_root=storage_root,
@@ -1633,6 +1638,14 @@ def _drain_replay_option_feature_backoff(
         if decision is None:
             break
         decisions.append(decision)
+        _emit_replay_option_feature_drain_status(
+            decision,
+            batch_index=step_index,
+            batch_size=provider_acquisition_limit,
+            elapsed_seconds=round(time.monotonic() - step_started, 3),
+            status_jsonl_path=status_jsonl_path,
+            latest_status_json_path=latest_status_json_path,
+        )
         if decision.decision_status != "executed":
             break
         if decision.reason_code == "model_group_replay_option_features_already_ready":
@@ -1640,6 +1653,46 @@ def _drain_replay_option_feature_backoff(
         if max_seconds > 0 and time.monotonic() - started >= max_seconds:
             break
     return decisions
+
+
+def _emit_replay_option_feature_drain_status(
+    decision: SchedulerDecision,
+    *,
+    batch_index: int,
+    batch_size: int,
+    elapsed_seconds: float,
+    status_jsonl_path: Path | None,
+    latest_status_json_path: Path | None,
+) -> None:
+    if status_jsonl_path is None and latest_status_json_path is None:
+        return
+    row = decision.summary_row()
+    execution = row.get("execution_summary") if isinstance(row.get("execution_summary"), dict) else {}
+    payload = {
+        "contract_type": "manager_model_group_replay_option_feature_drain_status",
+        "event": "batch_complete",
+        "batch_index": batch_index,
+        "batch_size": batch_size,
+        "elapsed_seconds": elapsed_seconds,
+        "emitted_at_utc": utc_now_iso(),
+        "selected_work": row.get("selected_work") or "model_group.replay_option_features",
+        "decision_status": row.get("decision_status"),
+        "reason_code": row.get("reason_code"),
+        "provider_calls": row.get("provider_calls"),
+        "batch_count": execution.get("batch_count"),
+        "source_missing_count": execution.get("source_missing_count"),
+        "source_ready_count": execution.get("source_ready_count"),
+        "option_source_unavailable_count": execution.get("option_source_unavailable_count"),
+        "required_next_step": execution.get("required_next_step"),
+        "resume_stage_id": execution.get("resume_stage_id"),
+    }
+    if status_jsonl_path is not None:
+        status_jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+        with status_jsonl_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, sort_keys=True) + "\n")
+    if latest_status_json_path is not None:
+        latest_status_json_path.parent.mkdir(parents=True, exist_ok=True)
+        latest_status_json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _pending_replay_option_feature_backoff_decision(*, storage_root: Path) -> SchedulerDecision | None:
@@ -1765,6 +1818,8 @@ def run_daemon_loop(
     state_path: Path = DEFAULT_STATE_PATH,
     lock_path: Path = DEFAULT_LOCK_PATH,
     decision_log_path: Path = DEFAULT_DECISION_LOG_PATH,
+    replay_option_feature_drain_status_jsonl_path: Path | None = None,
+    replay_option_feature_drain_latest_json_path: Path | None = None,
     interval_seconds: float = DEFAULT_INTERVAL_SECONDS,
     max_iterations: int | None = None,
     execute_safe_preparation: bool = False,
@@ -1803,6 +1858,14 @@ def run_daemon_loop(
     """
 
     month_ingest_workers = 1
+    replay_option_feature_drain_status_jsonl_path = (
+        replay_option_feature_drain_status_jsonl_path
+        or decision_log_path.parent / DEFAULT_REPLAY_OPTION_FEATURE_DRAIN_STATUS_JSONL_PATH.name
+    )
+    replay_option_feature_drain_latest_json_path = (
+        replay_option_feature_drain_latest_json_path
+        or decision_log_path.parent / DEFAULT_REPLAY_OPTION_FEATURE_DRAIN_LATEST_JSON_PATH.name
+    )
     acquire_daemon_lock(lock_path)
     state = load_daemon_state(
         state_path,
@@ -2015,6 +2078,8 @@ def run_daemon_loop(
                                 feature_repair_limit=replay_option_feature_repair_limit,
                                 max_steps=drain_max_steps,
                                 max_seconds=drain_max_seconds,
+                                status_jsonl_path=replay_option_feature_drain_status_jsonl_path,
+                                latest_status_json_path=replay_option_feature_drain_latest_json_path,
                             )
                             for replay_option_feature_decision in replay_option_feature_decisions:
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
@@ -2085,6 +2150,8 @@ def run_daemon_loop(
                                 feature_repair_limit=replay_option_feature_repair_limit,
                                 max_steps=drain_max_steps,
                                 max_seconds=drain_max_seconds,
+                                status_jsonl_path=replay_option_feature_drain_status_jsonl_path,
+                                latest_status_json_path=replay_option_feature_drain_latest_json_path,
                             )
                             for replay_option_feature_decision in replay_option_feature_decisions:
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
@@ -2327,6 +2394,8 @@ def run_daemon_loop(
                                 feature_repair_limit=replay_option_feature_repair_limit,
                                 max_steps=drain_max_steps,
                                 max_seconds=drain_max_seconds,
+                                status_jsonl_path=replay_option_feature_drain_status_jsonl_path,
+                                latest_status_json_path=replay_option_feature_drain_latest_json_path,
                             )
                             for replay_option_feature_decision in replay_option_feature_decisions:
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
@@ -2381,6 +2450,8 @@ def run_daemon_loop(
                                 feature_repair_limit=replay_option_feature_repair_limit,
                                 max_steps=drain_max_steps,
                                 max_seconds=drain_max_seconds,
+                                status_jsonl_path=replay_option_feature_drain_status_jsonl_path,
+                                latest_status_json_path=replay_option_feature_drain_latest_json_path,
                             )
                             for replay_option_feature_decision in replay_option_feature_decisions:
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
@@ -2528,6 +2599,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--state-path", type=Path, default=DEFAULT_STATE_PATH)
     parser.add_argument("--lock-path", type=Path, default=DEFAULT_LOCK_PATH)
     parser.add_argument("--decision-log-path", type=Path, default=DEFAULT_DECISION_LOG_PATH)
+    parser.add_argument(
+        "--replay-option-feature-drain-status-jsonl-path",
+        type=Path,
+        help="JSONL status path for per-batch replay option-feature drain progress. Defaults beside --decision-log-path.",
+    )
+    parser.add_argument(
+        "--replay-option-feature-drain-latest-json-path",
+        type=Path,
+        help="Latest JSON status path for replay option-feature drain progress. Defaults beside --decision-log-path.",
+    )
     parser.add_argument("--interval-seconds", type=float, default=DEFAULT_INTERVAL_SECONDS)
     parser.add_argument("--max-iterations", type=int, help="Run a bounded number of daemon iterations for smoke tests.")
     parser.add_argument("--once", action="store_true", help="Alias for --max-iterations 1.")
@@ -2580,6 +2661,8 @@ def main(argv: list[str] | None = None) -> int:
         state_path=args.state_path,
         lock_path=args.lock_path,
         decision_log_path=args.decision_log_path,
+        replay_option_feature_drain_status_jsonl_path=args.replay_option_feature_drain_status_jsonl_path,
+        replay_option_feature_drain_latest_json_path=args.replay_option_feature_drain_latest_json_path,
         interval_seconds=args.interval_seconds,
         max_iterations=max_iterations,
         execute_safe_preparation=args.execute_safe_preparation,

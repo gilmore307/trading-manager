@@ -2174,11 +2174,19 @@ class SchedulerDaemonTests(unittest.TestCase):
             repair.assert_called_once()
             replay.assert_not_called()
             log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
+            status_jsonl = decision_log.parent / "replay_option_feature_drain_status.jsonl"
+            latest_status_json = decision_log.parent / "replay_option_feature_drain_latest.json"
+            status_rows = [json.loads(line) for line in status_jsonl.read_text(encoding="utf-8").splitlines()]
+            latest_status = json.loads(latest_status_json.read_text(encoding="utf-8"))
 
         self.assertEqual(
             [row["reason_code"] for row in log_rows],
             ["no_month_stage_ready", "model_group_replay_option_source_acquisition_required"],
         )
+        self.assertEqual(len(status_rows), 1)
+        self.assertEqual(status_rows[0]["event"], "batch_complete")
+        self.assertEqual(status_rows[0]["reason_code"], "model_group_replay_option_source_acquisition_required")
+        self.assertEqual(latest_status["reason_code"], "model_group_replay_option_source_acquisition_required")
 
     def test_daemon_can_trigger_event_dashboard_refresh_after_executed_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

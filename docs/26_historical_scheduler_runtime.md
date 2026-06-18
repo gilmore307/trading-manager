@@ -79,6 +79,11 @@ timestamp so replay can continue through a no-option expression path instead of
 repeating the same provider request. It must not derive option downloads from
 all equity bars, and it must not perform broker/order/fill/account mutation,
 production model activation, or promoted-roster changes.
+Both the daemon and the manual drain script write per-batch progress to
+`runtime/replay_option_feature_drain_status.jsonl` and
+`runtime/replay_option_feature_drain_latest.json` so long provider-gated drains
+remain observable before the scheduler decision log receives its end-of-drain
+rows.
 
 After replay has M05 features and selects concrete listed option contracts, the
 separate `model_group.replay_contract_paths` stage prepares
