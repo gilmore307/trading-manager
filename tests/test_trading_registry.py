@@ -397,7 +397,10 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(drain_status["kind"], "artifact_type")
         self.assertEqual(drain_status["payload"], "manager_model_group_replay_option_feature_drain_status")
         self.assertIn("drain_model_group_replay_option_features.py", drain_status["path"])
+        self.assertIn("scheduler_daemon.py", drain_status["path"])
         self.assertIn("drain_status", drain_status["applies_to"])
+        self.assertIn("runtime/replay_option_feature_drain_status.jsonl", drain_status["applies_to"])
+        self.assertIn("runtime/replay_option_feature_drain_latest.json", drain_status["applies_to"])
         backoff_policy = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_BACKOFF_PAYLOAD_POLICY"]
         self.assertIn("requirements_artifact_ref=option_feature_requirements.jsonl", backoff_policy["payload"])
         self.assertIn(
@@ -412,6 +415,12 @@ class RegistryHelperTests(unittest.TestCase):
             replay_option_policy["payload"],
         )
         self.assertIn("option_feature_requirement_policy", replay_option_policy["applies_to"])
+        drain_limits = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_DRAIN_LIMITS"]
+        self.assertIn("replay_option_feature_repair_limit=5000", drain_limits["payload"])
+        self.assertIn("feature_repair_limit_cli_defaults_to_batch_size", drain_limits["payload"])
+        self.assertIn("provider_stage_next_limit", drain_limits["applies_to"])
+        self.assertIn("feature_repair_limit", drain_limits["applies_to"])
+        self.assertIn("without the provider gate", drain_limits["note"])
         requirements_ref = rows["OPTION_FEATURE_REQUIREMENTS_ARTIFACT_REF"]
         self.assertEqual(requirements_ref["kind"], "path_field")
         self.assertEqual(requirements_ref["payload"], "requirements_artifact_ref")
