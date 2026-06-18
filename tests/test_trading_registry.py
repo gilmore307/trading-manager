@@ -393,6 +393,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(requirements_artifact["payload"], "replay_option_feature_requirements")
         self.assertIn("option_feature_requirements.jsonl", requirements_artifact["applies_to"])
         self.assertIn("requirements_artifact_ref", requirements_artifact["applies_to"])
+        replay_execution = rows["EVALUATION_REPLAY_EXECUTION_RUN"]
+        self.assertIn("run_replay_execution.py", replay_execution["path"])
+        self.assertIn("portfolio_replay_policy", replay_execution["applies_to"])
+        self.assertIn("portfolio_selection_summary", replay_execution["applies_to"])
+        self.assertIn("finite-capital portfolio selection policy", replay_execution["note"])
         trace_audit = rows["EVALUATION_REPLAY_PORTFOLIO_TRACE_AUDIT"]
         self.assertEqual(trace_audit["payload"], "candidate_policy_portfolio_trace_audit")
         self.assertIn("build_replay_portfolio_trace_audit.py", trace_audit["path"])
@@ -406,11 +411,23 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("max_trace_timestamps=20", trace_defaults["payload"])
         self.assertIn("max_positions=5", trace_defaults["payload"])
         self.assertIn("position_notional_fraction=0.20", trace_defaults["payload"])
+        selection_defaults = rows["EVALUATION_REPLAY_PORTFOLIO_SELECTION_DEFAULTS"]
+        self.assertIn("portfolio_max_positions=5", selection_defaults["payload"])
+        self.assertIn("portfolio_position_notional_fraction=0.20", selection_defaults["payload"])
+        self.assertIn("portfolio_switch_minimum_rank_score_delta=0.05", selection_defaults["payload"])
+        self.assertIn("run_replay_execution.py", selection_defaults["path"])
+        self.assertIn("portfolio_replay_policy", selection_defaults["applies_to"])
         trace_script = rows["TRADING_EVALUATION_BUILD_REPLAY_PORTFOLIO_TRACE_AUDIT"]
         self.assertEqual(trace_script["kind"], "script")
         self.assertIn("build_replay_portfolio_trace_audit.py", trace_script["path"])
         self.assertIn("candidate_policy_portfolio_trace_audit", trace_script["applies_to"])
         self.assertIn("no provider calls", trace_script["note"])
+        replay_script = rows["TRADING_EVALUATION_RUN_REPLAY_EXECUTION"]
+        self.assertEqual(replay_script["kind"], "script")
+        self.assertIn("run_replay_execution.py", replay_script["path"])
+        self.assertIn("evaluation_replay_execution_run", replay_script["applies_to"])
+        self.assertIn("portfolio_replay_policy", replay_script["applies_to"])
+        self.assertIn("no provider calls", replay_script["note"])
         drain_status = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_DRAIN_STATUS"]
         self.assertEqual(drain_status["kind"], "artifact_type")
         self.assertEqual(drain_status["payload"], "manager_model_group_replay_option_feature_drain_status")
