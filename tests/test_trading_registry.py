@@ -2496,6 +2496,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("te_release_fetcher", release_fetcher["applies_to"])
         self.assertIn("Single shared TE release-fetch worker", release_fetcher["note"])
 
+        release_queue_artifact = registry["TRADING_ECONOMICS_RELEASE_FETCH_QUEUE"]
+        self.assertEqual(release_queue_artifact["kind"], "artifact_type")
+        self.assertEqual(release_queue_artifact["payload"], "trading_economics_release_fetch_queue")
+        self.assertIn("release_fetch_queue.json", release_queue_artifact["note"])
+        self.assertIn("te_release_fetcher", release_queue_artifact["applies_to"])
+
+        release_queue_update = registry["TRADING_ECONOMICS_RELEASE_FETCH_QUEUE_UPDATE_RECEIPT"]
+        self.assertEqual(release_queue_update["kind"], "artifact_type")
+        self.assertEqual(release_queue_update["payload"], "trading_economics_release_fetch_queue_update")
+        self.assertIn("calendar_maintenance", release_queue_update["applies_to"])
+        self.assertIn("no broker/account/model mutation", release_queue_update["note"])
+
+        release_fetcher_receipt = registry["TRADING_ECONOMICS_RELEASE_FETCHER_RECEIPT"]
+        self.assertEqual(release_fetcher_receipt["kind"], "artifact_type")
+        self.assertEqual(release_fetcher_receipt["payload"], "trading_economics_release_fetcher_receipt")
+        self.assertIn("te_release_poll", release_fetcher_receipt["applies_to"])
+        self.assertIn("safety flags", release_fetcher_receipt["note"])
+
         poll_policy = registry["TRADING_ECONOMICS_RELEASE_POLL_FALLBACK_POLICY"]
         self.assertIn("release_poll_until_value", poll_policy["payload"])
         self.assertIn("fallback_requested", poll_policy["payload"])
