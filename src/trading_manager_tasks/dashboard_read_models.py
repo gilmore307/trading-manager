@@ -57,7 +57,8 @@ FOLD_MODEL_STAGE_TYPES = {
     "model_training",
     "model_generation",
     "replay",
-    "model_06_residual_event_governance",
+    "replay_review",
+    "model_06_event_risk_governor",
     "model_evaluation",
     "post_replay_attribution",
     "promotion_review",
@@ -69,8 +70,8 @@ MODEL_GROUP_EVALUATION_TESTS = (
     "replay_metrics",
     "guardrail_checks",
     "incumbent_comparison",
-    "residual_event_governance",
-    "residual_event_governance_event_focus_proposal",
+    "m06_event_risk_governor",
+    "m06_event_focus_proposal",
 )
 MODEL_GROUP_PROMOTION_TESTS = (
     "fixed_benchmark",
@@ -92,7 +93,6 @@ RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES = {
     "post_replay_residual_event_governance_receipt",
     "model_06_residual_event_governance_event_attribution_receipt",
 }
-CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 BASE_TASK_YEAR = 2016
 BASE_TASK_MONTH = 1
 MAX_AGENT_ERROR_SUMMARY_ROWS = 50
@@ -108,8 +108,9 @@ TASK_STAGE_SORT_ORDER = {
     "model_task": 30,
     "model_generation": 30,
     "replay": 40,
+    "replay_review": 42,
     "post_replay_attribution": 45,
-    "model_06_residual_event_governance": 45,
+    "model_06_event_risk_governor": 45,
     "model_evaluation": 48,
     "promotion_review_preparation": 45,
     "promotion_review": 50,
@@ -1516,7 +1517,7 @@ def _model_task_label(layer_key: str, layer: int | None = None) -> str:
             return f"Layer {layer} {model_label}"
         return model_label
     if layer == 10:
-        return "M06 Residual Event Governance"
+        return "M06 Event Risk Governor"
     return layer_key.replace("_", " ").title()
 
 
@@ -3673,6 +3674,46 @@ def _count_jsonl_rows(path: Path) -> int:
     return len(_load_jsonl_objects(path))
 
 
+def _replay_review_ready_count(review_artifacts: Mapping[str, Any] | None, *, expected_count: int) -> int:
+    if review_artifacts is None:
+        return 0
+    receipt = review_artifacts.get("receipt")
+    if not isinstance(receipt, Mapping):
+        return expected_count
+    for key in ("processed_review_count", "reviewed_failure_count", "expected_review_count", "ready_count"):
+        if key in receipt:
+            return min(_int_field(receipt, key), expected_count)
+    review_rows_ref = str(receipt.get("review_rows_ref") or "")
+    if review_rows_ref:
+        return min(_count_jsonl_rows(Path(review_rows_ref)), expected_count)
+    return expected_count
+
+
+def _replay_review_progress(
+    *,
+    dataset_root: Path,
+    review_artifacts: Mapping[str, Any] | None,
+    replay_complete: bool,
+) -> dict[str, Any]:
+    expected = _residual_event_governance_expected_count(dataset_root) if replay_complete else 0
+    ready = _replay_review_ready_count(review_artifacts, expected_count=expected)
+    pending = max(expected - ready, 0)
+    complete = review_artifacts is not None and (expected == 0 or ready >= expected)
+    return {
+        "stage_id": "model_group.replay_review",
+        "status": "complete" if complete else ("ready" if replay_complete else "blocked"),
+        "unit_label": "review rows",
+        "expected_count": expected,
+        "ready_count": ready,
+        "pending_count": pending,
+        "failed_count": 0,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": complete,
+        "progress_source": "post_replay_review_rows",
+        "progress_basis": "side-effect-free review rows over replay failures, missed opportunities, and path deviations",
+    }
+
+
 def _attribution_ready_count(attribution_artifacts: Mapping[str, Any] | None, *, expected_count: int) -> int:
     if attribution_artifacts is None:
         return 0
@@ -3703,15 +3744,15 @@ def _residual_event_governance_progress(
     *,
     dataset_root: Path,
     attribution_artifacts: Mapping[str, Any] | None,
-    replay_complete: bool,
+    review_complete: bool,
 ) -> dict[str, Any]:
-    expected = _residual_event_governance_expected_count(dataset_root) if replay_complete else 0
+    expected = _residual_event_governance_expected_count(dataset_root) if review_complete else 0
     ready = _attribution_ready_count(attribution_artifacts, expected_count=expected)
     pending = max(expected - ready, 0)
     complete = expected > 0 and ready >= expected
     return {
-        "stage_id": "model_group.model_06_residual_event_governance",
-        "status": "complete" if complete else ("ready" if replay_complete else "blocked"),
+        "stage_id": "model_group.model_06_event_risk_governor",
+        "status": "complete" if complete else ("ready" if review_complete else "blocked"),
         "unit_label": "failure attributions",
         "expected_count": expected,
         "ready_count": ready,
@@ -3720,7 +3761,7 @@ def _residual_event_governance_progress(
         "accepted_failed_count": 0,
         "can_unlock_downstream": attribution_artifacts is not None and (expected == 0 or ready >= expected),
         "progress_source": "replay_failure_attribution_units",
-        "progress_basis": "replay rows where a filled decision lost money or a rejected decision missed a positive next outcome",
+        "progress_basis": "M06 event-risk attribution for replay rows where a filled decision lost money or a rejected decision missed a positive next outcome",
     }
 
 
@@ -3882,6 +3923,31 @@ def _latest_promotion_review_artifacts(
     if receipt_path is not None and receipt_path.exists():
         refs.append(str(receipt_path))
     return {"decision": dict(decision), "review": dict(review or {}), "receipt_refs": refs}
+
+
+def _latest_post_replay_review_artifacts(dataset_root: Path) -> dict[str, Any] | None:
+    review_root = dataset_root / "post_replay_review_runs"
+    if not review_root.exists():
+        return None
+    decision_rows_path = _latest_replay_decision_rows_path(dataset_root)
+    candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
+    for receipt_path in sorted(review_root.glob("*/post_replay_review_receipt.json")):
+        receipt = _load_optional_json_object(receipt_path)
+        if receipt is None:
+            continue
+        status = str(receipt.get("status") or receipt.get("review_status") or "")
+        if status not in {"succeeded", "complete", "completed"}:
+            continue
+        if str(receipt.get("contract_type") or "") != "post_replay_review_receipt":
+            continue
+        if decision_rows_path is not None and str(receipt.get("decision_rows_ref") or "") != str(decision_rows_path):
+            continue
+        created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or receipt_path.parent.name)
+        candidates.append((created, receipt_path, receipt))
+    if not candidates:
+        return None
+    _created, receipt_path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
+    return {"receipt": dict(receipt), "receipt_refs": [str(receipt_path)]}
 
 
 def _latest_post_replay_attribution_artifacts(dataset_root: Path) -> dict[str, Any] | None:
@@ -4124,7 +4190,18 @@ def _model_group_replay_timeline_tasks(
     )
     replay_started = bool(replay_ready_months)
     replay_complete = bool(replay_progress["can_unlock_downstream"])
-    attribution_artifacts = _latest_post_replay_attribution_artifacts(dataset_root) if lifecycle_artifacts_allowed and replay_complete else None
+    review_artifacts = _latest_post_replay_review_artifacts(dataset_root) if lifecycle_artifacts_allowed and replay_complete else None
+    replay_review_complete = review_artifacts is not None
+    replay_review_progress = _replay_review_progress(
+        dataset_root=dataset_root,
+        review_artifacts=review_artifacts,
+        replay_complete=replay_complete,
+    )
+    attribution_artifacts = (
+        _latest_post_replay_attribution_artifacts(dataset_root)
+        if lifecycle_artifacts_allowed and replay_review_complete
+        else None
+    )
     attribution_receipt = attribution_artifacts["receipt"] if attribution_artifacts else {}
     attribution_rows_complete = attribution_artifacts is not None
     residual_event_governance_event_focus_proposals_ref = str(attribution_receipt.get("event_focus_proposals_ref") or "").strip()
@@ -4138,7 +4215,7 @@ def _model_group_replay_timeline_tasks(
     attribution_progress = _residual_event_governance_progress(
         dataset_root=dataset_root,
         attribution_artifacts=attribution_artifacts,
-        replay_complete=replay_complete,
+        review_complete=replay_review_complete,
     )
     if attribution_rows_complete and not event_focus_complete:
         attribution_progress = {
@@ -4263,22 +4340,40 @@ def _model_group_replay_timeline_tasks(
     tasks[-1]["status_updated_at_utc"] = tasks_updated_at
 
     append_task(
-        task_id="model_group.model_06_residual_event_governance",
-        label="M06 Residual Event Governance",
-        task_state="completed" if attribution_complete else ("current" if replay_complete else "future"),
-        status="succeeded" if attribution_complete else ("ready" if replay_complete else "blocked"),
+        task_id="model_group.replay_review",
+        label="Replay Review",
+        task_state="completed" if replay_review_complete else ("current" if replay_complete else "future"),
+        status="succeeded" if replay_review_complete else ("ready" if replay_complete else "blocked"),
         reason=(
-            "M06 post-replay event attribution and event-focus proposal evidence are complete."
-            if attribution_complete
-            else "M06 attribution exists but must be rerun because its receipt lacks internal event-focus proposals."
-            if attribution_rows_complete
-            else "M06 is ready to attribute replay failures, residuals, missed opportunities, and path deviations."
+            "Post-replay review is complete and ready for M06 Event Risk Governor attribution."
+            if replay_review_complete
+            else "Replay review is ready to classify replay failures, missed opportunities, and path deviations."
             if replay_complete
-            else "Waiting for model-group replay before M06 attribution can run."
+            else "Waiting for model-group replay before replay review can run."
+        ),
+        receipt_refs=list(review_artifacts["receipt_refs"]) if review_artifacts else None,
+        blockers=[] if replay_complete else ["model_group.replay"],
+        stage_type="replay_review",
+        progress=replay_review_progress,
+    )
+
+    append_task(
+        task_id="model_group.model_06_event_risk_governor",
+        label="M06 Event Risk Governor",
+        task_state="completed" if attribution_complete else ("current" if replay_review_complete else "future"),
+        status="succeeded" if attribution_complete else ("ready" if replay_review_complete else "blocked"),
+        reason=(
+            "M06 Event Risk Governor attribution and event-focus proposal evidence are complete."
+            if attribution_complete
+            else "M06 Event Risk Governor attribution exists but must be rerun because its receipt lacks internal event-focus proposals."
+            if attribution_rows_complete
+            else "M06 Event Risk Governor is ready to consume replay review and attribute event-risk residuals."
+            if replay_review_complete
+            else "Waiting for replay review before M06 Event Risk Governor can run."
         ),
         receipt_refs=list(attribution_artifacts["receipt_refs"]) if attribution_artifacts else None,
-        blockers=[] if replay_complete else ["model_group.replay"],
-        stage_type="model_06_residual_event_governance",
+        blockers=[] if replay_review_complete else ["model_group.replay_review"],
+        stage_type="model_06_event_risk_governor",
         progress=attribution_progress,
     )
 
@@ -4293,10 +4388,10 @@ def _model_group_replay_timeline_tasks(
             if evaluation_complete
             else "Evaluation is ready to aggregate replay metrics, guardrails, incumbent comparison, M06 attribution, and event-focus proposal evidence."
             if event_focus_complete
-            else "Waiting for M06 to write attribution and internal event-focus proposal evidence before evaluation can run."
+            else "Waiting for M06 Event Risk Governor to write attribution and internal event-focus proposal evidence before evaluation can run."
         ),
         receipt_refs=list(promotion_artifacts["receipt_refs"]) if promotion_artifacts else None,
-        blockers=[] if event_focus_complete else ["model_group.model_06_residual_event_governance"],
+        blockers=[] if event_focus_complete else ["model_group.model_06_event_risk_governor"],
         stage_type="model_evaluation",
         progress=_model_group_evaluation_progress(
             status="succeeded" if evaluation_complete else ("ready" if event_focus_complete else "blocked"),
