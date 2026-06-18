@@ -2544,6 +2544,14 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("skipped_no_new_or_changed_rows", script["applies_to"])
         self.assertIn("release-fetch queue updates", script["note"])
 
+        maintenance_receipt = registry["TRADING_DATA_CALENDAR_MAINTENANCE_REFRESH_RECEIPT"]
+        self.assertEqual(maintenance_receipt["kind"], "artifact_type")
+        self.assertEqual(maintenance_receipt["payload"], "calendar_maintenance_refresh_receipt")
+        self.assertIn("run_calendar_maintenance_refresh.py", maintenance_receipt["path"])
+        self.assertIn("recent_refresh_completion_receipt", maintenance_receipt["applies_to"])
+        self.assertIn("storage_source_only", maintenance_receipt["applies_to"])
+        self.assertIn("without broker account model activation", maintenance_receipt["note"])
+
         te_fetch_script = registry["RUN_TRADING_ECONOMICS_RECENT_CALENDAR_REFRESH"]
         self.assertIn("te_release_poll", te_fetch_script["applies_to"])
         self.assertIn("provisional_macro_release_web_search", te_fetch_script["applies_to"])
