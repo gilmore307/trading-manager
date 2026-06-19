@@ -68,7 +68,7 @@ class LayerFourEventFailureFeatureTests(unittest.TestCase):
             self.assertEqual(receipt.target_routed_gate_row_count, 1)
             rows = [json.loads(line) for line in Path(str(receipt.feature_rows_path)).read_text(encoding="utf-8").splitlines()]
             self.assertEqual(rows[0]["target_candidate_id"], "tcand_test")
-            self.assertEqual(rows[0]["event_strategy_failure_gate"]["agent_review_decision"], "accept_layer_04_event_failure_risk_scope")
+            self.assertEqual(rows[0]["event_strategy_failure_gate"]["agent_review_decision"], "accept_model_03_event_state_scope")
 
     def test_cli_accepts_workflow_persist_sql_alias(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

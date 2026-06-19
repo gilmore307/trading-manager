@@ -17,8 +17,8 @@ class TaskProgressTests(unittest.TestCase):
                 write_task_progress_node(
                     progress_root=progress_root,
                     worker_id="month_ingest_worker_stage_executor",
-                    task_uid=f"2016-{index + 1:02d}:layer_01_market_regime.feature_generation",
-                    stage_id="layer_01_market_regime.feature_generation",
+                    task_uid=f"2016-{index + 1:02d}:model_01_market_context.feature_generation",
+                    stage_id="model_01_market_context.feature_generation",
                     status="running",
                     processed_count=index,
                     expected_count=12,

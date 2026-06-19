@@ -16,7 +16,7 @@ Promotion is run-cycle scoped, not single-model or fixed-target scoped. A layer 
 
 Manager must not schedule promotion review from a single layer's completed fold alone, and it must not convert a target-substrate task into evidence that the system was forced to trade that target. Replay judgment belongs to the frozen live-flow component graph under point-in-time historical evidence.
 
-Promotion acceptance is bundle-scoped. Layer-local evidence remains available for diagnostics, regression attribution, and retraining priority, but it must not create independent promotion, shadow, live, or reusable-production acceptance for a single layer or partial substack unless an accepted lifecycle contract explicitly defines that component-local role.
+Promotion acceptance is bundle-scoped. Model-local evidence remains available for diagnostics, regression attribution, and retraining priority, but it must not create independent promotion, shadow, live, or reusable-production acceptance for a single layer or partial substack unless an accepted lifecycle contract explicitly defines that component-local role.
 
 ## Required Evidence
 
@@ -123,7 +123,7 @@ attribution after the regular session closes or in another explicitly accepted
 off-hours window. Realtime watch may produce warning evidence for C03/C05/C06
 review paths, but it must not mutate intraday entry, lifecycle, sizing, or
 execution decisions by itself. If C07 identifies an event or anomaly that has not
-been trained and accepted through M06/Layer 4, it may only emit a
+been trained and accepted through M06/M03 event-state, it may only emit a
 provisional untrained-event risk estimate from model-failure severity and
 supporting evidence. That estimate must be routed to the trading-review agent
 before it can affect a live block, reduce, exit, or human-review path.
@@ -178,9 +178,9 @@ point-in-time evidence. The tool's role is to decide the next bounded
 counterfactual or repair question when promotion fails due to overblocking,
 underblocking, option-expression drag, alpha calibration, or drawdown.
 
-## M06 / Layer 4 Rule
+## M06 / M03 event-state Rule
 
-M06 event-risk research may propose a promotion packet. Layer 4 may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
+M06 event-risk research may propose a promotion packet. M03 event-state may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
 
 ## Useful Commands
 

@@ -397,7 +397,7 @@ def run_model_group_residual_event_governance_if_ready(
             "provider_calls": 0,
             "broker_execution_performed": False,
             "model_activation_performed": False,
-            "layer_4_promotion_performed": False,
+            "model_03_event_state_promotion_performed": False,
         }
         receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -573,9 +573,9 @@ def _build_attribution_rows(
         "confounder_analysis_status": "passed",
         "leakage_status": "passed",
         "upstream_overlap_status": "residual_after_upstream_conditioning",
-        "same_fold_layer_4_mutation_performed": False,
+        "same_fold_model_03_event_mutation_performed": False,
         "notes": [
-            "M06 attribution consumes post-replay review rows; it does not create same-fold Layer 4 inputs.",
+            "M06 attribution consumes post-replay review rows; it does not create same-fold M03 event-state inputs.",
             "Rows with multiple matching events are marked confounded until a later promotion packet proves incremental value.",
             "M06 uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay review row provides an impact clock.",
         ],
@@ -802,8 +802,8 @@ def _build_event_family_attention_evidence(
             "event_release_phase": effect_profile["event_release_phase"],
             "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
             "state_signal_type": effect_profile["state_signal_type"],
-            "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
-            "layer_4_projection_type": effect_profile["layer_4_projection_type"],
+            "model_03_event_state_overlay": effect_profile["model_03_event_state_overlay"],
+            "model_03_event_projection_type": effect_profile["model_03_event_projection_type"],
             "event_family_impact_parameterization": effect_profile["event_family_impact_parameterization"],
             "available_time": str(candidate.get("available_time") or ""),
             "event_month": str(candidate.get("event_month") or ""),
@@ -845,8 +845,8 @@ def _build_event_family_attention_evidence(
                 "event_release_phase_counts": {},
                 "event_lifecycle_stage_counts": {},
                 "state_signal_type_counts": {},
-                "layer_4_state_overlay_counts": {},
-                "layer_4_projection_type_counts": {},
+                "model_03_event_state_overlay_counts": {},
+                "model_03_event_projection_type_counts": {},
                 "dominant_event_schedule_type": row["event_schedule_type"],
                 "leakage_violation_count": 0,
                 "impact_cutoff_violation_count": 0,
@@ -889,8 +889,8 @@ def _build_event_family_attention_evidence(
         _increment_count(group["event_release_phase_counts"], row["event_release_phase"])
         _increment_count(group["event_lifecycle_stage_counts"], row["event_lifecycle_stage"])
         _increment_count(group["state_signal_type_counts"], row["state_signal_type"])
-        _increment_count(group["layer_4_state_overlay_counts"], row["layer_4_state_overlay"])
-        _increment_count(group["layer_4_projection_type_counts"], row["layer_4_projection_type"])
+        _increment_count(group["model_03_event_state_overlay_counts"], row["model_03_event_state_overlay"])
+        _increment_count(group["model_03_event_projection_type_counts"], row["model_03_event_projection_type"])
     for proposal in event_focus_proposals:
         event_ref = str(proposal.get("event_ref") or "")
         candidate = event_ref_to_candidate.get(event_ref)
@@ -966,8 +966,8 @@ def _build_event_family_attention_evidence(
                 "event_release_phase": effect_profile["event_release_phase"],
                 "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
                 "state_signal_type": effect_profile["state_signal_type"],
-                "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
-                "layer_4_projection_type": effect_profile["layer_4_projection_type"],
+                "model_03_event_state_overlay": effect_profile["model_03_event_state_overlay"],
+                "model_03_event_projection_type": effect_profile["model_03_event_projection_type"],
                 "event_family_impact_parameterization": effect_profile["event_family_impact_parameterization"],
                 "supporting_failure_count": group["supporting_failure_count"],
                 "occurrence_count": occurrence_count,
@@ -1003,8 +1003,8 @@ def _build_event_family_attention_evidence(
                 "event_release_phase": effect_profile["event_release_phase"],
                 "event_lifecycle_stage": effect_profile["event_lifecycle_stage"],
                 "state_signal_type": effect_profile["state_signal_type"],
-                "layer_4_state_overlay": effect_profile["layer_4_state_overlay"],
-                "layer_4_projection_type": effect_profile["layer_4_projection_type"],
+                "model_03_event_state_overlay": effect_profile["model_03_event_state_overlay"],
+                "model_03_event_projection_type": effect_profile["model_03_event_projection_type"],
                 "event_family_impact_parameterization": effect_profile["event_family_impact_parameterization"],
                 "affected_scope": group["affected_scope"],
                 "event_temporal_form_counts": dict(sorted(group["event_temporal_form_counts"].items())),
@@ -1013,8 +1013,8 @@ def _build_event_family_attention_evidence(
                 "event_release_phase_counts": dict(sorted(group["event_release_phase_counts"].items())),
                 "event_lifecycle_stage_counts": dict(sorted(group["event_lifecycle_stage_counts"].items())),
                 "state_signal_type_counts": dict(sorted(group["state_signal_type_counts"].items())),
-                "layer_4_state_overlay_counts": dict(sorted(group["layer_4_state_overlay_counts"].items())),
-                "layer_4_projection_type_counts": dict(sorted(group["layer_4_projection_type_counts"].items())),
+                "model_03_event_state_overlay_counts": dict(sorted(group["model_03_event_state_overlay_counts"].items())),
+                "model_03_event_projection_type_counts": dict(sorted(group["model_03_event_projection_type_counts"].items())),
                 "deterministic_gate_status": deterministic_gate_status,
                 "pit_status": pit_status,
                 "control_status": control_status,
@@ -1048,8 +1048,8 @@ def _build_event_family_attention_evidence(
                 "source_decision_ids": sorted(group["source_decision_ids"])[:50],
                 "source_replay_review_ids": sorted(group["source_replay_review_ids"])[:50],
                 "event_family_occurrence_scan_ref": event_family_occurrence_scan_ref,
-                "allowed_model_use": ["temporal_attention_pool", "event_family_scouting", "layer_4_state_overlay_candidate"],
-                "blocked_model_use": [] if deterministic_gate_status == "passed" else ["accepted_temporal_attention_pool", "layer_4_promotion"],
+                "allowed_model_use": ["temporal_attention_pool", "event_family_scouting", "model_03_event_state_overlay_candidate"],
+                "blocked_model_use": [] if deterministic_gate_status == "passed" else ["accepted_temporal_attention_pool", "model_03_event_state_promotion"],
                 "blocking_issues": blockers,
                 "required_followups": [] if deterministic_gate_status == "passed" else ["collect non-confounded matched controls before agent review"],
                 "provider_calls": 0,
@@ -1171,17 +1171,17 @@ def _event_effect_profile(
         release_phase = "post_release"
         lifecycle_stage = "post_release_impact_state"
         state_signal_type = "impact_state"
-        layer_4_overlay = "event_post_release_impact_state"
+        model_03_event_overlay = "event_post_release_impact_state"
     elif temporal_form in {"scheduled_data_release_event", "scheduled_calendar_event"}:
         release_phase = "pre_release"
         lifecycle_stage = "pre_release_risk_state"
         state_signal_type = "risk_state"
-        layer_4_overlay = "event_pre_release_risk_state_change"
+        model_03_event_overlay = "event_pre_release_risk_state_change"
     else:
         release_phase = "post_release"
         lifecycle_stage = "post_release_impact_state"
         state_signal_type = "impact_state"
-        layer_4_overlay = "event_post_release_impact_state"
+        model_03_event_overlay = "event_post_release_impact_state"
 
     return {
         "event_temporal_form": temporal_form,
@@ -1191,13 +1191,13 @@ def _event_effect_profile(
         "event_release_phase": release_phase,
         "event_lifecycle_stage": lifecycle_stage,
         "state_signal_type": state_signal_type,
-        "layer_4_state_overlay": layer_4_overlay,
-        "layer_4_projection_type": "event_family_impact_state_projection",
+        "model_03_event_state_overlay": model_03_event_overlay,
+        "model_03_event_projection_type": "event_family_impact_state_projection",
         "event_family_impact_parameterization": _event_family_impact_parameterization(
             temporal_form=temporal_form,
             schedule_type=schedule_type,
             state_signal_type=state_signal_type,
-            layer_4_overlay=layer_4_overlay,
+            model_03_event_overlay=model_03_event_overlay,
         ),
     }
 
@@ -1231,13 +1231,13 @@ def _dominant_effect_profile(group: Mapping[str, Any]) -> dict[str, Any]:
             "event_release_phase": "post_release",
             "event_lifecycle_stage": "post_release_impact_state",
             "state_signal_type": "impact_state",
-            "layer_4_state_overlay": "event_post_release_impact_state",
-            "layer_4_projection_type": "event_family_impact_state_projection",
+            "model_03_event_state_overlay": "event_post_release_impact_state",
+            "model_03_event_projection_type": "event_family_impact_state_projection",
             "event_family_impact_parameterization": _event_family_impact_parameterization(
                 temporal_form=dominant_temporal_form,
                 schedule_type=schedule_type,
                 state_signal_type="impact_state",
-                layer_4_overlay="event_post_release_impact_state",
+                model_03_event_overlay="event_post_release_impact_state",
             ),
         }
     return {
@@ -1248,13 +1248,13 @@ def _dominant_effect_profile(group: Mapping[str, Any]) -> dict[str, Any]:
         "event_release_phase": "pre_release",
         "event_lifecycle_stage": "pre_release_risk_state",
         "state_signal_type": "risk_state",
-        "layer_4_state_overlay": "event_pre_release_risk_state_change",
-        "layer_4_projection_type": "event_family_impact_state_projection",
+        "model_03_event_state_overlay": "event_pre_release_risk_state_change",
+        "model_03_event_projection_type": "event_family_impact_state_projection",
         "event_family_impact_parameterization": _event_family_impact_parameterization(
             temporal_form=dominant_temporal_form,
             schedule_type=schedule_type,
             state_signal_type="risk_state",
-            layer_4_overlay="event_pre_release_risk_state_change",
+            model_03_event_overlay="event_pre_release_risk_state_change",
         ),
     }
 
@@ -1264,7 +1264,7 @@ def _event_family_impact_parameterization(
     temporal_form: str,
     schedule_type: str,
     state_signal_type: str,
-    layer_4_overlay: str,
+    model_03_event_overlay: str,
 ) -> dict[str, Any]:
     if temporal_form == "scheduled_data_release_event":
         curve = {
@@ -1297,9 +1297,9 @@ def _event_family_impact_parameterization(
         "impact_curve_components": curve,
         "impact_scope_parameter": "learn_from_event_family_occurrence_scan",
         "severity_model": "target_normalized_market_response",
-        "layer_4_projection_type": "event_family_impact_state_projection",
+        "model_03_event_projection_type": "event_family_impact_state_projection",
         "state_signal_type": state_signal_type,
-        "layer_4_state_overlay": layer_4_overlay,
+        "model_03_event_state_overlay": model_03_event_overlay,
     }
 
 
@@ -1390,7 +1390,7 @@ def _event_strategy_fallback_review(packet: Mapping[str, Any], *, invocation_sta
         "overlap_status": str(packet.get("overlap_status") or "review_required_overlap_unknown"),
         "leakage_status": str(packet.get("leakage_status") or "insufficient_evidence"),
         "allowed_model_use": [],
-        "blocked_model_use": ["accepted_temporal_attention_pool", "layer_4_promotion"],
+        "blocked_model_use": ["accepted_temporal_attention_pool", "model_03_event_state_promotion"],
         "blocking_issues": _string_list(packet.get("blocking_issues")) + ["event_strategy_promotion_review_not_approved"],
         "required_followups": _string_list(packet.get("required_followups")) + ["complete event-strategy-promotion-review successfully"],
         "rationale": "Deterministic packet is reviewable, but no approving event-strategy review has accepted it.",
@@ -1443,7 +1443,7 @@ def _invoke_event_strategy_review_agent(
 def _event_strategy_review_agent_prompt(review_packet: Mapping[str, Any]) -> str:
     return (
         "Use the event-strategy-promotion-review skill. Review this deterministic M06 event-family packet as a final guard only.\n"
-        "Do not recompute co-event/confounder, impact-onset, impact-severity, or leakage gates; those are deterministic inputs. Pre-release and post-release evidence are lifecycle stages of the same event family. Do not require a linear up/down prediction when the packet is a phase-aware state overlay for Layer 4.\n"
+        "Do not recompute co-event/confounder, impact-onset, impact-severity, or leakage gates; those are deterministic inputs. Pre-release and post-release evidence are lifecycle stages of the same event family. Do not require a linear up/down prediction when the packet is a phase-aware state overlay for M03 event-state.\n"
         "Do not activate models, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
         "Return strict JSON only, with exactly this contract shape and no markdown:\n"
         "{"
@@ -1534,8 +1534,8 @@ def _build_accepted_temporal_attention_pool_entries(
                 "event_release_phase": candidate.get("event_release_phase"),
                 "event_lifecycle_stage": candidate.get("event_lifecycle_stage"),
                 "state_signal_type": candidate.get("state_signal_type"),
-                "layer_4_state_overlay": candidate.get("layer_4_state_overlay"),
-                "layer_4_projection_type": candidate.get("layer_4_projection_type"),
+                "model_03_event_state_overlay": candidate.get("model_03_event_state_overlay"),
+                "model_03_event_projection_type": candidate.get("model_03_event_projection_type"),
                 "event_family_impact_parameterization": candidate.get("event_family_impact_parameterization"),
                 "source_candidate_ref": candidate.get("event_family_bias_association_packet_ref"),
                 "event_strategy_review_ref": f"{event_strategy_reviews_ref}#{len(entries) + 1}",
@@ -1631,7 +1631,7 @@ def _load_event_candidates(*, storage_root: Path, fold_scope: Mapping[str, str])
     checked_paths: list[str] = []
     start_month = str(fold_scope.get("start_month") or "")
     end_month = str(fold_scope.get("end_month") or "")
-    observation_path = storage_root / "runtime" / "layer_04_event_observation_inputs" / f"{start_month}_{end_month}.json"
+    observation_path = storage_root / "runtime" / "model_03_event_observation_inputs" / f"{start_month}_{end_month}.json"
     checked_paths.append(str(observation_path))
     if observation_path.exists():
         payload = _load_optional_json_object(observation_path) or {}
@@ -2018,7 +2018,7 @@ def _event_candidate_readiness_summary(*, storage_root: Path, fold_scope: Mappin
     start_month = str(fold_scope.get("start_month") or "")
     end_month = str(fold_scope.get("end_month") or "")
 
-    observation_path = storage_root / "runtime" / "layer_04_event_observation_inputs" / f"{start_month}_{end_month}.json"
+    observation_path = storage_root / "runtime" / "model_03_event_observation_inputs" / f"{start_month}_{end_month}.json"
     checked_paths.append(str(observation_path))
     observation_payload = _load_optional_json_object(observation_path) if observation_path.exists() else None
     if observation_payload is not None and _observation_payload_has_event_refs(observation_payload):

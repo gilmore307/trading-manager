@@ -17,15 +17,15 @@ from trading_manager_tasks.stage_reconcile import DEFAULT_COMPONENT_STORAGE_ROOT
 
 def _stage_id(model_layer: str) -> str:
     if model_layer == LAYER_ONE_MODEL_LAYER:
-        return "layer_01_market_regime.data_acquisition"
+        return "model_01_market_context.data_acquisition"
     if model_layer == LAYER_TWO_MODEL_LAYER:
-        return "layer_02_sector_context.data_acquisition"
-    raise TaskSystemError(f"unsupported provider model layer: {model_layer}")
+        return "model_01_sector_context.data_acquisition"
+    raise TaskSystemError(f"unsupported provider model: {model_layer}")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Dispatch autonomous historical provider acquisition and reconcile the provider stage.")
-    parser.add_argument("--model-layer", required=True, choices=(LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER))
+    parser.add_argument("--model", required=True, choices=(LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER))
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)

@@ -86,7 +86,7 @@ def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
     model_layer = _model_layer_for_stage(stage_id)
     return {
         f"mgrreq_backfill_alpaca_bars_{member.symbol.lower()}_{start_month.replace('-', '_')}"
-        for member in load_market_regime_universe(model_layers=(model_layer,))
+        for member in load_market_regime_universe(model_readiness=(model_layer,))
     }
 
 

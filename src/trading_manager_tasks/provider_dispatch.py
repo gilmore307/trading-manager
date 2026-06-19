@@ -461,7 +461,7 @@ def dispatch_layer_provider_acquisition(
 
 
 def dispatch_layer_one_provider_acquisition(**kwargs: Any) -> ProviderDispatchSummary:
-    """Layer 1 provider dispatch wrapper."""
+    """M01 provider dispatch wrapper."""
 
     return dispatch_layer_provider_acquisition(model_layer=LAYER_ONE_MODEL_LAYER, **kwargs)
 
@@ -473,13 +473,13 @@ def write_dispatch_summary(summary: ProviderDispatchSummary, *, output: TextIO) 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Plan or dispatch autonomous layer provider acquisition.")
-    parser.add_argument("--model-layer", default=LAYER_ONE_MODEL_LAYER, choices=(LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, LAYER_THREE_TARGET_STATE_MODEL_LAYER))
+    parser.add_argument("--model", default=LAYER_ONE_MODEL_LAYER, choices=(LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, LAYER_THREE_TARGET_STATE_MODEL_LAYER))
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
     parser.add_argument("--symbol", action="append", default=[], help="Limit dispatch to one symbol; repeat for multiple symbols.")
-    parser.add_argument("--target-symbol", action="append", default=[], help="Layer 3 target-local symbol; repeat for multiple targets.")
+    parser.add_argument("--target-symbol", action="append", default=[], help="M02 target-local symbol; repeat for multiple targets.")
     parser.add_argument("--request-id", action="append", default=[], help="Limit dispatch to one request id; repeat for multiple ids.")
     parser.add_argument("--limit", type=int, help="Limit dispatch to the first N selected requests after symbol/request filtering.")
     parser.add_argument(

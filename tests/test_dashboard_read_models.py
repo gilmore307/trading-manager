@@ -45,16 +45,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "error_number": 3,
                 "handling_status": "awaiting_retry",
                 "repair_status": "repaired",
-                "summary": "model training stage layer_03_target_state_vector.option_chain_data_acquisition command returned non-zero status",
+                "summary": "model training stage model_02_target_state.option_chain_data_acquisition command returned non-zero status",
             },
             {
                 "error_number": 6,
                 "handling_status": "open",
                 "repair_status": "unknown",
-                "summary": "provider stage layer_03_target_state_vector.option_chain_data_acquisition has failed requests requiring automatic repair",
+                "summary": "provider stage model_02_target_state.option_chain_data_acquisition has failed requests requiring automatic repair",
             },
         ]
-        task = {"task_id": "layer_03_target_state_vector", "detail": {"active_stage_id": "layer_03_target_state_vector.option_chain_data_acquisition"}}
+        task = {"task_id": "model_02_target_state", "detail": {"active_stage_id": "model_02_target_state.option_chain_data_acquisition"}}
 
         ordered = _agent_errors_for_task(rows, task)
 
@@ -63,11 +63,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
     def test_task_error_context_closes_nonblocking_awaiting_retry(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             task = {
-                "task_id": "layer_03_target_state_vector",
+                "task_id": "model_02_target_state",
                 "task_state": "current",
                 "status": "ready",
                 "detail": {
-                    "active_stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                    "active_stage_id": "model_02_target_state.option_chain_data_acquisition",
                     "progress": {"failed_count": 0, "accepted_failed_count": 0},
                 },
             }
@@ -77,7 +77,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "error_ref": "ERR-000003",
                     "handling_status": "awaiting_retry",
                     "repair_status": "repaired",
-                    "summary": "model training stage layer_03_target_state_vector.option_chain_data_acquisition command returned non-zero status",
+                    "summary": "model training stage model_02_target_state.option_chain_data_acquisition command returned non-zero status",
                 }
             ]
 
@@ -154,7 +154,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "repair_status": "unknown",
                 "handling_status": "open",
                 "dashboard_severity": "error",
-                "summary": "model training stage layer_09_option_expression.data_acquisition command returned non-zero status",
+                "summary": "model training stage model_05_option_expression.data_acquisition command returned non-zero status",
             }
         ]
         tasks = [{"task_id": "model_05_option_expression"}]
@@ -262,7 +262,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             }
         ]
         task_timeline = [
-            {"task_id": "layer_03_target_state_vector.option_chain_data_acquisition"},
+            {"task_id": "model_02_target_state.option_chain_data_acquisition"},
             {"task_id": "model_05_option_expression.feature_generation"},
         ]
 
@@ -336,7 +336,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
-                    "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                    "candidate_handoff_source": "model_02_target_candidate_handoff",
                     "replay_completion_scope": "full_candidate_universe",
                     "max_decision_rows": None,
                     "validation_status": "passed",
@@ -434,14 +434,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         fold_state = runtime / f"model_training_fold_state_{symbol.lower()}_2016-01_2016-06.json"
         fold_state.parent.mkdir(parents=True, exist_ok=True)
         stages = []
-        for layer in range(1, 10):
+        for layer in range(1, 7):
             for split_name in ("train", "validation", "test"):
                 stages.append(
                     {
-                        "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                        "stage_id": f"model_{layer:02d}_fixture.model_generation.{split_name}",
                         "stage_type": "model_generation",
                         "layer": layer,
-                        "layer_key": f"layer_{layer:02d}_fixture",
+                        "layer_key": f"model_{layer:02d}_fixture",
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
@@ -484,7 +484,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "component_completion_receipt",
-                        "manager_stage_id": "layer_01_market_regime.data_acquisition",
+                        "manager_stage_id": "model_01_market_context.data_acquisition",
                         "started_at": "2026-05-12T09:00:00Z",
                         "completed_at": "2026-05-12T09:30:00Z",
                         "status": "succeeded",
@@ -501,34 +501,34 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2019-05",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                                 "updated_utc": "2026-05-12T10:00:00Z",
                                 "last_reason": "stage coverage complete",
                                 "receipt_refs": ["02_control_plane/runtime/example_stage_receipt.json"],
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "blocked",
                                 "updated_utc": "2026-05-12T11:00:00Z",
                                 "last_reason": "waiting for source rows",
-                                "blockers": ["layer_02_sector_context.model_evaluation_complete"],
+                                "blockers": ["model_01_sector_context.model_evaluation_complete"],
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "blocked",
                                 "updated_utc": "2026-05-12T11:05:00Z",
                                 "last_reason": "waiting for data acquisition",
-                                "blockers": ["layer_03_target_state_vector.data_acquisition_complete"],
+                                "blockers": ["model_02_target_state.data_acquisition_complete"],
                             },
                         ],
                     }
@@ -542,14 +542,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_scheduler_decision",
                         "decision_status": "executed",
-                        "selected_work": "layer_03_target_state_vector.data_acquisition",
+                        "selected_work": "model_02_target_state.data_acquisition",
                         "start_month": "2019-05",
                         "execution_summary": {
                             "stage_execution": {
                                 "contract_type": "manager_stage_execution_summary",
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "status": "failed",
-                                "reason": "no successful Layer 2 feed artifacts are available for Layer 3 target-state materialization",
+                                "reason": "no successful M02 feed artifacts are available for M02 target-state materialization",
                                 "return_code": 1,
                                 "stdout_path": "02_control_plane/runtime/model_training_stage_logs/example.stdout.log",
                                 "stderr_path": "02_control_plane/runtime/model_training_stage_logs/example.stderr.log",
@@ -578,7 +578,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 status,
                 stage_coverage={
                     "contract_type": "manager_stage_coverage",
-                    "stage_id": "layer_01_market_regime.data_acquisition",
+                    "stage_id": "model_01_market_context.data_acquisition",
                     "status": "partial_ready",
                     "expected_count": 19,
                     "ready_count": 3,
@@ -605,14 +605,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         lifecycle_tasks = [task for task in task_timeline if str(task["task_id"]).startswith("model_group.")]
         self.assertEqual([task["task_state"] for task in model_tasks], ["completed", "failed"])
         self.assertEqual(lifecycle_tasks, [])
-        self.assertEqual(task_timeline[1]["task_label"], "Layer 3 Target State Vector Model")
+        self.assertEqual(task_timeline[1]["task_label"], "M02 Target State Vector Model")
         self.assertEqual(task_timeline[1]["month"], "2019-fold1")
         self.assertEqual(task_timeline[1]["detail"]["child_partitions"], ["2019-01", "2019-02", "2019-03", "2019-04", "2019-05", "2019-06"])
         self.assertEqual(task_timeline[1]["detail"]["last_execution"]["return_code"], 1)
         self.assertEqual(task_timeline[0]["worker_id"], "model_worker_1")
         self.assertEqual(task_timeline[0]["detail"]["worker"]["worker_label"], "Model Worker 1")
         self.assertEqual(task_timeline[1]["stage_type"], "model_task")
-        self.assertEqual(task_timeline[1]["detail"]["active_stage_id"], "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(task_timeline[1]["detail"]["active_stage_id"], "model_02_target_state.data_acquisition")
         self.assertIsNone(task_timeline[0]["created_at_utc"])
         self.assertEqual(task_timeline[0]["started_at_utc"], "2026-05-12T09:00:00Z")
         self.assertEqual(task_timeline[0]["ended_at_utc"], "2026-05-12T09:30:00Z")
@@ -621,7 +621,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task_timeline[1]["detail"]["progress"]["unit_label"], "source-month requests")
         self.assertEqual(task_timeline[1]["detail"]["progress"]["expected_count"], 6)
         self.assertEqual(task_timeline[1]["detail"]["progress"]["pending_count"], 6)
-        self.assertIn("Layer 2 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
+        self.assertIn("M02 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
         self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))
         self.assertIn("profile_refs", payload)
@@ -746,13 +746,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2020-07",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                                "stage_id": "model_02_target_state.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "blocked",
-                                "blockers": ["upstream_layer_08_model_evaluation_complete", "other_static_dependency"],
-                                "last_reason": "waiting for upstream_layer_08_model_evaluation_complete",
+                                "blockers": ["upstream_model_04_evaluation_complete", "other_static_dependency"],
+                                "last_reason": "waiting for upstream_model_04_evaluation_complete",
                             }
                         ],
                     }
@@ -773,7 +773,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T13:00:00Z")
 
         self.assertFalse(
-            any(task["task_id"] == "layer_03_target_state_vector" for task in payload["chart_payload"]["task_timeline"])
+            any(task["task_id"] == "model_02_target_state" for task in payload["chart_payload"]["task_timeline"])
         )
 
     def test_layer_model_evaluation_is_hidden_from_public_timeline(self):
@@ -790,10 +790,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.model_evaluation",
+                                "stage_id": "model_02_target_state.model_evaluation",
                                 "stage_type": "model_evaluation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
@@ -820,7 +820,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T12:00:00Z")
 
         task_ids = [task["task_id"] for task in payload["chart_payload"]["task_timeline"]]
-        self.assertNotIn("layer_03_target_state_vector.model_evaluation", task_ids)
+        self.assertNotIn("model_02_target_state.model_evaluation", task_ids)
         self.assertIsNone(payload["chart_payload"]["active_stage"])
         self.assertIn("internal_active_stage", payload["chart_payload"])
         self.assertIn("runtime_active_work", payload["chart_payload"])
@@ -1080,10 +1080,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-12",
                         "stages": [
                             {
-                                "stage_id": f"layer_{layer:02d}_fixture.model_generation",
+                                "stage_id": f"model_{layer:02d}_fixture.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": layer,
-                                "layer_key": f"layer_{layer:02d}_fixture",
+                                "layer_key": f"model_{layer:02d}_fixture",
                                 "status": "succeeded" if layer <= 2 else "blocked",
                                 "last_reason": "waiting for pre-replay input" if layer > 2 else "stage complete",
                                 "dataset_unit": {
@@ -1095,7 +1095,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                     "target_symbol": "AAPL" if layer >= 3 else None,
                                 },
                             }
-                            for layer in range(1, 10)
+                            for layer in range(1, 7)
                         ],
                     }
                 )
@@ -1116,18 +1116,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
         fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2"]
-        self.assertEqual(len(fold1_tasks), 14)
+        self.assertEqual(len(fold1_tasks), 11)
         self.assertEqual(
             [task["task_label"] for task in fold1_tasks],
             [
-                "Layer 01 Fixture",
-                "Layer 02 Fixture",
-                "Layer 03 Fixture",
-                "Layer 04 Fixture",
-                "Layer 05 Fixture",
-                "Layer 07 Fixture",
-                "Layer 08 Fixture",
-                "Layer 09 Fixture",
+                "Model 01 Fixture",
+                "Model 02 Fixture",
+                "Model 03 Fixture",
+                "Model 04 Fixture",
+                "Model 05 Fixture",
                 "Model Replay",
                 "Replay Review",
                 "M06 Event Risk Governor",
@@ -1155,14 +1152,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             def write_completed_fold(start: str, end: str) -> None:
                 stages = []
-                for layer in range(1, 10):
+                for layer in range(1, 7):
                     for split_name in ("train", "validation", "test"):
                         stages.append(
                             {
-                                "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                                "stage_id": f"model_{layer:02d}_fixture.model_generation.{split_name}",
                                 "stage_type": "model_generation",
                                 "layer": layer,
-                                "layer_key": f"layer_{layer:02d}_fixture",
+                                "layer_key": f"model_{layer:02d}_fixture",
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": split_name},
                                 "dataset_unit": {
@@ -1303,7 +1300,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["detail"]["blockers"], ["fold_models_01_05_model_generation_complete"])
         self.assertNotIn("replay_month_operation", replay_task["detail"])
         self.assertNotIn("Replay month 2025-12 is incomplete", replay_task["reason"])
-        self.assertIn("Waiting for pre-replay Layer 1-9 model generation", replay_task["reason"])
+        self.assertIn("Waiting for pre-replay M01-M05 model generation", replay_task["reason"])
 
     def test_ready_model_group_replay_becomes_active_after_pre_replay_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -1347,10 +1344,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2020-07",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "updated_utc": "2026-05-22T12:20:59Z",
                             }
@@ -1505,7 +1502,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                        "candidate_handoff_source": "model_02_target_candidate_handoff",
                         "replay_completion_scope": "full_candidate_universe",
                         "max_decision_rows": None,
                         "validation_status": "passed",
@@ -1610,10 +1607,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": f"layer_{layer:02d}_fixture.model_generation",
+                                "stage_id": f"model_{layer:02d}_fixture.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": layer,
-                                "layer_key": f"layer_{layer:02d}_fixture",
+                                "layer_key": f"model_{layer:02d}_fixture",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "six_month_target_fold",
@@ -1623,7 +1620,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                     "target_symbol": "AAPL" if layer >= 3 else None,
                                 },
                             }
-                            for layer in range(1, 10)
+                            for layer in range(1, 7)
                         ],
                     }
                 )
@@ -1681,10 +1678,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "six_month_panel",
@@ -1695,12 +1692,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_01_market_regime.feature_generation",
+                                "stage_id": "model_01_market_context.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "blocked",
-                                "blockers": ["layer_01_market_regime.data_acquisition_complete"],
+                                "blockers": ["model_01_market_context.data_acquisition_complete"],
                             },
                         ],
                     }
@@ -1711,11 +1708,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             coverage_root = runtime / "stage_coverage"
             coverage_root.mkdir(parents=True)
             for month, ready_count in [("2016-01", 3), ("2016-02", 5), ("2016-03", 0)]:
-                (coverage_root / f"layer_01_market_regime_data_acquisition_{month}.json").write_text(
+                (coverage_root / f"model_01_market_context_data_acquisition_{month}.json").write_text(
                     json.dumps(
                         {
                             "contract_type": "manager_stage_coverage",
-                            "stage_id": "layer_01_market_regime.data_acquisition",
+                            "stage_id": "model_01_market_context.data_acquisition",
                             "start_month": month,
                             "end_month": month,
                             "expected_count": 10,
@@ -1746,7 +1743,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_01_market_regime")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_01_market_context")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "fold_stage_coverage")
         self.assertEqual(progress["unit_label"], "source-month requests")
@@ -1770,10 +1767,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "target_symbol_six_month",
@@ -1784,10 +1781,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                             },
                         ],
@@ -1807,7 +1804,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:30Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "fold_feature_generation_partitions")
         self.assertEqual(progress["unit_label"], "feature months")
@@ -1834,14 +1831,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_02_sector_context.data_acquisition",
+                                "stage_id": "model_01_sector_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 2,
-                                "layer_key": "layer_02_sector_context",
+                                "layer_key": "model_01_sector_context",
                                 "status": "ready",
                                 "last_reason": (
-                                    "rerun reset from layer_02.data_acquisition: Layer 2 sector-context "
-                                    "contract changed; reset AAPL fold Layer 2 and downstream generated workflow state."
+                                    "rerun reset from model_01_sector_context.data_acquisition: M02 sector-context "
+                                    "contract changed; reset AAPL fold M02 and downstream generated workflow state."
                                 ),
                                 "dataset_unit": {
                                     "unit_kind": "six_month_panel",
@@ -1852,12 +1849,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_02_sector_context.feature_generation",
+                                "stage_id": "model_01_sector_context.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 2,
-                                "layer_key": "layer_02_sector_context",
+                                "layer_key": "model_01_sector_context",
                                 "status": "blocked",
-                                "blockers": ["layer_02_sector_context.data_acquisition_complete"],
+                                "blockers": ["model_01_sector_context.data_acquisition_complete"],
                             },
                         ],
                     }
@@ -1879,7 +1876,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertFalse(
             any(
                 task["month"] == "2016-fold1"
-                and task["task_id"] == "layer_02_sector_context"
+                and task["task_id"] == "model_01_sector_context"
                 and task["task_state"] == "future"
                 for task in payload["chart_payload"]["task_timeline"]
             )
@@ -1896,7 +1893,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_model_training_target_queue",
                         "queue_policy": "ordered_first_open_fold",
-                        "rotation_boundary": "layer_03_plus_model_worker",
+                        "rotation_boundary": "model_02_plus_model_worker",
                         "targets": [{"symbol": "AAPL"}, {"symbol": "NVDA"}],
                     }
                 )
@@ -1911,10 +1908,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.model_task",
+                                "stage_id": "model_01_market_context.model_task",
                                 "stage_type": "model_task",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "six_month_panel",
@@ -1997,10 +1994,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "target_symbol_six_month",
@@ -2011,35 +2008,35 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.train",
+                                "stage_id": "model_02_target_state.model_generation.train",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "train"},
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.validation",
+                                "stage_id": "model_02_target_state.model_generation.validation",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_split": {"split_name": "validation"},
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.test",
+                                "stage_id": "model_02_target_state.model_generation.test",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "blocked",
-                                "blockers": ["layer_03_target_state_vector.model_generation.validation_complete"],
+                                "blockers": ["model_02_target_state.model_generation.validation_complete"],
                                 "dataset_split": {"split_name": "test"},
                             },
                         ],
@@ -2059,7 +2056,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:45Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
         self.assertEqual(progress["unit_label"], "dataset months")
@@ -2067,7 +2064,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["ready_count"], 4)
         self.assertEqual(progress["pending_count"], 2)
         self.assertIn("train=4 months", progress["progress_basis"])
-        self.assertEqual(task["detail"]["active_stage_id"], "layer_03_target_state_vector.model_generation.validation")
+        self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
 
     def test_active_model_generation_progress_preserves_split_total(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2083,10 +2080,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.train",
+                                "stage_id": "model_02_target_state.model_generation.train",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "train"},
                                 "dataset_unit": {
@@ -2098,20 +2095,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.validation",
+                                "stage_id": "model_02_target_state.model_generation.validation",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_split": {"split_name": "validation"},
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.test",
+                                "stage_id": "model_02_target_state.model_generation.test",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "blocked",
-                                "blockers": ["layer_03_target_state_vector.model_generation.validation_complete"],
+                                "blockers": ["model_02_target_state.model_generation.validation_complete"],
                                 "dataset_split": {"split_name": "test"},
                             },
                         ],
@@ -2123,8 +2120,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             write_task_progress_node(
                 progress_root=runtime / "task_progress",
                 worker_id="model_worker_1",
-                task_uid="2016-01..2016-06:layer_03_target_state_vector.model_generation.validation",
-                stage_id="layer_03_target_state_vector.model_generation.validation",
+                task_uid="2016-01..2016-06:model_02_target_state.model_generation.validation",
+                stage_id="model_02_target_state.model_generation.validation",
                 unit_label="model rows",
                 expected_count=1,
                 node_id="stage_started",
@@ -2141,7 +2138,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:35:50Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["status"], "running")
         self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
@@ -2149,7 +2146,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["expected_count"], 6)
         self.assertEqual(progress["ready_count"], 4)
         self.assertEqual(progress["pending_count"], 2)
-        self.assertEqual(progress["stage_id"], "layer_03_target_state_vector.model_generation.validation")
+        self.assertEqual(progress["stage_id"], "model_02_target_state.model_generation.validation")
         self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
@@ -2166,10 +2163,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.train",
+                                "stage_id": "model_02_target_state.model_generation.train",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "train"},
                                 "dataset_unit": {
@@ -2182,18 +2179,18 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.validation",
+                                "stage_id": "model_02_target_state.model_generation.validation",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "validation"},
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation.test",
+                                "stage_id": "model_02_target_state.model_generation.test",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "test"},
                                 "dataset_unit": {
@@ -2222,7 +2219,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:36:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
         self.assertEqual(progress["unit_label"], "dataset months")
@@ -2269,7 +2266,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                        "candidate_handoff_source": "model_02_target_candidate_handoff",
                         "replay_completion_scope": "full_candidate_universe",
                         "max_decision_rows": None,
                         "validation_status": "passed",
@@ -2718,10 +2715,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                                "stage_id": "model_02_target_state.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "six_month_target_fold",
@@ -2740,11 +2737,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             coverage_root = runtime / "stage_coverage"
             coverage_root.mkdir(parents=True, exist_ok=True)
-            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01.json").write_text(
+            (coverage_root / "model_02_target_state_option_chain_data_acquisition_2016-01.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                        "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
                         "status": "partial_ready",
@@ -2759,14 +2756,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
+            (coverage_root / "model_02_target_state_option_chain_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_failure_register",
                         "failure_id": "fail_option_chain_provider_policy",
                         "request_id": "mgrreq_option_chain_window_aapl_2016_01_2016_01_05_0930",
                         "run_id": "run_option_chain_provider_policy",
-                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                        "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "target_component_id": "option_chain_state_source",
                         "source_id": "option_chain_state_source",
                         "symbol": "AAPL",
@@ -2819,7 +2816,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.provider_stage_failure_register",
                         "error_kind": "provider_stage_requests_failed",
                         "severity": "warning",
-                        "summary": "provider stage layer_03_target_state_vector.option_chain_data_acquisition has failed requests requiring automatic repair",
+                        "summary": "provider stage model_02_target_state.option_chain_data_acquisition has failed requests requiring automatic repair",
                         "occurred_at_utc": "2026-06-05T10:33:32Z",
                         "created_at_utc": "2026-06-05T10:33:32Z",
                     }
@@ -2839,7 +2836,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T10:40:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["detail"]["progress"]["failed_count"], 0)
@@ -2867,10 +2864,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                                "stage_id": "model_02_target_state.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "six_month_target_fold",
@@ -2889,11 +2886,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             coverage_root = runtime / "stage_coverage"
             coverage_root.mkdir(parents=True, exist_ok=True)
-            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01.json").write_text(
+            (coverage_root / "model_02_target_state_option_chain_data_acquisition_2016-01.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                        "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
                         "status": "partial_ready",
@@ -2908,14 +2905,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
+            (coverage_root / "model_02_target_state_option_chain_data_acquisition_2016-01_failure_register_proposals.jsonl").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_failure_register",
                         "failure_id": "fail_option_chain_thetadata_connection_refused",
                         "request_id": "mgrreq_option_chain_window_aapl_2016_01_2016_01_05_0930",
                         "run_id": "run_option_chain_thetadata_connection_refused",
-                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                        "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "target_component_id": "option_chain_state_source",
                         "source_id": "option_chain_state_source",
                         "symbol": "AAPL",
@@ -2944,7 +2941,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T10:40:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["detail"]["failure_register"]["retry_required_count"], 1)
@@ -2971,10 +2968,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-01",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "ready",
                             }
                         ],
@@ -2991,31 +2988,31 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_01_market_regime.feature_generation",
+                                "stage_id": "model_01_market_context.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_02_sector_context.data_acquisition",
+                                "stage_id": "model_01_sector_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 2,
-                                "layer_key": "layer_02_sector_context",
+                                "layer_key": "model_01_sector_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_02_sector_context.feature_generation",
+                                "stage_id": "model_01_sector_context.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 2,
-                                "layer_key": "layer_02_sector_context",
+                                "layer_key": "model_01_sector_context",
                                 "status": "succeeded",
                             },
                             {
@@ -3034,10 +3031,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                                "stage_id": "model_02_target_state.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "target_symbol_six_month",
@@ -3056,11 +3053,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             coverage_root = runtime / "stage_coverage"
             coverage_root.mkdir(parents=True, exist_ok=True)
-            (coverage_root / "layer_03_target_state_vector_option_chain_data_acquisition_2016-01.json").write_text(
+            (coverage_root / "model_02_target_state_option_chain_data_acquisition_2016-01.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_stage_coverage",
-                        "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                        "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
                         "status": "partial_ready",
@@ -3087,7 +3084,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-05T16:55:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "layer_03_target_state_vector")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["status"], "running")
         self.assertEqual(task["detail"]["progress"]["progress_source"], "fold_stage_coverage")
@@ -3221,7 +3218,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage layer_03_target_state_vector.data_acquisition command returned non-zero status",
+                        "summary": "model training stage model_02_target_state.data_acquisition command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-18T13:35:00Z",
                         "created_at_utc": "2026-05-18T13:35:00Z",
@@ -3308,7 +3305,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage layer_03_target_state_vector.data_acquisition command returned non-zero status",
+                        "summary": "model training stage model_02_target_state.data_acquisition command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-18T13:52:00Z",
                         "created_at_utc": "2026-05-18T13:52:00Z",
@@ -3579,7 +3576,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage layer_03_target_state_vector.data_acquisition command returned non-zero status",
+                        "summary": "model training stage model_02_target_state.data_acquisition command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-18T13:45:00Z",
                         "created_at_utc": "2026-05-18T13:45:00Z",
@@ -3718,13 +3715,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            receipt_dir = runtime / "model_training_stage_receipts" / "layer_04_event_failure_risk__model_generation"
+            receipt_dir = runtime / "model_training_stage_receipts" / "model_03_event_state__model_generation"
             receipt_dir.mkdir(parents=True, exist_ok=True)
             (receipt_dir / "2026-05-21T112022.000000+0000.receipt.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "component_completion_receipt",
-                        "manager_stage_id": "layer_04_event_failure_risk.model_generation",
+                        "manager_stage_id": "model_03_event_state.model_generation",
                         "status": "succeeded",
                         "completed_at": "2026-05-21T11:20:22Z",
                         "runs": [{"status": "succeeded", "return_code": 0}],
@@ -3749,7 +3746,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage layer_04_event_failure_risk.model_generation command returned non-zero status",
+                        "summary": "model training stage model_03_event_state.model_generation command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-18T13:27:32Z",
                         "created_at_utc": "2026-05-18T13:27:32Z",
@@ -3794,7 +3791,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer": 10,
                                 "layer_key": "model_06_residual_event_governance",
                                 "status": "blocked",
-                                "last_reason": "waiting for upstream_layer_08_model_evaluation_complete",
+                                "last_reason": "waiting for upstream_model_04_evaluation_complete",
                                 "updated_utc": "2026-05-21T10:00:00Z",
                             }
                         ],
@@ -3889,10 +3886,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2021-10",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "updated_utc": "2026-05-18T10:46:52Z",
                                 "last_reason": "stage execution started by manager stage executor",
@@ -3918,7 +3915,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_scheduler_decision",
                         "decision_status": "backoff",
                         "start_month": "2021-10",
-                        "selected_work": "layer_03_target_state_vector.feature_generation",
+                        "selected_work": "model_02_target_state.feature_generation",
                         "reason": "no executable scheduler-owned workflow stage is currently available",
                     }
                 )
@@ -3944,7 +3941,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["chart_payload"]["runtime_active_work"]["status"], "running")
         self.assertEqual(
             payload["chart_payload"]["runtime_active_work"]["stage_id"],
-            "layer_03_target_state_vector.feature_generation",
+            "model_02_target_state.feature_generation",
         )
 
 
@@ -3962,10 +3959,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2019-04",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                                 "updated_utc": "2026-05-12T10:00:00Z",
                                 "receipt_refs": ["02_control_plane/runtime/stage_coverage/example.json"],
@@ -4015,10 +4012,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2019-04",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             }
                         ],
@@ -4035,10 +4032,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2019-06",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "ready",
                             }
                         ],
@@ -4093,10 +4090,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2018-01",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             }
                         ],
@@ -4136,7 +4133,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         durable_task = next(task for task in tasks if task["month"] == "2018-fold1")
         self.assertEqual(durable_task["task_number"], durable_task["sequence"])
         self.assertEqual(durable_task["task_number"], 1)
-        self.assertEqual(durable_task["task_uid"], "2018-01..2018-06:layer_01_market_regime")
+        self.assertEqual(durable_task["task_uid"], "2018-01..2018-06:model_01_market_context")
 
     def test_task_timeline_shows_fold_target_chain_prep_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -4152,31 +4149,31 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_01_market_regime.model_generation",
+                                "stage_id": "model_01_market_context.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_02_sector_context.model_generation",
+                                "stage_id": "model_01_sector_context.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": 2,
-                                "layer_key": "layer_02_sector_context",
+                                "layer_key": "model_01_sector_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                             },
                         ],
@@ -4193,10 +4190,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             }
                         ],
@@ -4222,8 +4219,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             write_task_progress_node(
                 progress_root=runtime / "task_progress",
                 worker_id="model_worker_1",
-                task_uid="2016-01..2016-06:layer_03_target_state_vector.data_acquisition",
-                stage_id="layer_03_target_state_vector.data_acquisition",
+                task_uid="2016-01..2016-06:model_02_target_state.data_acquisition",
+                stage_id="model_02_target_state.data_acquisition",
                 unit_label="rows",
                 processed_count=40,
                 expected_count=100,
@@ -4248,11 +4245,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual([task["stage_type"] for task in model_tasks], ["model_task", "model_task", "model_task"])
         self.assertEqual([task["task_number"] for task in model_tasks], [1, 2, 3])
         self.assertEqual([task["sequence"] for task in model_tasks], [1, 2, 3])
-        self.assertEqual(model_tasks[0]["task_uid"], "2016-01..2016-06:layer_01_market_regime")
+        self.assertEqual(model_tasks[0]["task_uid"], "2016-01..2016-06:model_01_market_context")
         self.assertEqual(model_tasks[0]["detail"]["child_partitions"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
-        self.assertEqual(model_tasks[0]["task_label"], "Layer 1 Market Regime Model")
-        self.assertEqual(model_tasks[1]["task_label"], "Layer 2 Sector Context Model")
-        self.assertEqual(model_tasks[2]["task_label"], "Layer 3 Target State Vector Model")
+        self.assertEqual(model_tasks[0]["task_label"], "M01 Market Regime Model")
+        self.assertEqual(model_tasks[1]["task_label"], "M01 Sector Context Model")
+        self.assertEqual(model_tasks[2]["task_label"], "M02 Target State Vector Model")
         self.assertEqual(
             [task["task_id"] for task in lifecycle_tasks],
             [
@@ -4269,7 +4266,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         fold_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if task["task_id"] == "layer_03_target_state_vector"
+            if task["task_id"] == "model_02_target_state"
         ]
         self.assertEqual([task["month"] for task in fold_prep_tasks], ["2016-fold1"])
         timeline_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
@@ -4298,10 +4295,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "blocked",
                                 "last_reason": "waiting for selected_target_symbol_required",
                             }
@@ -4319,10 +4316,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "last_reason": "stage completed by manager stage executor",
                                 "dataset_unit": {
@@ -4355,7 +4352,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if task["month"] == "2016-fold1" and task["task_id"] == "layer_03_target_state_vector"
+            if task["month"] == "2016-fold1" and task["task_id"] == "model_02_target_state"
         )
         self.assertEqual(task["status"], "succeeded")
         self.assertEqual(task["target_symbol"], "AAPL")
@@ -4375,10 +4372,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             "end_month": month,
                             "stages": [
                                 {
-                                    "stage_id": "layer_01_market_regime.data_acquisition",
+                                    "stage_id": "model_01_market_context.data_acquisition",
                                     "stage_type": "data_acquisition",
                                     "layer": 1,
-                                    "layer_key": "layer_01_market_regime",
+                                    "layer_key": "model_01_market_context",
                                     "status": "succeeded",
                                 }
                             ],
@@ -4396,10 +4393,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             "end_month": end,
                             "stages": [
                                 {
-                                    "stage_id": "layer_01_market_regime.model_generation",
+                                    "stage_id": "model_01_market_context.model_generation",
                                     "stage_type": "model_generation",
                                     "layer": 1,
-                                    "layer_key": "layer_01_market_regime",
+                                    "layer_key": "model_01_market_context",
                                     "status": "succeeded",
                                 }
                             ],
@@ -4459,10 +4456,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2026-05",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "ready",
                             }
                         ],
@@ -4542,10 +4539,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "blocked",
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                                "stage_id": "model_02_target_state.option_chain_data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 5,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "not_applicable",
                                 "last_reason": "no M05 training-eligible underlying minutes ready for option-expression acquisition",
                             },
@@ -4575,7 +4572,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             any(task["layer"] == 6 and task["stage_type"] in {"data_acquisition", "feature_generation"} for task in task_timeline)
         )
         self.assertFalse(any(task["layer"] == 6 and task["stage_type"] == "model_task" for task in task_timeline))
-        real_skip = next(task for task in task_timeline if task["task_id"] == "layer_03_target_state_vector")
+        real_skip = next(task for task in task_timeline if task["task_id"] == "model_02_target_state")
         self.assertEqual(real_skip["task_state"], "skipped")
         self.assertIn("no M05 training-eligible", real_skip["reason"])
 
@@ -4630,31 +4627,31 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             "end_month": month,
                             "stages": [
                                 {
-                                    "stage_id": "layer_01_market_regime.data_acquisition",
+                                    "stage_id": "model_01_market_context.data_acquisition",
                                     "stage_type": "data_acquisition",
                                     "layer": 1,
-                                    "layer_key": "layer_01_market_regime",
+                                    "layer_key": "model_01_market_context",
                                     "status": "succeeded",
                                 },
                                 {
-                                    "stage_id": "layer_01_market_regime.feature_generation",
+                                    "stage_id": "model_01_market_context.feature_generation",
                                     "stage_type": "feature_generation",
                                     "layer": 1,
-                                    "layer_key": "layer_01_market_regime",
+                                    "layer_key": "model_01_market_context",
                                     "status": "succeeded",
                                 },
                                 {
-                                    "stage_id": "layer_02_sector_context.data_acquisition",
+                                    "stage_id": "model_01_sector_context.data_acquisition",
                                     "stage_type": "data_acquisition",
                                     "layer": 2,
-                                    "layer_key": "layer_02_sector_context",
+                                    "layer_key": "model_01_sector_context",
                                     "status": "ready",
                                 },
                                 {
-                                    "stage_id": "layer_02_sector_context.feature_generation",
+                                    "stage_id": "model_01_sector_context.feature_generation",
                                     "stage_type": "feature_generation",
                                     "layer": 2,
-                                    "layer_key": "layer_02_sector_context",
+                                    "layer_key": "model_01_sector_context",
                                     "status": "blocked",
                                 },
                             ],
@@ -4691,7 +4688,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertEqual([task["month"] for task in current_tasks], ["2017-fold1"])
         self.assertEqual([task["worker_id"] for task in current_tasks], ["model_worker_1"])
-        self.assertTrue(all(task["task_id"] == "layer_02_sector_context" for task in current_tasks))
+        self.assertTrue(all(task["task_id"] == "model_01_sector_context" for task in current_tasks))
 
     def test_task_timeline_advances_after_completed_foundation_months(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -4708,38 +4705,38 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             "end_month": month,
                             "stages": [
                                 {
-                                    "stage_id": "layer_01_market_regime.data_acquisition",
+                                    "stage_id": "model_01_market_context.data_acquisition",
                                     "stage_type": "data_acquisition",
                                     "layer": 1,
-                                    "layer_key": "layer_01_market_regime",
+                                    "layer_key": "model_01_market_context",
                                     "status": "succeeded",
                                 },
                                 {
-                                    "stage_id": "layer_01_market_regime.feature_generation",
+                                    "stage_id": "model_01_market_context.feature_generation",
                                     "stage_type": "feature_generation",
                                     "layer": 1,
-                                    "layer_key": "layer_01_market_regime",
+                                    "layer_key": "model_01_market_context",
                                     "status": "succeeded",
                                 },
                                 {
-                                    "stage_id": "layer_02_sector_context.data_acquisition",
+                                    "stage_id": "model_01_sector_context.data_acquisition",
                                     "stage_type": "data_acquisition",
                                     "layer": 2,
-                                    "layer_key": "layer_02_sector_context",
+                                    "layer_key": "model_01_sector_context",
                                     "status": "succeeded",
                                 },
                                 {
-                                    "stage_id": "layer_02_sector_context.feature_generation",
+                                    "stage_id": "model_01_sector_context.feature_generation",
                                     "stage_type": "feature_generation",
                                     "layer": 2,
-                                    "layer_key": "layer_02_sector_context",
+                                    "layer_key": "model_01_sector_context",
                                     "status": "succeeded",
                                 },
                                 {
-                                    "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                    "stage_id": "model_02_target_state.data_acquisition",
                                     "stage_type": "data_acquisition",
                                     "layer": 3,
-                                    "layer_key": "layer_03_target_state_vector",
+                                    "layer_key": "model_02_target_state",
                                     "status": "ready",
                                 },
                             ],
@@ -4774,7 +4771,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-14T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertEqual([(task["month"], task["task_id"]) for task in current_tasks], [("2020-fold2", "layer_03_target_state_vector")])
+        self.assertEqual([(task["month"], task["task_id"]) for task in current_tasks], [("2020-fold2", "model_02_target_state")])
 
     def test_task_timeline_blocks_later_fold_until_earliest_open_fold_closes(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -4811,10 +4808,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2017-06",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.model_generation",
+                                "stage_id": "model_01_market_context.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "ready",
                             }
                         ],
@@ -4860,31 +4857,31 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-02",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.data_acquisition",
+                                "stage_id": "model_01_market_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_01_market_regime.feature_generation",
+                                "stage_id": "model_01_market_context.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_02_sector_context.data_acquisition",
+                                "stage_id": "model_01_sector_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 2,
-                                "layer_key": "layer_02_sector_context",
+                                "layer_key": "model_01_sector_context",
                                 "status": "succeeded",
                             },
                             {
-                                "stage_id": "layer_02_sector_context.feature_generation",
+                                "stage_id": "model_01_sector_context.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 2,
-                                "layer_key": "layer_02_sector_context",
+                                "layer_key": "model_01_sector_context",
                                 "status": "succeeded",
                             },
                         ],
@@ -4926,10 +4923,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.model_evaluation",
+                                "stage_id": "model_01_market_context.model_evaluation",
                                 "stage_type": "model_evaluation",
                                 "layer": 1,
-                                "layer_key": "layer_01_market_regime",
+                                "layer_key": "model_01_market_context",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
@@ -4951,10 +4948,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-12",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAOI",
@@ -4976,10 +4973,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-12",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
@@ -4988,10 +4985,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
@@ -5012,7 +5009,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_scheduler_decision",
                         "decision_status": "executed",
-                        "selected_work": "layer_03_target_state_vector.data_acquisition",
+                        "selected_work": "model_02_target_state.data_acquisition",
                         "execution_summary": {
                             "workflow_plan": {
                                 "start_month": "2016-07",
@@ -5020,7 +5017,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "selected_target_symbol": "AAPL",
                             },
                             "stage_execution": {
-                                "stage_id": "layer_03_target_state_vector.data_acquisition",
+                                "stage_id": "model_02_target_state.data_acquisition",
                                 "status": "succeeded",
                                 "return_code": 0,
                             }
@@ -5044,11 +5041,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertIn(
-            ("2016-fold2", "layer_03_target_state_vector", "AAPL", "Model Worker 1"),
+            ("2016-fold2", "model_02_target_state", "AAPL", "Model Worker 1"),
             [(task["month"], task["task_id"], task["target_symbol"], task["worker_label"]) for task in current_tasks],
         )
         self.assertNotIn(
-            ("2016-fold1", "layer_01_market_regime.model_evaluation"),
+            ("2016-fold1", "model_01_market_context.model_evaluation"),
             [(task["month"], task["task_id"]) for task in current_tasks],
         )
 
@@ -5070,10 +5067,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "stage_type": "feature_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
@@ -5095,10 +5092,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2016-12",
                         "stages": [
                             {
-                                "stage_id": "layer_03_target_state_vector.model_generation",
+                                "stage_id": "model_02_target_state.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": 3,
-                                "layer_key": "layer_03_target_state_vector",
+                                "layer_key": "model_02_target_state",
                                 "status": "blocked",
                                 "last_reason": "stage command is currently running outside checkpoint state",
                                 "dataset_unit": {
@@ -5120,7 +5117,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_scheduler_decision",
                         "decision_status": "executed",
-                        "selected_work": "layer_03_target_state_vector.feature_generation",
+                        "selected_work": "model_02_target_state.feature_generation",
                         "execution_summary": {
                             "workflow_plan": {
                                 "start_month": "2016-07",
@@ -5128,7 +5125,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "selected_target_symbol": "AAPL",
                             },
                             "stage_execution": {
-                                "stage_id": "layer_03_target_state_vector.feature_generation",
+                                "stage_id": "model_02_target_state.feature_generation",
                                 "status": "succeeded",
                                 "return_code": 0,
                             },
@@ -5152,7 +5149,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertNotIn(
-            ("2016-fold1", "layer_03_target_state_vector.feature_generation"),
+            ("2016-fold1", "model_02_target_state.feature_generation"),
             [(task["month"], task["task_id"]) for task in current_tasks],
         )
 

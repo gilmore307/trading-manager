@@ -15,7 +15,7 @@ from trading_manager_tasks.model_promotion import (
 
 
 class ModelPromotionRequestTests(unittest.TestCase):
-    def test_all_model_layers_use_one_request_kind(self):
+    def test_all_model_readiness_use_one_request_kind(self):
         self.assertEqual(len(MODEL_PROMOTION_TARGETS), 6)
         self.assertEqual({target.model_id for target in MODEL_PROMOTION_TARGETS}, {
             "background_context_model",

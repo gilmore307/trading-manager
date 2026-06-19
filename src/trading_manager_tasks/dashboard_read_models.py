@@ -88,7 +88,7 @@ MODEL_GROUP_MAINTENANCE_DATA_KINDS = (
 )
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
 FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE = "fixed_current_snapshot_historical_candidate_universe"
-LAYER_TWO_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
+LAYER_TWO_TARGET_CANDIDATE_HANDOFF_SOURCE = "model_02_target_candidate_handoff"
 CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES = {
     FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE,
     LAYER_TWO_TARGET_CANDIDATE_HANDOFF_SOURCE,
@@ -555,7 +555,7 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
             updated["dashboard_severity"] = "notice"
             updated["retry_recommendation"] = (
                 "Superseded by model_06_residual_event_governance. "
-                "Prepare fold-scoped Layer 4 event-observation artifacts before replay; M06 starts after replay for attribution."
+                "Prepare fold-scoped M03 event-observation artifacts before replay; M06 starts after replay for attribution."
             )
             updated_rows.append(updated)
         elif (
@@ -572,7 +572,7 @@ def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timel
                 "current M05 option-expression features are generated from option_chain_state_source."
             )
             updated_rows.append(updated)
-        elif str(row.get("handling_status") or "") != "closed" and "layer_09_option_expression." in text:
+        elif str(row.get("handling_status") or "") != "closed" and "model_05_option_expression." in text:
             updated = dict(row)
             updated["repair_status"] = "superseded"
             updated["handling_status"] = "closed"
@@ -1510,7 +1510,7 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
 def _public_stage_name(stage_id: object, stage_type: object) -> str:
     stage_id_text = str(stage_id or "")
     if stage_id_text.startswith("layer_") and stage_type == "model_evaluation":
-        return "Local Layer Evaluation"
+        return "Local Model Evaluation"
     phase = str(stage_type or "").replace("_", " ").strip()
     if phase:
         return phase.title()
@@ -1523,12 +1523,21 @@ MODEL_NAME_BY_LAYER_KEY = {
 }
 MODEL_NAME_BY_LAYER_KEY.update(
     {
-        "layer_01_market_regime": "MarketRegimeModel",
-        "layer_02_sector_context": "SectorContextModel",
-        "layer_03_target_state_vector": "TargetStateVectorModel",
+        "model_01_market_context": "MarketRegimeModel",
+        "model_01_sector_context": "SectorContextModel",
+        "model_02_target_state": "TargetStateVectorModel",
         "model_06_residual_event_governance": "EventRiskGovernor",
     }
 )
+MODEL_NUMBER_BY_LAYER_KEY = {
+    "model_01_market_context": 1,
+    "model_01_sector_context": 1,
+    "model_02_target_state": 2,
+    "model_03_event_state": 3,
+    "model_04_unified_decision": 4,
+    "model_05_option_expression": 5,
+    "model_06_residual_event_governance": 6,
+}
 
 
 def _spaced_model_name(model_name: str) -> str:
@@ -1541,10 +1550,13 @@ def _model_task_label(layer_key: str, layer: int | None = None) -> str:
     model_name = MODEL_NAME_BY_LAYER_KEY.get(layer_key)
     if model_name:
         model_label = _spaced_model_name(model_name)
+        current_model_number = MODEL_NUMBER_BY_LAYER_KEY.get(layer_key)
+        if current_model_number is not None:
+            return f"M{current_model_number:02d} {model_label}"
         if layer_key.startswith("model_") and layer is not None:
             return f"M{layer:02d} {model_label}"
         if layer is not None:
-            return f"Layer {layer} {model_label}"
+            return f"M{layer:02d} {model_label}"
         return model_label
     if layer == 10:
         return "M06 Event Risk Governor"
@@ -1925,7 +1937,7 @@ def _worker_info_for_stage(
 
     Historical training exposes fold as the first-class task unit. Month-level
     ingestion lanes may still exist as internal execution detail, but the owner
-    dashboard should present Layer 1+ historical stages as fold work so task
+    dashboard should present M01+ historical stages as fold work so task
     identity stays consistent across layers. Worker fields stay diagnostic and
     should not drive the owner-facing Tasks page.
     """
@@ -2189,7 +2201,7 @@ def _fold_foundation_hold_progress(
         "accepted_failed_count": 0,
         "can_unlock_downstream": False,
         "progress_source": "monthly_foundation_catch_up",
-        "progress_basis": "monthly Layer 1/2 foundation must be rebuilt before reset fold workers resume",
+        "progress_basis": "monthly M01/M02 foundation must be rebuilt before reset fold workers resume",
         "ready_months": ready_months,
         "missing_months": missing_months,
     }
@@ -2384,7 +2396,7 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
                 "active_stage_type": active_stage.get("stage_type"),
                 "model_name": MODEL_NAME_BY_LAYER_KEY.get(layer_key),
                 "model_display_name": _spaced_model_name(MODEL_NAME_BY_LAYER_KEY.get(layer_key) or ""),
-                "layer_label": f"Layer {layer}" if layer is not None else None,
+                "layer_label": f"M{layer:02d}" if layer is not None else None,
                 "dashboard_progress": active_dashboard_progress or _model_task_progress(layer_key, stages, status),
                 "internal_stages": [
                     {
@@ -4443,7 +4455,7 @@ def _model_group_replay_timeline_tasks(
         if replay_month_reason is not None
         else f"Model-group replay has started and completed {len(replay_ready_months)}/{_replay_window_month_count(dataset_root)} replay months."
         if replay_started
-        else "Pre-replay Layer 1-9 fold is complete; replay is waiting for its fixed replay dataset preparation manifest."
+        else "Pre-replay M01-M05 fold is complete; replay is waiting for its fixed replay dataset preparation manifest."
         if pre_replay_complete and manifest is None
         else str(replay_scope_status["reason"])
         if pre_replay_complete and manifest is not None and not replay_scope_status["compatible"]
@@ -4453,7 +4465,7 @@ def _model_group_replay_timeline_tasks(
         if pre_replay_complete and manifest is not None and coverage_complete and not freeze_ready
         else "Replay dataset is frozen and ready for fold-bound execution-component-graph replay."
         if pre_replay_complete and manifest is not None and freeze_ready and not replay_complete
-        else "Waiting for pre-replay Layer 1-9 model generation to complete before replay can run."
+        else "Waiting for pre-replay M01-M05 model generation to complete before replay can run."
     )
     if manifest is not None and replay_scope_status["compatible"] and not coverage_complete:
         replay_progress = _replay_dataset_month_operation_progress(

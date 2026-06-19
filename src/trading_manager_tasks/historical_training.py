@@ -1,7 +1,7 @@
 """Manager-owned orchestration for historical model-training batches.
 
 The helpers here prepare manager requests, task-key payloads, and handoff
-validation evidence for a model layer. They do not call providers, dispatch
+validation evidence for a model. They do not call providers, dispatch
 component runs, activate models, or touch broker/execution state.
 """
 
@@ -25,9 +25,9 @@ from .monthly_backfill import (
 from .request_handoff import DEFAULT_TRADING_DATA_SRC, validate_request_handoffs
 from .request_payloads import DEFAULT_STORAGE_ROOT, materialize_request_payloads
 
-LAYER_ONE_PHASE = "layer_01_market_regime_historical_training"
-LAYER_TWO_PHASE = "layer_02_sector_context_historical_training"
-LAYER_THREE_TARGET_LOCAL_PHASE = "layer_03_target_state_vector_target_local_feed"
+LAYER_ONE_PHASE = "model_01_market_context_historical_training"
+LAYER_TWO_PHASE = "model_01_sector_context_historical_training"
+LAYER_THREE_TARGET_LOCAL_PHASE = "model_02_target_state_target_local_feed"
 LAYER_ALPACA_BARS_COMPONENT_ID = "01_feed_alpaca_bars"
 LAYER_PHASES = {
     LAYER_ONE_MODEL_LAYER: LAYER_ONE_PHASE,
@@ -81,12 +81,12 @@ class HistoricalTrainingBatchPreparation:
 
 def _layer_requests(*, model_layer: str, start_month: str, end_month: str) -> list[dict[str, Any]]:
     if model_layer not in {LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER}:
-        raise TaskSystemError(f"unsupported historical-training model layer: {model_layer}")
+        raise TaskSystemError(f"unsupported historical-training model: {model_layer}")
     rows = plan_monthly_backfill_requests(
         start_month=start_month,
         end_month=end_month,
         include_crypto=False,
-        model_layers=(model_layer,),
+        model_readiness=(model_layer,),
     )
     selected = [dict(row) for row in rows if row.get("target_component_id") == LAYER_ALPACA_BARS_COMPONENT_ID]
     if not selected:
@@ -172,7 +172,7 @@ def prepare_target_local_historical_training_batch(
     validate_handoff: bool = True,
     database_url: str | None = None,
 ) -> tuple[HistoricalTrainingBatchPreparation, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Prepare target-local Layer 3 Alpaca bar requests without provider dispatch."""
+    """Prepare target-local M02 Alpaca bar requests without provider dispatch."""
 
     requests = _target_local_requests(start_month=start_month, end_month=end_month, target_symbols=target_symbols)
     if persist_sql:
@@ -222,7 +222,7 @@ def prepare_layer_one_historical_training_batch(
     validate_handoff: bool = True,
     database_url: str | None = None,
 ) -> tuple[HistoricalTrainingBatchPreparation, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Prepare a complete Layer 1 historical-training request batch.
+    """Prepare a complete M01 historical-training request batch.
 
     `write=True` writes task_key payload files. `persist_sql=True` also persists
     manager_request rows and request-scoped input_binding rows. No
@@ -253,7 +253,7 @@ def prepare_layer_two_historical_training_batch(
     validate_handoff: bool = True,
     database_url: str | None = None,
 ) -> tuple[HistoricalTrainingBatchPreparation, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Prepare Layer 2 sector-context ETF bar requests without provider dispatch."""
+    """Prepare M02 sector-context ETF bar requests without provider dispatch."""
 
     return prepare_layer_historical_training_batch(
         model_layer=LAYER_TWO_MODEL_LAYER,
@@ -302,7 +302,7 @@ def write_batch_output(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Prepare a manager-owned Layer 1 historical-training batch without provider dispatch."
+        description="Prepare a manager-owned M01 historical-training batch without provider dispatch."
     )
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")

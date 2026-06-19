@@ -369,7 +369,7 @@ def select_month_ingest_worker_months(
     """Return the single month-scoped ingest lane to work now.
 
     This selector is intentionally narrower than ``select_next_historical_work``:
-    it only considers the Layer 1/2 foundation substrate as ingest work. If a
+    it only considers the M01/M02 foundation substrate as ingest work. If a
     complete foundation fold is already ready for model-worker execution, the
     fold owns the lane and month ingest pauses instead of prebuilding later
     fold inputs. ``worker_count`` is accepted for service compatibility only;
@@ -737,8 +737,8 @@ def model_group_lifecycle_blocks_next_fold(
 ) -> bool:
     """Return whether any completed pre-replay fold still owns the lane.
 
-    M06 may update the event-observation pool consumed by later Layer 4
-    folds. The scheduler therefore cannot start the next fold after Layer 1-9
+    M06 may update the event-observation pool consumed by later M03 event-state
+    folds. The scheduler therefore cannot start the next fold after M01-M05
     alone; the current fold must complete replay, M06, evaluation,
     promotion, and maintenance readiness first.
     """
@@ -1145,7 +1145,7 @@ def seed_model_worker_fold_state(
     selection: ModelWorkerFoldSelection,
     selected_target_symbol: str | None = None,
 ) -> Path:
-    """Create/refresh a fold-scoped state seeded from completed Layer 1/2 substrate months."""
+    """Create/refresh a fold-scoped state seeded from completed M01/M02 substrate months."""
 
     state_path = model_worker_fold_state_path(
         selection.start_month,

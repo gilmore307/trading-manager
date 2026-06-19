@@ -76,7 +76,7 @@ class DatasetUnit:
 
 @dataclass(frozen=True)
 class WorkflowStage:
-    """One manager-orchestrated stage for a model layer."""
+    """One manager-orchestrated stage for a model."""
 
     stage_id: str
     layer: int
@@ -103,7 +103,7 @@ class WorkflowStage:
 
 @dataclass(frozen=True)
 class LayerWorkflow:
-    """Manager workflow coverage for one model layer."""
+    """Manager workflow coverage for one model."""
 
     layer: int
     layer_key: str
@@ -425,7 +425,7 @@ def maintenance_command(layer: int, slug: str) -> list[str]:
 
 
 def _symbols_for_model_layer(model_layer: str) -> tuple[str, ...]:
-    return tuple(member.symbol for member in load_market_regime_universe(model_layers=(model_layer,)))
+    return tuple(member.symbol for member in load_market_regime_universe(model_readiness=(model_layer,)))
 
 
 def count_alpaca_bar_task_keys(storage_root: Path, *, start_month: str, model_layer: str) -> int:
@@ -752,7 +752,7 @@ def _build_layer_workflow(
         acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_provider_acquisition(
             task_key_count=layer_one_task_key_count,
             required_count=LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
-            preparation_blocker="layer_01_task_key_preparation",
+            preparation_blocker="model_01_task_key_preparation",
         )
     elif layer == 2:
         acquisition_status = "blocked" if model_two_target_local_feed_blockers else "ready"
@@ -782,7 +782,7 @@ def _build_layer_workflow(
             "${START_MONTH}",
             "--end-month",
             "${END_MONTH}",
-            "--model-layer",
+            "--model",
             LAYER_ONE_MODEL_LAYER,
             "--skip-registered-failures",
             "--reject-terminal-coverage",

@@ -49,7 +49,7 @@ Failures should become durable evidence, not chat-only notes. Ordinary runtime, 
 ## Model Research Run Cycle
 
 Model research tasks are grouped by data reuse and decision-cycle ownership, not
-by the retired ten-layer loop.
+by the retired serial loop.
 
 The public task list is a task-fact projection over scheduler state. It shows
 completed history, failures, and one current executable or review task. Future

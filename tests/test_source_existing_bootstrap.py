@@ -11,7 +11,7 @@ from trading_manager_tasks.source_existing_bootstrap import build_source_coverag
 
 
 def _symbols(model_layer: str) -> tuple[str, ...]:
-    return tuple(member.symbol.upper() for member in load_market_regime_universe(model_layers=(model_layer,)))
+    return tuple(member.symbol.upper() for member in load_market_regime_universe(model_readiness=(model_layer,)))
 
 
 class SourceExistingBootstrapTests(unittest.TestCase):

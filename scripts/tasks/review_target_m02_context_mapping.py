@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create or call an agent review for target-to-Layer-2 context mapping rows."""
+"""Create or call an agent review for target-to-M02 context mapping rows."""
 
 from __future__ import annotations
 

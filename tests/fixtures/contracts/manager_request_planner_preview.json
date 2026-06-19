@@ -8,7 +8,7 @@
   ],
   "exposure_type": "broad_market",
   "feature_grain": "30m",
-  "model_layer": "layer_01_market_regime",
+  "model_layer": "model_01_market_context",
   "month": "2016-01",
   "parameter_ref": "storage://trading-manager/monthly_backfill/alpaca_bars/SPY/2016-01/task_key.json",
   "policy_refs": [
@@ -26,6 +26,6 @@
   "target_component_kind": "data_feed",
   "target_repo_id": "trading-data",
   "timeframe": "1Min",
-  "universe_ref": "trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv",
+  "universe_ref": "trading-storage/main/shared/model_01_background_context_etf_universe.csv",
   "universe_type": "market_context"
 }

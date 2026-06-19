@@ -19,7 +19,7 @@ class StageExecutorTests(unittest.TestCase):
             stage = StageProgress(
                 stage_id="model_01_background_context.feature_generation",
                 layer=1,
-                layer_key="layer_01_market_regime",
+                layer_key="model_01_market_context",
                 stage_type="feature_generation",
                 status="ready",
                 command=[
@@ -58,7 +58,7 @@ class StageExecutorTests(unittest.TestCase):
             stage = StageProgress(
                 stage_id="model_01_background_context.feature_generation",
                 layer=1,
-                layer_key="layer_01_market_regime",
+                layer_key="model_01_market_context",
                 stage_type="feature_generation",
                 status="ready",
                 command=["python3", "-c", "import sys; print(sys.executable)"],
@@ -85,7 +85,7 @@ class StageExecutorTests(unittest.TestCase):
             stage = StageProgress(
                 stage_id="model_01_background_context.feature_generation",
                 layer=1,
-                layer_key="layer_01_market_regime",
+                layer_key="model_01_market_context",
                 stage_type="feature_generation",
                 status="ready",
                 command=["python3", "-c", "import time; time.sleep(2)"],
@@ -120,7 +120,7 @@ class StageExecutorTests(unittest.TestCase):
             stage = StageProgress(
                 stage_id="model_01_background_context.feature_generation",
                 layer=1,
-                layer_key="layer_01_market_regime",
+                layer_key="model_01_market_context",
                 stage_type="feature_generation",
                 status="ready",
                 command=["python3", "-c", "import time; time.sleep(2)"],
@@ -207,7 +207,7 @@ class StageExecutorTests(unittest.TestCase):
             stage = StageProgress(
                 stage_id="model_01_background_context.feature_generation",
                 layer=1,
-                layer_key="layer_01_market_regime",
+                layer_key="model_01_market_context",
                 stage_type="feature_generation",
                 status="ready",
                 command=["python3", "-c", command],
@@ -271,9 +271,9 @@ class StageExecutorTests(unittest.TestCase):
 
     def test_rejects_deprecated_runtime_model_rows_output(self):
         stage = StageProgress(
-            stage_id="layer_04_event_failure_risk.model_generation.train",
+            stage_id="model_03_event_state.model_generation.train",
             layer=4,
-            layer_key="layer_04_event_failure_risk",
+            layer_key="model_03_event_state",
             stage_type="model_generation",
             status="ready",
             command=[
@@ -298,9 +298,9 @@ class StageExecutorTests(unittest.TestCase):
 
     def test_manager_task_scripts_run_from_manager_root_even_with_trading_model_refs(self):
         stage = StageProgress(
-            stage_id="layer_01_market_regime.maintenance",
+            stage_id="model_01_market_context.maintenance",
             layer=1,
-            layer_key="layer_01_market_regime",
+            layer_key="model_01_market_context",
             stage_type="maintenance",
             status="ready",
             command=["PYTHONPATH=src", "python3", "scripts/tasks/plan_model_promotion_review.py", "--candidate-ref", "storage://trading-model/example.json"],
@@ -317,7 +317,7 @@ class StageExecutorTests(unittest.TestCase):
             stage = StageProgress(
                 stage_id="model_02_target_state.data_acquisition",
                 layer=3,
-                layer_key="layer_03_target_state_vector",
+                layer_key="model_02_target_state",
                 stage_type="data_acquisition",
                 status="ready",
                 command=["python3", "materialize_layer_three_target_state_inputs.py"],
@@ -341,9 +341,9 @@ class StageExecutorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             stage = StageProgress(
-                stage_id="layer_04_event_failure_risk.data_acquisition",
+                stage_id="model_03_event_state.data_acquisition",
                 layer=4,
-                layer_key="layer_04_event_failure_risk",
+                layer_key="model_03_event_state",
                 stage_type="data_acquisition",
                 status="ready",
                 command=["python3", "materialize_layer_four_event_observation_inputs.py"],
@@ -366,7 +366,7 @@ class StageExecutorTests(unittest.TestCase):
             stage = StageProgress(
                 stage_id="model_01_background_context.data_acquisition",
                 layer=1,
-                layer_key="layer_01_market_regime",
+                layer_key="model_01_market_context",
                 stage_type="data_acquisition",
                 status="ready",
                 command=["python3", f"scripts/tasks/{script}"],
@@ -380,7 +380,7 @@ class StageExecutorTests(unittest.TestCase):
         stage = StageProgress(
             stage_id="model_05_option_expression.option_chain_data_acquisition",
             layer=3,
-            layer_key="layer_03_target_state_vector",
+            layer_key="model_02_target_state",
             stage_type="data_acquisition",
             status="ready",
             command=["python3", "scripts/tasks/prepare_option_chain_source_acquisition.py", "--write", "--persist-sql"],
@@ -394,7 +394,7 @@ class StageExecutorTests(unittest.TestCase):
         stage = StageProgress(
             stage_id="model_02_target_state.data_acquisition",
             layer=3,
-            layer_key="layer_03_target_state_vector",
+            layer_key="model_02_target_state",
             stage_type="data_acquisition",
             status="ready",
             command=["python3", "-c", "print('not approved')"],
@@ -407,7 +407,7 @@ class StageExecutorTests(unittest.TestCase):
         stage = StageProgress(
             stage_id="model_01_background_context.data_acquisition",
             layer=1,
-            layer_key="layer_01_market_regime",
+            layer_key="model_01_market_context",
             stage_type="data_acquisition",
             status="ready",
             command=["python3", "-c", "print('no')"],

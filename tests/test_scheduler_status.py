@@ -99,7 +99,7 @@ class SchedulerStatusTests(unittest.TestCase):
                     "decision_status": "ready",
                     "reason_code": "workflow_stage_ready",
                     "reason": "provider stage ready for autonomous dispatch",
-                    "selected_work": "layer_01_market_regime.data_acquisition",
+                    "selected_work": "model_01_market_context.data_acquisition",
                     "next_internal_stage": "autonomous_historical_provider_acquisition",
                     "provider_calls": 0,
                     "dispatch_performed": False,
@@ -119,7 +119,7 @@ class SchedulerStatusTests(unittest.TestCase):
 
         row = status.summary_row()
         self.assertEqual(row["current_month"], "2016-04")
-        self.assertEqual(row["current_stage"], "layer_01_market_regime.data_acquisition")
+        self.assertEqual(row["current_stage"], "model_01_market_context.data_acquisition")
         self.assertEqual(row["provider_status"]["status"], "provider_stage_autonomous_ready")
         self.assertIsNone(row["blocked_reason"])
         self.assertEqual(row["latest_decision"]["decision_log_row_count"], 1)

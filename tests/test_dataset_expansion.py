@@ -55,7 +55,7 @@ class DatasetExpansionTests(unittest.TestCase):
         self.assertEqual(decision.dataset_unit_kind, "six_month_panel")
         self.assertFalse(decision.target_required)
         self.assertIsNone(decision.target_symbol)
-        self.assertIn("fixed Layer 1 panel", decision.task_scope_description)
+        self.assertIn("fixed M01 panel", decision.task_scope_description)
 
         plan = build_dataset_expansion_plan(
             start_month="2016-01",
@@ -70,7 +70,7 @@ class DatasetExpansionTests(unittest.TestCase):
         evidence = list(self.empty_evidence())
         evidence[0] = LayerDatasetEvidence(
             layer=1,
-            layer_key="layer_01_market_regime",
+            layer_key="model_01_market_context",
             roles=(DatasetRoleEvidence("train", month_count=60),),
         )
 
@@ -83,7 +83,7 @@ class DatasetExpansionTests(unittest.TestCase):
     def test_manager_blocks_downstream_until_upstream_minimum_roles_are_complete(self):
         evidence = list(self.empty_evidence())
         evidence[0] = self.complete_layer(1)
-        # Layer 2 is incomplete, so manager should expand Layer 2 before Layer 3.
+        # M02 is incomplete, so manager should expand M02 before M02.
 
         decision = decide_dataset_expansion(tuple(evidence))
 

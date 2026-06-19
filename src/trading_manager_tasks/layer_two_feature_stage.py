@@ -1,6 +1,6 @@
-"""Layer 2 feature stage executor.
+"""M02 feature stage executor.
 
-The Layer 2 feature stage owns sector-context feature rows only.
+The M02 feature stage owns sector-context feature rows only.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 
 @dataclass(frozen=True)
 class LayerTwoFeatureStageSummary:
-    """Combined Layer 2 feature/source materialization receipt."""
+    """Combined M02 feature/source materialization receipt."""
 
     contract_type: str
     month: str
@@ -72,7 +72,7 @@ def execute_layer_two_feature_stage(
 ) -> LayerTwoFeatureStageSummary:
     if not manager_storage_root.is_absolute():
         manager_storage_root = Path.cwd() / manager_storage_root
-    output_dir = manager_storage_root / "runtime" / "layer_02_sector_context" / "feature_generation" / month
+    output_dir = manager_storage_root / "runtime" / "model_01_sector_context" / "feature_generation" / month
     sector_feature_summary = _run_layer_two_feature_command(
         month=month,
         trading_data_root=trading_data_root,
@@ -93,7 +93,7 @@ def write_summary(summary: LayerTwoFeatureStageSummary, *, output: TextIO) -> No
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Execute Layer 2 sector-context feature generation.")
+    parser = argparse.ArgumentParser(description="Execute M02 sector-context feature generation.")
     parser.add_argument("--month", required=True)
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)

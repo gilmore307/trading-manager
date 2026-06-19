@@ -7,7 +7,7 @@ The schemas are the cross-repository contract authority for concise control-plan
 Current first slice:
 
 - `manager_request.schema.json` — concise persisted `trading_manager.manager_request` row.
-- `manager_request_planner_preview.schema.json` — CLI/planner preview row with convenience fields such as month, symbol, model layer, or candidate refs.
+- `manager_request_planner_preview.schema.json` — CLI/planner preview row with convenience fields such as month, symbol, model, or candidate refs.
 - `input_binding.schema.json`
 - `run_manifest.schema.json`
 - `artifact_ref.schema.json`

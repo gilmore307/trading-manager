@@ -153,7 +153,7 @@ def _symbol_from_parameter_ref(parameter_ref: str) -> str | None:
 def _market_regime_timeframe(symbol: str, *, model_layer: str | None = None) -> str | None:
     layers = [model_layer] if model_layer else None
     try:
-        members = load_market_regime_universe(model_layers=layers)
+        members = load_market_regime_universe(model_readiness=layers)
     except ValueError:
         return None
     for member in members:

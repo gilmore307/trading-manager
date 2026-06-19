@@ -35,7 +35,7 @@ class ProviderDispatchTests(unittest.TestCase):
                 execute_provider_calls=False,
             )
         self.assertEqual(dispatch.contract_type, "manager_provider_dispatch_summary")
-        self.assertEqual(dispatch.stage_id, "layer_01_market_regime.data_acquisition")
+        self.assertEqual(dispatch.stage_id, "model_01_market_context.data_acquisition")
         self.assertEqual(dispatch.request_count, 19)
         self.assertEqual(dispatch.validation_count, 0)
         self.assertEqual(dispatch.dispatch_count, 0)
@@ -63,8 +63,8 @@ class ProviderDispatchTests(unittest.TestCase):
                 storage_root=tmp,
                 execute_provider_calls=False,
             )
-        self.assertEqual(dispatch.stage_id, "layer_02_sector_context.data_acquisition")
-        self.assertEqual(dispatch.request_count, len(load_market_regime_universe(model_layers=(LAYER_TWO_MODEL_LAYER,))))
+        self.assertEqual(dispatch.stage_id, "model_01_sector_context.data_acquisition")
+        self.assertEqual(dispatch.request_count, len(load_market_regime_universe(model_readiness=(LAYER_TWO_MODEL_LAYER,))))
         self.assertEqual(dispatch.validation_count, 0)
         self.assertEqual(dispatch.provider_calls, 0)
         self.assertFalse(dispatch.dispatch_performed)
@@ -90,7 +90,7 @@ class ProviderDispatchTests(unittest.TestCase):
                 execute_provider_calls=False,
             )
 
-        self.assertEqual(dispatch.stage_id, "layer_03_target_state_vector.data_acquisition")
+        self.assertEqual(dispatch.stage_id, "model_02_target_state.data_acquisition")
         self.assertEqual(dispatch.request_count, 1)
         self.assertEqual(dispatch.provider_calls, 0)
         self.assertFalse(dispatch.dispatch_performed)

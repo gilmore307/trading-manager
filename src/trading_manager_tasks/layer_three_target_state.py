@@ -1,4 +1,4 @@
-"""Safe Layer 3 target-state input materialization.
+"""Safe M02 target-state input materialization.
 
 This module turns already-approved target-local Alpaca bar receipts into the local
 ``model_03_target_state_vector_data_acquisition`` SQL input surface. It performs no provider calls; it only
@@ -26,14 +26,14 @@ from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
-DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
-DEFAULT_TARGET_CONTEXT_MAPPING = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
-DEFAULT_OUTPUT_ROOT = Path("runtime") / "layer_03_target_state_vector" / "input_materialization"
-LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
+DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/model_01_background_context_etf_universe.csv")
+DEFAULT_TARGET_CONTEXT_MAPPING = Path("/root/projects/trading-storage/main/shared/model_02_target_context_mapping.csv")
+DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_02_target_state" / "input_materialization"
+LAYER_TWO_MODEL_LAYER = "model_01_sector_context"
 SOURCE = "m03_target_state_vector_data_acquisition"
 OUTPUT_TABLE = "model_03_target_state_vector_data_acquisition"
 OPTION_CHAIN_SOURCE_TABLE = "option_chain_state_source"
-OPTION_CHAIN_SOURCE_POLICY_REF = "LAYER_03_OPTION_CHAIN_ROLE_SELECTOR_POLICY"
+OPTION_CHAIN_SOURCE_POLICY_REF = "M02_OPTION_CHAIN_ROLE_SELECTOR_POLICY"
 MONTHLY_BACKFILL_STORAGE_DIR = "monthly_backfill"
 BAR_SOURCE_TABLE = "model_01_market_regime_data_acquisition"
 DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME = "1Min"
@@ -41,7 +41,7 @@ DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME = "1Min"
 
 @dataclass(frozen=True)
 class FeedArtifactRef:
-    """Completed Layer 2 feed receipt selected as target-local source evidence."""
+    """Completed M02 feed receipt selected as target-local source evidence."""
 
     symbol: str
     month: str
@@ -58,7 +58,7 @@ class FeedArtifactRef:
 
 @dataclass(frozen=True)
 class LayerThreeTargetStateMaterialization:
-    """Receipt for manager-owned local Layer 3 source materialization."""
+    """Receipt for manager-owned local M02 source materialization."""
 
     contract_type: str
     start_month: str
@@ -74,7 +74,7 @@ class LayerThreeTargetStateMaterialization:
     feed_artifacts: tuple[FeedArtifactRef, ...]
     option_chain_source_table: str = OPTION_CHAIN_SOURCE_TABLE
     option_chain_source_policy_ref: str = OPTION_CHAIN_SOURCE_POLICY_REF
-    option_chain_source_usage: str = "optional_sql_overlay_for_layer_3_target_level_reduction"
+    option_chain_source_usage: str = "optional_sql_overlay_for_model_02_target_state_target_level_reduction"
     provider_calls: int = 0
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
@@ -262,7 +262,7 @@ def discover_layer_two_feed_artifacts(
 
 
 def _target_candidate_id(*, fold_key: str, symbol: str) -> str:
-    digest = hashlib.sha256(f"layer_03_target_state_vector:{fold_key}:{symbol}".encode("utf-8")).hexdigest()[:16]
+    digest = hashlib.sha256(f"model_02_target_state:{fold_key}:{symbol}".encode("utf-8")).hexdigest()[:16]
     return f"tcand_l03_{fold_key}_{digest}"
 
 
@@ -339,7 +339,7 @@ def build_source_task_key(
     refs: Sequence[FeedArtifactRef],
 ) -> tuple[dict[str, Any], Path, Path, Path, int]:
     if not refs:
-        raise TaskSystemError("no successful target-local feed artifacts are available for Layer 3 target-state materialization")
+        raise TaskSystemError("no successful target-local feed artifacts are available for M02 target-state materialization")
     source_start, source_end = _range_bounds(start_month, end_month)
     fold_key = _fold_key(start_month, end_month)
     candidate_path = output_dir / "target_candidates.jsonl"
@@ -352,7 +352,7 @@ def build_source_task_key(
     bar_sources_path.write_text(json.dumps(bar_sources, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     bar_count = sum(ref.row_count for ref in refs)
     task_key = {
-        "task_id": f"layer_03_target_state_vector_{fold_key}",
+        "task_id": f"model_02_target_state_{fold_key}",
         "source": SOURCE,
         "params": {
             "start": source_start,
@@ -362,12 +362,12 @@ def build_source_task_key(
             "bar_sql_sources": bar_sources,
         },
         "output_root": str(trading_data_output_root),
-        "manager_stage_id": "layer_03_target_state_vector.data_acquisition",
-        "source_policy": "local_reuse_of_reviewed_layer_02_alpaca_bar_sql_receipts_no_provider_calls",
+        "manager_stage_id": "model_02_target_state.data_acquisition",
+        "source_policy": "local_reuse_of_reviewed_m02_alpaca_bar_sql_receipts_no_provider_calls",
         "downstream_feature_inputs": {
             "shared_option_chain_source_table": f"trading_data.{OPTION_CHAIN_SOURCE_TABLE}",
             "shared_option_chain_source_policy_ref": OPTION_CHAIN_SOURCE_POLICY_REF,
-            "layer_3_usage": "target_level_option_chain_state_reduction_only",
+            "model_02_target_state_usage": "target_level_option_chain_state_reduction_only",
         },
     }
     task_key_path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -407,7 +407,7 @@ def materialize_layer_three_target_state_inputs(
     output_base = output_root if output_root.is_absolute() else manager_storage_root / output_root
     output_dir = output_base / fold_key
     trading_data_output_root = output_dir / "trading_data_outputs" / SOURCE
-    run_id = run_id or f"layer_03_target_state_vector_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_id = run_id or f"model_02_target_state_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     _task_key, task_key_path, candidate_path, bar_sources_path, _bar_count = build_source_task_key(
         start_month=start_month,
         end_month=end_month,
@@ -464,7 +464,7 @@ def write_summary(summary: LayerThreeTargetStateMaterialization, *, output: Text
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize Layer 3 model_03_target_state_vector_data_acquisition SQL rows from existing target-local feed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize M02 model_03_target_state_vector_data_acquisition SQL rows from existing target-local feed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
@@ -472,7 +472,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trading-storage-root", type=Path, default=DEFAULT_TRADING_STORAGE_ROOT)
     parser.add_argument("--universe-path", type=Path, default=DEFAULT_TRADING_STORAGE_UNIVERSE)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
-    parser.add_argument("--target-symbol", help="Selected Layer 3+ target symbol. When supplied, only that target's local bar artifacts are materialized.")
+    parser.add_argument("--target-symbol", help="Selected M02+ target symbol. When supplied, only that target's local bar artifacts are materialized.")
     parser.add_argument("--run-id")
     parser.add_argument("--write", action="store_true", help="Run the trading-data source_03 normalizer and write SQL rows.")
     parser.add_argument("--persist-sql", action="store_true", help="Alias for --write retained for stage command compatibility.")

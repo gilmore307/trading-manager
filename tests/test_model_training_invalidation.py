@@ -23,7 +23,7 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "updated_utc": "old",
                         "stages": [
-                            {"stage_id": "layer_03_target_state_vector.model_generation", "layer": 3, "status": "succeeded", "artifact_refs": []},
+                            {"stage_id": "model_02_target_state.model_generation", "layer": 3, "status": "succeeded", "artifact_refs": []},
                             {"stage_id": "model_05_option_expression.model_evaluation", "layer": 5, "status": "ready", "artifact_refs": []},
                             {"stage_id": "model_06_residual_event_governance.model_generation", "layer": 6, "status": "succeeded", "artifact_refs": ["old"]},
                         ],
@@ -37,7 +37,7 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
             by_stage = {stage["stage_id"]: stage for stage in payload["stages"]}
 
             self.assertEqual(summary.invalidated_stage_count, 1)
-            self.assertEqual(by_stage["layer_03_target_state_vector.model_generation"]["status"], "succeeded")
+            self.assertEqual(by_stage["model_02_target_state.model_generation"]["status"], "succeeded")
             self.assertEqual(by_stage["model_05_option_expression.model_evaluation"]["status"], "ready")
             self.assertEqual(by_stage["model_06_residual_event_governance.model_generation"]["status"], "failed")
             self.assertIn("rebuild_from_residual_event_governance_required", by_stage["model_06_residual_event_governance.model_generation"]["last_reason"])

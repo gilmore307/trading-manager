@@ -53,11 +53,11 @@ class MonthlyBackfillPlannerTests(unittest.TestCase):
             start_month="2016-01",
             end_month="2016-01",
             include_crypto=False,
-            model_layers=(LAYER_TWO_MODEL_LAYER,),
+            model_readiness=(LAYER_TWO_MODEL_LAYER,),
         )
         bars = [request for request in requests if request["target_component_id"] == "01_feed_alpaca_bars"]
 
-        self.assertEqual(len(bars), len(load_market_regime_universe(model_layers=(LAYER_TWO_MODEL_LAYER,))))
+        self.assertEqual(len(bars), len(load_market_regime_universe(model_readiness=(LAYER_TWO_MODEL_LAYER,))))
         self.assertTrue(all(request["model_layer"] == LAYER_TWO_MODEL_LAYER for request in bars))
         self.assertIn("XLK", {request["symbol"] for request in bars})
         self.assertNotIn("SPY", {request["symbol"] for request in bars})

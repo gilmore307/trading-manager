@@ -247,7 +247,7 @@ class ModelGroupRerunTests(unittest.TestCase):
                 storage_root=storage_root,
                 batch_id="layer2_reset_test",
                 receipt_paths=receipt_paths,
-                reason="Layer 2 contract changed.",
+                reason="M02 contract changed.",
                 created_at_utc="2026-06-05T08:00:00+00:00",
             )
             batch_payload = json.loads(Path(batch_path).read_text(encoding="utf-8"))

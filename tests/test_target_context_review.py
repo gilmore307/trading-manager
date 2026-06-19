@@ -26,7 +26,7 @@ class TargetContextReviewTests(unittest.TestCase):
         self.assertEqual(normalized["mapping_rows"][0]["layer2_context_symbol"], "BKCH")
         self.assertEqual(normalized["mapping_rows"][0]["listed_proxy_symbol"], "IBIT")
         self.assertIn("do not dispatch provider calls", normalized["forbidden_actions"])
-        self.assertIn("target_layer2_context_agent_review_decision", normalized["agent_prompt"])
+        self.assertIn("target_m02_context_agent_review_decision", normalized["agent_prompt"])
         self.assertIn("target-context-review", normalized["agent_prompt"])
 
     def test_builds_review_request_for_multi_context_equity_mapping(self) -> None:
@@ -55,7 +55,7 @@ class TargetContextReviewTests(unittest.TestCase):
                 write=True,
             )
 
-            self.assertEqual(result["contract_type"], "target_layer2_context_agent_review_result")
+            self.assertEqual(result["contract_type"], "target_m02_context_agent_review_result")
             self.assertEqual(result["decision_status"], "queued")
             request_path = Path(result["request_path"])
             decision_path = Path(result["decision_path"])

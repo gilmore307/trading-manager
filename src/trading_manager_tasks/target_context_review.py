@@ -1,9 +1,9 @@
-"""Script-called agent review for target-to-Layer-2 context mappings.
+"""Script-called agent review for target-to-M02 context mappings.
 
 The mapping artifact lives in ``trading-storage`` because it is shared market
 structure. ``trading-manager`` owns the review entrypoint so scripts and the
 scheduler can ask an agent to review target/context/proxy rows without directly
-mutating Layer 1/2 universes, calling providers, activating models, or touching
+mutating M01/M02 universes, calling providers, activating models, or touching
 broker/account state.
 """
 
@@ -23,12 +23,12 @@ from typing import Any, Iterable, Mapping, TextIO
 from .control_plane import TaskSystemError
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
-TARGET_CONTEXT_AGENT_REVIEW_REQUEST_CONTRACT = "target_layer2_context_agent_review_request"
-TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT = "target_layer2_context_agent_review_decision"
-DEFAULT_MAPPING_CSV = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
-DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "target_layer2_context_agent_review"
+TARGET_CONTEXT_AGENT_REVIEW_REQUEST_CONTRACT = "target_m02_context_agent_review_request"
+TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT = "target_m02_context_agent_review_decision"
+DEFAULT_MAPPING_CSV = Path("/root/projects/trading-storage/main/shared/model_02_target_context_mapping.csv")
+DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "target_m02_context_agent_review"
 DEFAULT_AGENT_REF = "codex_cli_gpt_5_5"
-DEFAULT_REVIEW_SCOPE = "target_layer2_context_mapping"
+DEFAULT_REVIEW_SCOPE = "target_m02_context_mapping"
 REQUIRED_COLUMNS = (
     "target_symbol",
     "target_asset_class",
@@ -44,7 +44,7 @@ REQUIRED_COLUMNS = (
     "interpretation",
 )
 FORBIDDEN_ACTIONS = (
-    "do not add listed_proxy_symbol or optionable_proxy_symbol values to Layer 1/2 ETF universe files",
+    "do not add listed_proxy_symbol or optionable_proxy_symbol values to M01/M02 ETF universe files",
     "do not dispatch provider calls",
     "do not activate models or switch production pointers",
     "do not submit broker orders or mutate accounts",
@@ -52,10 +52,10 @@ FORBIDDEN_ACTIONS = (
     "do not edit repository files from the review runner; return a decision artifact only",
 )
 REQUIRED_CHECKS = (
-    "verify every target has a reviewed Layer 2 context symbol",
+    "verify every target has a reviewed M02 context symbol",
     "verify proxy symbols remain target-specific auxiliary evidence references",
     "verify optionable_proxy_status gates option-specific provider tasks",
-    "verify target context symbols are accepted broad Layer 2 anchors or the BKCH crypto context-anchor exception",
+    "verify target context symbols are accepted broad M02 anchors or the BKCH crypto context-anchor exception",
 )
 
 
@@ -77,7 +77,7 @@ def _read_mapping_rows(mapping_csv: Path, *, target_symbols: Iterable[str] | Non
     with mapping_csv.open(newline="", encoding="utf-8") as csv_file:
         reader = csv.DictReader(csv_file)
         if tuple(reader.fieldnames or ()) != REQUIRED_COLUMNS:
-            raise TaskSystemError("target Layer 2 context mapping CSV has unexpected columns")
+            raise TaskSystemError("target M02 context mapping CSV has unexpected columns")
         rows = [dict(row) for row in reader]
     wanted = {symbol.strip().upper() for symbol in target_symbols or [] if symbol.strip()}
     if wanted:
@@ -87,7 +87,7 @@ def _read_mapping_rows(mapping_csv: Path, *, target_symbols: Iterable[str] | Non
         if missing:
             raise TaskSystemError(f"target symbols not found in mapping CSV: {', '.join(missing)}")
     if not rows:
-        raise TaskSystemError("no target Layer 2 context mapping rows selected")
+        raise TaskSystemError("no target M02 context mapping rows selected")
     return rows
 
 
@@ -99,13 +99,13 @@ def _rows_digest(rows: Iterable[Mapping[str, Any]]) -> str:
 def build_agent_prompt(request: Mapping[str, Any]) -> str:
     return "\n".join(
         [
-            "You are reviewing a trading-system target-to-Layer-2 context mapping artifact.",
+            "You are reviewing a trading-system target-to-M02 context mapping artifact.",
             "Use the fixed workspace skill target-context-review.",
             "Decide whether the selected rows are approved, deferred, or rejected for use as target-study context/proxy metadata.",
             "Review request:",
             json.dumps({key: value for key, value in request.items() if key != "agent_prompt"}, indent=2, sort_keys=True),
-            "Required output: JSON with contract_type=target_layer2_context_agent_review_decision, request_ref, agent_ref, decision_status, decision_reason, reviewed_rows, and completed_at_utc.",
-            "Safety: do not call providers, mutate broker/account state, activate models, change storage lifecycle, or edit Layer 1/2 universe files.",
+            "Required output: JSON with contract_type=target_m02_context_agent_review_decision, request_ref, agent_ref, decision_status, decision_reason, reviewed_rows, and completed_at_utc.",
+            "Safety: do not call providers, mutate broker/account state, activate models, change storage lifecycle, or edit M01/M02 universe files.",
         ]
     )
 
@@ -161,7 +161,7 @@ def build_target_context_agent_review_request(
         "agent_ref": agent_ref,
         "requested_by": requested_by,
         "review_scope": review_scope,
-        "mapping_ref": "trading-storage/main/shared/layer_02_target_context_mapping.csv",
+        "mapping_ref": "trading-storage/main/shared/model_02_target_context_mapping.csv",
         "mapping_path": str(mapping_csv),
         "mapping_content_sha256": digest,
         "target_symbols": selected_targets,
@@ -171,7 +171,7 @@ def build_target_context_agent_review_request(
         "forbidden_actions": list(FORBIDDEN_ACTIONS),
         "expected_outputs": [TARGET_CONTEXT_AGENT_REVIEW_DECISION_CONTRACT],
         "policy_refs": [
-            "target_layer2_context_mapping",
+            "target_m02_context_mapping",
             "target_context_sector_anchor_mapping",
             "proxy_not_layer_context",
             "script_called_agent_review",
@@ -270,11 +270,11 @@ def call_agent_runner(
 
 
 def request_path(request: Mapping[str, Any], output_root: Path = DEFAULT_OUTPUT_ROOT) -> Path:
-    return output_root / str(request["request_id"]) / "target_layer2_context_agent_review_request.json"
+    return output_root / str(request["request_id"]) / "target_m02_context_agent_review_request.json"
 
 
 def decision_path(request: Mapping[str, Any], output_root: Path = DEFAULT_OUTPUT_ROOT) -> Path:
-    return output_root / str(request["request_id"]) / "target_layer2_context_agent_review_decision.json"
+    return output_root / str(request["request_id"]) / "target_m02_context_agent_review_decision.json"
 
 
 def write_json_artifact(payload: Mapping[str, Any], *, path: Path) -> None:
@@ -313,7 +313,7 @@ def handle_target_context_agent_review(
         reason = "agent runner not configured" if call_agent else "agent call not requested"
         decision = build_queued_decision(request, reason=reason)
     result = {
-        "contract_type": "target_layer2_context_agent_review_result",
+        "contract_type": "target_m02_context_agent_review_result",
         "schema_version": "1",
         "request_id": request["request_id"],
         "decision_id": decision["decision_id"],
@@ -340,7 +340,7 @@ def write_result(result: Mapping[str, Any], *, output: TextIO) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Create or call an agent review for target-to-Layer-2 context mapping rows.")
+    parser = argparse.ArgumentParser(description="Create or call an agent review for target-to-M02 context mapping rows.")
     parser.add_argument("--mapping-csv", default=str(DEFAULT_MAPPING_CSV))
     parser.add_argument("--target-symbol", action="append", default=[])
     parser.add_argument("--review-scope", default=DEFAULT_REVIEW_SCOPE)

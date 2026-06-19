@@ -33,27 +33,27 @@ Manager recognizes the current M01-M06 stack: BackgroundContext, TargetState, Ev
 
 ## D007 - Reusable foundation catch-up is priority
 
-The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes Layer 1 market/cross-asset context, Layer 2 broad sector-anchor and crypto-context evidence, and fold-scoped global or sector-scoped Layer 4 event-observation context. Layer 4 event-observation substrate must be collected for each fold because the accepted event observation pool can change across folds. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
+The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes M01 market/cross-asset context, M02 broad sector-anchor and crypto-context evidence, and fold-scoped global or sector-scoped M03 event-observation context. M03 event-observation substrate must be collected for each fold because the accepted event observation pool can change across folds. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
 
-Historical training uses the six-month fold as the public first-class work unit across all layers. Months are child partitions inside a fold for data coverage, receipts, and provider batching; they are not separate owner-facing training tasks. Dashboard task identity and stage progress must therefore present Layer 1+ data acquisition, feature generation, model generation, evaluation, and review under the same fold period such as `2016-fold1`. A fold is eligible only after its final calendar month is complete in `America/New_York`; for example `2026-fold1` stays closed until 2026-07-01 because it ends at 2026-06. Public task numbers are list sequence numbers assigned after chronological fold, layer, and workflow-stage sorting; `task_uid` is the durable identity for progress/evidence joins. Historical runtime advances one canonical month at a time; worker identity is internal execution detail and Tasks should not display or filter by worker.
+Historical training uses the six-month fold as the public first-class work unit across all layers. Months are child partitions inside a fold for data coverage, receipts, and provider batching; they are not separate owner-facing training tasks. Dashboard task identity and stage progress must therefore present M01+ data acquisition, feature generation, model generation, evaluation, and review under the same fold period such as `2016-fold1`. A fold is eligible only after its final calendar month is complete in `America/New_York`; for example `2026-fold1` stays closed until 2026-07-01 because it ends at 2026-06. Public task numbers are list sequence numbers assigned after chronological fold, layer, and workflow-stage sorting; `task_uid` is the durable identity for progress/evidence joins. Historical runtime advances one canonical month at a time; worker identity is internal execution detail and Tasks should not display or filter by worker.
 
-The scheduler must finish one fold's full run cycle before opening the next fold. Completion means Layer 1-9 pre-replay model work, model replay, replay review, M06 Event Risk Governor attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. M06 can update the event-observation pool used by later Layer 4 folds, so starting the next fold after Layer 1-9 alone is invalid.
+The scheduler must finish one fold's full run cycle before opening the next fold. Completion means M01-M05 pre-replay model work, model replay, replay review, M06 Event Risk Governor attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. M06 can update the event-observation pool used by later M03 event-state folds, so starting the next fold after M01-M05 alone is invalid.
 
 ## D008 - M05 is optional trading guidance/expression
 
 M05 may produce optional offline trading-guidance records and option-expression plans from the M04 direct-underlying thesis and point-in-time option context when available. It is not an event-risk governor and does not execute trades or mutate broker/account state.
 
-## D009 - Layer 4 consumes only accepted event-failure evidence
+## D009 - M03 event-state consumes only accepted event-failure evidence
 
-Layer 4 may condition alpha only with evidence packets that passed source precedence, point-in-time availability, non-overlap, matched controls, leakage review, and agent/manager acceptance. Raw anomalies and unreviewed event text cannot enter Layer 4 scoring.
+M03 event-state may condition alpha only with evidence packets that passed source precedence, point-in-time availability, non-overlap, matched controls, leakage review, and agent/manager acceptance. Raw anomalies and unreviewed event text cannot enter M03 event-state scoring.
 
 When M06 has not yet produced accepted attribution or promotion evidence,
-the Layer 4 event-observation substrate may be empty. That is a valid state:
-Layer 4 should materialize a no-event-risk input and downstream scoring should
+the M03 event-observation substrate may be empty. That is a valid state:
+M03 event-state should materialize a no-event-risk input and downstream scoring should
 resolve to `no_reviewed_event_failure_risk` rather than blocking the fold.
 
-C07 provisional untrained-event risk estimates are not Layer 4 inputs. They may
-support live trading-review decisions and later M06/Layer 4 promotion
+C07 provisional untrained-event risk estimates are not M03 event-state inputs. They may
+support live trading-review decisions and later M06/M03 event-state promotion
 research, but they cannot be treated as trained event-failure evidence until the
 normal review and acceptance route completes.
 
@@ -77,8 +77,8 @@ Every agent decision surface must cite a fixed workspace skill so the reviewer u
 
 - `promotion-evaluation-review` for offline replay and promotion eligibility review.
 - `runtime-model-lifecycle-review` for execution-owned active/shadow roster review.
-- `event-strategy-promotion-review` for event-family or strategy-failure promotion into model layers.
-- `target-context-review` for target-to-Layer-2 context mapping review.
+- `event-strategy-promotion-review` for event-family or strategy-failure promotion into models.
+- `target-context-review` for target-to-M02 context mapping review.
 - `failure-register-review` for failed request disposition.
 - `server-error-diagnosis` for bounded server error diagnosis and safe repair.
 - `storage-lifecycle-review` for backup, cleanup, archive, restore, and delete review.
@@ -107,7 +107,7 @@ Runtime promoted-model lifecycle management belongs in `trading-execution`: the 
 
 ## D018 - Promotion Waits For Full Run Cycle
 
-Promotion review is not triggered when one model finishes a local check or one target substrate lane completes. Layer-local checks and target-substrate runs remain diagnostic until the candidate bundle has completed the same run cycle.
+Promotion review is not triggered when one model finishes a local check or one target substrate lane completes. Model-local checks and target-substrate runs remain diagnostic until the candidate bundle has completed the same run cycle.
 
 The current run cycle is reusable foundation substrate, target substrate where needed, live-flow replay, replay review, M06 residual-event attribution, evaluation, and promotion/lifecycle handoff. Replay must simulate the frozen live component graph over the historical candidate pool with a fixed `25000.0` USD replay initial capital for equity-path diagnostics and return normalization; this is not broker/account state. Components may choose no target, one target, or a target combination. Replay review is the first post-replay task: it compares decisions against replay-derived missed/failure evidence and prepares component-funnel review rows before M06 performs event-risk attribution. Evaluation compares the pinned candidate bundle against accepted baselines after attribution evidence exists. Promotion acceptance is bundle-scoped: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently without an accepted component-local lifecycle contract.
 
@@ -121,7 +121,7 @@ residual_after_upstream_conditioning
 review_required_overlap_unknown
 ```
 
-Only `not_in_upstream_features` and `residual_after_upstream_conditioning` may support scoring, intervention, or Layer 4 promotion. `review_required_overlap_unknown` is review/provenance only.
+Only `not_in_upstream_features` and `residual_after_upstream_conditioning` may support scoring, intervention, or M03 event-state promotion. `review_required_overlap_unknown` is review/provenance only.
 
 ## D211 - Startup abnormality scope is narrow
 
@@ -136,13 +136,13 @@ option_derivatives_abnormality
 
 Ordinary bar, volume, spread, liquidity, target-state, option-expression, M06 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into M05 evidence.
 
-## D212 - Layer 3 candidate selection is policy-based
+## D212 - M02 candidate selection is policy-based
 
-Layer 3 candidate selection is part of the model stack, not an externally preselected final ticker list. Manager recognizes Layer 3 as an anonymous target-state model that may rank the current candidate-policy batch for target handoff.
+M02 candidate selection is part of the model stack, not an externally preselected final ticker list. Manager recognizes M02 as an anonymous target-state model that may rank the current candidate-policy batch for target handoff.
 
 The candidate policy is rule-fixed: current realtime routing uses the reviewed realtime total-symbol pool, target metadata, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast. Promotion replay uses the fixed `historical_candidate_universe.csv` table seeded from the current realtime pool plus BTC, ETH, and SOL, and must not read the mutable realtime pool directly or use current ETF holdings. This fixed table is stable replay scope, not point-in-time historical market-wide ranking evidence. Same-day candidate-universe freezes remain route-smoke evidence until the post-close readiness gate; replay execution must back off before that gate.
 
-Layer 3 and later substrate work may remain target-major in task execution because routing symbols prepare data samples. That scheduling choice does not select the replay target. Promotion replay runs the live-flow component graph over the fixed historical candidate pool, allowing components to choose no target, one target, or a target combination. Fixed target/window panels remain diagnostic repair evidence only and are not accepted promotion evidence.
+M02 and later substrate work may remain target-major in task execution because routing symbols prepare data samples. That scheduling choice does not select the replay target. Promotion replay runs the live-flow component graph over the fixed historical candidate pool, allowing components to choose no target, one target, or a target combination. Fixed target/window panels remain diagnostic repair evidence only and are not accepted promotion evidence.
 
 Historical replay may acquire data that does not already exist locally. That acquisition is replay-owned, month-sharded, budget-gated, and temporary: it materializes only the historical candidate set needed for the shard, records lightweight receipts, coverage, hashes, and decision rows, and deletes transient month-cache inputs after the shard is accepted. Replay must not use preexisting local source directories as the candidate-selection mechanism.
 
@@ -150,11 +150,11 @@ Realtime/live execution is different. It consumes the current provider stream or
 
 ## D213 - Model-worker targets rotate autonomously
 
-Manager may run Layer 3+ historical model-worker training as target-scoped fold chains. Each target owns separate fold checkpoint files, so one completed target does not consume or overwrite another target's `2016-01` onward training state.
+Manager may run M02+ historical model-worker training as target-scoped fold chains. Each target owns separate fold checkpoint files, so one completed target does not consume or overwrite another target's `2016-01` onward training state.
 
 When no target is pinned by the service command, the scheduler reads the ordered runtime target queue and selects the first target with an open or unstarted six-month fold. If the current target has completed all eligible folds through the latest fully completed training fold, manager skips it and starts the next target from the earliest ready fold, normally `2016-01`.
 
-The target queue is an execution-routing queue, not promotion evidence and not a replacement for Layer 3 candidate-policy replay. Promotion still requires evaluation-owned replay evidence over the accepted candidate policy.
+The target queue is an execution-routing queue, not promotion evidence and not a replacement for M02 candidate-policy replay. Promotion still requires evaluation-owned replay evidence over the accepted candidate policy.
 
 ## D214 - Model group reruns start from the earliest affected workflow cutpoint
 

@@ -47,13 +47,13 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py --start-
 
 ## Research-Cycle Priority
 
-The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes Layer 1 market context, Layer 2 sector context, and fold-scoped global or sector-scoped Layer 4 event-observation substrate. Layer 4 event-observation collection repeats per fold because the accepted observation pool may change between folds. These rows are shared across target research runs and must not be redownloaded merely because a new target is being studied.
+The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes M01 market context, M02 sector context, and fold-scoped global or sector-scoped M03 event-observation substrate. M03 event-observation collection repeats per fold because the accepted observation pool may change between folds. These rows are shared across target research runs and must not be redownloaded merely because a new target is being studied.
 
 Historical status surfaces expose one current task fact, not a future task
 scaffold. Month checkpoints, fold states, and downstream blocked stages remain
 internal scheduler evidence. The dashboard may show completed history and the
 single current fold- or month-scoped task, with child partitions inside detail,
-but it must not project later Layer 4-10 dependencies as independent Future
+but it must not project later M03-M06 dependencies as independent Future
 Tasks rows. A six-month fold opens only after its final calendar month has
 completed in `America/New_York`, so `2026-fold1` is not eligible before
 2026-07-01 even if some January-June child months already have source data.

@@ -78,7 +78,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\nSPY,layer_01_market_regime\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\nSPY,model_01_market_context\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "XLF", "2016-01")
 
             refs = discover_layer_two_feed_artifacts(
@@ -99,7 +99,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nAAPL,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nAAPL,model_01_sector_context\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "AAPL", "2021-01", write_task_key=False, manifest_timeframe="1Day")
 
             refs = discover_layer_two_feed_artifacts(
@@ -147,7 +147,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
                 "trading_data.option_chain_state_source",
             )
             self.assertEqual(
-                task_key["downstream_feature_inputs"]["layer_3_usage"],
+                task_key["downstream_feature_inputs"]["model_02_target_state_usage"],
                 "target_level_option_chain_state_reduction_only",
             )
             self.assertNotIn("bar_rows_path", task_key["params"])
@@ -162,7 +162,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "XLF", "2016-01")
 
             summary = materialize_layer_three_target_state_inputs(
@@ -185,14 +185,14 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertTrue(Path(task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
             self.assertIn("bar_sql_sources", task_key["params"])
             self.assertEqual(summary.option_chain_source_table, "option_chain_state_source")
-            self.assertEqual(summary.option_chain_source_usage, "optional_sql_overlay_for_layer_3_target_level_reduction")
+            self.assertEqual(summary.option_chain_source_usage, "optional_sql_overlay_for_model_02_target_state_target_level_reduction")
 
     def test_write_summary_reads_downstream_output_table_row_count(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nAAPL,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nAAPL,model_01_sector_context\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "AAPL", "2021-01", write_task_key=False, manifest_timeframe="1Day")
 
             with patch("trading_manager_tasks.layer_three_target_state.subprocess.run") as run:
@@ -223,7 +223,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "AAPL", "2016-01")
             _write_bar_receipt(storage_root, "XLF", "2016-01")
 
@@ -254,7 +254,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
                 "BTC,crypto_spot,BTC,BKCH,accepted\n",
                 encoding="utf-8",
             )
-            universe_path.write_text("symbol,model_layer\nBKCH,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nBKCH,model_01_sector_context\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "BKCH", "2016-01")
 
             with patch("trading_manager_tasks.layer_three_target_state.DEFAULT_TARGET_CONTEXT_MAPPING", mapping_path):
@@ -281,7 +281,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             for month in ("2016-01", "2016-02"):
                 _write_bar_receipt(storage_root, "XLF", month)
 

@@ -66,7 +66,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                 {
                     "baseline_refs": ["baseline://active_model", "baseline://no_trade"],
                     "replay_mode": "candidate_policy_replay",
-                    "candidate_policy_ref": "trading-model://layer_03_target_candidate_universe_policy/live_equivalent",
+                    "candidate_policy_ref": "trading-model://model_02_target_candidate_universe_policy/live_equivalent",
                     "contract_id": "promotion_replay_candidate_policy",
                     "cost_model_ref": "storage://replay/promotion_replay_candidate_policy/cost_model/pending_review",
                     "data_snapshot_ref": "storage://replay/promotion_replay_candidate_policy/data_snapshot/pending_materialization",
@@ -88,7 +88,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                         "metric://selection_hit_rate",
                     ],
                     "start_date": "2021-01-01",
-                    "base_context_policy_ref": "trading-model://layer_03_target_candidate_universe_policy/live_equivalent",
+                    "base_context_policy_ref": "trading-model://model_02_target_candidate_universe_policy/live_equivalent",
                     "base_context_ref": str(base_context_ref),
                 }
             )

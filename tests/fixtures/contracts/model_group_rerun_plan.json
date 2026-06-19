@@ -32,7 +32,7 @@
     },
     {
       "artifact_class": "workflow_state",
-      "ref": "storage://02_control_plane/runtime/model_training_workflow_state_2016-01.json#layer_05_plus",
+      "ref": "storage://02_control_plane/runtime/model_training_workflow_state_2016-01.json#model_04_plus",
       "delete_reason": "Completed downstream stage state would otherwise block rerun.",
       "requires_storage_lifecycle_review": false
     }
@@ -77,7 +77,7 @@
     "reason": "M05 option-expression model_generation contract changed; downstream model group outputs must be rebuilt.",
     "candidate_refs": [
       "postgres://trading_model.model_05_option_expression_model_generation?target=AAPL&start=2016-01&end=2016-06",
-      "storage://02_control_plane/runtime/model_training_workflow_state_2016-01.json#layer_05_plus"
+      "storage://02_control_plane/runtime/model_training_workflow_state_2016-01.json#model_04_plus"
     ],
     "protected_refs": [
       "storage://01_source_data/monthly_backfill/alpaca_bars/"

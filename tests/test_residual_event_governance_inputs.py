@@ -38,7 +38,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             trading_data_root = tmp / "trading-data"
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
 
             summary = materialize_residual_event_governance_inputs_inputs(
@@ -70,7 +70,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             trading_data_root = tmp / "trading-data"
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-02", row_count=0)
 
             summary = materialize_residual_event_governance_inputs_inputs(
@@ -94,7 +94,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             trading_data_root = tmp / "trading-data"
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             for month in ("2016-01", "2016-02"):
                 _write_layer_two_bar_receipt(storage_root, "XLF", month)
 
@@ -122,7 +122,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             trading_data_root = tmp / "trading-data"
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
             feed_root = trading_data_root / "storage" / "monthly_backfill"
             artifacts = {
@@ -180,7 +180,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             trading_data_root = tmp / "trading-data"
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
             feed_root = trading_data_root / "storage" / "monthly_backfill"
             artifacts = {
@@ -210,7 +210,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             trading_data_root = tmp / "trading-data"
             storage_root = trading_data_root / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,layer_02_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
 
             with self.assertRaisesRegex(TaskSystemError, "event-risk coverage is incomplete"):

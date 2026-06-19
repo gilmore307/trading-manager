@@ -2845,7 +2845,7 @@ def _verdict(
         "fault_surface": "M04/M05 boundary",
         "root_cause_status": _root_cause_status(counterfactual_summary),
         "supporting_observations": [
-            "Layer 1/2/3 replay coverage is not contradicted by this diagnostic; the first trade-universe selection split appears at M04.",
+            "M01/M02/3 replay coverage is not contradicted by this diagnostic; the first trade-universe selection split appears at M04.",
             "M04 open_long plus M05 alpha-passed rows split between filled contracts and expression-unfilled rows.",
             "M05 alpha score does not materially separate filled good from filled bad rows.",
             "Filled score bins are non-monotonic, so alpha ranking alone is not sufficient for promotion.",

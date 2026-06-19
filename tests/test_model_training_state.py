@@ -21,7 +21,7 @@ from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_m
 
 
 def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
-    for member in load_market_regime_universe(model_layers=(model_layer,)):
+    for member in load_market_regime_universe(model_readiness=(model_layer,)):
         task_key = root / "monthly_backfill" / "alpaca_bars" / member.symbol / month / "task_key.json"
         task_key.parent.mkdir(parents=True, exist_ok=True)
         task_key.write_text("{}\n", encoding="utf-8")
@@ -36,7 +36,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
         self.assertEqual(state.contract_type, "manager_model_training_workflow_state")
         self.assertEqual(stage.stage_id, "model_01_background_context.data_acquisition")
         self.assertEqual(stage.status, "blocked")
-        self.assertIn("layer_01_task_key_preparation", stage.last_reason or "")
+        self.assertIn("model_01_task_key_preparation", stage.last_reason or "")
         self.assertIsNone(next_ready_or_blocked_stage(state))
         self.assertEqual(first_blocked_stage(state).stage_id, "model_01_background_context.data_acquisition")
 
@@ -65,7 +65,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
                 json.dumps(
                     {
                         "manager_stage_id": "model_01_background_context.data_acquisition",
-                        "run_id": "run_layer_01_acq",
+                        "run_id": "run_model_01_acq",
                         "status": "succeeded",
                         "started_at": "2026-05-10T00:00:00+00:00",
                         "completed_at": "2026-05-10T00:01:00+00:00",

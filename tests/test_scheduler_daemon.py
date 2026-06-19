@@ -906,7 +906,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 reason="executed model generation",
                 market_protection_active=False,
                 resource_pressure_active=False,
-                selected_work="layer_01_market_regime.model_generation",
+                selected_work="model_01_market_context.model_generation",
                 command=[],
                 next_internal_stage="model_generation",
             )
@@ -929,7 +929,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         target_selection, model_decision = result
         self.assertIsNone(target_selection.selected_target_symbol)
         self.assertEqual(target_selection.fold_selection.fold_id, "fold_2016-01_2016-06")
-        self.assertEqual(model_decision.selected_work, "layer_01_market_regime.model_generation")
+        self.assertEqual(model_decision.selected_work, "model_01_market_context.model_generation")
         self.assertIsNone(run_once.call_args.kwargs["selected_target_symbol"])
         self.assertTrue(run_once.call_args.kwargs["execute_autonomous_provider_stages"])
         self.assertEqual(run_once.call_args.kwargs["provider_stage_next_limit"], 12)
@@ -1026,7 +1026,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                         "end_month": "2016-12",
                         "stages": [
                             {
-                                "stage_id": "layer_01_market_regime.model_generation",
+                                "stage_id": "model_01_market_context.model_generation",
                                 "stage_type": "model_generation",
                                 "layer": 1,
                                 "status": "ready",
@@ -1164,10 +1164,10 @@ class SchedulerDaemonTests(unittest.TestCase):
                         "end_month": "2016-06",
                         "stages": [
                             {
-                                "stage_id": "layer_02_sector_context.data_acquisition",
+                                "stage_id": "model_01_sector_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 2,
-                                "layer_key": "layer_02_sector_context",
+                                "layer_key": "model_01_sector_context",
                                 "status": "ready",
                             }
                         ],

@@ -13,7 +13,7 @@ class FailureRegisterTests(unittest.TestCase):
             validate_failure_register_row(
                 {
                     "request_id": "mgrreq_backfill_alpaca_bars_bitw_2016_01",
-                    "stage_id": "layer_01_market_regime.data_acquisition",
+                    "stage_id": "model_01_market_context.data_acquisition",
                     "target_component_id": "01_feed_alpaca_bars",
                     "failure_status": "accepted_skip",
                     "failure_kind": "no_data_not_yet_listed",
@@ -26,7 +26,7 @@ class FailureRegisterTests(unittest.TestCase):
             validate_failure_register_row(
                 {
                     "request_id": "mgrreq_backfill_alpaca_bars_bitw_2016_01",
-                    "stage_id": "layer_01_market_regime.data_acquisition",
+                    "stage_id": "model_01_market_context.data_acquisition",
                     "target_component_id": "01_feed_alpaca_bars",
                     "failure_status": "corrected",
                     "failure_kind": "provider_schema_shape",
@@ -38,7 +38,7 @@ class FailureRegisterTests(unittest.TestCase):
         row = validate_failure_register_row(
             {
                 "request_id": "mgrreq_backfill_alpaca_bars_bitw_2016_01",
-                "stage_id": "layer_01_market_regime.data_acquisition",
+                "stage_id": "model_01_market_context.data_acquisition",
                 "target_component_id": "01_feed_alpaca_bars",
                 "source_id": "alpaca_bars",
                 "symbol": "bitw",
@@ -62,7 +62,7 @@ class FailureRegisterTests(unittest.TestCase):
                 "failure_id": "fail_a",
                 "request_id": "request_a",
                 "run_id": "run_failed",
-                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                "stage_id": "model_02_target_state.option_chain_data_acquisition",
                 "target_component_id": "option_chain_state_source",
                 "source_id": "option_chain_state_source",
                 "symbol": "AAPL",
@@ -78,7 +78,7 @@ class FailureRegisterTests(unittest.TestCase):
                 "failure_id": "fail_b",
                 "request_id": "request_b",
                 "run_id": "run_failed",
-                "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                "stage_id": "model_02_target_state.option_chain_data_acquisition",
                 "target_component_id": "option_chain_state_source",
                 "failure_status": "accepted_skip",
                 "failure_kind": "no_data",
@@ -90,7 +90,7 @@ class FailureRegisterTests(unittest.TestCase):
             "trading_manager_tasks.failure_register.persist_failure_register_rows"
         ) as persist_mock:
             count = mark_failure_register_requests_corrected(
-                stage_id="layer_03_target_state_vector.option_chain_data_acquisition",
+                stage_id="model_02_target_state.option_chain_data_acquisition",
                 start_month="2016-01",
                 end_month="2016-06",
                 corrected_request_refs={"request_a": "storage://new-success.json", "request_b": "storage://new-success.json"},

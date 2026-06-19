@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare manager-owned Layer 1 historical-training batch."""
+"""Prepare manager-owned M01 historical-training batch."""
 
 from __future__ import annotations
 

@@ -106,7 +106,7 @@ class DatasetEvidenceRoleSummary:
 
 @dataclass(frozen=True)
 class DatasetEvidenceLayerSummary:
-    """Collected evidence for one model layer."""
+    """Collected evidence for one model."""
 
     layer: int
     layer_key: str

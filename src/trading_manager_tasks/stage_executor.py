@@ -618,11 +618,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--receipt-root", type=Path, default=DEFAULT_RECEIPT_ROOT)
     parser.add_argument("--log-root", type=Path, default=DEFAULT_LOG_ROOT)
     parser.add_argument("--progress-root", type=Path, default=None)
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ six-month dataset units.")
     parser.add_argument(
         "--allow-post-foundation-model-stages",
         action="store_true",
-        help="Allow fold-scoped model generation/evaluation/promotion stages after Layer 1/2 substrate readiness.",
+        help="Allow fold-scoped model generation/evaluation/promotion stages after M01/M02 substrate readiness.",
     )
     parser.add_argument("--write", action="store_true", help="Persist successful stage progress to the workflow state checkpoint.")
     args = parser.parse_args(argv)

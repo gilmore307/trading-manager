@@ -364,12 +364,12 @@ class RegistryHelperTests(unittest.TestCase):
             candidate_input["payload"],
         )
         self.assertIn(
-            "target_candidate_handoff_source=layer_02_target_candidate_handoff",
+            "target_candidate_handoff_source=model_02_target_candidate_handoff",
             candidate_input["payload"],
         )
         self.assertIn("historical_candidate_universe.csv", candidate_input["payload"])
         self.assertIn("target_candidate_handoff_forbidden_for_canonical_replay", candidate_input["payload"])
-        self.assertIn("layer_02_target_candidate_handoff", candidate_input["applies_to"])
+        self.assertIn("model_02_target_candidate_handoff", candidate_input["applies_to"])
         self.assertIn("fixed historical candidate-universe artifact", candidate_input["note"])
         self.assertIn("dashboard compatibility paths", candidate_input["note"])
         initial_capital = rows["EVALUATION_REPLAY_INITIAL_CAPITAL_USD"]
@@ -826,7 +826,7 @@ class RegistryHelperTests(unittest.TestCase):
             attention_pool_entry["payload"],
             "model_06_residual_event_governance_temporal_attention_pool_entry",
         )
-        self.assertIn("layer_4_state_overlay_candidate", attention_pool_entry["applies_to"])
+        self.assertIn("model_03_event_state_overlay_candidate", attention_pool_entry["applies_to"])
 
         runtime_surfaces = rows["MANAGER_POST_REPLAY_ATTRIBUTION_RUNTIME_SURFACES"]
         self.assertIn("post_replay_review_runs", runtime_surfaces["payload"])
@@ -870,12 +870,12 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_STRATEGY_PROMOTION_REVIEW_STATUS": "event_strategy_promotion_review_status",
             "EVENT_LIFECYCLE_STAGE": "event_lifecycle_stage",
             "STATE_SIGNAL_TYPE": "state_signal_type",
-            "LAYER_4_STATE_OVERLAY": "layer_4_state_overlay",
+            "MODEL_03_EVENT_STATE_OVERLAY": "model_03_event_state_overlay",
             "EVENT_RELEASE_PHASE": "event_release_phase",
             "EVENT_RELEASE_PHASE_COUNTS": "event_release_phase_counts",
             "EVENT_LIFECYCLE_STAGE_COUNTS": "event_lifecycle_stage_counts",
             "STATE_SIGNAL_TYPE_COUNTS": "state_signal_type_counts",
-            "LAYER_4_STATE_OVERLAY_COUNTS": "layer_4_state_overlay_counts",
+            "MODEL_03_EVENT_STATE_OVERLAY_COUNTS": "model_03_event_state_overlay_counts",
             "IMPACT_EXPOSURE_TIME": "impact_exposure_time",
             "IMPACT_ONSET_BASIS": "impact_onset_basis",
             "IMPACT_SCOPE_TYPE": "impact_scope_type",
@@ -887,12 +887,12 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_SCHEDULE_TYPE": "event_schedule_type",
             "EVENT_INSTANCE_OBSERVATION_ROLE": "event_instance_observation_role",
             "EVENT_FAMILY_PRIOR_ROLE": "event_family_prior_role",
-            "LAYER_4_PROJECTION_TYPE": "layer_4_projection_type",
+            "MODEL_03_EVENT_PROJECTION_TYPE": "model_03_event_projection_type",
             "EVENT_FAMILY_IMPACT_PARAMETERIZATION": "event_family_impact_parameterization",
             "EVENT_TEMPORAL_FORM_COUNTS": "event_temporal_form_counts",
             "EVENT_SCHEDULE_TYPE_COUNTS": "event_schedule_type_counts",
             "EVENT_INSTANCE_OBSERVATION_ROLE_COUNTS": "event_instance_observation_role_counts",
-            "LAYER_4_PROJECTION_TYPE_COUNTS": "layer_4_projection_type_counts",
+            "MODEL_03_EVENT_PROJECTION_TYPE_COUNTS": "model_03_event_projection_type_counts",
         }
         for key, payload in field_payloads.items():
             self.assertEqual(rows[key]["kind"], "field")
@@ -926,8 +926,8 @@ class RegistryHelperTests(unittest.TestCase):
             "EVENT_LIFECYCLE_STAGE_POST_RELEASE_IMPACT_STATE": "post_release_impact_state",
             "STATE_SIGNAL_TYPE_RISK_STATE": "risk_state",
             "STATE_SIGNAL_TYPE_IMPACT_STATE": "impact_state",
-            "LAYER_4_STATE_OVERLAY_EVENT_PRE_RELEASE_RISK_STATE_CHANGE": "event_pre_release_risk_state_change",
-            "LAYER_4_STATE_OVERLAY_EVENT_POST_RELEASE_IMPACT_STATE": "event_post_release_impact_state",
+            "MODEL_03_EVENT_STATE_OVERLAY_EVENT_PRE_RELEASE_RISK_STATE_CHANGE": "event_pre_release_risk_state_change",
+            "MODEL_03_EVENT_STATE_OVERLAY_EVENT_POST_RELEASE_IMPACT_STATE": "event_post_release_impact_state",
             "EVENT_RELEASE_PHASE_PRE_RELEASE": "pre_release",
             "EVENT_RELEASE_PHASE_POST_RELEASE": "post_release",
         }
@@ -1196,14 +1196,14 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "status_value")
             self.assertEqual(rows[key]["payload"], payload)
 
-    def test_retired_layer_4_focus_pool_names_are_not_current_registry_rows(self):
+    def test_retired_model_03_event_focus_pool_names_are_not_current_registry_rows(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
         for retired_key in {
-            "LAYER_04_FOCUS_POOL_INPUTS_20260610",
-            "LAYER_04_FOCUS_POOL_INPUT_ROWS",
-            "LAYER_04_FOCUS_POOL_MODEL_ROWS",
+            "MODEL_03_FOCUS_POOL_INPUTS_20260610",
+            "MODEL_03_FOCUS_POOL_INPUT_ROWS",
+            "MODEL_03_FOCUS_POOL_MODEL_ROWS",
             "MODEL_04_EVENT_FAILURE_RISK_M06_FOCUS_POOL_INPUTS_BUILD",
         }:
             self.assertNotIn(retired_key, rows)
@@ -1333,7 +1333,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("future_gated_broker_mutation", rows["TRADE_BROKER_ORDER_SUBMISSION_TABLE"]["applies_to"])
         self.assertIn("outside the active current loop", rows["TRADE_BROKER_ORDER_SUBMISSION_TABLE"]["note"])
 
-        layer_policy = rows["SQL_LAYER_TABLE_NAMING_POLICY"]
+        layer_policy = rows["SQL_MODEL_TABLE_NAMING_POLICY"]
         self.assertIn("use_mNN_domain_task_stage_sql_names", layer_policy["payload"])
         self.assertIn("old_source_feature_model_prefixes_are_migration_debt", layer_policy["payload"])
         self.assertNotIn("use_source_NN_feature_NN_model_NN_prefixes", layer_policy["payload"])
@@ -1408,11 +1408,11 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["payload"], skill_name)
             self.assertIn(f"{skill_name}/SKILL.md", rows[key]["path"])
 
-        self.assertIn("target-context-review", rows["TARGET_LAYER2_CONTEXT_AGENT_REVIEW"]["note"])
+        self.assertIn("target-context-review", rows["TARGET_M02_CONTEXT_AGENT_REVIEW"]["note"])
         self.assertIn("server-error-diagnosis", rows["SERVER_WIDE_AGENT_ERROR_HANDOFF"]["note"])
         self.assertIn("storage-lifecycle-review", rows["AGENT_STORAGE_LIFECYCLE_DECISION"]["note"])
         self.assertIn("automatic repair", rows["MANAGER_FAILED_REQUEST_DECISION_GATE_POLICY"]["note"])
-        self.assertIn("event-strategy-promotion-review", rows["EVENT_FAMILY_TO_LAYER_04_PROMOTION_POLICY"]["note"])
+        self.assertIn("event-strategy-promotion-review", rows["EVENT_FAMILY_TO_M03_PROMOTION_POLICY"]["note"])
 
     def test_current_six_model_stack_policy_terms_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -1469,7 +1469,7 @@ class RegistryHelperTests(unittest.TestCase):
 
         for key in (
             "MODEL_PROMOTION_UNIFIED_TARGETS",
-            "MODEL_LAYER_03_PRODUCTION_EVAL_SUBSTRATE_RECEIPT",
+            "MODEL_03_PRODUCTION_EVAL_SUBSTRATE_RECEIPT",
             "MODEL_PROMOTION_ACCEPTANCE_DECISION_RECEIPTS",
         ):
             self.assertNotRegex(rows[key]["payload"], numbered_model_pattern)
@@ -1703,8 +1703,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("protective_reductions_still_allowed", rows["TARGET_POSITION_SCALING_CAPACITY_POLICY"]["payload"])
         self.assertNotIn("advanced_tranche_management_allowed", rows["TARGET_POSITION_SCALING_CAPACITY_POLICY"]["payload"])
         self.assertIn("tactical_add_disabled", rows["TRANCHE_EXPOSURE_MANAGEMENT_POLICY"]["payload"])
-        self.assertNotIn("model_07_projects_target_exposure_gap", rows["TRANCHE_EXPOSURE_MANAGEMENT_POLICY"]["payload"])
-        self.assertNotIn("model_08_owns_tranche_plan", rows["TRANCHE_EXPOSURE_MANAGEMENT_POLICY"]["payload"])
+        self.assertNotIn("retired_projects_target_exposure_gap", rows["TRANCHE_EXPOSURE_MANAGEMENT_POLICY"]["payload"])
+        self.assertNotIn("retired_owns_tranche_plan", rows["TRANCHE_EXPOSURE_MANAGEMENT_POLICY"]["payload"])
         self.assertIn("limit_near_mid", rows["UNIFIED_DECISION_ENTRY_STYLES"]["payload"])
         self.assertIn("no_entry", rows["UNIFIED_DECISION_ENTRY_STYLES"]["payload"])
         self.assertEqual(rows["OPTION_EXPRESSION_MODEL"]["payload"], "option_expression_model")
@@ -1750,7 +1750,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("calibration_report_ref", rows["MODEL_PROMOTION_READINESS_CHECKLIST"]["payload"])
         self.assertIn("m02_target_state_deferred", rows["MODEL_PROMOTION_READINESS_STATUS_MATRIX"]["payload"])
         self.assertEqual(rows["MODEL_PROMOTION_REVIEW"]["payload"], "model_promotion_review")
-        self.assertIn("every model layer", rows["MODEL_PROMOTION_REVIEW"]["note"])
+        self.assertIn("every model", rows["MODEL_PROMOTION_REVIEW"]["note"])
         self.assertIn("manager_schedules_only", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertIn("evaluation_owns_replay_settlement_eligibility_readiness", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
         self.assertIn("execution_owns_shadow_cycle_activation", rows["MODEL_PROMOTION_UNIFIED_REVIEW_POLICY"]["payload"])
@@ -2022,10 +2022,10 @@ class RegistryHelperTests(unittest.TestCase):
         )
         self.assertIn("pre-replay data-acquisition", rows["M06_POST_REPLAY_ATTRIBUTION_POLICY"]["note"])
         self.assertEqual(
-            rows["LAYER_4_FOLD_EVENT_OBSERVATION_POLICY"]["payload"],
-            "layer_4_global_sector_event_observation_substrate_collected_each_fold",
+            rows["M03_FOLD_EVENT_OBSERVATION_POLICY"]["payload"],
+            "model_03_event_global_sector_event_observation_substrate_collected_each_fold",
         )
-        self.assertIn("collected for each fold", rows["LAYER_4_FOLD_EVENT_OBSERVATION_POLICY"]["note"])
+        self.assertIn("collected for each fold", rows["M03_FOLD_EVENT_OBSERVATION_POLICY"]["note"])
         self.assertIn(
             "materialize_layer_four_event_observation_inputs.py",
             rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["payload"],
@@ -2064,7 +2064,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("manager_selects_next_dataset_role", rows["MANAGER_DATASET_EXPANSION_POLICY"]["payload"])
         self.assertIn("provider_calls_use_autonomous_historical_acquisition", rows["MANAGER_DATASET_EXPANSION_POLICY"]["payload"])
         self.assertIn("historical_training_sampling_universe_may_be_broader", rows["HISTORICAL_SAMPLING_VS_LIVE_ROUTING_POLICY"]["payload"])
-        self.assertIn("layer_03_targets_may_include_non_selected_sectors", rows["HISTORICAL_SAMPLING_VS_LIVE_ROUTING_POLICY"]["payload"])
+        self.assertIn("model_02_targets_may_include_non_selected_sectors", rows["HISTORICAL_SAMPLING_VS_LIVE_ROUTING_POLICY"]["payload"])
         self.assertEqual(rows["HISTORICAL_TRAINING_SAMPLING_UNIVERSE"]["payload"], "historical_training_sampling_universe")
         self.assertEqual(rows["LIVE_INFERENCE_ROUTING_UNIVERSE"]["payload"], "live_inference_routing_universe")
         self.assertEqual(rows["MANAGER_DATASET_EXPANSION_PLAN"]["payload"], "manager_dataset_expansion_plan")
@@ -2400,7 +2400,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("model_01_market_regime_model_generation", rows["MODEL_01_MARKET_REGIME_DIAGNOSTICS"]["applies_to"])
 
     def test_market_regime_etf_universe_shared_csv_columns_are_registered(self):
-        shared_path = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
+        shared_path = Path("/root/projects/trading-storage/main/shared/model_01_background_context_etf_universe.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         self.assertEqual(len(rows), 31)
@@ -2409,9 +2409,9 @@ class RegistryHelperTests(unittest.TestCase):
             ["symbol", "universe_type", "model_layer", "exposure_type", "feature_grain", "fund_name", "issuer_name", "interpretation"],
         )
         self.assertEqual(rows[0]["symbol"], "BITW")
-        self.assertEqual(rows[0]["model_layer"], "layer_01_market_regime")
-        self.assertEqual({row["model_layer"] for row in rows}, {"layer_01_market_regime", "layer_02_sector_context"})
-        layer_two_symbols = {row["symbol"] for row in rows if row["model_layer"] == "layer_02_sector_context"}
+        self.assertEqual(rows[0]["model_layer"], "model_01_market_context")
+        self.assertEqual({row["model_layer"] for row in rows}, {"model_01_market_context", "model_01_sector_context"})
+        layer_two_symbols = {row["symbol"] for row in rows if row["model_layer"] == "model_01_sector_context"}
         self.assertEqual(
             layer_two_symbols,
             {"BKCH", "XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"},
@@ -2429,8 +2429,8 @@ class RegistryHelperTests(unittest.TestCase):
 
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
-        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["payload"], "trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
-        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
+        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["payload"], "trading-storage/main/shared/model_01_background_context_etf_universe.csv")
+        self.assertEqual(registry["MARKET_REGIME_ETF_UNIVERSE_SHARED_CSV"]["path"], "/root/projects/trading-storage/main/shared/model_01_background_context_etf_universe.csv")
         expected_fields = {
             "SYMBOL": "symbol",
             "UNIVERSE_TYPE": "universe_type",
@@ -2442,10 +2442,10 @@ class RegistryHelperTests(unittest.TestCase):
             "INTERPRETATION": "interpretation",
         }
         classification_fields = {"UNIVERSE_TYPE", "MODEL_LAYER", "EXPOSURE_TYPE"}
-        self.assertEqual(registry["MODEL_LAYER_LAYER_01_MARKET_REGIME"]["kind"], "term")
-        self.assertEqual(registry["MODEL_LAYER_LAYER_01_MARKET_REGIME"]["payload"], "layer_01_market_regime")
-        self.assertEqual(registry["MODEL_LAYER_LAYER_02_SECTOR_CONTEXT"]["kind"], "term")
-        self.assertEqual(registry["MODEL_LAYER_LAYER_02_SECTOR_CONTEXT"]["payload"], "layer_02_sector_context")
+        self.assertEqual(registry["MODEL_SCOPE_MODEL_01_MARKET_CONTEXT"]["kind"], "term")
+        self.assertEqual(registry["MODEL_SCOPE_MODEL_01_MARKET_CONTEXT"]["payload"], "model_01_market_context")
+        self.assertEqual(registry["MODEL_SCOPE_MODEL_01_SECTOR_CONTEXT"]["kind"], "term")
+        self.assertEqual(registry["MODEL_SCOPE_MODEL_01_SECTOR_CONTEXT"]["payload"], "model_01_sector_context")
         identity_fields = {"SYMBOL", "FUND_NAME", "ISSUER_NAME"}
         text_fields = {"INTERPRETATION"}
         for key, payload in expected_fields.items():
@@ -2454,10 +2454,10 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["payload"], payload)
             self.assertIn("market_regime_etf_universe", registry[key]["applies_to"])
             if key not in {"SYMBOL", "ISSUER_NAME", "INTERPRETATION"}:
-                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
+                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/model_01_background_context_etf_universe.csv")
 
     def test_market_regime_relative_strength_combinations_shared_csv_is_registered(self):
-        shared_path = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_relative_strength_combinations.csv")
+        shared_path = Path("/root/projects/trading-storage/main/shared/model_01_background_context_relative_strength_combinations.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         self.assertEqual(len(rows), 39)
@@ -2477,14 +2477,14 @@ class RegistryHelperTests(unittest.TestCase):
         )
         by_id = {row["combination_id"]: row for row in rows}
         self.assertEqual(by_id["rsp_spy"]["feature_bar_grain"], "1m")
-        self.assertEqual(by_id["rsp_spy"]["model_layer"], "layer_01_market_regime")
-        self.assertEqual({row["model_layer"] for row in rows}, {"layer_01_market_regime", "layer_02_sector_context"})
+        self.assertEqual(by_id["rsp_spy"]["model_layer"], "model_01_market_context")
+        self.assertEqual({row["model_layer"] for row in rows}, {"model_01_market_context", "model_01_sector_context"})
         self.assertEqual(by_id["tlt_shy"]["combination_type"], "primary")
         self.assertEqual(by_id["ief_shy"]["combination_type"], "primary")
         self.assertEqual(by_id["xlk_spy"]["combination_type"], "sector_rotation")
         self.assertNotIn("smh_xlk", by_id)
         self.assertNotIn("aiq_qqq", by_id)
-        self.assertEqual(by_id["bkch_bitw"]["model_layer"], "layer_02_sector_context")
+        self.assertEqual(by_id["bkch_bitw"]["model_layer"], "model_01_sector_context")
         self.assertEqual(by_id["bkch_bitw"]["combination_type"], "sector_rotation")
         self.assertNotIn("ibit_bitw", by_id)
         self.assertNotIn("etha_bitw", by_id)
@@ -2494,11 +2494,11 @@ class RegistryHelperTests(unittest.TestCase):
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
         self.assertEqual(
             registry["MARKET_REGIME_RELATIVE_STRENGTH_COMBINATIONS_SHARED_CSV"]["payload"],
-            "trading-storage/main/shared/layer_01_02_market_context_relative_strength_combinations.csv",
+            "trading-storage/main/shared/model_01_background_context_relative_strength_combinations.csv",
         )
         self.assertEqual(
             registry["MARKET_REGIME_RELATIVE_STRENGTH_COMBINATIONS_SHARED_CSV"]["path"],
-            "/root/projects/trading-storage/main/shared/layer_01_02_market_context_relative_strength_combinations.csv",
+            "/root/projects/trading-storage/main/shared/model_01_background_context_relative_strength_combinations.csv",
         )
         expected_fields = {
             "COMBINATION_ID": ("identity_field", "combination_id"),
@@ -2515,7 +2515,7 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(registry[key]["kind"], kind)
             self.assertEqual(registry[key]["payload"], payload)
             if key not in {"INTERPRETATION", "MODEL_LAYER"}:
-                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/layer_01_02_market_context_relative_strength_combinations.csv")
+                self.assertEqual(registry[key]["path"], "trading-storage/main/shared/model_01_background_context_relative_strength_combinations.csv")
             self.assertIn("market_regime_relative_strength_combinations", registry[key]["applies_to"])
 
     def test_equity_total_symbol_pool_route_is_registered(self):
@@ -2750,8 +2750,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("one_minute_fetch_cadence", release_fetch_timer["applies_to"])
         self.assertIn("single shared TE release fetcher once per minute", release_fetch_timer["note"])
 
-    def test_target_layer2_context_mapping_shared_csv_is_registered(self):
-        shared_path = Path("/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv")
+    def test_target_m02_context_mapping_shared_csv_is_registered(self):
+        shared_path = Path("/root/projects/trading-storage/main/shared/model_02_target_context_mapping.csv")
         with shared_path.open(newline="") as csv_file:
             rows = list(csv.DictReader(csv_file))
         self.assertEqual(len(rows), 6)
@@ -2799,59 +2799,59 @@ class RegistryHelperTests(unittest.TestCase):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
         self.assertEqual(
-            registry["TARGET_LAYER2_CONTEXT_MAPPING_SHARED_CSV"]["payload"],
-            "trading-storage/main/shared/layer_02_target_context_mapping.csv",
+            registry["TARGET_M02_CONTEXT_MAPPING_SHARED_CSV"]["payload"],
+            "trading-storage/main/shared/model_02_target_context_mapping.csv",
         )
         self.assertEqual(
-            registry["TARGET_LAYER2_CONTEXT_MAPPING_SHARED_CSV"]["path"],
-            "/root/projects/trading-storage/main/shared/layer_02_target_context_mapping.csv",
+            registry["TARGET_M02_CONTEXT_MAPPING_SHARED_CSV"]["path"],
+            "/root/projects/trading-storage/main/shared/model_02_target_context_mapping.csv",
         )
-        self.assertEqual(registry["TARGET_LAYER2_CONTEXT_MAPPING"]["payload"], "target_layer2_context_mapping")
-        self.assertIn("target_context_sector_anchor_mapping", registry["TARGET_LAYER2_CONTEXT_MAPPING"]["applies_to"])
+        self.assertEqual(registry["TARGET_M02_CONTEXT_MAPPING"]["payload"], "target_m02_context_mapping")
+        self.assertIn("target_context_sector_anchor_mapping", registry["TARGET_M02_CONTEXT_MAPPING"]["applies_to"])
         self.assertEqual(registry["TARGET_CONTEXT_SECTOR_ANCHOR_MAPPING"]["payload"], "target_context_sector_anchor_mapping")
         self.assertEqual(registry["TARGET_CONTEXT_MULTI_ROW_BY_TARGET"]["payload"], "target_context_multi_row_by_target")
         self.assertEqual(registry["TARGET_SYMBOL"]["payload"], "target_symbol")
-        self.assertIn("target_layer2_context_mapping", registry["TARGET_SYMBOL"]["applies_to"])
+        self.assertIn("target_m02_context_mapping", registry["TARGET_SYMBOL"]["applies_to"])
         self.assertEqual(registry["INTERPRETATION"]["payload"], "interpretation")
-        self.assertIn("target_layer2_context_mapping", registry["INTERPRETATION"]["applies_to"])
+        self.assertIn("target_m02_context_mapping", registry["INTERPRETATION"]["applies_to"])
         expected_fields = {
-            "TARGET_LAYER2_CONTEXT_TARGET_ASSET_CLASS": ("classification_field", "target_asset_class"),
-            "TARGET_LAYER2_CONTEXT_SPOT_REF": ("identity_field", "spot_ref"),
-            "TARGET_LAYER2_CONTEXT_SYMBOL": ("identity_field", "layer2_context_symbol"),
+            "TARGET_M02_CONTEXT_TARGET_ASSET_CLASS": ("classification_field", "target_asset_class"),
+            "TARGET_M02_CONTEXT_SPOT_REF": ("identity_field", "spot_ref"),
+            "TARGET_M02_CONTEXT_SYMBOL": ("identity_field", "layer2_context_symbol"),
             "TARGET_LAYER2_MAPPING_METHOD_TYPE": ("classification_field", "layer2_mapping_method_type"),
             "TARGET_LISTED_PROXY_SYMBOL": ("identity_field", "listed_proxy_symbol"),
             "TARGET_OPTIONABLE_PROXY_SYMBOL": ("identity_field", "optionable_proxy_symbol"),
             "TARGET_OPTIONABLE_PROXY_STATUS": ("classification_field", "optionable_proxy_status"),
             "TARGET_PROXY_ROLE_TYPE": ("classification_field", "proxy_role_type"),
             "TARGET_PROXY_USE": ("text_field", "proxy_use"),
-            "TARGET_LAYER2_CONTEXT_REVIEW_STATUS": ("classification_field", "review_status"),
+            "TARGET_M02_CONTEXT_REVIEW_STATUS": ("classification_field", "review_status"),
         }
         for key, (kind, payload) in expected_fields.items():
             self.assertEqual(registry[key]["kind"], kind)
             self.assertEqual(registry[key]["payload"], payload)
-            self.assertEqual(registry[key]["path"], "trading-storage/main/shared/layer_02_target_context_mapping.csv")
-            self.assertIn("target_layer2_context_mapping", registry[key]["applies_to"])
+            self.assertEqual(registry[key]["path"], "trading-storage/main/shared/model_02_target_context_mapping.csv")
+            self.assertIn("target_m02_context_mapping", registry[key]["applies_to"])
 
     def test_target_context_agent_review_script_is_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             registry = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        self.assertEqual(registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW"]["payload"], "target_layer2_context_agent_review")
+        self.assertEqual(registry["TARGET_M02_CONTEXT_AGENT_REVIEW"]["payload"], "target_m02_context_agent_review")
         self.assertEqual(
-            registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW_REQUEST"]["payload"],
-            "target_layer2_context_agent_review_request",
+            registry["TARGET_M02_CONTEXT_AGENT_REVIEW_REQUEST"]["payload"],
+            "target_m02_context_agent_review_request",
         )
         self.assertEqual(
-            registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW_DECISION"]["payload"],
-            "target_layer2_context_agent_review_decision",
+            registry["TARGET_M02_CONTEXT_AGENT_REVIEW_DECISION"]["payload"],
+            "target_m02_context_agent_review_decision",
         )
-        self.assertEqual(registry["REVIEW_TARGET_LAYER2_CONTEXT_MAPPING"]["kind"], "script")
+        self.assertEqual(registry["REVIEW_TARGET_M02_CONTEXT_MAPPING"]["kind"], "script")
         self.assertEqual(
-            registry["REVIEW_TARGET_LAYER2_CONTEXT_MAPPING"]["path"],
-            "/root/projects/trading-manager/scripts/tasks/review_target_layer2_context_mapping.py",
+            registry["REVIEW_TARGET_M02_CONTEXT_MAPPING"]["path"],
+            "/root/projects/trading-manager/scripts/tasks/review_target_m02_context_mapping.py",
         )
-        self.assertIn("target_layer2_context_agent_review", registry["REVIEW_TARGET_LAYER2_CONTEXT_MAPPING"]["applies_to"])
-        self.assertIn("no_provider_calls", registry["TARGET_LAYER2_CONTEXT_AGENT_REVIEW_SAFETY_BOUNDARY"]["payload"])
+        self.assertIn("target_m02_context_agent_review", registry["REVIEW_TARGET_M02_CONTEXT_MAPPING"]["applies_to"])
+        self.assertIn("no_provider_calls", registry["TARGET_M02_CONTEXT_AGENT_REVIEW_SAFETY_BOUNDARY"]["payload"])
 
     def test_registered_payload_formats_match_sql_constraint(self):
         schema = Path("scripts/registry/sql/trading_registry.sql").read_text()
@@ -2919,10 +2919,10 @@ class RegistryHelperTests(unittest.TestCase):
             "detector_run",
             "event_schedule_type",
             "event_temporal_form",
-            "layer_04_event_failure_risk",
-            "layer_4_projection_type",
-            "layer_4_state_overlay",
-            "layer_4_state_overlay_candidate",
+            "model_03_event_state",
+            "model_03_event_projection_type",
+            "model_03_event_state_overlay",
+            "model_03_event_state_overlay_candidate",
             "model_06_residual_event_governance",
             "m06_residual_event_governance_fold_completion",
             "m06_residual_event_governance_fold_completion_summary",
@@ -3414,7 +3414,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(registry_payload("trm_L2XES001"), "cross_etf_summary")
         self.assertEqual(registry_payload("trm_L2TCP001"), "target_context_profile")
         self.assertEqual(registry_payload("mlv_M06REG001"), "model_06_residual_event_governance")
-        self.assertTrue(registry_value("out_TL2CTX001", "path").endswith("layer_02_target_context_mapping.csv"))
+        self.assertTrue(registry_value("out_TL2CTX001", "path").endswith("model_02_target_context_mapping.csv"))
 
     def test_require_item_by_id_throws_for_missing_item(self):
         reader = RegistryReader(lambda _sql, _params: {"rows": []})

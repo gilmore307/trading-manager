@@ -231,7 +231,7 @@ class AgentRepairClosureTests(unittest.TestCase):
                 request_overrides={
                     "error_scope": "server.provider_stage_failure_register",
                     "error_kind": "provider_stage_requests_failed",
-                    "summary": "provider stage layer_03_target_state_vector.option_chain_data_acquisition has 10 failed request(s) requiring automatic repair",
+                    "summary": "provider stage model_02_target_state.option_chain_data_acquisition has 10 failed request(s) requiring automatic repair",
                 },
             )
             diagnosis = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
@@ -240,7 +240,7 @@ class AgentRepairClosureTests(unittest.TestCase):
             candidate.diagnosis_path.write_text(json.dumps(diagnosis), encoding="utf-8")
             resolved_rows = [
                 {
-                    "stage_id": "layer_03_target_state_vector.option_chain_data_acquisition",
+                    "stage_id": "model_02_target_state.option_chain_data_acquisition",
                     "failure_status": "corrected",
                 }
             ]

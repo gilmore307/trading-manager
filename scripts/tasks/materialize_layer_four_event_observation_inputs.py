@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate fold-scoped Layer 4 event-observation substrate readiness."""
+"""Validate fold-scoped M03 event-observation substrate readiness."""
 
 from __future__ import annotations
 
@@ -43,8 +43,8 @@ def main() -> int:
     missing_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
     missing_rows = _missing_event_feed_rows(event_feed_row_coverage)
     payload = {
-        "contract_type": "manager_layer_04_event_observation_materialization",
-        "manager_stage_id": "layer_04_event_failure_risk.data_acquisition",
+        "contract_type": "manager_model_03_event_observation_materialization",
+        "manager_stage_id": "model_03_event_state.data_acquisition",
         "stage_type": "data_acquisition",
         "status": SUCCEEDED,
         "start_month": args.start_month,
@@ -52,19 +52,19 @@ def main() -> int:
         "event_observation_scope": "global_sector_fold_substrate",
         "event_observation_state": "no_reviewed_event_observations",
         "event_failure_risk_default": "no_reviewed_event_failure_risk",
-        "m06_residual_event_governance_prior_attribution_required_for_non_empty_layer_4_event_risk": True,
+        "m06_residual_event_governance_prior_attribution_required_for_non_empty_model_03_event_event_risk": True,
         "event_feed_coverage": event_feed_coverage,
         EVENT_FEED_ROW_COVERAGE: event_feed_row_coverage,
         "missing_event_feed_artifacts": missing_artifacts,
         "missing_event_feed_rows": missing_rows,
-        "missing_event_feeds_block_layer_4": False,
+        "missing_event_feeds_block_model_03_event": False,
         "provider_calls": 0,
         "model_activation_performed": False,
         "broker_execution_performed": False,
     }
 
     if args.write:
-        output_dir = DEFAULT_STORAGE_ROOT / "runtime" / "layer_04_event_observation_inputs"
+        output_dir = DEFAULT_STORAGE_ROOT / "runtime" / "model_03_event_observation_inputs"
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{args.start_month}_{args.end_month}.json"
         output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

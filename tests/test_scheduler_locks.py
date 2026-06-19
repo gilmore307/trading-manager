@@ -28,9 +28,9 @@ class SchedulerLocksTest(unittest.TestCase):
     def test_helper_rows_validate_against_contract_schema(self) -> None:
         refs = [
             daemon_lock_ref(),
-            month_stage_lock_ref("2016-01", "layer_01_market_regime.data_acquisition"),
-            provider_partition_lock_ref("2016-01", "layer_01_market_regime.data_acquisition", "alpaca", "SPY"),
-            reconcile_lock_ref("2016-01", "layer_01_market_regime.data_acquisition"),
+            month_stage_lock_ref("2016-01", "model_01_market_context.data_acquisition"),
+            provider_partition_lock_ref("2016-01", "model_01_market_context.data_acquisition", "alpaca", "SPY"),
+            reconcile_lock_ref("2016-01", "model_01_market_context.data_acquisition"),
             promotion_lock_ref("model_05_option_expression", "candidate_001"),
         ]
         for ref in refs:
@@ -44,28 +44,28 @@ class SchedulerLocksTest(unittest.TestCase):
         self.assertEqual(ref.lock_path, str(DEFAULT_STORAGE_ROOT / "runtime" / "historical_scheduler.lock"))
 
     def test_month_stage_and_reconcile_lock_keys_are_distinct(self) -> None:
-        stage = month_stage_lock_ref("2016-01", "layer_01_market_regime.data_acquisition")
-        reconcile = reconcile_lock_ref("2016-01", "layer_01_market_regime.data_acquisition")
-        self.assertEqual(stage.lock_key, "lock:stage:2016-01:layer_01_market_regime.data_acquisition")
-        self.assertEqual(reconcile.lock_key, "lock:reconcile:2016-01:layer_01_market_regime.data_acquisition")
+        stage = month_stage_lock_ref("2016-01", "model_01_market_context.data_acquisition")
+        reconcile = reconcile_lock_ref("2016-01", "model_01_market_context.data_acquisition")
+        self.assertEqual(stage.lock_key, "lock:stage:2016-01:model_01_market_context.data_acquisition")
+        self.assertEqual(reconcile.lock_key, "lock:reconcile:2016-01:model_01_market_context.data_acquisition")
         self.assertNotEqual(stage.lock_path, reconcile.lock_path)
 
     def test_provider_partition_lock_is_partitioned_by_provider_and_symbol(self) -> None:
         spy = provider_partition_lock_ref(
             "2016-01",
-            "layer_01_market_regime.data_acquisition",
+            "model_01_market_context.data_acquisition",
             "alpaca",
             "SPY",
         )
         qqq = provider_partition_lock_ref(
             "2016-01",
-            "layer_01_market_regime.data_acquisition",
+            "model_01_market_context.data_acquisition",
             "alpaca",
             "QQQ",
         )
         self.assertEqual(
             spy.lock_key,
-            "lock:provider:2016-01:layer_01_market_regime.data_acquisition:alpaca:SPY",
+            "lock:provider:2016-01:model_01_market_context.data_acquisition:alpaca:SPY",
         )
         self.assertNotEqual(spy.lock_path, qqq.lock_path)
         self.assertIn(str(DEFAULT_STORAGE_ROOT / "runtime" / "locks" / "provider" / "2016-01"), spy.lock_path)
@@ -89,7 +89,7 @@ class SchedulerLocksTest(unittest.TestCase):
     def test_acquire_scheduler_lock_creates_and_releases_lock_file(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             locks_dir = Path(raw_tmp) / "locks"
-            ref = month_stage_lock_ref("2016-01", "layer_01_market_regime.data_acquisition", locks_dir=locks_dir)
+            ref = month_stage_lock_ref("2016-01", "model_01_market_context.data_acquisition", locks_dir=locks_dir)
             path = Path(ref.lock_path)
 
             with acquire_scheduler_lock(ref):
@@ -103,7 +103,7 @@ class SchedulerLocksTest(unittest.TestCase):
     def test_acquire_scheduler_lock_replaces_dead_pid_lock_file(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             locks_dir = Path(raw_tmp) / "locks"
-            ref = month_stage_lock_ref("2016-01", "layer_01_market_regime.data_acquisition", locks_dir=locks_dir)
+            ref = month_stage_lock_ref("2016-01", "model_01_market_context.data_acquisition", locks_dir=locks_dir)
             path = Path(ref.lock_path)
             path.parent.mkdir(parents=True)
             path.write_text('{"pid": 999999999, "created_utc": "2026-05-13T00:00:00Z"}\n', encoding="utf-8")
@@ -119,8 +119,8 @@ class SchedulerLocksTest(unittest.TestCase):
             self.assertFalse(path.exists())
 
     def test_lock_paths_can_use_custom_lock_root(self) -> None:
-        ref = reconcile_lock_ref("2016-01", "layer_01_market_regime.data_acquisition", locks_dir=Path("runtime/locks"))
-        self.assertEqual(ref.lock_path, "runtime/locks/reconcile/2016-01/layer_01_market_regime.data_acquisition.lock")
+        ref = reconcile_lock_ref("2016-01", "model_01_market_context.data_acquisition", locks_dir=Path("runtime/locks"))
+        self.assertEqual(ref.lock_path, "runtime/locks/reconcile/2016-01/model_01_market_context.data_acquisition.lock")
 
 
 if __name__ == "__main__":

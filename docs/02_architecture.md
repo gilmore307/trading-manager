@@ -41,7 +41,7 @@ M01 owns background context over broad market, sector, and industry state; it do
 
 Manager may schedule target-major substrate work because routing symbols only prepare data samples. That scheduling choice does not select the replay target. Live-flow replay must run the component graph against the fixed historical candidate pool, allowing components to choose no target, one target, or a target combination. A fixed-symbol run is a diagnostic repair scenario, not ordinary promotion evidence.
 
-Layer 4 event evidence has both reusable global/sector substrate and
+M03 event evidence has both reusable global/sector substrate and
 target-local slices. Global/sector event-observation substrate belongs with
 reusable foundation work, but it is still collected per fold because the
 accepted observation pool can change across folds. Target-local event evidence

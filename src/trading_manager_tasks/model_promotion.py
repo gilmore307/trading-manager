@@ -206,7 +206,7 @@ def _parse_models(args: argparse.Namespace) -> list[str]:
 def model_promotion_review_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Plan unified manager-side model promotion review requests.")
     parser.add_argument("--model", action="append", help="Model id or layer id. Repeat for multiple models.")
-    parser.add_argument("--all", action="store_true", help="Plan one request for every registered model layer.")
+    parser.add_argument("--all", action="store_true", help="Plan one request for every registered model.")
     parser.add_argument("--candidate-ref", required=True, help="Promotion candidate ref or artifact URI to review.")
     parser.add_argument("--evaluation-run-ref", action="append", default=[])
     parser.add_argument("--evidence-ref", action="append", default=[])

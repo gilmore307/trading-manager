@@ -1,10 +1,10 @@
-# Model Layer Naming Rules
+# Model Naming Rules
 
-This file owns shared naming rules for model-layer source, feature, and model surfaces that cross repository boundaries. General physical SQL table naming and SQL-versus-artifact storage boundaries live in `sql-table-surface-naming.md`.
+This file owns shared naming rules for model source, feature, and model surfaces that cross repository boundaries. General physical SQL table naming and SQL-versus-artifact storage boundaries live in `sql-table-surface-naming.md`.
 
-## Current Layer Stack
+## Current Model Stack
 
-| Layer | Boundary | Stable model id | Model-generation table |
+| Model | Boundary | Stable model id | Model-generation table |
 |---|---|---|---|
 | 1 | MarketRegimeModel | `market_regime_model` | `trading_model.model_01_market_regime_model_generation` |
 | 2 | SectorContextModel | `sector_context_model` | `trading_model.model_02_sector_context_model_generation` |
@@ -28,7 +28,7 @@ Model/data table surfaces apply the shared pattern from
 <schema>.<owner_prefix>_<domain_slug>_<task_stage>[_<artifact_role>]
 ```
 
-For model-layer tables, `owner_prefix` is `model_NN`, `domain_slug` is the reviewed
+For model tables, `owner_prefix` is `model_NN`, `domain_slug` is the reviewed
 model/domain slug, `task_stage` is the task that generates the table, and
 `artifact_role` is optional support evidence such as `explainability` or
 `diagnostics`.
@@ -45,7 +45,7 @@ trading_model.model_01_market_regime_model_generation_diagnostics
 
 Old `mNN_*`, `source_NN_*`, and `feature_NN_*` names are migration debt, not current planning names. Do not introduce, document, or register new tables with the old surface-stem pattern. Historical applied migrations may still mention old names as immutable history.
 
-Layer-neutral governance, control-plane, registry, receipt, and audit tables must not invent a fake layer number; they should carry layer refs in row fields when needed.
+Model-neutral governance, control-plane, registry, receipt, and audit tables must not invent a fake model number; they should carry model refs in row fields when needed.
 
 ## Current Shared Table Examples
 
@@ -68,7 +68,7 @@ The table prefix is not automatic proof of business authority. The registered ro
 
 ## Field Prefix Rule
 
-Layer-owned model score tokens use compact numeric prefixes only when the token is part of a reviewed layer contract:
+Model-owned model score tokens use compact numeric prefixes only when the token is part of a reviewed layer contract:
 
 ```text
 1_* 2_* 3_* 4_* 5_* 6_*
@@ -80,16 +80,16 @@ Core scalar score tokens that are shared across repositories belong in `state_ve
 
 ## Boundary Rules
 
-- Layer 1 conditions downstream work; it does not rank sectors, targets, strategies, positions, options, or actions.
-- Layer 2 conditions target construction; it does not select final symbols or actions.
-- Layer 3 builds target context; it does not emit alpha, exposure, option choice, or action.
-- Layer 4 produces the unified direct-underlying decision thesis; it does not route orders or mutate broker/account state.
-- Layer 5 produces optional offline option-expression plans; it does not execute or mutate broker/account state.
-- Layer 6 produces residual event governance/intervention evidence from the M04 thesis, with M05 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
+- M01 conditions downstream work; it does not rank sectors, targets, strategies, positions, options, or actions.
+- M02 conditions target construction; it does not select final symbols or actions.
+- M02 builds target context; it does not emit alpha, exposure, option choice, or action.
+- M03 event-state produces the unified direct-underlying decision thesis; it does not route orders or mutate broker/account state.
+- M04 decision produces optional offline option-expression plans; it does not execute or mutate broker/account state.
+- M04 risk produces residual event governance/intervention evidence from the M04 thesis, with M05 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
 
 ## Registry Review Checklist
 
-Before adding or changing a model-layer registry row, verify:
+Before adding or changing a model registry row, verify:
 
 - the layer boundary is current;
 - the row uses the narrowest kind;

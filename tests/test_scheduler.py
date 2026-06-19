@@ -29,7 +29,7 @@ class SchedulerTests(unittest.TestCase):
         return ResourceSnapshot(cpu_count=8, load_1m=1.0, available_memory_mb=32768, free_disk_gb=500.0)
 
     def _write_task_keys(self, root: Path, *, model_layer: str, month: str = "2016-01") -> None:
-        for member in load_market_regime_universe(model_layers=(model_layer,)):
+        for member in load_market_regime_universe(model_readiness=(model_layer,)):
             path = root / "monthly_backfill" / "alpaca_bars" / member.symbol / month / "task_key.json"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("{}\n", encoding="utf-8")

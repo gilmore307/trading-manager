@@ -68,7 +68,7 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         stale_end_month = {
             **current,
             "request_id": "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700",
-            "parameter_ref": "storage://trading-manager/runtime/layer_03_target_state_vector/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700/task_key.json",
+            "parameter_ref": "storage://trading-manager/runtime/model_02_target_state/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700/task_key.json",
         }
 
         self.assertTrue(is_current_option_chain_request(current, start_month="2021-01", end_month="2021-06"))

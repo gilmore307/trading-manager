@@ -45,7 +45,7 @@ def _dashboard(next_action: str) -> StageRunDashboard:
     return StageRunDashboard(
         contract_type="manager_stage_run_dashboard",
         stage_id="model_01_background_context.data_acquisition",
-        model_layer="layer_01_market_regime",
+        model_layer="model_01_market_context",
         start_month="2016-01",
         end_month="2016-01",
         coverage=_coverage(),

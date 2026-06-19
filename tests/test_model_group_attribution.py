@@ -23,9 +23,9 @@ class ModelGroupAttributionTests(unittest.TestCase):
             "overlap_status": "residual_after_upstream_conditioning",
             "leakage_status": "passed",
             "allowed_model_use": ["temporal_attention_pool", "event_family_scouting"],
-            "blocked_model_use": ["layer_4_promotion"],
+            "blocked_model_use": ["model_03_event_state_promotion"],
             "blocking_issues": [],
-            "required_followups": ["retest before layer_4_promotion"],
+            "required_followups": ["retest before model_03_event_state_promotion"],
             "rationale": "Fixture review approves the deterministic temporal attention candidate.",
         }
 
@@ -314,7 +314,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                         "created_at_utc": "2026-06-18T12:30:00+00:00",
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "layer_02_target_candidate_handoff",
+                        "candidate_handoff_source": "model_02_target_candidate_handoff",
                         "decision_rows_ref": str(incompatible_root / "decision_rows.jsonl"),
                         "replay_completion_scope": "full_candidate_universe",
                         "max_decision_rows": None,
@@ -367,12 +367,12 @@ class ModelGroupAttributionTests(unittest.TestCase):
             dataset_root = self._write_replay_dataset(storage_root)
             review_decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
             self.assertIsNotNone(review_decision)
-            observation_root = storage_root / "runtime" / "layer_04_event_observation_inputs"
+            observation_root = storage_root / "runtime" / "model_03_event_observation_inputs"
             observation_root.mkdir(parents=True)
             (observation_root / "2021-01_2021-02.json").write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_layer_04_event_observation_materialization",
+                        "contract_type": "manager_model_03_event_observation_materialization",
                         "reviewed_event_interpretations": [
                             {
                                 "contract_type": "event_interpretation",
@@ -499,7 +499,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(candidates[0]["event_temporal_form"], "instantaneous_unscheduled_event")
             self.assertEqual(candidates[0]["event_schedule_type"], "unscheduled")
             self.assertEqual(candidates[0]["event_family_prior_role"], "event_family_impact_parameterization")
-            self.assertEqual(candidates[0]["layer_4_projection_type"], "event_family_impact_state_projection")
+            self.assertEqual(candidates[0]["model_03_event_projection_type"], "event_family_impact_state_projection")
             self.assertEqual(candidates[0]["event_family_impact_parameterization"]["severity_model"], "target_normalized_market_response")
             packets = [
                 json.loads(line)
@@ -517,7 +517,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(packets[0]["event_release_phase"], "post_release")
             self.assertEqual(packets[0]["event_lifecycle_stage"], "post_release_impact_state")
             self.assertEqual(packets[0]["state_signal_type"], "impact_state")
-            self.assertEqual(packets[0]["layer_4_state_overlay"], "event_post_release_impact_state")
+            self.assertEqual(packets[0]["model_03_event_state_overlay"], "event_post_release_impact_state")
             self.assertEqual(packets[0]["matched_occurrence_count"], 1)
             self.assertEqual(packets[0]["unmatched_occurrence_count"], 1)
             reviews = [
@@ -535,12 +535,12 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(accepted[0]["pool_status"], "accepted")
             self.assertEqual(accepted[0]["event_temporal_form"], "instantaneous_unscheduled_event")
             self.assertEqual(accepted[0]["event_family_prior_role"], "event_family_impact_parameterization")
-            self.assertEqual(accepted[0]["layer_4_projection_type"], "event_family_impact_state_projection")
+            self.assertEqual(accepted[0]["model_03_event_projection_type"], "event_family_impact_state_projection")
             self.assertEqual(accepted[0]["event_release_phase"], "post_release")
             self.assertEqual(accepted[0]["event_lifecycle_stage"], "post_release_impact_state")
             self.assertEqual(accepted[0]["state_signal_type"], "impact_state")
-            self.assertEqual(accepted[0]["layer_4_state_overlay"], "event_post_release_impact_state")
-            self.assertFalse(receipt["layer_4_promotion_performed"])
+            self.assertEqual(accepted[0]["model_03_event_state_overlay"], "event_post_release_impact_state")
+            self.assertFalse(receipt["model_03_event_state_promotion_performed"])
 
     def test_residual_event_governance_backoff_when_event_evidence_missing(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -570,7 +570,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
         self.assertEqual(profile["event_release_phase"], "pre_release")
         self.assertEqual(profile["event_lifecycle_stage"], "pre_release_risk_state")
         self.assertEqual(profile["state_signal_type"], "risk_state")
-        self.assertEqual(profile["layer_4_state_overlay"], "event_pre_release_risk_state_change")
+        self.assertEqual(profile["model_03_event_state_overlay"], "event_pre_release_risk_state_change")
 
     def test_event_effect_profile_turns_released_earnings_into_post_release_impact_stage(self):
         profile = _event_effect_profile(
@@ -585,7 +585,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
         self.assertEqual(profile["event_release_phase"], "post_release")
         self.assertEqual(profile["event_lifecycle_stage"], "post_release_impact_state")
         self.assertEqual(profile["state_signal_type"], "impact_state")
-        self.assertEqual(profile["layer_4_state_overlay"], "event_post_release_impact_state")
+        self.assertEqual(profile["model_03_event_state_overlay"], "event_post_release_impact_state")
 
     def test_event_effect_profile_represents_scheduled_calendar_events(self):
         profile = _event_effect_profile("triple_witching", information_role_type="calendar", text="Known options expiration calendar event.")

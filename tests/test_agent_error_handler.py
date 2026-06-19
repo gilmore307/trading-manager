@@ -37,7 +37,7 @@ class AgentErrorHandlerTests(unittest.TestCase):
                 command=["python3", "script.py"],
                 exit_code=1,
                 stderr_path=str(stderr),
-                evidence_refs=["manager_stage:layer_03_target_state_vector.data_acquisition"],
+                evidence_refs=["manager_stage:model_02_target_state.data_acquisition"],
                 occurred_at_utc="2026-05-13T12:06:38Z",
             )
 

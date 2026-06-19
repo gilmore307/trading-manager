@@ -36,7 +36,7 @@ DEFAULT_REPLAY_INITIAL_CAPITAL_USD = 25_000.0
 REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED = "replay_option_feature_acquisition_required"
 NEW_YORK = ZoneInfo("America/New_York")
 CRYPTO_REPLAY_TARGET_REFS = {"BTC", "ETH", "SOL"}
-LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "layer_02_target_candidate_handoff"
+MODEL_02_TARGET_CANDIDATE_HANDOFF_SOURCE = "model_02_target_candidate_handoff"
 FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE = "fixed_current_snapshot_historical_candidate_universe"
 CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES = {FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE}
 REPLAY_CANDIDATE_UNIVERSE_CLOSE_READY_TIME = time(16, 15)
@@ -162,7 +162,7 @@ def run_model_group_replay_if_ready(
             reason = (
                 "fold-scoped after-cost alpha model artifact training is ready"
                 if not execute
-                else "fold-scoped after-cost alpha model artifact is required for replay Layer 5 inference"
+                else "fold-scoped after-cost alpha model artifact is required for replay M04 decision inference"
             )
             required_next_step = (
                 "run the fold-scoped after-cost alpha training command before replay"
@@ -628,12 +628,12 @@ def _target_candidate_handoff_path(*, storage_root: Path, training_fold: Mapping
     start_month = str(training_fold.get("start_month") or "").strip()
     end_month = str(training_fold.get("end_month") or "").strip()
     fold_key = f"{start_month.replace('-', '_')}_{end_month.replace('-', '_')}"
-    return storage_root / "runtime" / "layer_03_target_state_vector" / "input_materialization" / fold_key / "target_candidates.jsonl"
+    return storage_root / "runtime" / "model_02_target_state" / "input_materialization" / fold_key / "target_candidates.jsonl"
 
 
 def _candidate_universe_source_policy(path: Path) -> str:
     if path.suffix.lower() == ".jsonl":
-        return LAYER_02_TARGET_CANDIDATE_HANDOFF_SOURCE
+        return MODEL_02_TARGET_CANDIDATE_HANDOFF_SOURCE
     return FIXED_HISTORICAL_CANDIDATE_UNIVERSE_SOURCE
 
 

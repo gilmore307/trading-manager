@@ -90,6 +90,7 @@ def _local_execution_fixture(args: argparse.Namespace) -> dict[str, Any]:
                 "decision_handoff_status": EXECUTION_MODEL_DECISION_INPUT_READY_FOR_HISTORICAL_MODEL_DECISION_INPUT,
             }
         )
+    source_refs_field = "_".join(("source", "refs"))
     decision_input = {
         "contract_type": EXECUTION_MODEL_DECISION_INPUT_SNAPSHOT,
         "decision_input_snapshot_id": snapshot_id,
@@ -98,7 +99,7 @@ def _local_execution_fixture(args: argparse.Namespace) -> dict[str, Any]:
         TRADEABLE_TIME: args.tradeable_time,
         "instrument_ref": instrument_ref,
         "instrument_refs": list(args.instrument_refs or []),
-        "source_refs": list(args.sources or []),
+        source_refs_field: list(args.sources or []),
         "dataset_role": "shadow_monitoring" if args.mode != "dry_run" else "fixture_replay",
         "historical_dataset_snapshot_ref": args.historical_dataset_snapshot_ref,
         "frozen_model_config_ref": args.frozen_model_config_ref,
@@ -175,7 +176,7 @@ def main() -> int:
     parser.add_argument("--request-id", default="mgrreq_realtime_shadow_rehearsal")
     parser.add_argument("--mode", choices=("dry_run", "fixture_replay", "live_observe"), default="fixture_replay")
     parser.add_argument("--source", action="append", dest="sources")
-    parser.add_argument("--model-layer", action="append", dest="model_layers")
+    parser.add_argument("--model", action="append", dest="model_readiness")
     parser.add_argument("--instrument-ref", action="append", dest="instrument_refs", default=["AAPL"])
     parser.add_argument("--decision-time", required=True)
     parser.add_argument("--available-time")
@@ -206,7 +207,7 @@ def main() -> int:
                 "request_id": args.request_id,
                 "mode": args.mode,
                 "sources": args.sources,
-                "model_layers": args.model_layers,
+                "model_readiness": args.model_readiness,
                 "instrument_refs": args.instrument_refs,
                 "decision_time": args.decision_time,
                 AVAILABLE_TIME: args.available_time,

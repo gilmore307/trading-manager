@@ -287,9 +287,9 @@ class StageReconcileTests(unittest.TestCase):
             current_id = "mgrreq_option_chain_window_aapl_2021_01_2021_06_01_0930"
             stale_id = "mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700"
             current_task_key = root / "runtime/model_05_option_expression/option_chain_state_source/2021-01" / current_id / "task_key.json"
-            stale_task_key = root / "runtime/layer_03_target_state_vector/option_chain_state_source/2021-06" / stale_id / "task_key.json"
+            stale_task_key = root / "runtime/model_02_target_state/option_chain_state_source/2021-06" / stale_id / "task_key.json"
             current_receipt = root / "component/model_05_option_expression/option_chain_state_source/2021-01" / current_id / "completion_receipt.json"
-            stale_receipt = root / "component/layer_03_target_state_vector/option_chain_state_source/2021-06" / stale_id / "completion_receipt.json"
+            stale_receipt = root / "component/model_02_target_state/option_chain_state_source/2021-06" / stale_id / "completion_receipt.json"
             for task_key, receipt in ((current_task_key, current_receipt), (stale_task_key, stale_receipt)):
                 task_key.parent.mkdir(parents=True, exist_ok=True)
                 receipt.parent.mkdir(parents=True, exist_ok=True)
@@ -324,7 +324,7 @@ class StageReconcileTests(unittest.TestCase):
                     "request_id": stale_id,
                     "request_kind": "option_chain_snapshot",
                     "target_component_id": "option_chain_state_source",
-                    "parameter_ref": f"storage://trading-manager/runtime/layer_03_target_state_vector/option_chain_state_source/2021-06/{stale_id}/task_key.json",
+                    "parameter_ref": f"storage://trading-manager/runtime/model_02_target_state/option_chain_state_source/2021-06/{stale_id}/task_key.json",
                 },
             ]
             with patch("trading_manager_tasks.stage_reconcile.fetch_manager_requests", return_value=rows):
@@ -387,7 +387,7 @@ class StageReconcileTests(unittest.TestCase):
             stale_ref = _write_option_chain_task(
                 manager_root,
                 component_root,
-                model_layer="layer_03_target_state_vector",
+                model_layer="model_02_target_state",
                 request_id=stale_request_id,
                 status="failed",
             )

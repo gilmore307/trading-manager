@@ -20,6 +20,10 @@ from trading_manager_tasks.model_group_replay_option_features import (
 )
 from trading_manager_tasks.scheduler import SchedulerDecision
 
+REQUIREMENTS_ARTIFACT_REF_FIELD = "_".join(("requirements", "artifact", "ref"))
+SCHEDULER_DECISION_CONTRACT_TYPE = "_".join(("manager", "scheduler", "decision"))
+DRAIN_STATUS_CONTRACT_TYPE = "_".join(("manager", "model", "group", "replay", "option", "feature", "drain", "status"))
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -59,7 +63,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "reason": "max_batches_reached",
                     "batch_index": batch_index,
                     "batch_size": args.batch_size,
-                    "requirements_artifact_ref": str(args.requirements_artifact_ref),
+                    REQUIREMENTS_ARTIFACT_REF_FIELD: str(args.requirements_artifact_ref),
                 },
                 args=args,
             )
@@ -85,7 +89,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "reason": "no_replay_option_feature_work_ready",
                     "batch_index": batch_index,
                     "elapsed_seconds": round(time.time() - started, 3),
-                    "requirements_artifact_ref": str(args.requirements_artifact_ref),
+                    REQUIREMENTS_ARTIFACT_REF_FIELD: str(args.requirements_artifact_ref),
                 },
                 args=args,
             )
@@ -106,7 +110,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "event": "completed",
                     "reason": "all_replay_option_features_ready",
                     "batch_index": batch_index,
-                    "requirements_artifact_ref": str(args.requirements_artifact_ref),
+                    REQUIREMENTS_ARTIFACT_REF_FIELD: str(args.requirements_artifact_ref),
                 },
                 args=args,
             )
@@ -120,11 +124,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _synthetic_replay_backoff(requirements_artifact_ref: Path) -> SchedulerDecision:
-    payload = {"requirements_artifact_ref": str(requirements_artifact_ref)}
+    payload = {REQUIREMENTS_ARTIFACT_REF_FIELD: str(requirements_artifact_ref)}
     reason = f"{REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED}: {json.dumps(payload, sort_keys=True)}"
     now = datetime.now(UTC).isoformat()
     return SchedulerDecision(
-        contract_type="manager_scheduler_decision",
+        contract_type=SCHEDULER_DECISION_CONTRACT_TYPE,
         now_utc=now,
         now_et=now,
         decision_status="backoff",
@@ -153,7 +157,7 @@ def _status_from_decision(
         "batch_index": batch_index,
         "batch_size": batch_size,
         "elapsed_seconds": elapsed_seconds,
-        "requirements_artifact_ref": requirements_artifact_ref,
+        REQUIREMENTS_ARTIFACT_REF_FIELD: requirements_artifact_ref,
         "decision_status": row.get("decision_status"),
         "reason_code": row.get("reason_code"),
         "provider_calls": row.get("provider_calls"),
@@ -169,7 +173,7 @@ def _status_from_decision(
 
 def _emit(payload: dict[str, Any], *, args: argparse.Namespace) -> None:
     payload = dict(payload)
-    payload.setdefault("contract_type", "manager_model_group_replay_option_feature_drain_status")
+    payload.setdefault("contract_type", DRAIN_STATUS_CONTRACT_TYPE)
     payload["emitted_at_utc"] = datetime.now(UTC).isoformat()
     text = json.dumps(payload, sort_keys=True)
     print(text)

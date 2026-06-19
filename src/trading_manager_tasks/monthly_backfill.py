@@ -24,11 +24,11 @@ CHRONOLOGICAL_FORWARD_POLICY_REF = "chronological_forward_backfill_policy"
 DEFAULT_POLICY_REFS = ("monthly_backfill", CHRONOLOGICAL_FORWARD_POLICY_REF, "autonomous_historical_provider_acquisition")
 DEFAULT_PROJECTS_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH = (
-    DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "layer_01_02_market_context_etf_universe.csv"
+    DEFAULT_PROJECTS_ROOT / "trading-storage" / "main" / "shared" / "model_01_background_context_etf_universe.csv"
 )
-LAYER_ONE_MODEL_LAYER = "layer_01_market_regime"
-LAYER_TWO_MODEL_LAYER = "layer_02_sector_context"
-LAYER_THREE_TARGET_STATE_MODEL_LAYER = "layer_03_target_state_vector"
+LAYER_ONE_MODEL_LAYER = "model_01_market_context"
+LAYER_TWO_MODEL_LAYER = "model_01_sector_context"
+LAYER_THREE_TARGET_STATE_MODEL_LAYER = "model_02_target_state"
 SUPPORTED_MARKET_REGIME_MODEL_LAYERS = (LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER)
 SUPPORTED_FEATURE_GRAINS = {"1m", "30m", "1d"}
 MARKET_CONTEXT_SOURCE_TIMEFRAME = "1Min"
@@ -236,11 +236,11 @@ def _expected_outputs(source_id: str, month: str, *, symbol: str | None = None) 
 def load_market_regime_universe(
     path: Path = DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH,
     *,
-    model_layers: Iterable[str] | None = None,
+    model_readiness: Iterable[str] | None = None,
 ) -> tuple[MarketRegimeUniverseMember, ...]:
-    """Load reviewed ETF universe rows for the requested model layers."""
+    """Load reviewed ETF universe rows for the requested models."""
 
-    layer_filter = set(model_layers or [LAYER_ONE_MODEL_LAYER])
+    layer_filter = set(model_readiness or [LAYER_ONE_MODEL_LAYER])
     unsupported = sorted(layer_filter - set(SUPPORTED_MARKET_REGIME_MODEL_LAYERS))
     if unsupported:
         raise ValueError("unsupported model_layer values: " + ",".join(unsupported))
@@ -301,7 +301,7 @@ def _plan_source_window(
                 "timeframe": universe_member.timeframe,
                 "feature_grain": universe_member.feature_grain,
                 "model_layer": universe_member.model_layer,
-                "universe_ref": "trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv",
+                "universe_ref": "trading-storage/main/shared/model_01_background_context_etf_universe.csv",
                 "universe_type": universe_member.universe_type,
                 "exposure_type": universe_member.exposure_type,
             }
@@ -317,7 +317,7 @@ def plan_monthly_backfill_requests(
     include_crypto: bool = True,
     requested_by: str = DEFAULT_REQUESTED_BY,
     market_regime_universe_path: Path = DEFAULT_MARKET_REGIME_ETF_UNIVERSE_PATH,
-    model_layers: Iterable[str] = (LAYER_ONE_MODEL_LAYER,),
+    model_readiness: Iterable[str] = (LAYER_ONE_MODEL_LAYER,),
 ) -> list[dict[str, object]]:
     """Plan deterministic `manager_request` dictionaries.
 
@@ -335,8 +335,8 @@ def plan_monthly_backfill_requests(
     if requested_end < effective_global_start:
         return []
 
-    selected_model_layers = tuple(dict.fromkeys(model_layers))
-    market_regime_universe = load_market_regime_universe(market_regime_universe_path, model_layers=selected_model_layers)
+    selected_model_readiness = tuple(dict.fromkeys(model_readiness))
+    market_regime_universe = load_market_regime_universe(market_regime_universe_path, model_readiness=selected_model_readiness)
     eligible_sources: list[tuple[SourceAvailability, Month]] = []
     for source in sources:
         if not source.include_by_default:
@@ -371,7 +371,7 @@ def plan_target_local_alpaca_bar_requests(
     target_symbols: Iterable[str],
     requested_by: str = DEFAULT_REQUESTED_BY,
 ) -> list[dict[str, object]]:
-    """Plan Layer 3 target-local Alpaca bar requests for selected targets."""
+    """Plan M02 target-local Alpaca bar requests for selected targets."""
 
     requested_start = Month.parse(start_month)
     accepted_start = Month.parse(DEFAULT_START_MONTH)
@@ -406,7 +406,7 @@ def plan_target_local_alpaca_bar_requests(
             )
             row = _plan_source_window(source=alpaca_bars, window=window, requested_by=requested_by, universe_member=member)
             row["universe_ref"] = "manager_model_training_target_queue.selected_target_symbol"
-            row["policy_refs"] = [*DEFAULT_POLICY_REFS, "layer_03_target_local_feed_artifacts_ready"]
+            row["policy_refs"] = [*DEFAULT_POLICY_REFS, "model_02_target_local_feed_artifacts_ready"]
             row["priority"] = "high"
             planned.append(row)
     return planned
@@ -455,7 +455,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", required=True, help="Inclusive YYYY-MM end month.")
     parser.add_argument("--exclude-crypto", action="store_true", help="Skip OKX crypto; by default it joins at its later 2018-01 start.")
     parser.add_argument("--requested-by", default=DEFAULT_REQUESTED_BY)
-    parser.add_argument("--model-layer", action="append", choices=SUPPORTED_MARKET_REGIME_MODEL_LAYERS, default=[], help="Universe model_layer to plan for Alpaca bars. Omit for Layer 1; repeat for multiple layers.")
+    parser.add_argument("--model", action="append", choices=SUPPORTED_MARKET_REGIME_MODEL_LAYERS, default=[], help="Universe model_layer to plan for Alpaca bars. Omit for M01; repeat for multiple layers.")
     parser.add_argument("--format", choices=("jsonl", "json", "csv"), default="jsonl")
     parser.add_argument("--inventory", action="store_true", help="Print source availability inventory instead of requests.")
     args = parser.parse_args(argv)
@@ -470,7 +470,7 @@ def main(argv: list[str] | None = None) -> int:
         end_month=args.end_month,
         include_crypto=not args.exclude_crypto,
         requested_by=args.requested_by,
-        model_layers=tuple(args.model_layer) if args.model_layer else (LAYER_ONE_MODEL_LAYER,),
+        model_readiness=tuple(args.model_layer) if args.model_layer else (LAYER_ONE_MODEL_LAYER,),
     )
     write_requests(requests, output=sys.stdout, output_format=args.format)
     return 0

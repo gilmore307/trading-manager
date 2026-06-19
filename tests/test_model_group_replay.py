@@ -65,7 +65,7 @@ class ModelGroupReplayTests(unittest.TestCase):
         target_candidates_path = (
             storage_root
             / "runtime"
-            / "layer_03_target_state_vector"
+            / "model_02_target_state"
             / "input_materialization"
             / "2016_01_2016_06"
             / "target_candidates.jsonl"
@@ -141,7 +141,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     candidate_source = "fixed_current_snapshot_historical_candidate_universe"
                 else:
                     candidate_symbols = ["AAPL"]
-                    candidate_source = "layer_02_target_candidate_handoff"
+                    candidate_source = "model_02_target_candidate_handoff"
                 progress_path = Path(sys.argv[sys.argv.index("--progress-path") + 1])
                 progress_path.parent.mkdir(parents=True, exist_ok=True)
                 rows = [
@@ -305,7 +305,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             handoff_path = (
                 storage_root
                 / "runtime"
-                / "layer_03_target_state_vector"
+                / "model_02_target_state"
                 / "input_materialization"
                 / "2016_01_2016_06"
                 / "target_candidates.jsonl"
@@ -328,7 +328,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_candidate_universe_not_canonical")
             self.assertEqual(
                 decision.execution_summary["candidate_universe_source_policy"],
-                "layer_02_target_candidate_handoff",
+                "model_02_target_candidate_handoff",
             )
 
     def test_bounded_replay_receipt_does_not_satisfy_full_replay_completion(self):

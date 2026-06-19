@@ -179,7 +179,7 @@ def discover_stage_receipts(
         return tuple(refs)
     model_layer = _model_layer_for_stage(stage_id)
     refs: list[StageReceiptRef] = []
-    for member in load_market_regime_universe(model_layers=(model_layer,)):
+    for member in load_market_regime_universe(model_readiness=(model_layer,)):
         symbol = member.symbol.upper()
         receipt_path = component_storage_root / "monthly_backfill" / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
         if not receipt_path.exists():
@@ -639,7 +639,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--advance-workflow", action="store_true", help="Ingest the written coverage report into workflow state.")
     parser.add_argument("--workflow-state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the manager runtime root under trading-storage/storage/02_control_plane/runtime.")
     parser.add_argument("--write-workflow-state", action="store_true")
-    parser.add_argument("--target-symbol", help="Optional target symbol for Layer 3+ workflow-state routing.")
+    parser.add_argument("--target-symbol", help="Optional target symbol for M02+ workflow-state routing.")
     parser.add_argument(
         "--allow-post-foundation-model-stages",
         action="store_true",

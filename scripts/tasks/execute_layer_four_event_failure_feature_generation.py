@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Layer 4 event-failure feature receipts from reviewed event evidence."""
+"""Generate M03 event-failure feature receipts from reviewed event evidence."""
 
 from __future__ import annotations
 

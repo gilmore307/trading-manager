@@ -63,7 +63,7 @@ class DatasetRoleEvidence:
 
 @dataclass(frozen=True)
 class LayerDatasetEvidence:
-    """Manager-visible evidence for one model layer."""
+    """Manager-visible evidence for one model."""
 
     layer: int
     layer_key: str
@@ -301,7 +301,7 @@ def _decision_for_role(
     dataset_unit_kind = "six_month_panel" if layer_evidence.layer in {1, 2} else "target_symbol_six_month"
     target_text = normalized_target if normalized_target else ("UNSELECTED_TARGET" if target_required else "not_applicable")
     task_scope_description = (
-        f"{layer_evidence.layer_key}: {role} dataset unit is the fixed Layer {layer_evidence.layer} panel over 6 months."
+        f"{layer_evidence.layer_key}: {role} dataset unit is the fixed M{layer_evidence.layer:02d} panel over 6 months."
         if layer_evidence.layer in {1, 2}
         else f"{layer_evidence.layer_key}: {role} dataset unit is target {target_text} over 6 months."
     )
@@ -351,7 +351,7 @@ def build_dataset_expansion_plan(
             plan_path=str(output_path),
             wrote_layer_one_payloads=True,
             layer_one_preparation=layer_one_preparation.summary_row(),
-            note="Prepared Layer 1 task-key payloads only; provider dispatch proceeds through autonomous historical acquisition.",
+            note="Prepared M01 task-key payloads only; provider dispatch proceeds through autonomous historical acquisition.",
         )
     elif write and decision:
         target_missing = decision.target_required and not decision.target_symbol
@@ -360,7 +360,7 @@ def build_dataset_expansion_plan(
             wrote_plan=True,
             plan_path=str(output_path),
             note=(
-                "Layer 3+ expansion is blocked until the task names the selected target symbol for the six-month unit."
+                "M02+ expansion is blocked until the task names the selected target symbol for the six-month unit."
                 if target_missing
                 else "Expansion request selected by manager; component-specific implementation is queued through the workflow state."
                 if not decision.provider_calls_allowed
@@ -407,7 +407,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model-schema", default="trading_model")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_DATASET_EXPANSION_PATH)
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ six-month dataset units.")
     parser.add_argument("--write", action="store_true", help="Prepare the selected safe expansion artifact/payloads without provider calls.")
     args = parser.parse_args(argv)
 

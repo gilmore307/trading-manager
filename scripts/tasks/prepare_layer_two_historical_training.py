@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare Layer 2 sector-context historical-training task keys without provider dispatch."""
+"""Prepare M02 sector-context historical-training task keys without provider dispatch."""
 
 from __future__ import annotations
 

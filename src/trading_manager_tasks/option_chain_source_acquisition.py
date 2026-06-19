@@ -340,7 +340,7 @@ def build_option_chain_source_review(*, start_month: str, end_month: str, target
         request_count=len(previews),
         request_previews=previews,
         evidence_refs=("calendar:manager_us_equity_regular_trading_days",),
-        reason=f"{len(previews)} regular-session day window(s) require shared ThetaData option-chain source/cache acquisition before Layer 3.",
+        reason=f"{len(previews)} regular-session day window(s) require shared ThetaData option-chain source/cache acquisition before M02.",
     )
 
 
@@ -611,7 +611,7 @@ def write_review(review: OptionChainSourceReview, *, output: TextIO) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Prepare shared option-chain source acquisition before Layer 3.")
+    parser = argparse.ArgumentParser(description="Prepare shared option-chain source acquisition before M02.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--target-symbol", required=True)

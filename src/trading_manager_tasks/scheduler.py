@@ -346,7 +346,7 @@ def _preparation_selected_work(model_layer: str) -> str:
         return "prepare_layer_one_historical_training_batch"
     if model_layer == LAYER_TWO_MODEL_LAYER:
         return "prepare_layer_two_historical_training_batch"
-    raise ValueError(f"unsupported preparation model layer: {model_layer}")
+    raise ValueError(f"unsupported preparation model: {model_layer}")
 
 
 def _execute_autonomous_provider_stage(
@@ -698,7 +698,7 @@ def run_scheduler_once(
                 "PYTHONPATH=src",
                 "python3",
                 "scripts/tasks/dispatch_provider_acquisition.py",
-                "--model-layer",
+                "--model",
                 LAYER_THREE_TARGET_STATE_MODEL_LAYER,
                 "--start-month",
                 start_month,
@@ -1004,7 +1004,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Execute one bounded autonomous provider-dispatch/reconcile slice when a provider acquisition stage is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one scheduler tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one scheduler tick.")
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ six-month dataset units.")
     parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the month-scoped manager runtime checkpoint.")
     parser.add_argument(
         "--allow-post-foundation-model-stages",

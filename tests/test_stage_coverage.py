@@ -12,14 +12,14 @@ from trading_manager_tasks.stage_coverage import summarize_stage_coverage_from_r
 
 
 def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
-    for member in load_market_regime_universe(model_layers=(model_layer,)):
+    for member in load_market_regime_universe(model_readiness=(model_layer,)):
         task_key = root / "monthly_backfill" / "alpaca_bars" / member.symbol / month / "task_key.json"
         task_key.parent.mkdir(parents=True, exist_ok=True)
         task_key.write_text("{}\n", encoding="utf-8")
 
 
 def _symbols(model_layer: str) -> list[str]:
-    return [member.symbol for member in load_market_regime_universe(model_layers=(model_layer,))]
+    return [member.symbol for member in load_market_regime_universe(model_readiness=(model_layer,))]
 
 
 def _summary_row(symbol: str, *, ready: bool = False, failed: bool = False) -> dict[str, object]:
@@ -276,7 +276,7 @@ class StageCoverageTests(unittest.TestCase):
             },
             {
                 **_option_chain_summary_row(stale_end_month_request, failed=True),
-                "parameter_ref": "storage://trading-manager/runtime/layer_03_target_state_vector/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700/task_key.json",
+                "parameter_ref": "storage://trading-manager/runtime/model_02_target_state/option_chain_state_source/2021-06/mgrreq_option_chain_window_aapl_2021_06_2021_06_01_1700/task_key.json",
             },
         ]
 

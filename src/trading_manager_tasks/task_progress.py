@@ -220,7 +220,7 @@ def _default_unit_label_for_stage(row: Mapping[str, Any], fallback: str) -> str:
     if stage_id == "model_05_option_expression.option_chain_data_acquisition":
         return "option source"
     if stage_id.endswith(".data_acquisition"):
-        if stage_id == "layer_04_event_failure_risk.data_acquisition":
+        if stage_id == "model_03_event_state.data_acquisition":
             return "event substrate"
     return progress_contract_for_stage(stage_id, fallback_unit_label=fallback)["unit_label"]
 

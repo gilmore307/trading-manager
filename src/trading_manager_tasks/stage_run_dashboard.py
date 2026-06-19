@@ -127,7 +127,7 @@ def _execute_command(
         "PYTHONPATH=src",
         "python3",
         "scripts/tasks/dispatch_and_reconcile_provider_stage.py",
-        "--model-layer",
+        "--model",
         _model_layer_for_stage(stage_id),
         "--start-month",
         start_month,

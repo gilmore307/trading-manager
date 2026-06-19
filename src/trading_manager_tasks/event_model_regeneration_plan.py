@@ -106,7 +106,7 @@ def build_event_model_regeneration_plan(
         required_event_feed_ids=tuple(REQUIRED_EVENT_FEED_IDS),
         preserved_surfaces=(
             "reviewed_provider_data_and_monthly_cleaned_data_when_point_in_time_valid",
-            "layer_01_market_regime_and_layer_02_sector_context_persistent_foundation_data",
+            "model_01_market_context_and_model_01_sector_context_persistent_foundation_data",
             "base_target_chain_outputs_before_concentrated_replay_when_point_in_time_valid",
             "event_risk_diagnostic_evidence_artifacts_for_comparison_debug_and_audit",
             "storage_artifacts_and_dashboard_snapshots_until_regeneration_review_completes",
@@ -114,7 +114,7 @@ def build_event_model_regeneration_plan(
         superseded_surfaces=(
             "pre_replay_residual_event_governance_data_or_feature_outputs",
             "event_risk_governor_outputs_built_before_concentrated_replay_failure_attribution",
-            "promotion_review_artifacts_claiming_event_alpha_without_layer_4_acceptance_and_replay_attribution_evidence",
+            "promotion_review_artifacts_claiming_event_alpha_without_model_03_event_acceptance_and_replay_attribution_evidence",
             "model_run_metadata_that_depends_on_non_current_event_observation_or_replay_attribution_after_reviewed_rebuild_exists",
         ),
         invalidation_scope=(
@@ -153,9 +153,9 @@ def build_event_model_regeneration_plan(
                 requires_review_before_apply=True,
             ),
             RegenerationStep(
-                step_id="04_materialize_layer_4_event_observation_fold_pool",
+                step_id="04_materialize_model_03_event_event_observation_fold_pool",
                 owner_repo="trading-manager",
-                action="materialize the fold-scoped Layer 4 event-observation substrate, allowing an explicit empty pool before M06 has accepted event attribution",
+                action="materialize the fold-scoped M03 event-observation substrate, allowing an explicit empty pool before M06 has accepted event attribution",
                 command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_observation_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
                 status="ready_without_provider_calls",
                 mutation_class="local_event_observation_substrate_receipt",
@@ -167,7 +167,7 @@ def build_event_model_regeneration_plan(
                 owner_repo="trading-manager;trading-model",
                 action="run concentrated live-flow replay so components can choose no target, one target, or target combinations under historical point-in-time conditions",
                 command_ref="manager concentrated-replay --start-month ${START_MONTH} --end-month ${END_MONTH}",
-                status="blocked_until_layer_4_event_observation_pool_ready",
+                status="blocked_until_model_03_event_event_observation_pool_ready",
                 mutation_class="offline_replay_trace_generation",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,
@@ -218,8 +218,8 @@ def build_event_model_regeneration_plan(
             "EventRiskGovernor fold has acceptance/evaluation/review evidence and Chentong approves a storage lifecycle apply step."
         ),
         notes=(
-            "Layer 1 and Layer 2 data are persistent foundations: compress/archive only, never auto-delete.",
-            "Layer 4 event observations are collected for each fold before replay, even for global/sector events, because the accepted observation pool can change by fold.",
+            "M01 and M02 data are persistent foundations: compress/archive only, never auto-delete.",
+            "M03 event-state event observations are collected for each fold before replay, even for global/sector events, because the accepted observation pool can change by fold.",
             "M06 starts after concentrated replay and learns attribution from replay failures/residuals; it is not a pre-replay data-acquisition lane.",
             "Current earnings/guidance route remains blocked for signed claims by missing comparable current guidance and PIT expectation baselines.",
             "This plan is non-mutating; executable steps remain separate reviewed tools.",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare the runtime Layer 3+ model-worker target queue."""
+"""Prepare the runtime M02+ model-worker target queue."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def build_target_queue(*, bootstrap_targets: list[str], mapping_csv: Path, gener
         "contract_type": MANAGER_MODEL_TRAINING_TARGET_QUEUE,
         "generated_at_utc": generated_at_utc or _now(),
         "queue_policy": "ordered_first_open_fold",
-        "rotation_boundary": "layer_03_plus_model_worker",
+        "rotation_boundary": "model_02_plus_model_worker",
         "targets": [{"symbol": symbol, "enabled": True} for symbol in targets],
         "promotion_evidence": False,
     }

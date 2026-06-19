@@ -139,7 +139,7 @@ def _month_end_date(month: str) -> str:
 
 
 def _symbols_for_model_layer(model_layer: str) -> tuple[str, ...]:
-    return tuple(sorted(member.symbol.upper() for member in load_market_regime_universe(model_layers=(model_layer,))))
+    return tuple(sorted(member.symbol.upper() for member in load_market_regime_universe(model_readiness=(model_layer,))))
 
 
 def _source_stage_coverage(

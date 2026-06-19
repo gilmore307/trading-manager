@@ -351,7 +351,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
     return _decision(
         decision_status="executed",
         reason_code="model_group_replay_option_feature_repair_executed",
-        reason="prepared replay option source/features for emitted Layer 8 signal timestamps; scheduler can retry replay from the same clock",
+        reason="prepared replay option source/features for emitted M04 decision signal timestamps; scheduler can retry replay from the same clock",
         selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
         provider_calls=provider_calls,
         dispatch_performed=provider_calls > 0,

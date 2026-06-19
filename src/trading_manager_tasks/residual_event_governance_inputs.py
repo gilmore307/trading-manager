@@ -1,7 +1,7 @@
 """Safe M06 event-risk input materialization.
 
 This module builds ``model_06_residual_event_governance_data_acquisition`` SQL rows only from already-saved local
-Layer 2 bar SQL receipts. It may run the trading-data equity abnormal activity
+M02 bar SQL receipts. It may run the trading-data equity abnormal activity
 source-detector, but it performs no provider calls, no model activation, no
 broker execution, and no storage lifecycle mutation.
 """
@@ -27,7 +27,7 @@ from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
-DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/layer_01_02_market_context_etf_universe.csv")
+DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/model_01_background_context_etf_universe.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_06_residual_event_governance" / "input_materialization"
 DETECTOR_SOURCE = "m06_residual_event_governance_data_acquisition.equity_abnormal_activity"
 SOURCE = "m06_residual_event_governance_data_acquisition"
@@ -270,7 +270,7 @@ def _run_detector(
         },
         "output_root": str(detector_output_root),
         "manager_stage_id": "model_06_residual_event_governance.data_acquisition",
-        "source_policy": "local_source_detector_over_reviewed_layer_02_alpaca_bar_sql_receipts_no_provider_calls",
+        "source_policy": "local_source_detector_over_reviewed_m02_alpaca_bar_sql_receipts_no_provider_calls",
     }
     task_key_path.parent.mkdir(parents=True, exist_ok=True)
     task_key_path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -548,7 +548,7 @@ def materialize_residual_event_governance_inputs_inputs(
         )
     )
     if not refs:
-        raise TaskSystemError("no successful Layer 2 feed artifacts are available for M06 event-risk materialization")
+        raise TaskSystemError("no successful M02 feed artifacts are available for M06 event-risk materialization")
     event_artifact_paths, artifact_coverage = _discover_event_feed_artifacts(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
     artifact_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
     event_sql_inputs, sql_coverage, sql_row_coverage = _discover_event_feed_sql_inputs(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)

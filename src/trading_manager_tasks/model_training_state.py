@@ -241,7 +241,7 @@ def _layer_model_generation_complete(layer_number: int, stages: Mapping[str, Sta
 
 
 def _is_satisfied(blocker: str, stages: Mapping[str, StageProgress]) -> bool:
-    if blocker in {"layer_01_task_key_preparation", FOUNDATION_CATCH_UP_BLOCKER, POST_MODEL_GENERATION_REBUILD_BLOCKER}:
+    if blocker in {"model_01_task_key_preparation", FOUNDATION_CATCH_UP_BLOCKER, POST_MODEL_GENERATION_REBUILD_BLOCKER}:
         return False
     if blocker == FOLD_STACK_PROMOTION_BLOCKER:
         return base_stack_model_generation_splits_complete(stages.values())
@@ -818,11 +818,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stage-coverage-report", action="append", type=Path, default=[], help="Ingest manager_stage_coverage report; only ready/full coverage may complete a stage.")
     parser.add_argument("--complete-stage", action="append", default=[], help="Mark a workflow stage succeeded from manager evidence.")
     parser.add_argument("--approve-stage", action="append", default=[], help="Mark stage approval as satisfied: stage_id=approval_ref.")
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for Layer 3+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ six-month dataset units.")
     parser.add_argument(
         "--allow-post-foundation-model-stages",
         action="store_true",
-        help="Allow model generation/evaluation/promotion stages after the Layer 1/2 historical substrate catch-up has been explicitly accepted.",
+        help="Allow model generation/evaluation/promotion stages after the M01/M02 historical substrate catch-up has been explicitly accepted.",
     )
     parser.add_argument("--write", action="store_true", help="Persist the refreshed workflow state checkpoint.")
     args = parser.parse_args(argv)

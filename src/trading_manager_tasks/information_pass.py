@@ -170,7 +170,7 @@ def _information_needs(*, dispatch: ProviderDispatchSummary | None, plan: Datase
                 "ranking signals such as liquidity, event density, sector coverage, data completeness, and representativeness",
                 "one-target-at-a-time chain receipt evidence through Layers 3-7",
             ),
-            safe_next_action="inventory candidate pools after Layer 1/2 coverage exists; keep L3-L7 target-major serial default",
+            safe_next_action="inventory candidate pools after M01/M02 coverage exists; keep L3-L7 target-major serial default",
         ),
         InformationNeed(
             topic="dataset_thresholds",

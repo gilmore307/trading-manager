@@ -1,6 +1,6 @@
-"""Layer 4 event-failure feature materialization.
+"""M03 event-failure feature materialization.
 
-Layer 4 does not discover event families and does not reinterpret raw event
+M03 event-state does not discover event families and does not reinterpret raw event
 artifacts. It consumes M06 / review-owned event interpretation evidence and
 turns accepted, point-in-time interpretations into model-facing event failure
 gate rows when they are already target-routable. Empty input is an explicit
@@ -19,8 +19,8 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
-DEFAULT_INPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_04_event_observation_inputs"
-DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "layer_04_event_failure_risk" / "feature_generation"
+DEFAULT_INPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_03_event_observation_inputs"
+DEFAULT_OUTPUT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_03_event_state" / "feature_generation"
 DEFAULT_DB_URL_FILE = Path("/root/projects/trading-main/registry/config/database_url.txt")
 ACCEPTED_REVIEW_STATUSES = {"accepted", "reviewed_accepted", "approved", "reviewed"}
 ACCEPTED_STANDARDIZATION_STATUSES = {"standardized", "accepted", "complete", "validated"}
@@ -28,7 +28,7 @@ ACCEPTED_STANDARDIZATION_STATUSES = {"standardized", "accepted", "complete", "va
 
 @dataclass(frozen=True)
 class LayerFourEventFailureFeatureReceipt:
-    """Receipt for Layer 4 feature generation."""
+    """Receipt for M03 event-state feature generation."""
 
     contract_type: str
     manager_stage_id: str
@@ -66,7 +66,7 @@ def materialize_layer_four_event_failure_features(
     write_database: bool = False,
     database_url: str | None = None,
 ) -> LayerFourEventFailureFeatureReceipt:
-    """Build Layer 4 feature rows from reviewed event interpretations."""
+    """Build M03 event-state feature rows from reviewed event interpretations."""
 
     observation_path = input_root / f"{start_month}_{end_month}.json"
     observation_payload = _load_json_object(observation_path) if observation_path.exists() else {}
@@ -96,8 +96,8 @@ def materialize_layer_four_event_failure_features(
         state = "target_routed_event_failure_gate_rows_ready"
 
     receipt = LayerFourEventFailureFeatureReceipt(
-        contract_type="manager_layer_04_event_failure_feature_generation",
-        manager_stage_id="layer_04_event_failure_risk.feature_generation",
+        contract_type="manager_model_03_event_state_feature_generation",
+        manager_stage_id="model_03_event_state.feature_generation",
         stage_type="feature_generation",
         status="succeeded",
         start_month=start_month,
@@ -189,7 +189,7 @@ def _event_strategy_failure_gate(row: Mapping[str, Any]) -> dict[str, Any]:
     effect = _clip01((0.65 * intensity + 0.35 * novelty) * (1.0 - 0.4 * uncertainty))
     return {
         "gate_status": "reviewed_accepted",
-        "agent_review_decision": "accept_layer_04_event_failure_risk_scope",
+        "agent_review_decision": "accept_model_03_event_state_scope",
         "normalized_event_type": row.get("normalized_event_type"),
         "event_domain_tags": row.get("event_domain_tags") or [],
         "strategy_failure_effect_score": round(effect, 6),
