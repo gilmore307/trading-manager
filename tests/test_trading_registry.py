@@ -1196,25 +1196,17 @@ class RegistryHelperTests(unittest.TestCase):
             self.assertEqual(rows[key]["kind"], "status_value")
             self.assertEqual(rows[key]["payload"], payload)
 
-    def test_layer_4_focus_pool_and_layer_5_event_feature_policy_names_are_registered(self):
+    def test_retired_layer_4_focus_pool_names_are_not_current_registry_rows(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}
 
-        focus_pool = rows["LAYER_04_FOCUS_POOL_INPUTS_20260610"]
-        self.assertEqual(focus_pool["kind"], "artifact_type")
-        self.assertEqual(focus_pool["payload"], "layer_04_focus_pool_inputs")
-        self.assertIn("layer_04_focus_pool_inputs_20260610", focus_pool["path"])
-        self.assertIn("m06_residual_event_governance_focus_pool_inputs", focus_pool["applies_to"])
-        self.assertIn("review_ready_not_promotion_approved", focus_pool["applies_to"])
-
-        self.assertEqual(rows["LAYER_04_FOCUS_POOL_INPUT_ROWS"]["payload"], "layer_04_focus_pool_input_rows")
-        self.assertEqual(rows["LAYER_04_FOCUS_POOL_MODEL_ROWS"]["payload"], "model_04_event_failure_risk_rows")
-
-        focus_runner = rows["MODEL_04_EVENT_FAILURE_RISK_M06_FOCUS_POOL_INPUTS_BUILD"]
-        self.assertEqual(focus_runner["kind"], "script")
-        self.assertIn("build_layer4_focus_pool_inputs.py", focus_runner["path"])
-        self.assertIn("m06_residual_event_governance_focus_pool_inputs.py", focus_runner["path"])
-        self.assertIn("review_ready_not_promotion_approved", focus_runner["applies_to"])
+        for retired_key in {
+            "LAYER_04_FOCUS_POOL_INPUTS_20260610",
+            "LAYER_04_FOCUS_POOL_INPUT_ROWS",
+            "LAYER_04_FOCUS_POOL_MODEL_ROWS",
+            "MODEL_04_EVENT_FAILURE_RISK_M06_FOCUS_POOL_INPUTS_BUILD",
+        }:
+            self.assertNotIn(retired_key, rows)
 
     def test_event_family_remaining_acceptance_names_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
@@ -1700,7 +1692,19 @@ class RegistryHelperTests(unittest.TestCase):
             "4_target_allocation_fraction_<horizon>",
         )
         self.assertIn("open_long", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
+        self.assertNotIn("increase_long", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
+        self.assertNotIn("increase_short", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
         self.assertIn("bearish_underlying_path_but_no_short_allowed", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
+        self.assertIn("tactical_add_disabled_full_allocation_policy", rows["C03_LIFECYCLE_UNDERLYING_REVIEW_POLICY"]["payload"])
+        self.assertIn("risk_reductions_allowed", rows["C03_LIFECYCLE_UNDERLYING_REVIEW_POLICY"]["payload"])
+        self.assertIn("applies_to_open_reduce_exit_stop_take_profit_roll_stock_fallback", rows["EXECUTION_AGENT_FINAL_REVIEW_POLICY"]["payload"])
+        self.assertNotIn("applies_to_open_add_reduce", rows["EXECUTION_AGENT_FINAL_REVIEW_POLICY"]["payload"])
+        self.assertIn("tactical_add_disabled_full_allocation_policy", rows["TARGET_POSITION_SCALING_CAPACITY_POLICY"]["payload"])
+        self.assertIn("protective_reductions_still_allowed", rows["TARGET_POSITION_SCALING_CAPACITY_POLICY"]["payload"])
+        self.assertNotIn("advanced_tranche_management_allowed", rows["TARGET_POSITION_SCALING_CAPACITY_POLICY"]["payload"])
+        self.assertIn("tactical_add_disabled", rows["TRANCHE_EXPOSURE_MANAGEMENT_POLICY"]["payload"])
+        self.assertNotIn("model_07_projects_target_exposure_gap", rows["TRANCHE_EXPOSURE_MANAGEMENT_POLICY"]["payload"])
+        self.assertNotIn("model_08_owns_tranche_plan", rows["TRANCHE_EXPOSURE_MANAGEMENT_POLICY"]["payload"])
         self.assertIn("limit_near_mid", rows["UNIFIED_DECISION_ENTRY_STYLES"]["payload"])
         self.assertIn("no_entry", rows["UNIFIED_DECISION_ENTRY_STYLES"]["payload"])
         self.assertEqual(rows["OPTION_EXPRESSION_MODEL"]["payload"], "option_expression_model")
@@ -1785,15 +1789,12 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertNotIn("CURRENT_MODEL_CHAIN_RETIRED_FIELD_GUARD", rows)
         self.assertEqual(rows["REVIEW_CURRENT_MODEL_PROMOTION_ACCEPTANCE"]["kind"], "script")
         self.assertIn("review_current_model_promotion_acceptance.py", rows["REVIEW_CURRENT_MODEL_PROMOTION_ACCEPTANCE"]["path"])
-        self.assertEqual(rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["kind"], "script")
-        self.assertIn("review_target_state_vector_production_substrate.py", rows["REVIEW_LAYER_03_TARGET_STATE_VECTOR_PRODUCTION_SUBSTRATE"]["path"])
         expected_layer_script_paths = {
             "CURRENT_MODEL_CHAIN_RUN": "scripts/models/run_current_model_chain.py",
             "CURRENT_MODEL_HISTORICAL_EVALUATION_RUN": "scripts/models/run_current_model_historical_evaluation.py",
             "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_GENERATE": "scripts/models/model_06_residual_event_governance/generate_model_06_residual_event_governance.py",
             "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_06_residual_event_governance/evaluate_model_06_residual_event_governance.py",
             "MODEL_06_RESIDUAL_EVENT_GOVERNANCE_REVIEW_PROMOTION": "scripts/models/model_06_residual_event_governance/review_event_risk_governor_promotion.py",
-            "MODEL_01_MARKET_REGIME_DIAGNOSE_SUBSTRATE": "scripts/models/model_01_market_regime/diagnose_model_01_market_regime_substrate.py",
             "MODEL_01_BACKGROUND_CONTEXT_GENERATE": "scripts/models/model_01_background_context/generate_model_01_background_context.py",
             "MODEL_01_BACKGROUND_CONTEXT_EVALUATE_PROMOTION_EVIDENCE": "scripts/models/model_01_background_context/evaluate_model_01_background_context.py",
             "MODEL_01_BACKGROUND_CONTEXT_REVIEW_PROMOTION": "scripts/models/model_01_background_context/review_background_context_promotion.py",
