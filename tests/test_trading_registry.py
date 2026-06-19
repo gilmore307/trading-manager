@@ -409,14 +409,16 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("capital_selected_m05_count", trace_row["applies_to"])
         trace_defaults = rows["EVALUATION_REPLAY_PORTFOLIO_TRACE_AUDIT_DEFAULTS"]
         self.assertIn("max_trace_timestamps=20", trace_defaults["payload"])
-        self.assertIn("max_positions=5", trace_defaults["payload"])
-        self.assertIn("position_notional_fraction=0.20", trace_defaults["payload"])
+        self.assertIn("max_positions=0", trace_defaults["payload"])
+        self.assertIn("default_target_allocation_fraction=0.20", trace_defaults["payload"])
+        self.assertIn("target_allocation_fraction", trace_defaults["applies_to"])
         selection_defaults = rows["EVALUATION_REPLAY_PORTFOLIO_SELECTION_DEFAULTS"]
-        self.assertIn("portfolio_max_positions=5", selection_defaults["payload"])
-        self.assertIn("portfolio_position_notional_fraction=0.20", selection_defaults["payload"])
+        self.assertIn("portfolio_max_positions=0", selection_defaults["payload"])
+        self.assertIn("portfolio_default_target_allocation_fraction=0.20", selection_defaults["payload"])
         self.assertIn("portfolio_switch_minimum_rank_score_delta=0.05", selection_defaults["payload"])
         self.assertIn("run_replay_execution.py", selection_defaults["path"])
         self.assertIn("portfolio_replay_policy", selection_defaults["applies_to"])
+        self.assertIn("target_allocation_fraction", selection_defaults["applies_to"])
         trace_script = rows["TRADING_EVALUATION_BUILD_REPLAY_PORTFOLIO_TRACE_AUDIT"]
         self.assertEqual(trace_script["kind"], "script")
         self.assertIn("build_replay_portfolio_trace_audit.py", trace_script["path"])
@@ -1681,11 +1683,22 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["UNIFIED_DECISION_VECTOR"]["payload"], "unified_decision_vector")
         self.assertEqual(rows["UNIFIED_DECISION_VECTOR_HORIZONS"]["payload"], "model_decision_horizon_grid")
         self.assertIn("4_edge_direction_score_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
+        self.assertIn("4_target_allocation_fraction_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("4_materiality_adjusted_action_score_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("4_action_confidence_score_<horizon>", rows["UNIFIED_DECISION_VECTOR_SCORE_FAMILIES"]["payload"])
         self.assertIn("4_resolved_underlying_action_type", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertIn("4_resolved_target_allocation_fraction", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
         self.assertIn("4_resolved_materiality_adjusted_action_score", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
         self.assertIn("4_resolved_reason_codes", rows["UNIFIED_DECISION_RESOLVED_FIELD_FAMILIES"]["payload"])
+        self.assertEqual(rows["MODEL_04_TARGET_ALLOCATION_FRACTION"]["payload"], "target_allocation_fraction")
+        self.assertEqual(
+            rows["MODEL_04_RESOLVED_TARGET_ALLOCATION_FRACTION"]["payload"],
+            "4_resolved_target_allocation_fraction",
+        )
+        self.assertEqual(
+            rows["MODEL_04_HORIZON_TARGET_ALLOCATION_FRACTION"]["payload"],
+            "4_target_allocation_fraction_<horizon>",
+        )
         self.assertIn("open_long", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
         self.assertIn("bearish_underlying_path_but_no_short_allowed", rows["UNIFIED_DECISION_PLANNED_ACTION_TYPES"]["payload"])
         self.assertIn("limit_near_mid", rows["UNIFIED_DECISION_ENTRY_STYLES"]["payload"])
