@@ -98,6 +98,7 @@ def run_model_group_replay_if_ready(
     ready_months = _ready_replay_months(dataset_root, replay_run_ids=compatible_run_ids) if compatible_run_ids else set()
     if expected_months > 0 and len(ready_months) >= expected_months:
         return None
+    replay_month = _next_replay_month(dataset_root=dataset_root, ready_months=ready_months)
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
@@ -272,6 +273,8 @@ def run_model_group_replay_if_ready(
         "--candidate-universe-path",
         str(resolved_candidate_universe_path),
     ]
+    if replay_month:
+        command.extend(["--replay-month", replay_month])
     if max_decision_rows is not None:
         command.extend(["--max-decision-rows", str(max_decision_rows)])
 
@@ -290,6 +293,7 @@ def run_model_group_replay_if_ready(
                 "dataset_root": str(dataset_root),
                 "training_fold": training_fold,
                 "expected_replay_months": expected_months,
+                "replay_month": replay_month,
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
                 "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
@@ -321,6 +325,7 @@ def run_model_group_replay_if_ready(
                 "dataset_root": str(dataset_root),
                 "training_fold": training_fold,
                 "expected_replay_months": expected_months,
+                "replay_month": replay_month,
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
                 "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
@@ -350,6 +355,7 @@ def run_model_group_replay_if_ready(
                 "dataset_root": str(dataset_root),
                 "training_fold": training_fold,
                 "expected_replay_months": expected_months,
+                "replay_month": replay_month,
                 "ready_replay_months": len(ready_months),
                 "option_feature_database_configured": bool(option_feature_database_url),
                 "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
@@ -380,6 +386,7 @@ def run_model_group_replay_if_ready(
                 "dataset_root": str(dataset_root),
                 "training_fold": training_fold,
                 "expected_replay_months": expected_months,
+                "replay_month": replay_month,
                 "ready_replay_months": len(ready_months),
                 "candidate_universe_path": str(resolved_candidate_universe_path),
                 "candidate_universe_close_status": candidate_universe_close_status,
@@ -442,6 +449,7 @@ def run_model_group_replay_if_ready(
                     "dataset_root": str(dataset_root),
                     "training_fold": training_fold,
                     "expected_replay_months": expected_months,
+                    "replay_month": replay_month,
                     "ready_replay_months_before": len(ready_months),
                     "option_feature_database_configured": bool(option_feature_database_url),
                     "candidate_universe_path": str(resolved_candidate_universe_path),
@@ -492,7 +500,10 @@ def run_model_group_replay_if_ready(
                 "candidate_universe_source_policy": candidate_universe_source_policy,
             },
         )
-    refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_ids={str(receipt.get("replay_execution_run_id") or run_id)})
+    refreshed_ready_months = _ready_replay_months(
+        dataset_root,
+        replay_run_ids=compatible_run_ids | {str(receipt.get("replay_execution_run_id") or run_id)},
+    )
     return _decision(
         now=now,
         decision_status="executed",
@@ -505,6 +516,7 @@ def run_model_group_replay_if_ready(
             "dataset_root": str(dataset_root),
             "training_fold": training_fold,
             "expected_replay_months": expected_months,
+            "replay_month": replay_month,
             "ready_replay_months_before": len(ready_months),
             "ready_replay_months_after": len(refreshed_ready_months),
             "option_feature_database_configured": bool(option_feature_database_url),
@@ -878,7 +890,7 @@ def _fold_label(start_month: str, end_month: str) -> str:
 
 
 def _expected_replay_months(dataset_root: Path) -> int:
-    months = _unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month")
+    months = _replay_plan_months(dataset_root)
     if months:
         return len(months)
     rows = _csv_rows(dataset_root / "replay_window_manifest.csv")
@@ -890,6 +902,17 @@ def _expected_replay_months(dataset_root: Path) -> int:
     except (TypeError, ValueError):
         return 60
     return max(1, (end.year - start.year) * 12 + end.month - start.month)
+
+
+def _next_replay_month(*, dataset_root: Path, ready_months: set[str]) -> str | None:
+    for month in _replay_plan_months(dataset_root):
+        if month not in ready_months:
+            return month
+    return None
+
+
+def _replay_plan_months(dataset_root: Path) -> tuple[str, ...]:
+    return tuple(sorted(_unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month")))
 
 
 def _compatible_replay_run_ids(*, dataset_root: Path, training_fold: Mapping[str, Any]) -> set[str]:

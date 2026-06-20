@@ -208,6 +208,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
             self.assertIn("storage://trading-manager/model_group/2016-01_2016-06", decision.command)
+            self.assertEqual(decision.command[decision.command.index("--replay-month") + 1], "2021-01")
             self.assertIn("--after-cost-alpha-model-json", decision.command)
             alpha_ref = decision.command[decision.command.index("--after-cost-alpha-model-json") + 1]
             self.assertTrue(alpha_ref.endswith("after_cost_alpha_model_2016-01_2016-06.json"))
@@ -228,6 +229,68 @@ class ModelGroupReplayTests(unittest.TestCase):
             )
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
+
+    def test_replay_command_uses_next_incomplete_month(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            run_id = "first_month"
+            receipt_root = dataset_root / "replay_execution_runs" / run_id
+            receipt_root.mkdir(parents=True)
+            decision_rows_path = receipt_root / "decision_rows.jsonl"
+            decision_rows_path.write_text('{"decision_id":"decision_1"}\n', encoding="utf-8")
+            (receipt_root / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": run_id,
+                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "candidate_handoff_symbols": ["AAPL"],
+                        "decision_rows_ref": str(decision_rows_path),
+                        "max_decision_rows": None,
+                        "replay_completion_scope": "full_candidate_universe",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (dataset_root / "replay_progress.jsonl").write_text(
+                json.dumps(
+                    {
+                        "stage_id": "model_group.replay",
+                        "replay_execution_run_id": run_id,
+                        "month": "2021-01",
+                        "status": "completed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "ready")
+            self.assertEqual(decision.execution_summary["ready_replay_months"], 1)
+            self.assertEqual(decision.execution_summary["replay_month"], "2021-02")
+            self.assertEqual(decision.command[decision.command.index("--replay-month") + 1], "2021-02")
 
     def test_plan_passes_fixed_historical_candidate_universe_without_symbol_override(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
