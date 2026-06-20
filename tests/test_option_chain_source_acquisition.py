@@ -105,7 +105,7 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertEqual(len(previews), 1)
         self.assertEqual(previews[0].request_id, "mgrreq_replay_option_chain_window_aapl_2021_01_2021_01_04_1600")
         self.assertEqual(previews[0].snapshot_time, "2021-01-04T16:00:00-05:00")
-        self.assertEqual(previews[0].window_start, "2021-01-04T16:00:00-05:00")
+        self.assertEqual(previews[0].window_start, "2021-01-04T15:59:00-05:00")
         self.assertEqual(previews[0].window_end, "2021-01-04T16:00:00-05:00")
 
     def test_replay_decision_request_matching_allows_replay_intraday_window(self) -> None:

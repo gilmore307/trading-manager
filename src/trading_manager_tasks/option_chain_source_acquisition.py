@@ -325,9 +325,9 @@ def request_previews_for_replay_decision_times(
         session_start_dt = datetime.combine(decision_time.date(), DEFAULT_SESSION_START, tzinfo=ET)
         session_end_dt = datetime.combine(decision_time.date(), DEFAULT_SESSION_END, tzinfo=ET)
         if decision_time < session_start_dt:
-            window_start_dt = decision_time
+            window_start_dt = decision_time - timedelta(minutes=window_minutes)
         else:
-            window_start_dt = max(session_start_dt, decision_time - timedelta(minutes=window_minutes - 1))
+            window_start_dt = max(session_start_dt, decision_time - timedelta(minutes=window_minutes))
         window_end_dt = min(decision_time, session_end_dt) if decision_time >= session_start_dt else decision_time
         start_month = decision_time.strftime("%Y-%m")
         request_id = _replay_window_request_id(symbol=symbol, start_month=start_month, decision_time=decision_time)
