@@ -93,9 +93,9 @@ def run_model_group_replay_if_ready(
             },
         )
 
-    compatible_run_ids = _compatible_replay_run_ids(dataset_root=dataset_root, training_fold=training_fold)
+    compatible_run_months = _compatible_replay_run_months(dataset_root=dataset_root, training_fold=training_fold)
     expected_months = _expected_replay_months(dataset_root)
-    ready_months = _ready_replay_months(dataset_root, replay_run_ids=compatible_run_ids) if compatible_run_ids else set()
+    ready_months = _ready_replay_months(dataset_root, replay_run_months=compatible_run_months) if compatible_run_months else set()
     if expected_months > 0 and len(ready_months) >= expected_months:
         return None
     replay_month = _next_replay_month(dataset_root=dataset_root, ready_months=ready_months)
@@ -500,10 +500,8 @@ def run_model_group_replay_if_ready(
                 "candidate_universe_source_policy": candidate_universe_source_policy,
             },
         )
-    refreshed_ready_months = _ready_replay_months(
-        dataset_root,
-        replay_run_ids=compatible_run_ids | {str(receipt.get("replay_execution_run_id") or run_id)},
-    )
+    refreshed_run_months = _compatible_replay_run_months(dataset_root=dataset_root, training_fold=training_fold)
+    refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_months=refreshed_run_months)
     return _decision(
         now=now,
         decision_status="executed",
@@ -916,10 +914,14 @@ def _replay_plan_months(dataset_root: Path) -> tuple[str, ...]:
 
 
 def _compatible_replay_run_ids(*, dataset_root: Path, training_fold: Mapping[str, Any]) -> set[str]:
-    run_ids: set[str] = set()
+    return set(_compatible_replay_run_months(dataset_root=dataset_root, training_fold=training_fold))
+
+
+def _compatible_replay_run_months(*, dataset_root: Path, training_fold: Mapping[str, Any]) -> dict[str, set[str]]:
+    run_months: dict[str, set[str]] = {}
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
-        return run_ids
+        return run_months
     for receipt_path in sorted(replay_root.glob("*/replay_execution_receipt.json")):
         try:
             receipt = _load_json_object(receipt_path)
@@ -931,10 +933,13 @@ def _compatible_replay_run_ids(*, dataset_root: Path, training_fold: Mapping[str
             continue
         if not _replay_receipt_decision_rows_exist(receipt):
             continue
+        months = _replay_receipt_valid_months(receipt)
+        if not months:
+            continue
         run_id = str(receipt.get("replay_execution_run_id") or receipt_path.parent.name).strip()
         if run_id:
-            run_ids.add(run_id)
-    return run_ids
+            run_months[run_id] = months
+    return run_months
 
 
 def _replay_receipt_full_completion_scope(replay_receipt: Mapping[str, Any]) -> bool:
@@ -947,6 +952,38 @@ def _replay_receipt_full_completion_scope(replay_receipt: Mapping[str, Any]) -> 
 def _replay_receipt_decision_rows_exist(replay_receipt: Mapping[str, Any]) -> bool:
     decision_rows_ref = str(replay_receipt.get("decision_rows_ref") or "").strip()
     return bool(decision_rows_ref) and Path(decision_rows_ref).exists()
+
+
+def _replay_receipt_valid_months(replay_receipt: Mapping[str, Any]) -> set[str]:
+    receipt_month = str(replay_receipt.get("replay_month") or "").strip()
+    if not receipt_month:
+        return set()
+    decision_rows_ref = str(replay_receipt.get("decision_rows_ref") or "").strip()
+    if not decision_rows_ref:
+        return set()
+    try:
+        decision_months = _decision_row_months(Path(decision_rows_ref))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return set()
+    if decision_months == {receipt_month}:
+        return {receipt_month}
+    return set()
+
+
+def _decision_row_months(path: Path) -> set[str]:
+    months: set[str] = set()
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if not isinstance(row, Mapping):
+                continue
+            timestamp = str(row.get("timestamp") or row.get("replay_time_pointer") or "").strip()
+            month = timestamp[:7]
+            if len(month) == 7 and month[4] == "-":
+                months.add(month)
+    return months
 
 
 def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
@@ -980,7 +1017,7 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
 
-def _ready_replay_months(dataset_root: Path, replay_run_ids: set[str] | None = None) -> set[str]:
+def _ready_replay_months(dataset_root: Path, replay_run_months: Mapping[str, set[str]] | None = None) -> set[str]:
     ready: set[str] = set()
     paths = sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]
     for path in paths:
@@ -992,10 +1029,10 @@ def _ready_replay_months(dataset_root: Path, replay_run_ids: set[str] | None = N
                     continue
                 row = json.loads(line)
                 run_id = str(row.get("replay_execution_run_id") or "").strip()
-                if replay_run_ids is not None and run_id not in replay_run_ids:
-                    continue
                 status = str(row.get("status") or row.get("replay_status") or "").lower()
                 month = str(row.get("month") or row.get("replay_month") or "").strip()
+                if replay_run_months is not None and month not in replay_run_months.get(run_id, set()):
+                    continue
                 if month and status in {"succeeded", "completed", "complete"}:
                     ready.add(month)
     return ready
