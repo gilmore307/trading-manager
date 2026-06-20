@@ -148,7 +148,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     },
                     args=args,
                 )
-                break
+                _emit(
+                    {
+                        "event": "stopped",
+                        "reason": "provider_budget_exhausted",
+                        "attempt": attempt,
+                        "provider_calls_used": provider_calls_used,
+                        "max_provider_calls": args.max_provider_calls,
+                    },
+                    args=args,
+                )
+                return 2
             remaining_provider_budget = args.max_provider_calls - provider_calls_used if args.max_provider_calls > 0 else args.batch_size
             batch_size = min(args.batch_size, max(1, remaining_provider_budget))
             drain_started = time.monotonic()
