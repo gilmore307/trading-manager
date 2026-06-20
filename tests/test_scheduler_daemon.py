@@ -2188,6 +2188,191 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(status_rows[0]["reason_code"], "model_group_replay_option_source_acquisition_required")
         self.assertEqual(latest_status["reason_code"], "model_group_replay_option_source_acquisition_required")
 
+    def test_daemon_retries_replay_after_pending_option_feature_repair_executes(self):
+        pending_backoff = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:00+00:00",
+            now_et="2026-05-27T20:00:00-04:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_option_feature_acquisition_required",
+            reason="replay_option_feature_acquisition_required",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay",
+            command=[],
+            next_internal_stage="model_group.replay",
+        )
+        option_executed = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:01+00:00",
+            now_et="2026-05-27T20:00:01-04:00",
+            decision_status="executed",
+            reason_code="model_group_replay_option_feature_repair_executed",
+            reason="prepared replay option source/features",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay_option_features",
+            command=[],
+            next_internal_stage="model_group.replay_option_features",
+            execution_summary={"required_next_step": None},
+        )
+        replay_completed = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:02+00:00",
+            now_et="2026-05-27T20:00:02-04:00",
+            decision_status="executed",
+            reason_code="model_group_replay_executed",
+            reason="replay completed",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay",
+            command=[],
+            next_internal_stage="model_group.replay",
+        )
+        no_month = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:00+00:00",
+            now_et="2026-05-27T20:00:00-04:00",
+            decision_status="ready",
+            reason_code="no_month_stage_ready",
+            reason="no month stage ready",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work=None,
+            command=[],
+            next_internal_stage="historical_training_work_loop",
+        )
+
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            decision_log = tmp / "runtime" / "decisions.jsonl"
+
+            def repair_once(replay_decision, **_kwargs):
+                if replay_decision.reason_code == "model_group_replay_option_feature_acquisition_required":
+                    return option_executed
+                return None
+
+            with (
+                patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=no_month),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_dataset_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon._pending_replay_option_feature_backoff_decision", return_value=pending_backoff),
+                patch(
+                    "trading_manager_tasks.scheduler_daemon.run_model_group_replay_option_features_for_replay_backoff",
+                    side_effect=repair_once,
+                ),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_if_ready", return_value=replay_completed) as replay,
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_review_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_residual_event_governance_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_evaluation_if_ready", return_value=None),
+            ):
+                run_daemon_loop(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp / "manager-storage",
+                    component_src_root=self._fake_data_src(tmp),
+                    state_path=tmp / "runtime" / "state.json",
+                    lock_path=tmp / "runtime" / "scheduler.lock",
+                    decision_log_path=decision_log,
+                    interval_seconds=0,
+                    max_iterations=1,
+                    execute_safe_preparation=True,
+                    execute_model_group_replay=True,
+                    drain_max_steps=1,
+                    source_existing_bootstrap=False,
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                )
+
+            replay.assert_called_once()
+            log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(
+            [row["reason_code"] for row in log_rows],
+            ["no_month_stage_ready", "model_group_replay_option_feature_repair_executed", "model_group_replay_executed"],
+        )
+
+    def test_daemon_does_not_retry_replay_when_pending_option_feature_repair_needs_more_drain(self):
+        pending_backoff = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:00+00:00",
+            now_et="2026-05-27T20:00:00-04:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_option_feature_acquisition_required",
+            reason="replay_option_feature_acquisition_required",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay",
+            command=[],
+            next_internal_stage="model_group.replay",
+        )
+        option_executed = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:01+00:00",
+            now_et="2026-05-27T20:00:01-04:00",
+            decision_status="executed",
+            reason_code="model_group_replay_option_feature_repair_executed",
+            reason="prepared replay option source/features",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay_option_features",
+            command=[],
+            next_internal_stage="model_group.replay_option_features",
+            execution_summary={"required_next_step": "continue replay option feature drain before retrying model_group.replay"},
+        )
+        no_month = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:00+00:00",
+            now_et="2026-05-27T20:00:00-04:00",
+            decision_status="ready",
+            reason_code="no_month_stage_ready",
+            reason="no month stage ready",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work=None,
+            command=[],
+            next_internal_stage="historical_training_work_loop",
+        )
+
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            decision_log = tmp / "runtime" / "decisions.jsonl"
+
+            def repair_once(replay_decision, **_kwargs):
+                if replay_decision.reason_code == "model_group_replay_option_feature_acquisition_required":
+                    return option_executed
+                return None
+
+            with (
+                patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=no_month),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_dataset_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon._pending_replay_option_feature_backoff_decision", return_value=pending_backoff),
+                patch(
+                    "trading_manager_tasks.scheduler_daemon.run_model_group_replay_option_features_for_replay_backoff",
+                    side_effect=repair_once,
+                ),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_if_ready") as replay,
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_review_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_residual_event_governance_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_evaluation_if_ready", return_value=None),
+            ):
+                run_daemon_loop(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp / "manager-storage",
+                    component_src_root=self._fake_data_src(tmp),
+                    state_path=tmp / "runtime" / "state.json",
+                    lock_path=tmp / "runtime" / "scheduler.lock",
+                    decision_log_path=decision_log,
+                    interval_seconds=0,
+                    max_iterations=1,
+                    execute_safe_preparation=True,
+                    execute_model_group_replay=True,
+                    drain_max_steps=1,
+                    source_existing_bootstrap=False,
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                )
+
+            replay.assert_not_called()
+
     def test_daemon_can_trigger_event_dashboard_refresh_after_executed_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

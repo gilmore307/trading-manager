@@ -18,7 +18,7 @@ import time
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Sequence, TextIO
 from zoneinfo import ZoneInfo
 
 from .request_handoff import DEFAULT_TRADING_DATA_SRC
@@ -1608,6 +1608,21 @@ def _decision_should_continue_drain(decision: SchedulerDecision, *, advanced_mon
     return False
 
 
+def _replay_option_feature_drain_allows_replay_retry(decisions: Sequence[SchedulerDecision]) -> bool:
+    """Return whether an option-feature drain has cleared the replay backoff."""
+
+    if not decisions:
+        return True
+    last_decision = decisions[-1]
+    if last_decision.reason_code == "model_group_replay_option_features_already_ready":
+        return True
+    if last_decision.decision_status != "executed":
+        return False
+    summary = last_decision.execution_summary if isinstance(last_decision.execution_summary, dict) else {}
+    required_next_step = str(summary.get("required_next_step") or "").lower()
+    return "continue replay option feature drain" not in required_next_step
+
+
 def _drain_replay_option_feature_backoff(
     replay_decision: SchedulerDecision,
     *,
@@ -2108,8 +2123,7 @@ def run_daemon_loop(
                                 )
                             if replay_option_feature_decisions:
                                 retry_replay_after_pending_option_drain = (
-                                    replay_option_feature_decisions[-1].reason_code
-                                    == "model_group_replay_option_features_already_ready"
+                                    _replay_option_feature_drain_allows_replay_retry(replay_option_feature_decisions)
                                 )
                         replay_decision = (
                             run_model_group_replay_if_ready(
@@ -2416,8 +2430,7 @@ def run_daemon_loop(
                                 )
                             if replay_option_feature_decisions:
                                 retry_replay_after_pending_option_drain = (
-                                    replay_option_feature_decisions[-1].reason_code
-                                    == "model_group_replay_option_features_already_ready"
+                                    _replay_option_feature_drain_allows_replay_retry(replay_option_feature_decisions)
                                 )
                         replay_decision = (
                             run_model_group_replay_if_ready(
