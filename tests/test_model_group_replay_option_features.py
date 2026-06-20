@@ -117,7 +117,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
-                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", side_effect=((requirement,), ())),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=(requirement,)),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage",
@@ -183,7 +183,10 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
-                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(ready, missing_source)),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements",
+                    side_effect=((ready, missing_source), (missing_source,)),
+                ),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=(ready,)),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage",
@@ -209,10 +212,53 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
         self.assertIsNotNone(decision)
         assert decision is not None
-        self.assertEqual(decision.decision_status, "executed")
-        self.assertEqual(decision.reason_code, "model_group_replay_option_feature_repair_executed")
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_feature_repair_incomplete")
         self.assertEqual(decision.execution_summary["source_missing_count"], 1)
+        self.assertEqual(decision.execution_summary["post_repair_missing_count"], 1)
         generate.assert_called_once_with(start_month="2021-01", end_month="2021-01", target_symbol="MSFT")
+
+    def test_feature_generation_success_requires_post_repair_feature_rows(self) -> None:
+        requirement = ReplayOptionFeatureRequirement("MSFT", "2021-01-04T16:00:00-05:00", "2021-01")
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True, exist_ok=True)
+            self._write_completed_fold(storage_root)
+            self._write_frozen_dataset(storage_root)
+
+            with (
+                patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements",
+                    side_effect=((requirement,), (requirement,)),
+                ),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=(requirement,)),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage",
+                    return_value=M05OptionExpressionFeatureStageSummary(
+                        contract_type="manager_model_05_option_expression_feature_generation_stage",
+                        stage_id="model_05_option_expression.feature_generation",
+                        start_month="2021-01",
+                        end_month="2021-01",
+                        status="succeeded",
+                        mode="test",
+                        receipt_path=None,
+                    ),
+                ),
+            ):
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    self._replay_backoff(requirement),
+                    storage_root=storage_root,
+                    selected_target_symbol="AAPL",
+                    execute=True,
+                    execute_provider_acquisition=False,
+                )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_feature_repair_incomplete")
+        self.assertEqual(decision.execution_summary["post_repair_missing_count"], 1)
 
     def test_extracts_requirements_from_replay_backoff_sample(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-01-04T16:00:00-05:00", "2021-01")
@@ -304,7 +350,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
-                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", side_effect=((requirement,), ())),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=()),
             ):
                 decision = run_model_group_replay_option_features_for_replay_backoff(
@@ -331,7 +377,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
-                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", side_effect=((requirement,), ())),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=()),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
@@ -371,7 +417,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
-                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", side_effect=((requirement,), ())),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=()),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
@@ -420,7 +466,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
 
             with (
                 patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
-                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(requirement,)),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", side_effect=((requirement,), ())),
                 patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", side_effect=((), ())),
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
