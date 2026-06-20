@@ -59,19 +59,28 @@ point-in-time candidates, replay backs off with
 backoff payload or its full `requirements_artifact_ref`. The callable
 `scripts/tasks/drain_model_group_replay_option_features.py` is the bounded
 operator entrypoint for draining a large replay requirements artifact without
-rerunning replay between batches. Provider acquisition remains constrained by
-`--provider-stage-next-limit`, while local SQL feature repair uses the separate
-`--replay-option-feature-repair-limit` / `--feature-repair-limit` batch controls
-so already-local source rows can be generated in larger safe chunks. The daemon
-continues draining the same requirements artifact until the option features are
-ready or a provider/source backoff is reached; only then should it retry full
-`model_group.replay`. On daemon restart or a later tick, an unfinished
-`option_feature_requirements.jsonl` without a completed replay receipt is treated
-as pending replay-owned work and is drained before replay is dispatched again. It
-prepares the matching regular-session option-chain source day windows, dispatches
-bounded historical ThetaData calls only when `--execute-autonomous-provider-stages`
-is enabled, generates M05 features from `trading_data.option_chain_state_source`,
-and retries replay from the same lifecycle. If the bounded provider request
+rerunning replay between batches. The callable
+`scripts/tasks/run_model_group_replay_with_option_auto_acquisition.py` is the
+bounded diagnostic/maintenance runner for an explicit replay command and progress
+path: it runs replay, parses option-feature backoff payloads, drains emitted
+requirements within provider and replay-attempt budgets, and retries replay. It
+is useful for isolated validation paths where the daemon's canonical replay
+progress path should not be advanced. Provider acquisition remains constrained by
+`--provider-stage-next-limit` in the daemon or `--batch-size` /
+`--max-provider-calls` in the diagnostic runner, while local SQL feature repair
+uses the separate `--replay-option-feature-repair-limit` /
+`--feature-repair-limit` batch controls so already-local source rows can be
+generated in larger safe chunks. The daemon continues draining the same
+requirements artifact until the option features are ready or a provider/source
+backoff is reached; only then should it retry full `model_group.replay`. On
+daemon restart or a later tick, an unfinished `option_feature_requirements.jsonl`
+without a completed replay receipt is treated as pending replay-owned work and is
+drained before replay is dispatched again. It prepares the matching
+regular-session option-chain source day windows, dispatches bounded historical
+ThetaData calls only when `--execute-autonomous-provider-stages` or the
+diagnostic runner's `--execute-provider-acquisition` flag is enabled, generates
+M05 features from `trading_data.option_chain_state_source`, and retries replay
+from the same lifecycle. If the bounded provider request
 deterministically reports unavailable source data, or completes without writing
 the requested source rows, the daemon records a `snapshot_type = source_unavailable` sentinel
 row in `trading_data.model_05_option_expression_feature_generation` for that signal

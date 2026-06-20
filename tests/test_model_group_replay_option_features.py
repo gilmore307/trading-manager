@@ -12,6 +12,7 @@ from trading_manager_tasks.model_group_replay_option_features import (
     ReplayOptionFeatureRequirement,
     latest_replay_option_feature_requirements_artifact,
     replay_option_feature_backoff_for_requirements_artifact,
+    replay_option_feature_payload_from_text,
     replay_option_feature_requirements_from_replay_decision,
     run_model_group_replay_option_features_for_replay_backoff,
 )
@@ -19,6 +20,19 @@ from trading_manager_tasks.scheduler import SchedulerDecision
 
 
 class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
+    def test_extracts_option_feature_payload_from_runner_text(self) -> None:
+        payload = {
+            "missing_count": 2,
+            "requirements_artifact_ref": "/tmp/requirements.jsonl",
+            "sample": [{"target_ref": "AAPL", "timestamp": "2021-01-04T16:00:00-05:00"}],
+        }
+        text = "ValueError: replay_option_feature_acquisition_required: " + json.dumps(payload, sort_keys=True)
+
+        self.assertEqual(replay_option_feature_payload_from_text(text), payload)
+
+    def test_option_feature_payload_returns_empty_for_unrelated_text(self) -> None:
+        self.assertEqual(replay_option_feature_payload_from_text("ValueError: unrelated"), {})
+
     def _replay_backoff(self, requirement: ReplayOptionFeatureRequirement) -> SchedulerDecision:
         payload = {
             "missing_count": 1,

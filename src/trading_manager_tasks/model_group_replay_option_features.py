@@ -512,20 +512,29 @@ def _option_feature_payload_from_replay_decision(replay_decision: SchedulerDecis
         str(summary.get("runner_stdout") or ""),
         replay_decision.reason,
     ]
-    decoder = json.JSONDecoder()
     for text in texts:
-        token_index = text.find(REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED)
-        if token_index < 0:
-            continue
-        payload_start = text.find("{", token_index)
-        if payload_start < 0:
-            continue
-        try:
-            payload, _ = decoder.raw_decode(text[payload_start:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(payload, dict):
+        payload = replay_option_feature_payload_from_text(text)
+        if payload:
             return payload
+    return {}
+
+
+def replay_option_feature_payload_from_text(text: str) -> dict[str, Any]:
+    """Extract a replay option-feature backoff payload from runner text."""
+
+    decoder = json.JSONDecoder()
+    token_index = text.find(REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED)
+    if token_index < 0:
+        return {}
+    payload_start = text.find("{", token_index)
+    if payload_start < 0:
+        return {}
+    try:
+        payload, _ = decoder.raw_decode(text[payload_start:])
+    except json.JSONDecodeError:
+        return {}
+    if isinstance(payload, dict):
+        return payload
     return {}
 
 
