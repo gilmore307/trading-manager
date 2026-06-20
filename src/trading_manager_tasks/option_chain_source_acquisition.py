@@ -35,6 +35,7 @@ DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_SESSION_START = time(9, 30)
 DEFAULT_SESSION_END = time(16, 0)
 DEFAULT_WINDOW_MINUTES = 30
+DEFAULT_REPLAY_DECISION_WINDOW_MINUTES = 1
 DEFAULT_MAX_DTE = 180
 DEFAULT_STRIKE_RANGE = 5
 DEFAULT_OPTION_BUCKET_POLICY_REF = "MODEL_05_OPTION_CHAIN_ROLE_SELECTOR_POLICY"
@@ -234,6 +235,13 @@ def _window_request_id(*, symbol: str, start_month: str, window_start: datetime)
     )
 
 
+def _replay_window_request_id(*, symbol: str, start_month: str, decision_time: datetime) -> str:
+    return (
+        f"mgrreq_replay_option_chain_window_{symbol.lower()}_{start_month.replace('-', '_')}_"
+        f"{decision_time.date().isoformat().replace('-', '_')}_{decision_time.strftime('%H%M')}"
+    )
+
+
 def iter_regular_session_windows(start_month: str, end_month: str, *, window_minutes: int = DEFAULT_WINDOW_MINUTES) -> Iterable[tuple[datetime, datetime]]:
     if window_minutes <= 0:
         raise TaskSystemError("window_minutes must be positive")
@@ -299,13 +307,13 @@ def request_previews_for_replay_decision_times(
     *,
     target_symbol: str,
     decision_timestamps: Sequence[str],
-    window_minutes: int = DEFAULT_WINDOW_MINUTES,
+    window_minutes: int = DEFAULT_REPLAY_DECISION_WINDOW_MINUTES,
 ) -> tuple[OptionChainRequestPreview, ...]:
     """Build bounded option-chain requests for replay decision timestamps.
 
-    Replay repair fetches one selected-contract regular-session source/cache
-    window for each emitted decision day. Downstream feature generation must
-    still filter source rows by each decision timestamp.
+    Replay repair fetches one as-of source/cache window for each emitted
+    decision timestamp. The window ends at the replay decision pointer and never
+    stages future option-chain rows for the M05 decision input.
     """
 
     symbol = _safe_symbol(target_symbol)
@@ -314,14 +322,19 @@ def request_previews_for_replay_decision_times(
     previews_by_id: dict[str, OptionChainRequestPreview] = {}
     for raw_timestamp in decision_timestamps:
         decision_time = _parse_replay_decision_time(raw_timestamp)
-        window_start_dt = datetime.combine(decision_time.date(), DEFAULT_SESSION_START, tzinfo=ET)
-        window_end_dt = datetime.combine(decision_time.date(), DEFAULT_SESSION_END, tzinfo=ET)
+        session_start_dt = datetime.combine(decision_time.date(), DEFAULT_SESSION_START, tzinfo=ET)
+        session_end_dt = datetime.combine(decision_time.date(), DEFAULT_SESSION_END, tzinfo=ET)
+        if decision_time < session_start_dt:
+            window_start_dt = decision_time
+        else:
+            window_start_dt = max(session_start_dt, decision_time - timedelta(minutes=window_minutes - 1))
+        window_end_dt = min(decision_time, session_end_dt) if decision_time >= session_start_dt else decision_time
         start_month = decision_time.strftime("%Y-%m")
-        request_id = _window_request_id(symbol=symbol, start_month=start_month, window_start=window_start_dt)
+        request_id = _replay_window_request_id(symbol=symbol, start_month=start_month, decision_time=decision_time)
         previews_by_id[request_id] = OptionChainRequestPreview(
             request_id=request_id,
             underlying=symbol,
-            snapshot_time=window_start_dt.isoformat(),
+            snapshot_time=decision_time.isoformat(),
             window_start=window_start_dt.isoformat(),
             window_end=window_end_dt.isoformat(),
         )

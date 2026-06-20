@@ -30,9 +30,11 @@ def is_current_option_chain_request(row: Mapping[str, Any], *, start_month: str,
     if row.get("target_component_id") != OPTION_CHAIN_TARGET_COMPONENT_ID or row.get("request_kind") != OPTION_CHAIN_REQUEST_KIND:
         return False
     request_id = str(row.get("request_id") or "")
-    if not request_id.startswith("mgrreq_option_chain_window_"):
+    is_fold_request = request_id.startswith("mgrreq_option_chain_window_")
+    is_replay_request = request_id.startswith("mgrreq_replay_option_chain_window_")
+    if not is_fold_request and not is_replay_request:
         return False
-    if not request_id.endswith("_0930"):
+    if is_fold_request and not request_id.endswith("_0930"):
         return False
     parameter_ref = str(row.get("parameter_ref") or "")
     current_prefix = f"storage://trading-manager/runtime/model_05_option_expression/{OPTION_CHAIN_SOURCE_ID}/"

@@ -96,17 +96,27 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertFalse(is_current_option_chain_request(stale_intraday, start_month="2021-01", end_month="2021-06"))
         self.assertFalse(is_current_option_chain_request(stale_after_close, start_month="2021-01", end_month="2021-06"))
 
-    def test_replay_decision_requests_regular_session_day_window(self) -> None:
+    def test_replay_decision_requests_same_row_asof_window(self) -> None:
         previews = request_previews_for_replay_decision_times(
             target_symbol="AAPL",
             decision_timestamps=["2021-01-04T16:00:00-05:00"],
         )
 
         self.assertEqual(len(previews), 1)
-        self.assertEqual(previews[0].request_id, "mgrreq_option_chain_window_aapl_2021_01_2021_01_04_0930")
-        self.assertEqual(previews[0].snapshot_time, "2021-01-04T09:30:00-05:00")
-        self.assertEqual(previews[0].window_start, "2021-01-04T09:30:00-05:00")
+        self.assertEqual(previews[0].request_id, "mgrreq_replay_option_chain_window_aapl_2021_01_2021_01_04_1600")
+        self.assertEqual(previews[0].snapshot_time, "2021-01-04T16:00:00-05:00")
+        self.assertEqual(previews[0].window_start, "2021-01-04T16:00:00-05:00")
         self.assertEqual(previews[0].window_end, "2021-01-04T16:00:00-05:00")
+
+    def test_replay_decision_request_matching_allows_replay_intraday_window(self) -> None:
+        replay = {
+            "request_id": "mgrreq_replay_option_chain_window_aapl_2021_06_2021_06_01_1600",
+            "request_kind": "option_chain_snapshot",
+            "target_component_id": "option_chain_state_source",
+            "parameter_ref": "storage://trading-manager/runtime/model_05_option_expression/option_chain_state_source/2021-06/mgrreq_replay_option_chain_window_aapl_2021_06_2021_06_01_1600/task_key.json",
+        }
+
+        self.assertTrue(is_current_option_chain_request(replay, start_month="2021-06", end_month="2021-06"))
 
 
 if __name__ == "__main__":  # pragma: no cover
