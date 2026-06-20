@@ -107,6 +107,24 @@ def run_model_group_replay_if_ready(
     resolved_python = python_executable or _python_executable()
     after_cost_alpha_model_path = _after_cost_alpha_model_path(storage_root=storage_root, training_fold=training_fold)
     if not after_cost_alpha_model_path.exists():
+        alpha_training_script_path = _after_cost_alpha_training_script_path(model_repo_root)
+        if execute and not alpha_training_script_path.exists():
+            return _decision(
+                now=now,
+                decision_status="backoff",
+                reason_code="model_group_replay_after_cost_alpha_training_script_missing",
+                reason="fold-scoped after-cost alpha model training script is missing",
+                selected_work="model_group.replay",
+                command=[],
+                execution_summary={
+                    "contract_id": contract_id,
+                    "dataset_root": str(dataset_root),
+                    "training_fold": training_fold,
+                    "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+                    "after_cost_alpha_training_script_ref": str(alpha_training_script_path),
+                    "required_next_step": "restore the fold-scoped after-cost alpha training script, then retry model_group.replay",
+                },
+            )
         alpha_training_command = _after_cost_alpha_training_command(
             python_executable=resolved_python,
             model_repo_root=model_repo_root,
@@ -562,10 +580,9 @@ def _database_url() -> str | None:
 
 
 def _after_cost_alpha_model_path(*, storage_root: Path, training_fold: Mapping[str, Any]) -> Path:
-    target_symbol = str(training_fold.get("target_symbol") or "").strip().lower()
     start_month = str(training_fold.get("start_month") or "").strip()
     end_month = str(training_fold.get("end_month") or "").strip()
-    filename = f"after_cost_alpha_model_{target_symbol}_{start_month}_{end_month}.json"
+    filename = f"after_cost_alpha_model_{start_month}_{end_month}.json"
     return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / filename
 
 
@@ -578,11 +595,10 @@ def _after_cost_alpha_training_command(
     output_path: Path,
 ) -> list[str]:
     source_start, source_end = _after_cost_alpha_training_bounds(training_fold)
-    target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    command = [
+    return [
         python_executable,
-        str(model_repo_root / "scripts" / "models" / "model_05_alpha_confidence" / "train_model_05_alpha_confidence.py"),
+        str(_after_cost_alpha_training_script_path(model_repo_root)),
         "--from-database",
         "--all-horizons",
         "--source-start",
@@ -592,9 +608,10 @@ def _after_cost_alpha_training_command(
         "--output-json",
         str(output_path),
     ]
-    if target_symbol:
-        command.extend(["--target-symbol", target_symbol])
-    return command
+
+
+def _after_cost_alpha_training_script_path(model_repo_root: Path) -> Path:
+    return model_repo_root / "scripts" / "models" / "model_05_alpha_confidence" / "train_model_05_alpha_confidence.py"
 
 
 def _after_cost_alpha_training_bounds(training_fold: Mapping[str, Any]) -> tuple[str, str]:
@@ -789,8 +806,7 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
 
 
 def _candidate_model_ref(*, target_symbol: str | None, start_month: str, end_month: str) -> str:
-    target_token = str(target_symbol or "target").strip().lower().replace(".", "_")
-    return f"storage://trading-manager/model_group/{target_token}/{start_month}_{end_month}"
+    return f"storage://trading-manager/model_group/{start_month}_{end_month}"
 
 
 def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | None:

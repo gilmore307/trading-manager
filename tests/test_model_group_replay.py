@@ -50,7 +50,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             / "03_model_artifacts"
             / "runtime"
             / "model_05_alpha_confidence"
-            / "after_cost_alpha_model_aapl_2016-01_2016-06.json"
+            / "after_cost_alpha_model_2016-01_2016-06.json"
         )
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
         artifact_path.write_text('{"contract_type":"current_replay_placeholder_after_cost_alpha_model"}\n', encoding="utf-8")
@@ -207,10 +207,10 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.provider_calls, 0)
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
-            self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2016-06", decision.command)
+            self.assertIn("storage://trading-manager/model_group/2016-01_2016-06", decision.command)
             self.assertIn("--after-cost-alpha-model-json", decision.command)
             alpha_ref = decision.command[decision.command.index("--after-cost-alpha-model-json") + 1]
-            self.assertTrue(alpha_ref.endswith("after_cost_alpha_model_aapl_2016-01_2016-06.json"))
+            self.assertTrue(alpha_ref.endswith("after_cost_alpha_model_2016-01_2016-06.json"))
             self.assertIn("--initial-capital-usd", decision.command)
             self.assertEqual(decision.command[decision.command.index("--initial-capital-usd") + 1], "25000.0")
             self.assertNotIn("--option-feature-database-url", decision.command)
@@ -224,7 +224,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             )
             self.assertEqual(
                 decision.execution_summary["replay_execution_receipt"]["candidate_model_ref"],
-                "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                "storage://trading-manager/model_group/2016-01_2016-06",
             )
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
@@ -294,6 +294,43 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_candidate_universe_missing")
             self.assertTrue(decision.execution_summary["candidate_universe_path"].endswith("historical_candidate_universe.csv"))
+
+    def test_missing_fold_scoped_alpha_training_script_blocks_before_subprocess(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            alpha_model_path = (
+                storage_root.parent
+                / "03_model_artifacts"
+                / "runtime"
+                / "model_05_alpha_confidence"
+                / "after_cost_alpha_model_2016-01_2016-06.json"
+            )
+            alpha_model_path.unlink()
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                model_repo_root=tmp / "missing-model-repo",
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_training_script_missing")
+            self.assertEqual(decision.command, [])
+            self.assertTrue(
+                decision.execution_summary["after_cost_alpha_training_script_ref"].endswith(
+                    "scripts/models/model_05_alpha_confidence/train_model_05_alpha_confidence.py"
+                )
+            )
 
     def test_explicit_training_target_handoff_does_not_run_canonical_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -365,7 +402,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": run_id,
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
                         "candidate_fold_id": "fold_2016-01_2016-06",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
