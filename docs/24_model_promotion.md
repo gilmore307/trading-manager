@@ -134,7 +134,8 @@ M04/M05 boundary attribution is a manager-side diagnostic helper for this
 failure-attribution lane. `scripts/tasks/build_model_group_layer_attribution.py`
 reads an existing replay `decision_rows.jsonl` and writes compact cohort, score
 bin, tail-loss, optional M05 unfilled-filter, gate-sweep, row-level
-counterfactual, component-surface, component-to-model mapping, and
+counterfactual, component-surface, component survival/quality flow,
+component-to-model mapping, and
 parameter-level replay summaries. Component-surface rows are the first
 diagnostic view: they classify each replay row by the first materially limiting
 decision surface, using `C01_` through `C09_` prefixes for diagnostic ordering
@@ -142,8 +143,15 @@ inside this report, then map that surface back to model refs and evidence-chain
 participation. These diagnostic prefixes do not rename execution-runtime
 component IDs. Model-asset rollups are secondary and must not include rows that
 were excluded from settled prediction-quality metrics by missing path,
-expression, execution, or settlement evidence. The helper also writes a parameter
-replay-review report, a suspect-parameter counterfactual report, and a focused
+expression, execution, or settlement evidence. The component
+survival/quality flow is the closed-loop review surface for finding where model
+group performance first becomes visibly bad and whether downstream components
+amplify, recover, censor, or leave that damage unmeasured. It reports explicit
+entered, passed, blocked, censored, and settled-eligible denominators for each
+C01-C09 component. Missing selected option paths are materialization censoring,
+not model wins or losses; only settled-eligible rows contribute outcome quality
+metrics. The helper also writes a parameter replay-review report, a
+suspect-parameter counterfactual report, and a focused
 high-score filled tail-loss packet that compares high-score losing fills with
 matched high-score non-loss fills. For suspect parameters, it also writes a
 fixed-input M04/M05 mechanism review with `m04_component_diagnostics.csv`,

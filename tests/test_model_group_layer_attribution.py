@@ -177,6 +177,8 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "row_counterfactual_attribution.csv").exists())
             self.assertTrue((output_dir / "decision_surface_component_matrix.csv").exists())
             self.assertTrue((output_dir / "component_model_mapping.csv").exists())
+            self.assertTrue((output_dir / "component_survival_quality_flow.csv").exists())
+            self.assertTrue((output_dir / "component_survival_quality_flow_report.json").exists())
             self.assertTrue((output_dir / "high_score_filled_tail_loss_matches.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review_report.json").exists())
@@ -194,6 +196,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertIn("parameter_replay_review_report_ref", report)
             self.assertIn("suspect_parameter_counterfactual_summary", report)
             self.assertIn("m04_m05_mechanism_review_summary", report)
+            self.assertIn("component_survival_quality_flow_summary", report)
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
                     "C09_settled_prediction_quality_surface"
@@ -274,6 +277,18 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(mapping_rows["C04_underlying_decision_surface"]["first_limiting_surface_count"], "2")
             self.assertEqual(mapping_rows["C09_settled_prediction_quality_surface"]["mapping_status"], "non_model_surface")
             self.assertEqual(mapping_rows["C09_settled_prediction_quality_surface"]["first_limiting_surface_count"], "2")
+            with (output_dir / "component_survival_quality_flow.csv").open(encoding="utf-8") as handle:
+                flow_rows = {
+                    row["component_surface"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(flow_rows["C05_option_expression_surface"]["stage_verdict"], "first_observed_deterioration")
+            self.assertEqual(flow_rows["C09_settled_prediction_quality_surface"]["settled_metric_eligible_count"], "2")
+            self.assertEqual(flow_rows["C09_settled_prediction_quality_surface"]["tail_loss_count"], "1")
+            self.assertEqual(
+                flow_rows["C09_settled_prediction_quality_surface"]["stage_verdict"],
+                "insufficient_evidence",
+            )
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -359,6 +374,21 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(
                 mapping_rows["C08_residual_event_governance_surface"]["mapping_status"],
                 "evidence_chain_only",
+            )
+            with (output_dir / "component_survival_quality_flow.csv").open(encoding="utf-8") as handle:
+                flow_rows = {
+                    row["component_surface"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["stage_verdict"], "dominant_censoring_point")
+            self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["censored_count"], "1")
+            self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["settled_metric_eligible_count"], "0")
+            flow_report = json.loads(
+                (output_dir / "component_survival_quality_flow_report.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                flow_report["summary"]["dominant_censoring_surfaces"],
+                ["C06_selected_option_path_materialization"],
             )
 
     def test_tail_loss_packet_keeps_numeric_zero_label_for_disagreement(self):

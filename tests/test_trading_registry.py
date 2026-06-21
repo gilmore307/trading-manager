@@ -949,6 +949,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("row_counterfactual_attribution.csv", layer_attribution_surfaces["payload"])
         self.assertIn("decision_surface_component_matrix.csv", layer_attribution_surfaces["payload"])
         self.assertIn("component_model_mapping.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("component_survival_quality_flow.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("component_survival_quality_flow_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("parameter_replay_review.csv", layer_attribution_surfaces["payload"])
         self.assertIn("parameter_replay_review_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("parameter_bucket_metrics.csv", layer_attribution_surfaces["payload"])

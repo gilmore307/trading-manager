@@ -206,6 +206,43 @@ COMPONENT_MODEL_MAPPING_FIELDNAMES = [
     "mapping_status",
     "fixed_input_only",
 ]
+COMPONENT_SURFACE_ORDER = [
+    "C01_background_context_surface",
+    "C02_target_state_surface",
+    "C03_event_state_surface",
+    "C04_underlying_decision_surface",
+    "C05_option_expression_surface",
+    "C06_selected_option_path_materialization",
+    "C07_portfolio_execution_surface",
+    "C08_residual_event_governance_surface",
+    "C09_settled_prediction_quality_surface",
+]
+COMPONENT_SURVIVAL_QUALITY_FLOW_FIELDNAMES = [
+    "component_index",
+    "component_surface",
+    "model_layer",
+    "entered_count",
+    "first_limiting_count",
+    "blocked_count",
+    "censored_count",
+    "passed_count",
+    "settled_metric_eligible_count",
+    "settled_metric_excluded_count",
+    "outcome_metric_available",
+    "mean_prediction_score",
+    "score_label_spearman",
+    "score_return_spearman",
+    "mean_realized_return",
+    "hit_rate",
+    "tail_loss_count",
+    "prior_bad_cohort_count",
+    "post_component_bad_cohort_count",
+    "stage_verdict",
+    "verdict_basis",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -253,6 +290,13 @@ def build_model_group_layer_attribution(
     )
     decision_surface_rows = _decision_surface_component_matrix_rows(rows)
     component_model_mapping_rows = _component_model_mapping_rows(rows, decision_surface_rows)
+    component_survival_quality_flow_rows = _component_survival_quality_flow_rows(
+        decision_surface_rows,
+        component_model_mapping_rows,
+    )
+    component_survival_quality_flow_report = _component_survival_quality_flow_report(
+        component_survival_quality_flow_rows
+    )
     parameter_review = _parameter_replay_review(rows)
     m04_component_rows = _m04_component_diagnostic_rows(rows)
     m05_selection_rows = _m05_selection_mechanics_rows(rows, counterfactual_rows)
@@ -291,6 +335,11 @@ def build_model_group_layer_attribution(
         output_dir / "component_model_mapping.csv",
         component_model_mapping_rows,
         fieldnames=COMPONENT_MODEL_MAPPING_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "component_survival_quality_flow.csv",
+        component_survival_quality_flow_rows,
+        fieldnames=COMPONENT_SURVIVAL_QUALITY_FLOW_FIELDNAMES,
     )
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
@@ -342,6 +391,10 @@ def build_model_group_layer_attribution(
         json.dumps(mechanism_review_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "component_survival_quality_flow_report.json").write_text(
+        json.dumps(component_survival_quality_flow_report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     if m05_unfilled_summary["source_status"] == "available":
         _write_csv(output_dir / "m05_unfilled_filter_reasons.csv", m05_unfilled_summary["filter_reason_rows"])
 
@@ -366,6 +419,11 @@ def build_model_group_layer_attribution(
         "component_model_mapping_ref": str(output_dir / "component_model_mapping.csv"),
         "decision_surface_summary": _decision_surface_summary(decision_surface_rows),
         "component_model_mapping_summary": _component_model_mapping_summary(component_model_mapping_rows),
+        "component_survival_quality_flow_ref": str(output_dir / "component_survival_quality_flow.csv"),
+        "component_survival_quality_flow_report_ref": str(
+            output_dir / "component_survival_quality_flow_report.json"
+        ),
+        "component_survival_quality_flow_summary": component_survival_quality_flow_report["summary"],
         "high_score_filled_tail_loss_attribution_packet_ref": str(
             output_dir / "high_score_filled_tail_loss_attribution_packet.json"
         ),
@@ -939,6 +997,210 @@ def _component_model_mapping_summary(rows: Sequence[Mapping[str, Any]]) -> dict[
         },
         "fixed_input_only": True,
     }
+
+
+def _component_survival_quality_flow_rows(
+    decision_surface_rows: Sequence[Mapping[str, Any]],
+    component_model_mapping_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    order_index = {surface: index for index, surface in enumerate(COMPONENT_SURFACE_ORDER)}
+    mapping_by_surface = {
+        str(row.get("component_surface") or ""): row
+        for row in component_model_mapping_rows
+    }
+    previous_bad_rate: float | None = None
+    output: list[dict[str, Any]] = []
+    for index, component_surface in enumerate(COMPONENT_SURFACE_ORDER, start=1):
+        entered_rows = [
+            row
+            for row in decision_surface_rows
+            if order_index.get(str(row.get("first_limiting_surface") or ""), len(COMPONENT_SURFACE_ORDER) - 1)
+            >= index - 1
+        ]
+        first_limiting_rows = [
+            row
+            for row in entered_rows
+            if str(row.get("first_limiting_surface") or "") == component_surface
+        ]
+        blocked_count = 0 if component_surface == "C09_settled_prediction_quality_surface" else len(first_limiting_rows)
+        censored_count = (
+            len(first_limiting_rows)
+            if component_surface == "C06_selected_option_path_materialization"
+            else 0
+        )
+        passed_rows = entered_rows if component_surface == "C09_settled_prediction_quality_surface" else [
+            row
+            for row in entered_rows
+            if str(row.get("first_limiting_surface") or "") != component_surface
+        ]
+        entered_settled_rows = _settled_rows(entered_rows)
+        passed_settled_rows = _settled_rows(passed_rows)
+        prior_bad_count = _bad_outcome_count(entered_settled_rows)
+        post_bad_count = _bad_outcome_count(passed_settled_rows)
+        bad_rate = (post_bad_count / len(passed_settled_rows)) if passed_settled_rows else None
+        mean_realized_return = _mean(_numeric_values(passed_settled_rows, "realized_return"))
+        tail_loss_count = sum(1 for row in passed_settled_rows if _float(row.get("realized_return")) <= -0.2)
+        verdict, basis = _component_flow_verdict(
+            component_surface=component_surface,
+            entered_count=len(entered_rows),
+            blocked_count=blocked_count,
+            censored_count=censored_count,
+            settled_count=len(passed_settled_rows),
+            post_bad_rate=bad_rate,
+            mean_realized_return=mean_realized_return,
+            tail_loss_count=tail_loss_count,
+            previous_bad_rate=previous_bad_rate,
+        )
+        if bad_rate is not None:
+            previous_bad_rate = bad_rate
+        output.append(
+            {
+                "component_index": index,
+                "component_surface": component_surface,
+                "model_layer": str((mapping_by_surface.get(component_surface) or {}).get("model_layer") or ""),
+                "entered_count": len(entered_rows),
+                "first_limiting_count": len(first_limiting_rows),
+                "blocked_count": blocked_count,
+                "censored_count": censored_count,
+                "passed_count": len(passed_rows),
+                "settled_metric_eligible_count": len(passed_settled_rows),
+                "settled_metric_excluded_count": len(passed_rows) - len(passed_settled_rows),
+                "outcome_metric_available": bool(passed_settled_rows),
+                "mean_prediction_score": _round(_mean(_numeric_values(passed_settled_rows, "prediction_score"))),
+                "score_label_spearman": _round(
+                    _spearman_for_key(passed_settled_rows, "prediction_score", "outcome_label")
+                ),
+                "score_return_spearman": _round(
+                    _spearman_for_key(passed_settled_rows, "prediction_score", "realized_return")
+                ),
+                "mean_realized_return": _round(mean_realized_return),
+                "hit_rate": _round(
+                    sum(1 for row in passed_settled_rows if str(row.get("outcome_label")) == "1")
+                    / len(passed_settled_rows)
+                )
+                if passed_settled_rows
+                else None,
+                "tail_loss_count": tail_loss_count,
+                "prior_bad_cohort_count": prior_bad_count,
+                "post_component_bad_cohort_count": post_bad_count,
+                "stage_verdict": verdict,
+                "verdict_basis": basis,
+                "threshold_selection_performed": False,
+                "retraining_performed": False,
+                "fixed_input_only": True,
+            }
+        )
+    return output
+
+
+def _component_survival_quality_flow_report(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    first_problem_row = next(
+        (
+            row
+            for row in rows
+            if str(row.get("stage_verdict") or "") not in {"neutral_or_unmeasured", "insufficient_evidence"}
+        ),
+        None,
+    )
+    return {
+        "contract_type": "model_group_component_survival_quality_flow_report",
+        "summary": {
+            "component_count": len(rows),
+            "first_problem_surface": str((first_problem_row or {}).get("component_surface") or ""),
+            "first_problem_verdict": str((first_problem_row or {}).get("stage_verdict") or ""),
+            "verdict_counts": dict(Counter(str(row.get("stage_verdict") or "") for row in rows)),
+            "dominant_censoring_surfaces": [
+                str(row.get("component_surface") or "")
+                for row in rows
+                if str(row.get("stage_verdict") or "") == "dominant_censoring_point"
+            ],
+            "settled_quality_surface_status": str(
+                next(
+                    (
+                        row.get("stage_verdict")
+                        for row in rows
+                        if row.get("component_surface") == "C09_settled_prediction_quality_surface"
+                    ),
+                    "",
+                )
+            ),
+            "fixed_input_only": True,
+            "threshold_selection_performed": False,
+            "retraining_performed": False,
+        },
+        "component_survival_quality_flow_ref": "component_survival_quality_flow.csv",
+        "forbidden_uses": [
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_action",
+        ],
+        "interpretation_notes": [
+            "Component flow verdicts localize where degradation is first observed, not causal model blame.",
+            "Path-materialization censored rows are excluded from settled model win/loss metrics.",
+            "Outcome fields are labels for settled quality only and must not be treated as point-in-time inputs.",
+        ],
+    }
+
+
+def _component_flow_verdict(
+    *,
+    component_surface: str,
+    entered_count: int,
+    blocked_count: int,
+    censored_count: int,
+    settled_count: int,
+    post_bad_rate: float | None,
+    mean_realized_return: float | None,
+    tail_loss_count: int,
+    previous_bad_rate: float | None,
+) -> tuple[str, str]:
+    if entered_count <= 0:
+        return "neutral_or_unmeasured", "component_not_reached"
+    if censored_count and censored_count / entered_count >= 0.5:
+        return "dominant_censoring_point", "majority_of_entered_rows_missing_settled_path"
+    if blocked_count:
+        return "first_observed_deterioration", "rows_first_limited_at_component"
+    if settled_count < 5 or post_bad_rate is None:
+        return "insufficient_evidence", "too_few_settled_rows_for_quality_flow"
+    if component_surface == "C09_settled_prediction_quality_surface":
+        if post_bad_rate > 0.5:
+            return "first_observed_deterioration", "settled_survivor_cohort_bad_rate_above_half"
+        if mean_realized_return is not None and mean_realized_return < 0:
+            return "first_observed_deterioration", "settled_survivor_cohort_negative_mean_return"
+        if tail_loss_count:
+            return "first_observed_deterioration", "settled_survivor_tail_loss_present"
+        return "neutral_or_unmeasured", "settled_survivor_cohort_not_majority_bad"
+    if previous_bad_rate is None:
+        return "neutral_or_unmeasured", "no_prior_observable_bad_rate"
+    if post_bad_rate - previous_bad_rate >= 0.15:
+        return "amplifies_prior_damage", "post_component_bad_rate_increased"
+    if previous_bad_rate - post_bad_rate >= 0.15:
+        return "pulls_back_prior_damage", "post_component_bad_rate_decreased"
+    return "neutral_or_unmeasured", "bad_rate_change_below_materiality"
+
+
+def _settled_rows(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [row for row in rows if row.get("settled_metric_eligible") is True]
+
+
+def _bad_outcome_count(rows: Sequence[Mapping[str, Any]]) -> int:
+    return sum(1 for row in rows if str(row.get("outcome_label")) == "0" or _float(row.get("realized_return")) < 0)
+
+
+def _numeric_values(rows: Sequence[Mapping[str, Any]], key: str) -> list[float]:
+    return [_float(row.get(key)) for row in rows if row.get(key) not in {None, ""}]
+
+
+def _spearman_for_key(rows: Sequence[Mapping[str, Any]], left_key: str, right_key: str) -> float | None:
+    pairs = [
+        (_float(row.get(left_key)), _float(row.get(right_key)))
+        for row in rows
+        if row.get(left_key) not in {None, ""} and row.get(right_key) not in {None, ""}
+    ]
+    if not pairs:
+        return None
+    return _spearman([left for left, _right in pairs], [right for _left, right in pairs])
 
 
 def _m05_unfilled_summary(path: Path | None) -> dict[str, Any]:
