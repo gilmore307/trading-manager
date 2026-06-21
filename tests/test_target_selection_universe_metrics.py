@@ -32,17 +32,45 @@ class TargetSelectionUniverseMetricsTests(unittest.TestCase):
             with candidate_universe.open("w", newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(
                     handle,
-                    fieldnames=["symbol", "target_ref", "asset_class", "replay_candidate_status"],
+                    fieldnames=[
+                        "symbol",
+                        "target_ref",
+                        "asset_class",
+                        "replay_candidate_status",
+                        "tradingview_sector",
+                        "layer2_context_symbol",
+                    ],
                 )
                 writer.writeheader()
                 writer.writerow(
-                    {"symbol": "AAPL", "target_ref": "AAPL", "asset_class": "us_equity", "replay_candidate_status": "active"}
+                    {
+                        "symbol": "AAPL",
+                        "target_ref": "AAPL",
+                        "asset_class": "us_equity",
+                        "replay_candidate_status": "active",
+                        "tradingview_sector": "Technology",
+                        "layer2_context_symbol": "XLK",
+                    }
                 )
                 writer.writerow(
-                    {"symbol": "MSFT", "target_ref": "MSFT", "asset_class": "us_equity", "replay_candidate_status": "active"}
+                    {
+                        "symbol": "MSFT",
+                        "target_ref": "MSFT",
+                        "asset_class": "us_equity",
+                        "replay_candidate_status": "active",
+                        "tradingview_sector": "Technology",
+                        "layer2_context_symbol": "XLK",
+                    }
                 )
                 writer.writerow(
-                    {"symbol": "NVDA", "target_ref": "NVDA", "asset_class": "us_equity", "replay_candidate_status": "active"}
+                    {
+                        "symbol": "NVDA",
+                        "target_ref": "NVDA",
+                        "asset_class": "us_equity",
+                        "replay_candidate_status": "active",
+                        "tradingview_sector": "Communications",
+                        "layer2_context_symbol": "XLC",
+                    }
                 )
             report = build_target_selection_universe_metrics(
                 decision_rows_path=decision_rows,
@@ -71,6 +99,13 @@ class TargetSelectionUniverseMetricsTests(unittest.TestCase):
             self.assertEqual(rows["MSFT"]["forward_return_rank"], "2")
             self.assertEqual(rows["MSFT"]["forward_return_percentile"], "0.5")
             self.assertEqual(rows["MSFT"]["opportunity_cost_to_best"], "0.1")
+            self.assertEqual(rows["MSFT"]["sector_bucket_ref"], "XLK")
+            self.assertEqual(rows["MSFT"]["selected_sector_bucket"], "True")
+            self.assertEqual(rows["MSFT"]["sector_forward_return_rank"], "2")
+            self.assertEqual(rows["MSFT"]["sector_forward_return_percentile"], "0.0")
+            self.assertEqual(rows["MSFT"]["forward_return_rank_within_sector"], "1")
+            self.assertEqual(rows["MSFT"]["forward_return_percentile_within_sector"], "1.0")
+            self.assertEqual(rows["MSFT"]["opportunity_cost_to_sector_best"], "0.0")
             self.assertEqual(rows["NVDA"]["top_quartile_candidate"], "True")
 
     def test_missing_exit_bar_keeps_universe_visible_but_marks_return_gap(self):
@@ -93,11 +128,25 @@ class TargetSelectionUniverseMetricsTests(unittest.TestCase):
             with candidate_universe.open("w", newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(
                     handle,
-                    fieldnames=["symbol", "target_ref", "asset_class", "replay_candidate_status"],
+                    fieldnames=[
+                        "symbol",
+                        "target_ref",
+                        "asset_class",
+                        "replay_candidate_status",
+                        "tradingview_sector",
+                        "layer2_context_symbol",
+                    ],
                 )
                 writer.writeheader()
                 writer.writerow(
-                    {"symbol": "MSFT", "target_ref": "MSFT", "asset_class": "us_equity", "replay_candidate_status": "active"}
+                    {
+                        "symbol": "MSFT",
+                        "target_ref": "MSFT",
+                        "asset_class": "us_equity",
+                        "replay_candidate_status": "active",
+                        "tradingview_sector": "Technology",
+                        "layer2_context_symbol": "XLK",
+                    }
                 )
 
             report = build_target_selection_universe_metrics(

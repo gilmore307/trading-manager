@@ -28,8 +28,12 @@ FIELDNAMES = [
     "target_ref",
     "symbol",
     "asset_class",
+    "sector_bucket_ref",
+    "tradingview_sector",
+    "layer2_context_symbol",
     "visible_universe_membership",
     "selected_by_replay",
+    "selected_sector_bucket",
     "entry_bar_date",
     "exit_bar_date",
     "entry_bar_close",
@@ -40,6 +44,15 @@ FIELDNAMES = [
     "forward_return_percentile",
     "top_quartile_candidate",
     "opportunity_cost_to_best",
+    "sector_forward_return_mean",
+    "sector_forward_return_rank",
+    "sector_forward_return_percentile",
+    "sector_candidate_count",
+    "sector_top_quartile_bucket",
+    "forward_return_rank_within_sector",
+    "forward_return_percentile_within_sector",
+    "top_quartile_candidate_within_sector",
+    "opportunity_cost_to_sector_best",
     "candidate_universe_ref",
     "bar_source_ref",
     "diagnostic_role",
@@ -64,6 +77,10 @@ def build_target_selection_universe_metrics(
     candidate_rows = _active_equity_candidate_rows(_load_csv_rows(candidate_universe_path))
     time_windows = _decision_time_windows(decision_rows)
     selected_targets_by_timestamp = _selected_targets_by_timestamp(decision_rows)
+    selected_sector_buckets_by_timestamp = _selected_sector_buckets_by_timestamp(
+        candidate_rows,
+        selected_targets_by_timestamp,
+    )
     bar_lookup = _bar_lookup(
         _fetch_bar_rows(
             symbols=[str(row["symbol"]) for row in candidate_rows],
@@ -96,8 +113,13 @@ def build_target_selection_universe_metrics(
                     "target_ref": str(candidate.get("target_ref") or symbol),
                     "symbol": symbol,
                     "asset_class": str(candidate.get("asset_class") or ""),
+                    "sector_bucket_ref": _sector_bucket_ref(candidate),
+                    "tradingview_sector": str(candidate.get("tradingview_sector") or ""),
+                    "layer2_context_symbol": str(candidate.get("layer2_context_symbol") or ""),
                     "visible_universe_membership": True,
                     "selected_by_replay": symbol in selected_targets or str(candidate.get("target_ref") or "") in selected_targets,
+                    "selected_sector_bucket": _sector_bucket_ref(candidate)
+                    in selected_sector_buckets_by_timestamp.get(timestamp, set()),
                     "entry_bar_date": entry_date.isoformat(),
                     "exit_bar_date": exit_date.isoformat(),
                     "entry_bar_close": _round(entry_close),
@@ -150,6 +172,16 @@ def _active_equity_candidate_rows(rows: Sequence[Mapping[str, Any]]) -> list[dic
     return candidates
 
 
+def _sector_bucket_ref(row: Mapping[str, Any]) -> str:
+    """Return the bucket used for sector-first target-selection review."""
+
+    for key in ("layer2_context_symbol", "tradingview_sector", "sector", "industry"):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value.upper()
+    return "UNMAPPED"
+
+
 def _decision_time_windows(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[str, str], ...]:
     windows: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
@@ -174,6 +206,20 @@ def _selected_targets_by_timestamp(rows: Sequence[Mapping[str, Any]]) -> dict[st
         if timestamp and target:
             selected[timestamp].add(target)
     return selected
+
+
+def _selected_sector_buckets_by_timestamp(
+    candidate_rows: Sequence[Mapping[str, Any]],
+    selected_targets_by_timestamp: Mapping[str, set[str]],
+) -> dict[str, set[str]]:
+    buckets: dict[str, set[str]] = defaultdict(set)
+    for timestamp, selected_targets in selected_targets_by_timestamp.items():
+        for candidate in candidate_rows:
+            symbol = str(candidate.get("symbol") or "").strip().upper()
+            target_ref = str(candidate.get("target_ref") or symbol).strip().upper()
+            if symbol in selected_targets or target_ref in selected_targets:
+                buckets[timestamp].add(_sector_bucket_ref(candidate))
+    return buckets
 
 
 def _required_bar_dates(time_windows: Sequence[tuple[str, str]]) -> tuple[date, ...]:
@@ -249,6 +295,15 @@ def _add_forward_return_ranks(rows: list[dict[str, Any]]) -> None:
                     "forward_return_percentile": "",
                     "top_quartile_candidate": "",
                     "opportunity_cost_to_best": "",
+                    "sector_forward_return_mean": "",
+                    "sector_forward_return_rank": "",
+                    "sector_forward_return_percentile": "",
+                    "sector_candidate_count": "",
+                    "sector_top_quartile_bucket": "",
+                    "forward_return_rank_within_sector": "",
+                    "forward_return_percentile_within_sector": "",
+                    "top_quartile_candidate_within_sector": "",
+                    "opportunity_cost_to_sector_best": "",
                 }
             )
         return
@@ -277,6 +332,67 @@ def _add_forward_return_ranks(rows: list[dict[str, Any]]) -> None:
                 "opportunity_cost_to_best": _round(best - value),
             }
         )
+    _add_sector_forward_return_metrics(rows)
+
+
+def _add_sector_forward_return_metrics(rows: list[dict[str, Any]]) -> None:
+    empty_fields = {
+        "sector_forward_return_mean": "",
+        "sector_forward_return_rank": "",
+        "sector_forward_return_percentile": "",
+        "sector_candidate_count": "",
+        "sector_top_quartile_bucket": "",
+        "forward_return_rank_within_sector": "",
+        "forward_return_percentile_within_sector": "",
+        "top_quartile_candidate_within_sector": "",
+        "opportunity_cost_to_sector_best": "",
+    }
+    computed_by_sector: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        value = _float(row.get("forward_return"))
+        if value is None:
+            row.update(empty_fields)
+            continue
+        computed_by_sector[str(row.get("sector_bucket_ref") or "UNMAPPED")].append(row)
+    if not computed_by_sector:
+        for row in rows:
+            row.update(empty_fields)
+        return
+
+    sector_means = {
+        sector: sum(float(row["forward_return"]) for row in sector_rows) / len(sector_rows)
+        for sector, sector_rows in computed_by_sector.items()
+        if sector_rows
+    }
+    sector_count = len(sector_means)
+    sector_top_quartile_limit = max(1, (sector_count + 3) // 4)
+    for sector, sector_rows in computed_by_sector.items():
+        sector_mean = sector_means[sector]
+        sector_rank = 1 + sum(1 for other_mean in sector_means.values() if other_mean > sector_mean)
+        sector_percentile = 1.0 if sector_count <= 1 else (sector_count - sector_rank) / (sector_count - 1)
+        sector_returns = [float(row["forward_return"]) for row in sector_rows]
+        sector_best = max(sector_returns)
+        sector_member_count = len(sector_rows)
+        sector_top_quartile_limit_within = max(1, (sector_member_count + 3) // 4)
+        for row in sector_rows:
+            value = float(row["forward_return"])
+            within_rank = 1 + sum(1 for other in sector_returns if other > value)
+            within_percentile = (
+                1.0 if sector_member_count <= 1 else (sector_member_count - within_rank) / (sector_member_count - 1)
+            )
+            row.update(
+                {
+                    "sector_forward_return_mean": _round(sector_mean),
+                    "sector_forward_return_rank": sector_rank,
+                    "sector_forward_return_percentile": _round(sector_percentile),
+                    "sector_candidate_count": sector_member_count,
+                    "sector_top_quartile_bucket": sector_rank <= sector_top_quartile_limit,
+                    "forward_return_rank_within_sector": within_rank,
+                    "forward_return_percentile_within_sector": _round(within_percentile),
+                    "top_quartile_candidate_within_sector": within_rank <= sector_top_quartile_limit_within,
+                    "opportunity_cost_to_sector_best": _round(sector_best - value),
+                }
+            )
 
 
 def _report(
@@ -291,6 +407,16 @@ def _report(
     status_counts = Counter(str(row.get("forward_return_status") or "") for row in metric_rows)
     selected_rows = [row for row in metric_rows if str(row.get("selected_by_replay") or "").lower() == "true"]
     selected_computed = [row for row in selected_rows if str(row.get("forward_return_status") or "") == "computed"]
+    computed_sector_buckets = {
+        str(row.get("sector_bucket_ref") or "")
+        for row in metric_rows
+        if str(row.get("forward_return_status") or "") == "computed"
+    }
+    selected_sector_buckets = {
+        str(row.get("sector_bucket_ref") or "")
+        for row in metric_rows
+        if str(row.get("selected_sector_bucket") or "").lower() == "true"
+    }
     return {
         "contract_type": "target_selection_universe_metrics_report",
         "generated_at_utc": now_utc.astimezone(UTC).isoformat(),
@@ -305,8 +431,10 @@ def _report(
             "forward_return_status_counts": dict(status_counts),
             "computed_forward_return_coverage": (status_counts.get("computed", 0) / len(metric_rows)) if metric_rows else None,
             "selected_forward_return_coverage": (len(selected_computed) / len(selected_rows)) if selected_rows else None,
+            "computed_sector_bucket_count": len(computed_sector_buckets),
+            "selected_sector_bucket_count": len(selected_sector_buckets),
         },
-        "effectiveness_role": "rank_selected_targets_against_fixed_visible_universe_forward_returns",
+        "effectiveness_role": "rank_selected_sector_buckets_then_selected_targets_within_bucket",
         "forbidden_uses": [
             "training_feature_input",
             "threshold_selection",

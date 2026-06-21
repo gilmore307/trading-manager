@@ -149,9 +149,9 @@ the operation that consumed or exposed them: background and target state under
 C01, event and underlying-entry decision under C02, option selection and selected
 contract path materialization under C04, fill/execution under C06, and residual
 event or settled prediction quality under C07. The metrics surface gives each
-operation its own diagnostic family: C01/C02 target-selection universe integrity
-and forward-return rank when a fixed point-in-time universe metrics CSV is
-provided, C02 entry signal/outcome alignment, C04 option-expression candidate
+operation its own diagnostic family: C01 target-universe integrity and
+sector-bucket selection effectiveness, C02 target rank inside the selected
+sector bucket and entry signal/outcome alignment, C04 option-expression candidate
 funnel and selected-path materialization, C05 capacity/sizing counterfactual
 spread, C06 path/fill coverage, and C07 settled score/outcome quality. Future
 returns in these metrics are retrospective labels only and are forbidden as
@@ -166,11 +166,14 @@ Build `target_selection_universe_metrics.csv` with
 effectiveness. The builder reads existing replay decision rows, the fixed
 historical candidate universe, and already-acquired daily SQL bars to label every
 visible candidate at each replay decision timestamp with retrospective next-bar
-forward return, rank, percentile, top-quartile membership, and opportunity cost
-to the best visible candidate. This artifact is diagnostic only: it helps judge
-whether the intake/entry operation selected effective targets from the visible
-universe, but its future-return labels are forbidden as training features,
-threshold-selection inputs, promotion approval, model activation, or
+forward return. It evaluates target selection hierarchically: first by the
+selected `layer2_context_symbol`/sector bucket's forward-return rank among
+visible sector buckets, then by the selected target's rank inside that selected
+bucket. Whole-universe target rank may remain background evidence, but it is not
+the primary C02 effectiveness metric. This artifact is diagnostic only: it helps
+judge whether the intake/entry operation selected effective sectors and targets
+from the visible universe, but its future-return labels are forbidden as training
+features, threshold-selection inputs, promotion approval, model activation, or
 broker/account/order authority.
 
 The older `decision_surface_component_matrix.csv`,

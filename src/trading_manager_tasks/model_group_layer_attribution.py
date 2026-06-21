@@ -1940,7 +1940,8 @@ def _target_selection_metric_rows(
             )
             for component_id, metric_name in (
                 ("C01_intake_operation", "visible_universe_integrity"),
-                ("C02_entry_operation", "selected_target_forward_return_rank"),
+                ("C01_intake_operation", "selected_sector_bucket_forward_return_rank"),
+                ("C02_entry_operation", "selected_target_forward_return_rank_within_sector"),
             )
         ]
 
@@ -1948,7 +1949,8 @@ def _target_selection_metric_rows(
     for row in target_selection_universe_rows:
         universe_by_timestamp[str(row.get("timestamp") or "")].append(row)
 
-    selected_results: list[dict[str, float]] = []
+    selected_sector_results: list[dict[str, float]] = []
+    selected_target_results: list[dict[str, float]] = []
     visible_universe_counts: list[float] = []
     present_count = 0
     for row in rows:
@@ -1973,16 +1975,37 @@ def _target_selection_metric_rows(
         if selected_visible_row is None:
             continue
         present_count += 1
+        selected_sector_bucket = _target_universe_sector_bucket(selected_visible_row)
         selected_row = next(
             (item for item in ranked_rows if str(item.get("target_ref") or item.get("symbol") or "") == target_ref),
             None,
         )
+        sector_ranked_rows = [
+            item for item in ranked_rows if _target_universe_sector_bucket(item) == selected_sector_bucket
+        ]
+        sector_means = _target_universe_sector_return_means(ranked_rows)
+        selected_sector_mean = sector_means.get(selected_sector_bucket)
+        if selected_sector_mean is not None and sector_means:
+            sector_count = len(sector_means)
+            sector_rank = 1 + sum(1 for value in sector_means.values() if value > selected_sector_mean)
+            sector_percentile = 1.0 if sector_count <= 1 else (sector_count - sector_rank) / (sector_count - 1)
+            selected_sector_results.append(
+                {
+                    "selected_forward_return": selected_sector_mean,
+                    "rank": float(sector_rank),
+                    "percentile": sector_percentile,
+                    "top_quartile_hit": 1.0 if sector_rank <= max(1, int((sector_count + 3) // 4)) else 0.0,
+                    "opportunity_cost_to_best": max(sector_means.values()) - selected_sector_mean,
+                    "opportunity_cost_to_median": (_median(sector_means.values()) or 0.0) - selected_sector_mean,
+                    "universe_count": float(sector_count),
+                }
+            )
         if selected_row is None:
             continue
         selected_return = _target_universe_forward_return(selected_row)
         if selected_return is None:
             continue
-        returns = [_target_universe_forward_return(item) for item in ranked_rows]
+        returns = [_target_universe_forward_return(item) for item in sector_ranked_rows]
         numeric_returns = [float(value) for value in returns if value is not None]
         if not numeric_returns:
             continue
@@ -1991,7 +2014,7 @@ def _target_selection_metric_rows(
         percentile = 1.0 if universe_count <= 1 else (universe_count - rank) / (universe_count - 1)
         best_return = max(numeric_returns)
         median_return = _median(numeric_returns)
-        selected_results.append(
+        selected_target_results.append(
             {
                 "selected_forward_return": selected_return,
                 "rank": float(rank),
@@ -2006,12 +2029,18 @@ def _target_selection_metric_rows(
     integrity_status = "computed" if present_count == len(rows) else "partial"
     if present_count <= 0:
         integrity_status = "data_gap"
-    if not selected_results:
-        rank_status = "data_gap"
-    elif len(selected_results) < len(rows):
-        rank_status = "partial"
+    if not selected_sector_results:
+        sector_status = "data_gap"
+    elif len(selected_sector_results) < len(rows):
+        sector_status = "partial"
     else:
-        rank_status = "computed"
+        sector_status = "computed"
+    if not selected_target_results:
+        target_status = "data_gap"
+    elif len(selected_target_results) < len(rows):
+        target_status = "partial"
+    else:
+        target_status = "computed"
     return [
         _operation_component_metric_row(
             component_id="C01_intake_operation",
@@ -2030,30 +2059,83 @@ def _target_selection_metric_rows(
             value=(present_count / len(rows)) if rows else None,
         ),
         _operation_component_metric_row(
-            component_id="C02_entry_operation",
-            metric_family="target_selection_quality",
-            metric_name="selected_target_forward_return_rank",
-            metric_scope="decision_time_visible_universe",
-            availability_status=rank_status,
-            reason_codes=[] if rank_status == "computed" else ["selected_target_forward_return_unavailable"],
-            point_in_time_input_fields=["timestamp", "target_ref", "visible_universe_membership"],
-            future_outcome_fields=["forward_return"],
+            component_id="C01_intake_operation",
+            metric_family="sector_selection_effectiveness",
+            metric_name="selected_sector_bucket_forward_return_rank",
+            metric_scope="decision_time_visible_sector_buckets",
+            availability_status=sector_status,
+            reason_codes=[] if sector_status == "computed" else ["selected_sector_bucket_forward_return_unavailable"],
+            point_in_time_input_fields=[
+                "timestamp",
+                "target_ref",
+                "sector_bucket_ref",
+                "visible_universe_membership",
+            ],
+            future_outcome_fields=["sector_forward_return_mean"],
             row_count=len(rows),
-            eligible_row_count=len(selected_results),
+            eligible_row_count=len(selected_sector_results),
             selected_count=len(rows),
             selected_target_present_count=present_count,
-            universe_count_mean=_mean(result["universe_count"] for result in selected_results),
-            selected_forward_return_mean=_mean(result["selected_forward_return"] for result in selected_results),
-            selected_forward_return_rank_mean=_mean(result["rank"] for result in selected_results),
-            selected_forward_return_percentile_mean=_mean(result["percentile"] for result in selected_results),
-            top_quartile_hit_rate=_mean(result["top_quartile_hit"] for result in selected_results),
-            opportunity_cost_to_best_mean=_mean(result["opportunity_cost_to_best"] for result in selected_results),
+            universe_count_mean=_mean(result["universe_count"] for result in selected_sector_results),
+            selected_forward_return_mean=_mean(result["selected_forward_return"] for result in selected_sector_results),
+            selected_forward_return_rank_mean=_mean(result["rank"] for result in selected_sector_results),
+            selected_forward_return_percentile_mean=_mean(result["percentile"] for result in selected_sector_results),
+            top_quartile_hit_rate=_mean(result["top_quartile_hit"] for result in selected_sector_results),
+            opportunity_cost_to_best_mean=_mean(result["opportunity_cost_to_best"] for result in selected_sector_results),
             opportunity_cost_to_median_mean=_mean(
-                result["opportunity_cost_to_median"] for result in selected_results
+                result["opportunity_cost_to_median"] for result in selected_sector_results
             ),
-            value=_mean(result["percentile"] for result in selected_results),
+            value=_mean(result["percentile"] for result in selected_sector_results),
+        ),
+        _operation_component_metric_row(
+            component_id="C02_entry_operation",
+            metric_family="target_selection_effectiveness",
+            metric_name="selected_target_forward_return_rank_within_sector",
+            metric_scope="decision_time_selected_sector_bucket",
+            availability_status=target_status,
+            reason_codes=[] if target_status == "computed" else ["selected_target_sector_forward_return_unavailable"],
+            point_in_time_input_fields=["timestamp", "target_ref", "sector_bucket_ref", "visible_universe_membership"],
+            future_outcome_fields=["forward_return"],
+            row_count=len(rows),
+            eligible_row_count=len(selected_target_results),
+            selected_count=len(rows),
+            selected_target_present_count=present_count,
+            universe_count_mean=_mean(result["universe_count"] for result in selected_target_results),
+            selected_forward_return_mean=_mean(result["selected_forward_return"] for result in selected_target_results),
+            selected_forward_return_rank_mean=_mean(result["rank"] for result in selected_target_results),
+            selected_forward_return_percentile_mean=_mean(result["percentile"] for result in selected_target_results),
+            top_quartile_hit_rate=_mean(result["top_quartile_hit"] for result in selected_target_results),
+            opportunity_cost_to_best_mean=_mean(result["opportunity_cost_to_best"] for result in selected_target_results),
+            opportunity_cost_to_median_mean=_mean(
+                result["opportunity_cost_to_median"] for result in selected_target_results
+            ),
+            value=_mean(result["percentile"] for result in selected_target_results),
         ),
     ]
+
+
+def _target_universe_sector_bucket(row: Mapping[str, Any]) -> str:
+    value = str(
+        row.get("sector_bucket_ref")
+        or row.get("layer2_context_symbol")
+        or row.get("tradingview_sector")
+        or "UNMAPPED"
+    ).strip()
+    return value.upper() or "UNMAPPED"
+
+
+def _target_universe_sector_return_means(rows: Sequence[Mapping[str, Any]]) -> dict[str, float]:
+    values_by_sector: dict[str, list[float]] = defaultdict(list)
+    for row in rows:
+        value = _target_universe_forward_return(row)
+        if value is None:
+            continue
+        values_by_sector[_target_universe_sector_bucket(row)].append(float(value))
+    return {
+        sector: sum(values) / len(values)
+        for sector, values in values_by_sector.items()
+        if values
+    }
 
 
 def _entry_signal_metric_row(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:

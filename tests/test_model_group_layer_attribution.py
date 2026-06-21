@@ -307,7 +307,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 "data_gap",
             )
             self.assertEqual(
-                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank")][
+                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank_within_sector")][
                     "availability_status"
                 ],
                 "data_gap",
@@ -423,7 +423,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             )
             self.assertIn("C05_option_expression_surface", packet["summary"]["components_with_missing_review_outputs"])
 
-    def test_operation_component_metrics_rank_selected_target_against_fixed_universe(self):
+    def test_operation_component_metrics_rank_selected_target_after_sector_bucket_selection(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             rows_path = tmp / "decision_rows.jsonl"
@@ -445,16 +445,34 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             row["timestamp"] = "2021-01-04T16:00:00-05:00"
             rows_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
             with universe_path.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=["timestamp", "target_ref", "forward_return"])
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=["timestamp", "target_ref", "sector_bucket_ref", "forward_return"],
+                )
                 writer.writeheader()
                 writer.writerow(
-                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "AAPL", "forward_return": "0.05"}
+                    {
+                        "timestamp": "2021-01-04T16:00:00-05:00",
+                        "target_ref": "AAPL",
+                        "sector_bucket_ref": "XLK",
+                        "forward_return": "0.05",
+                    }
                 )
                 writer.writerow(
-                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "MSFT", "forward_return": "0.10"}
+                    {
+                        "timestamp": "2021-01-04T16:00:00-05:00",
+                        "target_ref": "MSFT",
+                        "sector_bucket_ref": "XLK",
+                        "forward_return": "0.10",
+                    }
                 )
                 writer.writerow(
-                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "NVDA", "forward_return": "0.20"}
+                    {
+                        "timestamp": "2021-01-04T16:00:00-05:00",
+                        "target_ref": "NVDA",
+                        "sector_bucket_ref": "XLC",
+                        "forward_return": "0.20",
+                    }
                 )
 
             report = build_model_group_layer_attribution(
@@ -466,19 +484,25 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
 
             self.assertEqual(
                 report["operation_component_metrics_summary"]["availability_status_counts"]["computed"],
-                7,
+                8,
             )
             with (output_dir / "operation_component_metrics.csv").open(encoding="utf-8") as handle:
                 metric_rows = {
                     (row["operation_component_id"], row["metric_name"]): row
                     for row in csv.DictReader(handle)
                 }
-            rank_metric = metric_rows[("C02_entry_operation", "selected_target_forward_return_rank")]
+            sector_metric = metric_rows[("C01_intake_operation", "selected_sector_bucket_forward_return_rank")]
+            self.assertEqual(sector_metric["availability_status"], "computed")
+            self.assertEqual(sector_metric["universe_count_mean"], "2.0")
+            self.assertEqual(sector_metric["selected_forward_return_rank_mean"], "2.0")
+            self.assertEqual(sector_metric["selected_forward_return_percentile_mean"], "0.0")
+            self.assertEqual(sector_metric["opportunity_cost_to_best_mean"], "0.125")
+            rank_metric = metric_rows[("C02_entry_operation", "selected_target_forward_return_rank_within_sector")]
             self.assertEqual(rank_metric["availability_status"], "computed")
-            self.assertEqual(rank_metric["universe_count_mean"], "3.0")
-            self.assertEqual(rank_metric["selected_forward_return_rank_mean"], "2.0")
-            self.assertEqual(rank_metric["selected_forward_return_percentile_mean"], "0.5")
-            self.assertEqual(rank_metric["opportunity_cost_to_best_mean"], "0.1")
+            self.assertEqual(rank_metric["universe_count_mean"], "2.0")
+            self.assertEqual(rank_metric["selected_forward_return_rank_mean"], "1.0")
+            self.assertEqual(rank_metric["selected_forward_return_percentile_mean"], "1.0")
+            self.assertEqual(rank_metric["opportunity_cost_to_best_mean"], "0.0")
             self.assertEqual(
                 metric_rows[("C01_intake_operation", "visible_universe_integrity")]["value"],
                 "1.0",
@@ -525,13 +549,26 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with universe_path.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=["timestamp", "target_ref", "forward_return"])
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=["timestamp", "target_ref", "sector_bucket_ref", "forward_return"],
+                )
                 writer.writeheader()
                 writer.writerow(
-                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "AAPL", "forward_return": "0.05"}
+                    {
+                        "timestamp": "2021-01-04T16:00:00-05:00",
+                        "target_ref": "AAPL",
+                        "sector_bucket_ref": "XLK",
+                        "forward_return": "0.05",
+                    }
                 )
                 writer.writerow(
-                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "MSFT", "forward_return": "0.10"}
+                    {
+                        "timestamp": "2021-01-04T16:00:00-05:00",
+                        "target_ref": "MSFT",
+                        "sector_bucket_ref": "XLK",
+                        "forward_return": "0.10",
+                    }
                 )
 
             report = build_model_group_layer_attribution(
@@ -559,7 +596,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 "partial",
             )
             self.assertEqual(
-                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank")][
+                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank_within_sector")][
                     "availability_status"
                 ],
                 "partial",
@@ -605,6 +642,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     fieldnames=[
                         "timestamp",
                         "target_ref",
+                        "sector_bucket_ref",
                         "visible_universe_membership",
                         "forward_return",
                         "forward_return_status",
@@ -615,6 +653,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     {
                         "timestamp": "2021-01-04T16:00:00-05:00",
                         "target_ref": "MSFT",
+                        "sector_bucket_ref": "XLK",
                         "visible_universe_membership": "true",
                         "forward_return": "",
                         "forward_return_status": "missing_exit_bar",
@@ -642,7 +681,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 "computed",
             )
             self.assertEqual(
-                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank")][
+                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank_within_sector")][
                     "availability_status"
                 ],
                 "data_gap",
@@ -652,7 +691,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     row["operation_component_id"]: row
                     for row in csv.DictReader(handle)
                 }
-            self.assertNotIn(
+            self.assertIn(
                 "component_specific_metric_data_gap",
                 packet_rows["C01_intake_operation"]["missing_review_outputs"],
             )
