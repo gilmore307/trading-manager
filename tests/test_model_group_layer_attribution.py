@@ -185,6 +185,8 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "operation_component_flow.csv").exists())
             self.assertTrue((output_dir / "operation_component_review_packet.csv").exists())
             self.assertTrue((output_dir / "operation_component_review_packet.json").exists())
+            self.assertTrue((output_dir / "operation_component_metrics.csv").exists())
+            self.assertTrue((output_dir / "operation_component_metrics_report.json").exists())
             self.assertTrue((output_dir / "high_score_filled_tail_loss_matches.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review_report.json").exists())
@@ -208,6 +210,15 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertIn("component_survival_quality_flow_summary", report)
             self.assertIn("component_review_packet_summary", report)
             self.assertIn("operation_component_review_packet_summary", report)
+            self.assertIn("operation_component_metrics_summary", report)
+            self.assertIn(
+                "C01_intake_operation",
+                report["operation_component_metrics_summary"]["components_with_metric_data_gaps"],
+            )
+            self.assertIn(
+                "C02_entry_operation",
+                report["operation_component_metrics_summary"]["components_with_metric_data_gaps"],
+            )
             self.assertEqual(
                 report["operation_component_review_packet_summary"]["first_limiting_projection_counts"][
                     "settled_prediction_quality"
@@ -281,6 +292,25 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertIn(
                 "explicit_model_05_option_expression_ref",
                 operation_packet_rows["C04_expression_review_operation"]["missing_review_outputs"],
+            )
+            self.assertIn(
+                "component_specific_metric_data_gap",
+                operation_packet_rows["C01_intake_operation"]["missing_review_outputs"],
+            )
+            with (output_dir / "operation_component_metrics.csv").open(encoding="utf-8") as handle:
+                metric_rows = {
+                    (row["operation_component_id"], row["metric_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                metric_rows[("C01_intake_operation", "visible_universe_integrity")]["availability_status"],
+                "data_gap",
+            )
+            self.assertEqual(
+                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank")][
+                    "availability_status"
+                ],
+                "data_gap",
             )
             operation_packet = json.loads(
                 (output_dir / "operation_component_review_packet.json").read_text(encoding="utf-8")
@@ -392,6 +422,161 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 "insufficient_attribution_for_some_problem_surfaces",
             )
             self.assertIn("C05_option_expression_surface", packet["summary"]["components_with_missing_review_outputs"])
+
+    def test_operation_component_metrics_rank_selected_target_against_fixed_universe(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            universe_path = tmp / "target_selection_universe_metrics.csv"
+            row = _row(
+                "r1",
+                "accepted",
+                "simulated_filled",
+                1,
+                0.72,
+                0.12,
+                "open_long",
+                "long",
+                "passed",
+                "listed_option_contract",
+            )
+            row["target_ref"] = "MSFT"
+            row["timestamp"] = "2021-01-04T16:00:00-05:00"
+            rows_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            with universe_path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["timestamp", "target_ref", "forward_return"])
+                writer.writeheader()
+                writer.writerow(
+                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "AAPL", "forward_return": "0.05"}
+                )
+                writer.writerow(
+                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "MSFT", "forward_return": "0.10"}
+                )
+                writer.writerow(
+                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "NVDA", "forward_return": "0.20"}
+                )
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                target_selection_universe_metrics_path=universe_path,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            self.assertEqual(
+                report["operation_component_metrics_summary"]["availability_status_counts"]["computed"],
+                7,
+            )
+            with (output_dir / "operation_component_metrics.csv").open(encoding="utf-8") as handle:
+                metric_rows = {
+                    (row["operation_component_id"], row["metric_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            rank_metric = metric_rows[("C02_entry_operation", "selected_target_forward_return_rank")]
+            self.assertEqual(rank_metric["availability_status"], "computed")
+            self.assertEqual(rank_metric["universe_count_mean"], "3.0")
+            self.assertEqual(rank_metric["selected_forward_return_rank_mean"], "2.0")
+            self.assertEqual(rank_metric["selected_forward_return_percentile_mean"], "0.5")
+            self.assertEqual(rank_metric["opportunity_cost_to_best_mean"], "0.1")
+            self.assertEqual(
+                metric_rows[("C01_intake_operation", "visible_universe_integrity")]["value"],
+                "1.0",
+            )
+            with (output_dir / "operation_component_review_packet.csv").open(encoding="utf-8") as handle:
+                packet_rows = {
+                    row["operation_component_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertNotIn(
+                "component_specific_metric_data_gap",
+                packet_rows["C01_intake_operation"]["missing_review_outputs"],
+            )
+            self.assertNotIn(
+                "component_specific_metric_data_gap",
+                packet_rows["C02_entry_operation"]["missing_review_outputs"],
+            )
+
+    def test_operation_component_metrics_marks_partial_target_universe_as_gap(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            universe_path = tmp / "target_selection_universe_metrics.csv"
+            selected_row = _row(
+                "r1",
+                "accepted",
+                "simulated_filled",
+                1,
+                0.72,
+                0.12,
+                "open_long",
+                "long",
+                "passed",
+                "listed_option_contract",
+            )
+            selected_row["target_ref"] = "MSFT"
+            selected_row["timestamp"] = "2021-01-04T16:00:00-05:00"
+            missing_row = dict(selected_row)
+            missing_row["decision_id"] = "r2"
+            missing_row["target_ref"] = "TSLA"
+            rows_path.write_text(
+                "\n".join(json.dumps(row) for row in (selected_row, missing_row)) + "\n",
+                encoding="utf-8",
+            )
+            with universe_path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["timestamp", "target_ref", "forward_return"])
+                writer.writeheader()
+                writer.writerow(
+                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "AAPL", "forward_return": "0.05"}
+                )
+                writer.writerow(
+                    {"timestamp": "2021-01-04T16:00:00-05:00", "target_ref": "MSFT", "forward_return": "0.10"}
+                )
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                target_selection_universe_metrics_path=universe_path,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            self.assertIn(
+                "C01_intake_operation",
+                report["operation_component_metrics_summary"]["components_with_metric_data_gaps"],
+            )
+            self.assertIn(
+                "C02_entry_operation",
+                report["operation_component_metrics_summary"]["components_with_metric_data_gaps"],
+            )
+            with (output_dir / "operation_component_metrics.csv").open(encoding="utf-8") as handle:
+                metric_rows = {
+                    (row["operation_component_id"], row["metric_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                metric_rows[("C01_intake_operation", "visible_universe_integrity")]["availability_status"],
+                "partial",
+            )
+            self.assertEqual(
+                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank")][
+                    "availability_status"
+                ],
+                "partial",
+            )
+            with (output_dir / "operation_component_review_packet.csv").open(encoding="utf-8") as handle:
+                packet_rows = {
+                    row["operation_component_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertIn(
+                "component_specific_metric_data_gap",
+                packet_rows["C01_intake_operation"]["missing_review_outputs"],
+            )
+            self.assertIn(
+                "component_specific_metric_data_gap",
+                packet_rows["C02_entry_operation"]["missing_review_outputs"],
+            )
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

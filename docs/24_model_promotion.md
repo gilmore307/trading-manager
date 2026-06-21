@@ -138,7 +138,9 @@ counterfactual, operation-component, review-projection, component-surface, and
 parameter-level replay summaries. The canonical review entry is
 `operation_component_review_packet.json` with companion
 `operation_component_review_packet.csv`, `operation_component_flow.csv`, and
-`operation_review_projection_matrix.csv`. These files use live/replay action
+`operation_review_projection_matrix.csv`. `operation_component_metrics.csv` and
+`operation_component_metrics_report.json` add component-specific diagnostic
+metrics under that same action axis. These files use live/replay action
 components as the first axis: C01 intake, C02 entry, C03 lifecycle, C04
 expression review, C05 order intent, C06 execution gate, and C07 failure review.
 Models and legacy decision surfaces are not treated as components. Instead,
@@ -146,7 +148,16 @@ Models and legacy decision surfaces are not treated as components. Instead,
 the operation that consumed or exposed them: background and target state under
 C01, event and underlying-entry decision under C02, option selection and selected
 contract path materialization under C04, fill/execution under C06, and residual
-event or settled prediction quality under C07. C03 lifecycle is marked
+event or settled prediction quality under C07. The metrics surface gives each
+operation its own diagnostic family: C01/C02 target-selection universe integrity
+and forward-return rank when a fixed point-in-time universe metrics CSV is
+provided, C02 entry signal/outcome alignment, C04 option-expression candidate
+funnel and selected-path materialization, C05 capacity/sizing counterfactual
+spread, C06 path/fill coverage, and C07 settled score/outcome quality. Future
+returns in these metrics are retrospective labels only and are forbidden as
+decision-time inputs. When the visible universe or forward-return evidence is not
+available, the component metric is a `data_gap`, not neutral performance. C03
+lifecycle is marked
 `not_applicable_for_candidate_entry_replay` for candidate-entry replay rows that
 do not manage an existing position.
 

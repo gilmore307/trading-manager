@@ -485,6 +485,35 @@ OPERATION_COMPONENT_REVIEW_PACKET_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+OPERATION_COMPONENT_METRIC_FIELDNAMES = [
+    "component_index",
+    "operation_component_id",
+    "runtime_component_ref",
+    "operation_component_label",
+    "metric_family",
+    "metric_name",
+    "metric_scope",
+    "availability_status",
+    "reason_codes",
+    "point_in_time_input_fields",
+    "future_outcome_fields",
+    "row_count",
+    "eligible_row_count",
+    "selected_count",
+    "universe_count_mean",
+    "selected_target_present_count",
+    "selected_forward_return_mean",
+    "selected_forward_return_rank_mean",
+    "selected_forward_return_percentile_mean",
+    "top_quartile_hit_rate",
+    "opportunity_cost_to_best_mean",
+    "opportunity_cost_to_median_mean",
+    "value",
+    "diagnostic_only",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -495,6 +524,7 @@ def build_model_group_layer_attribution(
     promotion_review_path: Path | None = None,
     m05_unfilled_diagnostics_path: Path | None = None,
     counterfactual_gate_sweep_path: Path | None = None,
+    target_selection_universe_metrics_path: Path | None = None,
     run_id: str | None = None,
     now_utc: datetime | None = None,
     tail_row_limit: int = DEFAULT_TAIL_ROW_LIMIT,
@@ -565,9 +595,17 @@ def build_model_group_layer_attribution(
         decision_surface_rows,
         operation_review_projection_rows,
     )
+    target_selection_universe_rows = _load_csv_rows(target_selection_universe_metrics_path)
+    operation_component_metric_rows = _operation_component_metric_rows(
+        rows=rows,
+        target_selection_universe_rows=target_selection_universe_rows,
+        portfolio_capacity_rows=portfolio_capacity_rows,
+    )
+    operation_component_metric_report = _operation_component_metric_report(operation_component_metric_rows)
     operation_component_review_packet = _operation_component_review_packet(
         operation_component_flow_rows=operation_component_flow_rows,
         operation_review_projection_rows=operation_review_projection_rows,
+        operation_component_metric_rows=operation_component_metric_rows,
         component_model_mapping_rows=component_model_mapping_rows,
         m05_unfilled_summary=m05_unfilled_summary,
         replay_receipt_available=replay_receipt_path is not None,
@@ -623,6 +661,11 @@ def build_model_group_layer_attribution(
         output_dir / "operation_component_review_packet.csv",
         operation_component_review_packet["component_rows"],
         fieldnames=OPERATION_COMPONENT_REVIEW_PACKET_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "operation_component_metrics.csv",
+        operation_component_metric_rows,
+        fieldnames=OPERATION_COMPONENT_METRIC_FIELDNAMES,
     )
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
@@ -695,6 +738,10 @@ def build_model_group_layer_attribution(
         json.dumps(operation_component_review_packet["packet"], indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "operation_component_metrics_report.json").write_text(
+        json.dumps(operation_component_metric_report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     if m05_unfilled_summary["source_status"] == "available":
         _write_csv(output_dir / "m05_unfilled_filter_reasons.csv", m05_unfilled_summary["filter_reason_rows"])
 
@@ -707,6 +754,9 @@ def build_model_group_layer_attribution(
         "promotion_review_ref": str(promotion_review_path) if promotion_review_path else "",
         "m05_unfilled_diagnostics_ref": str(m05_unfilled_diagnostics_path) if m05_unfilled_diagnostics_path else "",
         "counterfactual_gate_sweep_ref": str(counterfactual_gate_sweep_path) if counterfactual_gate_sweep_path else "",
+        "target_selection_universe_metrics_ref": (
+            str(target_selection_universe_metrics_path) if target_selection_universe_metrics_path else ""
+        ),
         "row_scope": _row_scope(rows),
         "layer_status": _layer_status(rows),
         "cohorts": cohort_rows,
@@ -732,6 +782,9 @@ def build_model_group_layer_attribution(
         "operation_component_review_packet_ref": str(output_dir / "operation_component_review_packet.json"),
         "operation_component_review_packet_csv_ref": str(output_dir / "operation_component_review_packet.csv"),
         "operation_component_review_packet_summary": operation_component_review_packet["packet"]["summary"],
+        "operation_component_metrics_ref": str(output_dir / "operation_component_metrics.csv"),
+        "operation_component_metrics_report_ref": str(output_dir / "operation_component_metrics_report.json"),
+        "operation_component_metrics_summary": operation_component_metric_report["summary"],
         "canonical_operation_components": [
             {
                 "operation_component_id": str(spec["operation_component_id"]),
@@ -821,6 +874,10 @@ def _m05_diagnostics(row: Mapping[str, Any]) -> Mapping[str, Any]:
         or diagnostics.get("model_05_option_expression")
         or {}
     )
+
+
+def _m05_option_expression_diagnostics(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    return ((row.get("model_layer_diagnostics") or {}).get("model_05_option_expression") or {})
 
 
 def _m06_diagnostics(row: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -1847,10 +1904,418 @@ def _operation_component_flow_verdict(
     return "neutral_measured", "bad_rate_change_below_materiality"
 
 
+def _operation_component_metric_rows(
+    *,
+    rows: Sequence[Mapping[str, Any]],
+    target_selection_universe_rows: Sequence[Mapping[str, Any]],
+    portfolio_capacity_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    output.extend(_target_selection_metric_rows(rows, target_selection_universe_rows))
+    output.append(_entry_signal_metric_row(rows))
+    output.append(_lifecycle_metric_row())
+    output.append(_option_expression_metric_row(rows))
+    output.append(_order_intent_metric_row(rows, portfolio_capacity_rows))
+    output.append(_execution_gate_metric_row(rows))
+    output.append(_failure_review_metric_row(rows))
+    return output
+
+
+def _target_selection_metric_rows(
+    rows: Sequence[Mapping[str, Any]],
+    target_selection_universe_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    if not target_selection_universe_rows:
+        return [
+            _operation_component_metric_row(
+                component_id=component_id,
+                metric_family="target_selection_quality",
+                metric_name=metric_name,
+                metric_scope="decision_time_visible_universe",
+                availability_status="data_gap",
+                reason_codes=["target_selection_universe_metrics_missing"],
+                point_in_time_input_fields=["timestamp", "target_ref", "visible_universe_membership"],
+                future_outcome_fields=["forward_return"],
+                row_count=len(rows),
+            )
+            for component_id, metric_name in (
+                ("C01_intake_operation", "visible_universe_integrity"),
+                ("C02_entry_operation", "selected_target_forward_return_rank"),
+            )
+        ]
+
+    universe_by_timestamp: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for row in target_selection_universe_rows:
+        universe_by_timestamp[str(row.get("timestamp") or "")].append(row)
+
+    selected_results: list[dict[str, float]] = []
+    present_count = 0
+    for row in rows:
+        timestamp = str(row.get("timestamp") or "")
+        target_ref = str(row.get("target_ref") or "")
+        universe_rows = universe_by_timestamp.get(timestamp, [])
+        ranked_rows = [
+            item
+            for item in universe_rows
+            if _target_universe_forward_return(item) is not None
+        ]
+        selected_row = next(
+            (item for item in ranked_rows if str(item.get("target_ref") or "") == target_ref),
+            None,
+        )
+        if selected_row is None:
+            continue
+        present_count += 1
+        selected_return = _target_universe_forward_return(selected_row)
+        if selected_return is None:
+            continue
+        returns = [_target_universe_forward_return(item) for item in ranked_rows]
+        numeric_returns = [float(value) for value in returns if value is not None]
+        if not numeric_returns:
+            continue
+        rank = 1 + sum(1 for value in numeric_returns if value > selected_return)
+        universe_count = len(numeric_returns)
+        percentile = 1.0 if universe_count <= 1 else (universe_count - rank) / (universe_count - 1)
+        best_return = max(numeric_returns)
+        median_return = _median(numeric_returns)
+        selected_results.append(
+            {
+                "selected_forward_return": selected_return,
+                "rank": float(rank),
+                "percentile": percentile,
+                "top_quartile_hit": 1.0 if rank <= max(1, int((universe_count + 3) // 4)) else 0.0,
+                "opportunity_cost_to_best": best_return - selected_return,
+                "opportunity_cost_to_median": (median_return or 0.0) - selected_return,
+                "universe_count": float(universe_count),
+            }
+        )
+
+    integrity_status = "computed" if present_count == len(rows) else "partial"
+    if present_count <= 0:
+        integrity_status = "data_gap"
+    if not selected_results:
+        rank_status = "data_gap"
+    elif len(selected_results) < len(rows):
+        rank_status = "partial"
+    else:
+        rank_status = "computed"
+    return [
+        _operation_component_metric_row(
+            component_id="C01_intake_operation",
+            metric_family="target_selection_quality",
+            metric_name="visible_universe_integrity",
+            metric_scope="decision_time_visible_universe",
+            availability_status=integrity_status,
+            reason_codes=[] if integrity_status == "computed" else ["selected_target_missing_from_visible_universe"],
+            point_in_time_input_fields=["timestamp", "target_ref", "visible_universe_membership"],
+            future_outcome_fields=[],
+            row_count=len(rows),
+            eligible_row_count=present_count,
+            selected_count=len(rows),
+            selected_target_present_count=present_count,
+            universe_count_mean=_mean(result["universe_count"] for result in selected_results),
+            value=(present_count / len(rows)) if rows else None,
+        ),
+        _operation_component_metric_row(
+            component_id="C02_entry_operation",
+            metric_family="target_selection_quality",
+            metric_name="selected_target_forward_return_rank",
+            metric_scope="decision_time_visible_universe",
+            availability_status=rank_status,
+            reason_codes=[] if rank_status == "computed" else ["selected_target_forward_return_unavailable"],
+            point_in_time_input_fields=["timestamp", "target_ref", "visible_universe_membership"],
+            future_outcome_fields=["forward_return"],
+            row_count=len(rows),
+            eligible_row_count=len(selected_results),
+            selected_count=len(rows),
+            selected_target_present_count=present_count,
+            universe_count_mean=_mean(result["universe_count"] for result in selected_results),
+            selected_forward_return_mean=_mean(result["selected_forward_return"] for result in selected_results),
+            selected_forward_return_rank_mean=_mean(result["rank"] for result in selected_results),
+            selected_forward_return_percentile_mean=_mean(result["percentile"] for result in selected_results),
+            top_quartile_hit_rate=_mean(result["top_quartile_hit"] for result in selected_results),
+            opportunity_cost_to_best_mean=_mean(result["opportunity_cost_to_best"] for result in selected_results),
+            opportunity_cost_to_median_mean=_mean(
+                result["opportunity_cost_to_median"] for result in selected_results
+            ),
+            value=_mean(result["percentile"] for result in selected_results),
+        ),
+    ]
+
+
+def _entry_signal_metric_row(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    m04_open_rows = [row for row in rows if _m04_state(row) == "open_long/long"]
+    return _operation_component_metric_row(
+        component_id="C02_entry_operation",
+        metric_family="entry_action_quality",
+        metric_name="entry_signal_strength_and_outcome_alignment",
+        metric_scope="replay_decision_rows",
+        availability_status="computed" if rows else "data_gap",
+        reason_codes=[] if rows else ["decision_rows_missing"],
+        point_in_time_input_fields=["model_04_unified_decision.dominant_horizon_scores", "prediction_score"],
+        future_outcome_fields=["outcome_label", "realized_return"],
+        row_count=len(rows),
+        eligible_row_count=len(m04_open_rows),
+        selected_count=len(m04_open_rows),
+        value=_spearman_for_key(rows, "prediction_score", "realized_return"),
+        selected_forward_return_mean=_mean(_numeric_values(rows, "realized_return")),
+        top_quartile_hit_rate=_round(
+            sum(1 for row in rows if str(row.get("outcome_label")) == "1") / len(rows)
+        )
+        if rows
+        else None,
+    )
+
+
+def _lifecycle_metric_row() -> dict[str, Any]:
+    return _operation_component_metric_row(
+        component_id="C03_lifecycle_operation",
+        metric_family="position_lifecycle_quality",
+        metric_name="existing_position_lifecycle_outcome",
+        metric_scope="candidate_entry_replay",
+        availability_status="not_applicable",
+        reason_codes=["candidate_entry_replay_does_not_operate_lifecycle_component"],
+        point_in_time_input_fields=[],
+        future_outcome_fields=[],
+    )
+
+
+def _option_expression_metric_row(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    expression_rows = [
+        row for row in rows if _m05_option_expression_diagnostics(row) or str(row.get("selected_option_contract_ref") or "")
+    ]
+    before_filter = [
+        _float(_m05_option_expression_diagnostics(row).get("candidate_count_before_filter"))
+        for row in expression_rows
+        if _m05_option_expression_diagnostics(row).get("candidate_count_before_filter") not in {None, ""}
+    ]
+    eligible = [
+        _float(_m05_option_expression_diagnostics(row).get("eligible_candidate_count"))
+        for row in expression_rows
+        if _m05_option_expression_diagnostics(row).get("eligible_candidate_count") not in {None, ""}
+    ]
+    selected_count = sum(1 for row in expression_rows if str(row.get("selected_option_contract_ref") or ""))
+    path_available = sum(1 for row in expression_rows if _selected_option_path_status(row) == "available")
+    return _operation_component_metric_row(
+        component_id="C04_expression_review_operation",
+        metric_family="option_expression_quality",
+        metric_name="candidate_funnel_and_path_materialization",
+        metric_scope="m05_option_expression_rows",
+        availability_status="computed" if expression_rows else "data_gap",
+        reason_codes=[] if expression_rows else ["option_expression_rows_missing"],
+        point_in_time_input_fields=[
+            "candidate_count_before_filter",
+            "eligible_candidate_count",
+            "selected_option_contract_ref",
+            "option_contract_path_status",
+        ],
+        future_outcome_fields=["realized_return"],
+        row_count=len(rows),
+        eligible_row_count=len(expression_rows),
+        selected_count=selected_count,
+        universe_count_mean=_mean(before_filter),
+        selected_target_present_count=path_available,
+        selected_forward_return_mean=_mean(_numeric_values([row for row in rows if row.get("fill_status") == "simulated_filled"], "realized_return")),
+        value=(path_available / selected_count) if selected_count else None,
+        opportunity_cost_to_median_mean=_mean(eligible),
+    )
+
+
+def _order_intent_metric_row(
+    rows: Sequence[Mapping[str, Any]],
+    portfolio_capacity_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    baseline = next(
+        (row for row in portfolio_capacity_rows if str(row.get("variant_name") or "") == "baseline_all_selected"),
+        {},
+    )
+    best = max(
+        portfolio_capacity_rows,
+        key=lambda row: _float(row.get("selected_realized_return_total"), default=float("-inf")),
+        default={},
+    )
+    selected_count = int(_float(baseline.get("selected_count"), default=0.0))
+    return _operation_component_metric_row(
+        component_id="C05_order_intent_operation",
+        metric_family="order_intent_capacity_quality",
+        metric_name="capacity_counterfactual_spread",
+        metric_scope="fixed_replay_portfolio_capacity_variants",
+        availability_status="computed" if portfolio_capacity_rows else "data_gap",
+        reason_codes=[] if portfolio_capacity_rows else ["portfolio_capacity_counterfactual_missing"],
+        point_in_time_input_fields=["planned_position_notional_usd", "prediction_score", "portfolio_budget"],
+        future_outcome_fields=["realized_return"],
+        row_count=len(rows),
+        eligible_row_count=selected_count,
+        selected_count=selected_count,
+        value=_float(best.get("selected_realized_return_total")) - _float(baseline.get("selected_realized_return_total"))
+        if best and baseline
+        else None,
+        selected_forward_return_mean=_float(baseline.get("selected_return_per_row")),
+        opportunity_cost_to_best_mean=_float(best.get("selected_realized_return_total"))
+        - _float(baseline.get("selected_realized_return_total"))
+        if best and baseline
+        else None,
+    )
+
+
+def _execution_gate_metric_row(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    selected_rows = [row for row in rows if str(row.get("selected_option_contract_ref") or "")]
+    filled_count = sum(1 for row in selected_rows if row.get("fill_status") == "simulated_filled")
+    path_missing_count = sum(1 for row in selected_rows if _selected_option_path_status(row) == "missing")
+    return _operation_component_metric_row(
+        component_id="C06_execution_gate_operation",
+        metric_family="execution_gate_quality",
+        metric_name="selected_contract_path_and_fill_coverage",
+        metric_scope="selected_contract_rows",
+        availability_status="computed" if selected_rows else "data_gap",
+        reason_codes=[] if selected_rows else ["selected_contract_rows_missing"],
+        point_in_time_input_fields=["selected_option_contract_ref", "option_contract_path_status", "fill_status"],
+        future_outcome_fields=[],
+        row_count=len(rows),
+        eligible_row_count=len(selected_rows),
+        selected_count=filled_count,
+        selected_target_present_count=len(selected_rows) - path_missing_count,
+        value=(filled_count / len(selected_rows)) if selected_rows else None,
+    )
+
+
+def _failure_review_metric_row(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    filled_rows = [row for row in rows if row.get("fill_status") == "simulated_filled"]
+    return _operation_component_metric_row(
+        component_id="C07_failure_review_operation",
+        metric_family="settled_failure_review_quality",
+        metric_name="settled_score_outcome_surface",
+        metric_scope="settled_replay_rows",
+        availability_status="computed" if filled_rows else "data_gap",
+        reason_codes=[] if filled_rows else ["settled_rows_missing"],
+        point_in_time_input_fields=["prediction_score", "model_evidence_chain"],
+        future_outcome_fields=["outcome_label", "realized_return"],
+        row_count=len(rows),
+        eligible_row_count=len(filled_rows),
+        selected_count=len(filled_rows),
+        selected_forward_return_mean=_mean(_numeric_values(filled_rows, "realized_return")),
+        top_quartile_hit_rate=_round(
+            sum(1 for row in filled_rows if str(row.get("outcome_label")) == "1") / len(filled_rows)
+        )
+        if filled_rows
+        else None,
+        value=_spearman_for_key(filled_rows, "prediction_score", "realized_return"),
+    )
+
+
+def _operation_component_metric_row(
+    *,
+    component_id: str,
+    metric_family: str,
+    metric_name: str,
+    metric_scope: str,
+    availability_status: str,
+    reason_codes: Sequence[str],
+    point_in_time_input_fields: Sequence[str],
+    future_outcome_fields: Sequence[str],
+    row_count: int = 0,
+    eligible_row_count: int = 0,
+    selected_count: int = 0,
+    universe_count_mean: float | None = None,
+    selected_target_present_count: int = 0,
+    selected_forward_return_mean: float | None = None,
+    selected_forward_return_rank_mean: float | None = None,
+    selected_forward_return_percentile_mean: float | None = None,
+    top_quartile_hit_rate: float | None = None,
+    opportunity_cost_to_best_mean: float | None = None,
+    opportunity_cost_to_median_mean: float | None = None,
+    value: float | None = None,
+) -> dict[str, Any]:
+    component = OPERATION_COMPONENT_BY_ID.get(component_id) or {}
+    return {
+        "component_index": int(component.get("component_index") or 0),
+        "operation_component_id": component_id,
+        "runtime_component_ref": str(component.get("runtime_component_ref") or ""),
+        "operation_component_label": str(component.get("operation_component_label") or ""),
+        "metric_family": metric_family,
+        "metric_name": metric_name,
+        "metric_scope": metric_scope,
+        "availability_status": availability_status,
+        "reason_codes": ";".join(reason_codes),
+        "point_in_time_input_fields": ";".join(point_in_time_input_fields),
+        "future_outcome_fields": ";".join(future_outcome_fields),
+        "row_count": row_count,
+        "eligible_row_count": eligible_row_count,
+        "selected_count": selected_count,
+        "universe_count_mean": _round(universe_count_mean),
+        "selected_target_present_count": selected_target_present_count,
+        "selected_forward_return_mean": _round(selected_forward_return_mean),
+        "selected_forward_return_rank_mean": _round(selected_forward_return_rank_mean),
+        "selected_forward_return_percentile_mean": _round(selected_forward_return_percentile_mean),
+        "top_quartile_hit_rate": _round(top_quartile_hit_rate),
+        "opportunity_cost_to_best_mean": _round(opportunity_cost_to_best_mean),
+        "opportunity_cost_to_median_mean": _round(opportunity_cost_to_median_mean),
+        "value": _round(value),
+        "diagnostic_only": True,
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+
+
+def _target_universe_forward_return(row: Mapping[str, Any]) -> float | None:
+    for key in (
+        "forward_return",
+        "future_return",
+        "horizon_forward_return",
+        "replay_forward_return",
+        "replay_opportunity_return",
+        "candidate_opportunity_return",
+        "realized_return",
+    ):
+        if row.get(key) not in {None, ""}:
+            return _float(row.get(key))
+    return None
+
+
+def _operation_component_metric_report(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    return {
+        "contract_type": "model_group_operation_component_metric_report",
+        "operation_component_metrics_ref": "operation_component_metrics.csv",
+        "summary": {
+            "metric_count": len(rows),
+            "availability_status_counts": dict(Counter(str(row.get("availability_status") or "") for row in rows)),
+            "metric_family_counts": dict(Counter(str(row.get("metric_family") or "") for row in rows)),
+            "components_with_metric_data_gaps": sorted(
+                {
+                    str(row.get("operation_component_id") or "")
+                    for row in rows
+                    if _metric_status_has_data_gap(row)
+                }
+            ),
+            "fixed_input_only": True,
+            "threshold_selection_performed": False,
+            "retraining_performed": False,
+        },
+        "forbidden_uses": [
+            "training_feature_input",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+        "interpretation_notes": [
+            "Future outcome fields are ex-post diagnostic labels only.",
+            "Target-selection ranks require a fixed point-in-time visible universe input.",
+            "Metric data gaps are evidence gaps, not neutral component performance.",
+        ],
+    }
+
+
+def _metric_status_has_data_gap(row: Mapping[str, Any]) -> bool:
+    return str(row.get("availability_status") or "") in {"data_gap", "partial"}
+
+
 def _operation_component_review_packet(
     *,
     operation_component_flow_rows: Sequence[Mapping[str, Any]],
     operation_review_projection_rows: Sequence[Mapping[str, Any]],
+    operation_component_metric_rows: Sequence[Mapping[str, Any]],
     component_model_mapping_rows: Sequence[Mapping[str, Any]],
     m05_unfilled_summary: Mapping[str, Any],
     replay_receipt_available: bool,
@@ -1863,6 +2328,9 @@ def _operation_component_review_packet(
     projection_rows_by_component: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for row in operation_review_projection_rows:
         projection_rows_by_component[str(row.get("operation_component_id") or "")].append(row)
+    metric_rows_by_component: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for row in operation_component_metric_rows:
+        metric_rows_by_component[str(row.get("operation_component_id") or "")].append(row)
     component_rows: list[dict[str, Any]] = []
     for flow_row in operation_component_flow_rows:
         component_id = str(flow_row.get("operation_component_id") or "")
@@ -1873,6 +2341,7 @@ def _operation_component_review_packet(
         missing_outputs = _operation_component_missing_review_outputs(
             component_id=component_id,
             mapping_by_surface=mapping_by_surface,
+            metric_rows=metric_rows_by_component.get(component_id, []),
             m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
             replay_receipt_available=replay_receipt_available,
             settled_metric_eligible_count=int(flow_row.get("settled_metric_eligible_count") or 0),
@@ -1934,6 +2403,7 @@ def _operation_component_review_packet(
         "operation_component_review_packet_csv_ref": str(output_dir / "operation_component_review_packet.csv"),
         "operation_review_projection_matrix_ref": str(output_dir / "operation_review_projection_matrix.csv"),
         "operation_component_flow_ref": str(output_dir / "operation_component_flow.csv"),
+        "operation_component_metrics_ref": str(output_dir / "operation_component_metrics.csv"),
         "component_count": len(component_rows),
         "summary": {
             "component_count": len(component_rows),
@@ -1944,6 +2414,16 @@ def _operation_component_review_packet(
             "interpretation_status_counts": dict(Counter(str(row["interpretation_status"]) for row in component_rows)),
             "first_limiting_projection_counts": dict(
                 Counter(str(row.get("review_projection") or "") for row in operation_review_projection_rows)
+            ),
+            "component_metric_availability_counts": dict(
+                Counter(str(row.get("availability_status") or "") for row in operation_component_metric_rows)
+            ),
+            "components_with_metric_data_gaps": sorted(
+                {
+                    str(row.get("operation_component_id") or "")
+                    for row in operation_component_metric_rows
+                    if _metric_status_has_data_gap(row)
+                }
             ),
             "components_with_missing_review_outputs": [
                 str(row["operation_component_id"])
@@ -2037,11 +2517,14 @@ def _operation_component_missing_review_outputs(
     *,
     component_id: str,
     mapping_by_surface: Mapping[str, Mapping[str, Any]],
+    metric_rows: Sequence[Mapping[str, Any]],
     m05_unfilled_available: bool,
     replay_receipt_available: bool,
     settled_metric_eligible_count: int,
 ) -> list[str]:
     missing: list[str] = []
+    if any(_metric_status_has_data_gap(row) for row in metric_rows):
+        missing.append("component_specific_metric_data_gap")
     if component_id == "C01_intake_operation":
         for surface in ("C01_background_context_surface", "C02_target_state_surface"):
             mapping_row = mapping_by_surface.get(surface) or {}
@@ -4891,6 +5374,16 @@ def _mean(values: Iterable[float]) -> float | None:
     return sum(values_tuple) / len(values_tuple)
 
 
+def _median(values: Iterable[float]) -> float | None:
+    values_tuple = tuple(sorted(values))
+    if not values_tuple:
+        return None
+    midpoint = len(values_tuple) // 2
+    if len(values_tuple) % 2:
+        return values_tuple[midpoint]
+    return (values_tuple[midpoint - 1] + values_tuple[midpoint]) / 2
+
+
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], *, fieldnames: Sequence[str] | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows and not fieldnames:
@@ -4916,6 +5409,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--promotion-review", type=Path)
     parser.add_argument("--m05-unfilled-diagnostics", type=Path)
     parser.add_argument("--counterfactual-gate-sweep", type=Path)
+    parser.add_argument("--target-selection-universe-metrics", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument("--tail-row-limit", type=int, default=DEFAULT_TAIL_ROW_LIMIT)
     parser.add_argument("--high-score-threshold", type=float, default=DEFAULT_HIGH_SCORE_THRESHOLD)
@@ -4927,6 +5421,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         promotion_review_path=args.promotion_review,
         m05_unfilled_diagnostics_path=args.m05_unfilled_diagnostics,
         counterfactual_gate_sweep_path=args.counterfactual_gate_sweep,
+        target_selection_universe_metrics_path=args.target_selection_universe_metrics,
         run_id=args.run_id,
         tail_row_limit=args.tail_row_limit,
         high_score_threshold=args.high_score_threshold,
