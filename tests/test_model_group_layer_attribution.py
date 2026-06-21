@@ -529,6 +529,22 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             )["summary"]
             self.assertEqual(model_candidate_summary["selected_candidate_rank_mean_same_timestamp"], 1.0)
             self.assertEqual(model_candidate_summary["selected_candidate_top_25_same_timestamp_count"], 1)
+            self.assertTrue((output_dir / "pre_option_candidate_quality.csv").exists())
+            pre_option_summary = json.loads(
+                (output_dir / "pre_option_candidate_quality_report.json").read_text(encoding="utf-8")
+            )["summary"]
+            self.assertEqual(pre_option_summary["cohort_count"], 9)
+            self.assertTrue((output_dir / "operation_mechanism_task_packet.csv").exists())
+            mechanism_task_summary = json.loads(
+                (output_dir / "operation_mechanism_task_packet.json").read_text(encoding="utf-8")
+            )["summary"]
+            self.assertGreaterEqual(mechanism_task_summary["task_count"], 1)
+            with (output_dir / "operation_mechanism_task_packet.csv").open(encoding="utf-8") as handle:
+                mechanism_tasks = {
+                    row["task_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertIn("mechanism_c01_sector_selection_effectiveness", mechanism_tasks)
             with (output_dir / "operation_component_review_packet.csv").open(encoding="utf-8") as handle:
                 packet_rows = {
                     row["operation_component_id"]: row

@@ -6,6 +6,7 @@ import argparse
 import ast
 import csv
 import json
+import math
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -541,6 +542,42 @@ MODEL_CANDIDATE_SELECTION_SUMMARY_FIELDNAMES = [
     "option_hard_filter_reason_counts",
     "fixed_input_only",
 ]
+PRE_OPTION_CANDIDATE_QUALITY_FIELDNAMES = [
+    "cohort_name",
+    "cohort_role",
+    "row_count",
+    "matched_outcome_count",
+    "status_counts",
+    "option_expression_unexecutable_reason_counts",
+    "model_rank_mean",
+    "forward_return_mean",
+    "global_forward_return_percentile_mean",
+    "global_top_quartile_hit_rate",
+    "within_sector_forward_return_percentile_mean",
+    "within_sector_top_quartile_hit_rate",
+    "diagnostic_only",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
+OPERATION_MECHANISM_TASK_FIELDNAMES = [
+    "task_id",
+    "operation_component_id",
+    "runtime_component_ref",
+    "task_title",
+    "task_type",
+    "priority",
+    "problem_statement",
+    "evidence_refs",
+    "trigger_metrics",
+    "required_action",
+    "acceptance_gate",
+    "forbidden_actions",
+    "diagnostic_only",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -636,6 +673,11 @@ def build_model_group_layer_attribution(
         model_candidate_selection_trace_rows,
         model_candidate_selection_summary_rows,
     )
+    pre_option_candidate_quality_rows = _pre_option_candidate_quality_rows(
+        trace_rows=model_candidate_selection_trace_rows,
+        target_selection_universe_rows=target_selection_universe_rows,
+    )
+    pre_option_candidate_quality_report = _pre_option_candidate_quality_report(pre_option_candidate_quality_rows)
     operation_component_metric_rows = _operation_component_metric_rows(
         rows=rows,
         target_selection_universe_rows=target_selection_universe_rows,
@@ -655,6 +697,12 @@ def build_model_group_layer_attribution(
         replay_receipt_available=replay_receipt_path is not None,
         output_dir=output_dir,
     )
+    operation_mechanism_task_rows = _operation_mechanism_task_rows(
+        operation_component_metric_rows=operation_component_metric_rows,
+        model_candidate_selection_summary=model_candidate_selection_summary_report["summary"],
+        pre_option_candidate_quality_rows=pre_option_candidate_quality_rows,
+    )
+    operation_mechanism_task_packet = _operation_mechanism_task_packet(operation_mechanism_task_rows)
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
     tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
         rows=rows,
@@ -715,6 +763,16 @@ def build_model_group_layer_attribution(
         output_dir / "model_candidate_selection_summary.csv",
         model_candidate_selection_summary_rows,
         fieldnames=MODEL_CANDIDATE_SELECTION_SUMMARY_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "pre_option_candidate_quality.csv",
+        pre_option_candidate_quality_rows,
+        fieldnames=PRE_OPTION_CANDIDATE_QUALITY_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "operation_mechanism_task_packet.csv",
+        operation_mechanism_task_rows,
+        fieldnames=OPERATION_MECHANISM_TASK_FIELDNAMES,
     )
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
@@ -795,6 +853,14 @@ def build_model_group_layer_attribution(
         json.dumps(model_candidate_selection_summary_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "pre_option_candidate_quality_report.json").write_text(
+        json.dumps(pre_option_candidate_quality_report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "operation_mechanism_task_packet.json").write_text(
+        json.dumps(operation_mechanism_task_packet, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     if m05_unfilled_summary["source_status"] == "available":
         _write_csv(output_dir / "m05_unfilled_filter_reasons.csv", m05_unfilled_summary["filter_reason_rows"])
 
@@ -817,6 +883,12 @@ def build_model_group_layer_attribution(
             output_dir / "model_candidate_selection_summary_report.json"
         ),
         "model_candidate_selection_summary": model_candidate_selection_summary_report["summary"],
+        "pre_option_candidate_quality_ref": str(output_dir / "pre_option_candidate_quality.csv"),
+        "pre_option_candidate_quality_report_ref": str(output_dir / "pre_option_candidate_quality_report.json"),
+        "pre_option_candidate_quality_summary": pre_option_candidate_quality_report["summary"],
+        "operation_mechanism_task_packet_ref": str(output_dir / "operation_mechanism_task_packet.json"),
+        "operation_mechanism_task_packet_csv_ref": str(output_dir / "operation_mechanism_task_packet.csv"),
+        "operation_mechanism_task_packet_summary": operation_mechanism_task_packet["summary"],
         "row_scope": _row_scope(rows),
         "layer_status": _layer_status(rows),
         "cohorts": cohort_rows,
@@ -980,10 +1052,26 @@ def _model_candidate_selection_summary_rows(trace_rows: Sequence[Mapping[str, An
     return output
 
 
+def _as_mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
 def _json_dumps_sorted(value: Any) -> str:
     if not isinstance(value, Mapping):
         return "{}"
-    return json.dumps(dict(sorted(value.items())), sort_keys=True)
+    return json.dumps(_json_safe_mapping(value), sort_keys=True)
+
+
+def _json_safe_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
+    output: dict[str, Any] = {}
+    for key, item in sorted(value.items()):
+        if isinstance(item, float) and math.isnan(item):
+            output[str(key)] = None
+        elif isinstance(item, Mapping):
+            output[str(key)] = _json_safe_mapping(item)
+        else:
+            output[str(key)] = item
+    return output
 
 
 def _model_candidate_selection_summary_report(
@@ -1059,6 +1147,441 @@ def _model_candidate_selection_summary_report(
             "promotion_approval",
             "model_activation",
             "broker_or_account_authority",
+        ],
+    }
+
+
+def _pre_option_candidate_quality_rows(
+    *,
+    trace_rows: Sequence[Mapping[str, Any]],
+    target_selection_universe_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    if not trace_rows or not target_selection_universe_rows:
+        return []
+    outcome_by_key: dict[tuple[str, str], Mapping[str, Any]] = {}
+    for row in target_selection_universe_rows:
+        timestamp = str(row.get("timestamp") or "")
+        target_ref = str(row.get("target_ref") or row.get("symbol") or "")
+        if timestamp and target_ref:
+            outcome_by_key[(timestamp, target_ref)] = row
+    scored_rows = [row for row in trace_rows if _truthy(row.get("model_score_available"))]
+    if not scored_rows:
+        return []
+
+    def rank_between(row: Mapping[str, Any], low: int, high: int) -> bool:
+        rank = int(_float(row.get("model_rank_within_timestamp"), default=10**9))
+        return low <= rank <= high
+
+    cohorts = [
+        ("all_visible_scored", "all point-in-time scored visible candidates", scored_rows),
+        (
+            "pre_option_entry_intent",
+            "candidates with underlying entry intent before option expression",
+            [row for row in scored_rows if _truthy(row.get("option_expression_signal_required"))],
+        ),
+        (
+            "model_rank_top_10_pre_option",
+            "top 10 model-ranked underlying candidates before option expression",
+            [row for row in scored_rows if rank_between(row, 1, 10)],
+        ),
+        (
+            "model_rank_top_25_pre_option",
+            "top 25 model-ranked underlying candidates before option expression",
+            [row for row in scored_rows if rank_between(row, 1, 25)],
+        ),
+        (
+            "model_rank_top_50_pre_option",
+            "top 50 model-ranked underlying candidates before option expression",
+            [row for row in scored_rows if rank_between(row, 1, 50)],
+        ),
+        (
+            "option_executable_entry_intent",
+            "entry-intent candidates with executable option expression",
+            [
+                row
+                for row in scored_rows
+                if str(row.get("model_candidate_trace_status") or "")
+                in {"selected_by_replay", "scored_not_selected_by_portfolio"}
+            ],
+        ),
+        (
+            "option_unexecutable_entry_intent",
+            "entry-intent candidates blocked before order intent by option expression",
+            [
+                row
+                for row in scored_rows
+                if str(row.get("model_candidate_trace_status") or "") == "option_expression_unexecutable"
+            ],
+        ),
+        (
+            "final_selected_after_option_expression",
+            "portfolio-selected candidates after option expression and capital feasibility",
+            [row for row in scored_rows if _truthy(row.get("selected_by_replay"))],
+        ),
+        (
+            "no_entry_intent",
+            "scored candidates rejected before option expression",
+            [
+                row
+                for row in scored_rows
+                if str(row.get("model_candidate_trace_status") or "") == "scored_no_entry_intent"
+            ],
+        ),
+    ]
+    return [
+        _pre_option_candidate_quality_row(
+            cohort_name=name,
+            cohort_role=role,
+            rows=rows,
+            outcome_by_key=outcome_by_key,
+        )
+        for name, role, rows in cohorts
+    ]
+
+
+def _pre_option_candidate_quality_row(
+    *,
+    cohort_name: str,
+    cohort_role: str,
+    rows: Sequence[Mapping[str, Any]],
+    outcome_by_key: Mapping[tuple[str, str], Mapping[str, Any]],
+) -> dict[str, Any]:
+    matched: list[Mapping[str, Any]] = []
+    ranks: list[float] = []
+    returns: list[float] = []
+    global_percentiles: list[float] = []
+    sector_percentiles: list[float] = []
+    global_top_quartile_hits = 0
+    sector_top_quartile_hits = 0
+    status_counts = Counter(str(row.get("model_candidate_trace_status") or "unknown") for row in rows)
+    unexecutable_reason_counts = Counter(
+        str(row.get("option_expression_unexecutable_reason") or "unknown")
+        for row in rows
+        if str(row.get("model_candidate_trace_status") or "") == "option_expression_unexecutable"
+    )
+    for row in rows:
+        rank = _float(row.get("model_rank_within_timestamp"), default=float("nan"))
+        if not math.isnan(rank):
+            ranks.append(rank)
+        timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "")
+        target_ref = str(row.get("target_ref") or "")
+        outcome = outcome_by_key.get((timestamp, target_ref))
+        if not outcome:
+            continue
+        matched.append(outcome)
+        forward_return = _target_universe_forward_return(outcome)
+        if forward_return is not None:
+            returns.append(float(forward_return))
+        global_percentile = _float(outcome.get("forward_return_percentile"), default=float("nan"))
+        if not math.isnan(global_percentile):
+            global_percentiles.append(global_percentile)
+        sector_percentile = _float(outcome.get("forward_return_percentile_within_sector"), default=float("nan"))
+        if not math.isnan(sector_percentile):
+            sector_percentiles.append(sector_percentile)
+        if _truthy(outcome.get("top_quartile_candidate")):
+            global_top_quartile_hits += 1
+        if _truthy(outcome.get("top_quartile_candidate_within_sector")):
+            sector_top_quartile_hits += 1
+    matched_count = len(matched)
+    return {
+        "cohort_name": cohort_name,
+        "cohort_role": cohort_role,
+        "row_count": len(rows),
+        "matched_outcome_count": matched_count,
+        "status_counts": _json_dumps_sorted(status_counts),
+        "option_expression_unexecutable_reason_counts": _json_dumps_sorted(unexecutable_reason_counts),
+        "model_rank_mean": _round(_mean(ranks)),
+        "forward_return_mean": _round(_mean(returns)),
+        "global_forward_return_percentile_mean": _round(_mean(global_percentiles)),
+        "global_top_quartile_hit_rate": _round(global_top_quartile_hits / matched_count) if matched_count else None,
+        "within_sector_forward_return_percentile_mean": _round(_mean(sector_percentiles)),
+        "within_sector_top_quartile_hit_rate": _round(sector_top_quartile_hits / matched_count) if matched_count else None,
+        "diagnostic_only": True,
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+
+
+def _pre_option_candidate_quality_report(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    rows_by_name = {str(row.get("cohort_name") or ""): row for row in rows}
+    entry = rows_by_name.get("pre_option_entry_intent", {})
+    no_entry = rows_by_name.get("no_entry_intent", {})
+    top25 = rows_by_name.get("model_rank_top_25_pre_option", {})
+    all_visible = rows_by_name.get("all_visible_scored", {})
+    flags: list[str] = []
+    entry_percentile = _float(entry.get("global_forward_return_percentile_mean"), default=float("nan"))
+    no_entry_percentile = _float(no_entry.get("global_forward_return_percentile_mean"), default=float("nan"))
+    all_percentile = _float(all_visible.get("global_forward_return_percentile_mean"), default=float("nan"))
+    top25_percentile = _float(top25.get("global_forward_return_percentile_mean"), default=float("nan"))
+    if not math.isnan(entry_percentile) and not math.isnan(all_percentile) and entry_percentile < all_percentile:
+        flags.append("entry_intent_underperforms_visible_universe")
+    if not math.isnan(no_entry_percentile) and not math.isnan(entry_percentile) and no_entry_percentile > entry_percentile:
+        flags.append("no_entry_candidates_outperform_entry_intent")
+    if not math.isnan(top25_percentile) and top25_percentile > 0.55:
+        flags.append("top_ranked_underlying_candidates_have_positive_signal")
+    return {
+        "contract_type": "model_group_pre_option_candidate_quality_report",
+        "summary": {
+            "cohort_count": len(rows),
+            "entry_intent_global_percentile_mean": _round(entry_percentile if not math.isnan(entry_percentile) else None),
+            "no_entry_global_percentile_mean": _round(no_entry_percentile if not math.isnan(no_entry_percentile) else None),
+            "top25_global_percentile_mean": _round(top25_percentile if not math.isnan(top25_percentile) else None),
+            "flags": flags,
+            "fixed_input_only": True,
+            "threshold_selection_performed": False,
+            "retraining_performed": False,
+        },
+        "cohort_rows_ref": "pre_option_candidate_quality.csv",
+        "forbidden_uses": [
+            "training_feature_input",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+    }
+
+
+def _operation_mechanism_task_rows(
+    *,
+    operation_component_metric_rows: Sequence[Mapping[str, Any]],
+    model_candidate_selection_summary: Mapping[str, Any],
+    pre_option_candidate_quality_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    metrics_by_name = {str(row.get("metric_name") or ""): row for row in operation_component_metric_rows}
+    cohorts_by_name = {str(row.get("cohort_name") or ""): row for row in pre_option_candidate_quality_rows}
+    tasks: list[dict[str, Any]] = []
+
+    sector_metric = metrics_by_name.get("selected_sector_bucket_forward_return_rank", {})
+    sector_topq = _float(sector_metric.get("top_quartile_hit_rate"), default=float("nan"))
+    sector_percentile = _float(sector_metric.get("selected_forward_return_percentile_mean"), default=float("nan"))
+    if (
+        str(sector_metric.get("availability_status") or "") == "computed"
+        and ((not math.isnan(sector_topq) and sector_topq < 0.25) or (not math.isnan(sector_percentile) and sector_percentile < 0.52))
+    ):
+        tasks.append(
+            _operation_mechanism_task_row(
+                task_id="mechanism_c01_sector_selection_effectiveness",
+                component_id="C01_intake_operation",
+                task_title="Calibrate sector/intake opportunity selection",
+                task_type="model_mechanism_counterfactual",
+                priority="high",
+                problem_statement="Selected sector buckets do not show enough top-quartile opportunity capture before target selection.",
+                evidence_refs=["operation_component_metrics.csv", "target_selection_universe_metrics.csv"],
+                trigger_metrics={
+                    "sector_top_quartile_hit_rate": sector_topq,
+                    "sector_forward_return_percentile_mean": sector_percentile,
+                },
+                required_action=(
+                    "Add a fixed-input C01 sector opportunity counterfactual that compares current sector routing "
+                    "against point-in-time sector momentum/dispersion/liquidity alternatives without changing thresholds."
+                ),
+                acceptance_gate=(
+                    "Across at least 200 filled/evaluable timestamps, selected sector top-quartile hit is above 25% "
+                    "and mean sector percentile improves versus the current route without using future labels as inputs."
+                ),
+            )
+        )
+
+    entry = cohorts_by_name.get("pre_option_entry_intent", {})
+    no_entry = cohorts_by_name.get("no_entry_intent", {})
+    top25 = cohorts_by_name.get("model_rank_top_25_pre_option", {})
+    entry_percentile = _float(entry.get("global_forward_return_percentile_mean"), default=float("nan"))
+    no_entry_percentile = _float(no_entry.get("global_forward_return_percentile_mean"), default=float("nan"))
+    top25_percentile = _float(top25.get("global_forward_return_percentile_mean"), default=float("nan"))
+    if (
+        str(entry.get("cohort_name") or "")
+        and (
+            (not math.isnan(no_entry_percentile) and not math.isnan(entry_percentile) and no_entry_percentile > entry_percentile)
+            or (not math.isnan(top25_percentile) and top25_percentile > entry_percentile + 0.05)
+        )
+    ):
+        tasks.append(
+            _operation_mechanism_task_row(
+                task_id="mechanism_c02_entry_gate_rank_curve",
+                component_id="C02_entry_operation",
+                task_title="Separate C04 top-rank signal from overly broad entry gate",
+                task_type="model_mechanism_counterfactual",
+                priority="high",
+                problem_statement=(
+                    "Pre-option top-ranked candidates show signal, but the full entry-intent cohort is weak and "
+                    "no-entry candidates can outperform entry-intent candidates."
+                ),
+                evidence_refs=["pre_option_candidate_quality.csv", "model_candidate_selection_summary.csv"],
+                trigger_metrics={
+                    "entry_intent_global_percentile_mean": entry_percentile,
+                    "no_entry_global_percentile_mean": no_entry_percentile,
+                    "top25_global_percentile_mean": top25_percentile,
+                },
+                required_action=(
+                    "Add C04 gate/rank counterfactuals for top-K, materiality, trade-intensity, no-trade probability, "
+                    "and expected-return filters over fixed replay inputs."
+                ),
+                acceptance_gate=(
+                    "Entry-intent cohort must outperform visible universe and no-entry cohort; top-K lift must remain "
+                    "positive across multiple months before any threshold or model change is accepted."
+                ),
+            )
+        )
+
+    status_counts = model_candidate_selection_summary.get("status_counts") if isinstance(model_candidate_selection_summary, Mapping) else {}
+    unexecutable_count = int(_float(_as_mapping(status_counts).get("option_expression_unexecutable"), default=0.0))
+    selected_count = int(_float(model_candidate_selection_summary.get("selected_candidate_row_count"), default=0.0))
+    hard_filter_counts = _as_mapping(model_candidate_selection_summary.get("option_hard_filter_reason_counts"))
+    top25_selected = int(_float(model_candidate_selection_summary.get("selected_candidate_top_25_same_timestamp_count"), default=0.0))
+    if unexecutable_count > selected_count:
+        tasks.append(
+            _operation_mechanism_task_row(
+                task_id="mechanism_c04_expression_feasibility_policy",
+                component_id="C04_expression_review_operation",
+                task_title="Diagnose option-expression hard-filter feasibility",
+                task_type="policy_counterfactual",
+                priority="critical",
+                problem_statement=(
+                    "Many model-ranked entry candidates cannot become listed-option trades because M05 hard filters "
+                    "leave zero eligible contracts."
+                ),
+                evidence_refs=["model_candidate_selection_summary_report.json", "pre_option_candidate_quality.csv"],
+                trigger_metrics={
+                    "option_expression_unexecutable_count": unexecutable_count,
+                    "selected_candidate_count": selected_count,
+                    "hard_filter_reason_counts": dict(hard_filter_counts),
+                },
+                required_action=(
+                    "Run fixed-input M05 policy counterfactuals for DTE, delta, spread, and strike-range constraints, "
+                    "and separate true source coverage gaps from policy infeasibility."
+                ),
+                acceptance_gate=(
+                    "Top-25 model-ranked candidate option-feasibility coverage materially improves, and any relaxed "
+                    "policy must preserve fill/path coverage and not use settlement labels for selection."
+                ),
+            )
+        )
+
+    if top25_selected < 15:
+        tasks.append(
+            _operation_mechanism_task_row(
+                task_id="mechanism_c02_c04_feasibility_feedback_loop",
+                component_id="C02_entry_operation",
+                task_title="Feed option-expression feasibility back into pre-order ranking",
+                task_type="component_interface_redesign",
+                priority="critical",
+                problem_statement=(
+                    "The portfolio receives a filtered executable subset rather than the true top-ranked underlying "
+                    "candidate list because option feasibility is learned after entry ranking."
+                ),
+                evidence_refs=["model_candidate_selection_summary.csv", "operation_component_flow.csv"],
+                trigger_metrics={
+                    "selected_top25_same_timestamp_count": top25_selected,
+                    "selected_outside_top25_same_timestamp_count": int(
+                        _float(model_candidate_selection_summary.get("selected_candidate_outside_top_25_same_timestamp_count"), default=0.0)
+                    ),
+                },
+                required_action=(
+                    "Define a C02/C04 interface where C04 expression feasibility and expression-quality diagnostics "
+                    "return to candidate ranking before C05 order intent construction."
+                ),
+                acceptance_gate=(
+                    "Final selected candidates should mostly come from the feasible top-ranked cohort, with explicit "
+                    "audit rows for any lower-ranked replacement."
+                ),
+            )
+        )
+
+    capacity_metric = metrics_by_name.get("capacity_counterfactual_spread", {})
+    capacity_value = _float(capacity_metric.get("value"), default=float("nan"))
+    if str(capacity_metric.get("availability_status") or "") == "computed":
+        tasks.append(
+            _operation_mechanism_task_row(
+                task_id="mechanism_c05_order_intent_capacity_guard",
+                component_id="C05_order_intent_operation",
+                task_title="Add rank-aware capacity and concentration diagnostics",
+                task_type="portfolio_mechanism_counterfactual",
+                priority="medium",
+                problem_statement=(
+                    "Order intent currently fills the feasible pool with weak protection against noisy entry ranks, "
+                    "long-call crowding, or budget concentration."
+                ),
+                evidence_refs=["portfolio_capacity_counterfactual.csv", "operation_component_metrics.csv"],
+                trigger_metrics={"capacity_counterfactual_best_minus_baseline": capacity_value},
+                required_action=(
+                    "Extend C05 capacity counterfactuals with per-sector, per-expression, max-position, budget, "
+                    "and rank-quality guard variants over fixed inputs."
+                ),
+                acceptance_gate=(
+                    "A capacity guard must reduce tail exposure or improve selected cohort quality across multiple "
+                    "months without merely overfitting top-N on this 25-row sample."
+                ),
+            )
+        )
+    return tasks
+
+
+def _operation_mechanism_task_row(
+    *,
+    task_id: str,
+    component_id: str,
+    task_title: str,
+    task_type: str,
+    priority: str,
+    problem_statement: str,
+    evidence_refs: Sequence[str],
+    trigger_metrics: Mapping[str, Any],
+    required_action: str,
+    acceptance_gate: str,
+) -> dict[str, Any]:
+    component = OPERATION_COMPONENT_BY_ID.get(component_id) or {}
+    return {
+        "task_id": task_id,
+        "operation_component_id": component_id,
+        "runtime_component_ref": str(component.get("runtime_component_ref") or ""),
+        "task_title": task_title,
+        "task_type": task_type,
+        "priority": priority,
+        "problem_statement": problem_statement,
+        "evidence_refs": ";".join(evidence_refs),
+        "trigger_metrics": _json_dumps_sorted(trigger_metrics),
+        "required_action": required_action,
+        "acceptance_gate": acceptance_gate,
+        "forbidden_actions": ";".join(
+            [
+                "no_training_from_replay_labels",
+                "no_threshold_selection_from_single_month",
+                "no_model_activation",
+                "no_broker_or_account_authority",
+            ]
+        ),
+        "diagnostic_only": True,
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+
+
+def _operation_mechanism_task_packet(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    return {
+        "contract_type": "model_group_operation_mechanism_task_packet",
+        "summary": {
+            "task_count": len(rows),
+            "task_type_counts": dict(Counter(str(row.get("task_type") or "") for row in rows)),
+            "priority_counts": dict(Counter(str(row.get("priority") or "") for row in rows)),
+            "component_counts": dict(Counter(str(row.get("operation_component_id") or "") for row in rows)),
+            "fixed_input_only": True,
+            "threshold_selection_performed": False,
+            "retraining_performed": False,
+        },
+        "task_rows_ref": "operation_mechanism_task_packet.csv",
+        "forbidden_uses": [
+            "training_feature_input",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+        "interpretation_notes": [
+            "Tasks are evidence-driven mechanism follow-ups, not approved model changes.",
+            "Acceptance gates require multi-month confirmation before policy or model changes.",
         ],
     }
 
