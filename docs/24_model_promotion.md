@@ -161,6 +161,18 @@ lifecycle is marked
 `not_applicable_for_candidate_entry_replay` for candidate-entry replay rows that
 do not manage an existing position.
 
+Build `target_selection_universe_metrics.csv` with
+`scripts/tasks/build_target_selection_universe_metrics.py` when reviewing C01/C02
+effectiveness. The builder reads existing replay decision rows, the fixed
+historical candidate universe, and already-acquired daily SQL bars to label every
+visible candidate at each replay decision timestamp with retrospective next-bar
+forward return, rank, percentile, top-quartile membership, and opportunity cost
+to the best visible candidate. This artifact is diagnostic only: it helps judge
+whether the intake/entry operation selected effective targets from the visible
+universe, but its future-return labels are forbidden as training features,
+threshold-selection inputs, promotion approval, model activation, or
+broker/account/order authority.
+
 The older `decision_surface_component_matrix.csv`,
 `component_model_mapping.csv`, `component_survival_quality_flow.csv`, and
 `component_review_packet.json` remain diagnostic projection evidence for

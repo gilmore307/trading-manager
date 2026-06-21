@@ -946,9 +946,21 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("build_model_group_layer_attribution.py", layer_attribution_script["path"])
         self.assertIn("no_provider_calls", layer_attribution_script["applies_to"])
 
+        target_selection_metrics_artifact = rows["MANAGER_TARGET_SELECTION_UNIVERSE_METRICS"]
+        self.assertEqual(target_selection_metrics_artifact["kind"], "artifact_type")
+        self.assertIn("target_selection_universe_metrics", target_selection_metrics_artifact["applies_to"])
+        self.assertIn("component_effectiveness", target_selection_metrics_artifact["applies_to"])
+
+        target_selection_metrics_script = rows["TARGET_SELECTION_UNIVERSE_METRICS_BUILD"]
+        self.assertEqual(target_selection_metrics_script["kind"], "script")
+        self.assertIn("build_target_selection_universe_metrics.py", target_selection_metrics_script["path"])
+        self.assertIn("no_provider_calls", target_selection_metrics_script["applies_to"])
+
         layer_attribution_surfaces = rows["MANAGER_MODEL_GROUP_LAYER_ATTRIBUTION_SURFACES"]
         self.assertIn("layer_attribution_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("row_counterfactual_attribution.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("target_selection_universe_metrics.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("target_selection_universe_metrics.report.json", layer_attribution_surfaces["payload"])
         self.assertIn("operation_review_projection_matrix.csv", layer_attribution_surfaces["payload"])
         self.assertIn("operation_component_flow.csv", layer_attribution_surfaces["payload"])
         self.assertIn("operation_component_review_packet.csv", layer_attribution_surfaces["payload"])
@@ -964,6 +976,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("component_review_packet.json", layer_attribution_surfaces["payload"])
         self.assertIn("operation_component_review_packet", layer_attribution_surfaces["applies_to"])
         self.assertIn("operation_component_metrics", layer_attribution_surfaces["applies_to"])
+        self.assertIn("target_selection_universe_metrics", layer_attribution_surfaces["applies_to"])
+        self.assertIn("component_effectiveness", layer_attribution_surfaces["applies_to"])
         self.assertIn("review_projection", layer_attribution_surfaces["applies_to"])
         self.assertIn("component_review_packet", layer_attribution_surfaces["applies_to"])
         self.assertIn("parameter_replay_review.csv", layer_attribution_surfaces["payload"])

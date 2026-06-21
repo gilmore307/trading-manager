@@ -71,6 +71,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_stage_run_controller.py`
 - `test_stage_run_dashboard.py`
 - `test_target_context_review.py`
+- `test_target_selection_universe_metrics.py`
 - `test_task_control_plane.py`
 - `test_task_progress.py`
 - `test_task_rehearsal.py`

@@ -1949,23 +1949,36 @@ def _target_selection_metric_rows(
         universe_by_timestamp[str(row.get("timestamp") or "")].append(row)
 
     selected_results: list[dict[str, float]] = []
+    visible_universe_counts: list[float] = []
     present_count = 0
     for row in rows:
         timestamp = str(row.get("timestamp") or "")
         target_ref = str(row.get("target_ref") or "")
         universe_rows = universe_by_timestamp.get(timestamp, [])
-        ranked_rows = [
+        visible_rows = [
             item
             for item in universe_rows
+            if str(item.get("visible_universe_membership") or "true").strip().lower() in {"true", "1", "yes"}
+        ]
+        visible_universe_counts.append(float(len(visible_rows)))
+        ranked_rows = [
+            item
+            for item in visible_rows
             if _target_universe_forward_return(item) is not None
         ]
+        selected_visible_row = next(
+            (item for item in visible_rows if str(item.get("target_ref") or item.get("symbol") or "") == target_ref),
+            None,
+        )
+        if selected_visible_row is None:
+            continue
+        present_count += 1
         selected_row = next(
-            (item for item in ranked_rows if str(item.get("target_ref") or "") == target_ref),
+            (item for item in ranked_rows if str(item.get("target_ref") or item.get("symbol") or "") == target_ref),
             None,
         )
         if selected_row is None:
             continue
-        present_count += 1
         selected_return = _target_universe_forward_return(selected_row)
         if selected_return is None:
             continue
@@ -2013,7 +2026,7 @@ def _target_selection_metric_rows(
             eligible_row_count=present_count,
             selected_count=len(rows),
             selected_target_present_count=present_count,
-            universe_count_mean=_mean(result["universe_count"] for result in selected_results),
+            universe_count_mean=_mean(visible_universe_counts),
             value=(present_count / len(rows)) if rows else None,
         ),
         _operation_component_metric_row(

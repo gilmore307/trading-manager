@@ -578,6 +578,89 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 packet_rows["C02_entry_operation"]["missing_review_outputs"],
             )
 
+    def test_operation_component_metrics_separates_universe_membership_from_return_label_gap(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            universe_path = tmp / "target_selection_universe_metrics.csv"
+            row = _row(
+                "r1",
+                "accepted",
+                "simulated_filled",
+                1,
+                0.72,
+                0.12,
+                "open_long",
+                "long",
+                "passed",
+                "listed_option_contract",
+            )
+            row["target_ref"] = "MSFT"
+            row["timestamp"] = "2021-01-04T16:00:00-05:00"
+            rows_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            with universe_path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=[
+                        "timestamp",
+                        "target_ref",
+                        "visible_universe_membership",
+                        "forward_return",
+                        "forward_return_status",
+                    ],
+                )
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "timestamp": "2021-01-04T16:00:00-05:00",
+                        "target_ref": "MSFT",
+                        "visible_universe_membership": "true",
+                        "forward_return": "",
+                        "forward_return_status": "missing_exit_bar",
+                    }
+                )
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                target_selection_universe_metrics_path=universe_path,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            self.assertIn(
+                "C02_entry_operation",
+                report["operation_component_metrics_summary"]["components_with_metric_data_gaps"],
+            )
+            with (output_dir / "operation_component_metrics.csv").open(encoding="utf-8") as handle:
+                metric_rows = {
+                    (row["operation_component_id"], row["metric_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                metric_rows[("C01_intake_operation", "visible_universe_integrity")]["availability_status"],
+                "computed",
+            )
+            self.assertEqual(
+                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank")][
+                    "availability_status"
+                ],
+                "data_gap",
+            )
+            with (output_dir / "operation_component_review_packet.csv").open(encoding="utf-8") as handle:
+                packet_rows = {
+                    row["operation_component_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertNotIn(
+                "component_specific_metric_data_gap",
+                packet_rows["C01_intake_operation"]["missing_review_outputs"],
+            )
+            self.assertIn(
+                "component_specific_metric_data_gap",
+                packet_rows["C02_entry_operation"]["missing_review_outputs"],
+            )
+
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
