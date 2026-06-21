@@ -967,6 +967,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("operation_component_review_packet.json", layer_attribution_surfaces["payload"])
         self.assertIn("operation_component_metrics.csv", layer_attribution_surfaces["payload"])
         self.assertIn("operation_component_metrics_report.json", layer_attribution_surfaces["payload"])
+        self.assertIn("operation_mechanism_contract_packet.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("operation_mechanism_contract_packet.json", layer_attribution_surfaces["payload"])
         self.assertIn("target_selection_universe_metrics_ref", layer_attribution_surfaces["payload"])
         self.assertIn("decision_surface_component_matrix.csv", layer_attribution_surfaces["payload"])
         self.assertIn("component_model_mapping.csv", layer_attribution_surfaces["payload"])
@@ -980,6 +982,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("component_effectiveness", layer_attribution_surfaces["applies_to"])
         self.assertIn("review_projection", layer_attribution_surfaces["applies_to"])
         self.assertIn("component_review_packet", layer_attribution_surfaces["applies_to"])
+        self.assertIn("operation_mechanism_contract_packet", layer_attribution_surfaces["applies_to"])
+        self.assertIn("component_mechanism_contract", layer_attribution_surfaces["applies_to"])
         self.assertIn("parameter_replay_review.csv", layer_attribution_surfaces["payload"])
         self.assertIn("parameter_replay_review_report.json", layer_attribution_surfaces["payload"])
         self.assertIn("parameter_bucket_metrics.csv", layer_attribution_surfaces["payload"])
@@ -1000,6 +1004,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("counterfactual_gate_sweep_ref", layer_attribution_surfaces["payload"])
         self.assertIn("not be treated as threshold selection", layer_attribution_surfaces["note"])
         self.assertIn("portfolio policy selection", layer_attribution_surfaces["note"])
+        self.assertIn("not one-off repair tasks", layer_attribution_surfaces["note"])
 
         suspect_followup_payloads = {
             "MODEL_GROUP_SUSPECT_PARAMETER_FILLED_SUBSET_SELECTION_EFFECT": "filled_subset_selection_effect",

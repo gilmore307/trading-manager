@@ -161,6 +161,14 @@ lifecycle is marked
 `not_applicable_for_candidate_entry_replay` for candidate-entry replay rows that
 do not manage an existing position.
 
+`operation_mechanism_contract_packet.csv/json` is the standing mechanism
+contract layer. It does not create one-off repair tasks. Each row names a
+durable mechanism contract under a C01-C07 action component, reports the current
+breach state (`breached`, `not_breached`, or `data_gap`), and states the
+systemic closure requirement plus multi-month acceptance gate. These rows are
+diagnostic only; they do not authorize single-run threshold changes, retraining,
+promotion approval, model activation, or broker/account/order authority.
+
 Build `target_selection_universe_metrics.csv` with
 `scripts/tasks/build_target_selection_universe_metrics.py` when reviewing C01/C02
 effectiveness. The builder reads existing replay decision rows, the fixed

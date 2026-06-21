@@ -560,17 +560,17 @@ PRE_OPTION_CANDIDATE_QUALITY_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
-OPERATION_MECHANISM_TASK_FIELDNAMES = [
-    "task_id",
+OPERATION_MECHANISM_CONTRACT_FIELDNAMES = [
+    "mechanism_contract_id",
     "operation_component_id",
     "runtime_component_ref",
-    "task_title",
-    "task_type",
-    "priority",
-    "problem_statement",
+    "mechanism_contract",
+    "breach_status",
+    "severity",
+    "breach_statement",
     "evidence_refs",
     "trigger_metrics",
-    "required_action",
+    "systemic_closure_requirement",
     "acceptance_gate",
     "forbidden_actions",
     "diagnostic_only",
@@ -697,12 +697,12 @@ def build_model_group_layer_attribution(
         replay_receipt_available=replay_receipt_path is not None,
         output_dir=output_dir,
     )
-    operation_mechanism_task_rows = _operation_mechanism_task_rows(
+    operation_mechanism_contract_rows = _operation_mechanism_contract_rows(
         operation_component_metric_rows=operation_component_metric_rows,
         model_candidate_selection_summary=model_candidate_selection_summary_report["summary"],
         pre_option_candidate_quality_rows=pre_option_candidate_quality_rows,
     )
-    operation_mechanism_task_packet = _operation_mechanism_task_packet(operation_mechanism_task_rows)
+    operation_mechanism_contract_packet = _operation_mechanism_contract_packet(operation_mechanism_contract_rows)
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
     tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
         rows=rows,
@@ -770,9 +770,9 @@ def build_model_group_layer_attribution(
         fieldnames=PRE_OPTION_CANDIDATE_QUALITY_FIELDNAMES,
     )
     _write_csv(
-        output_dir / "operation_mechanism_task_packet.csv",
-        operation_mechanism_task_rows,
-        fieldnames=OPERATION_MECHANISM_TASK_FIELDNAMES,
+        output_dir / "operation_mechanism_contract_packet.csv",
+        operation_mechanism_contract_rows,
+        fieldnames=OPERATION_MECHANISM_CONTRACT_FIELDNAMES,
     )
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
@@ -857,8 +857,8 @@ def build_model_group_layer_attribution(
         json.dumps(pre_option_candidate_quality_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    (output_dir / "operation_mechanism_task_packet.json").write_text(
-        json.dumps(operation_mechanism_task_packet, indent=2, sort_keys=True) + "\n",
+    (output_dir / "operation_mechanism_contract_packet.json").write_text(
+        json.dumps(operation_mechanism_contract_packet, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     if m05_unfilled_summary["source_status"] == "available":
@@ -886,9 +886,9 @@ def build_model_group_layer_attribution(
         "pre_option_candidate_quality_ref": str(output_dir / "pre_option_candidate_quality.csv"),
         "pre_option_candidate_quality_report_ref": str(output_dir / "pre_option_candidate_quality_report.json"),
         "pre_option_candidate_quality_summary": pre_option_candidate_quality_report["summary"],
-        "operation_mechanism_task_packet_ref": str(output_dir / "operation_mechanism_task_packet.json"),
-        "operation_mechanism_task_packet_csv_ref": str(output_dir / "operation_mechanism_task_packet.csv"),
-        "operation_mechanism_task_packet_summary": operation_mechanism_task_packet["summary"],
+        "operation_mechanism_contract_packet_ref": str(output_dir / "operation_mechanism_contract_packet.json"),
+        "operation_mechanism_contract_packet_csv_ref": str(output_dir / "operation_mechanism_contract_packet.csv"),
+        "operation_mechanism_contract_packet_summary": operation_mechanism_contract_packet["summary"],
         "row_scope": _row_scope(rows),
         "layer_status": _layer_status(rows),
         "cohorts": cohort_rows,
@@ -1343,7 +1343,7 @@ def _pre_option_candidate_quality_report(rows: Sequence[Mapping[str, Any]]) -> d
     }
 
 
-def _operation_mechanism_task_rows(
+def _operation_mechanism_contract_rows(
     *,
     operation_component_metric_rows: Sequence[Mapping[str, Any]],
     model_candidate_selection_summary: Mapping[str, Any],
@@ -1351,38 +1351,43 @@ def _operation_mechanism_task_rows(
 ) -> list[dict[str, Any]]:
     metrics_by_name = {str(row.get("metric_name") or ""): row for row in operation_component_metric_rows}
     cohorts_by_name = {str(row.get("cohort_name") or ""): row for row in pre_option_candidate_quality_rows}
-    tasks: list[dict[str, Any]] = []
+    contracts: list[dict[str, Any]] = []
 
     sector_metric = metrics_by_name.get("selected_sector_bucket_forward_return_rank", {})
     sector_topq = _float(sector_metric.get("top_quartile_hit_rate"), default=float("nan"))
     sector_percentile = _float(sector_metric.get("selected_forward_return_percentile_mean"), default=float("nan"))
-    if (
-        str(sector_metric.get("availability_status") or "") == "computed"
-        and ((not math.isnan(sector_topq) and sector_topq < 0.25) or (not math.isnan(sector_percentile) and sector_percentile < 0.52))
-    ):
-        tasks.append(
-            _operation_mechanism_task_row(
-                task_id="mechanism_c01_sector_selection_effectiveness",
-                component_id="C01_intake_operation",
-                task_title="Calibrate sector/intake opportunity selection",
-                task_type="model_mechanism_counterfactual",
-                priority="high",
-                problem_statement="Selected sector buckets do not show enough top-quartile opportunity capture before target selection.",
-                evidence_refs=["operation_component_metrics.csv", "target_selection_universe_metrics.csv"],
-                trigger_metrics={
-                    "sector_top_quartile_hit_rate": sector_topq,
-                    "sector_forward_return_percentile_mean": sector_percentile,
-                },
-                required_action=(
-                    "Add a fixed-input C01 sector opportunity counterfactual that compares current sector routing "
-                    "against point-in-time sector momentum/dispersion/liquidity alternatives without changing thresholds."
-                ),
-                acceptance_gate=(
-                    "Across at least 200 filled/evaluable timestamps, selected sector top-quartile hit is above 25% "
-                    "and mean sector percentile improves versus the current route without using future labels as inputs."
-                ),
-            )
+    sector_status = str(sector_metric.get("availability_status") or "")
+    sector_breached = sector_status == "computed" and (
+        (not math.isnan(sector_topq) and sector_topq < 0.25)
+        or (not math.isnan(sector_percentile) and sector_percentile < 0.52)
+    )
+    contracts.append(
+        _operation_mechanism_contract_row(
+            mechanism_contract_id="mechanism_c01_sector_selection_effectiveness",
+            component_id="C01_intake_operation",
+            mechanism_contract="C01 must route candidate intake toward point-in-time sectors with measurable opportunity lift.",
+            breach_status=_mechanism_breach_status(sector_status, sector_breached),
+            severity="high" if sector_breached else "none",
+            breach_statement=(
+                "Selected sector buckets do not show enough top-quartile opportunity capture before target selection."
+                if sector_breached
+                else ""
+            ),
+            evidence_refs=["operation_component_metrics.csv", "target_selection_universe_metrics.csv"],
+            trigger_metrics={
+                "sector_top_quartile_hit_rate": sector_topq,
+                "sector_forward_return_percentile_mean": sector_percentile,
+            },
+            systemic_closure_requirement=(
+                "Maintain a fixed-input C01 sector opportunity contract that compares current sector routing against "
+                "point-in-time sector momentum/dispersion/liquidity alternatives without changing thresholds from one run."
+            ),
+            acceptance_gate=(
+                "Across at least 200 filled/evaluable timestamps, selected sector top-quartile hit is above 25% "
+                "and mean sector percentile improves versus the current route without using future labels as inputs."
+            ),
         )
+    )
 
     entry = cohorts_by_name.get("pre_option_entry_intent", {})
     no_entry = cohorts_by_name.get("no_entry_intent", {})
@@ -1390,159 +1395,175 @@ def _operation_mechanism_task_rows(
     entry_percentile = _float(entry.get("global_forward_return_percentile_mean"), default=float("nan"))
     no_entry_percentile = _float(no_entry.get("global_forward_return_percentile_mean"), default=float("nan"))
     top25_percentile = _float(top25.get("global_forward_return_percentile_mean"), default=float("nan"))
-    if (
-        str(entry.get("cohort_name") or "")
-        and (
-            (not math.isnan(no_entry_percentile) and not math.isnan(entry_percentile) and no_entry_percentile > entry_percentile)
-            or (not math.isnan(top25_percentile) and top25_percentile > entry_percentile + 0.05)
+    entry_available = bool(str(entry.get("cohort_name") or ""))
+    entry_breached = entry_available and (
+        (not math.isnan(no_entry_percentile) and not math.isnan(entry_percentile) and no_entry_percentile > entry_percentile)
+        or (not math.isnan(top25_percentile) and top25_percentile > entry_percentile + 0.05)
+    )
+    contracts.append(
+        _operation_mechanism_contract_row(
+            mechanism_contract_id="mechanism_c02_entry_gate_rank_curve",
+            component_id="C02_entry_operation",
+            mechanism_contract="C02/C04 entry gating must preserve top-ranked pre-option signal while rejecting weak broad cohorts.",
+            breach_status="breached" if entry_breached else ("not_breached" if entry_available else "data_gap"),
+            severity="high" if entry_breached else "none",
+            breach_statement=(
+                "Pre-option top-ranked candidates show signal, but the full entry-intent cohort is weak and "
+                "no-entry candidates can outperform entry-intent candidates."
+                if entry_breached
+                else ""
+            ),
+            evidence_refs=["pre_option_candidate_quality.csv", "model_candidate_selection_summary.csv"],
+            trigger_metrics={
+                "entry_intent_global_percentile_mean": entry_percentile,
+                "no_entry_global_percentile_mean": no_entry_percentile,
+                "top25_global_percentile_mean": top25_percentile,
+            },
+            systemic_closure_requirement=(
+                "Keep fixed-input C04 gate/rank curves for top-K, materiality, trade-intensity, no-trade probability, "
+                "and expected-return filters as a standing entry-effectiveness contract."
+            ),
+            acceptance_gate=(
+                "Entry-intent cohort must outperform visible universe and no-entry cohort; top-K lift must remain "
+                "positive across multiple months before any threshold or model change is accepted."
+            ),
         )
-    ):
-        tasks.append(
-            _operation_mechanism_task_row(
-                task_id="mechanism_c02_entry_gate_rank_curve",
-                component_id="C02_entry_operation",
-                task_title="Separate C04 top-rank signal from overly broad entry gate",
-                task_type="model_mechanism_counterfactual",
-                priority="high",
-                problem_statement=(
-                    "Pre-option top-ranked candidates show signal, but the full entry-intent cohort is weak and "
-                    "no-entry candidates can outperform entry-intent candidates."
-                ),
-                evidence_refs=["pre_option_candidate_quality.csv", "model_candidate_selection_summary.csv"],
-                trigger_metrics={
-                    "entry_intent_global_percentile_mean": entry_percentile,
-                    "no_entry_global_percentile_mean": no_entry_percentile,
-                    "top25_global_percentile_mean": top25_percentile,
-                },
-                required_action=(
-                    "Add C04 gate/rank counterfactuals for top-K, materiality, trade-intensity, no-trade probability, "
-                    "and expected-return filters over fixed replay inputs."
-                ),
-                acceptance_gate=(
-                    "Entry-intent cohort must outperform visible universe and no-entry cohort; top-K lift must remain "
-                    "positive across multiple months before any threshold or model change is accepted."
-                ),
-            )
-        )
+    )
 
     status_counts = model_candidate_selection_summary.get("status_counts") if isinstance(model_candidate_selection_summary, Mapping) else {}
     unexecutable_count = int(_float(_as_mapping(status_counts).get("option_expression_unexecutable"), default=0.0))
     selected_count = int(_float(model_candidate_selection_summary.get("selected_candidate_row_count"), default=0.0))
     hard_filter_counts = _as_mapping(model_candidate_selection_summary.get("option_hard_filter_reason_counts"))
     top25_selected = int(_float(model_candidate_selection_summary.get("selected_candidate_top_25_same_timestamp_count"), default=0.0))
-    if unexecutable_count > selected_count:
-        tasks.append(
-            _operation_mechanism_task_row(
-                task_id="mechanism_c04_expression_feasibility_policy",
-                component_id="C04_expression_review_operation",
-                task_title="Diagnose option-expression hard-filter feasibility",
-                task_type="policy_counterfactual",
-                priority="critical",
-                problem_statement=(
-                    "Many model-ranked entry candidates cannot become listed-option trades because M05 hard filters "
-                    "leave zero eligible contracts."
-                ),
-                evidence_refs=["model_candidate_selection_summary_report.json", "pre_option_candidate_quality.csv"],
-                trigger_metrics={
-                    "option_expression_unexecutable_count": unexecutable_count,
-                    "selected_candidate_count": selected_count,
-                    "hard_filter_reason_counts": dict(hard_filter_counts),
-                },
-                required_action=(
-                    "Run fixed-input M05 policy counterfactuals for DTE, delta, spread, and strike-range constraints, "
-                    "and separate true source coverage gaps from policy infeasibility."
-                ),
-                acceptance_gate=(
-                    "Top-25 model-ranked candidate option-feasibility coverage materially improves, and any relaxed "
-                    "policy must preserve fill/path coverage and not use settlement labels for selection."
-                ),
-            )
+    expression_evaluable = bool(model_candidate_selection_summary)
+    expression_breached = expression_evaluable and unexecutable_count > selected_count
+    contracts.append(
+        _operation_mechanism_contract_row(
+            mechanism_contract_id="mechanism_c04_expression_feasibility_policy",
+            component_id="C04_expression_review_operation",
+            mechanism_contract="C04 expression review must preserve feasible expression coverage for top-ranked entry candidates.",
+            breach_status="breached" if expression_breached else ("not_breached" if expression_evaluable else "data_gap"),
+            severity="critical" if expression_breached else "none",
+            breach_statement=(
+                "Many model-ranked entry candidates cannot become listed-option trades because M05 hard filters "
+                "leave zero eligible contracts."
+                if expression_breached
+                else ""
+            ),
+            evidence_refs=["model_candidate_selection_summary_report.json", "pre_option_candidate_quality.csv"],
+            trigger_metrics={
+                "option_expression_unexecutable_count": unexecutable_count,
+                "selected_candidate_count": selected_count,
+                "hard_filter_reason_counts": dict(hard_filter_counts),
+            },
+            systemic_closure_requirement=(
+                "Maintain fixed-input M05 policy counterfactuals for DTE, delta, spread, and strike-range constraints, "
+                "and separate true source coverage gaps from policy infeasibility."
+            ),
+            acceptance_gate=(
+                "Top-25 model-ranked candidate option-feasibility coverage materially improves, and any relaxed "
+                "policy must preserve fill/path coverage and not use settlement labels for selection."
+            ),
         )
+    )
 
-    if top25_selected < 15:
-        tasks.append(
-            _operation_mechanism_task_row(
-                task_id="mechanism_c02_c04_feasibility_feedback_loop",
-                component_id="C02_entry_operation",
-                task_title="Feed option-expression feasibility back into pre-order ranking",
-                task_type="component_interface_redesign",
-                priority="critical",
-                problem_statement=(
-                    "The portfolio receives a filtered executable subset rather than the true top-ranked underlying "
-                    "candidate list because option feasibility is learned after entry ranking."
+    feedback_breached = expression_evaluable and top25_selected < 15
+    contracts.append(
+        _operation_mechanism_contract_row(
+            mechanism_contract_id="mechanism_c02_c04_feasibility_feedback_loop",
+            component_id="C02_entry_operation",
+            mechanism_contract="C02/C04 must close the interface between underlying rank and expression feasibility before order intent.",
+            breach_status="breached" if feedback_breached else ("not_breached" if expression_evaluable else "data_gap"),
+            severity="critical" if feedback_breached else "none",
+            breach_statement=(
+                "The portfolio receives a filtered executable subset rather than the true top-ranked underlying "
+                "candidate list because option feasibility is learned after entry ranking."
+                if feedback_breached
+                else ""
+            ),
+            evidence_refs=["model_candidate_selection_summary.csv", "operation_component_flow.csv"],
+            trigger_metrics={
+                "selected_top25_same_timestamp_count": top25_selected,
+                "selected_outside_top25_same_timestamp_count": int(
+                    _float(model_candidate_selection_summary.get("selected_candidate_outside_top_25_same_timestamp_count"), default=0.0)
                 ),
-                evidence_refs=["model_candidate_selection_summary.csv", "operation_component_flow.csv"],
-                trigger_metrics={
-                    "selected_top25_same_timestamp_count": top25_selected,
-                    "selected_outside_top25_same_timestamp_count": int(
-                        _float(model_candidate_selection_summary.get("selected_candidate_outside_top_25_same_timestamp_count"), default=0.0)
-                    ),
-                },
-                required_action=(
-                    "Define a C02/C04 interface where C04 expression feasibility and expression-quality diagnostics "
-                    "return to candidate ranking before C05 order intent construction."
-                ),
-                acceptance_gate=(
-                    "Final selected candidates should mostly come from the feasible top-ranked cohort, with explicit "
-                    "audit rows for any lower-ranked replacement."
-                ),
-            )
+            },
+            systemic_closure_requirement=(
+                "C04 expression feasibility and expression-quality diagnostics must return to candidate ranking before "
+                "C05 order intent construction, with audit rows for every lower-ranked replacement."
+            ),
+            acceptance_gate=(
+                "Final selected candidates should mostly come from the feasible top-ranked cohort, with explicit "
+                "audit rows for any lower-ranked replacement."
+            ),
         )
+    )
 
     capacity_metric = metrics_by_name.get("capacity_counterfactual_spread", {})
     capacity_value = _float(capacity_metric.get("value"), default=float("nan"))
-    if str(capacity_metric.get("availability_status") or "") == "computed":
-        tasks.append(
-            _operation_mechanism_task_row(
-                task_id="mechanism_c05_order_intent_capacity_guard",
-                component_id="C05_order_intent_operation",
-                task_title="Add rank-aware capacity and concentration diagnostics",
-                task_type="portfolio_mechanism_counterfactual",
-                priority="medium",
-                problem_statement=(
-                    "Order intent currently fills the feasible pool with weak protection against noisy entry ranks, "
-                    "long-call crowding, or budget concentration."
-                ),
-                evidence_refs=["portfolio_capacity_counterfactual.csv", "operation_component_metrics.csv"],
-                trigger_metrics={"capacity_counterfactual_best_minus_baseline": capacity_value},
-                required_action=(
-                    "Extend C05 capacity counterfactuals with per-sector, per-expression, max-position, budget, "
-                    "and rank-quality guard variants over fixed inputs."
-                ),
-                acceptance_gate=(
-                    "A capacity guard must reduce tail exposure or improve selected cohort quality across multiple "
-                    "months without merely overfitting top-N on this 25-row sample."
-                ),
-            )
+    capacity_status = str(capacity_metric.get("availability_status") or "")
+    capacity_breached = capacity_status == "computed"
+    contracts.append(
+        _operation_mechanism_contract_row(
+            mechanism_contract_id="mechanism_c05_order_intent_capacity_guard",
+            component_id="C05_order_intent_operation",
+            mechanism_contract="C05 order intent must prove rank-aware capacity and concentration control over fixed inputs.",
+            breach_status=_mechanism_breach_status(capacity_status, capacity_breached),
+            severity="medium" if capacity_breached else "none",
+            breach_statement=(
+                "Order intent currently has only diagnostic capacity variants and must prove protection against noisy "
+                "entry ranks, long-call crowding, or budget concentration."
+                if capacity_breached
+                else ""
+            ),
+            evidence_refs=["portfolio_capacity_counterfactual.csv", "operation_component_metrics.csv"],
+            trigger_metrics={"capacity_counterfactual_best_minus_baseline": capacity_value},
+            systemic_closure_requirement=(
+                "C05 capacity contracts must include per-sector, per-expression, max-position, budget, and rank-quality "
+                "guard variants over fixed inputs."
+            ),
+            acceptance_gate=(
+                "A capacity guard must reduce tail exposure or improve selected cohort quality across multiple "
+                "months without merely overfitting top-N on this 25-row sample."
+            ),
         )
-    return tasks
+    )
+    return contracts
 
 
-def _operation_mechanism_task_row(
+def _mechanism_breach_status(availability_status: str, breached: bool) -> str:
+    if availability_status == "computed":
+        return "breached" if breached else "not_breached"
+    if availability_status:
+        return "data_gap"
+    return "data_gap"
+
+
+def _operation_mechanism_contract_row(
     *,
-    task_id: str,
+    mechanism_contract_id: str,
     component_id: str,
-    task_title: str,
-    task_type: str,
-    priority: str,
-    problem_statement: str,
+    mechanism_contract: str,
+    breach_status: str,
+    severity: str,
+    breach_statement: str,
     evidence_refs: Sequence[str],
     trigger_metrics: Mapping[str, Any],
-    required_action: str,
+    systemic_closure_requirement: str,
     acceptance_gate: str,
 ) -> dict[str, Any]:
     component = OPERATION_COMPONENT_BY_ID.get(component_id) or {}
     return {
-        "task_id": task_id,
+        "mechanism_contract_id": mechanism_contract_id,
         "operation_component_id": component_id,
         "runtime_component_ref": str(component.get("runtime_component_ref") or ""),
-        "task_title": task_title,
-        "task_type": task_type,
-        "priority": priority,
-        "problem_statement": problem_statement,
+        "mechanism_contract": mechanism_contract,
+        "breach_status": breach_status,
+        "severity": severity,
+        "breach_statement": breach_statement,
         "evidence_refs": ";".join(evidence_refs),
         "trigger_metrics": _json_dumps_sorted(trigger_metrics),
-        "required_action": required_action,
+        "systemic_closure_requirement": systemic_closure_requirement,
         "acceptance_gate": acceptance_gate,
         "forbidden_actions": ";".join(
             [
@@ -1559,19 +1580,19 @@ def _operation_mechanism_task_row(
     }
 
 
-def _operation_mechanism_task_packet(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _operation_mechanism_contract_packet(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     return {
-        "contract_type": "model_group_operation_mechanism_task_packet",
+        "contract_type": "model_group_operation_mechanism_contract_packet",
         "summary": {
-            "task_count": len(rows),
-            "task_type_counts": dict(Counter(str(row.get("task_type") or "") for row in rows)),
-            "priority_counts": dict(Counter(str(row.get("priority") or "") for row in rows)),
+            "mechanism_contract_count": len(rows),
+            "breach_status_counts": dict(Counter(str(row.get("breach_status") or "") for row in rows)),
+            "severity_counts": dict(Counter(str(row.get("severity") or "") for row in rows)),
             "component_counts": dict(Counter(str(row.get("operation_component_id") or "") for row in rows)),
             "fixed_input_only": True,
             "threshold_selection_performed": False,
             "retraining_performed": False,
         },
-        "task_rows_ref": "operation_mechanism_task_packet.csv",
+        "contract_rows_ref": "operation_mechanism_contract_packet.csv",
         "forbidden_uses": [
             "training_feature_input",
             "threshold_selection",
@@ -1580,8 +1601,8 @@ def _operation_mechanism_task_packet(rows: Sequence[Mapping[str, Any]]) -> dict[
             "broker_or_account_authority",
         ],
         "interpretation_notes": [
-            "Tasks are evidence-driven mechanism follow-ups, not approved model changes.",
-            "Acceptance gates require multi-month confirmation before policy or model changes.",
+            "Rows are standing mechanism contracts and current breach states, not one-off patches or approved model changes.",
+            "Systemic closure gates require multi-month confirmation before policy or model changes.",
         ],
     }
 

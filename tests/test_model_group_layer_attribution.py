@@ -534,17 +534,21 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 (output_dir / "pre_option_candidate_quality_report.json").read_text(encoding="utf-8")
             )["summary"]
             self.assertEqual(pre_option_summary["cohort_count"], 9)
-            self.assertTrue((output_dir / "operation_mechanism_task_packet.csv").exists())
-            mechanism_task_summary = json.loads(
-                (output_dir / "operation_mechanism_task_packet.json").read_text(encoding="utf-8")
+            self.assertTrue((output_dir / "operation_mechanism_contract_packet.csv").exists())
+            mechanism_contract_summary = json.loads(
+                (output_dir / "operation_mechanism_contract_packet.json").read_text(encoding="utf-8")
             )["summary"]
-            self.assertGreaterEqual(mechanism_task_summary["task_count"], 1)
-            with (output_dir / "operation_mechanism_task_packet.csv").open(encoding="utf-8") as handle:
-                mechanism_tasks = {
-                    row["task_id"]: row
+            self.assertGreaterEqual(mechanism_contract_summary["mechanism_contract_count"], 1)
+            with (output_dir / "operation_mechanism_contract_packet.csv").open(encoding="utf-8") as handle:
+                mechanism_contracts = {
+                    row["mechanism_contract_id"]: row
                     for row in csv.DictReader(handle)
                 }
-            self.assertIn("mechanism_c01_sector_selection_effectiveness", mechanism_tasks)
+            self.assertIn("mechanism_c01_sector_selection_effectiveness", mechanism_contracts)
+            self.assertEqual(
+                mechanism_contracts["mechanism_c01_sector_selection_effectiveness"]["breach_status"],
+                "breached",
+            )
             with (output_dir / "operation_component_review_packet.csv").open(encoding="utf-8") as handle:
                 packet_rows = {
                     row["operation_component_id"]: row
