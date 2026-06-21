@@ -179,6 +179,8 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "component_model_mapping.csv").exists())
             self.assertTrue((output_dir / "component_survival_quality_flow.csv").exists())
             self.assertTrue((output_dir / "component_survival_quality_flow_report.json").exists())
+            self.assertTrue((output_dir / "component_review_packet.csv").exists())
+            self.assertTrue((output_dir / "component_review_packet.json").exists())
             self.assertTrue((output_dir / "high_score_filled_tail_loss_matches.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review_report.json").exists())
@@ -197,6 +199,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertIn("suspect_parameter_counterfactual_summary", report)
             self.assertIn("m04_m05_mechanism_review_summary", report)
             self.assertIn("component_survival_quality_flow_summary", report)
+            self.assertIn("component_review_packet_summary", report)
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
                     "C09_settled_prediction_quality_surface"
@@ -289,6 +292,30 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 flow_rows["C09_settled_prediction_quality_surface"]["stage_verdict"],
                 "insufficient_evidence",
             )
+            with (output_dir / "component_review_packet.csv").open(encoding="utf-8") as handle:
+                packet_rows = {
+                    row["component_surface"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                packet_rows["C04_underlying_decision_surface"]["attribution_coverage_status"],
+                "diagnostic_without_explicit_asset_ref",
+            )
+            self.assertEqual(
+                packet_rows["C05_option_expression_surface"]["interpretation_status"],
+                "problem_surface_with_insufficient_attribution",
+            )
+            self.assertIn(
+                "explicit_model_05_option_expression_ref",
+                packet_rows["C05_option_expression_surface"]["missing_review_outputs"],
+            )
+            packet = json.loads((output_dir / "component_review_packet.json").read_text(encoding="utf-8"))
+            self.assertEqual(packet["contract_type"], "model_group_component_review_packet")
+            self.assertEqual(
+                packet["summary"]["review_readiness_status"],
+                "insufficient_attribution_for_some_problem_surfaces",
+            )
+            self.assertIn("C05_option_expression_surface", packet["summary"]["components_with_missing_review_outputs"])
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -383,6 +410,15 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["stage_verdict"], "dominant_censoring_point")
             self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["censored_count"], "1")
             self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["settled_metric_eligible_count"], "0")
+            with (output_dir / "component_review_packet.csv").open(encoding="utf-8") as handle:
+                packet_rows = {
+                    row["component_surface"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                packet_rows["C06_selected_option_path_materialization"]["interpretation_status"],
+                "problem_surface_without_direct_model_asset",
+            )
             flow_report = json.loads(
                 (output_dir / "component_survival_quality_flow_report.json").read_text(encoding="utf-8")
             )

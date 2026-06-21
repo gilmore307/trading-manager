@@ -135,7 +135,7 @@ failure-attribution lane. `scripts/tasks/build_model_group_layer_attribution.py`
 reads an existing replay `decision_rows.jsonl` and writes compact cohort, score
 bin, tail-loss, optional M05 unfilled-filter, gate-sweep, row-level
 counterfactual, component-surface, component survival/quality flow,
-component-to-model mapping, and
+component-to-model mapping, component review packet, and
 parameter-level replay summaries. Component-surface rows are the first
 diagnostic view: they classify each replay row by the first materially limiting
 decision surface, using `C01_` through `C09_` prefixes for diagnostic ordering
@@ -150,7 +150,13 @@ amplify, recover, censor, or leave that damage unmeasured. It reports explicit
 entered, passed, blocked, censored, and settled-eligible denominators for each
 C01-C09 component. Missing selected option paths are materialization censoring,
 not model wins or losses; only settled-eligible rows contribute outcome quality
-metrics. The helper also writes a parameter replay-review report, a
+metrics. `component_review_packet.json` and `component_review_packet.csv` are the
+review-facing inputs: each C01-C09 component row separates point-in-time evidence
+from retrospective outcome labels, lists the internal review refs that compose
+the component, marks missing review outputs, and records whether model blame can
+be assigned to an explicit asset or must remain an attribution gap. A component
+with missing diagnostics is not treated as neutral just because the final loss is
+first visible downstream. The helper also writes a parameter replay-review report, a
 suspect-parameter counterfactual report, and a focused
 high-score filled tail-loss packet that compares high-score losing fills with
 matched high-score non-loss fills. For suspect parameters, it also writes a

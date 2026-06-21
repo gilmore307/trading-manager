@@ -243,6 +243,45 @@ COMPONENT_SURVIVAL_QUALITY_FLOW_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+COMPONENT_REVIEW_PACKET_FIELDNAMES = [
+    "component_index",
+    "component_surface",
+    "model_layer",
+    "component_role",
+    "input_count",
+    "output_count",
+    "dropped_or_blocked_count",
+    "changed_or_transformed_count",
+    "settled_metric_eligible_count",
+    "survival_verdict",
+    "survival_verdict_basis",
+    "attribution_coverage_status",
+    "point_in_time_evidence_status",
+    "outcome_label_role",
+    "internal_review_refs",
+    "missing_review_outputs",
+    "explicit_ref_count",
+    "evidence_chain_count",
+    "diagnostic_surface_count",
+    "decision_surface_count",
+    "first_limiting_surface_count",
+    "can_assign_model_blame",
+    "interpretation_status",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
+COMPONENT_ROLE_BY_SURFACE = {
+    "C01_background_context_surface": "background_context_selection",
+    "C02_target_state_surface": "target_state_selection",
+    "C03_event_state_surface": "event_state_context",
+    "C04_underlying_decision_surface": "underlying_action_gate",
+    "C05_option_expression_surface": "option_expression_selection",
+    "C06_selected_option_path_materialization": "selected_contract_path_materialization",
+    "C07_portfolio_execution_surface": "portfolio_execution_and_fill",
+    "C08_residual_event_governance_surface": "residual_event_governance",
+    "C09_settled_prediction_quality_surface": "settled_outcome_quality",
+}
 
 
 def build_model_group_layer_attribution(
@@ -310,6 +349,12 @@ def build_model_group_layer_attribution(
         m05_dte_sensitivity_rows=m05_dte_sensitivity_rows,
         m05_hard_filter_overlap_rows=m05_hard_filter_overlap_rows,
     )
+    component_review_packet = _component_review_packet(
+        component_survival_quality_flow_rows=component_survival_quality_flow_rows,
+        component_model_mapping_rows=component_model_mapping_rows,
+        m05_unfilled_summary=m05_unfilled_summary,
+        output_dir=output_dir,
+    )
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
     tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
         rows=rows,
@@ -340,6 +385,11 @@ def build_model_group_layer_attribution(
         output_dir / "component_survival_quality_flow.csv",
         component_survival_quality_flow_rows,
         fieldnames=COMPONENT_SURVIVAL_QUALITY_FLOW_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "component_review_packet.csv",
+        component_review_packet["component_rows"],
+        fieldnames=COMPONENT_REVIEW_PACKET_FIELDNAMES,
     )
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
@@ -395,6 +445,10 @@ def build_model_group_layer_attribution(
         json.dumps(component_survival_quality_flow_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "component_review_packet.json").write_text(
+        json.dumps(component_review_packet["packet"], indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     if m05_unfilled_summary["source_status"] == "available":
         _write_csv(output_dir / "m05_unfilled_filter_reasons.csv", m05_unfilled_summary["filter_reason_rows"])
 
@@ -424,6 +478,9 @@ def build_model_group_layer_attribution(
             output_dir / "component_survival_quality_flow_report.json"
         ),
         "component_survival_quality_flow_summary": component_survival_quality_flow_report["summary"],
+        "component_review_packet_ref": str(output_dir / "component_review_packet.json"),
+        "component_review_packet_csv_ref": str(output_dir / "component_review_packet.csv"),
+        "component_review_packet_summary": component_review_packet["packet"]["summary"],
         "high_score_filled_tail_loss_attribution_packet_ref": str(
             output_dir / "high_score_filled_tail_loss_attribution_packet.json"
         ),
@@ -1098,7 +1155,7 @@ def _component_survival_quality_flow_report(rows: Sequence[Mapping[str, Any]]) -
         (
             row
             for row in rows
-            if str(row.get("stage_verdict") or "") not in {"neutral_or_unmeasured", "insufficient_evidence"}
+            if str(row.get("stage_verdict") or "") not in {"neutral_measured", "unmeasured", "insufficient_evidence"}
         ),
         None,
     )
@@ -1137,10 +1194,286 @@ def _component_survival_quality_flow_report(rows: Sequence[Mapping[str, Any]]) -
         ],
         "interpretation_notes": [
             "Component flow verdicts localize where degradation is first observed, not causal model blame.",
+            "Neutral measured and unmeasured states are separated so missing instrumentation is not read as success.",
             "Path-materialization censored rows are excluded from settled model win/loss metrics.",
             "Outcome fields are labels for settled quality only and must not be treated as point-in-time inputs.",
         ],
     }
+
+
+def _component_review_packet(
+    *,
+    component_survival_quality_flow_rows: Sequence[Mapping[str, Any]],
+    component_model_mapping_rows: Sequence[Mapping[str, Any]],
+    m05_unfilled_summary: Mapping[str, Any],
+    output_dir: Path,
+) -> dict[str, Any]:
+    mapping_by_surface = {
+        str(row.get("component_surface") or ""): row
+        for row in component_model_mapping_rows
+    }
+    component_rows: list[dict[str, Any]] = []
+    for flow_row in component_survival_quality_flow_rows:
+        component_surface = str(flow_row.get("component_surface") or "")
+        mapping_row = mapping_by_surface.get(component_surface) or {}
+        internal_refs = _component_internal_review_refs(
+            component_surface=component_surface,
+            m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
+        )
+        missing_outputs = _component_missing_review_outputs(
+            component_surface=component_surface,
+            mapping_row=mapping_row,
+            m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
+        )
+        attribution_status = _attribution_coverage_status(mapping_row)
+        interpretation_status = _component_interpretation_status(
+            survival_verdict=str(flow_row.get("stage_verdict") or ""),
+            attribution_coverage_status=attribution_status,
+            missing_review_outputs=missing_outputs,
+        )
+        input_count = int(flow_row.get("entered_count") or 0)
+        output_count = int(flow_row.get("passed_count") or 0)
+        blocked_count = int(flow_row.get("blocked_count") or 0)
+        component_rows.append(
+            {
+                "component_index": int(flow_row.get("component_index") or 0),
+                "component_surface": component_surface,
+                "model_layer": str(mapping_row.get("model_layer") or ""),
+                "component_role": COMPONENT_ROLE_BY_SURFACE.get(component_surface, ""),
+                "input_count": input_count,
+                "output_count": output_count,
+                "dropped_or_blocked_count": blocked_count,
+                "changed_or_transformed_count": _component_changed_or_transformed_count(component_surface, input_count),
+                "settled_metric_eligible_count": int(flow_row.get("settled_metric_eligible_count") or 0),
+                "survival_verdict": str(flow_row.get("stage_verdict") or ""),
+                "survival_verdict_basis": str(flow_row.get("verdict_basis") or ""),
+                "attribution_coverage_status": attribution_status,
+                "point_in_time_evidence_status": _point_in_time_evidence_status(mapping_row, internal_refs),
+                "outcome_label_role": "retrospective_label_only",
+                "internal_review_refs": ";".join(internal_refs),
+                "missing_review_outputs": ";".join(missing_outputs),
+                "explicit_ref_count": int(mapping_row.get("explicit_ref_count") or 0),
+                "evidence_chain_count": int(mapping_row.get("evidence_chain_count") or 0),
+                "diagnostic_surface_count": int(mapping_row.get("diagnostic_surface_count") or 0),
+                "decision_surface_count": int(mapping_row.get("decision_surface_count") or 0),
+                "first_limiting_surface_count": int(mapping_row.get("first_limiting_surface_count") or 0),
+                "can_assign_model_blame": _can_assign_model_blame(
+                    survival_verdict=str(flow_row.get("stage_verdict") or ""),
+                    attribution_coverage_status=attribution_status,
+                    missing_review_outputs=missing_outputs,
+                ),
+                "interpretation_status": interpretation_status,
+                "threshold_selection_performed": False,
+                "retraining_performed": False,
+                "fixed_input_only": True,
+            }
+        )
+    packet = {
+        "contract_type": "model_group_component_review_packet",
+        "component_review_packet_csv_ref": str(output_dir / "component_review_packet.csv"),
+        "component_count": len(component_rows),
+        "summary": {
+            "component_count": len(component_rows),
+            "survival_verdict_counts": dict(Counter(str(row["survival_verdict"]) for row in component_rows)),
+            "attribution_coverage_status_counts": dict(
+                Counter(str(row["attribution_coverage_status"]) for row in component_rows)
+            ),
+            "interpretation_status_counts": dict(Counter(str(row["interpretation_status"]) for row in component_rows)),
+            "components_with_missing_review_outputs": [
+                str(row["component_surface"])
+                for row in component_rows
+                if str(row.get("missing_review_outputs") or "")
+            ],
+            "model_blame_assignable_components": [
+                str(row["component_surface"])
+                for row in component_rows
+                if row.get("can_assign_model_blame") is True
+            ],
+            "model_attribution_ready_components": [
+                str(row["component_surface"])
+                for row in component_rows
+                if _model_attribution_ready(
+                    str(row.get("attribution_coverage_status") or ""),
+                    str(row.get("missing_review_outputs") or "").split(";")
+                    if str(row.get("missing_review_outputs") or "")
+                    else [],
+                )
+            ],
+            "review_readiness_status": _component_review_readiness_status(component_rows),
+            "fixed_input_only": True,
+            "threshold_selection_performed": False,
+            "retraining_performed": False,
+        },
+        "component_rows": component_rows,
+        "forbidden_uses": [
+            "causal_feature_importance_claim",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+        "interpretation_notes": [
+            "Every component row separates point-in-time evidence from retrospective outcome labels.",
+            "Outcome labels are evaluation labels and must not be used as decision-time explanatory inputs.",
+            "Model blame is assignable only when explicit asset refs and required internal review outputs are present.",
+            "Unmeasured or insufficient-attribution components must remain diagnostic gaps, not neutral evidence.",
+        ],
+    }
+    return {"component_rows": component_rows, "packet": packet}
+
+
+def _component_internal_review_refs(*, component_surface: str, m05_unfilled_available: bool) -> list[str]:
+    refs_by_surface = {
+        "C01_background_context_surface": ["decision_surface_component_matrix.csv"],
+        "C02_target_state_surface": ["decision_surface_component_matrix.csv"],
+        "C03_event_state_surface": ["decision_surface_component_matrix.csv"],
+        "C04_underlying_decision_surface": [
+            "m04_component_diagnostics.csv",
+            "m04_variant_counterfactual.csv",
+            "parameter_replay_review.csv",
+            "suspect_parameter_counterfactual.csv",
+        ],
+        "C05_option_expression_surface": [
+            "m05_selection_mechanics.csv",
+            "m05_dte_policy_sensitivity.csv",
+            "m05_hard_filter_overlap.csv",
+            "row_counterfactual_attribution.csv",
+        ],
+        "C06_selected_option_path_materialization": [
+            "decision_surface_component_matrix.csv",
+            "replay_execution_receipt.json",
+        ],
+        "C07_portfolio_execution_surface": [
+            "decision_surface_component_matrix.csv",
+            "row_counterfactual_attribution.csv",
+        ],
+        "C08_residual_event_governance_surface": ["decision_surface_component_matrix.csv"],
+        "C09_settled_prediction_quality_surface": [
+            "component_survival_quality_flow.csv",
+            "filled_score_bins.csv",
+            "tail_loss_rows.csv",
+            "top_gain_rows.csv",
+            "high_score_filled_tail_loss_attribution_packet.json",
+            "parameter_replay_review.csv",
+        ],
+    }
+    refs = list(refs_by_surface.get(component_surface, []))
+    if component_surface == "C05_option_expression_surface" and m05_unfilled_available:
+        refs.append("m05_unfilled_filter_reasons.csv")
+    return refs
+
+
+def _component_missing_review_outputs(
+    *,
+    component_surface: str,
+    mapping_row: Mapping[str, Any],
+    m05_unfilled_available: bool,
+) -> list[str]:
+    missing: list[str] = []
+    mapping_status = str(mapping_row.get("mapping_status") or "")
+    if component_surface in {
+        "C01_background_context_surface",
+        "C02_target_state_surface",
+        "C03_event_state_surface",
+    } and mapping_status == "explicit_ref_only":
+        missing.append("component_internal_score_or_candidate_delta")
+    if component_surface == "C05_option_expression_surface":
+        if int(mapping_row.get("explicit_ref_count") or 0) <= 0:
+            missing.append("explicit_model_05_option_expression_ref")
+        if int(mapping_row.get("diagnostic_surface_count") or 0) <= 0:
+            missing.append("model_05_alpha_or_selection_score_diagnostics")
+        if not m05_unfilled_available:
+            missing.append("m05_unfilled_filter_reasons")
+    if component_surface == "C08_residual_event_governance_surface":
+        if int(mapping_row.get("explicit_ref_count") or 0) <= 0:
+            missing.append("explicit_model_06_residual_event_governance_ref")
+        if int(mapping_row.get("diagnostic_surface_count") or 0) <= 0:
+            missing.append("model_06_action_surface_diagnostics")
+    if component_surface == "C07_portfolio_execution_surface":
+        missing.append("portfolio_capacity_and_sizing_delta")
+    return missing
+
+
+def _attribution_coverage_status(mapping_row: Mapping[str, Any]) -> str:
+    mapping_status = str(mapping_row.get("mapping_status") or "")
+    if mapping_status == "explicit_ref_and_diagnostic_surface":
+        return "explicit_asset_and_internal_diagnostics"
+    if mapping_status == "explicit_ref_only":
+        return "explicit_asset_without_internal_diagnostics"
+    if mapping_status == "diagnostic_or_decision_surface_without_explicit_ref":
+        return "diagnostic_without_explicit_asset_ref"
+    if mapping_status == "evidence_chain_only":
+        return "evidence_chain_only_insufficient_attribution"
+    if mapping_status == "non_model_surface":
+        return "non_model_surface"
+    return "missing_attribution"
+
+
+def _point_in_time_evidence_status(mapping_row: Mapping[str, Any], internal_refs: Sequence[str]) -> str:
+    decision_surface_count = int(mapping_row.get("decision_surface_count") or 0)
+    if decision_surface_count and internal_refs:
+        return "point_in_time_evidence_and_review_refs_present"
+    if decision_surface_count:
+        return "point_in_time_evidence_present_review_refs_missing"
+    if internal_refs:
+        return "review_refs_present_decision_surface_missing"
+    return "point_in_time_evidence_missing"
+
+
+def _component_changed_or_transformed_count(component_surface: str, input_count: int) -> int:
+    if component_surface in {
+        "C04_underlying_decision_surface",
+        "C05_option_expression_surface",
+        "C06_selected_option_path_materialization",
+        "C07_portfolio_execution_surface",
+        "C08_residual_event_governance_surface",
+    }:
+        return input_count
+    return 0
+
+
+def _model_attribution_ready(attribution_coverage_status: str, missing_review_outputs: Sequence[str]) -> bool:
+    return attribution_coverage_status == "explicit_asset_and_internal_diagnostics" and not missing_review_outputs
+
+
+def _can_assign_model_blame(
+    *,
+    survival_verdict: str,
+    attribution_coverage_status: str,
+    missing_review_outputs: Sequence[str],
+) -> bool:
+    return survival_verdict in {
+        "first_observed_deterioration",
+        "amplifies_prior_damage",
+        "dominant_censoring_point",
+    } and _model_attribution_ready(attribution_coverage_status, missing_review_outputs)
+
+
+def _component_interpretation_status(
+    *,
+    survival_verdict: str,
+    attribution_coverage_status: str,
+    missing_review_outputs: Sequence[str],
+) -> str:
+    if survival_verdict in {"first_observed_deterioration", "amplifies_prior_damage", "dominant_censoring_point"}:
+        if _model_attribution_ready(attribution_coverage_status, missing_review_outputs):
+            return "problem_surface_with_assignable_model_asset"
+        if attribution_coverage_status == "non_model_surface":
+            return "problem_surface_without_direct_model_asset"
+        return "problem_surface_with_insufficient_attribution"
+    if missing_review_outputs:
+        return "survival_neutral_but_review_incomplete"
+    if survival_verdict == "unmeasured":
+        return "survival_unmeasured"
+    return "reviewable_no_problem_observed"
+
+
+def _component_review_readiness_status(component_rows: Sequence[Mapping[str, Any]]) -> str:
+    if any(str(row.get("interpretation_status") or "").endswith("insufficient_attribution") for row in component_rows):
+        return "insufficient_attribution_for_some_problem_surfaces"
+    if any(str(row.get("missing_review_outputs") or "") for row in component_rows):
+        return "component_internal_review_outputs_incomplete"
+    return "component_review_packet_complete"
 
 
 def _component_flow_verdict(
@@ -1170,14 +1503,14 @@ def _component_flow_verdict(
             return "first_observed_deterioration", "settled_survivor_cohort_negative_mean_return"
         if tail_loss_count:
             return "first_observed_deterioration", "settled_survivor_tail_loss_present"
-        return "neutral_or_unmeasured", "settled_survivor_cohort_not_majority_bad"
+        return "neutral_measured", "settled_survivor_cohort_not_majority_bad"
     if previous_bad_rate is None:
-        return "neutral_or_unmeasured", "no_prior_observable_bad_rate"
+        return "unmeasured", "no_prior_observable_bad_rate"
     if post_bad_rate - previous_bad_rate >= 0.15:
         return "amplifies_prior_damage", "post_component_bad_rate_increased"
     if previous_bad_rate - post_bad_rate >= 0.15:
         return "pulls_back_prior_damage", "post_component_bad_rate_decreased"
-    return "neutral_or_unmeasured", "bad_rate_change_below_materiality"
+    return "neutral_measured", "bad_rate_change_below_materiality"
 
 
 def _settled_rows(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
