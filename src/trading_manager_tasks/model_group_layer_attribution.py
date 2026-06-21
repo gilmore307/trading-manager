@@ -478,6 +478,8 @@ OPERATION_COMPONENT_REVIEW_PACKET_FIELDNAMES = [
     "review_projections",
     "internal_review_refs",
     "missing_review_outputs",
+    "metric_effectiveness_status",
+    "metric_effectiveness_flags",
     "first_limiting_projection_count",
     "can_assign_operation_fault",
     "interpretation_status",
@@ -2406,6 +2408,42 @@ def _metric_status_has_data_gap(row: Mapping[str, Any]) -> bool:
     return str(row.get("availability_status") or "") in {"data_gap", "partial"}
 
 
+def _operation_component_metric_effectiveness_review(
+    metric_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    flags: list[str] = []
+    computed_rows = [
+        row
+        for row in metric_rows
+        if str(row.get("availability_status") or "") == "computed"
+    ]
+    for row in computed_rows:
+        metric_name = str(row.get("metric_name") or "")
+        percentile = _float(row.get("selected_forward_return_percentile_mean"))
+        top_quartile = _float(row.get("top_quartile_hit_rate"))
+        value = _float(row.get("value"))
+        if metric_name == "selected_sector_bucket_forward_return_rank":
+            if top_quartile is not None and top_quartile < 0.25:
+                flags.append("selected_sector_bucket_top_quartile_hit_below_random_baseline")
+            if percentile is not None and percentile < 0.5:
+                flags.append("selected_sector_bucket_mean_percentile_below_median")
+        elif metric_name == "selected_target_forward_return_rank_within_sector":
+            if top_quartile is not None and top_quartile < 0.25:
+                flags.append("selected_target_within_sector_top_quartile_hit_below_random_baseline")
+            if percentile is not None and percentile < 0.5:
+                flags.append("selected_target_within_sector_mean_percentile_below_median")
+        elif metric_name == "entry_signal_strength_and_outcome_alignment":
+            if value is not None and value < 0:
+                flags.append("entry_signal_return_alignment_negative")
+    if flags:
+        return {"status": "weak_effectiveness_observed", "flags": sorted(set(flags))}
+    if computed_rows:
+        return {"status": "effectiveness_metrics_reviewed", "flags": []}
+    if any(_metric_status_has_data_gap(row) for row in metric_rows):
+        return {"status": "effectiveness_metrics_incomplete", "flags": ["component_specific_metric_data_gap"]}
+    return {"status": "effectiveness_metrics_not_available", "flags": []}
+
+
 def _operation_component_review_packet(
     *,
     operation_component_flow_rows: Sequence[Mapping[str, Any]],
@@ -2429,14 +2467,18 @@ def _operation_component_review_packet(
     component_rows: list[dict[str, Any]] = []
     for flow_row in operation_component_flow_rows:
         component_id = str(flow_row.get("operation_component_id") or "")
+        component_metric_rows = metric_rows_by_component.get(component_id, [])
         internal_refs = _operation_component_internal_review_refs(
             component_id=component_id,
             m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
         )
+        if component_metric_rows and "operation_component_metrics.csv" not in internal_refs:
+            internal_refs.append("operation_component_metrics.csv")
+        metric_effectiveness = _operation_component_metric_effectiveness_review(component_metric_rows)
         missing_outputs = _operation_component_missing_review_outputs(
             component_id=component_id,
             mapping_by_surface=mapping_by_surface,
-            metric_rows=metric_rows_by_component.get(component_id, []),
+            metric_rows=component_metric_rows,
             m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
             replay_receipt_available=replay_receipt_available,
             settled_metric_eligible_count=int(flow_row.get("settled_metric_eligible_count") or 0),
@@ -2468,6 +2510,8 @@ def _operation_component_review_packet(
                 "review_projections": ";".join(_operation_component_projection_refs(component_id)),
                 "internal_review_refs": ";".join(internal_refs),
                 "missing_review_outputs": ";".join(missing_outputs),
+                "metric_effectiveness_status": metric_effectiveness["status"],
+                "metric_effectiveness_flags": ";".join(metric_effectiveness["flags"]),
                 "first_limiting_projection_count": int(flow_row.get("first_limiting_projection_count") or 0),
                 "can_assign_operation_fault": can_assign_fault,
                 "interpretation_status": _operation_component_interpretation_status(
@@ -2475,6 +2519,7 @@ def _operation_component_review_packet(
                     missing_review_outputs=missing_outputs,
                     applicability_status=str(flow_row.get("applicability_status") or ""),
                     can_assign_operation_fault=can_assign_fault,
+                    metric_effectiveness_status=str(metric_effectiveness["status"]),
                 ),
                 "threshold_selection_performed": False,
                 "retraining_performed": False,
@@ -2513,6 +2558,9 @@ def _operation_component_review_packet(
             "component_metric_availability_counts": dict(
                 Counter(str(row.get("availability_status") or "") for row in operation_component_metric_rows)
             ),
+            "metric_effectiveness_status_counts": dict(
+                Counter(str(row.get("metric_effectiveness_status") or "") for row in component_rows)
+            ),
             "components_with_metric_data_gaps": sorted(
                 {
                     str(row.get("operation_component_id") or "")
@@ -2520,6 +2568,11 @@ def _operation_component_review_packet(
                     if _metric_status_has_data_gap(row)
                 }
             ),
+            "components_with_weak_effectiveness_metrics": [
+                str(row["operation_component_id"])
+                for row in component_rows
+                if str(row.get("metric_effectiveness_status") or "") == "weak_effectiveness_observed"
+            ],
             "components_with_missing_review_outputs": [
                 str(row["operation_component_id"])
                 for row in component_rows
@@ -2682,6 +2735,7 @@ def _operation_component_interpretation_status(
     missing_review_outputs: Sequence[str],
     applicability_status: str,
     can_assign_operation_fault: bool,
+    metric_effectiveness_status: str,
 ) -> str:
     if applicability_status == "not_applicable_for_candidate_entry_replay":
         return "not_applicable_for_candidate_entry_replay"
@@ -2697,6 +2751,8 @@ def _operation_component_interpretation_status(
         return "problem_operation_with_incomplete_component_review"
     if missing_review_outputs:
         return "operation_review_incomplete_no_problem_assigned"
+    if metric_effectiveness_status == "weak_effectiveness_observed":
+        return "weak_component_effectiveness_observed"
     if survival_verdict in {"insufficient_evidence", "neutral_or_unmeasured", "unmeasured"}:
         return "operation_unmeasured_or_sample_limited"
     return "reviewable_no_problem_observed"

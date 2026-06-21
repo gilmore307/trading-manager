@@ -516,6 +516,14 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 "component_specific_metric_data_gap",
                 packet_rows["C01_intake_operation"]["missing_review_outputs"],
             )
+            self.assertEqual(
+                packet_rows["C01_intake_operation"]["metric_effectiveness_status"],
+                "weak_effectiveness_observed",
+            )
+            self.assertIn(
+                "selected_sector_bucket_mean_percentile_below_median",
+                packet_rows["C01_intake_operation"]["metric_effectiveness_flags"],
+            )
             self.assertNotIn(
                 "component_specific_metric_data_gap",
                 packet_rows["C02_entry_operation"]["missing_review_outputs"],

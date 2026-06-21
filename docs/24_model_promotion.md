@@ -175,6 +175,10 @@ judge whether the intake/entry operation selected effective sectors and targets
 from the visible universe, but its future-return labels are forbidden as training
 features, threshold-selection inputs, promotion approval, model activation, or
 broker/account/order authority.
+`operation_component_review_packet.csv/json` consumes these metric rows directly:
+computed-but-weak effectiveness metrics are surfaced as
+`metric_effectiveness_status=weak_effectiveness_observed` with component-specific
+flags, instead of being hidden behind the survival-flow verdict.
 
 The older `decision_surface_component_matrix.csv`,
 `component_model_mapping.csv`, `component_survival_quality_flow.csv`, and
