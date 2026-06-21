@@ -454,7 +454,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("option_feature_requirement_policy", replay_option_policy["applies_to"])
         drain_limits = rows["MANAGER_MODEL_GROUP_REPLAY_OPTION_FEATURE_DRAIN_LIMITS"]
         self.assertIn("replay_option_feature_repair_limit=5000", drain_limits["payload"])
-        self.assertIn("feature_repair_limit_cli_defaults_to_batch_size", drain_limits["payload"])
+        self.assertIn("feature_repair_limit_cli_defaults_to_full_emitted_artifact", drain_limits["payload"])
         self.assertIn("provider_stage_next_limit", drain_limits["applies_to"])
         self.assertIn("feature_repair_limit", drain_limits["applies_to"])
         self.assertIn("without the provider gate", drain_limits["note"])

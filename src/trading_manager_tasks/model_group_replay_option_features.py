@@ -406,6 +406,62 @@ def run_model_group_replay_option_features_for_replay_backoff(
     )
 
 
+def replay_option_feature_preflight_summary(
+    requirements_artifact_ref: Path,
+    *,
+    database_url: str | None = None,
+) -> dict[str, Any]:
+    """Summarize replay option-feature work without mutating provider/source state."""
+
+    raw_requirements = _raw_option_feature_requirements_from_artifact(requirements_artifact_ref)
+    requirements = _option_feature_requirements_from_items(raw_requirements)
+    db_url = _database_url(database_url)
+    if not db_url:
+        return {
+            "contract_type": "manager_model_group_replay_option_feature_preflight",
+            "requirements_artifact_ref": str(requirements_artifact_ref),
+            "raw_requirement_count": len(raw_requirements),
+            "deduped_requirement_count": len(requirements),
+            "database_available": False,
+            "reason": "shared SQL database URL is required for replay option-feature preflight",
+        }
+
+    feature_missing = _feature_missing_requirements(database_url=db_url, requirements=requirements, limit=max(1, len(requirements)))
+    feature_missing_keys = set(feature_missing)
+    feature_ready = tuple(item for item in requirements if item not in feature_missing_keys)
+    source_ready = _source_ready_requirements(database_url=db_url, requirements=feature_missing)
+    source_ready_keys = set(source_ready)
+    source_missing = tuple(item for item in feature_missing if item not in source_ready_keys)
+    unavailable = _source_unavailable_requirements(database_url=db_url, requirements=requirements)
+    unavailable_keys = set(unavailable)
+    provider_windows_all = _replay_option_provider_window_ids(requirements)
+    provider_windows_needed = _replay_option_provider_window_ids(source_missing)
+
+    return {
+        "contract_type": "manager_model_group_replay_option_feature_preflight",
+        "requirements_artifact_ref": str(requirements_artifact_ref),
+        "raw_requirement_count": len(raw_requirements),
+        "deduped_requirement_count": len(requirements),
+        "duplicate_requirement_count": max(0, len(raw_requirements) - len(requirements)),
+        "database_available": True,
+        "feature_ready_count": len(feature_ready),
+        "feature_missing_count": len(feature_missing),
+        "source_ready_feature_missing_count": len(source_ready),
+        "source_missing_feature_missing_count": len(source_missing),
+        "source_unavailable_marker_count": len(unavailable),
+        "provider_window_count_all_requirements": len(provider_windows_all),
+        "provider_window_count_needed": len(provider_windows_needed),
+        "estimated_provider_calls_after_preflight": len(provider_windows_needed),
+        "feature_ready_source_unavailable_count": len([item for item in feature_ready if item in unavailable_keys]),
+        "target_count": len({item.target_ref for item in requirements}),
+        "timestamp_count": len({item.timestamp for item in requirements}),
+        "month_count": len({item.month for item in requirements}),
+        "sample_source_missing": [item.__dict__ for item in source_missing[:10]],
+        "sample_source_ready_feature_missing": [item.__dict__ for item in source_ready[:10]],
+        "sample_source_unavailable": [item.__dict__ for item in unavailable[:10]],
+    }
+
+
 def replay_option_feature_requirements_from_replay_decision(
     replay_decision: SchedulerDecision,
 ) -> tuple[ReplayOptionFeatureRequirement, ...]:
@@ -465,6 +521,11 @@ def _option_feature_requirements_from_artifact(payload: Mapping[str, Any]) -> tu
     if not artifact_ref:
         return ()
     path = Path(artifact_ref)
+    raw_requirements = _raw_option_feature_requirements_from_artifact(path)
+    return _option_feature_requirements_from_items(raw_requirements)
+
+
+def _raw_option_feature_requirements_from_artifact(path: Path) -> tuple[Mapping[str, Any], ...]:
     if not path.exists():
         return ()
     items: list[Mapping[str, Any]] = []
@@ -479,7 +540,7 @@ def _option_feature_requirements_from_artifact(payload: Mapping[str, Any]) -> tu
                 continue
             if isinstance(parsed, Mapping):
                 items.append(parsed)
-    return _option_feature_requirements_from_items(items)
+    return tuple(items)
 
 
 def _option_feature_requirements_from_items(
@@ -606,6 +667,61 @@ def _source_ready_requirements(
     return tuple(requirements[index] for index in ordinals)
 
 
+def _source_unavailable_requirements(
+    *,
+    database_url: str,
+    requirements: Sequence[ReplayOptionFeatureRequirement],
+) -> tuple[ReplayOptionFeatureRequirement, ...]:
+    if not requirements:
+        return ()
+    import psycopg  # type: ignore
+    from psycopg.rows import dict_row  # type: ignore
+
+    with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT to_regclass(%s) AS table_ref", (f"{DEFAULT_OPTION_FEATURE_SCHEMA}.{DEFAULT_OPTION_FEATURE_TABLE}",))
+            exists = cursor.fetchone()
+            if not exists or exists.get("table_ref") is None:
+                return ()
+            cursor.execute(
+                """
+                CREATE TEMP TABLE replay_option_unavailable_requirement_filter (
+                  ordinal INTEGER NOT NULL,
+                  underlying TEXT NOT NULL,
+                  snapshot_time TIMESTAMPTZ NOT NULL
+                ) ON COMMIT DROP
+                """
+            )
+            cursor.executemany(
+                """
+                INSERT INTO replay_option_unavailable_requirement_filter (
+                  ordinal,
+                  underlying,
+                  snapshot_time
+                )
+                VALUES (%s, %s, %s::timestamptz)
+                """,
+                [(index, item.target_ref, item.timestamp) for index, item in enumerate(requirements)],
+            )
+            cursor.execute(
+                f"""
+                SELECT r.ordinal
+                FROM replay_option_unavailable_requirement_filter AS r
+                WHERE EXISTS (
+                  SELECT 1
+                  FROM "{DEFAULT_OPTION_FEATURE_SCHEMA}"."{DEFAULT_OPTION_FEATURE_TABLE}" AS f
+                  WHERE f."underlying" = r.underlying
+                    AND f."snapshot_time" = r.snapshot_time
+                    AND f."snapshot_type" = %s
+                )
+                ORDER BY r.ordinal ASC
+                """,
+                (OPTION_SOURCE_UNAVAILABLE_SNAPSHOT_TYPE,),
+            )
+            ordinals = [int(row["ordinal"]) for row in cursor.fetchall()]
+    return tuple(requirements[index] for index in ordinals)
+
+
 def _feature_missing_requirements(
     *,
     database_url: str,
@@ -662,6 +778,20 @@ def _feature_missing_requirements(
             )
             ordinals = [int(row["ordinal"]) for row in cursor.fetchall()]
     return tuple(requirements[index] for index in ordinals)
+
+
+def _replay_option_provider_window_ids(requirements: Sequence[ReplayOptionFeatureRequirement]) -> tuple[str, ...]:
+    grouped: dict[tuple[str, str], list[ReplayOptionFeatureRequirement]] = defaultdict(list)
+    for requirement in requirements:
+        grouped[(requirement.month, requirement.target_ref)].append(requirement)
+    request_ids: set[str] = set()
+    for (_month, target_ref), items in grouped.items():
+        previews = request_previews_for_replay_decision_times(
+            target_symbol=target_ref,
+            decision_timestamps=[item.timestamp for item in items],
+        )
+        request_ids.update(preview.request_id for preview in previews)
+    return tuple(sorted(request_ids))
 
 
 def _persist_replay_option_source_requests(

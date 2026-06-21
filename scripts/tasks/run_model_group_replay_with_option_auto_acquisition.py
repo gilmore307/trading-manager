@@ -53,7 +53,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--database-url")
     parser.add_argument("--database-url-file", type=Path, default=DEFAULT_DATABASE_URL_FILE)
     parser.add_argument("--batch-size", type=int, default=30)
-    parser.add_argument("--feature-repair-limit", type=int)
+    parser.add_argument(
+        "--feature-repair-limit",
+        type=int,
+        help="Maximum local feature requirements to repair per drain batch. Defaults to the full emitted requirements artifact.",
+    )
     parser.add_argument("--drain-batches-per-backoff", type=int, default=10)
     parser.add_argument("--max-replay-attempts", type=int, default=20)
     parser.add_argument("--max-provider-calls", type=int, default=300)
@@ -167,7 +171,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 execute=True,
                 execute_provider_acquisition=args.execute_provider_acquisition,
                 provider_acquisition_limit=batch_size,
-                feature_repair_limit=args.feature_repair_limit or batch_size,
+                feature_repair_limit=args.feature_repair_limit,
             )
             drain_elapsed = round(time.monotonic() - drain_started, 3)
             if decision is None:

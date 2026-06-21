@@ -22,6 +22,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_dashboard_read_models.py`
 - `test_dataset_evidence.py`
 - `test_dataset_expansion.py`
+- `test_drain_model_group_replay_option_features.py`
 - `test_event_feed_backfill.py`
 - `test_event_feed_dispatch.py`
 - `test_event_model_regeneration_plan.py`
@@ -37,6 +38,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_model_group_evaluation.py`
 - `test_model_group_layer_attribution.py`
 - `test_model_group_replay.py`
+- `test_model_group_replay_auto_option_acquisition.py`
 - `test_model_group_replay_contract_paths.py`
 - `test_model_group_replay_dataset.py`
 - `test_model_group_replay_option_features.py`

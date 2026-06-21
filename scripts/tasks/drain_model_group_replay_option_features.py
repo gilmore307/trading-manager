@@ -16,6 +16,7 @@ from trading_manager_tasks.model_group_replay_option_features import (
     REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED,
     REPLAY_OPTION_FEATURE_BACKOFF_REASON,
     REPLAY_OPTION_FEATURE_STAGE_ID,
+    replay_option_feature_preflight_summary,
     run_model_group_replay_option_features_for_replay_backoff,
 )
 from trading_manager_tasks.scheduler import SchedulerDecision
@@ -35,7 +36,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--feature-repair-limit",
         type=int,
-        help="Maximum local feature requirements to repair per batch. Defaults to --batch-size.",
+        help="Maximum local feature requirements to repair per batch. Defaults to the full emitted requirements artifact.",
     )
     parser.add_argument("--max-batches", type=int)
     parser.add_argument("--sleep-seconds", type=float, default=0.0)
@@ -43,6 +44,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--latest-status-json", type=Path)
     parser.add_argument("--execute-provider-acquisition", action="store_true")
     parser.add_argument("--plan-only", action="store_true")
+    parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args(argv)
 
     if args.batch_size <= 0:
@@ -53,6 +55,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--max-batches must be positive when provided")
     if not args.requirements_artifact_ref.exists():
         parser.error(f"--requirements-artifact-ref does not exist: {args.requirements_artifact_ref}")
+    if args.preflight_only and args.plan_only:
+        parser.error("--preflight-only and --plan-only are mutually exclusive")
+
+    if args.preflight_only:
+        _emit(
+            {
+                "event": "preflight_complete",
+                "requirements_artifact_ref": str(args.requirements_artifact_ref),
+                "preflight": replay_option_feature_preflight_summary(args.requirements_artifact_ref),
+            },
+            args=args,
+        )
+        return 0
 
     batch_index = 0
     while True:
@@ -78,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             execute=not args.plan_only,
             execute_provider_acquisition=args.execute_provider_acquisition,
             provider_acquisition_limit=args.batch_size,
-            feature_repair_limit=args.feature_repair_limit or args.batch_size,
+            feature_repair_limit=args.feature_repair_limit,
             selected_target_symbol=args.target_symbol,
         )
         row = decision.summary_row() if decision is not None else None

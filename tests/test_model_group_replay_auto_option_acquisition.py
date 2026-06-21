@@ -28,6 +28,7 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
             latest_path = tmp / "latest.json"
             artifact = tmp / "option_feature_requirements.jsonl"
             replay_calls: list[str] = []
+            drain_kwargs: list[dict] = []
 
             def fake_run_replay(args, *, run_id: str, database_url: str | None):
                 replay_calls.append(run_id)
@@ -41,6 +42,7 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
                 }
 
             def fake_drain(*args, **kwargs):
+                drain_kwargs.append(dict(kwargs))
                 now = datetime.now(UTC).isoformat()
                 return SchedulerDecision(
                     contract_type="manager_scheduler_decision",
@@ -95,6 +97,8 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
 
             self.assertEqual(result, 2)
             self.assertEqual(len(replay_calls), 2)
+            self.assertEqual(drain_kwargs[0]["provider_acquisition_limit"], 1)
+            self.assertIsNone(drain_kwargs[0]["feature_repair_limit"])
             rows = [json.loads(line) for line in status_path.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(rows[-1]["event"], "stopped")
             self.assertEqual(rows[-1]["reason"], "provider_budget_exhausted")

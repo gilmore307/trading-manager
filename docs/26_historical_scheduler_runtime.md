@@ -69,13 +69,16 @@ progress path should not be advanced. Provider acquisition remains constrained b
 `--provider-stage-next-limit` in the daemon or `--batch-size` /
 `--max-provider-calls` in the diagnostic runner, while local SQL feature repair
 uses the separate `--replay-option-feature-repair-limit` /
-`--feature-repair-limit` batch controls so already-local source rows can be
-generated in larger safe chunks. The daemon continues draining the same
-requirements artifact until the option features are ready or a provider/source
-backoff is reached; only then should it retry full `model_group.replay`. On
-daemon restart or a later tick, an unfinished `option_feature_requirements.jsonl`
-without a completed replay receipt is treated as pending replay-owned work and is
-drained before replay is dispatched again. It prepares the matching
+`--feature-repair-limit` controls so already-local source rows can be generated
+in larger safe chunks. When `--feature-repair-limit` is unset, the manual and
+diagnostic CLIs repair across the full emitted requirements artifact while
+provider acquisition remains batch/budget bounded. The daemon continues draining
+the same requirements artifact until the option features are ready or a
+provider/source backoff is reached; only then should it retry full
+`model_group.replay`. On daemon restart or a later tick, an unfinished
+`option_feature_requirements.jsonl` without a completed replay receipt is treated
+as pending replay-owned work and is drained before replay is dispatched again. It
+prepares the matching
 regular-session option-chain source day windows, dispatches bounded historical
 ThetaData calls only when `--execute-autonomous-provider-stages` or the
 diagnostic runner's `--execute-provider-acquisition` flag is enabled, generates
