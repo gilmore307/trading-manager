@@ -97,7 +97,11 @@ the replay decision rows, prepares the bounded
 `m05_option_expression_data_acquisition_contract_path` task key, and only calls
 ThetaData selected-contract tracking when the explicit provider-acquisition gate
 is enabled. Clean replay must retry after those path rows exist before treating
-listed-option decisions as executable fills.
+listed-option decisions as executable fills. The bounded auto replay runner also
+enforces this rule: a replay attempt with
+`selected_option_path_missing_count > 0` is a selected-contract path backoff, not
+a completed replay, and must drain `model_group.replay_contract_paths` before
+the next replay attempt can be accepted.
 
 Source-existing bootstrap may seed M02 data acquisition from durable
 `m03_target_state_vector_data_acquisition` rows for the selected target. That

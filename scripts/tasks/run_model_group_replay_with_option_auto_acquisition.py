@@ -18,6 +18,7 @@ from trading_manager_tasks.model_group_replay_option_features import (
     replay_option_feature_payload_from_text,
     run_model_group_replay_option_features_for_replay_backoff,
 )
+from trading_manager_tasks.model_group_replay_contract_paths import run_model_group_replay_contract_paths
 
 DEFAULT_DATASET_ROOT = Path("/root/projects/trading-storage/storage/05_replay_datasets/promotion_replay_candidate_policy")
 DEFAULT_RUNS_ROOT = DEFAULT_DATASET_ROOT / "replay_execution_runs"
@@ -94,6 +95,98 @@ def main(argv: Sequence[str] | None = None) -> int:
             args=args,
         )
         if replay.returncode == 0:
+            receipt = _replay_receipt(args, run_id=run_id)
+            if receipt is None:
+                _emit(
+                    {
+                        "event": "failed",
+                        "reason": "replay_completed_without_receipt",
+                        "attempt": attempt,
+                        "run_id": run_id,
+                    },
+                    args=args,
+                )
+                return 2
+            missing_contract_paths = _selected_option_path_missing_count(receipt)
+            if missing_contract_paths > 0:
+                decision_rows_ref = str(receipt.get("decision_rows_ref") or "").strip()
+                _emit(
+                    {
+                        "event": "selected_contract_path_backoff_detected",
+                        "attempt": attempt,
+                        "run_id": run_id,
+                        "missing_count": missing_contract_paths,
+                        "decision_rows_ref": decision_rows_ref,
+                        "required_next_step": "drain selected-contract path acquisition before accepting replay completion",
+                    },
+                    args=args,
+                )
+                if not args.execute_provider_acquisition:
+                    _emit(
+                        {
+                            "event": "stopped",
+                            "reason": "selected_contract_path_provider_required",
+                            "attempt": attempt,
+                            "run_id": run_id,
+                            "missing_count": missing_contract_paths,
+                        },
+                        args=args,
+                    )
+                    return 2
+                if not decision_rows_ref:
+                    _emit(
+                        {
+                            "event": "failed",
+                            "reason": "selected_contract_path_missing_decision_rows_ref",
+                            "attempt": attempt,
+                            "run_id": run_id,
+                        },
+                        args=args,
+                    )
+                    return 2
+                if _provider_budget_exhausted(args, provider_calls_used):
+                    _emit_provider_budget_exhausted(args=args, attempt=attempt, provider_calls_used=provider_calls_used)
+                    return 2
+                remaining_provider_budget = (
+                    args.max_provider_calls - provider_calls_used
+                    if args.max_provider_calls > 0
+                    else args.batch_size
+                )
+                batch_size = min(args.batch_size, max(1, remaining_provider_budget))
+                path_started = time.monotonic()
+                path_decision = run_model_group_replay_contract_paths(
+                    decision_rows_ref=Path(decision_rows_ref),
+                    execute=True,
+                    execute_provider_acquisition=True,
+                    limit=batch_size,
+                )
+                path_elapsed = round(time.monotonic() - path_started, 3)
+                provider_calls_used += path_decision.provider_calls
+                path_row = path_decision.summary_row()
+                path_summary = (
+                    path_row.get("execution_summary")
+                    if isinstance(path_row.get("execution_summary"), dict)
+                    else {}
+                )
+                _emit(
+                    {
+                        "event": "selected_contract_path_batch_complete",
+                        "attempt": attempt,
+                        "run_id": run_id,
+                        "elapsed_seconds": path_elapsed,
+                        "decision_status": path_row.get("decision_status"),
+                        "reason_code": path_row.get("reason_code"),
+                        "provider_calls": path_row.get("provider_calls"),
+                        "provider_calls_used": provider_calls_used,
+                        "selected_contract_requirement_count": path_summary.get("selected_contract_requirement_count"),
+                        "selected_contract_symbol_count": path_summary.get("selected_contract_symbol_count"),
+                        "task_key_path": path_summary.get("task_key_path"),
+                    },
+                    args=args,
+                )
+                if path_row.get("decision_status") != "executed":
+                    return 2
+                continue
             _emit(
                 {
                     "event": "completed",
@@ -143,25 +236,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _emit({"event": "stopped", "reason": "time_budget_exhausted", "attempt": attempt}, args=args)
                 return 2
             if _provider_budget_exhausted(args, provider_calls_used):
-                _emit(
-                    {
-                        "event": "provider_budget_reached",
-                        "attempt": attempt,
-                        "provider_calls_used": provider_calls_used,
-                        "max_provider_calls": args.max_provider_calls,
-                    },
-                    args=args,
-                )
-                _emit(
-                    {
-                        "event": "stopped",
-                        "reason": "provider_budget_exhausted",
-                        "attempt": attempt,
-                        "provider_calls_used": provider_calls_used,
-                        "max_provider_calls": args.max_provider_calls,
-                    },
-                    args=args,
-                )
+                _emit_provider_budget_exhausted(args=args, attempt=attempt, provider_calls_used=provider_calls_used)
                 return 2
             remaining_provider_budget = args.max_provider_calls - provider_calls_used if args.max_provider_calls > 0 else args.batch_size
             batch_size = min(args.batch_size, max(1, remaining_provider_budget))
@@ -262,6 +337,33 @@ def _provider_budget_exhausted(args: argparse.Namespace, provider_calls_used: in
     return args.max_provider_calls > 0 and provider_calls_used >= args.max_provider_calls
 
 
+def _emit_provider_budget_exhausted(
+    *,
+    args: argparse.Namespace,
+    attempt: int,
+    provider_calls_used: int,
+) -> None:
+    _emit(
+        {
+            "event": "provider_budget_reached",
+            "attempt": attempt,
+            "provider_calls_used": provider_calls_used,
+            "max_provider_calls": args.max_provider_calls,
+        },
+        args=args,
+    )
+    _emit(
+        {
+            "event": "stopped",
+            "reason": "provider_budget_exhausted",
+            "attempt": attempt,
+            "provider_calls_used": provider_calls_used,
+            "max_provider_calls": args.max_provider_calls,
+        },
+        args=args,
+    )
+
+
 def _run_replay(args: argparse.Namespace, *, run_id: str, database_url: str | None) -> subprocess.CompletedProcess[str]:
     command = [
         sys.executable,
@@ -301,6 +403,23 @@ def _run_replay(args: argparse.Namespace, *, run_id: str, database_url: str | No
     (args.runs_root / f"{run_id}.stdout.log").write_text(completed.stdout or "", encoding="utf-8")
     (args.runs_root / f"{run_id}.stderr.log").write_text(completed.stderr or "", encoding="utf-8")
     return completed
+
+
+def _replay_receipt(args: argparse.Namespace, *, run_id: str) -> dict[str, Any] | None:
+    receipt_path = args.runs_root / run_id / "replay_execution_receipt.json"
+    if not receipt_path.exists():
+        return None
+    return json.loads(receipt_path.read_text(encoding="utf-8"))
+
+
+def _selected_option_path_missing_count(receipt: dict[str, Any]) -> int:
+    coverage = receipt.get("option_replay_coverage")
+    if not isinstance(coverage, dict):
+        return 0
+    try:
+        return int(coverage.get("selected_option_path_missing_count") or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _run_id(prefix: str, replay_month: str, attempt: int) -> str:

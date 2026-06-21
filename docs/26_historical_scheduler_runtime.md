@@ -63,9 +63,14 @@ rerunning replay between batches. The callable
 `scripts/tasks/run_model_group_replay_with_option_auto_acquisition.py` is the
 bounded diagnostic/maintenance runner for an explicit replay command and progress
 path: it runs replay, parses option-feature backoff payloads, drains emitted
-requirements within provider and replay-attempt budgets, and retries replay. It
-is useful for isolated validation paths where the daemon's canonical replay
-progress path should not be advanced. Provider acquisition remains constrained by
+requirements within provider and replay-attempt budgets, and retries replay.
+Successful replay attempts are not accepted as complete while selected listed
+option contract paths are still missing; the same runner invokes
+`model_group.replay_contract_paths` under the explicit provider-acquisition gate
+and retries replay until selected-contract path coverage is closed or the shared
+provider/replay-attempt budget is exhausted. It is useful for isolated validation
+paths where the daemon's canonical replay progress path should not be advanced.
+Provider acquisition remains constrained by
 `--provider-stage-next-limit` in the daemon or `--batch-size` /
 `--max-provider-calls` in the diagnostic runner, while local SQL feature repair
 uses the separate `--replay-option-feature-repair-limit` /
