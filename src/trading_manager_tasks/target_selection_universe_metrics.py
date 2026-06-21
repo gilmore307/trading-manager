@@ -12,7 +12,7 @@ import csv
 import json
 import os
 from collections import Counter, defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -31,6 +31,10 @@ FIELDNAMES = [
     "sector_bucket_ref",
     "tradingview_sector",
     "layer2_context_symbol",
+    "optionable_underlying_status",
+    "replay_candidate_reason",
+    "in_dollar_volume_top300",
+    "in_market_cap_top300",
     "visible_universe_membership",
     "selected_by_replay",
     "selected_sector_bucket",
@@ -55,6 +59,36 @@ FIELDNAMES = [
     "opportunity_cost_to_sector_best",
     "candidate_universe_ref",
     "bar_source_ref",
+    "diagnostic_role",
+    "diagnostic_only",
+    "fixed_input_only",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "provider_call_performed",
+]
+
+SECTOR_OPPORTUNITY_FIELDNAMES = [
+    "timestamp",
+    "next_timestamp",
+    "sector_bucket_ref",
+    "selected_sector_bucket",
+    "best_visible_sector_bucket",
+    "selection_status",
+    "sector_candidate_count",
+    "computed_candidate_count",
+    "selected_target_count",
+    "selected_targets",
+    "sector_forward_return_mean",
+    "sector_forward_return_rank",
+    "sector_forward_return_percentile",
+    "sector_top_quartile_bucket",
+    "best_sector_forward_return_mean",
+    "sector_opportunity_cost_to_best",
+    "median_sector_forward_return_mean",
+    "sector_opportunity_cost_to_median",
+    "optionable_underlying_status_counts",
+    "replay_candidate_reason_counts",
+    "not_selected_reason",
     "diagnostic_role",
     "diagnostic_only",
     "fixed_input_only",
@@ -116,6 +150,10 @@ def build_target_selection_universe_metrics(
                     "sector_bucket_ref": _sector_bucket_ref(candidate),
                     "tradingview_sector": str(candidate.get("tradingview_sector") or ""),
                     "layer2_context_symbol": str(candidate.get("layer2_context_symbol") or ""),
+                    "optionable_underlying_status": str(candidate.get("optionable_underlying_status") or ""),
+                    "replay_candidate_reason": str(candidate.get("replay_candidate_reason") or ""),
+                    "in_dollar_volume_top300": str(candidate.get("in_dollar_volume_top300") or ""),
+                    "in_market_cap_top300": str(candidate.get("in_market_cap_top300") or ""),
                     "visible_universe_membership": True,
                     "selected_by_replay": symbol in selected_targets or str(candidate.get("target_ref") or "") in selected_targets,
                     "selected_sector_bucket": _sector_bucket_ref(candidate)
@@ -139,16 +177,35 @@ def build_target_selection_universe_metrics(
         _add_forward_return_ranks(rows_for_timestamp)
         metric_rows.extend(rows_for_timestamp)
 
+    sector_opportunity_rows = _sector_opportunity_packet_rows(metric_rows)
+    sector_opportunity_packet_path = output_path.with_name("sector_opportunity_packet.csv")
     _write_csv(output_path, metric_rows, FIELDNAMES)
+    _write_csv(sector_opportunity_packet_path, sector_opportunity_rows, SECTOR_OPPORTUNITY_FIELDNAMES)
     report = _report(
         decision_rows_path=decision_rows_path,
         output_path=output_path,
+        sector_opportunity_packet_path=sector_opportunity_packet_path,
         candidate_universe_path=candidate_universe_path,
         metric_rows=metric_rows,
+        sector_opportunity_rows=sector_opportunity_rows,
         time_windows=time_windows,
         now_utc=now_utc or datetime.now(UTC),
     )
     output_path.with_suffix(".report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    sector_opportunity_packet_path.with_suffix(".json").write_text(
+        json.dumps(
+            _sector_opportunity_packet(
+                sector_opportunity_rows=sector_opportunity_rows,
+                sector_opportunity_packet_path=sector_opportunity_packet_path,
+                target_selection_universe_metrics_path=output_path,
+                now_utc=now_utc or datetime.now(UTC),
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return report
 
 
@@ -395,12 +452,179 @@ def _add_sector_forward_return_metrics(rows: list[dict[str, Any]]) -> None:
             )
 
 
+def _sector_opportunity_packet_rows(metric_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    rows_by_timestamp: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for row in metric_rows:
+        rows_by_timestamp[str(row.get("timestamp") or "")].append(row)
+
+    for timestamp, rows in sorted(rows_by_timestamp.items()):
+        computed_rows = [row for row in rows if _float(row.get("forward_return")) is not None]
+        if not computed_rows:
+            continue
+        next_timestamp = str(computed_rows[0].get("next_timestamp") or "")
+        rows_by_sector: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+        for row in computed_rows:
+            rows_by_sector[str(row.get("sector_bucket_ref") or "UNMAPPED")].append(row)
+        sector_means = {
+            sector: sum(float(row["forward_return"]) for row in sector_rows) / len(sector_rows)
+            for sector, sector_rows in rows_by_sector.items()
+            if sector_rows
+        }
+        if not sector_means:
+            continue
+        best_sector = max(sector_means, key=lambda sector: sector_means[sector])
+        best_value = sector_means[best_sector]
+        median_value = _median(sector_means.values())
+        sector_count = len(sector_means)
+        top_quartile_limit = max(1, (sector_count + 3) // 4)
+        for sector, sector_rows in sorted(rows_by_sector.items()):
+            sector_mean = sector_means[sector]
+            sector_rank = 1 + sum(1 for other in sector_means.values() if other > sector_mean)
+            selected_rows = [
+                row
+                for row in sector_rows
+                if str(row.get("selected_by_replay") or "").strip().lower() in {"true", "1", "yes"}
+            ]
+            selected_sector = any(
+                str(row.get("selected_sector_bucket") or "").strip().lower() in {"true", "1", "yes"}
+                for row in sector_rows
+            )
+            selection_status = "unselected_sector"
+            if selected_sector and sector == best_sector:
+                selection_status = "selected_best_visible_sector"
+            elif selected_sector:
+                selection_status = "selected_weaker_visible_sector"
+            elif sector == best_sector:
+                selection_status = "missed_best_visible_sector"
+            not_selected_reason = "selected_by_replay" if selected_sector else "not_selected_reason_unavailable_in_current_inputs"
+            output.append(
+                {
+                    "timestamp": timestamp,
+                    "next_timestamp": next_timestamp,
+                    "sector_bucket_ref": sector,
+                    "selected_sector_bucket": selected_sector,
+                    "best_visible_sector_bucket": best_sector,
+                    "selection_status": selection_status,
+                    "sector_candidate_count": len(sector_rows),
+                    "computed_candidate_count": len(sector_rows),
+                    "selected_target_count": len(selected_rows),
+                    "selected_targets": ";".join(
+                        sorted(str(row.get("target_ref") or row.get("symbol") or "") for row in selected_rows)
+                    ),
+                    "sector_forward_return_mean": _round(sector_mean),
+                    "sector_forward_return_rank": sector_rank,
+                    "sector_forward_return_percentile": _round(
+                        1.0 if sector_count <= 1 else (sector_count - sector_rank) / (sector_count - 1)
+                    ),
+                    "sector_top_quartile_bucket": sector_rank <= top_quartile_limit,
+                    "best_sector_forward_return_mean": _round(best_value),
+                    "sector_opportunity_cost_to_best": _round(best_value - sector_mean),
+                    "median_sector_forward_return_mean": _round(median_value),
+                    "sector_opportunity_cost_to_median": _round((median_value or 0.0) - sector_mean),
+                    "optionable_underlying_status_counts": _counter_string(
+                        row.get("optionable_underlying_status") for row in sector_rows
+                    ),
+                    "replay_candidate_reason_counts": _counter_string(
+                        row.get("replay_candidate_reason") for row in sector_rows
+                    ),
+                    "not_selected_reason": not_selected_reason,
+                    "diagnostic_role": "sector_opportunity_review_label",
+                    "diagnostic_only": True,
+                    "fixed_input_only": True,
+                    "threshold_selection_performed": False,
+                    "retraining_performed": False,
+                    "provider_call_performed": False,
+                }
+            )
+    return output
+
+
+def _sector_opportunity_packet(
+    *,
+    sector_opportunity_rows: Sequence[Mapping[str, Any]],
+    sector_opportunity_packet_path: Path,
+    target_selection_universe_metrics_path: Path,
+    now_utc: datetime,
+) -> dict[str, Any]:
+    selected_rows = [
+        row
+        for row in sector_opportunity_rows
+        if str(row.get("selected_sector_bucket") or "").strip().lower() in {"true", "1", "yes"}
+    ]
+    missed_best_rows = [
+        row
+        for row in sector_opportunity_rows
+        if str(row.get("selection_status") or "") == "missed_best_visible_sector"
+    ]
+    selected_weaker_rows = [
+        row
+        for row in sector_opportunity_rows
+        if str(row.get("selection_status") or "") == "selected_weaker_visible_sector"
+    ]
+    return {
+        "contract_type": "target_selection_sector_opportunity_packet",
+        "generated_at_utc": now_utc.astimezone(UTC).isoformat(),
+        "sector_opportunity_packet_ref": str(sector_opportunity_packet_path),
+        "target_selection_universe_metrics_ref": str(target_selection_universe_metrics_path),
+        "summary": {
+            "sector_row_count": len(sector_opportunity_rows),
+            "selected_sector_row_count": len(selected_rows),
+            "missed_best_visible_sector_count": len(missed_best_rows),
+            "selected_weaker_visible_sector_count": len(selected_weaker_rows),
+            "selected_sector_opportunity_cost_to_best_mean": _mean(
+                _float(row.get("sector_opportunity_cost_to_best")) for row in selected_rows
+            ),
+            "selected_sector_forward_return_percentile_mean": _mean(
+                _float(row.get("sector_forward_return_percentile")) for row in selected_rows
+            ),
+            "selected_target_weighted_sector_opportunity_cost_to_best_mean": _weighted_mean(
+                (
+                    _float(row.get("sector_opportunity_cost_to_best")),
+                    _float(row.get("selected_target_count")),
+                )
+                for row in selected_rows
+            ),
+            "selected_target_weighted_sector_forward_return_percentile_mean": _weighted_mean(
+                (
+                    _float(row.get("sector_forward_return_percentile")),
+                    _float(row.get("selected_target_count")),
+                )
+                for row in selected_rows
+            ),
+        },
+        "forbidden_uses": [
+            "training_feature_input",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+        "interpretation_notes": [
+            "Sector opportunity rows are ex-post diagnostic labels over a fixed point-in-time visible universe.",
+            "A missed best visible sector is not automatically a model fault unless point-in-time admissibility evidence says it was tradable and in scope.",
+            "not_selected_reason_unavailable_in_current_inputs means the current diagnostic lacks a decision-time exclusion reason, not that no valid reason existed.",
+        ],
+        "side_effects": {
+            "provider_call_performed": False,
+            "broker_execution_performed": False,
+            "account_mutation_performed": False,
+            "model_activation_performed": False,
+            "retraining_performed": False,
+            "sql_mutation_performed": False,
+            "storage_source_mutation_performed": False,
+        },
+    }
+
+
 def _report(
     *,
     decision_rows_path: Path,
     output_path: Path,
+    sector_opportunity_packet_path: Path,
     candidate_universe_path: Path,
     metric_rows: Sequence[Mapping[str, Any]],
+    sector_opportunity_rows: Sequence[Mapping[str, Any]],
     time_windows: Sequence[tuple[str, str]],
     now_utc: datetime,
 ) -> dict[str, Any]:
@@ -423,6 +647,7 @@ def _report(
         "decision_rows_ref": str(decision_rows_path),
         "candidate_universe_ref": str(candidate_universe_path),
         "target_selection_universe_metrics_ref": str(output_path),
+        "sector_opportunity_packet_ref": str(sector_opportunity_packet_path),
         "summary": {
             "time_window_count": len(time_windows),
             "row_count": len(metric_rows),
@@ -433,6 +658,17 @@ def _report(
             "selected_forward_return_coverage": (len(selected_computed) / len(selected_rows)) if selected_rows else None,
             "computed_sector_bucket_count": len(computed_sector_buckets),
             "selected_sector_bucket_count": len(selected_sector_buckets),
+            "sector_opportunity_row_count": len(sector_opportunity_rows),
+            "selected_weaker_visible_sector_count": sum(
+                1
+                for row in sector_opportunity_rows
+                if str(row.get("selection_status") or "") == "selected_weaker_visible_sector"
+            ),
+            "missed_best_visible_sector_count": sum(
+                1
+                for row in sector_opportunity_rows
+                if str(row.get("selection_status") or "") == "missed_best_visible_sector"
+            ),
         },
         "effectiveness_role": "rank_selected_sector_buckets_then_selected_targets_within_bucket",
         "forbidden_uses": [
@@ -504,6 +740,40 @@ def _round(value: float | None) -> float | str:
     if value is None:
         return ""
     return round(float(value), 6)
+
+
+def _mean(values: Iterable[float | None]) -> float | None:
+    numeric = [float(value) for value in values if value is not None]
+    if not numeric:
+        return None
+    return round(sum(numeric) / len(numeric), 6)
+
+
+def _weighted_mean(values: Iterable[tuple[float | None, float | None]]) -> float | None:
+    weighted_values = [
+        (float(value), float(weight))
+        for value, weight in values
+        if value is not None and weight is not None and float(weight) > 0
+    ]
+    weight_total = sum(weight for _, weight in weighted_values)
+    if weight_total <= 0:
+        return None
+    return round(sum(value * weight for value, weight in weighted_values) / weight_total, 6)
+
+
+def _median(values: Iterable[float]) -> float | None:
+    numeric = sorted(float(value) for value in values)
+    if not numeric:
+        return None
+    midpoint = len(numeric) // 2
+    if len(numeric) % 2:
+        return round(numeric[midpoint], 6)
+    return round((numeric[midpoint - 1] + numeric[midpoint]) / 2.0, 6)
+
+
+def _counter_string(values: Iterable[Any]) -> str:
+    counts = Counter(str(value or "unknown") for value in values)
+    return ";".join(f"{key}:{counts[key]}" for key in sorted(counts))
 
 
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:

@@ -90,8 +90,13 @@ class TargetSelectionUniverseMetricsTests(unittest.TestCase):
             self.assertEqual(report["summary"]["row_count"], 3)
             self.assertEqual(report["summary"]["selected_row_count"], 1)
             self.assertEqual(report["summary"]["forward_return_status_counts"]["computed"], 3)
+            self.assertEqual(report["summary"]["sector_opportunity_row_count"], 2)
+            self.assertEqual(report["summary"]["selected_weaker_visible_sector_count"], 1)
+            self.assertEqual(report["summary"]["missed_best_visible_sector_count"], 1)
             self.assertFalse(report["side_effects"]["provider_call_performed"])
             self.assertTrue(output_path.with_suffix(".report.json").exists())
+            self.assertTrue((tmp / "sector_opportunity_packet.csv").exists())
+            self.assertTrue((tmp / "sector_opportunity_packet.json").exists())
             with output_path.open(encoding="utf-8") as handle:
                 rows = {row["target_ref"]: row for row in csv.DictReader(handle)}
             self.assertEqual(rows["MSFT"]["selected_by_replay"], "True")
@@ -107,6 +112,22 @@ class TargetSelectionUniverseMetricsTests(unittest.TestCase):
             self.assertEqual(rows["MSFT"]["forward_return_percentile_within_sector"], "1.0")
             self.assertEqual(rows["MSFT"]["opportunity_cost_to_sector_best"], "0.0")
             self.assertEqual(rows["NVDA"]["top_quartile_candidate"], "True")
+            with (tmp / "sector_opportunity_packet.csv").open(encoding="utf-8") as handle:
+                sector_rows = {
+                    row["sector_bucket_ref"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(sector_rows["XLK"]["selection_status"], "selected_weaker_visible_sector")
+            self.assertEqual(sector_rows["XLK"]["best_visible_sector_bucket"], "XLC")
+            self.assertEqual(sector_rows["XLK"]["sector_opportunity_cost_to_best"], "0.125")
+            self.assertEqual(sector_rows["XLC"]["selection_status"], "missed_best_visible_sector")
+            sector_packet = json.loads((tmp / "sector_opportunity_packet.json").read_text(encoding="utf-8"))
+            self.assertEqual(sector_packet["summary"]["selected_weaker_visible_sector_count"], 1)
+            self.assertEqual(sector_packet["summary"]["missed_best_visible_sector_count"], 1)
+            self.assertEqual(
+                sector_packet["summary"]["selected_target_weighted_sector_forward_return_percentile_mean"],
+                0.0,
+            )
 
     def test_missing_exit_bar_keeps_universe_visible_but_marks_return_gap(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

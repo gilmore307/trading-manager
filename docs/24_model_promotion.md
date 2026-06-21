@@ -166,15 +166,21 @@ Build `target_selection_universe_metrics.csv` with
 effectiveness. The builder reads existing replay decision rows, the fixed
 historical candidate universe, and already-acquired daily SQL bars to label every
 visible candidate at each replay decision timestamp with retrospective next-bar
-forward return. It evaluates target selection hierarchically: first by the
-selected `layer2_context_symbol`/sector bucket's forward-return rank among
+forward return. It also writes `sector_opportunity_packet.csv/json`, a C01
+sidecar that lists every visible sector bucket, identifies the best visible
+sector by retrospective forward return, marks selected weaker sectors, and
+records when the best visible sector was missed. If the current fixed inputs do
+not include a point-in-time exclusion reason for an unselected sector, the packet
+uses `not_selected_reason_unavailable_in_current_inputs` rather than inventing a
+cause. The C01/C02 diagnostic evaluates target selection hierarchically: first by
+the selected `layer2_context_symbol`/sector bucket's forward-return rank among
 visible sector buckets, then by the selected target's rank inside that selected
 bucket. Whole-universe target rank may remain background evidence, but it is not
-the primary C02 effectiveness metric. This artifact is diagnostic only: it helps
-judge whether the intake/entry operation selected effective sectors and targets
-from the visible universe, but its future-return labels are forbidden as training
-features, threshold-selection inputs, promotion approval, model activation, or
-broker/account/order authority.
+the primary C02 effectiveness metric. These artifacts are diagnostic only: they
+help judge whether the intake/entry operation selected effective sectors and
+targets from the visible universe, but future-return labels are forbidden as
+training features, threshold-selection inputs, promotion approval, model
+activation, or broker/account/order authority.
 `operation_component_review_packet.csv/json` consumes these metric rows directly:
 computed-but-weak effectiveness metrics are surfaced as
 `metric_effectiveness_status=weak_effectiveness_observed` with component-specific

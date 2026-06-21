@@ -604,12 +604,14 @@ def build_model_group_layer_attribution(
         portfolio_capacity_rows=portfolio_capacity_rows,
     )
     operation_component_metric_report = _operation_component_metric_report(operation_component_metric_rows)
+    sector_opportunity_packet_path = _sector_opportunity_packet_path(target_selection_universe_metrics_path)
     operation_component_review_packet = _operation_component_review_packet(
         operation_component_flow_rows=operation_component_flow_rows,
         operation_review_projection_rows=operation_review_projection_rows,
         operation_component_metric_rows=operation_component_metric_rows,
         component_model_mapping_rows=component_model_mapping_rows,
         m05_unfilled_summary=m05_unfilled_summary,
+        sector_opportunity_packet_available=sector_opportunity_packet_path is not None,
         replay_receipt_available=replay_receipt_path is not None,
         output_dir=output_dir,
     )
@@ -759,6 +761,7 @@ def build_model_group_layer_attribution(
         "target_selection_universe_metrics_ref": (
             str(target_selection_universe_metrics_path) if target_selection_universe_metrics_path else ""
         ),
+        "sector_opportunity_packet_ref": str(sector_opportunity_packet_path or ""),
         "row_scope": _row_scope(rows),
         "layer_status": _layer_status(rows),
         "cohorts": cohort_rows,
@@ -1923,6 +1926,13 @@ def _operation_component_metric_rows(
     return output
 
 
+def _sector_opportunity_packet_path(target_selection_universe_metrics_path: Path | None) -> Path | None:
+    if target_selection_universe_metrics_path is None:
+        return None
+    candidate = target_selection_universe_metrics_path.with_name("sector_opportunity_packet.csv")
+    return candidate if candidate.exists() else None
+
+
 def _target_selection_metric_rows(
     rows: Sequence[Mapping[str, Any]],
     target_selection_universe_rows: Sequence[Mapping[str, Any]],
@@ -2451,6 +2461,7 @@ def _operation_component_review_packet(
     operation_component_metric_rows: Sequence[Mapping[str, Any]],
     component_model_mapping_rows: Sequence[Mapping[str, Any]],
     m05_unfilled_summary: Mapping[str, Any],
+    sector_opportunity_packet_available: bool,
     replay_receipt_available: bool,
     output_dir: Path,
 ) -> dict[str, Any]:
@@ -2471,6 +2482,7 @@ def _operation_component_review_packet(
         internal_refs = _operation_component_internal_review_refs(
             component_id=component_id,
             m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
+            sector_opportunity_packet_available=sector_opportunity_packet_available,
         )
         if component_metric_rows and "operation_component_metrics.csv" not in internal_refs:
             internal_refs.append("operation_component_metrics.csv")
@@ -2615,7 +2627,12 @@ def _operation_component_projection_refs(component_id: str) -> list[str]:
     ]
 
 
-def _operation_component_internal_review_refs(*, component_id: str, m05_unfilled_available: bool) -> list[str]:
+def _operation_component_internal_review_refs(
+    *,
+    component_id: str,
+    m05_unfilled_available: bool,
+    sector_opportunity_packet_available: bool,
+) -> list[str]:
     refs_by_component = {
         "C01_intake_operation": [
             "operation_review_projection_matrix.csv",
@@ -2656,6 +2673,9 @@ def _operation_component_internal_review_refs(*, component_id: str, m05_unfilled
         ],
     }
     refs = list(refs_by_component.get(component_id, []))
+    if component_id == "C01_intake_operation" and sector_opportunity_packet_available:
+        refs.append("sector_opportunity_packet.csv")
+        refs.append("sector_opportunity_packet.json")
     if component_id == "C04_expression_review_operation" and m05_unfilled_available:
         refs.append("m05_unfilled_filter_reasons.csv")
     return refs
