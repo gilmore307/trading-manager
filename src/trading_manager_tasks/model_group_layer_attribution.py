@@ -516,6 +516,22 @@ OPERATION_COMPONENT_METRIC_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+MODEL_CANDIDATE_SELECTION_SUMMARY_FIELDNAMES = [
+    "timestamp",
+    "model_rank_within_timestamp",
+    "target_ref",
+    "model_candidate_trace_status",
+    "selected_by_replay",
+    "diagnostic_rank_score",
+    "alpha_score",
+    "trade_intensity_score",
+    "expected_return_score",
+    "action_direction_score",
+    "underlying_action_type",
+    "action_side",
+    "selected_option_contract_ref",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -527,6 +543,7 @@ def build_model_group_layer_attribution(
     m05_unfilled_diagnostics_path: Path | None = None,
     counterfactual_gate_sweep_path: Path | None = None,
     target_selection_universe_metrics_path: Path | None = None,
+    model_candidate_selection_trace_path: Path | None = None,
     run_id: str | None = None,
     now_utc: datetime | None = None,
     tail_row_limit: int = DEFAULT_TAIL_ROW_LIMIT,
@@ -598,10 +615,23 @@ def build_model_group_layer_attribution(
         operation_review_projection_rows,
     )
     target_selection_universe_rows = _load_csv_rows(target_selection_universe_metrics_path)
+    model_candidate_selection_trace_path = _resolved_model_candidate_selection_trace_path(
+        model_candidate_selection_trace_path=model_candidate_selection_trace_path,
+        replay_receipt_path=replay_receipt_path,
+    )
+    model_candidate_selection_trace_rows = tuple(_load_jsonl(model_candidate_selection_trace_path)) if model_candidate_selection_trace_path else ()
+    model_candidate_selection_summary_rows = _model_candidate_selection_summary_rows(
+        model_candidate_selection_trace_rows
+    )
+    model_candidate_selection_summary_report = _model_candidate_selection_summary_report(
+        model_candidate_selection_trace_rows,
+        model_candidate_selection_summary_rows,
+    )
     operation_component_metric_rows = _operation_component_metric_rows(
         rows=rows,
         target_selection_universe_rows=target_selection_universe_rows,
         portfolio_capacity_rows=portfolio_capacity_rows,
+        model_candidate_selection_trace_rows=model_candidate_selection_trace_rows,
     )
     operation_component_metric_report = _operation_component_metric_report(operation_component_metric_rows)
     sector_opportunity_packet_path = _sector_opportunity_packet_path(target_selection_universe_metrics_path)
@@ -612,6 +642,7 @@ def build_model_group_layer_attribution(
         component_model_mapping_rows=component_model_mapping_rows,
         m05_unfilled_summary=m05_unfilled_summary,
         sector_opportunity_packet_available=sector_opportunity_packet_path is not None,
+        model_candidate_selection_trace_available=bool(model_candidate_selection_trace_rows),
         replay_receipt_available=replay_receipt_path is not None,
         output_dir=output_dir,
     )
@@ -670,6 +701,11 @@ def build_model_group_layer_attribution(
         output_dir / "operation_component_metrics.csv",
         operation_component_metric_rows,
         fieldnames=OPERATION_COMPONENT_METRIC_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "model_candidate_selection_summary.csv",
+        model_candidate_selection_summary_rows,
+        fieldnames=MODEL_CANDIDATE_SELECTION_SUMMARY_FIELDNAMES,
     )
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
@@ -746,6 +782,10 @@ def build_model_group_layer_attribution(
         json.dumps(operation_component_metric_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "model_candidate_selection_summary_report.json").write_text(
+        json.dumps(model_candidate_selection_summary_report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     if m05_unfilled_summary["source_status"] == "available":
         _write_csv(output_dir / "m05_unfilled_filter_reasons.csv", m05_unfilled_summary["filter_reason_rows"])
 
@@ -762,6 +802,12 @@ def build_model_group_layer_attribution(
             str(target_selection_universe_metrics_path) if target_selection_universe_metrics_path else ""
         ),
         "sector_opportunity_packet_ref": str(sector_opportunity_packet_path or ""),
+        "model_candidate_selection_trace_ref": str(model_candidate_selection_trace_path or ""),
+        "model_candidate_selection_summary_ref": str(output_dir / "model_candidate_selection_summary.csv"),
+        "model_candidate_selection_summary_report_ref": str(
+            output_dir / "model_candidate_selection_summary_report.json"
+        ),
+        "model_candidate_selection_summary": model_candidate_selection_summary_report["summary"],
         "row_scope": _row_scope(rows),
         "layer_status": _layer_status(rows),
         "cohorts": cohort_rows,
@@ -859,6 +905,122 @@ def _load_jsonl(path: Path) -> Iterable[dict[str, Any]]:
                 yield json.loads(line)
 
 
+def _load_json_file(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _resolved_model_candidate_selection_trace_path(
+    *,
+    model_candidate_selection_trace_path: Path | None,
+    replay_receipt_path: Path | None,
+) -> Path | None:
+    if model_candidate_selection_trace_path is not None:
+        return model_candidate_selection_trace_path if model_candidate_selection_trace_path.exists() else None
+    receipt = _load_json_file(replay_receipt_path)
+    ref = str(receipt.get("model_candidate_selection_trace_ref") or "").strip()
+    if not ref:
+        return None
+    path = Path(ref)
+    return path if path.exists() else None
+
+
+def _model_candidate_selection_summary_rows(trace_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    ranked = sorted(
+        trace_rows,
+        key=lambda row: (
+            str(row.get("replay_time_pointer") or row.get("timestamp") or ""),
+            int(_float(row.get("model_rank_within_timestamp"), default=10**9)),
+            str(row.get("target_ref") or ""),
+        ),
+    )
+    output: list[dict[str, Any]] = []
+    for row in ranked:
+        if not _truthy(row.get("model_score_available")):
+            continue
+        output.append(
+            {
+                "timestamp": str(row.get("replay_time_pointer") or row.get("timestamp") or ""),
+                "model_rank_within_timestamp": int(_float(row.get("model_rank_within_timestamp"), default=0.0)),
+                "target_ref": str(row.get("target_ref") or ""),
+                "model_candidate_trace_status": str(row.get("model_candidate_trace_status") or ""),
+                "selected_by_replay": _truthy(row.get("selected_by_replay")),
+                "diagnostic_rank_score": _round(_float(row.get("diagnostic_rank_score"))),
+                "alpha_score": _round(_float(row.get("alpha_score"))),
+                "trade_intensity_score": _round(_float(row.get("trade_intensity_score"))),
+                "expected_return_score": _round(_float(row.get("expected_return_score"))),
+                "action_direction_score": _round(_float(row.get("action_direction_score"))),
+                "underlying_action_type": str(row.get("underlying_action_type") or ""),
+                "action_side": str(row.get("action_side") or ""),
+                "selected_option_contract_ref": str(row.get("selected_option_contract_ref") or ""),
+                "fixed_input_only": True,
+            }
+        )
+    return output
+
+
+def _model_candidate_selection_summary_report(
+    trace_rows: Sequence[Mapping[str, Any]],
+    summary_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    status_counts = Counter(str(row.get("model_candidate_trace_status") or "unknown") for row in trace_rows)
+    selected_rows = [row for row in summary_rows if _truthy(row.get("selected_by_replay"))]
+    top_ranked = [row for row in summary_rows if int(_float(row.get("model_rank_within_timestamp"), default=0.0)) <= 25]
+    selected_targets = {str(row.get("target_ref") or "") for row in selected_rows}
+    top_ranked_targets = {str(row.get("target_ref") or "") for row in top_ranked}
+    selected_rank_values = [
+        int(_float(row.get("model_rank_within_timestamp"), default=0.0))
+        for row in selected_rows
+        if row.get("model_rank_within_timestamp") not in {None, ""}
+    ]
+    selected_targets_outside_top_25_same_timestamp = sorted(
+        str(row.get("target_ref") or "")
+        for row in selected_rows
+        if int(_float(row.get("model_rank_within_timestamp"), default=0.0)) > 25
+    )
+    selected_rank_bucket_counts = {
+        "rank_1_to_10": sum(1 for rank in selected_rank_values if rank <= 10),
+        "rank_11_to_25": sum(1 for rank in selected_rank_values if 10 < rank <= 25),
+        "rank_26_to_50": sum(1 for rank in selected_rank_values if 25 < rank <= 50),
+        "rank_over_50": sum(1 for rank in selected_rank_values if rank > 50),
+    }
+    return {
+        "contract_type": "model_group_model_candidate_selection_summary_report",
+        "summary": {
+            "trace_row_count": len(trace_rows),
+            "scored_candidate_row_count": len(summary_rows),
+            "selected_candidate_row_count": len(selected_rows),
+            "status_counts": dict(sorted(status_counts.items())),
+            "selected_target_count": len(selected_targets),
+            "selected_candidate_rank_mean_same_timestamp": _round(_mean(selected_rank_values)),
+            "selected_candidate_top_10_same_timestamp_count": selected_rank_bucket_counts["rank_1_to_10"],
+            "selected_candidate_top_25_same_timestamp_count": (
+                selected_rank_bucket_counts["rank_1_to_10"] + selected_rank_bucket_counts["rank_11_to_25"]
+            ),
+            "selected_candidate_outside_top_25_same_timestamp_count": len(
+                selected_targets_outside_top_25_same_timestamp
+            ),
+            "selected_targets_outside_top_25_same_timestamp": selected_targets_outside_top_25_same_timestamp,
+            "selected_rank_bucket_counts_same_timestamp": selected_rank_bucket_counts,
+            "top_25_ranked_target_count": len(top_ranked_targets),
+            "selected_targets_in_top_25_ranked_count": len(selected_targets & top_ranked_targets),
+            "selected_targets_outside_top_25_ranked": sorted(selected_targets - top_ranked_targets),
+            "top_25_ranked_not_selected_targets": sorted(top_ranked_targets - selected_targets),
+            "future_outcome_label_included": False,
+            "summary_role": "model_standard_candidate_discovery_and_selection_not_future_return_rank",
+        },
+        "top_model_ranked_candidates_sample": list(summary_rows[:25]),
+        "forbidden_uses": [
+            "training_feature_input",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+    }
+
+
 def _float(value: Any, default: float = 0.0) -> float:
     try:
         if value is None or value == "":
@@ -866,6 +1028,12 @@ def _float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y"}
 
 
 def _m04_diagnostics(row: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -1914,9 +2082,11 @@ def _operation_component_metric_rows(
     rows: Sequence[Mapping[str, Any]],
     target_selection_universe_rows: Sequence[Mapping[str, Any]],
     portfolio_capacity_rows: Sequence[Mapping[str, Any]],
+    model_candidate_selection_trace_rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     output.extend(_target_selection_metric_rows(rows, target_selection_universe_rows))
+    output.extend(_model_candidate_selection_metric_rows(rows, model_candidate_selection_trace_rows))
     output.append(_entry_signal_metric_row(rows))
     output.append(_lifecycle_metric_row())
     output.append(_option_expression_metric_row(rows))
@@ -1924,6 +2094,88 @@ def _operation_component_metric_rows(
     output.append(_execution_gate_metric_row(rows))
     output.append(_failure_review_metric_row(rows))
     return output
+
+
+def _model_candidate_selection_metric_rows(
+    rows: Sequence[Mapping[str, Any]],
+    trace_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    if not trace_rows:
+        return [
+            _operation_component_metric_row(
+                component_id="C01_intake_operation",
+                metric_family="model_candidate_discovery",
+                metric_name="visible_candidate_model_scoring_coverage",
+                metric_scope="point_in_time_model_candidate_trace",
+                availability_status="data_gap",
+                reason_codes=["model_candidate_selection_trace_missing"],
+                point_in_time_input_fields=["visible_candidate", "model_score_available"],
+                future_outcome_fields=[],
+                row_count=len(rows),
+            ),
+            _operation_component_metric_row(
+                component_id="C02_entry_operation",
+                metric_family="model_candidate_selection",
+                metric_name="model_ranked_candidate_selection_funnel",
+                metric_scope="point_in_time_model_candidate_trace",
+                availability_status="data_gap",
+                reason_codes=["model_candidate_selection_trace_missing"],
+                point_in_time_input_fields=["diagnostic_rank_score", "model_rank_within_timestamp", "selected_by_replay"],
+                future_outcome_fields=[],
+                row_count=len(rows),
+            ),
+        ]
+    scored_rows = [row for row in trace_rows if _truthy(row.get("model_score_available"))]
+    selected_rows = [row for row in trace_rows if _truthy(row.get("selected_by_replay"))]
+    entry_intent_rows = [row for row in trace_rows if _truthy(row.get("m04_trade_intent"))]
+    option_signal_rows = [row for row in trace_rows if _truthy(row.get("option_expression_signal_required"))]
+    selected_rank_values = [
+        _float(row.get("model_rank_within_timestamp"))
+        for row in selected_rows
+        if row.get("model_rank_within_timestamp") not in {None, ""}
+    ]
+    timestamp_counts = Counter(str(row.get("replay_time_pointer") or row.get("timestamp") or "") for row in trace_rows)
+    status_counts = Counter(str(row.get("model_candidate_trace_status") or "unknown") for row in trace_rows)
+    return [
+        _operation_component_metric_row(
+            component_id="C01_intake_operation",
+            metric_family="model_candidate_discovery",
+            metric_name="visible_candidate_model_scoring_coverage",
+            metric_scope="point_in_time_model_candidate_trace",
+            availability_status="computed",
+            reason_codes=[],
+            point_in_time_input_fields=["visible_candidate", "model_score_available"],
+            future_outcome_fields=[],
+            row_count=len(trace_rows),
+            eligible_row_count=len(scored_rows),
+            selected_count=len(entry_intent_rows),
+            universe_count_mean=_mean(timestamp_counts.values()),
+            selected_target_present_count=len(scored_rows),
+            value=(len(scored_rows) / len(trace_rows)) if trace_rows else None,
+        ),
+        _operation_component_metric_row(
+            component_id="C02_entry_operation",
+            metric_family="model_candidate_selection",
+            metric_name="model_ranked_candidate_selection_funnel",
+            metric_scope="point_in_time_model_candidate_trace",
+            availability_status="computed",
+            reason_codes=[f"{key}:{value}" for key, value in sorted(status_counts.items())],
+            point_in_time_input_fields=[
+                "diagnostic_rank_score",
+                "model_rank_within_timestamp",
+                "m04_trade_intent",
+                "option_expression_signal_required",
+                "selected_by_replay",
+            ],
+            future_outcome_fields=[],
+            row_count=len(trace_rows),
+            eligible_row_count=len(option_signal_rows),
+            selected_count=len(selected_rows),
+            universe_count_mean=_mean(timestamp_counts.values()),
+            selected_forward_return_rank_mean=_mean(selected_rank_values),
+            value=(len(selected_rows) / len(option_signal_rows)) if option_signal_rows else None,
+        ),
+    ]
 
 
 def _sector_opportunity_packet_path(target_selection_universe_metrics_path: Path | None) -> Path | None:
@@ -2445,6 +2697,12 @@ def _operation_component_metric_effectiveness_review(
         elif metric_name == "entry_signal_strength_and_outcome_alignment":
             if value is not None and value < 0:
                 flags.append("entry_signal_return_alignment_negative")
+        elif metric_name == "model_ranked_candidate_selection_funnel":
+            rank_mean = _float(row.get("selected_forward_return_rank_mean"))
+            if rank_mean is not None and rank_mean > 25:
+                flags.append("selected_candidates_mean_model_rank_outside_top_25")
+            if value is not None and value < 0.01:
+                flags.append("low_selected_share_of_model_option_signal_candidates")
     if flags:
         return {"status": "weak_effectiveness_observed", "flags": sorted(set(flags))}
     if computed_rows:
@@ -2462,6 +2720,7 @@ def _operation_component_review_packet(
     component_model_mapping_rows: Sequence[Mapping[str, Any]],
     m05_unfilled_summary: Mapping[str, Any],
     sector_opportunity_packet_available: bool,
+    model_candidate_selection_trace_available: bool,
     replay_receipt_available: bool,
     output_dir: Path,
 ) -> dict[str, Any]:
@@ -2483,6 +2742,7 @@ def _operation_component_review_packet(
             component_id=component_id,
             m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
             sector_opportunity_packet_available=sector_opportunity_packet_available,
+            model_candidate_selection_trace_available=model_candidate_selection_trace_available,
         )
         if component_metric_rows and "operation_component_metrics.csv" not in internal_refs:
             internal_refs.append("operation_component_metrics.csv")
@@ -2632,6 +2892,7 @@ def _operation_component_internal_review_refs(
     component_id: str,
     m05_unfilled_available: bool,
     sector_opportunity_packet_available: bool,
+    model_candidate_selection_trace_available: bool,
 ) -> list[str]:
     refs_by_component = {
         "C01_intake_operation": [
@@ -2676,6 +2937,10 @@ def _operation_component_internal_review_refs(
     if component_id == "C01_intake_operation" and sector_opportunity_packet_available:
         refs.append("sector_opportunity_packet.csv")
         refs.append("sector_opportunity_packet.json")
+    if component_id in {"C01_intake_operation", "C02_entry_operation"} and model_candidate_selection_trace_available:
+        refs.append("model_candidate_selection_trace.jsonl")
+        refs.append("model_candidate_selection_summary.csv")
+        refs.append("model_candidate_selection_summary_report.json")
     if component_id == "C04_expression_review_operation" and m05_unfilled_available:
         refs.append("m05_unfilled_filter_reasons.csv")
     return refs
@@ -5581,6 +5846,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--m05-unfilled-diagnostics", type=Path)
     parser.add_argument("--counterfactual-gate-sweep", type=Path)
     parser.add_argument("--target-selection-universe-metrics", type=Path)
+    parser.add_argument("--model-candidate-selection-trace", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument("--tail-row-limit", type=int, default=DEFAULT_TAIL_ROW_LIMIT)
     parser.add_argument("--high-score-threshold", type=float, default=DEFAULT_HIGH_SCORE_THRESHOLD)
@@ -5593,6 +5859,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         m05_unfilled_diagnostics_path=args.m05_unfilled_diagnostics,
         counterfactual_gate_sweep_path=args.counterfactual_gate_sweep,
         target_selection_universe_metrics_path=args.target_selection_universe_metrics,
+        model_candidate_selection_trace_path=args.model_candidate_selection_trace,
         run_id=args.run_id,
         tail_row_limit=args.tail_row_limit,
         high_score_threshold=args.high_score_threshold,

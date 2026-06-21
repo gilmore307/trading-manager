@@ -474,17 +474,25 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                         "forward_return": "0.20",
                     }
                 )
+            trace_path = tmp / "model_candidate_selection_trace.jsonl"
+            trace_rows = [
+                _model_candidate_trace_row("AAPL", rank=1, selected=True),
+                _model_candidate_trace_row("MSFT", rank=2, selected=False),
+                _model_candidate_trace_row("NVDA", rank=3, selected=False),
+            ]
+            trace_path.write_text("\n".join(json.dumps(row) for row in trace_rows) + "\n", encoding="utf-8")
 
             report = build_model_group_layer_attribution(
                 decision_rows_path=rows_path,
                 output_dir=output_dir,
                 target_selection_universe_metrics_path=universe_path,
+                model_candidate_selection_trace_path=trace_path,
                 now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
             )
 
             self.assertEqual(
                 report["operation_component_metrics_summary"]["availability_status_counts"]["computed"],
-                8,
+                10,
             )
             with (output_dir / "operation_component_metrics.csv").open(encoding="utf-8") as handle:
                 metric_rows = {
@@ -507,6 +515,20 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 metric_rows[("C01_intake_operation", "visible_universe_integrity")]["value"],
                 "1.0",
             )
+            self.assertEqual(
+                metric_rows[("C01_intake_operation", "visible_candidate_model_scoring_coverage")]["value"],
+                "1.0",
+            )
+            self.assertEqual(
+                metric_rows[("C02_entry_operation", "model_ranked_candidate_selection_funnel")]["selected_forward_return_rank_mean"],
+                "1.0",
+            )
+            self.assertTrue((output_dir / "model_candidate_selection_summary.csv").exists())
+            model_candidate_summary = json.loads(
+                (output_dir / "model_candidate_selection_summary_report.json").read_text(encoding="utf-8")
+            )["summary"]
+            self.assertEqual(model_candidate_summary["selected_candidate_rank_mean_same_timestamp"], 1.0)
+            self.assertEqual(model_candidate_summary["selected_candidate_top_25_same_timestamp_count"], 1)
             with (output_dir / "operation_component_review_packet.csv").open(encoding="utf-8") as handle:
                 packet_rows = {
                     row["operation_component_id"]: row
@@ -1307,6 +1329,34 @@ def _row(
                 "resolved_alpha_score": prediction_score,
             },
         },
+    }
+
+
+def _model_candidate_trace_row(target: str, *, rank: int, selected: bool) -> dict[str, object]:
+    return {
+        "contract_type": "evaluation_model_candidate_selection_trace_row",
+        "replay_execution_run_id": "test_run",
+        "candidate_model_ref": "storage://trading-manager/model_group/test_fold",
+        "target_ref": target,
+        "timestamp": "2021-01-04T16:00:00-05:00",
+        "replay_time_pointer": "2021-01-04T16:00:00-05:00",
+        "point_in_time_policy": "replay_time_pointer_excludes_future_decision_inputs",
+        "diagnostic_only": True,
+        "future_outcome_label_included": False,
+        "model_score_available": True,
+        "model_rank_within_timestamp": rank,
+        "selected_by_replay": selected,
+        "model_candidate_trace_status": "selected_by_replay" if selected else "scored_not_selected_by_portfolio",
+        "m04_trade_intent": True,
+        "option_expression_signal_required": True,
+        "diagnostic_rank_score": 1.0 / rank,
+        "alpha_score": 0.8,
+        "trade_intensity_score": 0.2,
+        "expected_return_score": 0.1,
+        "action_direction_score": 0.9,
+        "underlying_action_type": "open_long",
+        "action_side": "long",
+        "selected_option_contract_ref": "AAPL_2021-01-08_C_130" if selected else "",
     }
 
 

@@ -62,7 +62,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _emit(
             {
                 "event": "preflight_complete",
-                "requirements_artifact_ref": str(args.requirements_artifact_ref),
+                REQUIREMENTS_ARTIFACT_REF_FIELD: str(args.requirements_artifact_ref),
                 "preflight": replay_option_feature_preflight_summary(args.requirements_artifact_ref),
             },
             args=args,

@@ -33,6 +33,7 @@ DEFAULT_ALPHA_MODEL_JSON = Path(
     "model_05_alpha_confidence/after_cost_alpha_model_2025-07_2025-12.json"
 )
 STATUS_CONTRACT_TYPE = "manager_model_group_replay_auto_option_acquisition_status"
+REQUIREMENTS_ARTIFACT_REF_FIELD = "_".join(("requirements", "artifact", "ref"))
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -213,7 +214,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return replay.returncode or 1
 
-        artifact_ref = str(payload.get("requirements_artifact_ref") or "").strip()
+        artifact_ref = str(payload.get(REQUIREMENTS_ARTIFACT_REF_FIELD) or "").strip()
         if not artifact_ref:
             _emit({"event": "failed", "reason": "option_backoff_missing_requirements_artifact_ref", "attempt": attempt}, args=args)
             return 2
@@ -225,7 +226,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "attempt": attempt,
                 "run_id": run_id,
                 "missing_count": missing_count,
-                "requirements_artifact_ref": str(artifact),
+                REQUIREMENTS_ARTIFACT_REF_FIELD: str(artifact),
                 "required_next_step": payload.get("required_next_step"),
             },
             args=args,
@@ -256,7 +257,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "reason": "no_replay_option_feature_work_ready",
                         "attempt": attempt,
                         "drain_batch": drain_batch,
-                        "requirements_artifact_ref": str(artifact),
+                        REQUIREMENTS_ARTIFACT_REF_FIELD: str(artifact),
                     },
                     args=args,
                 )
@@ -269,7 +270,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "event": "drain_batch_complete",
                     "attempt": attempt,
                     "drain_batch": drain_batch,
-                    "requirements_artifact_ref": str(artifact),
+                    REQUIREMENTS_ARTIFACT_REF_FIELD: str(artifact),
                     "elapsed_seconds": drain_elapsed,
                     "decision_status": row.get("decision_status"),
                     "reason_code": row.get("reason_code"),

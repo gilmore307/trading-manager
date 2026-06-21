@@ -181,6 +181,19 @@ help judge whether the intake/entry operation selected effective sectors and
 targets from the visible universe, but future-return labels are forbidden as
 training features, threshold-selection inputs, promotion approval, model
 activation, or broker/account/order authority.
+
+When the replay receipt references `model_candidate_selection_trace.jsonl`,
+`build_model_group_layer_attribution.py` also writes
+`model_candidate_selection_summary.csv` and
+`model_candidate_selection_summary_report.json`. These outputs answer a
+different C01/C02 question: which point-in-time visible candidates the model
+actually scored, where they ranked by the model's own diagnostic rank, and why
+they did or did not become final replay selections. This trace contains no
+future-return labels and is the primary evidence for whether a missed target was
+never discovered, discovered but not given entry intent, blocked by option
+expression feasibility, or passed downstream but not selected by portfolio/order
+intent. It must not be used as training input, threshold-selection authority,
+promotion approval, model activation, or broker/account/order authority.
 `operation_component_review_packet.csv/json` consumes these metric rows directly:
 computed-but-weak effectiveness metrics are surfaced as
 `metric_effectiveness_status=weak_effectiveness_observed` with component-specific
@@ -262,5 +275,5 @@ M06 event-risk research may propose a promotion packet. M03 event-state may cons
 ```bash
 PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/plan_model_promotion_review.py --model option_expression_model --candidate-ref trading-model://promotion-candidates/mpcand_example
 PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/build_agent_model_promotion_decision.py --promotion-request-ref manager_request://model-promotion/example --decision-status defer --decision-reason "missing production calibration evidence"
-PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/build_model_group_layer_attribution.py --decision-rows /path/to/decision_rows.jsonl --output-dir /path/to/diagnostic_run --m05-unfilled-diagnostics /path/to/m05_unfilled_diagnostics.csv --counterfactual-gate-sweep /path/to/counterfactual_gate_sweep.csv --high-score-threshold 0.8
+PYTHONPATH=src /root/projects/trading-manager/.venv/bin/python scripts/tasks/build_model_group_layer_attribution.py --decision-rows /path/to/decision_rows.jsonl --output-dir /path/to/diagnostic_run --replay-receipt /path/to/replay_execution_receipt.json --target-selection-universe-metrics /path/to/target_selection_universe_metrics.csv --m05-unfilled-diagnostics /path/to/m05_unfilled_diagnostics.csv --counterfactual-gate-sweep /path/to/counterfactual_gate_sweep.csv --high-score-threshold 0.8
 ```
