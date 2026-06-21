@@ -779,9 +779,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("m04_component_diagnostics", mechanism_review["applies_to"])
         self.assertIn("m05_selection_mechanics", mechanism_review["applies_to"])
         self.assertIn("m04_variant_counterfactual", mechanism_review["applies_to"])
+        self.assertIn("portfolio_capacity_counterfactual", mechanism_review["applies_to"])
         self.assertIn("m05_dte_policy_sensitivity", mechanism_review["applies_to"])
         self.assertIn("m05_hard_filter_overlap", mechanism_review["applies_to"])
         self.assertIn("without changing weights filters thresholds", mechanism_review["note"])
+        self.assertIn("portfolio policy", mechanism_review["note"])
 
         residual_event_governance_receipt = rows["MANAGER_POST_REPLAY_M06_EVENT_ATTRIBUTION_RECEIPT"]
         self.assertEqual(residual_event_governance_receipt["payload"], "post_replay_residual_event_governance_receipt")
@@ -963,6 +965,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("m04_component_diagnostics.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m05_selection_mechanics.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m04_variant_counterfactual.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("portfolio_capacity_counterfactual.csv", layer_attribution_surfaces["payload"])
+        self.assertIn("portfolio_capacity_counterfactual_report.json", layer_attribution_surfaces["payload"])
+        self.assertIn("portfolio_capacity_counterfactual", layer_attribution_surfaces["applies_to"])
         self.assertIn("m05_dte_policy_sensitivity.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m05_hard_filter_overlap.csv", layer_attribution_surfaces["payload"])
         self.assertIn("m04_m05_mechanism_review_report.json", layer_attribution_surfaces["payload"])
@@ -970,6 +975,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("high_score_filled_tail_loss_matches.csv", layer_attribution_surfaces["payload"])
         self.assertIn("counterfactual_gate_sweep_ref", layer_attribution_surfaces["payload"])
         self.assertIn("not be treated as threshold selection", layer_attribution_surfaces["note"])
+        self.assertIn("portfolio policy selection", layer_attribution_surfaces["note"])
 
         suspect_followup_payloads = {
             "MODEL_GROUP_SUSPECT_PARAMETER_FILLED_SUBSET_SELECTION_EFFECT": "filled_subset_selection_effect",

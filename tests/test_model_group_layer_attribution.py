@@ -191,12 +191,15 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "m04_component_diagnostics.csv").exists())
             self.assertTrue((output_dir / "m05_selection_mechanics.csv").exists())
             self.assertTrue((output_dir / "m04_variant_counterfactual.csv").exists())
+            self.assertTrue((output_dir / "portfolio_capacity_counterfactual.csv").exists())
+            self.assertTrue((output_dir / "portfolio_capacity_counterfactual_report.json").exists())
             self.assertTrue((output_dir / "m05_dte_policy_sensitivity.csv").exists())
             self.assertTrue((output_dir / "m05_hard_filter_overlap.csv").exists())
             self.assertTrue((output_dir / "m04_m05_mechanism_review_report.json").exists())
             self.assertIn("parameter_replay_review_summary", report)
             self.assertIn("parameter_replay_review_report_ref", report)
             self.assertIn("suspect_parameter_counterfactual_summary", report)
+            self.assertIn("portfolio_capacity_counterfactual_summary", report)
             self.assertIn("m04_m05_mechanism_review_summary", report)
             self.assertIn("component_survival_quality_flow_summary", report)
             self.assertIn("component_review_packet_summary", report)
@@ -247,6 +250,15 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 variant_rows[("current_horizon_rank_proxy", "m04_open_m05_pass")]["diagnostic_status"],
                 "missing_component_coverage",
             )
+            self.assertIn(("materiality_guarded_rank_proxy", "m04_open_m05_pass"), variant_rows)
+            capacity_report = json.loads(
+                (output_dir / "portfolio_capacity_counterfactual_report.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                capacity_report["contract_type"],
+                "model_group_portfolio_capacity_counterfactual_report",
+            )
+            self.assertIn("portfolio_policy_selection", capacity_report["forbidden_uses"])
             with (output_dir / "m05_hard_filter_overlap.csv").open(encoding="utf-8") as handle:
                 overlap_rows = list(csv.DictReader(handle))
             self.assertTrue(
@@ -735,6 +747,87 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(overlap_rows["dte_isolated"]["positive_label_count"], "30")
             self.assertEqual(report["m04_m05_mechanism_review_summary"]["m05_dte_isolated_positive_label_count"], 30)
             self.assertEqual(report["m04_m05_mechanism_review_summary"]["m05_dte_overlap_positive_label_count"], 0)
+
+    def test_portfolio_capacity_counterfactual_and_materiality_guard_are_fixed_input(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            rows = []
+            for index in range(6):
+                row = _row(
+                    f"c{index}",
+                    "accepted",
+                    "simulated_filled",
+                    1 if index in {0, 1, 5} else 0,
+                    0.70 + index * 0.02,
+                    0.04 if index in {0, 1, 5} else -0.04,
+                    "open_long",
+                    "long",
+                    "passed",
+                    "listed_option_contract",
+                )
+                row["timestamp"] = f"2021-05-{index + 1:02d}T16:00:00-05:00"
+                row["target_ref"] = f"T{index}"
+                row["planned_position_notional_usd"] = 1000.0
+                row["total_portfolio_notional_usd"] = 6000.0
+                scores = row["model_layer_diagnostics"]["model_04_unified_decision"]["dominant_horizon_scores"]
+                scores.update(
+                    {
+                        "action_confidence_score": 0.7 + index * 0.02,
+                        "materiality_adjusted_action_score": 0.7 + index * 0.02,
+                        "no_trade_probability_score": 0.10,
+                        "trade_intensity_score": 0.02 + index * 0.01,
+                        "minimum_trade_intensity": 0.01,
+                        "expected_return_score": 0.02 + index * 0.01,
+                        "action_direction_score": 0.55 + index * 0.05,
+                        "entry_quality_score": 0.8,
+                        "downside_risk_score": 0.1,
+                    }
+                )
+                if index == 5:
+                    row["model_layer_diagnostics"]["model_04_unified_decision"]["reason_codes"] = [
+                        "resolved_open_long",
+                        "position_gap_below_materiality",
+                    ]
+                rows.append(row)
+            rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            with (output_dir / "portfolio_capacity_counterfactual.csv").open(encoding="utf-8") as handle:
+                capacity_rows = {
+                    row["variant_name"]: row
+                    for row in csv.DictReader(handle)
+                }
+            top_5 = capacity_rows["top_5_by_replay_rank"]
+            self.assertEqual(top_5["selected_count"], "5")
+            self.assertEqual(top_5["excluded_count"], "1")
+            self.assertEqual(top_5["position_blocked_count"], "1")
+            self.assertEqual(top_5["budget_blocked_count"], "0")
+            self.assertEqual(top_5["threshold_selection_performed"], "False")
+            self.assertEqual(top_5["retraining_performed"], "False")
+            self.assertEqual(top_5["fixed_input_only"], "True")
+            budget_50 = capacity_rows["budget_50pct_by_replay_rank"]
+            self.assertEqual(budget_50["selected_count"], "3")
+            self.assertEqual(budget_50["budget_blocked_count"], "3")
+            self.assertEqual(
+                report["portfolio_capacity_counterfactual_summary"]["baseline_selected_count"],
+                6,
+            )
+            self.assertFalse(report["portfolio_capacity_counterfactual_summary"]["threshold_selection_performed"])
+            with (output_dir / "m04_variant_counterfactual.csv").open(encoding="utf-8") as handle:
+                variant_rows = {
+                    row["variant_name"]: row
+                    for row in csv.DictReader(handle)
+                    if row["subset_name"] == "m04_open_m05_pass_filled"
+                }
+            self.assertIn("materiality_guarded_rank_proxy", variant_rows)
+            self.assertEqual(variant_rows["materiality_guarded_rank_proxy"]["fixed_input_only"], "True")
 
     def test_suspect_parameter_counterfactual_keeps_header_when_no_suspects(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

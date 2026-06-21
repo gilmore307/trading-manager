@@ -125,6 +125,30 @@ M04_VARIANT_COUNTERFACTUAL_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+PORTFOLIO_CAPACITY_COUNTERFACTUAL_FIELDNAMES = [
+    "variant_name",
+    "ranking_metric",
+    "max_positions",
+    "budget_fraction",
+    "selected_count",
+    "excluded_count",
+    "selected_good_count",
+    "selected_bad_count",
+    "selected_hit_rate",
+    "selected_realized_return_total",
+    "selected_return_per_row",
+    "excluded_good_count",
+    "excluded_bad_count",
+    "excluded_realized_return_total",
+    "excluded_return_per_row",
+    "selected_planned_notional_total",
+    "budget_used_fraction",
+    "budget_blocked_count",
+    "position_blocked_count",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 M05_DTE_POLICY_SENSITIVITY_FIELDNAMES = [
     "sensitivity_case",
     "selected_expression_type",
@@ -340,6 +364,8 @@ def build_model_group_layer_attribution(
     m04_component_rows = _m04_component_diagnostic_rows(rows)
     m05_selection_rows = _m05_selection_mechanics_rows(rows, counterfactual_rows)
     m04_variant_rows = _m04_variant_counterfactual_rows(rows)
+    portfolio_capacity_rows = _portfolio_capacity_counterfactual_rows(rows)
+    portfolio_capacity_report = _portfolio_capacity_counterfactual_report(portfolio_capacity_rows)
     m05_dte_sensitivity_rows = _m05_dte_policy_sensitivity_rows(rows, counterfactual_rows)
     m05_hard_filter_overlap_rows = _m05_hard_filter_overlap_rows(rows, counterfactual_rows)
     mechanism_review_report = _m04_m05_mechanism_review_report(
@@ -416,6 +442,11 @@ def build_model_group_layer_attribution(
         fieldnames=M04_VARIANT_COUNTERFACTUAL_FIELDNAMES,
     )
     _write_csv(
+        output_dir / "portfolio_capacity_counterfactual.csv",
+        portfolio_capacity_rows,
+        fieldnames=PORTFOLIO_CAPACITY_COUNTERFACTUAL_FIELDNAMES,
+    )
+    _write_csv(
         output_dir / "m05_dte_policy_sensitivity.csv",
         m05_dte_sensitivity_rows,
         fieldnames=M05_DTE_POLICY_SENSITIVITY_FIELDNAMES,
@@ -439,6 +470,10 @@ def build_model_group_layer_attribution(
     )
     (output_dir / "m04_m05_mechanism_review_report.json").write_text(
         json.dumps(mechanism_review_report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "portfolio_capacity_counterfactual_report.json").write_text(
+        json.dumps(portfolio_capacity_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     (output_dir / "component_survival_quality_flow_report.json").write_text(
@@ -500,6 +535,9 @@ def build_model_group_layer_attribution(
         "m04_component_diagnostics_ref": str(output_dir / "m04_component_diagnostics.csv"),
         "m05_selection_mechanics_ref": str(output_dir / "m05_selection_mechanics.csv"),
         "m04_variant_counterfactual_ref": str(output_dir / "m04_variant_counterfactual.csv"),
+        "portfolio_capacity_counterfactual_ref": str(output_dir / "portfolio_capacity_counterfactual.csv"),
+        "portfolio_capacity_counterfactual_report_ref": str(output_dir / "portfolio_capacity_counterfactual_report.json"),
+        "portfolio_capacity_counterfactual_summary": portfolio_capacity_report["summary"],
         "m05_dte_policy_sensitivity_ref": str(output_dir / "m05_dte_policy_sensitivity.csv"),
         "m05_hard_filter_overlap_ref": str(output_dir / "m05_hard_filter_overlap.csv"),
         "m04_m05_mechanism_review_report_ref": str(output_dir / "m04_m05_mechanism_review_report.json"),
@@ -1368,6 +1406,8 @@ def _component_internal_review_refs(*, component_surface: str, m05_unfilled_avai
         ],
         "C07_portfolio_execution_surface": [
             "decision_surface_component_matrix.csv",
+            "portfolio_capacity_counterfactual.csv",
+            "portfolio_capacity_counterfactual_report.json",
             "row_counterfactual_attribution.csv",
         ],
         "C08_residual_event_governance_surface": ["decision_surface_component_matrix.csv"],
@@ -2892,6 +2932,10 @@ def _m04_variant_definitions() -> tuple[tuple[str, str], ...]:
             "action_confidence_score + 0.35 * materiality_adjusted_action_score - 0.25 * no_trade_probability_score",
         ),
         (
+            "materiality_guarded_rank_proxy",
+            "current_horizon_rank_proxy * indicator(position_gap_below_materiality is absent)",
+        ),
+        (
             "risk_adjusted_intensity",
             "trade_intensity_score * action_confidence_score * entry_quality_score * (1 - downside_risk_score)",
         ),
@@ -2942,6 +2986,11 @@ def _m04_variant_value(row: Mapping[str, Any], variant_name: str) -> float | Non
         if action_confidence is None or materiality_adjusted_action is None or no_trade_probability is None:
             return None
         return action_confidence + 0.35 * materiality_adjusted_action - 0.25 * no_trade_probability
+    if variant_name == "materiality_guarded_rank_proxy":
+        if action_confidence is None or materiality_adjusted_action is None or no_trade_probability is None:
+            return None
+        base = action_confidence + 0.35 * materiality_adjusted_action - 0.25 * no_trade_probability
+        return 0.0 if "position_gap_below_materiality" in _m04_reason_codes(row) else base
     if variant_name == "risk_adjusted_intensity":
         if None in (trade_intensity, action_confidence, entry_quality, downside_risk):
             return None
@@ -2965,6 +3014,223 @@ def _m04_variant_value(row: Mapping[str, Any], variant_name: str) -> float | Non
             return None
         return action_confidence + entry_quality + expected_return - downside_risk - no_trade_probability
     return None
+
+
+def _portfolio_capacity_counterfactual_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    filled_rows = [row for row in rows if row.get("fill_status") == "simulated_filled"]
+    if not filled_rows:
+        return [
+            _portfolio_capacity_counterfactual_row(
+                variant_name="baseline_selected_all",
+                ranking_metric="replay_selected_order",
+                rows=[],
+                selected_rows=[],
+                max_positions=0,
+                budget_fraction=1.0,
+                budget_blocked_count=0,
+                position_blocked_count=0,
+            )
+        ]
+    variants = [
+        ("baseline_selected_all", "replay_selected_order", 0, 1.0),
+        ("top_5_by_replay_rank", "replay_rank_score", 5, 1.0),
+        ("top_10_by_replay_rank", "replay_rank_score", 10, 1.0),
+        ("budget_50pct_by_replay_rank", "replay_rank_score", 0, 0.50),
+        ("budget_75pct_by_replay_rank", "replay_rank_score", 0, 0.75),
+    ]
+    return [
+        _portfolio_capacity_counterfactual_for_variant(
+            rows=filled_rows,
+            variant_name=variant_name,
+            ranking_metric=ranking_metric,
+            max_positions=max_positions,
+            budget_fraction=budget_fraction,
+        )
+        for variant_name, ranking_metric, max_positions, budget_fraction in variants
+    ]
+
+
+def _portfolio_capacity_counterfactual_for_variant(
+    *,
+    rows: Sequence[Mapping[str, Any]],
+    variant_name: str,
+    ranking_metric: str,
+    max_positions: int,
+    budget_fraction: float,
+) -> dict[str, Any]:
+    ordered = list(rows)
+    if ranking_metric == "replay_rank_score":
+        ordered.sort(
+            key=lambda row: (
+                -_portfolio_replay_rank_score(row),
+                str(row.get("timestamp") or ""),
+                str(row.get("target_ref") or ""),
+            )
+        )
+    else:
+        ordered.sort(key=lambda row: (str(row.get("timestamp") or ""), str(row.get("decision_id") or "")))
+    budget = _portfolio_total_budget(rows) * budget_fraction
+    selected: list[Mapping[str, Any]] = []
+    spent = 0.0
+    budget_blocked = 0
+    position_blocked = 0
+    for row in ordered:
+        if max_positions > 0 and len(selected) >= max_positions:
+            position_blocked += 1
+            continue
+        notional = _planned_notional(row)
+        if budget_fraction < 1.0 and spent + notional > budget + 1e-9:
+            budget_blocked += 1
+            continue
+        selected.append(row)
+        spent += notional
+    return _portfolio_capacity_counterfactual_row(
+        variant_name=variant_name,
+        ranking_metric=ranking_metric,
+        rows=ordered,
+        selected_rows=selected,
+        max_positions=max_positions,
+        budget_fraction=budget_fraction,
+        budget_blocked_count=budget_blocked,
+        position_blocked_count=position_blocked,
+    )
+
+
+def _portfolio_capacity_counterfactual_row(
+    *,
+    variant_name: str,
+    ranking_metric: str,
+    rows: Sequence[Mapping[str, Any]],
+    selected_rows: Sequence[Mapping[str, Any]],
+    max_positions: int,
+    budget_fraction: float,
+    budget_blocked_count: int,
+    position_blocked_count: int,
+) -> dict[str, Any]:
+    selected_ids = {str(row.get("decision_id") or "") for row in selected_rows}
+    excluded_rows = [row for row in rows if str(row.get("decision_id") or "") not in selected_ids]
+    selected_good = sum(1 for row in selected_rows if str(row.get("outcome_label")) == "1")
+    selected_bad = sum(1 for row in selected_rows if str(row.get("outcome_label")) == "0")
+    excluded_good = sum(1 for row in excluded_rows if str(row.get("outcome_label")) == "1")
+    excluded_bad = sum(1 for row in excluded_rows if str(row.get("outcome_label")) == "0")
+    selected_return_total = sum(_float(row.get("realized_return")) for row in selected_rows)
+    excluded_return_total = sum(_float(row.get("realized_return")) for row in excluded_rows)
+    selected_notional = sum(_planned_notional(row) for row in selected_rows)
+    total_budget = _portfolio_total_budget(rows)
+    selected_count = len(selected_rows)
+    excluded_count = len(excluded_rows)
+    return {
+        "variant_name": variant_name,
+        "ranking_metric": ranking_metric,
+        "max_positions": max_positions,
+        "budget_fraction": _round(budget_fraction),
+        "selected_count": selected_count,
+        "excluded_count": excluded_count,
+        "selected_good_count": selected_good,
+        "selected_bad_count": selected_bad,
+        "selected_hit_rate": _round(selected_good / selected_count) if selected_count else None,
+        "selected_realized_return_total": _round(selected_return_total),
+        "selected_return_per_row": _round(selected_return_total / selected_count) if selected_count else None,
+        "excluded_good_count": excluded_good,
+        "excluded_bad_count": excluded_bad,
+        "excluded_realized_return_total": _round(excluded_return_total),
+        "excluded_return_per_row": _round(excluded_return_total / excluded_count) if excluded_count else None,
+        "selected_planned_notional_total": _round(selected_notional),
+        "budget_used_fraction": _round(selected_notional / total_budget) if total_budget > 0 else None,
+        "budget_blocked_count": budget_blocked_count,
+        "position_blocked_count": position_blocked_count,
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+
+
+def _portfolio_capacity_counterfactual_report(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    baseline = next((row for row in rows if row.get("variant_name") == "baseline_selected_all"), None)
+    variants = [row for row in rows if row.get("variant_name") != "baseline_selected_all"]
+    baseline_row = baseline or {}
+    baseline_return = _float(baseline_row.get("selected_realized_return_total")) if baseline else 0.0
+    non_empty_variants = [row for row in variants if int(row.get("selected_count") or 0) > 0]
+    best_return_variant = max(
+        non_empty_variants,
+        key=lambda row: _float(row.get("selected_realized_return_total")),
+        default=None,
+    )
+    lowest_bad_rate_variant = min(
+        non_empty_variants,
+        key=lambda row: (
+            _float(row.get("selected_bad_count")) / max(1, int(row.get("selected_count") or 0)),
+            str(row.get("variant_name") or ""),
+        ),
+        default=None,
+    )
+    best_return_row = best_return_variant or {}
+    lowest_bad_rate_row = lowest_bad_rate_variant or {}
+    summary = {
+        "contract_type": "model_group_portfolio_capacity_counterfactual_summary",
+        "variant_count": len(rows),
+        "baseline_selected_count": int(baseline_row.get("selected_count") or 0) if baseline else 0,
+        "baseline_realized_return_total": _round(baseline_return),
+        "best_return_variant": str(best_return_row.get("variant_name") or ""),
+        "best_return_total": _round(_float(best_return_row.get("selected_realized_return_total")))
+        if best_return_variant
+        else None,
+        "lowest_bad_rate_variant": str(lowest_bad_rate_row.get("variant_name") or ""),
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+        "interpretation": "fixed_replay_capacity_variants_only_not_a_selected_portfolio_policy",
+    }
+    return {
+        "contract_type": "model_group_portfolio_capacity_counterfactual_report",
+        "summary": summary,
+        "portfolio_capacity_counterfactual_ref": "portfolio_capacity_counterfactual.csv",
+        "forbidden_uses": [
+            "threshold_selection",
+            "portfolio_policy_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+    }
+
+
+def _portfolio_replay_rank_score(row: Mapping[str, Any]) -> float:
+    scores = _m04_component_scores(row)
+    alpha_score = _float(row.get("prediction_score"))
+    minimum_alpha = _float(row.get("entry_minimum_alpha_confidence"), default=0.5)
+    trade_intensity = _float(scores.get("trade_intensity_score"))
+    minimum_trade_intensity = _minimum_trade_intensity(row, scores)
+    expected_return = _float(scores.get("expected_return_score"))
+    action_direction = _float(scores.get("action_direction_score"))
+    return (
+        max(0.0, alpha_score - minimum_alpha)
+        * max(0.0, trade_intensity - (minimum_trade_intensity if minimum_trade_intensity is not None else DEFAULT_MIN_TRADE_INTENSITY))
+        * max(0.0, expected_return)
+        * max(0.0, action_direction)
+    )
+
+
+def _planned_notional(row: Mapping[str, Any]) -> float:
+    return _float(row.get("planned_position_notional_usd") or row.get("planned_notional_usd"))
+
+
+def _portfolio_total_budget(rows: Sequence[Mapping[str, Any]]) -> float:
+    for row in rows:
+        budget = _float(row.get("total_portfolio_notional_usd"))
+        if budget > 0:
+            return budget
+    total = sum(_planned_notional(row) for row in rows)
+    return total if total > 0 else 1.0
+
+
+def _m04_reason_codes(row: Mapping[str, Any]) -> set[str]:
+    raw = _m04_diagnostics(row).get("reason_codes") or ()
+    if isinstance(raw, str):
+        return {item for item in raw.split(";") if item}
+    if isinstance(raw, Iterable):
+        return {str(item) for item in raw if str(item)}
+    return set()
 
 
 def _materiality_adjusted_action_score(

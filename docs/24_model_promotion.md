@@ -166,10 +166,12 @@ high-score filled tail-loss packet that compares high-score losing fills with
 matched high-score non-loss fills. For suspect parameters, it also writes a
 fixed-input M04/M05 mechanism review with `m04_component_diagnostics.csv`,
 `m05_selection_mechanics.csv`, `m04_variant_counterfactual.csv`,
-`m05_dte_policy_sensitivity.csv`, `m05_hard_filter_overlap.csv`, and
-`m04_m05_mechanism_review_report.json` so the repair question can distinguish
-M04 component weighting/direction from M05 option-expression DTE sensitivity,
-hard-filter overlap, or filled-subset selection mechanics. It separates weak
+`portfolio_capacity_counterfactual.csv`,
+`portfolio_capacity_counterfactual_report.json`, `m05_dte_policy_sensitivity.csv`,
+`m05_hard_filter_overlap.csv`, and `m04_m05_mechanism_review_report.json` so
+the repair question can distinguish M04 component weighting/direction from M05
+option-expression DTE sensitivity, hard-filter overlap, filled-subset selection
+mechanics, or C07 capacity concentration. It separates weak
 replay evidence into three explicit diagnostic classes:
 
 - data insufficiency, such as too few filled option rows, sparse score bins, or
@@ -197,6 +199,10 @@ to option-expression filters. The variant counterfactual and DTE sensitivity row
 may compare fixed-input M04 score-combination variants or DTE-filter pressure,
 but they remain diagnostic-only and cannot change weights, option filters, or
 promotion gates.
+Portfolio capacity counterfactual rows may compare fixed-input replay-selected,
+top-N-by-replay-rank, and budget-fraction variants to show whether C07 capacity
+would have amplified prior damage or pulled it back. They are a review surface
+only, not portfolio policy selection, threshold tuning, or promotion authority.
 High-score tail-loss classification must not invent causes from missing
 evidence: feature timing, liquidity/spread/fill realism, and regime/event miss remain
 `unknown_requires_evidence` unless the fixed replay rows contain the needed
