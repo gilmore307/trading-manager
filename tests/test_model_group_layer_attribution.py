@@ -427,6 +427,88 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 ["C06_selected_option_path_materialization"],
             )
 
+    def test_component_review_packet_consumes_m05_and_m06_explicit_refs(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            rows = [
+                _row("r1", "accepted", "simulated_filled", 1, 0.72, 0.25, "open_long", "long", "passed", "listed_option_contract"),
+                _row("r2", "accepted", "simulated_filled", 0, 0.68, -0.15, "open_long", "long", "passed", "listed_option_contract"),
+            ]
+            for row in rows:
+                row["model_layer_refs"] = {
+                    "model_01_background_context": f"m01://{row['decision_id']}",
+                    "model_02_target_state": f"m02://{row['decision_id']}",
+                    "model_03_event_state": f"m03://{row['decision_id']}",
+                    "model_04_unified_decision": f"m04://{row['decision_id']}",
+                    "model_05_option_expression": f"m05://{row['decision_id']}",
+                    "model_06_residual_event_governance": f"m06://{row['decision_id']}",
+                }
+                row["model_layer_diagnostics"]["model_01_background_context"] = {
+                    "state_quality_score": 0.91,
+                    "market_risk_stress_score": 0.12,
+                }
+                row["model_layer_diagnostics"]["model_02_target_state"] = {
+                    "target_ref": "AAPL",
+                    "target_direction_score_1D": 0.62,
+                }
+                row["model_layer_diagnostics"]["model_03_event_state"] = {
+                    "event_path_risk_score_1D": 0.18,
+                    "event_entry_block_pressure_score_1D": 0.05,
+                }
+                row["model_layer_diagnostics"]["model_05_option_expression"] = {
+                    "selection_gate_status": "passed",
+                    "resolved_selection_score": row["prediction_score"],
+                    "selected_contract_ref": row["selected_option_contract_ref"],
+                }
+                row["model_layer_diagnostics"]["model_06_residual_event_governance"] = {
+                    "action_surface_status": "measured",
+                    "intervention_action": "allow",
+                    "risk_level": "low",
+                }
+            rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+            build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            with (output_dir / "component_review_packet.csv").open(encoding="utf-8") as handle:
+                packet_rows = {
+                    row["component_surface"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                packet_rows["C05_option_expression_surface"]["attribution_coverage_status"],
+                "explicit_asset_and_internal_diagnostics",
+            )
+            for component_surface in (
+                "C01_background_context_surface",
+                "C02_target_state_surface",
+                "C03_event_state_surface",
+            ):
+                self.assertEqual(
+                    packet_rows[component_surface]["attribution_coverage_status"],
+                    "explicit_asset_and_internal_diagnostics",
+                )
+                self.assertEqual(packet_rows[component_surface]["missing_review_outputs"], "")
+            self.assertNotIn(
+                "explicit_model_05_option_expression_ref",
+                packet_rows["C05_option_expression_surface"]["missing_review_outputs"],
+            )
+            self.assertNotIn(
+                "model_05_alpha_or_selection_score_diagnostics",
+                packet_rows["C05_option_expression_surface"]["missing_review_outputs"],
+            )
+            self.assertEqual(packet_rows["C05_option_expression_surface"]["missing_review_outputs"], "")
+            self.assertEqual(
+                packet_rows["C08_residual_event_governance_surface"]["attribution_coverage_status"],
+                "explicit_asset_and_internal_diagnostics",
+            )
+            self.assertEqual(packet_rows["C08_residual_event_governance_surface"]["missing_review_outputs"], "")
+
     def test_tail_loss_packet_keeps_numeric_zero_label_for_disagreement(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

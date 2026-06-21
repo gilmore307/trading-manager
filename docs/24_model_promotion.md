@@ -156,7 +156,11 @@ from retrospective outcome labels, lists the internal review refs that compose
 the component, marks missing review outputs, and records whether model blame can
 be assigned to an explicit asset or must remain an attribution gap. A component
 with missing diagnostics is not treated as neutral just because the final loss is
-first visible downstream. The helper also writes a parameter replay-review report, a
+first visible downstream. The packet expects replay `decision_rows.jsonl` to carry
+component-layer `model_layer_refs` and `model_layer_diagnostics` for C01-C05 and
+C08 when those model surfaces participate; C06 selected-path materialization,
+C07 portfolio/execution, and C09 settled quality are non-model or downstream
+diagnostic surfaces. The helper also writes a parameter replay-review report, a
 suspect-parameter counterfactual report, and a focused
 high-score filled tail-loss packet that compares high-score losing fills with
 matched high-score non-loss fills. For suspect parameters, it also writes a

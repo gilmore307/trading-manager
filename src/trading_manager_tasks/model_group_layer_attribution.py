@@ -552,7 +552,16 @@ def _m04_diagnostics(row: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def _m05_diagnostics(row: Mapping[str, Any]) -> Mapping[str, Any]:
-    return ((row.get("model_layer_diagnostics") or {}).get("model_05_alpha_confidence") or {})
+    diagnostics = row.get("model_layer_diagnostics") or {}
+    return (
+        diagnostics.get("model_05_alpha_confidence")
+        or diagnostics.get("model_05_option_expression")
+        or {}
+    )
+
+
+def _m06_diagnostics(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    return ((row.get("model_layer_diagnostics") or {}).get("model_06_residual_event_governance") or {})
 
 
 def _m04_state(row: Mapping[str, Any]) -> str:
@@ -976,10 +985,22 @@ def _explicit_ref_count(rows: Sequence[Mapping[str, Any]], model_layer: str) -> 
 
 
 def _diagnostic_surface_count(rows: Sequence[Mapping[str, Any]], model_layer: str) -> int:
+    if model_layer in {
+        "model_01_background_context",
+        "model_02_target_state",
+        "model_03_event_state",
+    }:
+        return sum(
+            1
+            for row in rows
+            if bool((row.get("model_layer_diagnostics") or {}).get(model_layer))
+        )
     if model_layer == "model_04_unified_decision":
         return sum(1 for row in rows if bool(_m04_diagnostics(row)))
     if model_layer == "model_05_option_expression":
         return sum(1 for row in rows if bool(_m05_diagnostics(row)))
+    if model_layer == "model_06_residual_event_governance":
+        return sum(1 for row in rows if bool(_m06_diagnostics(row)))
     return 0
 
 
@@ -993,6 +1014,8 @@ def _decision_surface_count(rows: Sequence[Mapping[str, Any]], model_layer: str)
             if str(row.get("selected_option_contract_ref") or "").strip()
             or str(row.get("asset_expression_route") or "") == "option_expression_unfilled"
         )
+    if model_layer == "model_06_residual_event_governance":
+        return sum(1 for row in rows if bool(_m06_diagnostics(row)))
     return _explicit_ref_count(rows, model_layer)
 
 
@@ -1375,21 +1398,21 @@ def _component_missing_review_outputs(
         "C01_background_context_surface",
         "C02_target_state_surface",
         "C03_event_state_surface",
-    } and mapping_status == "explicit_ref_only":
+    } and int(mapping_row.get("diagnostic_surface_count") or 0) <= 0:
         missing.append("component_internal_score_or_candidate_delta")
     if component_surface == "C05_option_expression_surface":
         if int(mapping_row.get("explicit_ref_count") or 0) <= 0:
             missing.append("explicit_model_05_option_expression_ref")
         if int(mapping_row.get("diagnostic_surface_count") or 0) <= 0:
             missing.append("model_05_alpha_or_selection_score_diagnostics")
-        if not m05_unfilled_available:
-            missing.append("m05_unfilled_filter_reasons")
+        if int(mapping_row.get("diagnostic_surface_count") or 0) <= 0 and not m05_unfilled_available:
+            missing.append("m05_candidate_set_and_selection_delta")
     if component_surface == "C08_residual_event_governance_surface":
         if int(mapping_row.get("explicit_ref_count") or 0) <= 0:
             missing.append("explicit_model_06_residual_event_governance_ref")
         if int(mapping_row.get("diagnostic_surface_count") or 0) <= 0:
             missing.append("model_06_action_surface_diagnostics")
-    if component_surface == "C07_portfolio_execution_surface":
+    if component_surface == "C07_portfolio_execution_surface" and int(mapping_row.get("decision_surface_count") or 0) <= 0:
         missing.append("portfolio_capacity_and_sizing_delta")
     return missing
 
