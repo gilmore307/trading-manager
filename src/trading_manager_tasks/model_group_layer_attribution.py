@@ -185,7 +185,7 @@ DECISION_SURFACE_COMPONENT_MATRIX_FIELDNAMES = [
     "model_04_score_coverage_count",
     "model_04_resolved_action",
     "model_04_reason_codes",
-    "model_05_surface_state",
+    "option_expression_surface_state",
     "selected_option_contract_ref",
     "selected_option_expression_type",
     "selected_option_path_status",
@@ -652,7 +652,7 @@ def _decision_surface_component_matrix_rows(rows: Sequence[Mapping[str, Any]]) -
                 "model_04_score_coverage_count": len(scores),
                 "model_04_resolved_action": _m04_state(row),
                 "model_04_reason_codes": ";".join(str(value) for value in (m04.get("reason_codes") or [])),
-                "model_05_surface_state": _model_05_surface_state(row),
+                "option_expression_surface_state": _option_expression_surface_state(row),
                 "selected_option_contract_ref": str(row.get("selected_option_contract_ref") or ""),
                 "selected_option_expression_type": str(
                     row.get("selected_option_expression_type") or row.get("decision_expression_type") or ""
@@ -669,13 +669,13 @@ def _decision_surface_component_matrix_rows(rows: Sequence[Mapping[str, Any]]) -
 
 def _first_limiting_surface(row: Mapping[str, Any]) -> tuple[str, str]:
     if not _m04_diagnostics(row):
-        return "model_04_decision_surface", "model_04_diagnostics_missing"
+        return "underlying_decision_surface", "model_04_diagnostics_missing"
     if _m04_state(row) != "open_long/long":
-        return "model_04_decision_surface", "m04_resolved_non_open_long"
+        return "underlying_decision_surface", "m04_resolved_non_open_long"
     if not str(row.get("selected_option_contract_ref") or "").strip():
         if str(row.get("asset_expression_route") or "") == "option_expression_unfilled":
-            return "model_05_option_expression_surface", "no_selected_option_contract"
-        return "model_05_option_expression_surface", "option_expression_not_selected"
+            return "option_expression_surface", "no_selected_option_contract"
+        return "option_expression_surface", "option_expression_not_selected"
     path_status = _selected_option_path_status(row)
     if path_status == "missing":
         return "selected_option_path_materialization", "selected_option_contract_path_missing"
@@ -697,7 +697,7 @@ def _model_ref_status(row: Mapping[str, Any], model_layer: str) -> str:
     return "missing"
 
 
-def _model_05_surface_state(row: Mapping[str, Any]) -> str:
+def _option_expression_surface_state(row: Mapping[str, Any]) -> str:
     status = _m05_state(row)
     selected_contract = bool(str(row.get("selected_option_contract_ref") or "").strip())
     route = str(row.get("asset_expression_route") or "")
@@ -724,12 +724,12 @@ def _component_model_mapping_rows(
     decision_surface_rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     component_specs = [
-        ("model_01_background_context_surface", "model_01_background_context"),
-        ("model_02_target_state_surface", "model_02_target_state"),
-        ("model_03_event_state_surface", "model_03_event_state"),
-        ("model_04_decision_surface", "model_04_unified_decision"),
-        ("model_05_option_expression_surface", "model_05_option_expression"),
-        ("model_06_residual_event_governance_surface", "model_06_residual_event_governance"),
+        ("background_context_surface", "model_01_background_context"),
+        ("target_state_surface", "model_02_target_state"),
+        ("event_state_surface", "model_03_event_state"),
+        ("underlying_decision_surface", "model_04_unified_decision"),
+        ("option_expression_surface", "model_05_option_expression"),
+        ("residual_event_governance_surface", "model_06_residual_event_governance"),
     ]
     output: list[dict[str, Any]] = []
     for component_surface, model_layer in component_specs:
@@ -850,7 +850,7 @@ def _row_maps_to_model_layer(row: Mapping[str, Any], model_layer: str) -> bool:
     if model_layer == "model_04_unified_decision":
         return int(row.get("model_04_score_coverage_count") or 0) > 0
     if model_layer == "model_05_option_expression":
-        return str(row.get("model_05_surface_state") or "") != "alpha_unknown/no_selected_expression"
+        return str(row.get("option_expression_surface_state") or "") != "alpha_unknown/no_selected_expression"
     return False
 
 

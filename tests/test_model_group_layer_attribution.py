@@ -202,19 +202,19 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             )
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
-                    "model_05_option_expression_surface"
+                    "option_expression_surface"
                 ],
                 2,
             )
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
-                    "model_04_decision_surface"
+                    "underlying_decision_surface"
                 ],
                 2,
             )
             self.assertEqual(report["decision_surface_summary"]["settled_metric_eligible_count"], 2)
             self.assertIn(
-                "model_05_option_expression_surface",
+                "option_expression_surface",
                 report["component_model_mapping_summary"]["first_limiting_surface_counts"],
             )
             mechanism_report = json.loads((output_dir / "m04_m05_mechanism_review_report.json").read_text(encoding="utf-8"))
@@ -256,8 +256,8 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     for row in csv.DictReader(handle)
                 }
             self.assertEqual(surface_rows["r1"]["first_limiting_surface"], "settled_prediction_quality_surface")
-            self.assertEqual(surface_rows["r3"]["first_limiting_surface"], "model_05_option_expression_surface")
-            self.assertEqual(surface_rows["r4"]["first_limiting_surface"], "model_04_decision_surface")
+            self.assertEqual(surface_rows["r3"]["first_limiting_surface"], "option_expression_surface")
+            self.assertEqual(surface_rows["r4"]["first_limiting_surface"], "underlying_decision_surface")
             self.assertEqual(surface_rows["r1"]["settled_metric_eligible"], "True")
             self.assertEqual(surface_rows["r3"]["settled_metric_eligible"], "False")
             self.assertEqual(surface_rows["r1"]["model_04_score_coverage_count"], "1")
@@ -266,11 +266,12 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     row["component_surface"]: row
                     for row in csv.DictReader(handle)
                 }
+            self.assertFalse(any(surface.startswith("model_") for surface in mapping_rows))
             self.assertEqual(
-                mapping_rows["model_04_decision_surface"]["mapping_status"],
+                mapping_rows["underlying_decision_surface"]["mapping_status"],
                 "diagnostic_or_decision_surface_without_explicit_ref",
             )
-            self.assertEqual(mapping_rows["model_04_decision_surface"]["first_limiting_surface_count"], "2")
+            self.assertEqual(mapping_rows["underlying_decision_surface"]["first_limiting_surface_count"], "2")
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -354,7 +355,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 "non_model_surface",
             )
             self.assertEqual(
-                mapping_rows["model_06_residual_event_governance_surface"]["mapping_status"],
+                mapping_rows["residual_event_governance_surface"]["mapping_status"],
                 "evidence_chain_only",
             )
 
