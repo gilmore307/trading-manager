@@ -530,6 +530,15 @@ MODEL_CANDIDATE_SELECTION_SUMMARY_FIELDNAMES = [
     "underlying_action_type",
     "action_side",
     "selected_option_contract_ref",
+    "option_expression_unexecutable_reason",
+    "option_expression_route",
+    "option_surface_status",
+    "selected_expression_type",
+    "candidate_count_before_filter",
+    "candidate_count_after_filter",
+    "eligible_candidate_count",
+    "top_contract_fit_score",
+    "option_hard_filter_reason_counts",
     "fixed_input_only",
 ]
 
@@ -954,10 +963,27 @@ def _model_candidate_selection_summary_rows(trace_rows: Sequence[Mapping[str, An
                 "underlying_action_type": str(row.get("underlying_action_type") or ""),
                 "action_side": str(row.get("action_side") or ""),
                 "selected_option_contract_ref": str(row.get("selected_option_contract_ref") or ""),
+                "option_expression_unexecutable_reason": str(row.get("option_expression_unexecutable_reason") or ""),
+                "option_expression_route": str(row.get("option_expression_route") or ""),
+                "option_surface_status": str(row.get("option_surface_status") or ""),
+                "selected_expression_type": str(row.get("selected_expression_type") or ""),
+                "candidate_count_before_filter": int(
+                    _float(row.get("candidate_count_before_filter"), default=0.0)
+                ),
+                "candidate_count_after_filter": int(_float(row.get("candidate_count_after_filter"), default=0.0)),
+                "eligible_candidate_count": int(_float(row.get("eligible_candidate_count"), default=0.0)),
+                "top_contract_fit_score": _round(_float(row.get("top_contract_fit_score"))),
+                "option_hard_filter_reason_counts": _json_dumps_sorted(row.get("option_hard_filter_reason_counts")),
                 "fixed_input_only": True,
             }
         )
     return output
+
+
+def _json_dumps_sorted(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        return "{}"
+    return json.dumps(dict(sorted(value.items())), sort_keys=True)
 
 
 def _model_candidate_selection_summary_report(
@@ -965,6 +991,20 @@ def _model_candidate_selection_summary_report(
     summary_rows: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     status_counts = Counter(str(row.get("model_candidate_trace_status") or "unknown") for row in trace_rows)
+    unexecutable_reason_counts = Counter(
+        str(row.get("option_expression_unexecutable_reason") or "unknown")
+        for row in trace_rows
+        if str(row.get("model_candidate_trace_status") or "") == "option_expression_unexecutable"
+    )
+    hard_filter_reason_counts: Counter[str] = Counter()
+    for row in trace_rows:
+        if str(row.get("model_candidate_trace_status") or "") != "option_expression_unexecutable":
+            continue
+        reason_counts = row.get("option_hard_filter_reason_counts")
+        if not isinstance(reason_counts, Mapping):
+            continue
+        for reason, count in reason_counts.items():
+            hard_filter_reason_counts[str(reason)] += int(_float(count, default=0.0))
     selected_rows = [row for row in summary_rows if _truthy(row.get("selected_by_replay"))]
     top_ranked = [row for row in summary_rows if int(_float(row.get("model_rank_within_timestamp"), default=0.0)) <= 25]
     selected_targets = {str(row.get("target_ref") or "") for row in selected_rows}
@@ -992,6 +1032,8 @@ def _model_candidate_selection_summary_report(
             "scored_candidate_row_count": len(summary_rows),
             "selected_candidate_row_count": len(selected_rows),
             "status_counts": dict(sorted(status_counts.items())),
+            "option_expression_unexecutable_reason_counts": dict(sorted(unexecutable_reason_counts.items())),
+            "option_hard_filter_reason_counts": dict(sorted(hard_filter_reason_counts.items())),
             "selected_target_count": len(selected_targets),
             "selected_candidate_rank_mean_same_timestamp": _round(_mean(selected_rank_values)),
             "selected_candidate_top_10_same_timestamp_count": selected_rank_bucket_counts["rank_1_to_10"],
