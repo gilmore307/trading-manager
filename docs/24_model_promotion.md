@@ -137,8 +137,10 @@ bin, tail-loss, optional M05 unfilled-filter, gate-sweep, row-level
 counterfactual, component-surface, component-to-model mapping, and
 parameter-level replay summaries. Component-surface rows are the first
 diagnostic view: they classify each replay row by the first materially limiting
-decision surface, then map that surface back to model refs and evidence-chain
-participation. Model-asset rollups are secondary and must not include rows that
+decision surface, using `C01_` through `C09_` prefixes for diagnostic ordering
+inside this report, then map that surface back to model refs and evidence-chain
+participation. These diagnostic prefixes do not rename execution-runtime
+component IDs. Model-asset rollups are secondary and must not include rows that
 were excluded from settled prediction-quality metrics by missing path,
 expression, execution, or settlement evidence. The helper also writes a parameter
 replay-review report, a suspect-parameter counterfactual report, and a focused

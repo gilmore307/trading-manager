@@ -196,25 +196,25 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertIn("m04_m05_mechanism_review_summary", report)
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
-                    "settled_prediction_quality_surface"
+                    "C09_settled_prediction_quality_surface"
                 ],
                 2,
             )
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
-                    "option_expression_surface"
+                    "C05_option_expression_surface"
                 ],
                 2,
             )
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
-                    "underlying_decision_surface"
+                    "C04_underlying_decision_surface"
                 ],
                 2,
             )
             self.assertEqual(report["decision_surface_summary"]["settled_metric_eligible_count"], 2)
             self.assertIn(
-                "option_expression_surface",
+                "C05_option_expression_surface",
                 report["component_model_mapping_summary"]["first_limiting_surface_counts"],
             )
             mechanism_report = json.loads((output_dir / "m04_m05_mechanism_review_report.json").read_text(encoding="utf-8"))
@@ -255,9 +255,9 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     row["decision_id"]: row
                     for row in csv.DictReader(handle)
                 }
-            self.assertEqual(surface_rows["r1"]["first_limiting_surface"], "settled_prediction_quality_surface")
-            self.assertEqual(surface_rows["r3"]["first_limiting_surface"], "option_expression_surface")
-            self.assertEqual(surface_rows["r4"]["first_limiting_surface"], "underlying_decision_surface")
+            self.assertEqual(surface_rows["r1"]["first_limiting_surface"], "C09_settled_prediction_quality_surface")
+            self.assertEqual(surface_rows["r3"]["first_limiting_surface"], "C05_option_expression_surface")
+            self.assertEqual(surface_rows["r4"]["first_limiting_surface"], "C04_underlying_decision_surface")
             self.assertEqual(surface_rows["r1"]["settled_metric_eligible"], "True")
             self.assertEqual(surface_rows["r3"]["settled_metric_eligible"], "False")
             self.assertEqual(surface_rows["r1"]["model_04_score_coverage_count"], "1")
@@ -268,10 +268,12 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 }
             self.assertFalse(any(surface.startswith("model_") for surface in mapping_rows))
             self.assertEqual(
-                mapping_rows["underlying_decision_surface"]["mapping_status"],
+                mapping_rows["C04_underlying_decision_surface"]["mapping_status"],
                 "diagnostic_or_decision_surface_without_explicit_ref",
             )
-            self.assertEqual(mapping_rows["underlying_decision_surface"]["first_limiting_surface_count"], "2")
+            self.assertEqual(mapping_rows["C04_underlying_decision_surface"]["first_limiting_surface_count"], "2")
+            self.assertEqual(mapping_rows["C09_settled_prediction_quality_surface"]["mapping_status"], "non_model_surface")
+            self.assertEqual(mapping_rows["C09_settled_prediction_quality_surface"]["first_limiting_surface_count"], "2")
 
     def test_tail_loss_packet_does_not_count_unmatched_loss_as_match(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -334,14 +336,14 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
 
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
-                    "selected_option_path_materialization"
+                    "C06_selected_option_path_materialization"
                 ],
                 1,
             )
             self.assertEqual(report["decision_surface_summary"]["settled_metric_eligible_count"], 0)
             with (output_dir / "decision_surface_component_matrix.csv").open(encoding="utf-8") as handle:
                 surface_row = next(csv.DictReader(handle))
-            self.assertEqual(surface_row["first_limiting_surface"], "selected_option_path_materialization")
+            self.assertEqual(surface_row["first_limiting_surface"], "C06_selected_option_path_materialization")
             self.assertEqual(surface_row["model_04_unified_decision_ref_status"], "explicit_ref_and_evidence_chain")
             self.assertEqual(surface_row["model_05_option_expression_ref_status"], "evidence_chain_only")
             self.assertEqual(surface_row["model_06_residual_event_governance_ref_status"], "evidence_chain_only")
@@ -351,11 +353,11 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     for row in csv.DictReader(handle)
                 }
             self.assertEqual(
-                mapping_rows["selected_option_path_materialization"]["mapping_status"],
+                mapping_rows["C06_selected_option_path_materialization"]["mapping_status"],
                 "non_model_surface",
             )
             self.assertEqual(
-                mapping_rows["residual_event_governance_surface"]["mapping_status"],
+                mapping_rows["C08_residual_event_governance_surface"]["mapping_status"],
                 "evidence_chain_only",
             )
 
