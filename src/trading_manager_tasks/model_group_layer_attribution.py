@@ -166,6 +166,46 @@ M05_HARD_FILTER_OVERLAP_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+DECISION_SURFACE_COMPONENT_MATRIX_FIELDNAMES = [
+    "decision_id",
+    "timestamp",
+    "target_ref",
+    "decision_status",
+    "decision_action",
+    "fill_status",
+    "first_limiting_surface",
+    "first_limiting_surface_reason",
+    "settled_metric_eligible",
+    "model_01_background_context_ref_status",
+    "model_02_target_state_ref_status",
+    "model_03_event_state_ref_status",
+    "model_04_unified_decision_ref_status",
+    "model_05_option_expression_ref_status",
+    "model_06_residual_event_governance_ref_status",
+    "model_04_score_coverage_count",
+    "model_04_resolved_action",
+    "model_04_reason_codes",
+    "model_05_surface_state",
+    "selected_option_contract_ref",
+    "selected_option_expression_type",
+    "selected_option_path_status",
+    "prediction_score",
+    "outcome_label",
+    "realized_return",
+    "fixed_input_only",
+]
+COMPONENT_MODEL_MAPPING_FIELDNAMES = [
+    "component_surface",
+    "model_layer",
+    "explicit_ref_count",
+    "evidence_chain_count",
+    "diagnostic_surface_count",
+    "decision_surface_count",
+    "first_limiting_surface_count",
+    "settled_metric_eligible_count",
+    "mapping_status",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -211,6 +251,8 @@ def build_model_group_layer_attribution(
         counterfactual_rows=counterfactual_rows,
         score_bin_rows=score_bin_rows,
     )
+    decision_surface_rows = _decision_surface_component_matrix_rows(rows)
+    component_model_mapping_rows = _component_model_mapping_rows(rows, decision_surface_rows)
     parameter_review = _parameter_replay_review(rows)
     m04_component_rows = _m04_component_diagnostic_rows(rows)
     m05_selection_rows = _m05_selection_mechanics_rows(rows, counterfactual_rows)
@@ -240,6 +282,16 @@ def build_model_group_layer_attribution(
     _write_csv(output_dir / "tail_loss_rows.csv", tail_rows)
     _write_csv(output_dir / "top_gain_rows.csv", top_gain_rows)
     _write_csv(output_dir / "row_counterfactual_attribution.csv", counterfactual_rows)
+    _write_csv(
+        output_dir / "decision_surface_component_matrix.csv",
+        decision_surface_rows,
+        fieldnames=DECISION_SURFACE_COMPONENT_MATRIX_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "component_model_mapping.csv",
+        component_model_mapping_rows,
+        fieldnames=COMPONENT_MODEL_MAPPING_FIELDNAMES,
+    )
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
     _write_csv(output_dir / "parameter_bucket_metrics.csv", parameter_review["bucket_rows"])
@@ -310,6 +362,10 @@ def build_model_group_layer_attribution(
         "tail_loss_rows_ref": str(output_dir / "tail_loss_rows.csv"),
         "top_gain_rows_ref": str(output_dir / "top_gain_rows.csv"),
         "row_counterfactual_attribution_ref": str(output_dir / "row_counterfactual_attribution.csv"),
+        "decision_surface_component_matrix_ref": str(output_dir / "decision_surface_component_matrix.csv"),
+        "component_model_mapping_ref": str(output_dir / "component_model_mapping.csv"),
+        "decision_surface_summary": _decision_surface_summary(decision_surface_rows),
+        "component_model_mapping_summary": _component_model_mapping_summary(component_model_mapping_rows),
         "high_score_filled_tail_loss_attribution_packet_ref": str(
             output_dir / "high_score_filled_tail_loss_attribution_packet.json"
         ),
@@ -564,6 +620,282 @@ def _layer_status(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         )
         if m05_pass_m04_blocked
         else None,
+    }
+
+
+def _decision_surface_component_matrix_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        first_surface, first_surface_reason = _first_limiting_surface(row)
+        m04 = _m04_diagnostics(row)
+        scores = _m04_component_scores(row)
+        output.append(
+            {
+                "decision_id": str(row.get("decision_id") or ""),
+                "timestamp": str(row.get("timestamp") or ""),
+                "target_ref": str(row.get("target_ref") or ""),
+                "decision_status": str(row.get("decision_status") or ""),
+                "decision_action": str(row.get("decision_action") or row.get("action") or ""),
+                "fill_status": str(row.get("fill_status") or ""),
+                "first_limiting_surface": first_surface,
+                "first_limiting_surface_reason": first_surface_reason,
+                "settled_metric_eligible": row.get("fill_status") == "simulated_filled",
+                "model_01_background_context_ref_status": _model_ref_status(row, "model_01_background_context"),
+                "model_02_target_state_ref_status": _model_ref_status(row, "model_02_target_state"),
+                "model_03_event_state_ref_status": _model_ref_status(row, "model_03_event_state"),
+                "model_04_unified_decision_ref_status": _model_ref_status(row, "model_04_unified_decision"),
+                "model_05_option_expression_ref_status": _model_ref_status(row, "model_05_option_expression"),
+                "model_06_residual_event_governance_ref_status": _model_ref_status(
+                    row,
+                    "model_06_residual_event_governance",
+                ),
+                "model_04_score_coverage_count": len(scores),
+                "model_04_resolved_action": _m04_state(row),
+                "model_04_reason_codes": ";".join(str(value) for value in (m04.get("reason_codes") or [])),
+                "model_05_surface_state": _model_05_surface_state(row),
+                "selected_option_contract_ref": str(row.get("selected_option_contract_ref") or ""),
+                "selected_option_expression_type": str(
+                    row.get("selected_option_expression_type") or row.get("decision_expression_type") or ""
+                ),
+                "selected_option_path_status": _selected_option_path_status(row),
+                "prediction_score": _round(_float(row.get("prediction_score"))),
+                "outcome_label": _text(row.get("outcome_label")),
+                "realized_return": _round(_float(row.get("realized_return"))),
+                "fixed_input_only": True,
+            }
+        )
+    return output
+
+
+def _first_limiting_surface(row: Mapping[str, Any]) -> tuple[str, str]:
+    if not _m04_diagnostics(row):
+        return "model_04_decision_surface", "model_04_diagnostics_missing"
+    if _m04_state(row) != "open_long/long":
+        return "model_04_decision_surface", "m04_resolved_non_open_long"
+    if not str(row.get("selected_option_contract_ref") or "").strip():
+        if str(row.get("asset_expression_route") or "") == "option_expression_unfilled":
+            return "model_05_option_expression_surface", "no_selected_option_contract"
+        return "model_05_option_expression_surface", "option_expression_not_selected"
+    path_status = _selected_option_path_status(row)
+    if path_status == "missing":
+        return "selected_option_path_materialization", "selected_option_contract_path_missing"
+    if row.get("fill_status") != "simulated_filled":
+        return "portfolio_execution_surface", "selected_contract_not_filled"
+    return "settled_prediction_quality_surface", "filled_and_settled"
+
+
+def _model_ref_status(row: Mapping[str, Any], model_layer: str) -> str:
+    refs = row.get("model_layer_refs") or {}
+    in_refs = bool(refs.get(model_layer)) if isinstance(refs, Mapping) else False
+    in_chain = model_layer in (row.get("model_evidence_chain") or [])
+    if in_refs and in_chain:
+        return "explicit_ref_and_evidence_chain"
+    if in_refs:
+        return "explicit_ref_only"
+    if in_chain:
+        return "evidence_chain_only"
+    return "missing"
+
+
+def _model_05_surface_state(row: Mapping[str, Any]) -> str:
+    status = _m05_state(row)
+    selected_contract = bool(str(row.get("selected_option_contract_ref") or "").strip())
+    route = str(row.get("asset_expression_route") or "")
+    if selected_contract:
+        return f"{status}/selected_contract"
+    if route == "option_expression_unfilled":
+        return f"{status}/expression_unfilled"
+    return f"{status}/no_selected_expression"
+
+
+def _selected_option_path_status(row: Mapping[str, Any]) -> str:
+    status = str(row.get("option_contract_path_status") or "").strip()
+    if status:
+        return status
+    if row.get("fill_status") == "simulated_filled":
+        return "available"
+    if str(row.get("selected_option_contract_ref") or "").strip():
+        return "unknown"
+    return "not_applicable"
+
+
+def _component_model_mapping_rows(
+    rows: Sequence[Mapping[str, Any]],
+    decision_surface_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    component_specs = [
+        ("model_01_background_context_surface", "model_01_background_context"),
+        ("model_02_target_state_surface", "model_02_target_state"),
+        ("model_03_event_state_surface", "model_03_event_state"),
+        ("model_04_decision_surface", "model_04_unified_decision"),
+        ("model_05_option_expression_surface", "model_05_option_expression"),
+        ("model_06_residual_event_governance_surface", "model_06_residual_event_governance"),
+    ]
+    output: list[dict[str, Any]] = []
+    for component_surface, model_layer in component_specs:
+        explicit_ref_count = _explicit_ref_count(rows, model_layer)
+        evidence_chain_count = sum(1 for row in rows if model_layer in (row.get("model_evidence_chain") or []))
+        diagnostic_surface_count = _diagnostic_surface_count(rows, model_layer)
+        decision_surface_count = _decision_surface_count(rows, model_layer)
+        first_limiting_count = sum(
+            1 for row in decision_surface_rows if row.get("first_limiting_surface") == component_surface
+        )
+        settled_count = sum(
+            1
+            for row in decision_surface_rows
+            if _row_maps_to_model_layer(row, model_layer) and row.get("settled_metric_eligible") is True
+        )
+        output.append(
+            {
+                "component_surface": component_surface,
+                "model_layer": model_layer,
+                "explicit_ref_count": explicit_ref_count,
+                "evidence_chain_count": evidence_chain_count,
+                "diagnostic_surface_count": diagnostic_surface_count,
+                "decision_surface_count": decision_surface_count,
+                "first_limiting_surface_count": first_limiting_count,
+                "settled_metric_eligible_count": settled_count,
+                "mapping_status": _component_mapping_status(
+                    explicit_ref_count=explicit_ref_count,
+                    evidence_chain_count=evidence_chain_count,
+                    diagnostic_surface_count=diagnostic_surface_count,
+                    decision_surface_count=decision_surface_count,
+                ),
+                "fixed_input_only": True,
+            }
+        )
+    output.extend(
+        [
+            {
+                "component_surface": "selected_option_path_materialization",
+                "model_layer": "",
+                "explicit_ref_count": 0,
+                "evidence_chain_count": 0,
+                "diagnostic_surface_count": 0,
+                "decision_surface_count": sum(
+                    1
+                    for row in decision_surface_rows
+                    if row.get("selected_option_path_status") not in {"", "not_applicable"}
+                ),
+                "first_limiting_surface_count": sum(
+                    1
+                    for row in decision_surface_rows
+                    if row.get("first_limiting_surface") == "selected_option_path_materialization"
+                ),
+                "settled_metric_eligible_count": sum(
+                    1
+                    for row in decision_surface_rows
+                    if row.get("first_limiting_surface") == "settled_prediction_quality_surface"
+                ),
+                "mapping_status": "non_model_surface",
+                "fixed_input_only": True,
+            },
+            {
+                "component_surface": "portfolio_execution_surface",
+                "model_layer": "",
+                "explicit_ref_count": 0,
+                "evidence_chain_count": 0,
+                "diagnostic_surface_count": 0,
+                "decision_surface_count": len(decision_surface_rows),
+                "first_limiting_surface_count": sum(
+                    1
+                    for row in decision_surface_rows
+                    if row.get("first_limiting_surface") == "portfolio_execution_surface"
+                ),
+                "settled_metric_eligible_count": sum(
+                    1 for row in decision_surface_rows if row.get("settled_metric_eligible") is True
+                ),
+                "mapping_status": "non_model_surface",
+                "fixed_input_only": True,
+            },
+        ]
+    )
+    return output
+
+
+def _explicit_ref_count(rows: Sequence[Mapping[str, Any]], model_layer: str) -> int:
+    count = 0
+    for row in rows:
+        refs = row.get("model_layer_refs") or {}
+        if isinstance(refs, Mapping) and refs.get(model_layer):
+            count += 1
+    return count
+
+
+def _diagnostic_surface_count(rows: Sequence[Mapping[str, Any]], model_layer: str) -> int:
+    if model_layer == "model_04_unified_decision":
+        return sum(1 for row in rows if bool(_m04_diagnostics(row)))
+    if model_layer == "model_05_option_expression":
+        return sum(1 for row in rows if bool(_m05_diagnostics(row)))
+    return 0
+
+
+def _decision_surface_count(rows: Sequence[Mapping[str, Any]], model_layer: str) -> int:
+    if model_layer == "model_04_unified_decision":
+        return sum(1 for row in rows if bool(_m04_diagnostics(row)))
+    if model_layer == "model_05_option_expression":
+        return sum(
+            1
+            for row in rows
+            if str(row.get("selected_option_contract_ref") or "").strip()
+            or str(row.get("asset_expression_route") or "") == "option_expression_unfilled"
+        )
+    return _explicit_ref_count(rows, model_layer)
+
+
+def _row_maps_to_model_layer(row: Mapping[str, Any], model_layer: str) -> bool:
+    status = str(row.get(f"{model_layer}_ref_status") or "")
+    if status != "missing":
+        return True
+    if model_layer == "model_04_unified_decision":
+        return int(row.get("model_04_score_coverage_count") or 0) > 0
+    if model_layer == "model_05_option_expression":
+        return str(row.get("model_05_surface_state") or "") != "alpha_unknown/no_selected_expression"
+    return False
+
+
+def _component_mapping_status(
+    *,
+    explicit_ref_count: int,
+    evidence_chain_count: int,
+    diagnostic_surface_count: int,
+    decision_surface_count: int,
+) -> str:
+    if explicit_ref_count and diagnostic_surface_count:
+        return "explicit_ref_and_diagnostic_surface"
+    if explicit_ref_count:
+        return "explicit_ref_only"
+    if diagnostic_surface_count or decision_surface_count:
+        return "diagnostic_or_decision_surface_without_explicit_ref"
+    if evidence_chain_count:
+        return "evidence_chain_only"
+    return "missing"
+
+
+def _decision_surface_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    first_surface_counts = Counter(str(row.get("first_limiting_surface") or "") for row in rows)
+    settled_count = sum(1 for row in rows if row.get("settled_metric_eligible") is True)
+    return {
+        "contract_type": "model_group_decision_surface_component_summary",
+        "row_count": len(rows),
+        "first_limiting_surface_counts": dict(first_surface_counts),
+        "settled_metric_eligible_count": settled_count,
+        "settled_metric_excluded_count": len(rows) - settled_count,
+        "fixed_input_only": True,
+    }
+
+
+def _component_model_mapping_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    return {
+        "contract_type": "model_group_component_model_mapping_summary",
+        "component_surface_count": len(rows),
+        "mapping_status_counts": dict(Counter(str(row.get("mapping_status") or "") for row in rows)),
+        "first_limiting_surface_counts": {
+            str(row.get("component_surface") or ""): int(row.get("first_limiting_surface_count") or 0)
+            for row in rows
+            if int(row.get("first_limiting_surface_count") or 0) > 0
+        },
+        "fixed_input_only": True,
     }
 
 

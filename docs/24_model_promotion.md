@@ -134,10 +134,16 @@ M04/M05 boundary attribution is a manager-side diagnostic helper for this
 failure-attribution lane. `scripts/tasks/build_model_group_layer_attribution.py`
 reads an existing replay `decision_rows.jsonl` and writes compact cohort, score
 bin, tail-loss, optional M05 unfilled-filter, gate-sweep, row-level
-counterfactual, and parameter-level replay summaries. It also writes a
-parameter replay-review report, a suspect-parameter counterfactual report, and a
-focused high-score filled tail-loss packet that compares high-score losing fills
-with matched high-score non-loss fills. For suspect parameters, it also writes a
+counterfactual, component-surface, component-to-model mapping, and
+parameter-level replay summaries. Component-surface rows are the first
+diagnostic view: they classify each replay row by the first materially limiting
+decision surface, then map that surface back to model refs and evidence-chain
+participation. Model-asset rollups are secondary and must not include rows that
+were excluded from settled prediction-quality metrics by missing path,
+expression, execution, or settlement evidence. The helper also writes a parameter
+replay-review report, a suspect-parameter counterfactual report, and a focused
+high-score filled tail-loss packet that compares high-score losing fills with
+matched high-score non-loss fills. For suspect parameters, it also writes a
 fixed-input M04/M05 mechanism review with `m04_component_diagnostics.csv`,
 `m05_selection_mechanics.csv`, `m04_variant_counterfactual.csv`,
 `m05_dte_policy_sensitivity.csv`, `m05_hard_filter_overlap.csv`, and
