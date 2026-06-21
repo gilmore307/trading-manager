@@ -181,6 +181,10 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "component_survival_quality_flow_report.json").exists())
             self.assertTrue((output_dir / "component_review_packet.csv").exists())
             self.assertTrue((output_dir / "component_review_packet.json").exists())
+            self.assertTrue((output_dir / "operation_review_projection_matrix.csv").exists())
+            self.assertTrue((output_dir / "operation_component_flow.csv").exists())
+            self.assertTrue((output_dir / "operation_component_review_packet.csv").exists())
+            self.assertTrue((output_dir / "operation_component_review_packet.json").exists())
             self.assertTrue((output_dir / "high_score_filled_tail_loss_matches.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review_report.json").exists())
@@ -203,6 +207,19 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertIn("m04_m05_mechanism_review_summary", report)
             self.assertIn("component_survival_quality_flow_summary", report)
             self.assertIn("component_review_packet_summary", report)
+            self.assertIn("operation_component_review_packet_summary", report)
+            self.assertEqual(
+                report["operation_component_review_packet_summary"]["first_limiting_projection_counts"][
+                    "settled_prediction_quality"
+                ],
+                2,
+            )
+            self.assertEqual(
+                report["operation_component_review_packet_summary"]["first_limiting_projection_counts"][
+                    "option_expression_selection"
+                ],
+                2,
+            )
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
                     "C09_settled_prediction_quality_surface"
@@ -225,6 +242,53 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertIn(
                 "C05_option_expression_surface",
                 report["component_model_mapping_summary"]["first_limiting_surface_counts"],
+            )
+            with (output_dir / "operation_review_projection_matrix.csv").open(encoding="utf-8") as handle:
+                operation_projection_rows = {
+                    row["decision_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                operation_projection_rows["r1"]["operation_component_id"],
+                "C07_failure_review_operation",
+            )
+            self.assertEqual(operation_projection_rows["r1"]["review_projection"], "settled_prediction_quality")
+            self.assertEqual(
+                operation_projection_rows["r3"]["operation_component_id"],
+                "C04_expression_review_operation",
+            )
+            self.assertEqual(operation_projection_rows["r3"]["review_projection"], "option_expression_selection")
+            self.assertEqual(operation_projection_rows["r4"]["operation_component_id"], "C02_entry_operation")
+            self.assertEqual(operation_projection_rows["r4"]["review_projection"], "underlying_entry_decision")
+            with (output_dir / "operation_component_flow.csv").open(encoding="utf-8") as handle:
+                operation_flow_rows = {
+                    row["operation_component_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                operation_flow_rows["C03_lifecycle_operation"]["applicability_status"],
+                "not_applicable_for_candidate_entry_replay",
+            )
+            self.assertEqual(
+                operation_flow_rows["C04_expression_review_operation"]["first_limiting_projections"],
+                "option_expression_selection",
+            )
+            with (output_dir / "operation_component_review_packet.csv").open(encoding="utf-8") as handle:
+                operation_packet_rows = {
+                    row["operation_component_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertIn(
+                "explicit_model_05_option_expression_ref",
+                operation_packet_rows["C04_expression_review_operation"]["missing_review_outputs"],
+            )
+            operation_packet = json.loads(
+                (output_dir / "operation_component_review_packet.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(operation_packet["contract_type"], "model_group_operation_component_review_packet")
+            self.assertIn(
+                "C04_expression_review_operation",
+                operation_packet["summary"]["components_with_missing_review_outputs"],
             )
             mechanism_report = json.loads((output_dir / "m04_m05_mechanism_review_report.json").read_text(encoding="utf-8"))
             self.assertEqual(mechanism_report["contract_type"], "model_group_m04_m05_mechanism_review_report")
@@ -422,6 +486,26 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["stage_verdict"], "dominant_censoring_point")
             self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["censored_count"], "1")
             self.assertEqual(flow_rows["C06_selected_option_path_materialization"]["settled_metric_eligible_count"], "0")
+            with (output_dir / "operation_review_projection_matrix.csv").open(encoding="utf-8") as handle:
+                operation_projection_row = next(csv.DictReader(handle))
+            self.assertEqual(
+                operation_projection_row["operation_component_id"],
+                "C04_expression_review_operation",
+            )
+            self.assertEqual(
+                operation_projection_row["review_projection"],
+                "selected_contract_path_materialization",
+            )
+            with (output_dir / "operation_component_flow.csv").open(encoding="utf-8") as handle:
+                operation_flow_rows = {
+                    row["operation_component_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                operation_flow_rows["C04_expression_review_operation"]["stage_verdict"],
+                "dominant_censoring_point",
+            )
+            self.assertEqual(operation_flow_rows["C04_expression_review_operation"]["censored_count"], "1")
             with (output_dir / "component_review_packet.csv").open(encoding="utf-8") as handle:
                 packet_rows = {
                     row["component_surface"]: row

@@ -306,6 +306,185 @@ COMPONENT_ROLE_BY_SURFACE = {
     "C08_residual_event_governance_surface": "residual_event_governance",
     "C09_settled_prediction_quality_surface": "settled_outcome_quality",
 }
+OPERATION_COMPONENT_SPECS = [
+    {
+        "component_index": 1,
+        "operation_component_id": "C01_intake_operation",
+        "runtime_component_ref": "component_01_intake",
+        "operation_component_label": "C01 Intake",
+        "operation_role": "prepare target, context, and point-in-time inputs for an entry decision",
+        "entry_path_participant": True,
+    },
+    {
+        "component_index": 2,
+        "operation_component_id": "C02_entry_operation",
+        "runtime_component_ref": "component_02_entry",
+        "operation_component_label": "C02 Entry",
+        "operation_role": "decide whether the target should enter a new position",
+        "entry_path_participant": True,
+    },
+    {
+        "component_index": 3,
+        "operation_component_id": "C03_lifecycle_operation",
+        "runtime_component_ref": "component_03_lifecycle",
+        "operation_component_label": "C03 Lifecycle",
+        "operation_role": "manage existing positions after entry",
+        "entry_path_participant": False,
+    },
+    {
+        "component_index": 4,
+        "operation_component_id": "C04_expression_review_operation",
+        "runtime_component_ref": "component_04_expression_review",
+        "operation_component_label": "C04 Expression Review",
+        "operation_role": "choose and materialize the trade expression before order intent",
+        "entry_path_participant": True,
+    },
+    {
+        "component_index": 5,
+        "operation_component_id": "C05_order_intent_operation",
+        "runtime_component_ref": "component_05_order_intent",
+        "operation_component_label": "C05 Order Intent",
+        "operation_role": "turn an approved expression into sized order intent",
+        "entry_path_participant": True,
+    },
+    {
+        "component_index": 6,
+        "operation_component_id": "C06_execution_gate_operation",
+        "runtime_component_ref": "component_06_execution_gate",
+        "operation_component_label": "C06 Execution Gate",
+        "operation_role": "apply execution, fill, and broker-safety gates",
+        "entry_path_participant": True,
+    },
+    {
+        "component_index": 7,
+        "operation_component_id": "C07_failure_review_operation",
+        "runtime_component_ref": "component_07_failure_review",
+        "operation_component_label": "C07 Failure Review",
+        "operation_role": "review residual risk, settlement quality, and failure attribution after action",
+        "entry_path_participant": True,
+    },
+]
+OPERATION_COMPONENT_BY_ID = {
+    str(spec["operation_component_id"]): spec
+    for spec in OPERATION_COMPONENT_SPECS
+}
+OPERATION_REVIEW_PROJECTION_BY_SURFACE = {
+    "C01_background_context_surface": {
+        "operation_component_id": "C01_intake_operation",
+        "review_projection": "background_context",
+        "review_projection_role": "point_in_time_context_input",
+    },
+    "C02_target_state_surface": {
+        "operation_component_id": "C01_intake_operation",
+        "review_projection": "target_state",
+        "review_projection_role": "target_state_input",
+    },
+    "C03_event_state_surface": {
+        "operation_component_id": "C02_entry_operation",
+        "review_projection": "event_state",
+        "review_projection_role": "entry_event_context",
+    },
+    "C04_underlying_decision_surface": {
+        "operation_component_id": "C02_entry_operation",
+        "review_projection": "underlying_entry_decision",
+        "review_projection_role": "entry_action_gate",
+    },
+    "C05_option_expression_surface": {
+        "operation_component_id": "C04_expression_review_operation",
+        "review_projection": "option_expression_selection",
+        "review_projection_role": "expression_selection_gate",
+    },
+    "C06_selected_option_path_materialization": {
+        "operation_component_id": "C04_expression_review_operation",
+        "review_projection": "selected_contract_path_materialization",
+        "review_projection_role": "expression_materialization_gate",
+    },
+    "C07_portfolio_execution_surface": {
+        "operation_component_id": "C06_execution_gate_operation",
+        "review_projection": "execution_fill",
+        "review_projection_role": "fill_and_execution_gate",
+    },
+    "C08_residual_event_governance_surface": {
+        "operation_component_id": "C07_failure_review_operation",
+        "review_projection": "residual_event_governance",
+        "review_projection_role": "post_action_event_governance_review",
+    },
+    "C09_settled_prediction_quality_surface": {
+        "operation_component_id": "C07_failure_review_operation",
+        "review_projection": "settled_prediction_quality",
+        "review_projection_role": "retrospective_settlement_quality",
+    },
+}
+OPERATION_REVIEW_PROJECTION_MATRIX_FIELDNAMES = [
+    "decision_id",
+    "timestamp",
+    "target_ref",
+    "source_decision_surface",
+    "source_surface_reason",
+    "operation_component_id",
+    "runtime_component_ref",
+    "operation_component_label",
+    "review_projection",
+    "review_projection_role",
+    "projection_status",
+    "settled_metric_eligible",
+    "prediction_score",
+    "outcome_label",
+    "realized_return",
+    "fixed_input_only",
+]
+OPERATION_COMPONENT_FLOW_FIELDNAMES = [
+    "component_index",
+    "operation_component_id",
+    "runtime_component_ref",
+    "operation_component_label",
+    "operation_role",
+    "applicability_status",
+    "input_count",
+    "output_count",
+    "dropped_or_blocked_count",
+    "censored_count",
+    "settled_metric_eligible_count",
+    "settled_metric_excluded_count",
+    "first_limiting_projection_count",
+    "first_limiting_projections",
+    "review_projection_refs",
+    "outcome_metric_available",
+    "mean_prediction_score",
+    "score_label_spearman",
+    "score_return_spearman",
+    "mean_realized_return",
+    "hit_rate",
+    "tail_loss_count",
+    "stage_verdict",
+    "verdict_basis",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
+OPERATION_COMPONENT_REVIEW_PACKET_FIELDNAMES = [
+    "component_index",
+    "operation_component_id",
+    "runtime_component_ref",
+    "operation_component_label",
+    "operation_role",
+    "applicability_status",
+    "input_count",
+    "output_count",
+    "dropped_or_blocked_count",
+    "settled_metric_eligible_count",
+    "survival_verdict",
+    "survival_verdict_basis",
+    "review_projections",
+    "internal_review_refs",
+    "missing_review_outputs",
+    "first_limiting_projection_count",
+    "can_assign_operation_fault",
+    "interpretation_status",
+    "threshold_selection_performed",
+    "retraining_performed",
+    "fixed_input_only",
+]
 
 
 def build_model_group_layer_attribution(
@@ -381,6 +560,19 @@ def build_model_group_layer_attribution(
         m05_unfilled_summary=m05_unfilled_summary,
         output_dir=output_dir,
     )
+    operation_review_projection_rows = _operation_review_projection_matrix_rows(decision_surface_rows)
+    operation_component_flow_rows = _operation_component_flow_rows(
+        decision_surface_rows,
+        operation_review_projection_rows,
+    )
+    operation_component_review_packet = _operation_component_review_packet(
+        operation_component_flow_rows=operation_component_flow_rows,
+        operation_review_projection_rows=operation_review_projection_rows,
+        component_model_mapping_rows=component_model_mapping_rows,
+        m05_unfilled_summary=m05_unfilled_summary,
+        replay_receipt_available=replay_receipt_path is not None,
+        output_dir=output_dir,
+    )
     gate_sweep_summary = _counterfactual_gate_sweep_summary(counterfactual_gate_sweep_path)
     tail_loss_packet, matched_tail_rows = _high_score_tail_loss_attribution_packet(
         rows=rows,
@@ -416,6 +608,21 @@ def build_model_group_layer_attribution(
         output_dir / "component_review_packet.csv",
         component_review_packet["component_rows"],
         fieldnames=COMPONENT_REVIEW_PACKET_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "operation_review_projection_matrix.csv",
+        operation_review_projection_rows,
+        fieldnames=OPERATION_REVIEW_PROJECTION_MATRIX_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "operation_component_flow.csv",
+        operation_component_flow_rows,
+        fieldnames=OPERATION_COMPONENT_FLOW_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "operation_component_review_packet.csv",
+        operation_component_review_packet["component_rows"],
+        fieldnames=OPERATION_COMPONENT_REVIEW_PACKET_FIELDNAMES,
     )
     _write_csv(output_dir / "high_score_filled_tail_loss_matches.csv", matched_tail_rows)
     _write_csv(output_dir / "parameter_replay_review.csv", parameter_review["parameter_rows"])
@@ -484,6 +691,10 @@ def build_model_group_layer_attribution(
         json.dumps(component_review_packet["packet"], indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "operation_component_review_packet.json").write_text(
+        json.dumps(operation_component_review_packet["packet"], indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     if m05_unfilled_summary["source_status"] == "available":
         _write_csv(output_dir / "m05_unfilled_filter_reasons.csv", m05_unfilled_summary["filter_reason_rows"])
 
@@ -516,6 +727,20 @@ def build_model_group_layer_attribution(
         "component_review_packet_ref": str(output_dir / "component_review_packet.json"),
         "component_review_packet_csv_ref": str(output_dir / "component_review_packet.csv"),
         "component_review_packet_summary": component_review_packet["packet"]["summary"],
+        "operation_review_projection_matrix_ref": str(output_dir / "operation_review_projection_matrix.csv"),
+        "operation_component_flow_ref": str(output_dir / "operation_component_flow.csv"),
+        "operation_component_review_packet_ref": str(output_dir / "operation_component_review_packet.json"),
+        "operation_component_review_packet_csv_ref": str(output_dir / "operation_component_review_packet.csv"),
+        "operation_component_review_packet_summary": operation_component_review_packet["packet"]["summary"],
+        "canonical_operation_components": [
+            {
+                "operation_component_id": str(spec["operation_component_id"]),
+                "runtime_component_ref": str(spec["runtime_component_ref"]),
+                "operation_component_label": str(spec["operation_component_label"]),
+                "entry_path_participant": bool(spec["entry_path_participant"]),
+            }
+            for spec in OPERATION_COMPONENT_SPECS
+        ],
         "high_score_filled_tail_loss_attribution_packet_ref": str(
             output_dir / "high_score_filled_tail_loss_attribution_packet.json"
         ),
@@ -1381,6 +1606,533 @@ def _component_review_packet(
         ],
     }
     return {"component_rows": component_rows, "packet": packet}
+
+
+def _operation_review_projection_matrix_rows(
+    decision_surface_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    for row in decision_surface_rows:
+        source_surface = str(row.get("first_limiting_surface") or "")
+        projection = OPERATION_REVIEW_PROJECTION_BY_SURFACE.get(source_surface) or {}
+        component_id = str(projection.get("operation_component_id") or "")
+        component_spec = OPERATION_COMPONENT_BY_ID.get(component_id) or {}
+        output.append(
+            {
+                "decision_id": str(row.get("decision_id") or ""),
+                "timestamp": str(row.get("timestamp") or ""),
+                "target_ref": str(row.get("target_ref") or ""),
+                "source_decision_surface": source_surface,
+                "source_surface_reason": str(row.get("first_limiting_surface_reason") or ""),
+                "operation_component_id": component_id,
+                "runtime_component_ref": str(component_spec.get("runtime_component_ref") or ""),
+                "operation_component_label": str(component_spec.get("operation_component_label") or ""),
+                "review_projection": str(projection.get("review_projection") or ""),
+                "review_projection_role": str(projection.get("review_projection_role") or ""),
+                "projection_status": "first_limiting_projection",
+                "settled_metric_eligible": row.get("settled_metric_eligible") is True,
+                "prediction_score": _round(_float(row.get("prediction_score"))),
+                "outcome_label": _text(row.get("outcome_label")),
+                "realized_return": _round(_float(row.get("realized_return"))),
+                "fixed_input_only": True,
+            }
+        )
+    return output
+
+
+def _operation_component_flow_rows(
+    decision_surface_rows: Sequence[Mapping[str, Any]],
+    operation_review_projection_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    first_projection_by_decision = {
+        str(row.get("decision_id") or ""): row
+        for row in operation_review_projection_rows
+    }
+    entry_path_specs = [spec for spec in OPERATION_COMPONENT_SPECS if bool(spec["entry_path_participant"])]
+    entry_order = {
+        str(spec["operation_component_id"]): index
+        for index, spec in enumerate(entry_path_specs)
+    }
+    previous_bad_rate: float | None = None
+    output: list[dict[str, Any]] = []
+    for spec in OPERATION_COMPONENT_SPECS:
+        component_id = str(spec["operation_component_id"])
+        component_index = int(spec["component_index"])
+        if not bool(spec["entry_path_participant"]):
+            output.append(
+                _operation_component_not_applicable_row(
+                    spec=spec,
+                    review_projection_rows=operation_review_projection_rows,
+                )
+            )
+            continue
+        current_order = entry_order[component_id]
+        entered_rows = [
+            row
+            for row in decision_surface_rows
+            if _operation_order_for_decision(row, first_projection_by_decision, entry_order) >= current_order
+        ]
+        first_limiting_rows = [
+            row
+            for row in entered_rows
+            if str((first_projection_by_decision.get(str(row.get("decision_id") or "")) or {}).get("operation_component_id") or "")
+            == component_id
+        ]
+        first_limiting_projections = sorted(
+            {
+                str((first_projection_by_decision.get(str(row.get("decision_id") or "")) or {}).get("review_projection") or "")
+                for row in first_limiting_rows
+                if str((first_projection_by_decision.get(str(row.get("decision_id") or "")) or {}).get("review_projection") or "")
+            }
+        )
+        censored_count = sum(
+            1
+            for row in first_limiting_rows
+            if str(row.get("first_limiting_surface") or "") == "C06_selected_option_path_materialization"
+        )
+        blocked_count = 0 if component_id == "C07_failure_review_operation" else len(first_limiting_rows)
+        passed_rows = [
+            row
+            for row in entered_rows
+            if _operation_order_for_decision(row, first_projection_by_decision, entry_order) > current_order
+            or component_id == "C07_failure_review_operation"
+        ]
+        passed_settled_rows = _settled_rows(passed_rows)
+        bad_rate = (_bad_outcome_count(passed_settled_rows) / len(passed_settled_rows)) if passed_settled_rows else None
+        mean_realized_return = _mean(_numeric_values(passed_settled_rows, "realized_return"))
+        tail_loss_count = sum(1 for row in passed_settled_rows if _float(row.get("realized_return")) <= -0.2)
+        verdict, basis = _operation_component_flow_verdict(
+            component_id=component_id,
+            entered_count=len(entered_rows),
+            first_limiting_count=len(first_limiting_rows),
+            censored_count=censored_count,
+            settled_count=len(passed_settled_rows),
+            post_bad_rate=bad_rate,
+            mean_realized_return=mean_realized_return,
+            tail_loss_count=tail_loss_count,
+            previous_bad_rate=previous_bad_rate,
+            first_limiting_projections=first_limiting_projections,
+        )
+        if bad_rate is not None:
+            previous_bad_rate = bad_rate
+        output.append(
+            {
+                "component_index": component_index,
+                "operation_component_id": component_id,
+                "runtime_component_ref": str(spec["runtime_component_ref"]),
+                "operation_component_label": str(spec["operation_component_label"]),
+                "operation_role": str(spec["operation_role"]),
+                "applicability_status": "candidate_entry_path",
+                "input_count": len(entered_rows),
+                "output_count": len(passed_rows),
+                "dropped_or_blocked_count": blocked_count,
+                "censored_count": censored_count,
+                "settled_metric_eligible_count": len(passed_settled_rows),
+                "settled_metric_excluded_count": len(passed_rows) - len(passed_settled_rows),
+                "first_limiting_projection_count": len(first_limiting_rows),
+                "first_limiting_projections": ";".join(first_limiting_projections),
+                "review_projection_refs": ";".join(_operation_component_projection_refs(component_id)),
+                "outcome_metric_available": bool(passed_settled_rows),
+                "mean_prediction_score": _round(_mean(_numeric_values(passed_settled_rows, "prediction_score"))),
+                "score_label_spearman": _round(
+                    _spearman_for_key(passed_settled_rows, "prediction_score", "outcome_label")
+                ),
+                "score_return_spearman": _round(
+                    _spearman_for_key(passed_settled_rows, "prediction_score", "realized_return")
+                ),
+                "mean_realized_return": _round(mean_realized_return),
+                "hit_rate": _round(
+                    sum(1 for row in passed_settled_rows if str(row.get("outcome_label")) == "1")
+                    / len(passed_settled_rows)
+                )
+                if passed_settled_rows
+                else None,
+                "tail_loss_count": tail_loss_count,
+                "stage_verdict": verdict,
+                "verdict_basis": basis,
+                "threshold_selection_performed": False,
+                "retraining_performed": False,
+                "fixed_input_only": True,
+            }
+        )
+    return output
+
+
+def _operation_component_not_applicable_row(
+    *,
+    spec: Mapping[str, Any],
+    review_projection_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    component_id = str(spec["operation_component_id"])
+    return {
+        "component_index": int(spec["component_index"]),
+        "operation_component_id": component_id,
+        "runtime_component_ref": str(spec["runtime_component_ref"]),
+        "operation_component_label": str(spec["operation_component_label"]),
+        "operation_role": str(spec["operation_role"]),
+        "applicability_status": "not_applicable_for_candidate_entry_replay",
+        "input_count": 0,
+        "output_count": 0,
+        "dropped_or_blocked_count": 0,
+        "censored_count": 0,
+        "settled_metric_eligible_count": 0,
+        "settled_metric_excluded_count": 0,
+        "first_limiting_projection_count": sum(
+            1 for row in review_projection_rows if row.get("operation_component_id") == component_id
+        ),
+        "first_limiting_projections": ";".join(_operation_component_projection_refs(component_id)),
+        "review_projection_refs": ";".join(_operation_component_projection_refs(component_id)),
+        "outcome_metric_available": False,
+        "mean_prediction_score": None,
+        "score_label_spearman": None,
+        "score_return_spearman": None,
+        "mean_realized_return": None,
+        "hit_rate": None,
+        "tail_loss_count": 0,
+        "stage_verdict": "not_applicable",
+        "verdict_basis": "candidate_entry_replay_does_not_operate_lifecycle_component",
+        "threshold_selection_performed": False,
+        "retraining_performed": False,
+        "fixed_input_only": True,
+    }
+
+
+def _operation_order_for_decision(
+    row: Mapping[str, Any],
+    first_projection_by_decision: Mapping[str, Mapping[str, Any]],
+    entry_order: Mapping[str, int],
+) -> int:
+    projection_row = first_projection_by_decision.get(str(row.get("decision_id") or "")) or {}
+    component_id = str(projection_row.get("operation_component_id") or "")
+    return int(entry_order.get(component_id, len(entry_order) - 1))
+
+
+def _operation_component_flow_verdict(
+    *,
+    component_id: str,
+    entered_count: int,
+    first_limiting_count: int,
+    censored_count: int,
+    settled_count: int,
+    post_bad_rate: float | None,
+    mean_realized_return: float | None,
+    tail_loss_count: int,
+    previous_bad_rate: float | None,
+    first_limiting_projections: Sequence[str],
+) -> tuple[str, str]:
+    if entered_count <= 0:
+        return "neutral_or_unmeasured", "component_not_reached"
+    if censored_count and censored_count / entered_count >= 0.5:
+        return "dominant_censoring_point", "majority_of_entered_rows_missing_settled_path"
+    if first_limiting_count and component_id != "C07_failure_review_operation":
+        return "first_observed_deterioration", "rows_first_limited_at_operation_component"
+    if component_id == "C07_failure_review_operation":
+        if settled_count < 5 or post_bad_rate is None:
+            return "insufficient_evidence", "too_few_settled_rows_for_failure_review"
+        if post_bad_rate > 0.5:
+            return "first_observed_deterioration", "settled_survivor_cohort_bad_rate_above_half"
+        if mean_realized_return is not None and mean_realized_return < 0:
+            return "first_observed_deterioration", "settled_survivor_cohort_negative_mean_return"
+        if tail_loss_count:
+            return "first_observed_deterioration", "settled_survivor_tail_loss_present"
+        return "neutral_measured", "settled_survivor_cohort_not_majority_bad"
+    if settled_count < 5 or post_bad_rate is None:
+        return "insufficient_evidence", "too_few_settled_rows_for_component_quality_flow"
+    if previous_bad_rate is None:
+        return "unmeasured", "no_prior_observable_bad_rate"
+    if post_bad_rate - previous_bad_rate >= 0.15:
+        return "amplifies_prior_damage", "post_component_bad_rate_increased"
+    if previous_bad_rate - post_bad_rate >= 0.15:
+        return "pulls_back_prior_damage", "post_component_bad_rate_decreased"
+    return "neutral_measured", "bad_rate_change_below_materiality"
+
+
+def _operation_component_review_packet(
+    *,
+    operation_component_flow_rows: Sequence[Mapping[str, Any]],
+    operation_review_projection_rows: Sequence[Mapping[str, Any]],
+    component_model_mapping_rows: Sequence[Mapping[str, Any]],
+    m05_unfilled_summary: Mapping[str, Any],
+    replay_receipt_available: bool,
+    output_dir: Path,
+) -> dict[str, Any]:
+    mapping_by_surface = {
+        str(row.get("component_surface") or ""): row
+        for row in component_model_mapping_rows
+    }
+    projection_rows_by_component: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for row in operation_review_projection_rows:
+        projection_rows_by_component[str(row.get("operation_component_id") or "")].append(row)
+    component_rows: list[dict[str, Any]] = []
+    for flow_row in operation_component_flow_rows:
+        component_id = str(flow_row.get("operation_component_id") or "")
+        internal_refs = _operation_component_internal_review_refs(
+            component_id=component_id,
+            m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
+        )
+        missing_outputs = _operation_component_missing_review_outputs(
+            component_id=component_id,
+            mapping_by_surface=mapping_by_surface,
+            m05_unfilled_available=m05_unfilled_summary.get("source_status") == "available",
+            replay_receipt_available=replay_receipt_available,
+            settled_metric_eligible_count=int(flow_row.get("settled_metric_eligible_count") or 0),
+        )
+        survival_verdict = str(flow_row.get("stage_verdict") or "")
+        can_assign_fault = _can_assign_operation_fault(
+            component_id=component_id,
+            survival_verdict=survival_verdict,
+            missing_review_outputs=missing_outputs,
+            applicability_status=str(flow_row.get("applicability_status") or ""),
+            first_limiting_projections=str(flow_row.get("first_limiting_projections") or "").split(";")
+            if str(flow_row.get("first_limiting_projections") or "")
+            else [],
+        )
+        component_rows.append(
+            {
+                "component_index": int(flow_row.get("component_index") or 0),
+                "operation_component_id": component_id,
+                "runtime_component_ref": str(flow_row.get("runtime_component_ref") or ""),
+                "operation_component_label": str(flow_row.get("operation_component_label") or ""),
+                "operation_role": str(flow_row.get("operation_role") or ""),
+                "applicability_status": str(flow_row.get("applicability_status") or ""),
+                "input_count": int(flow_row.get("input_count") or 0),
+                "output_count": int(flow_row.get("output_count") or 0),
+                "dropped_or_blocked_count": int(flow_row.get("dropped_or_blocked_count") or 0),
+                "settled_metric_eligible_count": int(flow_row.get("settled_metric_eligible_count") or 0),
+                "survival_verdict": survival_verdict,
+                "survival_verdict_basis": str(flow_row.get("verdict_basis") or ""),
+                "review_projections": ";".join(_operation_component_projection_refs(component_id)),
+                "internal_review_refs": ";".join(internal_refs),
+                "missing_review_outputs": ";".join(missing_outputs),
+                "first_limiting_projection_count": int(flow_row.get("first_limiting_projection_count") or 0),
+                "can_assign_operation_fault": can_assign_fault,
+                "interpretation_status": _operation_component_interpretation_status(
+                    survival_verdict=survival_verdict,
+                    missing_review_outputs=missing_outputs,
+                    applicability_status=str(flow_row.get("applicability_status") or ""),
+                    can_assign_operation_fault=can_assign_fault,
+                ),
+                "threshold_selection_performed": False,
+                "retraining_performed": False,
+                "fixed_input_only": True,
+            }
+        )
+    first_problem_row = next(
+        (
+            row
+            for row in component_rows
+            if str(row.get("survival_verdict") or "") in {
+                "first_observed_deterioration",
+                "amplifies_prior_damage",
+                "dominant_censoring_point",
+            }
+        ),
+        None,
+    )
+    packet = {
+        "contract_type": "model_group_operation_component_review_packet",
+        "operation_component_review_packet_csv_ref": str(output_dir / "operation_component_review_packet.csv"),
+        "operation_review_projection_matrix_ref": str(output_dir / "operation_review_projection_matrix.csv"),
+        "operation_component_flow_ref": str(output_dir / "operation_component_flow.csv"),
+        "component_count": len(component_rows),
+        "summary": {
+            "component_count": len(component_rows),
+            "first_problem_operation_component": str((first_problem_row or {}).get("operation_component_id") or ""),
+            "first_problem_runtime_component_ref": str((first_problem_row or {}).get("runtime_component_ref") or ""),
+            "first_problem_verdict": str((first_problem_row or {}).get("survival_verdict") or ""),
+            "survival_verdict_counts": dict(Counter(str(row["survival_verdict"]) for row in component_rows)),
+            "interpretation_status_counts": dict(Counter(str(row["interpretation_status"]) for row in component_rows)),
+            "first_limiting_projection_counts": dict(
+                Counter(str(row.get("review_projection") or "") for row in operation_review_projection_rows)
+            ),
+            "components_with_missing_review_outputs": [
+                str(row["operation_component_id"])
+                for row in component_rows
+                if str(row.get("missing_review_outputs") or "")
+            ],
+            "operation_fault_assignable_components": [
+                str(row["operation_component_id"])
+                for row in component_rows
+                if row.get("can_assign_operation_fault") is True
+            ],
+            "review_readiness_status": _operation_component_review_readiness_status(component_rows),
+            "fixed_input_only": True,
+            "threshold_selection_performed": False,
+            "retraining_performed": False,
+        },
+        "component_rows": component_rows,
+        "projection_rows": list(operation_review_projection_rows),
+        "forbidden_uses": [
+            "causal_feature_importance_claim",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+        "interpretation_notes": [
+            "Operation components are live/replay action units; review projections are diagnostic lenses under those units.",
+            "Model assets are attributed through projections and explicit refs, not by treating models as components.",
+            "Rows stopped by materialization or execution are not counted in settled model win/loss metrics.",
+            "A missing review output is an attribution gap and must not be read as component success.",
+        ],
+    }
+    return {"component_rows": component_rows, "packet": packet}
+
+
+def _operation_component_projection_refs(component_id: str) -> list[str]:
+    return [
+        str(value["review_projection"])
+        for value in OPERATION_REVIEW_PROJECTION_BY_SURFACE.values()
+        if value.get("operation_component_id") == component_id
+    ]
+
+
+def _operation_component_internal_review_refs(*, component_id: str, m05_unfilled_available: bool) -> list[str]:
+    refs_by_component = {
+        "C01_intake_operation": [
+            "operation_review_projection_matrix.csv",
+            "decision_surface_component_matrix.csv",
+        ],
+        "C02_entry_operation": [
+            "operation_review_projection_matrix.csv",
+            "m04_component_diagnostics.csv",
+            "m04_variant_counterfactual.csv",
+            "parameter_replay_review.csv",
+            "suspect_parameter_counterfactual.csv",
+        ],
+        "C03_lifecycle_operation": [],
+        "C04_expression_review_operation": [
+            "operation_review_projection_matrix.csv",
+            "m05_selection_mechanics.csv",
+            "m05_dte_policy_sensitivity.csv",
+            "m05_hard_filter_overlap.csv",
+            "row_counterfactual_attribution.csv",
+            "decision_surface_component_matrix.csv",
+        ],
+        "C05_order_intent_operation": [
+            "portfolio_capacity_counterfactual.csv",
+            "portfolio_capacity_counterfactual_report.json",
+        ],
+        "C06_execution_gate_operation": [
+            "operation_review_projection_matrix.csv",
+            "decision_surface_component_matrix.csv",
+            "replay_execution_receipt.json",
+        ],
+        "C07_failure_review_operation": [
+            "operation_component_flow.csv",
+            "filled_score_bins.csv",
+            "tail_loss_rows.csv",
+            "top_gain_rows.csv",
+            "high_score_filled_tail_loss_attribution_packet.json",
+            "parameter_replay_review.csv",
+        ],
+    }
+    refs = list(refs_by_component.get(component_id, []))
+    if component_id == "C04_expression_review_operation" and m05_unfilled_available:
+        refs.append("m05_unfilled_filter_reasons.csv")
+    return refs
+
+
+def _operation_component_missing_review_outputs(
+    *,
+    component_id: str,
+    mapping_by_surface: Mapping[str, Mapping[str, Any]],
+    m05_unfilled_available: bool,
+    replay_receipt_available: bool,
+    settled_metric_eligible_count: int,
+) -> list[str]:
+    missing: list[str] = []
+    if component_id == "C01_intake_operation":
+        for surface in ("C01_background_context_surface", "C02_target_state_surface"):
+            mapping_row = mapping_by_surface.get(surface) or {}
+            if int(mapping_row.get("diagnostic_surface_count") or 0) <= 0:
+                missing.append(f"{surface}_internal_score_or_candidate_delta")
+    if component_id == "C02_entry_operation":
+        event_mapping = mapping_by_surface.get("C03_event_state_surface") or {}
+        entry_mapping = mapping_by_surface.get("C04_underlying_decision_surface") or {}
+        if int(event_mapping.get("diagnostic_surface_count") or 0) <= 0:
+            missing.append("event_state_component_internal_score_or_candidate_delta")
+        if int(entry_mapping.get("diagnostic_surface_count") or 0) <= 0:
+            missing.append("underlying_entry_decision_score_diagnostics")
+    if component_id == "C04_expression_review_operation":
+        m05_mapping = mapping_by_surface.get("C05_option_expression_surface") or {}
+        if int(m05_mapping.get("explicit_ref_count") or 0) <= 0:
+            missing.append("explicit_model_05_option_expression_ref")
+        if int(m05_mapping.get("diagnostic_surface_count") or 0) <= 0:
+            missing.append("model_05_alpha_or_selection_score_diagnostics")
+        if int(m05_mapping.get("diagnostic_surface_count") or 0) <= 0 and not m05_unfilled_available:
+            missing.append("m05_candidate_set_and_selection_delta")
+    if component_id == "C06_execution_gate_operation" and not replay_receipt_available:
+        missing.append("replay_execution_receipt")
+    if component_id == "C07_failure_review_operation":
+        m06_mapping = mapping_by_surface.get("C08_residual_event_governance_surface") or {}
+        if int(m06_mapping.get("explicit_ref_count") or 0) <= 0:
+            missing.append("explicit_model_06_residual_event_governance_ref")
+        if int(m06_mapping.get("diagnostic_surface_count") or 0) <= 0:
+            missing.append("model_06_action_surface_diagnostics")
+        if settled_metric_eligible_count <= 0:
+            missing.append("settled_outcome_rows")
+    return missing
+
+
+def _can_assign_operation_fault(
+    *,
+    component_id: str,
+    survival_verdict: str,
+    missing_review_outputs: Sequence[str],
+    applicability_status: str,
+    first_limiting_projections: Sequence[str],
+) -> bool:
+    if component_id == "C07_failure_review_operation" and set(first_limiting_projections) <= {
+        "settled_prediction_quality"
+    }:
+        return False
+    return (
+        applicability_status != "not_applicable_for_candidate_entry_replay"
+        and survival_verdict in {
+            "first_observed_deterioration",
+            "amplifies_prior_damage",
+            "dominant_censoring_point",
+        }
+        and not missing_review_outputs
+    )
+
+
+def _operation_component_interpretation_status(
+    *,
+    survival_verdict: str,
+    missing_review_outputs: Sequence[str],
+    applicability_status: str,
+    can_assign_operation_fault: bool,
+) -> str:
+    if applicability_status == "not_applicable_for_candidate_entry_replay":
+        return "not_applicable_for_candidate_entry_replay"
+    if survival_verdict in {
+        "first_observed_deterioration",
+        "amplifies_prior_damage",
+        "dominant_censoring_point",
+    }:
+        if not missing_review_outputs and not can_assign_operation_fault:
+            return "problem_observed_at_failure_review_not_causal_operation_fault"
+        if can_assign_operation_fault:
+            return "problem_operation_with_complete_component_review"
+        return "problem_operation_with_incomplete_component_review"
+    if missing_review_outputs:
+        return "operation_review_incomplete_no_problem_assigned"
+    if survival_verdict in {"insufficient_evidence", "neutral_or_unmeasured", "unmeasured"}:
+        return "operation_unmeasured_or_sample_limited"
+    return "reviewable_no_problem_observed"
+
+
+def _operation_component_review_readiness_status(component_rows: Sequence[Mapping[str, Any]]) -> str:
+    if any(
+        str(row.get("interpretation_status") or "") == "problem_operation_with_incomplete_component_review"
+        for row in component_rows
+    ):
+        return "incomplete_review_outputs_for_problem_operation"
+    if any(str(row.get("missing_review_outputs") or "") for row in component_rows):
+        return "component_internal_review_outputs_incomplete"
+    return "operation_component_review_packet_complete"
 
 
 def _component_internal_review_refs(*, component_surface: str, m05_unfilled_available: bool) -> list[str]:

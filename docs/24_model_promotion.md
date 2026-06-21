@@ -134,33 +134,40 @@ M04/M05 boundary attribution is a manager-side diagnostic helper for this
 failure-attribution lane. `scripts/tasks/build_model_group_layer_attribution.py`
 reads an existing replay `decision_rows.jsonl` and writes compact cohort, score
 bin, tail-loss, optional M05 unfilled-filter, gate-sweep, row-level
-counterfactual, component-surface, component survival/quality flow,
-component-to-model mapping, component review packet, and
-parameter-level replay summaries. Component-surface rows are the first
-diagnostic view: they classify each replay row by the first materially limiting
-decision surface, using `C01_` through `C09_` prefixes for diagnostic ordering
-inside this report, then map that surface back to model refs and evidence-chain
-participation. These diagnostic prefixes do not rename execution-runtime
-component IDs. Model-asset rollups are secondary and must not include rows that
-were excluded from settled prediction-quality metrics by missing path,
-expression, execution, or settlement evidence. The component
-survival/quality flow is the closed-loop review surface for finding where model
-group performance first becomes visibly bad and whether downstream components
-amplify, recover, censor, or leave that damage unmeasured. It reports explicit
-entered, passed, blocked, censored, and settled-eligible denominators for each
-C01-C09 component. Missing selected option paths are materialization censoring,
-not model wins or losses; only settled-eligible rows contribute outcome quality
-metrics. `component_review_packet.json` and `component_review_packet.csv` are the
-review-facing inputs: each C01-C09 component row separates point-in-time evidence
-from retrospective outcome labels, lists the internal review refs that compose
-the component, marks missing review outputs, and records whether model blame can
-be assigned to an explicit asset or must remain an attribution gap. A component
-with missing diagnostics is not treated as neutral just because the final loss is
-first visible downstream. The packet expects replay `decision_rows.jsonl` to carry
-component-layer `model_layer_refs` and `model_layer_diagnostics` for C01-C05 and
-C08 when those model surfaces participate; C06 selected-path materialization,
-C07 portfolio/execution, and C09 settled quality are non-model or downstream
-diagnostic surfaces. The helper also writes a parameter replay-review report, a
+counterfactual, operation-component, review-projection, component-surface, and
+parameter-level replay summaries. The canonical review entry is
+`operation_component_review_packet.json` with companion
+`operation_component_review_packet.csv`, `operation_component_flow.csv`, and
+`operation_review_projection_matrix.csv`. These files use live/replay action
+components as the first axis: C01 intake, C02 entry, C03 lifecycle, C04
+expression review, C05 order intent, C06 execution gate, and C07 failure review.
+Models and legacy decision surfaces are not treated as components. Instead,
+`operation_review_projection_matrix.csv` maps the older diagnostic surfaces under
+the operation that consumed or exposed them: background and target state under
+C01, event and underlying-entry decision under C02, option selection and selected
+contract path materialization under C04, fill/execution under C06, and residual
+event or settled prediction quality under C07. C03 lifecycle is marked
+`not_applicable_for_candidate_entry_replay` for candidate-entry replay rows that
+do not manage an existing position.
+
+The older `decision_surface_component_matrix.csv`,
+`component_model_mapping.csv`, `component_survival_quality_flow.csv`, and
+`component_review_packet.json` remain diagnostic projection evidence for
+model-ref coverage and historical C01-C09 surface ordering. They are not the
+canonical operation-component axis. Model-asset rollups are secondary and must
+not include rows that were excluded from settled prediction-quality metrics by
+missing path, expression, execution, or settlement evidence. Missing selected
+option paths are expression materialization censoring, not model wins or losses;
+only settled-eligible rows contribute outcome quality metrics. Every operation
+component row separates point-in-time evidence from retrospective outcome labels,
+lists the internal review refs that compose the component, marks missing review
+outputs, and records whether an operation fault can be assigned or must remain an
+attribution gap. A component with missing diagnostics is not treated as neutral
+just because the final loss is first visible downstream. The packet expects
+replay `decision_rows.jsonl` to carry `model_layer_refs` and
+`model_layer_diagnostics` for model surfaces when they participate; selected-path
+materialization, execution/fill, and settled quality remain non-model or
+downstream review projections. The helper also writes a parameter replay-review report, a
 suspect-parameter counterfactual report, and a focused
 high-score filled tail-loss packet that compares high-score losing fills with
 matched high-score non-loss fills. For suspect parameters, it also writes a
