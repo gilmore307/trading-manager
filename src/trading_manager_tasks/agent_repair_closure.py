@@ -195,7 +195,7 @@ def _forbidden_runtime_scope(request: Mapping[str, Any], payload: Mapping[str, A
         request.get("error_kind"),
         request.get("summary"),
         payload.get("retry_recommendation"),
-        payload.get("root_cause"),
+        payload.get("blockers"),
     )
     return any(term in text for term in FORBIDDEN_AUTOMATION_TERMS)
 
@@ -331,7 +331,13 @@ def discover_closure_candidates(output_root: Path = DEFAULT_OUTPUT_ROOT) -> tupl
         request_path = request_dir / "server_error_agent_request.json"
         diagnosis_path = request_dir / "agent_error_diagnosis.json"
         receipt_path = request_dir / "agent_repair_closure_receipt.json"
-        if request_path.exists() and diagnosis_path.exists() and not receipt_path.exists():
+        if not request_path.exists() or not diagnosis_path.exists():
+            continue
+        if receipt_path.exists():
+            receipt = _load_json(receipt_path)
+            if str(receipt.get("closure_status") or "").lower() != "blocked":
+                continue
+        if request_path.exists() and diagnosis_path.exists():
             candidates.append(
                 ClosureCandidate(
                     request_dir=request_dir,
@@ -444,14 +450,14 @@ def close_agent_repair(
     actions: list[dict[str, Any]] = []
     blockers: list[str] = []
     closure_status = "not_closed"
+    stage_id = _stage_id_from_request(request)
+    retry_receipt = _successful_retry_receipt(_control_plane_root(candidate), stage_id) if stage_id else None
 
-    if diagnosis.get("status") != "completed":
-        stage_id = _stage_id_from_request(request)
-        retry_receipt = _successful_retry_receipt(_control_plane_root(candidate), stage_id) if stage_id else None
-        if retry_receipt:
-            closure_status = "closed"
-            actions.append({"action": "retry_receipt_observed", "stage_id": stage_id, "status": "completed", "receipt": retry_receipt})
-        elif _provider_failures_resolved(request):
+    if retry_receipt:
+        closure_status = "closed"
+        actions.append({"action": "retry_receipt_observed", "stage_id": stage_id, "status": "completed", "receipt": retry_receipt})
+    elif diagnosis.get("status") != "completed":
+        if _provider_failures_resolved(request):
             closure_status = "closed"
             actions.append({"action": "failure_register_resolved", "status": "completed"})
         else:

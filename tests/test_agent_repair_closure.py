@@ -223,6 +223,51 @@ class AgentRepairClosureTests(unittest.TestCase):
             self.assertTrue(candidate.receipt_path.exists())
             self.assertEqual(receipt["actions"][0]["action"], "retry_receipt_observed")
 
+    def test_blocked_completed_diagnosis_closes_when_retry_receipt_succeeded(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            control_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            root = control_root / "runtime" / "agent_error_handling"
+            candidate = self._write_candidate(
+                root,
+                request_overrides={
+                    "error_scope": "server.model_training_stage",
+                    "summary": "model training stage model_02_target_state.feature_generation stage command exceeded timeout_seconds=1800",
+                },
+                stdout_payload={
+                    "diagnosis_status": "fixed_pending_retry",
+                    "root_cause": "stage timeout issue, not a broker/account/order/fill/position problem",
+                    "files_changed": [],
+                    "retry_recommendation": "retry_original_stage_command",
+                    "blockers": ["original stage had not rerun yet"],
+                },
+            )
+            candidate.receipt_path.write_text(
+                json.dumps({"contract_type": "agent_repair_closure_receipt", "closure_status": "blocked"}),
+                encoding="utf-8",
+            )
+            receipt_dir = control_root / "runtime" / "model_training_stage_receipts" / "model_02_target_state__feature_generation"
+            receipt_dir.mkdir(parents=True)
+            (receipt_dir / "2026-06-22T155411.926989+0000.receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "component_completion_receipt",
+                        "manager_stage_id": "model_02_target_state.feature_generation",
+                        "status": "succeeded",
+                        "completed_at": "2026-06-22T16:37:07Z",
+                        "runs": [{"status": "succeeded", "return_code": 0}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            candidates = discover_closure_candidates(root)
+            receipt = close_pending_agent_repairs(output_root=root, recover_agent_diagnoses=False)[0]
+
+            self.assertEqual(len(candidates), 1)
+            self.assertEqual(receipt["closure_status"], "closed")
+            self.assertEqual(receipt["actions"][0]["action"], "retry_receipt_observed")
+            self.assertEqual(receipt["blockers"], [])
+
     def test_incomplete_provider_diagnosis_closes_when_failure_register_resolved(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp) / "storage" / "02_control_plane" / "runtime" / "agent_error_handling"
