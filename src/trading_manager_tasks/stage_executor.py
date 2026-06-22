@@ -35,6 +35,7 @@ from .task_progress import DEFAULT_TASK_PROGRESS_ROOT, clear_worker_task_progres
 DEFAULT_RECEIPT_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_receipts"
 DEFAULT_LOG_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "model_training_stage_logs"
 DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 30
+DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 60 * 2
 DEFAULT_STAGE_PROGRESS_STALL_SECONDS = 60 * 10
 DEFAULT_STAGE_PROGRESS_POLL_SECONDS = 5.0
 LONG_DATABASE_STAGE_IDS = {
@@ -296,6 +297,25 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _stage_timeout_seconds(stage: StageProgress) -> int:
+    if stage.stage_id in LONG_DATABASE_STAGE_IDS:
+        return _env_int(
+            "TRADING_MANAGER_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS",
+            DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS,
+        )
+    return _env_int("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS", DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS)
+
+
 def _progress_marker(path: Path) -> tuple[int, int] | None:
     try:
         stat = path.stat()
@@ -420,7 +440,7 @@ def execute_stage_process(
             **({"dataset_split": stage.dataset_split} if stage.dataset_split is not None else {}),
         },
     )
-    timeout_seconds = int(os.environ.get("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS") or DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS)
+    timeout_seconds = _stage_timeout_seconds(stage)
     run_env = {
         **os.environ,
         **env_assignments,

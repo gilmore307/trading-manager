@@ -9,7 +9,14 @@ from unittest.mock import patch
 
 from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.model_training_state import StageProgress
-from trading_manager_tasks.stage_executor import _cwd_for_stage, _resolve_command_placeholders, _stage_progress_worker_id, execute_stage_process
+from trading_manager_tasks.stage_executor import (
+    DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS,
+    _cwd_for_stage,
+    _resolve_command_placeholders,
+    _stage_progress_worker_id,
+    _stage_timeout_seconds,
+    execute_stage_process,
+)
 
 
 class StageExecutorTests(unittest.TestCase):
@@ -192,6 +199,57 @@ class StageExecutorTests(unittest.TestCase):
                 self.assertEqual(summary.status, "succeeded")
                 self.assertEqual(summary.return_code, 0)
                 self.assertIn("long sql complete", Path(summary.stdout_path or "").read_text(encoding="utf-8"))
+
+    def test_long_database_feature_generation_uses_dedicated_timeout(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            stage = StageProgress(
+                stage_id="model_02_target_state.feature_generation",
+                layer=2,
+                layer_key="model_02_target_state",
+                stage_type="feature_generation",
+                status="ready",
+                command=["python3", "-c", "import time; time.sleep(0.3); print('dedicated timeout complete')"],
+                blockers=(),
+            )
+            with patch.dict(
+                "os.environ",
+                {
+                    "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl",
+                    "MANAGER_AGENT_ERROR_AUTOCALL": "false",
+                    "TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "0",
+                    "TRADING_MANAGER_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS": "2",
+                    "TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS": "0.1",
+                    "TRADING_MANAGER_STAGE_PROGRESS_POLL_SECONDS": "0.05",
+                },
+                clear=False,
+            ):
+                self.assertEqual(_stage_timeout_seconds(stage), 2)
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
+
+            self.assertEqual(summary.status, "succeeded")
+            self.assertEqual(summary.return_code, 0)
+            self.assertIn("dedicated timeout complete", Path(summary.stdout_path or "").read_text(encoding="utf-8"))
+
+    def test_long_database_feature_generation_default_timeout_exceeds_global_stage_timeout(self):
+        stage = StageProgress(
+            stage_id="model_02_target_state.feature_generation",
+            layer=2,
+            layer_key="model_02_target_state",
+            stage_type="feature_generation",
+            status="ready",
+            command=["python3", "-c", "print('ok')"],
+            blockers=(),
+        )
+        with patch.dict("os.environ", {"TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "1800"}, clear=True):
+            self.assertEqual(_stage_timeout_seconds(stage), DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS)
 
     def test_stage_process_retries_once_after_completed_agent_repair(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
