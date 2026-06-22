@@ -140,7 +140,7 @@ Ordinary bar, volume, spread, liquidity, target-state, option-expression, M06 ev
 
 M02 candidate selection is part of the model stack, not an externally preselected final ticker list. Manager recognizes M02 as an anonymous target-state model that may rank the current candidate-policy batch for target handoff.
 
-The candidate policy is rule-fixed: current realtime routing uses the reviewed realtime total-symbol pool, target metadata, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optional optionability diagnostics, and controls when evaluation needs contrast. Promotion replay uses the fixed `historical_candidate_universe.csv` table seeded from the current realtime pool plus BTC, ETH, and SOL, and must not read the mutable realtime pool directly or use current ETF holdings. This fixed table is stable replay scope, not point-in-time historical market-wide ranking evidence. Same-day candidate-universe freezes remain route-smoke evidence until the post-close readiness gate; replay execution must back off before that gate.
+The candidate policy is rule-fixed: current realtime routing uses the reviewed realtime total-symbol pool, target metadata, current market-wide hot/liquid names, liquidity/spread/data-quality filters, optionability diagnostics, and controls when evaluation needs contrast. Promotion replay uses the fixed `historical_candidate_universe.csv` table seeded from the current optionable equity pool, and must not read the mutable realtime pool directly or use current ETF holdings. This fixed table is stable replay scope, not point-in-time historical market-wide ranking evidence. Same-day candidate-universe freezes remain route-smoke evidence until the post-close readiness gate; replay execution must back off before that gate.
 
 M02 and later substrate work may remain target-major in task execution because routing symbols prepare data samples. That scheduling choice does not select the replay target. Promotion replay runs the live-flow component graph over the fixed historical candidate pool, allowing components to choose no target, one target, or a target combination. Fixed target/window panels remain diagnostic repair evidence only and are not accepted promotion evidence.
 
@@ -154,7 +154,7 @@ Manager may run M02+ historical model-worker training as target-scoped fold chai
 
 When no target is pinned by the service command, the scheduler reads the ordered runtime target queue and selects the first target with an open or unstarted six-month fold. If the current target has completed all eligible folds through the latest fully completed training fold, manager skips it and starts the next target from the earliest ready fold, normally `2016-01`.
 
-The target queue is an execution-routing queue, not promotion evidence and not a replacement for M02 candidate-policy replay. Promotion still requires evaluation-owned replay evidence over the accepted candidate policy.
+The target queue is an execution-routing queue, not promotion evidence and not a replacement for M02 candidate-policy replay. The default queue excludes crypto spot targets because the current M05/M06 current-chain training route depends on listed-option expression evidence. Promotion still requires evaluation-owned replay evidence over the accepted candidate policy.
 
 ## D214 - Model group reruns start from the earliest affected workflow cutpoint
 

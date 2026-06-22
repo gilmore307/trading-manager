@@ -136,7 +136,10 @@ Accepted queue shape:
 
 If the first target has completed all eligible substrate windows through the completed-fold cutoff and its current fold lifecycle has completed maintenance/readiness handoff, the scheduler skips it and starts the next queued target from the earliest ready window, usually `2016-01`. The queue controls data-preparation routing only; it does not become fixed-target promotion evidence and does not replace component-led candidate selection replay.
 
-The runtime queue can be prepared from reviewed target context mappings:
+The runtime queue can be prepared from reviewed target context mappings. The
+default prepared queue excludes crypto spot targets because this model-worker
+route trains the listed-option current chain; crypto requires a separate
+direct-underlying-only route before it can be scheduled here.
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --write

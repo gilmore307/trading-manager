@@ -16,6 +16,8 @@ DEFAULT_MAPPING_CSV = Path(registry_value("out_TL2CTX001", "path"))
 MANAGER_MODEL_TRAINING_TARGET_QUEUE = registry_payload("art_MGRTRGROT002")
 REVIEW_STATUS = registry_payload("fld_TL2CTX011")
 TARGET_SYMBOL = registry_payload("fld_DU004")
+TARGET_ASSET_CLASS = registry_payload("fld_TL2CTX002")
+NO_OPTION_TARGET_ASSET_CLASSES = {"crypto_spot", "spot_crypto", "crypto"}
 
 
 def _now() -> str:
@@ -34,6 +36,9 @@ def _mapping_targets(mapping_csv: Path) -> list[str]:
     with mapping_csv.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             if str(row.get(REVIEW_STATUS) or "").strip().lower() != "accepted":
+                continue
+            asset_class = str(row.get(TARGET_ASSET_CLASS) or "").strip().lower()
+            if asset_class in NO_OPTION_TARGET_ASSET_CLASSES:
                 continue
             symbol = _normal_symbol(row.get(TARGET_SYMBOL))
             if symbol and symbol not in targets:

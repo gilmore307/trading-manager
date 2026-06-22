@@ -2575,8 +2575,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(historical_artifact["kind"], "shared_artifact")
         self.assertEqual(historical_artifact["payload"], "trading-storage/main/shared/historical_candidate_universe.csv")
         self.assertIn("historical_candidate_universe", historical_artifact["applies_to"])
-        self.assertIn("crypto_context_anchor", historical_artifact["applies_to"])
+        self.assertIn("optionable_equity_candidate_pool", historical_artifact["applies_to"])
         self.assertIn("not point-in-time historical", historical_artifact["note"])
+        self.assertIn("Crypto spot targets are outside", historical_artifact["note"])
         self.assertNotIn("reviewed_symbol_addition", historical_artifact["applies_to"])
 
         script = registry["BUILD_EQUITY_TOTAL_SYMBOL_POOL"]
@@ -2591,7 +2592,6 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(historical_script["path"], "trading-data/scripts/data/build_historical_candidate_universe.py")
 
         self.assertIn("historical_candidate_universe", historical_script["applies_to"])
-        self.assertIn("crypto_spot", historical_script["applies_to"])
         self.assertNotIn("reviewed_symbol_addition", historical_script["applies_to"])
 
         fetch_script = registry["FETCH_TRADINGVIEW_EQUITY_SCREENER"]
