@@ -250,6 +250,8 @@ class StageExecutorTests(unittest.TestCase):
         )
         with patch.dict("os.environ", {"TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "1800"}, clear=True):
             self.assertEqual(_stage_timeout_seconds(stage), DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS)
+        with patch.dict("os.environ", {"TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "9000"}, clear=True):
+            self.assertEqual(_stage_timeout_seconds(stage), 9000)
 
     def test_stage_process_retries_once_after_completed_agent_repair(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -309,10 +309,11 @@ def _env_int(name: str, default: int) -> int:
 
 def _stage_timeout_seconds(stage: StageProgress) -> int:
     if stage.stage_id in LONG_DATABASE_STAGE_IDS:
-        return _env_int(
-            "TRADING_MANAGER_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS",
+        long_default = max(
+            _env_int("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS", DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS),
             DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS,
         )
+        return _env_int("TRADING_MANAGER_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS", long_default)
     return _env_int("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS", DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS)
 
 
