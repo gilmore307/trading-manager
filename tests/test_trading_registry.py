@@ -2576,8 +2576,9 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(historical_artifact["payload"], "trading-storage/main/shared/historical_candidate_universe.csv")
         self.assertIn("historical_candidate_universe", historical_artifact["applies_to"])
         self.assertIn("optionable_equity_candidate_pool", historical_artifact["applies_to"])
+        self.assertIn("crypto_spot_candidate_pool", historical_artifact["applies_to"])
         self.assertIn("not point-in-time historical", historical_artifact["note"])
-        self.assertIn("Crypto spot targets are outside", historical_artifact["note"])
+        self.assertIn("structural no-listed-options capability", historical_artifact["note"])
         self.assertNotIn("reviewed_symbol_addition", historical_artifact["applies_to"])
 
         script = registry["BUILD_EQUITY_TOTAL_SYMBOL_POOL"]

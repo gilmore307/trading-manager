@@ -243,6 +243,36 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             "model_05_option_expression.model_generation.test",
         ])
 
+    def test_m05_crypto_target_skips_option_source_but_keeps_model_generation(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            universe_path = tmp / "main" / "shared" / "historical_candidate_universe.csv"
+            universe_path.parent.mkdir(parents=True, exist_ok=True)
+            universe_path.write_text(
+                "symbol,asset_class,instrument_type,optionable_underlying_status,replay_candidate_status\n"
+                "BTC,crypto_spot,spot_crypto_underlying,not_applicable,active\n",
+                encoding="utf-8",
+            )
+            plan = build_model_training_workflow_plan(
+                storage_root=tmp,
+                trading_storage_root=tmp,
+                start_month="2016-01",
+                end_month="2016-06",
+                selected_target_symbol="BTC",
+                foundation_catch_up_only=False,
+            )
+
+        stage_ids = [stage.stage_id for stage in plan.layers[4].stages]
+        self.assertNotIn(MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID, stage_ids)
+        self.assertEqual(stage_ids, [
+            "model_05_option_expression.model_generation.train",
+            "model_05_option_expression.model_generation.validation",
+            "model_05_option_expression.model_generation.test",
+        ])
+        self.assertTrue(
+            all(MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER not in stage.blockers for stage in plan.layers[4].stages)
+        )
+
     def test_model_generation_uses_chronological_train_validation_test_split_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(

@@ -17,7 +17,6 @@ MANAGER_MODEL_TRAINING_TARGET_QUEUE = registry_payload("art_MGRTRGROT002")
 REVIEW_STATUS = registry_payload("fld_TL2CTX011")
 TARGET_SYMBOL = registry_payload("fld_DU004")
 TARGET_ASSET_CLASS = registry_payload("fld_TL2CTX002")
-NO_OPTION_TARGET_ASSET_CLASSES = {"crypto_spot", "spot_crypto", "crypto"}
 
 
 def _now() -> str:
@@ -29,41 +28,57 @@ def _normal_symbol(value: object) -> str | None:
     return symbol or None
 
 
-def _mapping_targets(mapping_csv: Path) -> list[str]:
+def _mapping_targets(mapping_csv: Path) -> list[dict[str, object]]:
     if not mapping_csv.exists():
         return []
-    targets: list[str] = []
+    targets: list[dict[str, object]] = []
+    seen: set[str] = set()
     with mapping_csv.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             if str(row.get(REVIEW_STATUS) or "").strip().lower() != "accepted":
                 continue
             asset_class = str(row.get(TARGET_ASSET_CLASS) or "").strip().lower()
-            if asset_class in NO_OPTION_TARGET_ASSET_CLASSES:
-                continue
             symbol = _normal_symbol(row.get(TARGET_SYMBOL))
-            if symbol and symbol not in targets:
-                targets.append(symbol)
+            if symbol and symbol not in seen:
+                targets.append(
+                    {
+                        "symbol": symbol,
+                        "enabled": True,
+                        "target_asset_class": asset_class or None,
+                        "option_capability": _option_capability(asset_class),
+                    }
+                )
+                seen.add(symbol)
     return targets
+
+
+def _option_capability(asset_class: str) -> str:
+    if asset_class in {"crypto_spot", "spot_crypto", "crypto"}:
+        return "structurally_no_listed_options"
+    return "listed_options_applicability_unknown"
 
 
 def build_target_queue(*, bootstrap_targets: list[str], mapping_csv: Path, generated_at_utc: str | None = None) -> dict[str, object]:
     mapping_targets = _mapping_targets(mapping_csv)
-    accepted_targets = set(mapping_targets)
-    targets: list[str] = []
+    accepted_targets = {str(row["symbol"]): row for row in mapping_targets}
+    targets: list[dict[str, object]] = []
+    seen: set[str] = set()
     for symbol in bootstrap_targets:
         normal = _normal_symbol(symbol)
-        if normal and normal in accepted_targets and normal not in targets:
-            targets.append(normal)
-    for symbol in mapping_targets:
-        normal = _normal_symbol(symbol)
-        if normal and normal not in targets:
-            targets.append(normal)
+        if normal and normal in accepted_targets and normal not in seen:
+            targets.append(dict(accepted_targets[normal]))
+            seen.add(normal)
+    for target in mapping_targets:
+        normal = str(target["symbol"])
+        if normal and normal not in seen:
+            targets.append(target)
+            seen.add(normal)
     return {
         "contract_type": MANAGER_MODEL_TRAINING_TARGET_QUEUE,
         "generated_at_utc": generated_at_utc or _now(),
         "queue_policy": "ordered_first_open_fold",
         "rotation_boundary": "model_02_plus_model_worker",
-        "targets": [{"symbol": symbol, "enabled": True} for symbol in targets],
+        "targets": targets,
         "promotion_evidence": False,
     }
 
