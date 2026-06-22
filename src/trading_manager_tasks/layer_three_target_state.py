@@ -26,10 +26,9 @@ from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
-DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/model_01_background_context_etf_universe.csv")
+DEFAULT_HISTORICAL_CANDIDATE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/historical_candidate_universe.csv")
 DEFAULT_TARGET_CONTEXT_MAPPING = Path("/root/projects/trading-storage/main/shared/model_02_target_context_mapping.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_02_target_state" / "input_materialization"
-LAYER_TWO_MODEL_LAYER = "model_01_sector_context"
 SOURCE = "m03_target_state_vector_data_acquisition"
 OUTPUT_TABLE = "model_03_target_state_vector_data_acquisition"
 OPTION_CHAIN_SOURCE_TABLE = "option_chain_state_source"
@@ -147,12 +146,22 @@ def _fold_key(start_month: str, end_month: str) -> str:
     return f"{start_month.replace('-', '_')}_{end_month.replace('-', '_')}"
 
 
-def _read_layer_two_symbols(universe_path: Path) -> tuple[str, ...]:
+def _read_candidate_universe_symbols(universe_path: Path, *, symbol_limit: int | None = None) -> tuple[str, ...]:
     with universe_path.open(newline="", encoding="utf-8") as handle:
         rows = [{str(k): str(v or "").strip() for k, v in row.items()} for row in csv.DictReader(handle)]
-    symbols = sorted({row["symbol"].upper() for row in rows if row.get("symbol") and row.get("model_layer") == LAYER_TWO_MODEL_LAYER})
+    symbols: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        symbol = str(row.get("symbol") or row.get("target_ref") or "").strip().upper()
+        status = str(row.get("replay_candidate_status") or row.get("pool_membership_status") or "active").strip().lower()
+        if not symbol or status != "active" or symbol in seen:
+            continue
+        symbols.append(symbol)
+        seen.add(symbol)
+        if symbol_limit is not None and len(symbols) >= symbol_limit:
+            break
     if not symbols:
-        raise TaskSystemError(f"no {LAYER_TWO_MODEL_LAYER} symbols found in {universe_path}")
+        raise TaskSystemError(f"no active candidate symbols found in {universe_path}")
     return tuple(symbols)
 
 
@@ -219,17 +228,20 @@ def _source_timeframe(receipt_path: Path) -> str:
     return timeframe or DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME
 
 
-def discover_layer_two_feed_artifacts(
+def discover_target_candidate_feed_artifacts(
     *,
     start_month: str,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
     trading_storage_root: Path = DEFAULT_TRADING_STORAGE_ROOT,
-    universe_path: Path = DEFAULT_TRADING_STORAGE_UNIVERSE,
+    universe_path: Path = DEFAULT_HISTORICAL_CANDIDATE_UNIVERSE,
     symbols: Iterable[str] | None = None,
+    symbol_limit: int | None = None,
 ) -> tuple[FeedArtifactRef, ...]:
     """Find successful target-local SQL-retained bar receipts already present on disk."""
 
-    requested_symbols = tuple(symbol.upper() for symbol in (symbols or _read_layer_two_symbols(universe_path)))
+    if symbol_limit is not None and symbol_limit <= 0:
+        raise TaskSystemError("symbol_limit must be positive when supplied")
+    requested_symbols = tuple(symbol.upper() for symbol in (symbols or _read_candidate_universe_symbols(universe_path, symbol_limit=symbol_limit)))
     allowed_symbols: dict[str, tuple[str, ...]] = {symbol: _target_evidence_symbols(symbol) for symbol in requested_symbols}
     refs: list[FeedArtifactRef] = []
     for target_symbol in sorted(allowed_symbols):
@@ -381,9 +393,10 @@ def materialize_layer_three_target_state_inputs(
     manager_storage_root: Path = DEFAULT_STORAGE_ROOT,
     trading_data_root: Path = DEFAULT_TRADING_DATA_ROOT,
     trading_storage_root: Path = DEFAULT_TRADING_STORAGE_ROOT,
-    universe_path: Path = DEFAULT_TRADING_STORAGE_UNIVERSE,
+    universe_path: Path = DEFAULT_HISTORICAL_CANDIDATE_UNIVERSE,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     target_symbol: str | None = None,
+    symbol_limit: int | None = None,
     run_id: str | None = None,
     write: bool = False,
 ) -> LayerThreeTargetStateMaterialization:
@@ -393,12 +406,13 @@ def materialize_layer_three_target_state_inputs(
     refs = tuple(
         ref
         for month in _iter_months(start_month, end_month)
-        for ref in discover_layer_two_feed_artifacts(
+        for ref in discover_target_candidate_feed_artifacts(
             start_month=month,
             trading_data_root=trading_data_root,
             trading_storage_root=trading_storage_root,
             universe_path=universe_path,
             symbols=selected_symbols,
+            symbol_limit=None if selected_symbols else symbol_limit,
         )
     )
     if not manager_storage_root.is_absolute():
@@ -470,9 +484,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--trading-data-root", type=Path, default=DEFAULT_TRADING_DATA_ROOT)
     parser.add_argument("--trading-storage-root", type=Path, default=DEFAULT_TRADING_STORAGE_ROOT)
-    parser.add_argument("--universe-path", type=Path, default=DEFAULT_TRADING_STORAGE_UNIVERSE)
+    parser.add_argument("--universe-path", type=Path, default=DEFAULT_HISTORICAL_CANDIDATE_UNIVERSE)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--target-symbol", help="Selected M02+ target symbol. When supplied, only that target's local bar artifacts are materialized.")
+    parser.add_argument("--symbol-limit", type=int, help="Limit default fixed-candidate universe materialization to the first N active candidates for bounded batch runs.")
     parser.add_argument("--run-id")
     parser.add_argument("--write", action="store_true", help="Run the trading-data source_03 normalizer and write SQL rows.")
     parser.add_argument("--persist-sql", action="store_true", help="Alias for --write retained for stage command compatibility.")
@@ -486,6 +501,7 @@ def main(argv: list[str] | None = None) -> int:
         universe_path=args.universe_path,
         output_root=args.output_root,
         target_symbol=args.target_symbol,
+        symbol_limit=args.symbol_limit,
         run_id=args.run_id,
         write=args.write or args.persist_sql,
     )
@@ -495,9 +511,10 @@ def main(argv: list[str] | None = None) -> int:
 
 __all__ = [
     "FeedArtifactRef",
+    "DEFAULT_HISTORICAL_CANDIDATE_UNIVERSE",
     "LayerThreeTargetStateMaterialization",
     "build_source_task_key",
-    "discover_layer_two_feed_artifacts",
+    "discover_target_candidate_feed_artifacts",
     "materialize_layer_three_target_state_inputs",
 ]
 

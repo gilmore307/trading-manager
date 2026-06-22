@@ -61,13 +61,13 @@ coverage remains child partition evidence under that one task.
    evidence and fold-scoped M03 event-state observation inputs. M03 event
    substrate is collected per fold because M06-governed event-family attributes
    and accepted event-observation pools can change across folds.
-2. Target substrate. Materialize M02 target-state source and feature evidence
-   only when a selected target needs it. If the selected target lacks reviewed
-   target-local bar artifacts for a fold, manager prepares bounded
-   `01_feed_alpaca_bars` requests for that target and dispatches them through the
-   autonomous provider gate; the existing `m03_target_state_vector_data_acquisition`
-   materializer remains the migration-source implementation detail consumed by
-   current M02.
+2. Target substrate. Ordinary replay materializes M02 target-state source and
+   feature evidence from the fixed `historical_candidate_universe.csv` candidate
+   pool. If a requested diagnostic target lacks reviewed target-local bar
+   artifacts for a fold, manager prepares bounded `01_feed_alpaca_bars` requests
+   for that target and dispatches them through the autonomous provider gate. The
+   existing `m03_target_state_vector_data_acquisition` materializer remains the
+   migration-source implementation detail consumed by current M02.
 3. Option-expression substrate. For targets whose metadata leaves listed
    options applicable, manager prepares `trading_data.option_chain_state_source`
    under the M05 option-expression stage

@@ -9,7 +9,7 @@ from unittest.mock import patch
 from trading_manager_tasks.layer_three_target_state import (
     FeedArtifactRef,
     build_source_task_key,
-    discover_layer_two_feed_artifacts,
+    discover_target_candidate_feed_artifacts,
     main,
     materialize_layer_three_target_state_inputs,
 )
@@ -73,15 +73,15 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertTrue(materialize.call_args.kwargs["write"])
 
-    def test_discovers_successful_layer_two_feed_receipt(self) -> None:
+    def test_discovers_successful_target_candidate_feed_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\nSPY,model_01_market_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,replay_candidate_status\nXLF,active\nSPY,active\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "XLF", "2016-01")
 
-            refs = discover_layer_two_feed_artifacts(
+            refs = discover_target_candidate_feed_artifacts(
                 start_month="2016-01",
                 trading_data_root=tmp / "trading-data",
                 trading_storage_root=storage_root,
@@ -99,10 +99,10 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nAAPL,model_01_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,replay_candidate_status\nAAPL,active\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "AAPL", "2021-01", write_task_key=False, manifest_timeframe="1Day")
 
-            refs = discover_layer_two_feed_artifacts(
+            refs = discover_target_candidate_feed_artifacts(
                 start_month="2021-01",
                 trading_data_root=tmp / "trading-data",
                 trading_storage_root=storage_root,
@@ -112,6 +112,31 @@ class LayerThreeTargetStateTests(unittest.TestCase):
 
             self.assertEqual(len(refs), 1)
             self.assertEqual(refs[0].timeframe, "1Day")
+
+    def test_default_candidate_universe_can_be_symbol_limited(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            universe_path = tmp / "historical_candidate_universe.csv"
+            universe_path.write_text(
+                "symbol,replay_candidate_status\n"
+                "AAPL,active\n"
+                "MSFT,active\n"
+                "TSLA,active\n",
+                encoding="utf-8",
+            )
+            for symbol in ("AAPL", "MSFT", "TSLA"):
+                _write_bar_receipt(storage_root, symbol, "2021-01")
+
+            refs = discover_target_candidate_feed_artifacts(
+                start_month="2021-01",
+                trading_data_root=tmp / "trading-data",
+                trading_storage_root=storage_root,
+                universe_path=universe_path,
+                symbol_limit=2,
+            )
+
+            self.assertEqual([ref.symbol for ref in refs], ["AAPL", "MSFT"])
 
     def test_builds_source_task_key_with_sql_bar_sources(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -162,7 +187,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,replay_candidate_status\nXLF,active\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "XLF", "2016-01")
 
             summary = materialize_layer_three_target_state_inputs(
@@ -192,7 +217,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nAAPL,model_01_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,replay_candidate_status\nAAPL,active\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "AAPL", "2021-01", write_task_key=False, manifest_timeframe="1Day")
 
             with patch("trading_manager_tasks.layer_three_target_state.subprocess.run") as run:
@@ -223,7 +248,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,replay_candidate_status\nXLF,active\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "AAPL", "2016-01")
             _write_bar_receipt(storage_root, "XLF", "2016-01")
 
@@ -254,7 +279,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
                 "BTC,crypto_spot,BTC,BKCH,accepted\n",
                 encoding="utf-8",
             )
-            universe_path.write_text("symbol,model_layer\nBKCH,model_01_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,replay_candidate_status\nBKCH,active\n", encoding="utf-8")
             _write_bar_receipt(storage_root, "BKCH", "2016-01")
 
             with patch("trading_manager_tasks.layer_three_target_state.DEFAULT_TARGET_CONTEXT_MAPPING", mapping_path):
@@ -281,7 +306,7 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
             universe_path = tmp / "universe.csv"
-            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
+            universe_path.write_text("symbol,replay_candidate_status\nXLF,active\n", encoding="utf-8")
             for month in ("2016-01", "2016-02"):
                 _write_bar_receipt(storage_root, "XLF", month)
 

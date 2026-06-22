@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
-from .layer_three_target_state import BAR_SOURCE_TABLE, FeedArtifactRef, _bar_source_ref, _latest_successful_run, _month_bounds, _read_layer_two_symbols, discover_layer_two_feed_artifacts
+from .layer_three_target_state import BAR_SOURCE_TABLE, FeedArtifactRef, _bar_source_ref, _latest_successful_run, discover_target_candidate_feed_artifacts
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root
 
@@ -29,6 +29,7 @@ DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/model_01_background_context_etf_universe.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_06_residual_event_governance" / "input_materialization"
+LAYER_TWO_MODEL_LAYER = "model_01_sector_context"
 DETECTOR_SOURCE = "m06_residual_event_governance_data_acquisition.equity_abnormal_activity"
 SOURCE = "m06_residual_event_governance_data_acquisition"
 REQUIRED_EVENT_FEED_ARTIFACTS = {
@@ -176,6 +177,15 @@ def _fold_key(start_month: str, end_month: str) -> str:
     return f"{start_month.replace('-', '_')}_{end_month.replace('-', '_')}"
 
 
+def _read_layer_two_symbols(universe_path: Path) -> tuple[str, ...]:
+    with universe_path.open(newline="", encoding="utf-8") as handle:
+        rows = [{str(k): str(v or "").strip() for k, v in row.items()} for row in csv.DictReader(handle)]
+    symbols = sorted({row["symbol"].upper() for row in rows if row.get("symbol") and row.get("model_layer") == LAYER_TWO_MODEL_LAYER})
+    if not symbols:
+        raise TaskSystemError(f"no {LAYER_TWO_MODEL_LAYER} symbols found in {universe_path}")
+    return tuple(symbols)
+
+
 def _ref_month(ref: FeedArtifactRef) -> str:
     return str(getattr(ref, "month", "") or "unknown_month")
 
@@ -188,11 +198,12 @@ def _discover_layer_two_feed_artifacts_including_zero_rows(
     universe_path: Path,
 ) -> tuple[FeedArtifactRef, ...]:
     refs = list(
-        discover_layer_two_feed_artifacts(
+        discover_target_candidate_feed_artifacts(
             start_month=start_month,
             trading_data_root=trading_data_root,
             trading_storage_root=trading_storage_root,
             universe_path=universe_path,
+            symbols=_read_layer_two_symbols(universe_path),
         )
     )
     if refs:

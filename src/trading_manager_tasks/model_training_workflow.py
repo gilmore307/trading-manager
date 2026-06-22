@@ -702,11 +702,11 @@ def _model_two_target_local_feed_blockers(
     target = _normalize_selected_target_symbol(selected_target_symbol)
     if target is None:
         return ()
-    from .layer_three_target_state import discover_layer_two_feed_artifacts
+    from .layer_three_target_state import discover_target_candidate_feed_artifacts
 
     month = start_month
     while month <= end_month:
-        refs = discover_layer_two_feed_artifacts(start_month=month, trading_storage_root=trading_storage_root, symbols=(target,))
+        refs = discover_target_candidate_feed_artifacts(start_month=month, trading_storage_root=trading_storage_root, symbols=(target,))
         if not refs:
             return (MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,)
         month = _next_month(month)

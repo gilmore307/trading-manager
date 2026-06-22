@@ -29,7 +29,7 @@ from .option_chain_source_acquisition import (
     STAGE_ID as OPTION_CHAIN_SOURCE_STAGE_ID,
     prepare_option_chain_source_acquisition,
 )
-from .layer_three_target_state import discover_layer_two_feed_artifacts
+from .layer_three_target_state import discover_target_candidate_feed_artifacts
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_THREE_TARGET_STATE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER
 from .model_training_state import (
     advance_workflow_state,
@@ -473,7 +473,7 @@ def _missing_target_local_feed_months(*, start_month: str, end_month: str, targe
     missing: list[str] = []
     month = start_month
     while month <= end_month:
-        refs = discover_layer_two_feed_artifacts(
+        refs = discover_target_candidate_feed_artifacts(
             start_month=month,
             trading_storage_root=component_storage_root,
             symbols=(target_symbol,),
