@@ -137,10 +137,12 @@ Accepted queue shape:
 If the first target has completed all eligible substrate windows through the completed-fold cutoff and its current fold lifecycle has completed maintenance/readiness handoff, the scheduler skips it and starts the next queued target from the earliest ready window, usually `2016-01`. The queue controls data-preparation routing only; it does not become fixed-target promotion evidence and does not replace component-led candidate selection replay.
 
 The runtime queue can be prepared from reviewed target context mappings. The
-prepared queue keeps crypto and confirmed no-listed-options targets, but marks
-their option capability as structurally unavailable. Those targets skip M05
-option-chain acquisition while still running the direct-underlying target and
-decision chain with explicit no-option/not-applicable states.
+default prepared queue defers crypto spot targets until the crypto target-local
+feed route is explicitly verified, while confirmed no-listed-options targets
+remain eligible. Eligible no-option targets skip M05 option-chain acquisition
+while still running the direct-underlying target and decision chain with
+explicit no-option/not-applicable states. Use `--include-crypto-spot` only after
+the crypto historical feed route is ready for autonomous scheduler use.
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --write

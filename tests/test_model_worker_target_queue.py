@@ -43,7 +43,7 @@ class ModelWorkerTargetQueueTests(unittest.TestCase):
 
         self.assertEqual([row["symbol"] for row in payload["targets"]], ["AAOI"])
 
-    def test_queue_includes_crypto_targets_with_no_option_capability(self):
+    def test_queue_defers_crypto_targets_by_default(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             mapping = Path(raw_tmp) / "mapping.csv"
             with mapping.open("w", newline="", encoding="utf-8") as handle:
@@ -53,6 +53,24 @@ class ModelWorkerTargetQueueTests(unittest.TestCase):
                 writer.writerow({"target_symbol": "AAPL", "target_asset_class": "equity_common", "review_status": "accepted"})
 
             payload = build_target_queue(bootstrap_targets=["BTC", "AAPL"], mapping_csv=mapping, generated_at_utc="2026-05-20T00:00:00Z")
+
+        self.assertEqual([row["symbol"] for row in payload["targets"]], ["AAPL"])
+
+    def test_queue_can_include_crypto_targets_with_no_option_capability(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            mapping = Path(raw_tmp) / "mapping.csv"
+            with mapping.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["target_symbol", "target_asset_class", "review_status"])
+                writer.writeheader()
+                writer.writerow({"target_symbol": "BTC", "target_asset_class": "crypto_spot", "review_status": "accepted"})
+                writer.writerow({"target_symbol": "AAPL", "target_asset_class": "equity_common", "review_status": "accepted"})
+
+            payload = build_target_queue(
+                bootstrap_targets=["BTC", "AAPL"],
+                mapping_csv=mapping,
+                generated_at_utc="2026-05-20T00:00:00Z",
+                include_crypto_spot=True,
+            )
 
         self.assertEqual([row["symbol"] for row in payload["targets"]], ["BTC", "AAPL"])
         self.assertEqual(payload["targets"][0]["target_asset_class"], "crypto_spot")
