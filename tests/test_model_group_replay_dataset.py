@@ -59,6 +59,16 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
         artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
 
+    def _mark_m06_incomplete(self, storage_root: Path, *, start_month: str = "2016-01", end_month: str = "2016-06") -> None:
+        state_path = storage_root / "runtime" / f"model_training_fold_state_aapl_{start_month}_{end_month}.json"
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+        for stage in payload["stages"]:
+            if int(stage.get("layer") or 0) != 6:
+                continue
+            split_name = stage.get("dataset_split", {}).get("split_name")
+            stage["status"] = "ready" if split_name == "train" else "blocked"
+        state_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
     def _write_contract(self, path: Path, *, base_context_ref: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
@@ -202,6 +212,33 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
             )
             self.assertIsNone(second)
+
+    def test_pre_replay_fold_admits_dataset_before_m06_generation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_completed_fold(storage_root)
+            self._mark_m06_incomplete(storage_root)
+            dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            contract_path = tmp / "replays" / "promotion_replay_candidate_policy.json"
+            self._write_contract(contract_path, base_context_ref=dataset_root / "base_context.json")
+
+            decision = run_model_group_replay_dataset_if_ready(
+                storage_root=storage_root,
+                contract_path=contract_path,
+                prepare_runner_path=tmp / "missing_prepare.py",
+                freeze_runner_path=tmp / "missing_freeze.py",
+                evaluation_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "ready")
+        self.assertEqual(decision.reason_code, "model_group_replay_dataset_base_context_ready")
 
     def test_stale_frozen_manifest_is_reprepared_for_latest_completed_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

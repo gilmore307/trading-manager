@@ -23,7 +23,10 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
 from .storage_paths import projects_root
-from .model_training_workflow import base_stack_model_generation_splits_complete
+from .model_training_workflow import (
+    PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT,
+    base_stack_model_generation_splits_complete,
+)
 
 DEFAULT_REPLAY_CONTRACT_ID = "promotion_replay_candidate_policy"
 DEFAULT_EVALUATION_REPO_ROOT = projects_root() / "trading-evaluation"
@@ -789,7 +792,7 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
             continue
         if not base_stack_model_generation_splits_complete(stages):
             continue
-        if not all(str(stage.get("status") or "").lower() in {"succeeded", "not_applicable"} for stage in stages if isinstance(stage, Mapping)):
+        if not _pre_replay_stages_terminal(stages):
             continue
         start_month = str(payload.get("start_month") or "")
         end_month = str(payload.get("end_month") or "")
@@ -813,6 +816,21 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
             }
         )
     return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))[-1] if candidates else None
+
+
+def _pre_replay_stages_terminal(stages: list[Any]) -> bool:
+    for stage in stages:
+        if not isinstance(stage, Mapping):
+            continue
+        try:
+            layer = int(stage.get("layer") or 0)
+        except (TypeError, ValueError):
+            continue
+        if layer > PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT:
+            continue
+        if str(stage.get("status") or "").lower() not in {"succeeded", "not_applicable"}:
+            return False
+    return True
 
 
 def _candidate_model_ref(*, target_symbol: str | None, start_month: str, end_month: str) -> str:
