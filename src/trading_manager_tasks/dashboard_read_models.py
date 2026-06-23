@@ -3464,6 +3464,24 @@ def _compatible_replay_run_ids(*, dataset_root: Path) -> set[str]:
     return run_ids
 
 
+def _replay_execution_has_started(dataset_root: Path) -> bool:
+    replay_root = dataset_root / "replay_execution_runs"
+    if not replay_root.exists():
+        return False
+    start_artifacts = {
+        "decision_rows.jsonl",
+        "entry_threshold_calibration.json",
+        "option_feature_requirements.jsonl",
+        "replay_execution_receipt.json",
+    }
+    for run_dir in replay_root.iterdir():
+        if not run_dir.is_dir():
+            continue
+        if any((run_dir / artifact).exists() for artifact in start_artifacts):
+            return True
+    return False
+
+
 def _replay_ready_months(dataset_root: Path, replay_run_ids: set[str] | None = None) -> set[str]:
     ready: set[str] = set()
     for path in sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]:
@@ -4322,7 +4340,9 @@ def _model_group_replay_timeline_tasks(
         ),
         ready_months=replay_ready_months,
     )
-    replay_started = bool(replay_ready_months)
+    replay_started = bool(replay_ready_months) or (
+        lifecycle_artifacts_allowed and _replay_execution_has_started(dataset_root)
+    )
     replay_complete = bool(replay_progress["can_unlock_downstream"])
     review_artifacts = _latest_post_replay_review_artifacts(dataset_root) if lifecycle_artifacts_allowed and replay_complete else None
     replay_review_complete = review_artifacts is not None

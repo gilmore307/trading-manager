@@ -1061,6 +1061,68 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(model_group_tasks[0]["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
 
+    def test_replay_attempt_artifact_marks_replay_started_before_first_month_completes(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            replay_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 2,
+                        "available_feed_acquisition_count": 2,
+                        "deferred_feed_acquisition_count": 0,
+                        "missing_feed_acquisition_count": 0,
+                        "pre_replay_target_refs": ["AAPL"],
+                        "target_refs": ["AAPL"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
+            replay_run = replay_root / "replay_execution_runs" / "model_group_replay_fixture"
+            replay_run.mkdir(parents=True, exist_ok=True)
+            (replay_run / "option_feature_requirements.jsonl").write_text(
+                json.dumps(
+                    {
+                        "requirement_kind": "same_row_option_snapshot",
+                        "target_ref": "AAPL",
+                        "timestamp": "2021-01-05T16:00:00-05:00",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T09:20:00Z")
+
+        replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
+        self.assertEqual(replay_task["task_state"], "current")
+        self.assertEqual(replay_task["status"], "ready")
+        self.assertEqual(replay_task["detail"]["progress"]["ready_count"], 0)
+        self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)
+        self.assertIn("started and completed 0/2 replay months", replay_task["reason"])
+
     def test_task_timeline_shows_fixed_model_group_lifecycle_for_later_fold_blocked_by_lane(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
