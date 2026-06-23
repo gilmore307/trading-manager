@@ -5,6 +5,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import csv
 from pathlib import Path
 
 from trading_manager_tasks.model_group_replay_dataset import run_model_group_replay_dataset_if_ready
@@ -105,6 +106,20 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+
+    def _write_fixed_equity_universe(self, path: Path, symbols: list[str]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["symbol", "asset_class", "replay_candidate_status"])
+            writer.writeheader()
+            for symbol in symbols:
+                writer.writerow(
+                    {
+                        "symbol": symbol,
+                        "asset_class": "us_equity",
+                        "replay_candidate_status": "active",
+                    }
+                )
 
     def _write_prepare_script(self, path: Path, *, missing_count: int) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -320,6 +335,67 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_dataset_acquisition_required")
             self.assertEqual(decision.provider_calls, 0)
             self.assertNotIn("--execute", decision.command)
+
+    def test_frozen_dataset_with_missing_fixed_candidate_bars_requires_acquisition_gate(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_completed_fold(storage_root)
+            dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            dataset_root.mkdir(parents=True, exist_ok=True)
+            (dataset_root / "base_context.json").write_text(
+                json.dumps({"candidate_fold_id": "fold_2016-01_2016-06", "pre_replay_target_refs": ["AAPL"]}) + "\n",
+                encoding="utf-8",
+            )
+            (dataset_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "freeze_status": "frozen",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "missing_feed_acquisition_count": 0,
+                        "pre_replay_target_refs": ["AAPL"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (dataset_root / "replay_freeze_receipt.json").write_text(
+                json.dumps({"freeze_status": "frozen", "validation": {"validation_status": "passed"}}) + "\n",
+                encoding="utf-8",
+            )
+            (dataset_root / "feed_acquisition_plan.csv").write_text(
+                "acquisition_id,source_id,coverage_status,target_ref,feed,month,output_root,params_json\n",
+                encoding="utf-8",
+            )
+            (storage_root.parent / "01_source_data" / "monthly_backfill" / "alpaca_bars" / "AAPL").mkdir(parents=True)
+            fixed_universe = tmp / "historical_candidate_universe.csv"
+            self._write_fixed_equity_universe(fixed_universe, ["AAPL", "MSFT"])
+            contract_path = tmp / "replays" / "promotion_replay_candidate_policy.json"
+            self._write_contract(contract_path, base_context_ref=dataset_root / "base_context.json")
+
+            decision = run_model_group_replay_dataset_if_ready(
+                storage_root=storage_root,
+                contract_path=contract_path,
+                prepare_runner_path=self._write_prepare_script(tmp / "prepare.py", missing_count=0),
+                freeze_runner_path=self._write_freeze_script(tmp / "freeze.py"),
+                evaluation_repo_root=tmp,
+                python_executable=sys.executable,
+                source_data_root=storage_root.parent / "01_source_data",
+                candidate_universe_path=fixed_universe,
+                selected_target_symbol="AAPL",
+                execute_provider_acquisition=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_dataset_acquisition_required")
+            self.assertEqual(decision.execution_summary["fixed_candidate_coverage_gap"]["missing_equity_candidate_symbols_sample"], ["MSFT"])
+            self.assertIn("--include-fixed-candidate-alpaca-bars", decision.command)
+            self.assertIn(str(fixed_universe), decision.command)
 
 
 if __name__ == "__main__":

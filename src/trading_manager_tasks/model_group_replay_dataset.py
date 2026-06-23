@@ -22,8 +22,11 @@ from .model_group_replay import (
     DEFAULT_EVALUATION_REPO_ROOT,
     DEFAULT_PYTHON_EXECUTABLE,
     DEFAULT_REPLAY_CONTRACT_ID,
+    _candidate_universe_symbols,
+    _canonical_alpaca_source_symbols,
     _completed_training_fold,
     _dataset_is_frozen_and_complete,
+    _historical_candidate_universe_path,
     _load_json_object,
     _replay_dataset_root,
     _replay_dataset_scope_status,
@@ -56,6 +59,7 @@ def run_model_group_replay_dataset_if_ready(
     freeze_runner_path: Path = DEFAULT_FREEZE_RUNNER_PATH,
     acquisition_runner_path: Path = DEFAULT_ACQUISITION_RUNNER_PATH,
     source_data_root: Path = DEFAULT_SOURCE_DATA_ROOT,
+    candidate_universe_path: Path | None = None,
     selected_target_symbol: str | None = None,
     now_utc: datetime | None = None,
 ) -> SchedulerDecision | None:
@@ -73,9 +77,13 @@ def run_model_group_replay_dataset_if_ready(
     stale_dataset_scope = False
     stale_manifest = None
     stale_freeze_receipt = None
+    fixed_candidate_coverage_gap = _fixed_candidate_bar_coverage_gap(
+        storage_root=storage_root,
+        candidate_universe_path=candidate_universe_path,
+    )
     if manifest is not None and freeze_receipt is not None and _dataset_is_frozen_and_complete(manifest, freeze_receipt):
         replay_scope_status = _replay_dataset_scope_status(dataset_root=dataset_root, manifest=manifest, training_fold=training_fold)
-        if replay_scope_status["compatible"]:
+        if replay_scope_status["compatible"] and fixed_candidate_coverage_gap is None:
             return None
         stale_dataset_scope = True
         stale_manifest = manifest
@@ -185,6 +193,16 @@ def run_model_group_replay_dataset_if_ready(
             str(max(1, acquisition_limit)),
             "--stop-on-failure",
         ]
+        if fixed_candidate_coverage_gap is not None:
+            command.extend(
+                [
+                    "--include-fixed-candidate-alpaca-bars",
+                    "--candidate-universe-path",
+                    str(fixed_candidate_coverage_gap["candidate_universe_path"]),
+                    "--storage-source-root",
+                    str(source_data_root),
+                ]
+            )
         if execute_provider_acquisition:
             command.append("--execute")
         if not execute or not execute_provider_acquisition:
@@ -204,6 +222,7 @@ def run_model_group_replay_dataset_if_ready(
                     base_context_written=base_context_written,
                     manifest=manifest,
                     missing_feed_acquisition_count=missing_count,
+                    fixed_candidate_coverage_gap=fixed_candidate_coverage_gap,
                     required_next_step="enable autonomous replay dataset provider acquisition or run the acquisition command, then retry dataset freeze",
                 ),
             )
@@ -229,6 +248,7 @@ def run_model_group_replay_dataset_if_ready(
                     base_context_written=base_context_written,
                     manifest=manifest,
                     missing_feed_acquisition_count=missing_count,
+                    fixed_candidate_coverage_gap=fixed_candidate_coverage_gap,
                     provider_calls_performed=True,
                 ),
             )
@@ -258,6 +278,111 @@ def run_model_group_replay_dataset_if_ready(
                 base_context_path=base_context_path,
                 base_context_written=base_context_written,
                 manifest=refreshed_manifest,
+                fixed_candidate_coverage_gap=fixed_candidate_coverage_gap,
+                acquisition_stdout=completed.stdout,
+                acquisition_stderr=completed.stderr,
+                refreshed_preparation_return_code=refreshed.returncode,
+                provider_calls_performed=True,
+            ),
+        )
+
+    if fixed_candidate_coverage_gap is not None:
+        missing_count = int(fixed_candidate_coverage_gap["missing_equity_candidate_symbol_count"])
+        acquisition_limit = provider_acquisition_limit if provider_acquisition_limit is not None else missing_count
+        command = [
+            resolved_python,
+            str(acquisition_runner_path),
+            "--dataset-root",
+            str(dataset_root),
+            "--data-root",
+            str(trading_data_repo_root),
+            "--run-id",
+            "model_group_replay_dataset_acquisition_" + now.strftime("%Y%m%dT%H%M%SZ"),
+            "--include-fixed-candidate-alpaca-bars",
+            "--candidate-universe-path",
+            str(fixed_candidate_coverage_gap["candidate_universe_path"]),
+            "--storage-source-root",
+            str(source_data_root),
+            "--limit",
+            str(max(1, acquisition_limit)),
+            "--stop-on-failure",
+        ]
+        if execute_provider_acquisition:
+            command.append("--execute")
+        if not execute or not execute_provider_acquisition:
+            return _decision(
+                now=now,
+                decision_status="backoff",
+                reason_code="model_group_replay_dataset_acquisition_required",
+                reason="fixed historical candidate universe has missing Alpaca bar coverage for replay",
+                selected_work="model_group.replay_dataset_acquisition",
+                command=command,
+                provider_calls=0,
+                execution_summary=_summary(
+                    contract_id=contract_id,
+                    dataset_root=dataset_root,
+                    training_fold=training_fold,
+                    base_context_path=base_context_path,
+                    base_context_written=base_context_written,
+                    manifest=manifest,
+                    fixed_candidate_coverage_gap=fixed_candidate_coverage_gap,
+                    missing_feed_acquisition_count=missing_count,
+                    required_next_step="run the gated replay candidate Alpaca bars acquisition for the fixed historical candidate universe before dataset freeze",
+                ),
+            )
+        completed = _run(
+            command,
+            cwd=evaluation_repo_root,
+            pythonpath=[evaluation_repo_root / "src"],
+        )
+        if completed.returncode != 0:
+            return _subprocess_backoff(
+                now=now,
+                reason_code="model_group_replay_dataset_acquisition_failed",
+                reason="fixed-candidate replay dataset Alpaca bar acquisition failed",
+                selected_work="model_group.replay_dataset_acquisition",
+                command=command,
+                completed=completed,
+                provider_calls=1,
+                execution_summary=_summary(
+                    contract_id=contract_id,
+                    dataset_root=dataset_root,
+                    training_fold=training_fold,
+                    base_context_path=base_context_path,
+                    base_context_written=base_context_written,
+                    manifest=manifest,
+                    fixed_candidate_coverage_gap=fixed_candidate_coverage_gap,
+                    missing_feed_acquisition_count=missing_count,
+                    provider_calls_performed=True,
+                ),
+            )
+        refreshed = _refresh_preparation(
+            resolved_python=resolved_python,
+            prepare_runner_path=prepare_runner_path,
+            contract_path=contract_path,
+            base_context_path=base_context_path,
+            dataset_root=dataset_root,
+            source_data_root=source_data_root,
+            evaluation_repo_root=evaluation_repo_root,
+            training_fold=training_fold,
+        )
+        refreshed_manifest = _load_json_object(manifest_path) if manifest_path.exists() else manifest
+        return _decision(
+            now=now,
+            decision_status="executed",
+            reason_code="model_group_replay_dataset_acquisition_executed",
+            reason="executed fixed-candidate replay dataset Alpaca bar acquisition and refreshed preparation coverage",
+            selected_work="model_group.replay_dataset_acquisition",
+            command=command,
+            provider_calls=1,
+            execution_summary=_summary(
+                contract_id=contract_id,
+                dataset_root=dataset_root,
+                training_fold=training_fold,
+                base_context_path=base_context_path,
+                base_context_written=base_context_written,
+                manifest=refreshed_manifest,
+                fixed_candidate_coverage_gap=fixed_candidate_coverage_gap,
                 acquisition_stdout=completed.stdout,
                 acquisition_stderr=completed.stderr,
                 refreshed_preparation_return_code=refreshed.returncode,
@@ -463,6 +588,28 @@ def _summary(
         summary["freeze_receipt"] = dict(freeze_receipt)
     summary.update(extra)
     return summary
+
+
+def _fixed_candidate_bar_coverage_gap(
+    *,
+    storage_root: Path,
+    candidate_universe_path: Path | None,
+) -> dict[str, Any] | None:
+    resolved_candidate_universe_path = candidate_universe_path or _historical_candidate_universe_path(storage_root)
+    if not resolved_candidate_universe_path.exists():
+        return None
+    fixed_equity_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path, asset_class="us_equity")
+    materialized_equity_symbols = _canonical_alpaca_source_symbols(storage_root)
+    missing_symbols = tuple(sorted(fixed_equity_universe_symbols - materialized_equity_symbols))
+    if not missing_symbols:
+        return None
+    return {
+        "candidate_universe_path": str(resolved_candidate_universe_path),
+        "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
+        "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
+        "missing_equity_candidate_symbol_count": len(missing_symbols),
+        "missing_equity_candidate_symbols_sample": list(missing_symbols[:25]),
+    }
 
 
 def _base_context_path(*, contract: Mapping[str, Any], dataset_root: Path) -> Path:

@@ -2080,9 +2080,10 @@ def run_daemon_loop(
                                 row["worker_id"] = "replay_dataset_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                        replay_blocked_by_dataset_decision = replay_dataset_decision is not None
                         pending_replay_option_backoff = _pending_replay_option_feature_backoff_decision(storage_root=storage_root)
                         retry_replay_after_pending_option_drain = True
-                        if pending_replay_option_backoff is not None:
+                        if pending_replay_option_backoff is not None and not replay_blocked_by_dataset_decision:
                             replay_option_feature_decisions = _drain_replay_option_feature_backoff(
                                 pending_replay_option_backoff,
                                 storage_root=storage_root,
@@ -2131,7 +2132,7 @@ def run_daemon_loop(
                                 selected_target_symbol=selected_target_symbol,
                                 execute=execute_model_group_replay,
                             )
-                            if retry_replay_after_pending_option_drain
+                            if retry_replay_after_pending_option_drain and not replay_blocked_by_dataset_decision
                             else None
                         )
                         if replay_decision is not None:
@@ -2395,9 +2396,10 @@ def run_daemon_loop(
                                 row["worker_id"] = "replay_dataset_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
+                        replay_blocked_by_dataset_decision = replay_dataset_decision is not None
                         pending_replay_option_backoff = _pending_replay_option_feature_backoff_decision(storage_root=storage_root)
                         retry_replay_after_pending_option_drain = True
-                        if pending_replay_option_backoff is not None:
+                        if pending_replay_option_backoff is not None and not replay_blocked_by_dataset_decision:
                             replay_option_feature_decisions = _drain_replay_option_feature_backoff(
                                 pending_replay_option_backoff,
                                 storage_root=storage_root,
@@ -2438,7 +2440,7 @@ def run_daemon_loop(
                                 selected_target_symbol=selected_target_symbol,
                                 execute=execute_model_group_replay,
                             )
-                            if retry_replay_after_pending_option_drain
+                            if retry_replay_after_pending_option_drain and not replay_blocked_by_dataset_decision
                             else None
                         )
                         if replay_decision is not None:
