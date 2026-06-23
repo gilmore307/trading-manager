@@ -1590,6 +1590,79 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(state.end_month, "2016-06")
         handler.assert_not_called()
 
+    def test_replay_dataset_decision_blocks_same_cycle_replay(self):
+        no_month = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:00+00:00",
+            now_et="2026-05-27T20:00:00-04:00",
+            decision_status="ready",
+            reason_code="no_month_stage_ready",
+            reason="no month stage ready",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work=None,
+            command=[],
+            next_internal_stage="historical_training_work_loop",
+        )
+        replay_dataset = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:01+00:00",
+            now_et="2026-05-27T20:00:01-04:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_dataset_acquisition_required",
+            reason="fixed candidate bars missing",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay_dataset_acquisition",
+            command=[],
+            next_internal_stage="model_group_replay_dataset",
+        )
+        replay_backoff = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-05-28T00:00:02+00:00",
+            now_et="2026-05-27T20:00:02-04:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_candidate_bar_coverage_incomplete",
+            reason="candidate bars missing",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay",
+            command=[],
+            next_internal_stage="model_group_replay",
+        )
+
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            decision_log = tmp / "runtime" / "decisions.jsonl"
+            with (
+                patch("trading_manager_tasks.scheduler_daemon.run_scheduler_once", return_value=no_month),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_dataset_if_ready", return_value=replay_dataset),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_if_ready", return_value=replay_backoff) as replay,
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_review_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_residual_event_governance_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon.run_model_group_evaluation_if_ready", return_value=None),
+            ):
+                state = run_daemon_loop(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    storage_root=tmp / "manager-storage",
+                    component_src_root=self._fake_data_src(tmp),
+                    state_path=tmp / "runtime" / "state.json",
+                    lock_path=tmp / "runtime" / "scheduler.lock",
+                    decision_log_path=decision_log,
+                    interval_seconds=0,
+                    max_iterations=2,
+                    execute_safe_preparation=True,
+                    source_existing_bootstrap=False,
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                )
+
+            replay.assert_not_called()
+            log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual([row["reason_code"] for row in log_rows], ["no_month_stage_ready", "model_group_replay_dataset_acquisition_required"])
+        self.assertEqual(state.last_reason_code, "model_group_replay_dataset_acquisition_required")
+
     def test_month_ingest_workers_pause_when_target_has_open_model_worker_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
