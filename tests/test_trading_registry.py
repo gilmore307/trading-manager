@@ -415,7 +415,8 @@ class RegistryHelperTests(unittest.TestCase):
         selection_defaults = rows["EVALUATION_REPLAY_PORTFOLIO_SELECTION_DEFAULTS"]
         self.assertIn("portfolio_max_positions=5", selection_defaults["payload"])
         self.assertIn("portfolio_default_target_allocation_fraction=0.20", selection_defaults["payload"])
-        self.assertIn("portfolio_switch_minimum_rank_score_delta=0.05", selection_defaults["payload"])
+        self.assertIn("portfolio_switch_minimum_rank_score_delta=0.00001", selection_defaults["payload"])
+        self.assertIn("portfolio_switch_threshold_policy=score_scale_aware_absolute_rank_delta", selection_defaults["payload"])
         self.assertIn("run_replay_execution.py", selection_defaults["path"])
         self.assertIn("portfolio_replay_policy", selection_defaults["applies_to"])
         self.assertIn("target_allocation_fraction", selection_defaults["applies_to"])

@@ -1518,6 +1518,7 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
         and int(portfolio_policy.get("max_positions") or 0) == 5
         and str(portfolio_policy.get("position_sizing_policy") or "")
         == "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up"
+        and str(portfolio_policy.get("switch_threshold_policy") or "") == "score_scale_aware_absolute_rank_delta"
     )
 
 

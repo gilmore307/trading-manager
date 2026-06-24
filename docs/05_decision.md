@@ -111,6 +111,8 @@ Promotion review is not triggered when one model finishes a local check or one t
 
 The current run cycle is reusable foundation substrate, target substrate where needed, live-flow replay, replay review, M06 residual-event attribution, evaluation, and promotion/lifecycle handoff. Replay must simulate the frozen live component graph over the historical candidate pool with a fixed `25000.0` USD replay initial capital for equity-path diagnostics and return normalization; this is not broker/account state. Components may choose no target, one target, or a target combination. Replay review is the first post-replay task: it compares decisions against replay-derived missed/failure evidence and prepares component-funnel review rows before M06 performs event-risk attribution. Evaluation compares the pinned candidate bundle against accepted baselines after attribution evidence exists. Promotion acceptance is bundle-scoped: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently without an accepted component-local lifecycle contract.
 
+Equity/options replay uses five simultaneous risk slots by default, each based on a `0.20` model-owned target allocation fraction. Replay keeps scanning after cash or slots are committed and may replace the weakest held position when the new candidate is point-in-time executable, allocation-compatible, and clears the score-scale-aware switch threshold. Receipts using the old fixed `0.05` switch threshold are stale and not current replay evidence.
+
 ## D210 - Activity bridge non-overlap is mandatory
 
 Activity bridge evidence must prove one of these statuses before it can affect scoring or intervention:

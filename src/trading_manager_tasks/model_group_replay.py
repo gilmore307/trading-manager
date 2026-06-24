@@ -1282,6 +1282,11 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
                 "compatible": False,
                 "reason": "equity/options replay receipt missing current target-allocation-floor sizing policy",
             }
+        if str(portfolio_policy.get("switch_threshold_policy") or "") != "score_scale_aware_absolute_rank_delta":
+            return {
+                "compatible": False,
+                "reason": "equity/options replay receipt missing current score-scale-aware switch threshold policy",
+            }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
 
