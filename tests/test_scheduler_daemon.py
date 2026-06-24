@@ -41,6 +41,7 @@ from trading_manager_tasks.scheduler_daemon import (
     select_next_historical_work,
     update_state_from_error,
     write_daemon_state,
+    _decision_advances_progress,
     _run_model_worker_decision,
     _pending_replay_option_feature_backoff_decision,
     _run_replay_contract_path_requirement_handoff,
@@ -371,6 +372,43 @@ class SchedulerDaemonTests(unittest.TestCase):
 
                 self.assertIsNone(updated.last_stall_agent_error_ref)
                 handler.assert_not_called()
+
+    def test_incomplete_replay_option_feature_repair_with_work_advances_progress(self):
+        decision = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-06-24T18:13:31+00:00",
+            now_et="2026-06-24T14:13:31-04:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_option_feature_repair_incomplete",
+            reason="replay option-feature repair did not produce all required point-in-time feature rows",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay_option_features",
+            command=[],
+            next_internal_stage="model_group.replay_option_features",
+            provider_calls=12,
+            execution_summary={
+                "feature_generation": [{"status": "succeeded"}],
+                "option_source_unavailable_count": 0,
+                "post_repair_missing_count": 94,
+            },
+        )
+        waiting_backoff = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-06-24T18:13:31+00:00",
+            now_et="2026-06-24T14:13:31-04:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_option_source_acquisition_required",
+            reason="replay option features require historical option-chain source acquisition",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay_option_features",
+            command=[],
+            next_internal_stage="model_group.replay_option_features",
+        )
+
+        self.assertTrue(_decision_advances_progress(decision))
+        self.assertFalse(_decision_advances_progress(waiting_backoff))
 
     def test_replay_option_feature_failure_routes_server_error_agent(self):
         decision = SchedulerDecision(

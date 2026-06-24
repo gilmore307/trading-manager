@@ -1239,7 +1239,24 @@ def _parse_utc_iso(value: str | None) -> datetime | None:
 
 
 def _decision_advances_progress(decision: SchedulerDecision) -> bool:
-    return decision.decision_status == "executed"
+    if decision.decision_status == "executed":
+        return True
+    if (
+        decision.selected_work == "model_group.replay_option_features"
+        and decision.reason_code == "model_group_replay_option_feature_repair_incomplete"
+        and isinstance(decision.execution_summary, dict)
+    ):
+        feature_generation = decision.execution_summary.get("feature_generation")
+        try:
+            option_source_unavailable_count = int(decision.execution_summary.get("option_source_unavailable_count") or 0)
+        except (TypeError, ValueError):
+            option_source_unavailable_count = 0
+        return (
+            decision.provider_calls > 0
+            or bool(feature_generation)
+            or option_source_unavailable_count > 0
+        )
+    return False
 
 
 def load_daemon_state(
