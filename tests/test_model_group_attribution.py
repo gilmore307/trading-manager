@@ -183,6 +183,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                     "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                     "portfolio_replay_policy": {
                         "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                        "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
                     },
                     "decision_rows_ref": str(decision_rows_path),
                     "model_candidate_selection_trace_ref": str(trace_rows_path),

@@ -1257,6 +1257,14 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
                 "compatible": False,
                 "reason": "equity/options replay receipt missing current full-budget replacement policy",
             }
+        if (
+            str(portfolio_policy.get("residual_cash_replacement_policy") or "")
+            != "insufficient_cash_falls_through_to_replacement"
+        ):
+            return {
+                "compatible": False,
+                "reason": "equity/options replay receipt missing current residual-cash replacement policy",
+            }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
 

@@ -1511,6 +1511,8 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
         str(receipt.get("candidate_handoff_status") or "") == "available"
         and str(receipt.get("candidate_handoff_source") or "") in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
         and str(portfolio_policy.get("full_budget_replacement_policy") or "") == "continue_scanning_after_budget_full"
+        and str(portfolio_policy.get("residual_cash_replacement_policy") or "")
+        == "insufficient_cash_falls_through_to_replacement"
     )
 
 

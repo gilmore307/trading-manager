@@ -2384,16 +2384,37 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         or int(asset_class_counts.get("us_equity") or 0) > 0
         or int(asset_class_counts.get("us_option") or 0) > 0
     )
-    if has_equity_or_option_scope and (
-        str(replay_receipt.get("candidate_handoff_status") or "") != "available"
-        or str(replay_receipt.get("candidate_handoff_source") or "") not in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
-    ):
-        return {
-            "compatible": False,
-            "reason": "replay receipt did not use the canonical fixed historical candidate universe",
-            "candidate_model_ref": candidate_model_ref,
-            "receipt_target_refs": sorted(target_refs),
-        }
+    if has_equity_or_option_scope:
+        portfolio_policy = replay_receipt.get("portfolio_replay_policy")
+        if not isinstance(portfolio_policy, Mapping):
+            portfolio_policy = {}
+        if (
+            str(replay_receipt.get("candidate_handoff_status") or "") != "available"
+            or str(replay_receipt.get("candidate_handoff_source") or "") not in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
+        ):
+            return {
+                "compatible": False,
+                "reason": "replay receipt did not use the canonical fixed historical candidate universe",
+                "candidate_model_ref": candidate_model_ref,
+                "receipt_target_refs": sorted(target_refs),
+            }
+        if str(portfolio_policy.get("full_budget_replacement_policy") or "") != "continue_scanning_after_budget_full":
+            return {
+                "compatible": False,
+                "reason": "replay receipt did not use the current full-budget replacement policy",
+                "candidate_model_ref": candidate_model_ref,
+                "receipt_target_refs": sorted(target_refs),
+            }
+        if (
+            str(portfolio_policy.get("residual_cash_replacement_policy") or "")
+            != "insufficient_cash_falls_through_to_replacement"
+        ):
+            return {
+                "compatible": False,
+                "reason": "replay receipt did not use the current residual-cash replacement policy",
+                "candidate_model_ref": candidate_model_ref,
+                "receipt_target_refs": sorted(target_refs),
+            }
     if receipt_fold_id and training_fold_id and receipt_fold_id != training_fold_id:
         return {
             "compatible": False,

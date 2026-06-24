@@ -167,6 +167,10 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                    "portfolio_replay_policy": {
+                        "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                        "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                    },
                     "decision_rows_ref": str(decision_rows_path),
                 }
             )
