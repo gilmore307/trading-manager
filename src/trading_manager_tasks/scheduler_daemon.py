@@ -1721,7 +1721,24 @@ def _pending_replay_option_feature_backoff_decision(*, storage_root: Path) -> Sc
     )
     if artifact is None:
         return None
+    if _replay_option_feature_artifact_already_cleared(artifact, storage_root=storage_root):
+        return None
     return replay_option_feature_backoff_for_requirements_artifact(artifact)
+
+
+def _replay_option_feature_artifact_already_cleared(artifact: Path, *, storage_root: Path) -> bool:
+    latest_status_path = storage_root / "runtime" / "replay_option_feature_drain_latest.json"
+    if not latest_status_path.exists():
+        return False
+    try:
+        if latest_status_path.stat().st_mtime < artifact.stat().st_mtime:
+            return False
+        status = json.loads(latest_status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(status, dict):
+        return False
+    return str(status.get("reason_code") or "") == "model_group_replay_option_features_already_ready"
 
 
 def update_state_from_error(

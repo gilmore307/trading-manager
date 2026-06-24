@@ -42,6 +42,7 @@ from trading_manager_tasks.scheduler_daemon import (
     update_state_from_error,
     write_daemon_state,
     _run_model_worker_decision,
+    _pending_replay_option_feature_backoff_decision,
     _run_replay_review_data_requirement_handoff,
 )
 
@@ -2327,6 +2328,33 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(status_rows[0]["event"], "batch_complete")
         self.assertEqual(status_rows[0]["reason_code"], "model_group_replay_option_source_acquisition_required")
         self.assertEqual(latest_status["reason_code"], "model_group_replay_option_source_acquisition_required")
+
+    def test_cleared_pending_replay_option_requirements_are_not_reselected(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            artifact = (
+                storage_root.parent
+                / "05_replay_datasets"
+                / "promotion_replay_candidate_policy"
+                / "replay_execution_runs"
+                / "open_run"
+                / "option_feature_requirements.jsonl"
+            )
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text(
+                json.dumps({"target_ref": "AAPL", "timestamp": "2021-01-04T16:00:00-05:00"}) + "\n",
+                encoding="utf-8",
+            )
+            latest_status = storage_root / "runtime" / "replay_option_feature_drain_latest.json"
+            latest_status.parent.mkdir(parents=True, exist_ok=True)
+            latest_status.write_text(
+                json.dumps({"reason_code": "model_group_replay_option_features_already_ready"}) + "\n",
+                encoding="utf-8",
+            )
+
+            decision = _pending_replay_option_feature_backoff_decision(storage_root=storage_root)
+
+        self.assertIsNone(decision)
 
     def test_daemon_retries_replay_after_pending_option_feature_repair_executes(self):
         pending_backoff = SchedulerDecision(
