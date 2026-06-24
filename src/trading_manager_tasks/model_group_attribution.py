@@ -1504,9 +1504,13 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
     )
     if not has_equity_or_option_scope:
         return True
+    portfolio_policy = receipt.get("portfolio_replay_policy")
+    if not isinstance(portfolio_policy, MappingABC):
+        portfolio_policy = {}
     return (
         str(receipt.get("candidate_handoff_status") or "") == "available"
         and str(receipt.get("candidate_handoff_source") or "") in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
+        and str(portfolio_policy.get("full_budget_replacement_policy") or "") == "continue_scanning_after_budget_full"
     )
 
 

@@ -161,6 +161,9 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": candidate_source,
                     "candidate_handoff_symbols": candidate_symbols,
+                    "portfolio_replay_policy": {
+                        "full_budget_replacement_policy": "continue_scanning_after_budget_full"
+                    },
                     "initial_capital_usd": initial_capital_usd,
                     "initial_capital": {"amount": initial_capital_usd, "currency": "USD"},
                     "decision_row_count": 2,
@@ -218,6 +221,9 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                     "candidate_handoff_symbols": ["AAPL"],
+                    "portfolio_replay_policy": {
+                        "full_budget_replacement_policy": "continue_scanning_after_budget_full"
+                    },
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "decision_row_count": 1,
@@ -262,6 +268,9 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": candidate_handoff_source,
                     "candidate_handoff_symbols": ["AAPL"],
+                    "portfolio_replay_policy": {
+                        "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                    },
                     "max_decision_rows": None,
                     "replay_completion_scope": "full_candidate_universe",
                 }
@@ -451,6 +460,9 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "candidate_handoff_status": "available",
                         "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                         "candidate_handoff_symbols": ["AAPL"],
+                        "portfolio_replay_policy": {
+                            "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                        },
                         "decision_rows_ref": str(decision_rows_path),
                         "max_decision_rows": None,
                         "replay_completion_scope": "full_candidate_universe",

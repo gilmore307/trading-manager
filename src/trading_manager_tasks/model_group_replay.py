@@ -1241,6 +1241,9 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
     if has_equity_or_option_scope:
         candidate_handoff_status = str(replay_receipt.get("candidate_handoff_status") or "")
         candidate_handoff_source = str(replay_receipt.get("candidate_handoff_source") or "")
+        portfolio_policy = replay_receipt.get("portfolio_replay_policy")
+        if not isinstance(portfolio_policy, Mapping):
+            portfolio_policy = {}
         if (
             candidate_handoff_status != "available"
             or candidate_handoff_source not in CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
@@ -1248,6 +1251,11 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
             return {
                 "compatible": False,
                 "reason": "equity/options replay receipt missing canonical fixed historical candidate-universe evidence",
+            }
+        if str(portfolio_policy.get("full_budget_replacement_policy") or "") != "continue_scanning_after_budget_full":
+            return {
+                "compatible": False,
+                "reason": "equity/options replay receipt missing current full-budget replacement policy",
             }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
