@@ -409,11 +409,11 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("capital_selected_m05_count", trace_row["applies_to"])
         trace_defaults = rows["EVALUATION_REPLAY_PORTFOLIO_TRACE_AUDIT_DEFAULTS"]
         self.assertIn("max_trace_timestamps=20", trace_defaults["payload"])
-        self.assertIn("max_positions=0", trace_defaults["payload"])
+        self.assertIn("max_positions=5", trace_defaults["payload"])
         self.assertIn("default_target_allocation_fraction=0.20", trace_defaults["payload"])
         self.assertIn("target_allocation_fraction", trace_defaults["applies_to"])
         selection_defaults = rows["EVALUATION_REPLAY_PORTFOLIO_SELECTION_DEFAULTS"]
-        self.assertIn("portfolio_max_positions=0", selection_defaults["payload"])
+        self.assertIn("portfolio_max_positions=5", selection_defaults["payload"])
         self.assertIn("portfolio_default_target_allocation_fraction=0.20", selection_defaults["payload"])
         self.assertIn("portfolio_switch_minimum_rank_score_delta=0.05", selection_defaults["payload"])
         self.assertIn("run_replay_execution.py", selection_defaults["path"])

@@ -1513,6 +1513,9 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
         and str(portfolio_policy.get("full_budget_replacement_policy") or "") == "continue_scanning_after_budget_full"
         and str(portfolio_policy.get("residual_cash_replacement_policy") or "")
         == "insufficient_cash_falls_through_to_replacement"
+        and str(portfolio_policy.get("portfolio_capacity_policy") or "")
+        == "default_5_simultaneous_risk_slots_from_20pct_allocation"
+        and int(portfolio_policy.get("max_positions") or 0) == 5
     )
 
 

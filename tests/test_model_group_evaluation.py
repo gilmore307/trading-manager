@@ -170,6 +170,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "portfolio_replay_policy": {
                         "full_budget_replacement_policy": "continue_scanning_after_budget_full",
                         "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                        "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                        "max_positions": 5,
                     },
                     "decision_rows_ref": str(decision_rows_path),
                 }

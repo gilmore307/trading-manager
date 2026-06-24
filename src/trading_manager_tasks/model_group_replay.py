@@ -1265,6 +1265,15 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
                 "compatible": False,
                 "reason": "equity/options replay receipt missing current residual-cash replacement policy",
             }
+        if (
+            str(portfolio_policy.get("portfolio_capacity_policy") or "")
+            != "default_5_simultaneous_risk_slots_from_20pct_allocation"
+            or int(portfolio_policy.get("max_positions") or 0) != 5
+        ):
+            return {
+                "compatible": False,
+                "reason": "equity/options replay receipt missing current five-slot portfolio-capacity policy",
+            }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
 

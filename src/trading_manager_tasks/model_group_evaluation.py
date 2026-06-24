@@ -2415,6 +2415,17 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
                 "candidate_model_ref": candidate_model_ref,
                 "receipt_target_refs": sorted(target_refs),
             }
+        if (
+            str(portfolio_policy.get("portfolio_capacity_policy") or "")
+            != "default_5_simultaneous_risk_slots_from_20pct_allocation"
+            or int(portfolio_policy.get("max_positions") or 0) != 5
+        ):
+            return {
+                "compatible": False,
+                "reason": "replay receipt did not use the current five-slot portfolio-capacity policy",
+                "candidate_model_ref": candidate_model_ref,
+                "receipt_target_refs": sorted(target_refs),
+            }
     if receipt_fold_id and training_fold_id and receipt_fold_id != training_fold_id:
         return {
             "compatible": False,
