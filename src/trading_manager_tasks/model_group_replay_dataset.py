@@ -25,6 +25,7 @@ from .model_group_replay import (
     _candidate_universe_symbols,
     _canonical_alpaca_source_symbols,
     _completed_training_fold,
+    _csv_rows,
     _dataset_is_frozen_and_complete,
     _historical_candidate_universe_path,
     _load_json_object,
@@ -79,6 +80,7 @@ def run_model_group_replay_dataset_if_ready(
     stale_freeze_receipt = None
     fixed_candidate_coverage_gap = _fixed_candidate_bar_coverage_gap(
         storage_root=storage_root,
+        dataset_root=dataset_root,
         candidate_universe_path=candidate_universe_path,
     )
     if manifest is not None and freeze_receipt is not None and _dataset_is_frozen_and_complete(manifest, freeze_receipt):
@@ -287,7 +289,7 @@ def run_model_group_replay_dataset_if_ready(
         )
 
     if fixed_candidate_coverage_gap is not None:
-        missing_count = int(fixed_candidate_coverage_gap["missing_equity_candidate_symbol_count"])
+        missing_count = _fixed_candidate_missing_acquisition_count(fixed_candidate_coverage_gap)
         acquisition_limit = provider_acquisition_limit if provider_acquisition_limit is not None else missing_count
         command = [
             resolved_python,
@@ -593,12 +595,39 @@ def _summary(
 def _fixed_candidate_bar_coverage_gap(
     *,
     storage_root: Path,
+    dataset_root: Path,
     candidate_universe_path: Path | None,
 ) -> dict[str, Any] | None:
     resolved_candidate_universe_path = candidate_universe_path or _historical_candidate_universe_path(storage_root)
     if not resolved_candidate_universe_path.exists():
         return None
     fixed_equity_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path, asset_class="us_equity")
+    replay_months = _replay_plan_months(dataset_root)
+    if replay_months:
+        materialized_by_month = {
+            month: _canonical_alpaca_source_symbols(storage_root, replay_month=month)
+            for month in replay_months
+        }
+        missing_pairs = tuple(
+            (month, symbol)
+            for month in replay_months
+            for symbol in sorted(fixed_equity_universe_symbols - materialized_by_month[month])
+        )
+        if not missing_pairs:
+            return None
+        missing_symbols = tuple(sorted({symbol for _month, symbol in missing_pairs}))
+        return {
+            "candidate_universe_path": str(resolved_candidate_universe_path),
+            "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
+            "replay_month_count": len(replay_months),
+            "materialized_equity_candidate_symbol_count": len(fixed_equity_universe_symbols) - len(missing_symbols),
+            "missing_equity_candidate_symbol_count": len(missing_symbols),
+            "missing_equity_candidate_symbol_month_count": len(missing_pairs),
+            "missing_equity_candidate_symbols_sample": list(missing_symbols[:25]),
+            "missing_equity_candidate_symbol_months_sample": [
+                {"month": month, "symbol": symbol} for month, symbol in missing_pairs[:25]
+            ],
+        }
     materialized_equity_symbols = _canonical_alpaca_source_symbols(storage_root)
     missing_symbols = tuple(sorted(fixed_equity_universe_symbols - materialized_equity_symbols))
     if not missing_symbols:
@@ -610,6 +639,25 @@ def _fixed_candidate_bar_coverage_gap(
         "missing_equity_candidate_symbol_count": len(missing_symbols),
         "missing_equity_candidate_symbols_sample": list(missing_symbols[:25]),
     }
+
+
+def _fixed_candidate_missing_acquisition_count(fixed_candidate_coverage_gap: Mapping[str, Any]) -> int:
+    return max(
+        0,
+        _int_value(
+            fixed_candidate_coverage_gap.get("missing_equity_candidate_symbol_month_count")
+            or fixed_candidate_coverage_gap.get("missing_equity_candidate_symbol_count")
+        ),
+    )
+
+
+def _replay_plan_months(dataset_root: Path) -> tuple[str, ...]:
+    months: set[str] = set()
+    for row in _csv_rows(dataset_root / "feed_acquisition_plan.csv"):
+        month = str(row.get("month") or "").strip()
+        if len(month) == 7 and month[4] == "-":
+            months.add(month)
+    return tuple(sorted(months))
 
 
 def _base_context_path(*, contract: Mapping[str, Any], dataset_root: Path) -> Path:
