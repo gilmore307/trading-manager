@@ -206,7 +206,7 @@ def run_model_group_replay_if_ready(
                     "required_next_step": required_next_step,
                 },
             )
-    replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root)
+    replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root, replay_month=replay_month)
     default_candidate_universe_path = _historical_candidate_universe_path(storage_root)
     resolved_candidate_universe_path = candidate_universe_path or default_candidate_universe_path
     if not resolved_candidate_universe_path.exists():
@@ -251,7 +251,10 @@ def run_model_group_replay_if_ready(
         )
     fixed_candidate_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path)
     fixed_equity_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path, asset_class="us_equity")
-    materialized_equity_symbols = replay_plan_equity_symbols | _canonical_alpaca_source_symbols(storage_root)
+    materialized_equity_symbols = replay_plan_equity_symbols | _canonical_alpaca_source_symbols(
+        storage_root,
+        replay_month=replay_month,
+    )
     missing_equity_candidate_symbols = tuple(sorted(fixed_equity_universe_symbols - materialized_equity_symbols))
     initial_capital_usd = _validated_initial_capital_usd(initial_capital_usd)
     equity_pool_symbols = _replay_equity_symbols_from_fixed_universe(
@@ -687,16 +690,58 @@ def _target_candidate_handoff_symbols(path: Path, *, asset_class: str | None = N
     return symbols
 
 
-def _canonical_alpaca_source_symbols(storage_root: Path) -> set[str]:
+def _canonical_alpaca_source_symbols(storage_root: Path, *, replay_month: str | None = None) -> set[str]:
     trading_storage_root = storage_root.parent.parent
     source_root = trading_storage_root / "storage" / "01_source_data" / "monthly_backfill" / "alpaca_bars"
     if not source_root.exists():
         return set()
+    if replay_month:
+        symbols: set[str] = set()
+        for symbol_dir in source_root.iterdir():
+            symbol = symbol_dir.name.upper()
+            if not symbol_dir.is_dir() or not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
+                continue
+            month_dir = symbol_dir / replay_month
+            if not month_dir.exists():
+                continue
+            if _alpaca_month_source_ready(month_dir):
+                symbols.add(symbol)
+        return symbols
     return {
         path.name.upper()
         for path in source_root.iterdir()
         if path.is_dir() and re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", path.name.upper())
     }
+
+
+def _alpaca_month_source_ready(month_dir: Path) -> bool:
+    if (month_dir / "completion_receipt.json").exists() and _completion_receipt_succeeded(month_dir / "completion_receipt.json"):
+        return True
+    return any(month_dir.glob("runs/*/saved/equity_bar.csv"))
+
+
+def _completion_receipt_succeeded(path: Path) -> bool:
+    try:
+        payload = _load_json_object(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    status_values = {
+        str(payload.get("status") or "").strip().lower(),
+        str(payload.get("completion_status") or "").strip().lower(),
+        str(payload.get("source_status") or "").strip().lower(),
+        str(payload.get("request_status") or "").strip().lower(),
+    }
+    if status_values & {"succeeded", "success", "completed", "complete", "available", "no_data"}:
+        return True
+    runs = payload.get("runs")
+    if isinstance(runs, list):
+        return any(
+            isinstance(run, Mapping)
+            and str(run.get("status") or "").strip().lower()
+            in {"succeeded", "success", "completed", "complete", "available", "no_data"}
+            for run in runs
+        )
+    return False
 
 
 def _fixed_historical_candidate_symbols(path: Path, *, asset_class: str | None = None) -> set[str]:
@@ -746,10 +791,12 @@ def _replay_equity_symbols_from_fixed_universe(*, fixed_universe_symbols: set[st
     return tuple(symbols)
 
 
-def _replay_dataset_available_equity_symbols(dataset_root: Path) -> set[str]:
+def _replay_dataset_available_equity_symbols(dataset_root: Path, *, replay_month: str | None = None) -> set[str]:
     symbols: set[str] = set()
     for row in _csv_rows(dataset_root / "feed_acquisition_plan.csv"):
         if str(row.get("source_id") or "").strip() != "alpaca_bars":
+            continue
+        if replay_month and str(row.get("month") or "").strip() != replay_month:
             continue
         if str(row.get("coverage_status") or "").strip().lower() not in {"available", "succeeded", "complete", "completed"}:
             continue

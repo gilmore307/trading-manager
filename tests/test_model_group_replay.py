@@ -62,6 +62,8 @@ class ModelGroupReplayTests(unittest.TestCase):
             / "AAPL"
             / "2016-01"
         ).mkdir(parents=True, exist_ok=True)
+        self._write_alpaca_month_source(storage_root, "AAPL", "2021-01")
+        self._write_alpaca_month_source(storage_root, "AAPL", "2021-02")
         target_candidates_path = (
             storage_root
             / "runtime"
@@ -230,6 +232,22 @@ class ModelGroupReplayTests(unittest.TestCase):
             for symbol in symbols:
                 asset_class = "crypto_spot" if symbol in {"BTC", "ETH", "SOL"} else "us_equity"
                 writer.writerow({"symbol": symbol, "asset_class": asset_class, "replay_candidate_status": "active", "freeze_as_of_date": freeze_as_of_date})
+
+    def _write_alpaca_month_source(self, storage_root: Path, symbol: str, month: str, *, status: str = "succeeded") -> None:
+        month_dir = (
+            storage_root.parent.parent
+            / "storage"
+            / "01_source_data"
+            / "monthly_backfill"
+            / "alpaca_bars"
+            / symbol
+            / month
+        )
+        month_dir.mkdir(parents=True, exist_ok=True)
+        (month_dir / "completion_receipt.json").write_text(
+            json.dumps({"contract_type": "source_completion_receipt", "runs": [{"status": status}]}) + "\n",
+            encoding="utf-8",
+        )
 
     def test_runs_replay_when_fold_and_frozen_dataset_are_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -601,6 +619,35 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_candidate_bar_coverage_incomplete")
             self.assertEqual(decision.execution_summary["missing_equity_candidate_symbol_count"], 1)
+            self.assertEqual(decision.execution_summary["missing_equity_candidate_symbols_sample"], ["MSFT"])
+
+    def test_plan_blocks_when_symbol_only_has_non_replay_month_bars(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            fixed_universe = tmp / "historical_candidate_universe.csv"
+            self._write_fixed_equity_universe(fixed_universe, ["AAPL", "MSFT"])
+            self._write_alpaca_month_source(storage_root, "MSFT", "2021-03")
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                candidate_universe_path=fixed_universe,
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_candidate_bar_coverage_incomplete")
+            self.assertEqual(decision.execution_summary["replay_month"], "2021-01")
             self.assertEqual(decision.execution_summary["missing_equity_candidate_symbols_sample"], ["MSFT"])
 
     def test_execution_blocks_current_day_candidate_universe_before_post_close_ready_time(self):

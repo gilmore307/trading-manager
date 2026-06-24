@@ -1623,6 +1623,10 @@ def _replay_option_feature_drain_allows_replay_retry(decisions: Sequence[Schedul
     return "continue replay option feature drain" not in required_next_step
 
 
+def _replay_decision_requires_option_feature_drain(decision: SchedulerDecision) -> bool:
+    return decision.reason_code == "model_group_replay_option_feature_acquisition_required"
+
+
 def _drain_replay_option_feature_backoff(
     replay_decision: SchedulerDecision,
     *,
@@ -2155,18 +2159,22 @@ def run_daemon_loop(
                                 row["worker_id"] = "evaluation_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                            replay_option_feature_decisions = _drain_replay_option_feature_backoff(
-                                replay_decision,
-                                storage_root=storage_root,
-                                selected_target_symbol=selected_target_symbol,
-                                execute=execute_model_group_replay,
-                                execute_provider_acquisition=execute_autonomous_provider_stages,
-                                provider_acquisition_limit=provider_stage_next_limit,
-                                feature_repair_limit=replay_option_feature_repair_limit,
-                                max_steps=drain_max_steps,
-                                max_seconds=drain_max_seconds,
-                                status_jsonl_path=replay_option_feature_drain_status_jsonl_path,
-                                latest_status_json_path=replay_option_feature_drain_latest_json_path,
+                            replay_option_feature_decisions = (
+                                _drain_replay_option_feature_backoff(
+                                    replay_decision,
+                                    storage_root=storage_root,
+                                    selected_target_symbol=selected_target_symbol,
+                                    execute=execute_model_group_replay,
+                                    execute_provider_acquisition=execute_autonomous_provider_stages,
+                                    provider_acquisition_limit=provider_stage_next_limit,
+                                    feature_repair_limit=replay_option_feature_repair_limit,
+                                    max_steps=drain_max_steps,
+                                    max_seconds=drain_max_seconds,
+                                    status_jsonl_path=replay_option_feature_drain_status_jsonl_path,
+                                    latest_status_json_path=replay_option_feature_drain_latest_json_path,
+                                )
+                                if _replay_decision_requires_option_feature_drain(replay_decision)
+                                else []
                             )
                             for replay_option_feature_decision in replay_option_feature_decisions:
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
@@ -2455,18 +2463,22 @@ def run_daemon_loop(
                                 row["worker_id"] = "evaluation_worker_1"
                                 output.write(json.dumps(row, sort_keys=True) + "\n")
                                 output.flush()
-                            replay_option_feature_decisions = _drain_replay_option_feature_backoff(
-                                replay_decision,
-                                storage_root=storage_root,
-                                selected_target_symbol=selected_target_symbol,
-                                execute=execute_model_group_replay,
-                                execute_provider_acquisition=execute_autonomous_provider_stages,
-                                provider_acquisition_limit=provider_stage_next_limit,
-                                feature_repair_limit=replay_option_feature_repair_limit,
-                                max_steps=drain_max_steps,
-                                max_seconds=drain_max_seconds,
-                                status_jsonl_path=replay_option_feature_drain_status_jsonl_path,
-                                latest_status_json_path=replay_option_feature_drain_latest_json_path,
+                            replay_option_feature_decisions = (
+                                _drain_replay_option_feature_backoff(
+                                    replay_decision,
+                                    storage_root=storage_root,
+                                    selected_target_symbol=selected_target_symbol,
+                                    execute=execute_model_group_replay,
+                                    execute_provider_acquisition=execute_autonomous_provider_stages,
+                                    provider_acquisition_limit=provider_stage_next_limit,
+                                    feature_repair_limit=replay_option_feature_repair_limit,
+                                    max_steps=drain_max_steps,
+                                    max_seconds=drain_max_seconds,
+                                    status_jsonl_path=replay_option_feature_drain_status_jsonl_path,
+                                    latest_status_json_path=replay_option_feature_drain_latest_json_path,
+                                )
+                                if _replay_decision_requires_option_feature_drain(replay_decision)
+                                else []
                             )
                             for replay_option_feature_decision in replay_option_feature_decisions:
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
