@@ -16,7 +16,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -233,7 +233,7 @@ def write_selected_contract_path_task_key(
             "allowed_providers": ["thetadata"],
             "allowed_endpoint_families": ["option_primary_tracking"],
             "max_symbols": len({item.option_symbol for item in requirements}),
-            "max_requests": len(requirements),
+            "max_requests": _provider_request_budget(requirements),
             "max_time_window": "7d",
             "timeout_seconds": 120,
             "retry_attempts": 3,
@@ -246,6 +246,27 @@ def write_selected_contract_path_task_key(
     task_key_path = task_root / "task_key.json"
     task_key_path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return task_key_path
+
+
+def _provider_request_budget(requirements: Sequence[ReplayContractPathRequirement]) -> int:
+    """Match the option tracking feed's per-date request granularity."""
+
+    total = 0
+    for item in requirements:
+        try:
+            start = datetime.fromisoformat(item.entry_time.replace("Z", "+00:00"))
+            end = datetime.fromisoformat(item.exit_time.replace("Z", "+00:00")) + timedelta(hours=1)
+        except ValueError:
+            total += 1
+            continue
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=NEW_YORK)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=NEW_YORK)
+        start_date = start.astimezone(NEW_YORK).date()
+        end_date = end.astimezone(NEW_YORK).date()
+        total += max((end_date - start_date).days + 1, 1)
+    return total
 
 
 def _parse_option_symbol(option_symbol: str, *, fallback_underlying: str) -> dict[str, Any] | None:

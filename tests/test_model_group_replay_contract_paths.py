@@ -85,6 +85,7 @@ class ModelGroupReplayContractPathsTests(unittest.TestCase):
         self.assertTrue(task_key["manager_controls"]["allow_live_provider_calls"])
         self.assertTrue(task_key["manager_controls"]["autonomous_historical_provider_acquisition"])
         self.assertEqual(task_key["manager_controls"]["allowed_endpoint_families"], ["option_primary_tracking"])
+        self.assertEqual(task_key["manager_controls"]["max_requests"], 2)
         self.assertFalse(task_key["manager_controls"]["broker_execution_performed"])
         self.assertFalse(task_key["manager_controls"]["model_activation_performed"])
 
