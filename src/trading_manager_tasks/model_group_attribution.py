@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
+from .model_group_layer_attribution import build_model_group_layer_attribution
 from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
@@ -35,22 +36,35 @@ def run_model_group_replay_review_if_ready(
     *,
     storage_root: Path = DEFAULT_STORAGE_ROOT,
     contract_id: str = DEFAULT_REPLAY_CONTRACT_ID,
+    replay_execution_run_id: str | None = None,
     execute: bool = True,
     python_executable: str = sys.executable,
     max_review_rows: int | None = None,
     now_utc: datetime | None = None,
     force: bool = False,
+    allow_partial_replay: bool = False,
 ) -> SchedulerDecision | None:
     """Run one replay review task when replay is complete."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
-    replay_receipt = _latest_replay_execution_receipt(dataset_root)
+    replay_receipt = _latest_replay_execution_receipt(dataset_root, replay_execution_run_id=replay_execution_run_id)
     if replay_receipt is None:
         return None
     expected_months = _expected_replay_months(dataset_root)
     replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "")
     ready_months = _ready_replay_months(dataset_root, replay_run_id=replay_run_id)
-    if expected_months > 0 and len(ready_months) < expected_months:
+    replay_complete = expected_months <= 0 or len(ready_months) >= expected_months
+    if not replay_complete and not allow_partial_replay:
+        return None
+    if not replay_complete:
+        replay_month = str(replay_receipt.get("replay_month") or "").strip()
+        if not ready_months or (replay_month and replay_month not in ready_months):
+            return None
+        if max_review_rows is not None:
+            return None
+        if not force:
+            return None
+    if expected_months > 0 and len(ready_months) < expected_months and not allow_partial_replay:
         return None
     decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
     if not decision_rows_path.exists():
@@ -68,8 +82,12 @@ def run_model_group_replay_review_if_ready(
         "--storage-root",
         str(storage_root),
     ]
+    if replay_execution_run_id:
+        command.extend(["--replay-execution-run-id", replay_execution_run_id])
     if max_review_rows is not None:
         command.extend(["--max-review-rows", str(max_review_rows)])
+    if allow_partial_replay:
+        command.append("--allow-partial-replay")
     requirements = tuple(_review_data_requirements(decision_rows_path, max_rows=max_review_rows))
     if requirements:
         requirements_root = dataset_root / "post_replay_review_requirements" / run_id
@@ -99,6 +117,8 @@ def run_model_group_replay_review_if_ready(
     output_root = dataset_root / "post_replay_review_runs" / run_id
     review_rows_path = output_root / "replay_review_rows.jsonl"
     receipt_path = output_root / "post_replay_review_receipt.json"
+    performance_summary_path = output_root / "replay_review_performance_summary.json"
+    layer_attribution_root = output_root / "layer_attribution"
 
     if not execute:
         return _decision(
@@ -117,8 +137,28 @@ def run_model_group_replay_review_if_ready(
         )
 
     review_rows = tuple(_build_review_rows(decision_rows_path, max_rows=max_review_rows))
+    decision_rows = tuple(_load_jsonl_objects(decision_rows_path))
+    replay_receipt_path = (
+        dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json"
+        if replay_run_id
+        else None
+    )
+    model_candidate_selection_trace_path = _model_candidate_selection_trace_path(replay_receipt, dataset_root=dataset_root)
+    trace_rows = (
+        tuple(_load_jsonl_objects(model_candidate_selection_trace_path))
+        if model_candidate_selection_trace_path is not None
+        else ()
+    )
+    performance_summary = _replay_review_performance_summary(
+        decision_rows=decision_rows,
+        trace_rows=trace_rows,
+        replay_receipt=replay_receipt,
+    )
     review_summary = _review_diagnostic_summary(review_rows)
-    completion_scope = "bounded_diagnostic" if max_review_rows is not None else "full_replay_review"
+    if replay_complete:
+        completion_scope = "bounded_diagnostic" if max_review_rows is not None else "full_replay_review"
+    else:
+        completion_scope = "completed_replay_run_diagnostic"
     lock_ref = SchedulerLockRef(
         contract_type="scheduler_lock",
         lock_scope="promotion",
@@ -130,6 +170,22 @@ def run_model_group_replay_review_if_ready(
     with acquire_scheduler_lock(lock_ref):
         output_root.mkdir(parents=True, exist_ok=True)
         _write_jsonl(review_rows_path, review_rows)
+        performance_summary_path.write_text(
+            json.dumps(performance_summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        layer_attribution_report = build_model_group_layer_attribution(
+            decision_rows_path=decision_rows_path,
+            output_dir=layer_attribution_root,
+            replay_receipt_path=(
+                replay_receipt_path
+                if replay_receipt_path is not None and replay_receipt_path.exists()
+                else None
+            ),
+            model_candidate_selection_trace_path=model_candidate_selection_trace_path,
+            run_id=f"{run_id}_layer_attribution",
+            now_utc=now,
+        )
         receipt = {
             "contract_type": REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE,
             "status": "succeeded",
@@ -145,6 +201,22 @@ def run_model_group_replay_review_if_ready(
             if replay_run_id
             else None,
             "review_rows_ref": str(review_rows_path),
+            "replay_review_performance_summary_ref": str(performance_summary_path),
+            "replay_review_performance_summary": performance_summary["summary"],
+            "layer_attribution_report_ref": str(layer_attribution_root / "layer_attribution_report.json"),
+            "layer_attribution_summary": {
+                "row_scope": layer_attribution_report.get("row_scope"),
+                "model_candidate_selection_summary": layer_attribution_report.get("model_candidate_selection_summary"),
+                "pre_option_candidate_quality_summary": layer_attribution_report.get(
+                    "pre_option_candidate_quality_summary"
+                ),
+                "operation_component_metrics_summary": layer_attribution_report.get(
+                    "operation_component_metrics_summary"
+                ),
+                "operation_mechanism_contract_packet_summary": layer_attribution_report.get(
+                    "operation_mechanism_contract_packet_summary"
+                ),
+            },
             "replay_review_completion_scope": completion_scope,
             "max_review_rows": max_review_rows,
             "expected_review_count": len(review_rows),
@@ -179,6 +251,22 @@ def run_model_group_replay_review_if_ready(
             "post_replay_review_receipt": str(receipt_path),
             "review_rows_ref": str(review_rows_path),
             "reviewed_failure_count": len(review_rows),
+            "replay_review_performance_summary_ref": str(performance_summary_path),
+            "replay_review_performance_summary": performance_summary["summary"],
+            "layer_attribution_report_ref": str(layer_attribution_root / "layer_attribution_report.json"),
+            "layer_attribution_summary": {
+                "row_scope": layer_attribution_report.get("row_scope"),
+                "model_candidate_selection_summary": layer_attribution_report.get("model_candidate_selection_summary"),
+                "pre_option_candidate_quality_summary": layer_attribution_report.get(
+                    "pre_option_candidate_quality_summary"
+                ),
+                "operation_component_metrics_summary": layer_attribution_report.get(
+                    "operation_component_metrics_summary"
+                ),
+                "operation_mechanism_contract_packet_summary": layer_attribution_report.get(
+                    "operation_mechanism_contract_packet_summary"
+                ),
+            },
             "replay_review_completion_scope": completion_scope,
             "max_review_rows": max_review_rows,
             "replay_review_diagnostic_summary": review_summary,
@@ -491,6 +579,265 @@ def _review_diagnostic_summary(review_rows: Iterable[Mapping[str, Any]]) -> dict
         "miss_attribution_layer_counts": _count_text(row.get("miss_attribution_layer") for row in rows),
         "top_regret_rows": _top_regret_rows(rows, limit=5),
     }
+
+
+def _replay_review_performance_summary(
+    *,
+    decision_rows: Iterable[Mapping[str, Any]],
+    trace_rows: Iterable[Mapping[str, Any]],
+    replay_receipt: Mapping[str, Any],
+) -> dict[str, Any]:
+    decisions = list(decision_rows)
+    traces = list(trace_rows)
+    filled = [row for row in decisions if str(row.get("fill_status") or "") == "simulated_filled"]
+    returns = [_safe_float(row.get("realized_return")) for row in filled]
+    material_returns = [value for value in returns if value is not None]
+    notional_by_row = [_safe_float(row.get("planned_position_notional_usd")) for row in filled]
+    pnl_values = [
+        notional * realized
+        for notional, realized in zip(notional_by_row, returns)
+        if notional is not None and realized is not None
+    ]
+    selected_trace_rows = [row for row in traces if _truthy(row.get("selected_by_replay"))]
+    unexecutable_trace_rows = [
+        row for row in traces if str(row.get("model_candidate_trace_status") or "") == "option_expression_unexecutable"
+    ]
+    executable_trace_rows = [
+        row
+        for row in traces
+        if str(row.get("model_candidate_trace_status") or "") in {"selected_by_replay", "scored_not_selected_by_portfolio"}
+    ]
+    selected_ranks = [_safe_float(row.get("model_rank_within_timestamp")) for row in selected_trace_rows]
+    selected_rank_values = [int(value) for value in selected_ranks if value is not None]
+    selected_timestamps = [_decision_time(row) for row in filled]
+    selected_timestamp_counts = _count_text(value for value in selected_timestamps if value)
+    path_status_counts = _count_text(row.get("option_contract_path_status") for row in decisions)
+    expression_type_counts = _count_text(
+        row.get("selected_option_expression_type") or row.get("decision_expression_type") for row in decisions
+    )
+    option_route_counts = _count_text(row.get("asset_expression_route") for row in decisions)
+    target_rows = _target_performance_rows(filled)
+    decision_scope = {
+        "decision_row_count": len(decisions),
+        "filled_count": len(filled),
+        "decision_status_counts": _count_text(row.get("decision_status") for row in decisions),
+        "fill_status_counts": _count_text(row.get("fill_status") for row in decisions),
+        "selected_target_count": len({str(row.get("target_ref") or _target_symbol(row) or "") for row in filled}),
+        "selected_timestamp_count": len(selected_timestamp_counts),
+        "selected_timestamp_counts": selected_timestamp_counts,
+        "selection_concentration_status": (
+            "single_timestamp_batch"
+            if len(selected_timestamp_counts) == 1 and len(filled) > 1
+            else "multi_timestamp_or_single_decision"
+        ),
+    }
+    target_performance = {
+        "filled_target_count": len(filled),
+        "positive_return_count": sum(1 for value in material_returns if value > 0),
+        "negative_return_count": sum(1 for value in material_returns if value < 0),
+        "flat_return_count": sum(1 for value in material_returns if value == 0),
+        "mean_realized_return": _round_metric_nullable(_mean_float(material_returns)),
+        "median_realized_return": _round_metric_nullable(_median_float(material_returns)),
+        "min_realized_return": _round_metric_nullable(min(material_returns)) if material_returns else None,
+        "max_realized_return": _round_metric_nullable(max(material_returns)) if material_returns else None,
+        "planned_notional_total": _round_metric_nullable(sum(value for value in notional_by_row if value is not None)),
+        "gross_pnl_total": _round_metric_nullable(sum(pnl_values)),
+        "gross_return_on_used_notional": _round_metric_nullable(
+            sum(pnl_values) / sum(value for value in notional_by_row if value is not None)
+        )
+        if sum(value for value in notional_by_row if value is not None) > 0
+        else None,
+        "top_target_returns": target_rows[:10],
+        "worst_target_returns": list(reversed(target_rows[-10:])),
+    }
+    stock_selection = {
+        "trace_available": bool(traces),
+        "scored_candidate_row_count": len([row for row in traces if _truthy(row.get("model_score_available"))]),
+        "trace_target_count": len({str(row.get("target_ref") or "") for row in traces if str(row.get("target_ref") or "")}),
+        "selected_trace_row_count": len(selected_trace_rows),
+        "selected_rank_mean_same_timestamp": _round_metric_nullable(_mean_float(selected_rank_values)),
+        "selected_top_10_count": sum(1 for rank in selected_rank_values if rank <= 10),
+        "selected_top_25_count": sum(1 for rank in selected_rank_values if rank <= 25),
+        "selected_outside_top_25_count": sum(1 for rank in selected_rank_values if rank > 25),
+        "candidate_trace_status_counts": _count_text(row.get("model_candidate_trace_status") for row in traces),
+    }
+    option_expression = {
+        "selected_option_decision_count": sum(
+            1 for row in decisions if _first_text(row, ("selected_option_contract_ref", "selected_contract_ref"))
+        ),
+        "path_status_counts": path_status_counts,
+        "expression_type_counts": expression_type_counts,
+        "option_route_counts": option_route_counts,
+        "trace_entry_intent_count": sum(1 for row in traces if _truthy(row.get("option_expression_signal_required"))),
+        "trace_executable_entry_intent_count": len(executable_trace_rows),
+        "trace_unexecutable_entry_intent_count": len(unexecutable_trace_rows),
+        "trace_unexecutable_reason_counts": _count_text(
+            row.get("option_expression_unexecutable_reason") for row in unexecutable_trace_rows
+        ),
+        "selected_candidate_count_before_filter_mean": _round_metric_nullable(
+            _mean_float(
+                _safe_float(row.get("candidate_count_before_filter"))
+                for row in selected_trace_rows
+            )
+        ),
+        "selected_candidate_count_after_filter_mean": _round_metric_nullable(
+            _mean_float(
+                _safe_float(row.get("candidate_count_after_filter"))
+                for row in selected_trace_rows
+            )
+        ),
+        "selected_eligible_candidate_count_mean": _round_metric_nullable(
+            _mean_float(
+                _safe_float(row.get("eligible_candidate_count"))
+                for row in selected_trace_rows
+            )
+        ),
+    }
+    return {
+        "contract_type": "model_group_replay_review_performance_summary",
+        "summary_role": "post_replay_layered_review_summary_not_training_or_threshold_input",
+        "summary": {
+            "decision_scope": decision_scope,
+            "target_performance": {
+                key: value
+                for key, value in target_performance.items()
+                if key not in {"top_target_returns", "worst_target_returns"}
+            },
+            "stock_selection": stock_selection,
+            "option_expression": option_expression,
+        },
+        "decision_scope": decision_scope,
+        "target_performance": target_performance,
+        "stock_selection": stock_selection,
+        "option_expression": option_expression,
+        "layer_differentiation": _layer_differentiation_summary(decisions),
+        "source_refs": {
+            "decision_rows_ref": str(replay_receipt.get("decision_rows_ref") or ""),
+            "model_candidate_selection_trace_ref": str(replay_receipt.get("model_candidate_selection_trace_ref") or ""),
+            "replay_execution_run_id": str(replay_receipt.get("replay_execution_run_id") or ""),
+        },
+        "forbidden_uses": [
+            "training_feature_input",
+            "threshold_selection",
+            "promotion_approval",
+            "model_activation",
+            "broker_or_account_authority",
+        ],
+    }
+
+
+def _target_performance_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        realized_return = _safe_float(row.get("realized_return"))
+        notional = _safe_float(row.get("planned_position_notional_usd"))
+        pnl = notional * realized_return if notional is not None and realized_return is not None else None
+        output.append(
+            {
+                "target_ref": str(row.get("target_ref") or _target_symbol(row) or ""),
+                "instrument_ref": str(row.get("instrument_ref") or row.get("selected_option_contract_ref") or ""),
+                "timestamp": _decision_time(row),
+                "realized_return": _round_metric_nullable(realized_return),
+                "planned_position_notional_usd": _round_metric_nullable(notional),
+                "gross_pnl_usd": _round_metric_nullable(pnl),
+                "prediction_score": _round_metric_nullable(_safe_float(row.get("prediction_score"))),
+                "selected_option_contract_ref": _first_text(row, ("selected_option_contract_ref", "selected_contract_ref")),
+                "selected_option_expression_type": _first_text(
+                    row,
+                    ("selected_option_expression_type", "decision_expression_type"),
+                ),
+                "option_contract_path_status": str(row.get("option_contract_path_status") or ""),
+            }
+        )
+    output.sort(key=lambda item: (item["realized_return"] is None, item["realized_return"] or 0.0), reverse=True)
+    return output
+
+
+def _layer_differentiation_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    decisions = list(rows)
+    diagnostics_by_layer: dict[str, list[Mapping[str, Any]]] = {
+        "model_01_background_context": [],
+        "model_02_target_state": [],
+        "model_03_event_state": [],
+        "model_04_unified_decision": [],
+        "model_05_option_expression": [],
+        "model_06_residual_event_governance": [],
+    }
+    for row in decisions:
+        diagnostics = row.get("model_layer_diagnostics")
+        if not isinstance(diagnostics, MappingABC):
+            continue
+        for layer in diagnostics_by_layer:
+            value = diagnostics.get(layer)
+            if isinstance(value, MappingABC):
+                diagnostics_by_layer[layer].append(value)
+    return {
+        layer: _diagnostic_variation_summary(items)
+        for layer, items in diagnostics_by_layer.items()
+    }
+
+
+def _diagnostic_variation_summary(items: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    rows = list(items)
+    scalar_keys: set[str] = set()
+    for row in rows:
+        for key, value in row.items():
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                scalar_keys.add(str(key))
+    varying_keys = []
+    constant_keys = []
+    for key in sorted(scalar_keys):
+        values = {json.dumps(row.get(key), sort_keys=True) for row in rows}
+        if len(values) > 1:
+            varying_keys.append(key)
+        elif values:
+            constant_keys.append(key)
+    return {
+        "row_count": len(rows),
+        "scalar_key_count": len(scalar_keys),
+        "varying_scalar_keys": varying_keys,
+        "constant_scalar_key_count": len(constant_keys),
+        "differentiation_status": "has_target_or_time_variation" if varying_keys else ("constant_or_missing" if rows else "missing"),
+    }
+
+
+def _model_candidate_selection_trace_path(replay_receipt: Mapping[str, Any], *, dataset_root: Path) -> Path | None:
+    explicit = str(replay_receipt.get("model_candidate_selection_trace_ref") or "").strip()
+    if explicit:
+        path = Path(explicit)
+        return path if path.exists() else None
+    replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "").strip()
+    if not replay_run_id:
+        return None
+    path = dataset_root / "replay_execution_runs" / replay_run_id / "model_candidate_selection_trace.jsonl"
+    return path if path.exists() else None
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _mean_float(values: Iterable[Any]) -> float | None:
+    material = [float(value) for value in values if value is not None]
+    if not material:
+        return None
+    return sum(material) / len(material)
+
+
+def _median_float(values: Iterable[Any]) -> float | None:
+    material = sorted(float(value) for value in values if value is not None)
+    if not material:
+        return None
+    midpoint = len(material) // 2
+    if len(material) % 2:
+        return material[midpoint]
+    return (material[midpoint - 1] + material[midpoint]) / 2
+
+
+def _round_metric_nullable(value: float | None) -> float | None:
+    return None if value is None else _round_metric(float(value))
 
 
 def _count_text(values: Iterable[Any]) -> dict[str, int]:
@@ -1016,10 +1363,24 @@ def _replay_row_needs_attribution(row: Mapping[str, Any]) -> bool:
     )
 
 
-def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | None:
+def _latest_replay_execution_receipt(
+    dataset_root: Path,
+    *,
+    replay_execution_run_id: str | None = None,
+) -> dict[str, Any] | None:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
         return None
+    if replay_execution_run_id:
+        receipt_path = replay_root / replay_execution_run_id / "replay_execution_receipt.json"
+        receipt = _load_optional_json_object(receipt_path)
+        if receipt is None:
+            return None
+        if not _replay_receipt_full_completion_scope(receipt):
+            return None
+        if not _replay_receipt_uses_current_candidate_handoff(receipt):
+            return None
+        return dict(receipt)
     candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
     for receipt_path in sorted(replay_root.glob("*/replay_execution_receipt.json")):
         receipt = _load_optional_json_object(receipt_path)

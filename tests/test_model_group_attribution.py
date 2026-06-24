@@ -141,6 +141,16 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(receipt["residual_event_governance_status"], "not_performed")
             self.assertIs(receipt["event_evidence_consumed"], False)
             self.assertEqual(receipt["replay_review_diagnostic_summary"]["reviewed_row_count"], 3)
+            self.assertIn("replay_review_performance_summary_ref", receipt)
+            self.assertIn("layer_attribution_report_ref", receipt)
+            performance_summary = json.loads(
+                Path(receipt["replay_review_performance_summary_ref"]).read_text(encoding="utf-8")
+            )
+            self.assertEqual(performance_summary["contract_type"], "model_group_replay_review_performance_summary")
+            self.assertEqual(performance_summary["summary"]["decision_scope"]["decision_row_count"], 5)
+            self.assertEqual(performance_summary["summary"]["target_performance"]["filled_target_count"], 2)
+            self.assertTrue(Path(receipt["layer_attribution_report_ref"]).exists())
+            self.assertIn("model_candidate_selection_summary", receipt["layer_attribution_summary"])
             self.assertEqual(receipt["replay_review_diagnostic_summary"]["material_regret_row_count"], 2)
             self.assertEqual(receipt["replay_review_diagnostic_summary"]["total_regret_to_best_available"], 0.06)
             self.assertEqual(
@@ -293,6 +303,33 @@ class ModelGroupAttributionTests(unittest.TestCase):
             ]
             self.assertEqual(len(full_receipts), 1)
             self.assertEqual(full_receipts[0]["processed_review_count"], 3)
+
+    def test_partial_replay_review_writes_diagnostic_without_unlocking_m06(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+            (dataset_root / "replay_progress.jsonl").write_text(
+                json.dumps({"stage_id": "model_group.replay", "month": "2021-01", "status": "completed"}) + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_review_if_ready(
+                storage_root=storage_root,
+                force=True,
+                allow_partial_replay=True,
+                now_utc=datetime(2026, 6, 18, 11, 52, tzinfo=UTC),
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "executed")
+            receipt_path = next((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json"))
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["replay_review_completion_scope"], "completed_replay_run_diagnostic")
+            self.assertTrue(Path(receipt["replay_review_performance_summary_ref"]).exists())
+            self.assertIsNone(run_model_group_residual_event_governance_if_ready(storage_root=storage_root))
 
     def test_newer_incompatible_replay_receipt_does_not_hide_latest_compatible_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

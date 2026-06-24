@@ -1894,6 +1894,7 @@ def _latest_replay_review_receipt(dataset_root: Path) -> tuple[Path | None, dict
         "post_replay_review_receipt.json",
         accepted_statuses=COMPLETE_STATUSES,
         predicate=lambda receipt: str(receipt.get("contract_type") or "") == REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE
+        and str(receipt.get("replay_review_completion_scope") or "") == "full_replay_review"
         and _replay_review_receipt_uses_current_replay_handoff(dataset_root, receipt),
     )
 
