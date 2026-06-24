@@ -1274,6 +1274,14 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
                 "compatible": False,
                 "reason": "equity/options replay receipt missing current five-slot portfolio-capacity policy",
             }
+        if (
+            str(portfolio_policy.get("position_sizing_policy") or "")
+            != "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up"
+        ):
+            return {
+                "compatible": False,
+                "reason": "equity/options replay receipt missing current target-allocation-floor sizing policy",
+            }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 
 

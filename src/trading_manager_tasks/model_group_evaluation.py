@@ -2426,6 +2426,16 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
                 "candidate_model_ref": candidate_model_ref,
                 "receipt_target_refs": sorted(target_refs),
             }
+        if (
+            str(portfolio_policy.get("position_sizing_policy") or "")
+            != "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up"
+        ):
+            return {
+                "compatible": False,
+                "reason": "replay receipt did not use the current target-allocation-floor sizing policy",
+                "candidate_model_ref": candidate_model_ref,
+                "receipt_target_refs": sorted(target_refs),
+            }
     if receipt_fold_id and training_fold_id and receipt_fold_id != training_fold_id:
         return {
             "compatible": False,

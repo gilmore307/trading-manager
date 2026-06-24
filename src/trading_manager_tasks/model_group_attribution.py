@@ -1516,6 +1516,8 @@ def _replay_receipt_uses_current_candidate_handoff(receipt: Mapping[str, Any]) -
         and str(portfolio_policy.get("portfolio_capacity_policy") or "")
         == "default_5_simultaneous_risk_slots_from_20pct_allocation"
         and int(portfolio_policy.get("max_positions") or 0) == 5
+        and str(portfolio_policy.get("position_sizing_policy") or "")
+        == "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up"
     )
 
 

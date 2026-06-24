@@ -186,6 +186,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                         "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
                         "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
                         "max_positions": 5,
+                    "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
                     },
                     "decision_rows_ref": str(decision_rows_path),
                     "model_candidate_selection_trace_ref": str(trace_rows_path),
