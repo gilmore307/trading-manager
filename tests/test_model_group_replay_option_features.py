@@ -31,6 +31,8 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             "timestamp": timestamp,
             "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
             "max_positions": "5",
+            "switch_threshold_policy": "score_scale_aware_absolute_rank_delta",
+            "switch_minimum_rank_score_delta": "1e-05",
         }
 
     def test_extracts_option_feature_payload_from_runner_text(self) -> None:
@@ -368,6 +370,28 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                 json.dumps({"target_ref": "AAPL", "timestamp": "2021-01-04T16:00:00-05:00"}) + "\n",
                 encoding="utf-8",
             )
+            current_artifact.write_text(
+                json.dumps(self._requirements_artifact_row(target_ref="MSFT")) + "\n",
+                encoding="utf-8",
+            )
+
+            selected = latest_replay_option_feature_requirements_artifact(storage_root=storage_root)
+
+        self.assertEqual(selected, current_artifact)
+
+    def test_latest_requirements_artifact_ignores_stale_switch_threshold_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            stale_run = dataset_root / "replay_execution_runs" / "stale_run"
+            current_run = dataset_root / "replay_execution_runs" / "current_run"
+            stale_run.mkdir(parents=True)
+            current_run.mkdir(parents=True)
+            stale_artifact = stale_run / "option_feature_requirements.jsonl"
+            current_artifact = current_run / "option_feature_requirements.jsonl"
+            stale_row = self._requirements_artifact_row(target_ref="AAPL")
+            stale_row.pop("switch_threshold_policy")
+            stale_artifact.write_text(json.dumps(stale_row) + "\n", encoding="utf-8")
             current_artifact.write_text(
                 json.dumps(self._requirements_artifact_row(target_ref="MSFT")) + "\n",
                 encoding="utf-8",

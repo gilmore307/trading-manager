@@ -494,7 +494,7 @@ def latest_replay_option_feature_requirements_artifact(
     for artifact in candidates:
         if (
             not (artifact.parent / "replay_execution_receipt.json").exists()
-            and _requirements_artifact_uses_current_portfolio_capacity(artifact)
+            and _requirements_artifact_uses_current_replay_policy(artifact)
         ):
             return artifact
     return None
@@ -547,7 +547,7 @@ def _raw_option_feature_requirements_from_artifact(path: Path) -> tuple[Mapping[
     return tuple(items)
 
 
-def _requirements_artifact_uses_current_portfolio_capacity(path: Path) -> bool:
+def _requirements_artifact_uses_current_replay_policy(path: Path) -> bool:
     rows = _raw_option_feature_requirements_from_artifact(path)
     if not rows:
         return False
@@ -563,6 +563,7 @@ def _requirements_artifact_uses_current_portfolio_capacity(path: Path) -> bool:
             str(row.get("portfolio_capacity_policy") or "")
             != "default_5_simultaneous_risk_slots_from_20pct_allocation"
             or max_positions != 5
+            or str(row.get("switch_threshold_policy") or "") != "score_scale_aware_absolute_rank_delta"
         ):
             return False
     return True
