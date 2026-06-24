@@ -73,13 +73,14 @@ def run_model_group_replay_option_features_for_replay_backoff(
     feature_repair_limit: int | None = None,
     selected_target_symbol: str | None = None,
     database_url: str | None = None,
-    lock_root: Path = DEFAULT_LOCK_ROOT,
+    lock_root: Path | None = None,
 ) -> SchedulerDecision | None:
     """Prepare only the option features requested by a replay signal backoff."""
 
     requirements = replay_option_feature_requirements_from_replay_decision(replay_decision)
     if not requirements:
         return None
+    lock_root = lock_root or storage_root / "runtime" / "locks" / "model_group"
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     manifest_path = dataset_root / "dataset_manifest.json"
     freeze_receipt_path = dataset_root / "replay_freeze_receipt.json"
@@ -491,7 +492,10 @@ def latest_replay_option_feature_requirements_artifact(
         reverse=True,
     )
     for artifact in candidates:
-        if not (artifact.parent / "replay_execution_receipt.json").exists():
+        if (
+            not (artifact.parent / "replay_execution_receipt.json").exists()
+            and _requirements_artifact_uses_current_portfolio_capacity(artifact)
+        ):
             return artifact
     return None
 
@@ -541,6 +545,27 @@ def _raw_option_feature_requirements_from_artifact(path: Path) -> tuple[Mapping[
             if isinstance(parsed, Mapping):
                 items.append(parsed)
     return tuple(items)
+
+
+def _requirements_artifact_uses_current_portfolio_capacity(path: Path) -> bool:
+    rows = _raw_option_feature_requirements_from_artifact(path)
+    if not rows:
+        return False
+    checked = [row for row in rows if isinstance(row, Mapping)]
+    if not checked:
+        return False
+    for row in checked:
+        try:
+            max_positions = int(row.get("max_positions") or 0)
+        except (TypeError, ValueError):
+            return False
+        if (
+            str(row.get("portfolio_capacity_policy") or "")
+            != "default_5_simultaneous_risk_slots_from_20pct_allocation"
+            or max_positions != 5
+        ):
+            return False
+    return True
 
 
 def _option_feature_requirements_from_items(

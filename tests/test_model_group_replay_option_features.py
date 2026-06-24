@@ -20,6 +20,19 @@ from trading_manager_tasks.scheduler import SchedulerDecision
 
 
 class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
+    def _requirements_artifact_row(
+        self,
+        *,
+        target_ref: str = "AAPL",
+        timestamp: str = "2021-01-04T16:00:00-05:00",
+    ) -> dict[str, str]:
+        return {
+            "target_ref": target_ref,
+            "timestamp": timestamp,
+            "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+            "max_positions": "5",
+        }
+
     def test_extracts_option_feature_payload_from_runner_text(self) -> None:
         payload = {
             "missing_count": 2,
@@ -333,13 +346,36 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             new_run.mkdir(parents=True)
             old_artifact = old_run / "option_feature_requirements.jsonl"
             new_artifact = new_run / "option_feature_requirements.jsonl"
-            old_artifact.write_text("{}\n", encoding="utf-8")
-            new_artifact.write_text("{}\n", encoding="utf-8")
+            old_artifact.write_text(json.dumps(self._requirements_artifact_row()) + "\n", encoding="utf-8")
+            new_artifact.write_text(json.dumps(self._requirements_artifact_row()) + "\n", encoding="utf-8")
             (new_run / "replay_execution_receipt.json").write_text("{}\n", encoding="utf-8")
 
             selected = latest_replay_option_feature_requirements_artifact(storage_root=storage_root)
 
         self.assertEqual(selected, old_artifact)
+
+    def test_latest_requirements_artifact_ignores_stale_portfolio_capacity_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            stale_run = dataset_root / "replay_execution_runs" / "stale_run"
+            current_run = dataset_root / "replay_execution_runs" / "current_run"
+            stale_run.mkdir(parents=True)
+            current_run.mkdir(parents=True)
+            stale_artifact = stale_run / "option_feature_requirements.jsonl"
+            current_artifact = current_run / "option_feature_requirements.jsonl"
+            stale_artifact.write_text(
+                json.dumps({"target_ref": "AAPL", "timestamp": "2021-01-04T16:00:00-05:00"}) + "\n",
+                encoding="utf-8",
+            )
+            current_artifact.write_text(
+                json.dumps(self._requirements_artifact_row(target_ref="MSFT")) + "\n",
+                encoding="utf-8",
+            )
+
+            selected = latest_replay_option_feature_requirements_artifact(storage_root=storage_root)
+
+        self.assertEqual(selected, current_artifact)
 
     def test_synthetic_backoff_from_requirements_artifact_round_trips(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
