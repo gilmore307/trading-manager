@@ -284,10 +284,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 },
                 args=args,
             )
-            if row.get("decision_status") != "executed":
-                return 2
             required_next_step = str(summary.get("required_next_step") or "").lower()
             if "continue replay option feature drain" not in required_next_step:
+                if row.get("decision_status") != "executed":
+                    return 2
                 break
             if _provider_budget_exhausted(args, provider_calls_used):
                 _emit(
