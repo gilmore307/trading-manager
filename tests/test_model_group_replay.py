@@ -389,7 +389,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
-            self._write_dataset(storage_root)
+            dataset_root = self._write_dataset(storage_root)
             self._write_completed_fold(storage_root)
 
             decision = run_model_group_replay_if_ready(
@@ -407,6 +407,9 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_contract_path_acquisition_required")
             self.assertEqual(decision.execution_summary["missing_selected_contract_path_count"], 1)
             self.assertEqual(decision.execution_summary["acquisition_routes"], ["model_group.replay_contract_paths"])
+            self.assertFalse((dataset_root / "replay_progress.jsonl").exists())
+            candidate_progress_path = Path(decision.execution_summary["candidate_progress_path"])
+            self.assertTrue(candidate_progress_path.exists())
 
             retry = run_model_group_replay_if_ready(
                 storage_root=storage_root,

@@ -16,7 +16,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime, time
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -106,6 +106,7 @@ def run_model_group_replay_if_ready(
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
     progress_path = dataset_root / "replay_progress.jsonl"
+    runner_progress_path = _candidate_replay_progress_path(dataset_root, run_id)
     candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
@@ -273,7 +274,7 @@ def run_model_group_replay_if_ready(
         "--after-cost-alpha-model-json",
         str(after_cost_alpha_model_path),
         "--progress-path",
-        str(progress_path),
+        str(runner_progress_path),
         "--initial-capital-usd",
         str(initial_capital_usd),
         "--candidate-universe-path",
@@ -311,6 +312,8 @@ def run_model_group_replay_if_ready(
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": candidate_universe_source_policy,
+                "formal_progress_path": str(progress_path),
+                "candidate_progress_path": str(runner_progress_path),
                 "required_next_step": "refresh the frozen replay dataset with Alpaca bars for the fixed historical equity candidate universe before fold replay",
             },
         )
@@ -344,6 +347,8 @@ def run_model_group_replay_if_ready(
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": candidate_universe_source_policy,
+                "formal_progress_path": str(progress_path),
+                "candidate_progress_path": str(runner_progress_path),
                 "required_next_step": "run the gated replay candidate Alpaca bars acquisition for the fixed historical candidate universe before canonical replay",
             },
         )
@@ -372,6 +377,8 @@ def run_model_group_replay_if_ready(
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": candidate_universe_source_policy,
+                "formal_progress_path": str(progress_path),
+                "candidate_progress_path": str(runner_progress_path),
             },
         )
 
@@ -402,6 +409,8 @@ def run_model_group_replay_if_ready(
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": candidate_universe_source_policy,
+                "formal_progress_path": str(progress_path),
+                "candidate_progress_path": str(runner_progress_path),
                 "required_next_step": "rerun the TradingView refresh and fixed candidate-universe build after the market close before executing replay",
             },
         )
@@ -468,6 +477,8 @@ def run_model_group_replay_if_ready(
                     "runner_returncode": exc.returncode,
                     "runner_stdout": exc.stdout,
                     "runner_stderr": exc.stderr,
+                    "formal_progress_path": str(progress_path),
+                    "candidate_progress_path": str(runner_progress_path),
                     "required_next_step": (
                         "run shared option_chain_state_source acquisition under M05 with source_end no later than each missing replay decision timestamp, generate M05 option features from that shared source, then retry model_group.replay"
                         if option_feature_acquisition_required
@@ -504,6 +515,8 @@ def run_model_group_replay_if_ready(
                 "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
                 "initial_capital_usd": initial_capital_usd,
                 "candidate_universe_source_policy": candidate_universe_source_policy,
+                "formal_progress_path": str(progress_path),
+                "candidate_progress_path": str(runner_progress_path),
             },
         )
     missing_selected_contract_path_count = _replay_receipt_selected_option_path_missing_count(receipt)
@@ -535,12 +548,19 @@ def run_model_group_replay_if_ready(
                 "replay_execution_receipt": receipt,
                 "decision_rows_ref": decision_rows_ref,
                 "missing_selected_contract_path_count": missing_selected_contract_path_count,
+                "formal_progress_path": str(progress_path),
+                "candidate_progress_path": str(runner_progress_path),
                 "acquisition_routes": ["model_group.replay_contract_paths"],
                 "required_next_step": "run selected-contract path acquisition, then retry model_group.replay for the same month",
                 "blocked_stage_id": "model_group.replay_contract_paths",
                 "resume_stage_id": "model_group.replay",
             },
         )
+    committed_progress_rows = _commit_candidate_replay_progress(
+        candidate_progress_path=runner_progress_path,
+        formal_progress_path=progress_path,
+        receipt=receipt,
+    )
     refreshed_run_months = _compatible_replay_run_months(dataset_root=dataset_root, training_fold=training_fold)
     refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_months=refreshed_run_months)
     return _decision(
@@ -567,6 +587,9 @@ def run_model_group_replay_if_ready(
             "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
             "initial_capital_usd": initial_capital_usd,
             "candidate_universe_source_policy": candidate_universe_source_policy,
+            "formal_progress_path": str(progress_path),
+            "candidate_progress_path": str(runner_progress_path),
+            "committed_progress_row_count": committed_progress_rows,
             "replay_execution_receipt": receipt,
         },
     )
@@ -618,6 +641,89 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"expected JSON object: {path}")
     return payload
+
+
+def _candidate_replay_progress_path(dataset_root: Path, run_id: str) -> Path:
+    return dataset_root / "replay_execution_runs" / run_id / "candidate_replay_progress.jsonl"
+
+
+def _commit_candidate_replay_progress(
+    *,
+    candidate_progress_path: Path,
+    formal_progress_path: Path,
+    receipt: dict[str, Any],
+) -> int:
+    progress_rows = _jsonl_mapping_rows(candidate_progress_path)
+    if not progress_rows:
+        return 0
+    run_id = str(receipt.get("replay_execution_run_id") or "").strip()
+    decision_rows_ref = str(receipt.get("decision_rows_ref") or "").strip()
+    receipt_path = _receipt_path_from_replay_receipt(receipt)
+    receipt["progress_ref"] = str(formal_progress_path)
+    if receipt_path is not None and receipt_path.exists():
+        receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    normalized_rows: list[dict[str, Any]] = []
+    for row in progress_rows:
+        normalized = dict(row)
+        if run_id:
+            normalized["replay_execution_run_id"] = run_id
+        if decision_rows_ref:
+            normalized["decision_rows_ref"] = decision_rows_ref
+        if receipt_path is not None:
+            normalized["receipt_ref"] = str(receipt_path)
+        normalized_rows.append(normalized)
+    _write_replay_progress_jsonl(formal_progress_path, normalized_rows)
+    return len(normalized_rows)
+
+
+def _receipt_path_from_replay_receipt(receipt: Mapping[str, Any]) -> Path | None:
+    decision_rows_ref = str(receipt.get("decision_rows_ref") or "").strip()
+    if decision_rows_ref:
+        return Path(decision_rows_ref).parent / "replay_execution_receipt.json"
+    run_id = str(receipt.get("replay_execution_run_id") or "").strip()
+    dataset_root = str(receipt.get("dataset_root") or "").strip()
+    if run_id and dataset_root:
+        return Path(dataset_root) / "replay_execution_runs" / run_id / "replay_execution_receipt.json"
+    return None
+
+
+def _jsonl_mapping_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if isinstance(row, Mapping):
+                rows.append(dict(row))
+    return rows
+
+
+def _write_replay_progress_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    if path.exists():
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if not isinstance(row, Mapping):
+                    continue
+                run_id = str(row.get("replay_execution_run_id") or "").strip()
+                month = str(row.get("month") or row.get("replay_month") or "").strip()
+                if run_id and month:
+                    rows_by_key[(run_id, month)] = dict(row)
+    for row in rows:
+        run_id = str(row.get("replay_execution_run_id") or "").strip()
+        month = str(row.get("month") or row.get("replay_month") or "").strip()
+        if run_id and month:
+            rows_by_key[(run_id, month)] = dict(row)
+    with path.open("w", encoding="utf-8") as handle:
+        for _, row in sorted(rows_by_key.items(), key=lambda item: (str(item[1].get("month") or ""), item[0][0])):
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
 
 
 def _database_url() -> str | None:
