@@ -506,6 +506,41 @@ def run_model_group_replay_if_ready(
                 "candidate_universe_source_policy": candidate_universe_source_policy,
             },
         )
+    missing_selected_contract_path_count = _replay_receipt_selected_option_path_missing_count(receipt)
+    if missing_selected_contract_path_count > 0:
+        decision_rows_ref = str(receipt.get("decision_rows_ref") or "").strip()
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_contract_path_acquisition_required",
+            reason="replay selected listed options without materialized contract paths; acquire selected-contract paths before accepting replay completion",
+            selected_work="model_group.replay",
+            command=command,
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "expected_replay_months": expected_months,
+                "replay_month": replay_month,
+                "ready_replay_months_before": len(ready_months),
+                "option_feature_database_configured": bool(option_feature_database_url),
+                "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+                "candidate_universe_path": str(resolved_candidate_universe_path),
+                "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
+                "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
+                "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
+                "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                "initial_capital_usd": initial_capital_usd,
+                "candidate_universe_source_policy": candidate_universe_source_policy,
+                "replay_execution_receipt": receipt,
+                "decision_rows_ref": decision_rows_ref,
+                "missing_selected_contract_path_count": missing_selected_contract_path_count,
+                "acquisition_routes": ["model_group.replay_contract_paths"],
+                "required_next_step": "run selected-contract path acquisition, then retry model_group.replay for the same month",
+                "blocked_stage_id": "model_group.replay_contract_paths",
+                "resume_stage_id": "model_group.replay",
+            },
+        )
     refreshed_run_months = _compatible_replay_run_months(dataset_root=dataset_root, training_fold=training_fold)
     refreshed_ready_months = _ready_replay_months(dataset_root, replay_run_months=refreshed_run_months)
     return _decision(
@@ -998,6 +1033,8 @@ def _compatible_replay_run_months(*, dataset_root: Path, training_fold: Mapping[
             continue
         if not _replay_receipt_decision_rows_exist(receipt):
             continue
+        if _replay_receipt_selected_option_path_missing_count(receipt) > 0:
+            continue
         months = _replay_receipt_valid_months(receipt)
         if not months:
             continue
@@ -1017,6 +1054,33 @@ def _replay_receipt_full_completion_scope(replay_receipt: Mapping[str, Any]) -> 
 def _replay_receipt_decision_rows_exist(replay_receipt: Mapping[str, Any]) -> bool:
     decision_rows_ref = str(replay_receipt.get("decision_rows_ref") or "").strip()
     return bool(decision_rows_ref) and Path(decision_rows_ref).exists()
+
+
+def _replay_receipt_selected_option_path_missing_count(replay_receipt: Mapping[str, Any]) -> int:
+    decision_rows_ref = str(replay_receipt.get("decision_rows_ref") or "").strip()
+    if not decision_rows_ref:
+        return 0
+    path = Path(decision_rows_ref)
+    if not path.exists():
+        return 0
+    missing_count = 0
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if not isinstance(row, Mapping):
+                    continue
+                selected_contract = str(row.get("selected_option_contract_ref") or row.get("selected_contract_ref") or "").strip()
+                if not selected_contract:
+                    continue
+                path_status = str(row.get("option_contract_path_status") or "").strip().lower()
+                if path_status != "available":
+                    missing_count += 1
+    except (OSError, ValueError, json.JSONDecodeError):
+        return 0
+    return missing_count
 
 
 def _replay_receipt_valid_months(replay_receipt: Mapping[str, Any]) -> set[str]:

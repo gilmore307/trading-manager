@@ -1554,6 +1554,35 @@ def _run_replay_review_data_requirement_handoff(
     )
 
 
+def _run_replay_contract_path_requirement_handoff(
+    replay_decision: SchedulerDecision,
+    *,
+    storage_root: Path,
+    execute: bool,
+    execute_provider_acquisition: bool,
+    limit: int | None,
+) -> SchedulerDecision | None:
+    if replay_decision.reason_code != "model_group_replay_contract_path_acquisition_required":
+        return None
+    summary = replay_decision.execution_summary or {}
+    routes = {str(route) for route in summary.get("acquisition_routes") or ()}
+    if "model_group.replay_contract_paths" not in routes:
+        return None
+    decision_rows_ref = str(summary.get("decision_rows_ref") or "").strip()
+    if not decision_rows_ref:
+        receipt = summary.get("replay_execution_receipt") if isinstance(summary.get("replay_execution_receipt"), dict) else {}
+        decision_rows_ref = str(receipt.get("decision_rows_ref") or "").strip()
+    if not decision_rows_ref:
+        return None
+    return run_model_group_replay_contract_paths(
+        decision_rows_ref=Path(decision_rows_ref),
+        storage_root=storage_root,
+        execute=execute,
+        execute_provider_acquisition=execute_provider_acquisition,
+        limit=limit,
+    )
+
+
 def refresh_dashboard_read_models(
     *,
     enabled: bool,
@@ -2218,6 +2247,33 @@ def run_daemon_loop(
                                     storage_root=storage_root,
                                     decision_log_path=decision_log_path,
                                 )
+                            replay_contract_path_decision = _run_replay_contract_path_requirement_handoff(
+                                replay_decision,
+                                storage_root=storage_root,
+                                execute=execute_model_group_replay,
+                                execute_provider_acquisition=execute_autonomous_provider_stages,
+                                limit=provider_stage_next_limit,
+                            )
+                            if replay_contract_path_decision is not None:
+                                append_decision_log(decision_log_path, replay_contract_path_decision)
+                                completed = utc_now_iso()
+                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_contract_path_decision)
+                                state = replace(
+                                    state,
+                                    start_month=active_start_month,
+                                    end_month=active_end_month,
+                                    last_next_internal_stage="replay_contract_path_requirement",
+                                    last_work_selection_reason="model_group_replay_contract_path_acquisition_required",
+                                    updated_utc=completed,
+                                )
+                                refresh_needed = refresh_needed or replay_contract_path_decision.decision_status == "executed"
+                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_contract_path_decision, advanced_month=False)
+                                decisions_this_cycle += 1
+                                if output is not None:
+                                    row = replay_contract_path_decision.summary_row()
+                                    row["worker_id"] = "replay_contract_path_worker_1"
+                                    output.write(json.dumps(row, sort_keys=True) + "\n")
+                                    output.flush()
                         replay_review_decision = run_model_group_replay_review_if_ready(
                             storage_root=storage_root,
                             execute=execute_model_group_attribution,
@@ -2514,6 +2570,25 @@ def run_daemon_loop(
                                     storage_root=storage_root,
                                     decision_log_path=decision_log_path,
                                 )
+                            replay_contract_path_decision = _run_replay_contract_path_requirement_handoff(
+                                replay_decision,
+                                storage_root=storage_root,
+                                execute=execute_model_group_replay,
+                                execute_provider_acquisition=execute_autonomous_provider_stages,
+                                limit=provider_stage_next_limit,
+                            )
+                            if replay_contract_path_decision is not None:
+                                append_decision_log(decision_log_path, replay_contract_path_decision)
+                                completed = utc_now_iso()
+                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_contract_path_decision)
+                                refresh_needed = refresh_needed or replay_contract_path_decision.decision_status == "executed"
+                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_contract_path_decision, advanced_month=False)
+                                decisions_this_cycle += 1
+                                if output is not None:
+                                    row = replay_contract_path_decision.summary_row()
+                                    row["worker_id"] = "replay_contract_path_worker_1"
+                                    output.write(json.dumps(row, sort_keys=True) + "\n")
+                                    output.flush()
                         replay_review_decision = run_model_group_replay_review_if_ready(
                             storage_root=storage_root,
                             execute=execute_model_group_attribution,

@@ -172,6 +172,67 @@ class ModelGroupReplayTests(unittest.TestCase):
         )
         return runner
 
+    def _write_runner_with_missing_selected_contract_path(self, root: Path) -> Path:
+        runner = root / "run_replay_execution_missing_contract_path.py"
+        runner.write_text(
+            textwrap.dedent(
+                """
+                import json
+                import sys
+                from pathlib import Path
+
+                run_id = sys.argv[sys.argv.index("--run-id") + 1]
+                candidate_model_ref = sys.argv[sys.argv.index("--candidate-model-ref") + 1]
+                replay_month = sys.argv[sys.argv.index("--replay-month") + 1]
+                progress_path = Path(sys.argv[sys.argv.index("--progress-path") + 1])
+                dataset_root = Path(sys.argv[sys.argv.index("--dataset-root") + 1])
+                run_root = dataset_root / "replay_execution_runs" / run_id
+                run_root.mkdir(parents=True, exist_ok=True)
+                decision_rows_ref = run_root / "decision_rows.jsonl"
+                decision_rows_ref.write_text(json.dumps({
+                    "decision_id": "ed_missing_path",
+                    "timestamp": f"{replay_month}-05T16:00:00-05:00",
+                    "target_ref": "AAPL",
+                    "selected_option_contract_ref": "AAPL_2021-01-08_C_142",
+                    "option_contract_path_status": "missing",
+                    "replay_time_pointer": f"{replay_month}-05T16:00:00-05:00",
+                    "next_timestamp": f"{replay_month}-06T16:00:00-05:00"
+                }, sort_keys=True) + "\\n", encoding="utf-8")
+                progress_path.parent.mkdir(parents=True, exist_ok=True)
+                progress_path.write_text(json.dumps({
+                    "contract_type": "evaluation_replay_progress",
+                    "stage_id": "model_group.replay",
+                    "replay_execution_run_id": run_id,
+                    "month": replay_month,
+                    "replay_month": replay_month,
+                    "status": "completed",
+                    "decision_rows_ref": str(decision_rows_ref),
+                }, sort_keys=True) + "\\n", encoding="utf-8")
+                receipt = {
+                    "contract_type": "evaluation_replay_execution_run",
+                    "replay_execution_run_id": run_id,
+                    "replay_month": replay_month,
+                    "candidate_model_ref": candidate_model_ref,
+                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "decision_rows_ref": str(decision_rows_ref),
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                    "candidate_handoff_symbols": ["AAPL"],
+                    "target_refs": ["AAPL"],
+                    "asset_class_counts": {"us_equity": 1},
+                    "decision_row_count": 1,
+                    "max_decision_rows": None,
+                    "replay_completion_scope": "full_candidate_universe",
+                    "validation_status": "passed",
+                }
+                print(json.dumps(receipt, sort_keys=True))
+                """
+            ).strip()
+            + "\n",
+            encoding="utf-8",
+        )
+        return runner
+
     def _write_completed_replay_month(
         self,
         dataset_root: Path,
@@ -322,6 +383,45 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.execution_summary["ready_replay_months"], 1)
             self.assertEqual(decision.execution_summary["replay_month"], "2021-02")
             self.assertEqual(decision.command[decision.command.index("--replay-month") + 1], "2021-02")
+
+    def test_missing_selected_contract_path_blocks_replay_completion(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner_with_missing_selected_contract_path(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_contract_path_acquisition_required")
+            self.assertEqual(decision.execution_summary["missing_selected_contract_path_count"], 1)
+            self.assertEqual(decision.execution_summary["acquisition_routes"], ["model_group.replay_contract_paths"])
+
+            retry = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(retry)
+            assert retry is not None
+            self.assertEqual(retry.execution_summary["ready_replay_months"], 0)
+            self.assertEqual(retry.execution_summary["replay_month"], "2021-01")
 
     def test_replay_progress_month_must_match_receipt_and_decision_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
