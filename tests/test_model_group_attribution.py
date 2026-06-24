@@ -49,6 +49,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             encoding="utf-8",
         )
         decision_rows_path = replay_run_root / "decision_rows.jsonl"
+        trace_rows_path = replay_run_root / "model_candidate_selection_trace.jsonl"
         decision_rows_path.write_text(
             "\n".join(
                 [
@@ -104,6 +105,74 @@ class ModelGroupAttributionTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        trace_rows_path.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "contract_type": "model_candidate_selection_trace_row",
+                            "target_ref": "AAPL",
+                            "replay_time_pointer": "2021-01-05T16:00:00-05:00",
+                            "model_score_available": True,
+                            "selected_by_replay": True,
+                            "model_candidate_trace_status": "selected_by_replay",
+                            "model_rank_within_timestamp": 1,
+                            "diagnostic_rank_score": 0.4,
+                            "option_expression_signal_required": True,
+                            "option_expression_selected_contract_available": True,
+                            "portfolio_replacement_evaluation_status": "not_needed_capacity_available",
+                            "portfolio_selection_action": "open_new_position",
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "contract_type": "model_candidate_selection_trace_row",
+                            "target_ref": "MSFT",
+                            "replay_time_pointer": "2021-01-06T16:00:00-05:00",
+                            "model_score_available": True,
+                            "selected_by_replay": False,
+                            "model_candidate_trace_status": "scored_not_selected_switch_threshold",
+                            "model_rank_within_timestamp": 1,
+                            "diagnostic_rank_score": 0.43,
+                            "option_expression_signal_required": True,
+                            "option_expression_selected_contract_available": True,
+                            "portfolio_replacement_evaluation_status": "blocked_by_switch_threshold",
+                            "portfolio_selection_action": "not_selected_keep_current_positions",
+                            "portfolio_selection_reason": "candidate_not_significantly_better_than_weakest_held_position",
+                            "portfolio_candidate_rank_score": 0.43,
+                            "portfolio_worst_held_target_before": "AAPL",
+                            "portfolio_worst_held_rank_score_before": 0.4,
+                            "portfolio_switch_rank_score_delta": 0.03,
+                            "portfolio_switch_minimum_rank_score_delta": 0.05,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "contract_type": "model_candidate_selection_trace_row",
+                            "target_ref": "NVDA",
+                            "replay_time_pointer": "2021-01-07T16:00:00-05:00",
+                            "model_score_available": True,
+                            "selected_by_replay": True,
+                            "model_candidate_trace_status": "selected_by_replay_replacement",
+                            "model_rank_within_timestamp": 1,
+                            "diagnostic_rank_score": 0.55,
+                            "option_expression_signal_required": True,
+                            "option_expression_selected_contract_available": True,
+                            "portfolio_replacement_evaluation_status": "triggered",
+                            "portfolio_selection_action": "replace_weakest_held_position",
+                            "portfolio_selection_reason": "candidate_significantly_better_than_weakest_held_position_after_switch_threshold",
+                            "portfolio_candidate_rank_score": 0.55,
+                            "portfolio_worst_held_target_before": "AAPL",
+                            "portfolio_worst_held_rank_score_before": 0.4,
+                            "portfolio_switch_rank_score_delta": 0.15,
+                            "portfolio_switch_minimum_rank_score_delta": 0.05,
+                        }
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (replay_run_root / "replay_execution_receipt.json").write_text(
             json.dumps(
                 {
@@ -113,6 +182,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
                     "decision_rows_ref": str(decision_rows_path),
+                    "model_candidate_selection_trace_ref": str(trace_rows_path),
                 }
             )
             + "\n",
@@ -149,6 +219,18 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(performance_summary["contract_type"], "model_group_replay_review_performance_summary")
             self.assertEqual(performance_summary["summary"]["decision_scope"]["decision_row_count"], 5)
             self.assertEqual(performance_summary["summary"]["target_performance"]["filled_target_count"], 2)
+            self.assertEqual(performance_summary["summary"]["replacement_review"]["replacement_evaluated_count"], 2)
+            self.assertEqual(performance_summary["summary"]["replacement_review"]["replacement_triggered_count"], 1)
+            self.assertEqual(
+                performance_summary["summary"]["replacement_review"][
+                    "replacement_blocked_by_switch_threshold_count"
+                ],
+                1,
+            )
+            self.assertEqual(
+                performance_summary["replacement_review"]["triggered_replacements_sample"][0]["target_ref"],
+                "NVDA",
+            )
             self.assertTrue(Path(receipt["layer_attribution_report_ref"]).exists())
             self.assertIn("model_candidate_selection_summary", receipt["layer_attribution_summary"])
             self.assertEqual(receipt["replay_review_diagnostic_summary"]["material_regret_row_count"], 2)

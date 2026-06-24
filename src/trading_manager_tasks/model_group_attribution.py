@@ -605,7 +605,14 @@ def _replay_review_performance_summary(
     executable_trace_rows = [
         row
         for row in traces
-        if str(row.get("model_candidate_trace_status") or "") in {"selected_by_replay", "scored_not_selected_by_portfolio"}
+        if str(row.get("model_candidate_trace_status") or "")
+        in {
+            "selected_by_replay",
+            "selected_by_replay_replacement",
+            "held_position_continued",
+            "scored_not_selected_by_portfolio",
+            "scored_not_selected_switch_threshold",
+        }
     ]
     selected_ranks = [_safe_float(row.get("model_rank_within_timestamp")) for row in selected_trace_rows]
     selected_rank_values = [int(value) for value in selected_ranks if value is not None]
@@ -661,6 +668,59 @@ def _replay_review_performance_summary(
         "selected_outside_top_25_count": sum(1 for rank in selected_rank_values if rank > 25),
         "candidate_trace_status_counts": _count_text(row.get("model_candidate_trace_status") for row in traces),
     }
+    replacement_rows = [
+        row for row in traces if str(row.get("portfolio_replacement_evaluation_status") or "").strip()
+    ]
+    replacement_evaluated_rows = [
+        row
+        for row in replacement_rows
+        if str(row.get("portfolio_replacement_evaluation_status") or "")
+        not in {
+            "not_needed_capacity_available",
+            "held_target_continued",
+            "not_evaluated_no_positions",
+        }
+    ]
+    replacement_triggered_rows = [
+        row for row in replacement_rows if str(row.get("portfolio_replacement_evaluation_status") or "") == "triggered"
+    ]
+    replacement_review = {
+        "trace_available": bool(traces),
+        "policy": "continue_scanning_after_budget_full; replace_weakest_held_only_when_new_rank_exceeds_threshold",
+        "replacement_status_counts": _count_text(
+            row.get("portfolio_replacement_evaluation_status") for row in replacement_rows
+        ),
+        "replacement_evaluated_count": len(replacement_evaluated_rows),
+        "replacement_triggered_count": len(replacement_triggered_rows),
+        "replacement_blocked_by_switch_threshold_count": sum(
+            1
+            for row in replacement_rows
+            if str(row.get("portfolio_replacement_evaluation_status") or "") == "blocked_by_switch_threshold"
+        ),
+        "continued_held_position_count": sum(
+            1
+            for row in replacement_rows
+            if str(row.get("portfolio_replacement_evaluation_status") or "") == "held_target_continued"
+        ),
+        "candidate_switch_delta_max": _round_metric_nullable(
+            max(
+                _safe_float(row.get("portfolio_switch_rank_score_delta"))
+                for row in replacement_evaluated_rows
+                if _safe_float(row.get("portfolio_switch_rank_score_delta")) is not None
+            )
+        )
+        if any(_safe_float(row.get("portfolio_switch_rank_score_delta")) is not None for row in replacement_evaluated_rows)
+        else None,
+        "triggered_replacements_sample": _replacement_review_rows(replacement_triggered_rows, limit=10),
+        "blocked_replacements_sample": _replacement_review_rows(
+            [
+                row
+                for row in replacement_rows
+                if str(row.get("portfolio_replacement_evaluation_status") or "") == "blocked_by_switch_threshold"
+            ],
+            limit=10,
+        ),
+    }
     option_expression = {
         "selected_option_decision_count": sum(
             1 for row in decisions if _first_text(row, ("selected_option_contract_ref", "selected_contract_ref"))
@@ -704,11 +764,13 @@ def _replay_review_performance_summary(
                 if key not in {"top_target_returns", "worst_target_returns"}
             },
             "stock_selection": stock_selection,
+            "replacement_review": replacement_review,
             "option_expression": option_expression,
         },
         "decision_scope": decision_scope,
         "target_performance": target_performance,
         "stock_selection": stock_selection,
+        "replacement_review": replacement_review,
         "option_expression": option_expression,
         "layer_differentiation": _layer_differentiation_summary(decisions),
         "source_refs": {
@@ -751,6 +813,36 @@ def _target_performance_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str
         )
     output.sort(key=lambda item: (item["realized_return"] is None, item["realized_return"] or 0.0), reverse=True)
     return output
+
+
+def _replacement_review_rows(rows: Iterable[Mapping[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    ranked = sorted(
+        rows,
+        key=lambda row: (
+            -(_safe_float(row.get("portfolio_switch_rank_score_delta")) or 0.0),
+            str(row.get("replay_time_pointer") or row.get("timestamp") or ""),
+            str(row.get("target_ref") or ""),
+        ),
+    )
+    return [
+        {
+            "target_ref": str(row.get("target_ref") or ""),
+            "replay_time_pointer": str(row.get("replay_time_pointer") or row.get("timestamp") or ""),
+            "portfolio_replacement_evaluation_status": str(row.get("portfolio_replacement_evaluation_status") or ""),
+            "portfolio_selection_action": str(row.get("portfolio_selection_action") or ""),
+            "portfolio_selection_reason": str(row.get("portfolio_selection_reason") or ""),
+            "candidate_rank_score": _round_metric_nullable(_safe_float(row.get("portfolio_candidate_rank_score"))),
+            "weakest_held_target_before": str(row.get("portfolio_worst_held_target_before") or ""),
+            "weakest_held_rank_score_before": _round_metric_nullable(
+                _safe_float(row.get("portfolio_worst_held_rank_score_before"))
+            ),
+            "switch_rank_score_delta": _round_metric_nullable(_safe_float(row.get("portfolio_switch_rank_score_delta"))),
+            "switch_minimum_rank_score_delta": _round_metric_nullable(
+                _safe_float(row.get("portfolio_switch_minimum_rank_score_delta"))
+            ),
+        }
+        for row in ranked[:limit]
+    ]
 
 
 def _layer_differentiation_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
