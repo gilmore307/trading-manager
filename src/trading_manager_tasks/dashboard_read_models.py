@@ -1065,6 +1065,28 @@ def _replay_option_feature_requirement_sample(path: Path | None, *, limit: int =
     return count, sample
 
 
+def _replay_activity_started_at(requirements_artifact: Path | None, latest_status: Mapping[str, Any]) -> str | None:
+    if requirements_artifact is not None:
+        match = re.search(r"_(\d{8}T\d{6})Z$", requirements_artifact.parent.name)
+        if match:
+            try:
+                parsed = datetime.strptime(match.group(1), "%Y%m%dT%H%M%S").replace(tzinfo=UTC)
+            except ValueError:
+                parsed = None
+            if parsed is not None:
+                return parsed.isoformat().replace("+00:00", "Z")
+    emitted_at = latest_status.get("emitted_at_utc")
+    elapsed_seconds = latest_status.get("elapsed_seconds")
+    if isinstance(emitted_at, str) and isinstance(elapsed_seconds, (int, float)):
+        try:
+            emitted = datetime.fromisoformat(emitted_at.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        started = emitted.timestamp() - float(elapsed_seconds)
+        return datetime.fromtimestamp(started, tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return None
+
+
 def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] | None:
     latest_status_path = storage_root / "runtime" / "replay_option_feature_drain_latest.json"
     latest_status = _load_optional_json_object(latest_status_path)
@@ -1087,6 +1109,7 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
     source_missing_count = latest_status.get("source_missing_count")
     source_ready_count = latest_status.get("source_ready_count")
     provider_calls = latest_status.get("provider_calls")
+    started_at_utc = _replay_activity_started_at(requirements_artifact, latest_status)
     activity_parts = ["Replay option feature drain"]
     if replay_time_pointer:
         activity_parts.append(replay_time_pointer)
@@ -1115,6 +1138,8 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
         "option_source_unavailable_count": latest_status.get("option_source_unavailable_count"),
         "required_next_step": latest_status.get("required_next_step"),
         "resume_stage_id": latest_status.get("resume_stage_id"),
+        "started_at_utc": started_at_utc,
+        "elapsed_seconds": latest_status.get("elapsed_seconds"),
         "updated_at_utc": latest_status.get("emitted_at_utc"),
     }
 
@@ -1214,6 +1239,11 @@ def _mark_active_task_running(
             detail = dict(updated.get("detail") or {})
             detail["runtime_activity"] = dict(runtime_activity)
             updated["detail"] = detail
+            if not updated.get("started_at_utc") and runtime_activity.get("started_at_utc"):
+                updated["started_at_utc"] = runtime_activity.get("started_at_utc")
+            if runtime_activity.get("updated_at_utc"):
+                updated["status_updated_at_utc"] = runtime_activity.get("updated_at_utc")
+                updated["updated_at_utc"] = runtime_activity.get("updated_at_utc")
         return updated
 
     running_task = with_running_activity(public_active_task)
