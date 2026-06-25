@@ -205,7 +205,6 @@ def _forbidden_runtime_scope(request: Mapping[str, Any], payload: Mapping[str, A
         request.get("error_kind"),
         request.get("summary"),
         payload.get("retry_recommendation"),
-        payload.get("blockers"),
     )
     return any(term in text for term in FORBIDDEN_AUTOMATION_TERMS)
 

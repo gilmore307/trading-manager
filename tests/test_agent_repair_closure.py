@@ -121,6 +121,46 @@ class AgentRepairClosureTests(unittest.TestCase):
         self.assertEqual(receipt["closure_status"], "blocked")
         self.assertIn("broker/account/order", receipt["blockers"][0])
 
+    def test_broker_safety_statement_does_not_block_repaired_internal_closure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            repo = tmp / "trading-manager"
+            changed_file = repo / "src" / "trading_manager_tasks" / "model_group_replay_option_features.py"
+            changed_file.parent.mkdir(parents=True)
+            changed_file.write_text("# fixture\n", encoding="utf-8")
+            candidate = self._write_candidate(
+                tmp / "agent",
+                request_overrides={
+                    "source_component": "trading-manager.model_group_replay_option_features",
+                    "error_scope": "server.replay_option_feature_repair",
+                    "error_kind": "model_group_replay_option_source_acquisition_failed",
+                    "summary": "replay option source/feature repair failed for emitted signal CSX",
+                },
+                stdout_payload={
+                    "diagnosis_status": "repaired_verified_push_blocked",
+                    "files_changed": ["src/trading_manager_tasks/model_group_replay_option_features.py"],
+                    "retry_recommendation": "retry_or_continue_model_group_replay_option_features_drain",
+                    "blockers": [
+                        "Push blocked before closure retry",
+                        "No broker, account, order, fill, position, buying-power, or funds state was mutated.",
+                    ],
+                },
+            )
+
+            def fake_run(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+                if argv[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="main\n", stderr="")
+                if argv[:2] == ["git", "status"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+                if argv[:3] == ["git", "rev-list", "--count"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="0\n", stderr="")
+                return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+            receipt = close_agent_repair(candidate, runner=fake_run, repo_roots=(repo,))
+
+        self.assertEqual(receipt["closure_status"], "closed")
+        self.assertEqual(receipt["blockers"], [])
+
     def test_push_blocked_diagnosis_blocks_automatic_closure(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             candidate = self._write_candidate(
