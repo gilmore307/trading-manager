@@ -753,6 +753,7 @@ def _replay_review_performance_summary(
             )
         ),
     }
+    direction_expression = _direction_expression_summary(filled)
     return {
         "contract_type": "model_group_replay_review_performance_summary",
         "summary_role": "post_replay_layered_review_summary_not_training_or_threshold_input",
@@ -766,12 +767,14 @@ def _replay_review_performance_summary(
             "stock_selection": stock_selection,
             "replacement_review": replacement_review,
             "option_expression": option_expression,
+            "direction_expression": direction_expression,
         },
         "decision_scope": decision_scope,
         "target_performance": target_performance,
         "stock_selection": stock_selection,
         "replacement_review": replacement_review,
         "option_expression": option_expression,
+        "direction_expression": direction_expression,
         "layer_differentiation": _layer_differentiation_summary(decisions),
         "source_refs": {
             "decision_rows_ref": str(replay_receipt.get("decision_rows_ref") or ""),
@@ -808,11 +811,174 @@ def _target_performance_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str
                     row,
                     ("selected_option_expression_type", "decision_expression_type"),
                 ),
+                "decision_intended_side": _decision_intended_side(row),
+                "decision_intended_action": _decision_intended_action(row),
+                "underlying_return": _round_metric_nullable(_safe_float(row.get("underlying_return"))),
+                "directional_underlying_return": _round_metric_nullable(
+                    _directional_underlying_return(row)
+                ),
+                "selected_option_right": _selected_option_right(row),
+                "option_direction_consistency_status": _option_direction_consistency_status(row),
                 "option_contract_path_status": str(row.get("option_contract_path_status") or ""),
             }
         )
     output.sort(key=lambda item: (item["realized_return"] is None, item["realized_return"] or 0.0), reverse=True)
     return output
+
+
+def _direction_expression_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    decisions = list(rows)
+    aligned = [row for row in decisions if _option_direction_consistency_status(row) == "aligned"]
+    mismatched = [row for row in decisions if _option_direction_consistency_status(row) == "mismatch"]
+    direction_returns = [
+        value
+        for value in (_directional_underlying_return(row) for row in decisions)
+        if value is not None
+    ]
+    return {
+        "filled_decision_count": len(decisions),
+        "intended_side_counts": _count_text(_decision_intended_side(row) for row in decisions),
+        "intended_action_counts": _count_text(_decision_intended_action(row) for row in decisions),
+        "selected_option_right_counts": _count_text(_selected_option_right(row) for row in decisions),
+        "option_direction_consistency_counts": _count_text(
+            _option_direction_consistency_status(row) for row in decisions
+        ),
+        "aligned_option_expression_count": len(aligned),
+        "mismatched_option_expression_count": len(mismatched),
+        "mean_directional_underlying_return": _round_metric_nullable(_mean_float(direction_returns)),
+        "positive_directional_underlying_return_count": sum(1 for value in direction_returns if value > 0),
+        "negative_directional_underlying_return_count": sum(1 for value in direction_returns if value < 0),
+        "sample_mismatches": [
+            {
+                "target_ref": str(row.get("target_ref") or _target_symbol(row) or ""),
+                "timestamp": _decision_time(row),
+                "decision_intended_side": _decision_intended_side(row),
+                "decision_expression_type": _first_text(
+                    row,
+                    ("decision_expression_type", "selected_option_expression_type"),
+                ),
+                "selected_option_right": _selected_option_right(row),
+                "selected_option_contract_ref": _first_text(
+                    row,
+                    ("selected_option_contract_ref", "selected_contract_ref"),
+                ),
+            }
+            for row in mismatched[:10]
+        ],
+    }
+
+
+def _decision_intended_side(row: Mapping[str, Any]) -> str:
+    explicit = _first_text(
+        row,
+        (
+            "decision_intended_side",
+            "intended_side",
+            "resolved_action_side",
+            "position_side",
+            "action_side",
+        ),
+    )
+    normalized = _normalize_side(explicit)
+    if normalized != "unknown":
+        return normalized
+    action = _decision_intended_action(row)
+    if action in {"open_long", "increase_long", "reduce_long", "close_long"}:
+        return "long"
+    if action in {"open_short", "increase_short", "reduce_short", "cover_short", "bearish_underlying_path_but_no_short_allowed"}:
+        return "short"
+    expression_type = _first_text(row, ("decision_expression_type", "selected_option_expression_type"))
+    if expression_type == "long_call":
+        return "long"
+    if expression_type == "long_put":
+        return "short"
+    if action in {"", "no_trade", "skip", "hold", "reject_entry_thesis"}:
+        return "flat"
+    return "unknown"
+
+
+def _decision_intended_action(row: Mapping[str, Any]) -> str:
+    return _first_text(
+        row,
+        (
+            "decision_intended_action",
+            "4_resolved_underlying_action_type",
+            "resolved_underlying_action_type",
+            "planned_underlying_action_type",
+            "decision_action",
+            "action",
+        ),
+    ) or ""
+
+
+def _selected_option_right(row: Mapping[str, Any]) -> str:
+    explicit = _first_text(row, ("selected_option_right", "option_right", "right"))
+    value = str(explicit or "").strip().lower()
+    if value in {"c", "call"}:
+        return "call"
+    if value in {"p", "put"}:
+        return "put"
+    expression_type = _first_text(row, ("decision_expression_type", "selected_option_expression_type"))
+    if expression_type == "long_call":
+        return "call"
+    if expression_type == "long_put":
+        return "put"
+    contract_ref = _first_text(row, ("selected_option_contract_ref", "selected_contract_ref")) or ""
+    if "_C_" in contract_ref:
+        return "call"
+    if "_P_" in contract_ref:
+        return "put"
+    return "none"
+
+
+def _directional_underlying_return(row: Mapping[str, Any]) -> float | None:
+    explicit = _safe_float(row.get("directional_underlying_return"))
+    if explicit is not None:
+        return explicit
+    underlying_return = _safe_float(row.get("underlying_return"))
+    if underlying_return is None:
+        entry = _safe_float(row.get("bar_close"))
+        exit_value = _safe_float(row.get("next_bar_close"))
+        if entry is not None and exit_value is not None and entry > 0:
+            underlying_return = (exit_value - entry) / entry
+    if underlying_return is None:
+        return None
+    side = _decision_intended_side(row)
+    if side == "short":
+        return -underlying_return
+    if side == "long":
+        return underlying_return
+    return 0.0
+
+
+def _option_direction_consistency_status(row: Mapping[str, Any]) -> str:
+    explicit = _first_text(row, ("option_direction_consistency_status",))
+    if explicit:
+        return explicit
+    side = _decision_intended_side(row)
+    right = _selected_option_right(row)
+    expression_type = _first_text(row, ("decision_expression_type", "selected_option_expression_type"))
+    expression_type = str(expression_type or "")
+    if expression_type == "long_call" or right == "call":
+        return "aligned" if side == "long" else "mismatch"
+    if expression_type == "long_put" or right == "put":
+        return "aligned" if side == "short" else "mismatch"
+    if expression_type in {"underlying_equity", "underlying_only_expression", "underlying_only"}:
+        return "underlying_expression"
+    if expression_type == "no_option_expression":
+        return "no_option_expression"
+    return "unknown"
+
+
+def _normalize_side(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"long", "buy", "bullish"}:
+        return "long"
+    if normalized in {"short", "sell_short", "bearish"}:
+        return "short"
+    if normalized in {"flat", "none", "cash", "no_trade"}:
+        return "flat"
+    return "unknown"
 
 
 def _replacement_review_rows(rows: Iterable[Mapping[str, Any]], *, limit: int) -> list[dict[str, Any]]:

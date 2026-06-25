@@ -171,6 +171,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                     },
                     "initial_capital_usd": initial_capital_usd,
                     "initial_capital": {"amount": initial_capital_usd, "currency": "USD"},
+                    "replay_completion_scope": "full_candidate_universe",
+                    "replay_continuity_policy": "continuous_cross_month_portfolio_path",
                     "decision_row_count": 2,
                 }))
                 """
@@ -191,7 +193,7 @@ class ModelGroupReplayTests(unittest.TestCase):
 
                 run_id = sys.argv[sys.argv.index("--run-id") + 1]
                 candidate_model_ref = sys.argv[sys.argv.index("--candidate-model-ref") + 1]
-                replay_month = sys.argv[sys.argv.index("--replay-month") + 1]
+                replay_month = "2021-01"
                 progress_path = Path(sys.argv[sys.argv.index("--progress-path") + 1])
                 dataset_root = Path(sys.argv[sys.argv.index("--dataset-root") + 1])
                 run_root = dataset_root / "replay_execution_runs" / run_id
@@ -219,7 +221,6 @@ class ModelGroupReplayTests(unittest.TestCase):
                 receipt = {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": run_id,
-                    "replay_month": replay_month,
                     "candidate_model_ref": candidate_model_ref,
                     "candidate_fold_id": "fold_2016-01_2016-06",
                     "decision_rows_ref": str(decision_rows_ref),
@@ -239,6 +240,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "decision_row_count": 1,
                     "max_decision_rows": None,
                     "replay_completion_scope": "full_candidate_universe",
+                    "replay_continuity_policy": "continuous_cross_month_portfolio_path",
                     "validation_status": "passed",
                 }
                 print(json.dumps(receipt, sort_keys=True))
@@ -288,6 +290,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     },
                     "max_decision_rows": None,
                     "replay_completion_scope": "full_candidate_universe",
+                    "replay_continuity_policy": "bounded_month_diagnostic",
                 }
             )
             + "\n",
@@ -305,6 +308,63 @@ class ModelGroupReplayTests(unittest.TestCase):
                 )
                 + "\n"
             )
+
+    def _write_completed_continuous_replay(self, dataset_root: Path, *, run_id: str = "continuous_run") -> None:
+        receipt_root = dataset_root / "replay_execution_runs" / run_id
+        receipt_root.mkdir(parents=True, exist_ok=True)
+        decision_rows_path = receipt_root / "decision_rows.jsonl"
+        decision_rows_path.write_text(
+            "\n".join(
+                [
+                    json.dumps({"decision_id": "decision_2021_01", "timestamp": "2021-01-05T16:00:00-05:00"}),
+                    json.dumps({"decision_id": "decision_2021_02", "timestamp": "2021-02-05T16:00:00-05:00"}),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (receipt_root / "replay_execution_receipt.json").write_text(
+            json.dumps(
+                {
+                    "contract_type": "evaluation_replay_execution_run",
+                    "replay_execution_run_id": run_id,
+                    "decision_rows_ref": str(decision_rows_path),
+                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "target_refs": ["AAPL"],
+                    "asset_class_counts": {"us_equity": 1},
+                    "candidate_handoff_status": "available",
+                    "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                    "candidate_handoff_symbols": ["AAPL"],
+                    "portfolio_replay_policy": {
+                        "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                        "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                        "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                        "max_positions": 5,
+                        "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                        "switch_threshold_policy": "score_scale_aware_absolute_rank_delta",
+                    },
+                    "max_decision_rows": None,
+                    "replay_completion_scope": "full_candidate_universe",
+                    "replay_continuity_policy": "continuous_cross_month_portfolio_path",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        with (dataset_root / "replay_progress.jsonl").open("a", encoding="utf-8") as handle:
+            for month in ("2021-01", "2021-02"):
+                handle.write(
+                    json.dumps(
+                        {
+                            "stage_id": "model_group.replay",
+                            "replay_execution_run_id": run_id,
+                            "month": month,
+                            "status": "completed",
+                        }
+                    )
+                    + "\n"
+                )
 
     def _default_fixed_universe_path(self, storage_root: Path) -> Path:
         return storage_root.parent.parent / "main" / "shared" / "historical_candidate_universe.csv"
@@ -360,7 +420,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
             self.assertIn("storage://trading-manager/model_group/2016-01_2016-06", decision.command)
-            self.assertEqual(decision.command[decision.command.index("--replay-month") + 1], "2021-01")
+            self.assertNotIn("--replay-month", decision.command)
             self.assertIn("--after-cost-alpha-model-json", decision.command)
             alpha_ref = decision.command[decision.command.index("--after-cost-alpha-model-json") + 1]
             self.assertTrue(alpha_ref.endswith("after_cost_alpha_model_2016-01_2016-06.json"))
@@ -372,6 +432,10 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertTrue(decision.command[decision.command.index("--candidate-universe-path") + 1].endswith("historical_candidate_universe.csv"))
             self.assertEqual(decision.execution_summary["replay_execution_receipt"]["initial_capital_usd"], 25000.0)
             self.assertEqual(
+                decision.execution_summary["replay_execution_receipt"]["replay_continuity_policy"],
+                "continuous_cross_month_portfolio_path",
+            )
+            self.assertEqual(
                 decision.execution_summary["replay_execution_receipt"]["candidate_handoff_source"],
                 "fixed_current_snapshot_historical_candidate_universe",
             )
@@ -382,7 +446,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
 
-    def test_replay_command_uses_next_incomplete_month(self):
+    def test_replay_command_ignores_legacy_month_shard_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -404,9 +468,9 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "ready")
-            self.assertEqual(decision.execution_summary["ready_replay_months"], 1)
-            self.assertEqual(decision.execution_summary["replay_month"], "2021-02")
-            self.assertEqual(decision.command[decision.command.index("--replay-month") + 1], "2021-02")
+            self.assertEqual(decision.execution_summary["ready_replay_months"], 0)
+            self.assertIsNone(decision.execution_summary["replay_month"])
+            self.assertNotIn("--replay-month", decision.command)
 
     def test_missing_selected_contract_path_blocks_replay_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -448,7 +512,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertIsNotNone(retry)
             assert retry is not None
             self.assertEqual(retry.execution_summary["ready_replay_months"], 0)
-            self.assertEqual(retry.execution_summary["replay_month"], "2021-01")
+            self.assertIsNone(retry.execution_summary["replay_month"])
 
     def test_replay_progress_month_must_match_receipt_and_decision_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -518,7 +582,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "ready")
             self.assertEqual(decision.execution_summary["ready_replay_months"], 0)
-            self.assertEqual(decision.execution_summary["replay_month"], "2021-01")
+            self.assertIsNone(decision.execution_summary["replay_month"])
 
     def test_plan_passes_fixed_historical_candidate_universe_without_symbol_override(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -533,8 +597,11 @@ class ModelGroupReplayTests(unittest.TestCase):
             with plan_path.open("a", newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(handle, fieldnames=["month", "source_id", "coverage_status", "target_ref"])
                 writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "AAPL"})
+                writer.writerow({"month": "2021-02", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "AAPL"})
                 writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "MSFT"})
+                writer.writerow({"month": "2021-02", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "MSFT"})
                 writer.writerow({"month": "2021-01", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "BAD SYMBOL"})
+                writer.writerow({"month": "2021-02", "source_id": "alpaca_bars", "coverage_status": "available", "target_ref": "BAD SYMBOL"})
 
             decision = run_model_group_replay_if_ready(
                 storage_root=storage_root,
@@ -782,7 +849,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_candidate_bar_coverage_incomplete")
-            self.assertEqual(decision.execution_summary["replay_month"], "2021-01")
+            self.assertIsNone(decision.execution_summary["replay_month"])
             self.assertEqual(decision.execution_summary["missing_equity_candidate_symbols_sample"], ["MSFT"])
 
     def test_execution_blocks_current_day_candidate_universe_before_post_close_ready_time(self):
@@ -1149,8 +1216,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             storage_root.mkdir(parents=True)
             dataset_root = self._write_dataset(storage_root)
             self._write_completed_fold(storage_root)
-            self._write_completed_replay_month(dataset_root, run_id="compatible_run_2021_01", month="2021-01")
-            self._write_completed_replay_month(dataset_root, run_id="compatible_run_2021_02", month="2021-02")
+            self._write_completed_continuous_replay(dataset_root)
 
             decision = run_model_group_replay_if_ready(storage_root=storage_root, runner_path=tmp / "missing.py")
 

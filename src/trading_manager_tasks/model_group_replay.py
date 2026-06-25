@@ -101,7 +101,7 @@ def run_model_group_replay_if_ready(
     ready_months = _ready_replay_months(dataset_root, replay_run_months=compatible_run_months) if compatible_run_months else set()
     if expected_months > 0 and len(ready_months) >= expected_months:
         return None
-    replay_month = _next_replay_month(dataset_root=dataset_root, ready_months=ready_months)
+    replay_month = None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
@@ -207,7 +207,7 @@ def run_model_group_replay_if_ready(
                     "required_next_step": required_next_step,
                 },
             )
-    replay_plan_equity_symbols = _replay_dataset_available_equity_symbols(dataset_root, replay_month=replay_month)
+    replay_plan_equity_symbols = _replay_dataset_available_equity_symbols_for_replay_plan(dataset_root)
     default_candidate_universe_path = _historical_candidate_universe_path(storage_root)
     resolved_candidate_universe_path = candidate_universe_path or default_candidate_universe_path
     if not resolved_candidate_universe_path.exists():
@@ -252,9 +252,9 @@ def run_model_group_replay_if_ready(
         )
     fixed_candidate_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path)
     fixed_equity_universe_symbols = _candidate_universe_symbols(resolved_candidate_universe_path, asset_class="us_equity")
-    materialized_equity_symbols = replay_plan_equity_symbols | _canonical_alpaca_source_symbols(
+    materialized_equity_symbols = replay_plan_equity_symbols | _canonical_alpaca_source_symbols_for_replay_plan(
         storage_root,
-        replay_month=replay_month,
+        dataset_root=dataset_root,
     )
     missing_equity_candidate_symbols = tuple(sorted(fixed_equity_universe_symbols - materialized_equity_symbols))
     initial_capital_usd = _validated_initial_capital_usd(initial_capital_usd)
@@ -280,8 +280,6 @@ def run_model_group_replay_if_ready(
         "--candidate-universe-path",
         str(resolved_candidate_universe_path),
     ]
-    if replay_month:
-        command.extend(["--replay-month", replay_month])
     if max_decision_rows is not None:
         command.extend(["--max-decision-rows", str(max_decision_rows)])
 
@@ -855,6 +853,16 @@ def _canonical_alpaca_source_symbols(storage_root: Path, *, replay_month: str | 
     }
 
 
+def _canonical_alpaca_source_symbols_for_replay_plan(storage_root: Path, *, dataset_root: Path) -> set[str]:
+    months = _replay_plan_months(dataset_root)
+    if not months:
+        return _canonical_alpaca_source_symbols(storage_root)
+    by_month = [_canonical_alpaca_source_symbols(storage_root, replay_month=month) for month in months]
+    if not by_month:
+        return set()
+    return set.intersection(*by_month)
+
+
 def _alpaca_month_source_ready(month_dir: Path) -> bool:
     if (month_dir / "completion_receipt.json").exists() and _completion_receipt_succeeded(month_dir / "completion_receipt.json"):
         return True
@@ -943,6 +951,16 @@ def _replay_dataset_available_equity_symbols(dataset_root: Path, *, replay_month
             continue
         symbols.update(_string_set(row.get("target_ref") or row.get("target_symbol") or row.get("symbol")))
     return symbols
+
+
+def _replay_dataset_available_equity_symbols_for_replay_plan(dataset_root: Path) -> set[str]:
+    months = _replay_plan_months(dataset_root)
+    if not months:
+        return _replay_dataset_available_equity_symbols(dataset_root)
+    by_month = [_replay_dataset_available_equity_symbols(dataset_root, replay_month=month) for month in months]
+    if not by_month:
+        return set()
+    return set.intersection(*by_month)
 
 
 def _python_executable() -> str:
@@ -1191,8 +1209,6 @@ def _replay_receipt_selected_option_path_missing_count(replay_receipt: Mapping[s
 
 def _replay_receipt_valid_months(replay_receipt: Mapping[str, Any]) -> set[str]:
     receipt_month = str(replay_receipt.get("replay_month") or "").strip()
-    if not receipt_month:
-        return set()
     decision_rows_ref = str(replay_receipt.get("decision_rows_ref") or "").strip()
     if not decision_rows_ref:
         return set()
@@ -1200,9 +1216,9 @@ def _replay_receipt_valid_months(replay_receipt: Mapping[str, Any]) -> set[str]:
         decision_months = _decision_row_months(Path(decision_rows_ref))
     except (OSError, ValueError, json.JSONDecodeError):
         return set()
-    if decision_months == {receipt_month}:
-        return {receipt_month}
-    return set()
+    if receipt_month:
+        return set()
+    return decision_months
 
 
 def _decision_row_months(path: Path) -> set[str]:
@@ -1286,6 +1302,11 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
             return {
                 "compatible": False,
                 "reason": "equity/options replay receipt missing current score-scale-aware switch threshold policy",
+            }
+        if str(replay_receipt.get("replay_continuity_policy") or "") != "continuous_cross_month_portfolio_path":
+            return {
+                "compatible": False,
+                "reason": "equity/options replay receipt missing continuous cross-month portfolio replay policy",
             }
     return {"compatible": True, "reason": "compatible fold-bound execution-component-graph replay receipt"}
 

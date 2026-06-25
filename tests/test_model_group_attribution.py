@@ -63,6 +63,13 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "impact_exposure_time": "2021-01-05T10:10:00-05:00",
                             "future_outcome_window": "2021-01-05T11:00:00-05:00->2021-01-05T16:00:00-05:00",
                             "realized_return": -0.01,
+                            "decision_intended_action": "open_long",
+                            "decision_intended_side": "long",
+                            "decision_expression_type": "long_call",
+                            "selected_option_right": "call",
+                            "underlying_return": -0.005,
+                            "directional_underlying_return": -0.005,
+                            "option_direction_consistency_status": "aligned",
                             "target_expected_move_abs_return": 0.02,
                         }
                     ),
@@ -74,6 +81,13 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "realized_return": 0.01,
                             "baseline_return": 0.02,
                             "month": "2021-01",
+                            "decision_intended_action": "open_short",
+                            "decision_intended_side": "short",
+                            "decision_expression_type": "long_put",
+                            "selected_option_right": "put",
+                            "underlying_return": -0.01,
+                            "directional_underlying_return": 0.01,
+                            "option_direction_consistency_status": "aligned",
                             "future_outcome_window": "2021-01-06T10:00:00-05:00->2021-01-06T16:00:00-05:00",
                         }
                     ),
@@ -99,7 +113,23 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "miss_attribution_layer": "global_hindsight_oracle",
                         }
                     ),
-                    json.dumps({"decision_id": "good_fill", "fill_status": "simulated_filled", "outcome_label": 1, "realized_return": 0.04, "baseline_return": 0.02, "month": "2021-02"}),
+                    json.dumps(
+                        {
+                            "decision_id": "good_fill",
+                            "fill_status": "simulated_filled",
+                            "outcome_label": 1,
+                            "realized_return": 0.04,
+                            "baseline_return": 0.02,
+                            "month": "2021-02",
+                            "decision_intended_action": "open_short",
+                            "decision_intended_side": "short",
+                            "decision_expression_type": "long_put",
+                            "selected_option_right": "put",
+                            "underlying_return": -0.03,
+                            "directional_underlying_return": 0.03,
+                            "option_direction_consistency_status": "aligned",
+                        }
+                    ),
                 ]
             )
             + "\n",
@@ -227,6 +257,18 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(performance_summary["contract_type"], "model_group_replay_review_performance_summary")
             self.assertEqual(performance_summary["summary"]["decision_scope"]["decision_row_count"], 5)
             self.assertEqual(performance_summary["summary"]["target_performance"]["filled_target_count"], 2)
+            self.assertEqual(
+                performance_summary["summary"]["direction_expression"]["intended_side_counts"],
+                {"long": 1, "short": 1},
+            )
+            self.assertEqual(
+                performance_summary["summary"]["direction_expression"]["selected_option_right_counts"],
+                {"call": 1, "put": 1},
+            )
+            self.assertEqual(
+                performance_summary["summary"]["direction_expression"]["option_direction_consistency_counts"],
+                {"aligned": 2},
+            )
             self.assertEqual(performance_summary["summary"]["replacement_review"]["replacement_evaluated_count"], 2)
             self.assertEqual(performance_summary["summary"]["replacement_review"]["replacement_triggered_count"], 1)
             self.assertEqual(
