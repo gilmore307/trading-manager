@@ -1450,6 +1450,7 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
         "model_group_evaluation_executed",
         "model_group_m06_event_evidence_missing",
         "model_group_residual_event_evidence_missing",
+        "model_group_replay_option_feature_drain_lock_active",
     }
     return state.last_work_selection_reason in known_nonprogress_reasons or state.last_reason_code in known_nonprogress_reasons
 
@@ -1654,6 +1655,31 @@ def _decision_should_continue_drain(decision: SchedulerDecision, *, advanced_mon
     return False
 
 
+def _active_replay_option_feature_lock_decision(error: Exception) -> SchedulerDecision | None:
+    message = f"{type(error).__name__}: {error}"
+    if "scheduler lock is active: lock:model_group_replay_option_features:" not in message:
+        return None
+    now_utc = datetime.now(UTC)
+    now_et = now_utc.astimezone(ZoneInfo("America/New_York"))
+    return SchedulerDecision(
+        contract_type="manager_scheduler_decision",
+        now_utc=now_utc.isoformat(),
+        now_et=now_et.isoformat(),
+        decision_status="backoff",
+        reason_code="model_group_replay_option_feature_drain_lock_active",
+        reason=message,
+        market_protection_active=False,
+        resource_pressure_active=False,
+        selected_work="model_group.replay_option_features",
+        command=[],
+        next_internal_stage="model_group.replay_option_features",
+        execution_summary={
+            "required_next_step": "wait for active replay option-feature drain owner, then continue replay option feature drain before retrying model_group.replay",
+            "lock_active": True,
+        },
+    )
+
+
 def _replay_option_feature_drain_allows_replay_retry(decisions: Sequence[SchedulerDecision]) -> bool:
     """Return whether an option-feature drain has cleared the replay backoff."""
 
@@ -1691,15 +1717,20 @@ def _drain_replay_option_feature_backoff(
     started = time.monotonic()
     for step_index in range(1, max(1, max_steps) + 1):
         step_started = time.monotonic()
-        decision = run_model_group_replay_option_features_for_replay_backoff(
-            replay_decision,
-            storage_root=storage_root,
-            selected_target_symbol=selected_target_symbol,
-            execute=execute,
-            execute_provider_acquisition=execute_provider_acquisition,
-            provider_acquisition_limit=provider_acquisition_limit,
-            feature_repair_limit=feature_repair_limit,
-        )
+        try:
+            decision = run_model_group_replay_option_features_for_replay_backoff(
+                replay_decision,
+                storage_root=storage_root,
+                selected_target_symbol=selected_target_symbol,
+                execute=execute,
+                execute_provider_acquisition=execute_provider_acquisition,
+                provider_acquisition_limit=provider_acquisition_limit,
+                feature_repair_limit=feature_repair_limit,
+            )
+        except RuntimeError as exc:
+            decision = _active_replay_option_feature_lock_decision(exc)
+            if decision is None:
+                raise
         if decision is None:
             break
         decisions.append(decision)

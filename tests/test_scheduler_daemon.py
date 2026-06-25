@@ -42,6 +42,7 @@ from trading_manager_tasks.scheduler_daemon import (
     update_state_from_error,
     write_daemon_state,
     _decision_advances_progress,
+    _active_replay_option_feature_lock_decision,
     _run_model_worker_decision,
     _pending_replay_option_feature_backoff_decision,
     _run_replay_contract_path_requirement_handoff,
@@ -409,6 +410,43 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertTrue(_decision_advances_progress(decision))
         self.assertFalse(_decision_advances_progress(waiting_backoff))
+
+    def test_active_replay_option_feature_lock_becomes_wait_decision(self):
+        decision = _active_replay_option_feature_lock_decision(
+            RuntimeError(
+                "scheduler lock is active: lock:model_group_replay_option_features:promotion_replay_candidate_policy "
+                "at /tmp/promotion_replay_candidate_policy_option_features.lock"
+            )
+        )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_feature_drain_lock_active")
+        self.assertEqual(decision.selected_work, "model_group.replay_option_features")
+        self.assertTrue((decision.execution_summary or {})["lock_active"])
+
+    def test_scheduler_progress_stall_ignores_active_replay_option_feature_lock(self):
+        state = SchedulerDaemonState(
+            start_month="2016-01",
+            end_month="2016-06",
+            last_decision_status="backoff",
+            last_reason_code="model_group_replay_option_feature_drain_lock_active",
+            last_work_selection_reason="model_group_replay_option_feature_repair_ready",
+            last_progress_utc="2026-01-01T00:00:00+00:00",
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.scheduler_daemon.handle_server_error") as handler:
+            tmp = Path(raw_tmp)
+            updated = handle_scheduler_progress_stall(
+                state,
+                storage_root=tmp / "storage",
+                state_path=tmp / "runtime" / "state.json",
+                decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                stall_seconds=600,
+            )
+
+        self.assertIsNone(updated.last_stall_agent_error_ref)
+        handler.assert_not_called()
 
     def test_replay_option_feature_failure_routes_server_error_agent(self):
         decision = SchedulerDecision(
