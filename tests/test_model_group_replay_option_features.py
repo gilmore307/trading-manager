@@ -481,6 +481,46 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             {"2021-03": ["mgrreq_option_chain_window_aapl_2021_03_2021_03_05_0930"]},
         )
 
+    def test_provider_read_timeout_returns_retryable_source_backoff(self) -> None:
+        requirement = ReplayOptionFeatureRequirement("TMHC", "2021-03-08T16:00:00-05:00", "2021-03")
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True, exist_ok=True)
+            self._write_completed_fold(storage_root)
+            self._write_frozen_dataset(storage_root)
+
+            with (
+                patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", side_effect=((requirement,), ())),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", return_value=()),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
+                    return_value={"2021-03": ["mgrreq_replay_option_chain_window_tmhc_2021_03_2021_03_08_1600"]},
+                ),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features.dispatch_option_chain_source_acquisition",
+                    side_effect=RuntimeError('"error": {"message": "The read operation timed out", "type": "ReadTimeout"}'),
+                ),
+            ):
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    self._replay_backoff(requirement),
+                    storage_root=storage_root,
+                    selected_target_symbol="AAPL",
+                    execute=True,
+                    execute_provider_acquisition=True,
+                )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_source_acquisition_required")
+        self.assertTrue(decision.dispatch_performed)
+        self.assertIn("ReadTimeout", decision.execution_summary["provider_acquisition_error"])
+        self.assertEqual(
+            decision.execution_summary["required_next_step"],
+            "continue bounded replay option source acquisition",
+        )
+
     def test_provider_unavailable_records_replay_sentinel(self) -> None:
         requirement = ReplayOptionFeatureRequirement("AAPL", "2021-03-05T16:00:00-05:00", "2021-03")
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -251,6 +251,32 @@ def run_model_group_replay_option_features_for_replay_backoff(
                                 option_source_unavailable_count=unavailable_count,
                             ),
                         )
+                    if _provider_error_is_retryable(provider_error):
+                        return _decision(
+                            decision_status="backoff",
+                            reason_code="model_group_replay_option_source_acquisition_required",
+                            reason=(
+                                "transient replay option-chain source provider transport failure; "
+                                "continue bounded source acquisition retry"
+                            ),
+                            selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
+                            provider_calls=provider_calls,
+                            dispatch_performed=True,
+                            execution_summary=_summary(
+                                contract_id=contract_id,
+                                dataset_root=dataset_root,
+                                training_fold=training_fold,
+                                missing=requirements,
+                                batch=batch,
+                                source_missing=source_missing,
+                                source_ready=source_ready,
+                                required_next_step="continue bounded replay option source acquisition",
+                                dispatch_summary=dispatch_summary,
+                                generated_summaries=generated_summaries,
+                                source_request_ids_by_month=source_request_ids_by_month,
+                                provider_acquisition_error=provider_error,
+                            ),
+                        )
                     return _decision(
                         decision_status="backoff",
                         reason_code="model_group_replay_option_source_acquisition_failed",
@@ -870,6 +896,21 @@ def _provider_error_means_source_unavailable(error_text: str) -> bool:
         "option source unavailable",
     )
     return any(marker in text for marker in unavailable_markers)
+
+
+def _provider_error_is_retryable(error_text: str) -> bool:
+    text = error_text.lower()
+    retryable_markers = (
+        "readtimeout",
+        "read operation timed out",
+        "connection timed out",
+        "connecttimeout",
+        "timeout",
+        "temporarily unavailable",
+        "connection reset",
+        "remote end closed connection",
+    )
+    return any(marker in text for marker in retryable_markers)
 
 
 def _persist_option_source_unavailable_markers(
