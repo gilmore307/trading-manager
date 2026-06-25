@@ -1123,7 +1123,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)
         self.assertIn("started and completed 0/2 replay months", replay_task["reason"])
 
-    def test_running_replay_option_feature_drain_attaches_live_activity_without_progress_change(self):
+    def test_running_replay_option_feature_drain_updates_live_cursor_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -1163,16 +1163,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             {
                                 "requirement_kind": "same_row_option_snapshot",
                                 "target_ref": "AAPL",
-                                "timestamp": "2021-01-05T16:00:00-05:00",
-                                "month": "2021-01",
+                                "timestamp": "2021-02-01T16:00:00-05:00",
+                                "month": "2021-02",
                             }
                         ),
                         json.dumps(
                             {
                                 "requirement_kind": "same_row_option_snapshot",
                                 "target_ref": "MSFT",
-                                "timestamp": "2021-01-05T16:00:00-05:00",
-                                "month": "2021-01",
+                                "timestamp": "2021-02-01T16:00:00-05:00",
+                                "month": "2021-02",
                             }
                         ),
                     ]
@@ -1187,7 +1187,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_replay_option_feature_drain_status",
                         "decision_status": "repair_incomplete",
                         "reason_code": "model_group_replay_option_feature_repair_incomplete",
-                        "replay_time_pointer": "2021-01-05T16:00:00-05:00",
+                        "replay_time_pointer": "2021-02-01T16:00:00-05:00",
                         "source_missing_count": 42,
                         "source_ready_count": 18,
                         "provider_calls": 12,
@@ -1253,6 +1253,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["detail"]["runtime_activity"]["source_missing_count"], 42)
         self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)
         self.assertEqual(replay_task["detail"]["progress"]["ready_count"], 0)
+        self.assertEqual(replay_task["detail"]["progress"]["active_count"], 2)
+        self.assertEqual(replay_task["detail"]["progress"]["active_month"], "2021-02")
+        self.assertEqual(
+            replay_task["detail"]["progress"]["active_time_pointer"],
+            "2021-02-01T16:00:00-05:00",
+        )
 
     def test_task_timeline_shows_fixed_model_group_lifecycle_for_later_fold_blocked_by_lane(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

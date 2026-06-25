@@ -1216,6 +1216,47 @@ def _public_task_identity(task: Mapping[str, Any]) -> tuple[str, str, str, str]:
     )
 
 
+def _month_key_from_replay_time_pointer(value: object) -> str | None:
+    text = str(value or "").strip()
+    month = text[:7]
+    return month if _is_month_key(month) else None
+
+
+def _replay_progress_with_runtime_cursor(
+    progress: Mapping[str, Any],
+    detail: Mapping[str, Any],
+    runtime_activity: Mapping[str, Any],
+) -> dict[str, Any]:
+    updated = dict(progress)
+    if str(updated.get("progress_source") or "") != "replay_window_months":
+        return updated
+    replay_month = _month_key_from_replay_time_pointer(runtime_activity.get("replay_time_pointer"))
+    replay_window = detail.get("replay_window")
+    if replay_month is None or not isinstance(replay_window, Mapping):
+        return updated
+    start_month = str(replay_window.get("start_month") or "").strip()
+    if not _is_month_key(start_month):
+        return updated
+    expected = _int_field(updated, "expected_count")
+    ready = _int_field(updated, "ready_count")
+    if expected <= 0:
+        return updated
+    active_count = min(max(_month_span_count(start_month, replay_month), ready), expected)
+    if active_count <= ready:
+        return updated
+    updated.update(
+        {
+            "active_count": active_count,
+            "current_count": active_count,
+            "active_month": replay_month,
+            "current_month": replay_month,
+            "active_time_pointer": runtime_activity.get("replay_time_pointer"),
+            "progress_display_basis": "running replay clock; ready_count remains completed replay months",
+        }
+    )
+    return updated
+
+
 def _mark_active_task_running(
     status: HistoricalSchedulerStatus,
     task_timeline: list[dict[str, Any]],
@@ -1238,6 +1279,9 @@ def _mark_active_task_running(
         if isinstance(runtime_activity, Mapping):
             detail = dict(updated.get("detail") or {})
             detail["runtime_activity"] = dict(runtime_activity)
+            progress = detail.get("progress")
+            if isinstance(progress, Mapping):
+                detail["progress"] = _replay_progress_with_runtime_cursor(progress, detail, runtime_activity)
             updated["detail"] = detail
             if not updated.get("started_at_utc") and runtime_activity.get("started_at_utc"):
                 updated["started_at_utc"] = runtime_activity.get("started_at_utc")
