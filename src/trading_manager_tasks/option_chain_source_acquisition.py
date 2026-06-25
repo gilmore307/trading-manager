@@ -32,6 +32,7 @@ TARGET_COMPONENT_ID = SOURCE_ID
 REQUEST_KIND = "option_chain_snapshot"
 DEFAULT_SOURCE_OUTPUT_ROOT = data_storage_root() / "model_05_option_expression" / SOURCE_ID
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
+DEFAULT_PYTHON_EXECUTABLE = Path("/root/projects/trading-manager/.venv/bin/python")
 DEFAULT_SESSION_START = time(9, 30)
 DEFAULT_SESSION_END = time(16, 0)
 DEFAULT_WINDOW_MINUTES = 30
@@ -479,6 +480,10 @@ def _run_id(request_id: str) -> str:
     return f"{request_id}_provider_{stamp}"
 
 
+def _provider_python_executable() -> str:
+    return str(DEFAULT_PYTHON_EXECUTABLE if DEFAULT_PYTHON_EXECUTABLE.exists() else Path(sys.executable))
+
+
 def dispatch_option_chain_source_acquisition(
     *,
     start_month: str,
@@ -520,7 +525,14 @@ def dispatch_option_chain_source_acquisition(
             runtime_task_key.write_text(json.dumps(_runtime_task_key(task_key), indent=2, sort_keys=True) + "\n", encoding="utf-8")
             command_path = runtime_task_key
             runtime_retained = True
-        command = [sys.executable, "-m", "data_source.option_chain_state_source", str(command_path), "--run-id", _run_id(request_id)]
+        command = [
+            _provider_python_executable(),
+            "-m",
+            "data_source.option_chain_state_source",
+            str(command_path),
+            "--run-id",
+            _run_id(request_id),
+        ]
         receipt_path = str(Path(str(task_key.get("output_root") or "")) / "completion_receipt.json")
         if not execute_provider_calls:
             return ProviderDispatchItem(

@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 
 from trading_manager_tasks.option_chain_source_acquisition import (
+    DEFAULT_PYTHON_EXECUTABLE,
     _runtime_task_key,
+    _provider_python_executable,
     build_option_chain_source_review,
     is_current_option_chain_request,
     manager_requests_from_review,
@@ -57,6 +59,12 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertEqual(runtime_key["manager_controls"]["max_time_window"], "1d")
         self.assertEqual(runtime_key["manager_controls"]["rate_limit_policy_ref"], "thetadata_python_library_serial_session")
         self.assertEqual(runtime_key["params"]["thetadata_transport"], "python_library")
+
+    def test_provider_command_uses_project_virtualenv_when_available(self) -> None:
+        if DEFAULT_PYTHON_EXECUTABLE.exists():
+            self.assertEqual(_provider_python_executable(), str(DEFAULT_PYTHON_EXECUTABLE))
+        else:
+            self.assertTrue(_provider_python_executable())
 
     def test_current_request_matching_uses_fold_start_month_not_end_month(self) -> None:
         current = {
