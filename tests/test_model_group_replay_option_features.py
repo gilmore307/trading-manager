@@ -573,6 +573,98 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         persist_unavailable.assert_called_once()
         generate.assert_not_called()
 
+    def test_provider_success_without_source_rows_with_deferred_work_reports_progress(self) -> None:
+        first = ReplayOptionFeatureRequirement("TKO", "2021-01-05T16:00:00-05:00", "2021-01")
+        deferred = ReplayOptionFeatureRequirement("CLS", "2021-01-05T16:00:00-05:00", "2021-01")
+        dispatch_summary = SimpleNamespace(
+            provider_calls=1,
+            summary_row=lambda: {
+                "contract_type": "manager_provider_dispatch_summary",
+                "provider_calls": 1,
+                "dispatch_count": 1,
+            },
+        )
+        payload = {
+            "missing_count": 2,
+            "sample": [
+                {
+                    "target_ref": first.target_ref,
+                    "timestamp": first.timestamp,
+                    "maximum_permitted_source_end": first.timestamp,
+                    "signal_source": "model_04_unified_decision.handoff_to_model_05",
+                },
+                {
+                    "target_ref": deferred.target_ref,
+                    "timestamp": deferred.timestamp,
+                    "maximum_permitted_source_end": deferred.timestamp,
+                    "signal_source": "model_04_unified_decision.handoff_to_model_05",
+                },
+            ],
+        }
+        reason = "ValueError: replay_option_feature_acquisition_required: " + json.dumps(payload, sort_keys=True)
+        replay_backoff = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-01-01T00:00:00+00:00",
+            now_et="2025-12-31T19:00:00-05:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_option_feature_acquisition_required",
+            reason=reason,
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay",
+            command=[],
+            execution_summary={"runner_stderr": reason},
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True, exist_ok=True)
+            self._write_completed_fold(storage_root)
+            self._write_frozen_dataset(storage_root)
+
+            with (
+                patch("trading_manager_tasks.model_group_replay_option_features._database_url", return_value="postgres://test"),
+                patch("trading_manager_tasks.model_group_replay_option_features._feature_missing_requirements", return_value=(first, deferred)),
+                patch("trading_manager_tasks.model_group_replay_option_features._source_ready_requirements", side_effect=((), ())),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._persist_replay_option_source_requests",
+                    return_value={"2021-01": ["mgrreq_replay_option_chain_window_tko_2021_01_2021_01_05_1600"]},
+                ),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features.dispatch_option_chain_source_acquisition",
+                    return_value=dispatch_summary,
+                ),
+                patch(
+                    "trading_manager_tasks.model_group_replay_option_features._persist_option_source_unavailable_markers",
+                    return_value=1,
+                ) as persist_unavailable,
+                patch("trading_manager_tasks.model_group_replay_option_features.execute_m05_option_expression_feature_stage") as generate,
+            ):
+                decision = run_model_group_replay_option_features_for_replay_backoff(
+                    replay_backoff,
+                    storage_root=storage_root,
+                    selected_target_symbol="AAPL",
+                    execute=True,
+                    execute_provider_acquisition=True,
+                    provider_acquisition_limit=1,
+                )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "executed")
+        self.assertEqual(decision.reason_code, "model_group_replay_option_source_unavailable_recorded")
+        self.assertEqual(decision.provider_calls, 1)
+        self.assertEqual(decision.execution_summary["option_source_unavailable_count"], 1)
+        self.assertEqual(
+            decision.execution_summary["required_next_step"],
+            "continue replay option feature drain before retrying model_group.replay",
+        )
+        persist_unavailable.assert_called_once_with(
+            [first],
+            database_url="postgres://test",
+            provider_error="provider acquisition completed without option_chain_state_source rows",
+        )
+        generate.assert_not_called()
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
