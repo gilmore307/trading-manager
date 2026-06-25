@@ -2384,6 +2384,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 patch("trading_manager_tasks.scheduler_daemon.run_model_group_replay_review_if_ready", return_value=None),
                 patch("trading_manager_tasks.scheduler_daemon.run_model_group_residual_event_governance_if_ready", return_value=None),
                 patch("trading_manager_tasks.scheduler_daemon.run_model_group_evaluation_if_ready", return_value=None),
+                patch("trading_manager_tasks.scheduler_daemon.refresh_dashboard_read_models") as refresh_dashboard,
             ):
                 run_daemon_loop(
                     start_month="2016-01",
@@ -2398,12 +2399,14 @@ class SchedulerDaemonTests(unittest.TestCase):
                     execute_safe_preparation=True,
                     execute_model_group_replay=True,
                     replay_option_feature_repair_limit=123,
+                    refresh_dashboard_on_decision=True,
                     source_existing_bootstrap=False,
                     config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
                 )
 
             repair.assert_called_once()
             replay.assert_not_called()
+            refresh_dashboard.assert_called_once()
             log_rows = [json.loads(line) for line in decision_log.read_text(encoding="utf-8").splitlines()]
             status_jsonl = decision_log.parent / "replay_option_feature_drain_status.jsonl"
             latest_status_json = decision_log.parent / "replay_option_feature_drain_latest.json"

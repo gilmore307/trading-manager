@@ -2176,7 +2176,7 @@ def run_daemon_loop(
                                     last_work_selection_reason="model_group_replay_option_feature_repair_ready",
                                     updated_utc=completed,
                                 )
-                                refresh_needed = refresh_needed or replay_option_feature_decision.decision_status == "executed"
+                                refresh_needed = True
                                 should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_option_feature_decision, advanced_month=False)
                                 decisions_this_cycle += 1
                                 if output is not None:
@@ -2251,7 +2251,7 @@ def run_daemon_loop(
                                     last_work_selection_reason="model_group_replay_option_feature_repair_ready",
                                     updated_utc=completed,
                                 )
-                                refresh_needed = refresh_needed or replay_option_feature_decision.decision_status == "executed"
+                                refresh_needed = True
                                 should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_option_feature_decision, advanced_month=False)
                                 decisions_this_cycle += 1
                                 if output is not None:
@@ -2515,7 +2515,7 @@ def run_daemon_loop(
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
                                 completed = utc_now_iso()
                                 state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_option_feature_decision)
-                                refresh_needed = refresh_needed or replay_option_feature_decision.decision_status == "executed"
+                                refresh_needed = True
                                 should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_option_feature_decision, advanced_month=False)
                                 decisions_this_cycle += 1
                                 if output is not None:
@@ -2574,7 +2574,7 @@ def run_daemon_loop(
                                 append_decision_log(decision_log_path, replay_option_feature_decision)
                                 completed = utc_now_iso()
                                 state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=replay_option_feature_decision)
-                                refresh_needed = refresh_needed or replay_option_feature_decision.decision_status == "executed"
+                                refresh_needed = True
                                 should_continue_drain = should_continue_drain or _decision_should_continue_drain(replay_option_feature_decision, advanced_month=False)
                                 decisions_this_cycle += 1
                                 if output is not None:
