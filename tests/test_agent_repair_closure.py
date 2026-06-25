@@ -5,6 +5,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from trading_manager_tasks.agent_repair_closure import (
@@ -135,6 +136,45 @@ class AgentRepairClosureTests(unittest.TestCase):
 
         self.assertEqual(receipt["closure_status"], "blocked")
         self.assertIn("automatic retry", receipt["blockers"][0])
+
+    def test_push_blocked_diagnosis_closes_after_repo_is_pushed_and_drain_can_continue(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            repo = tmp / "trading-manager"
+            changed_file = repo / "src" / "trading_manager_tasks" / "option_chain_source_acquisition.py"
+            changed_file.parent.mkdir(parents=True)
+            changed_file.write_text("# fixture\n", encoding="utf-8")
+            candidate = self._write_candidate(
+                tmp / "agent",
+                stdout_payload={
+                    "diagnosis_status": "repaired_verified_push_blocked",
+                    "files_changed": ["src/trading_manager_tasks/option_chain_source_acquisition.py"],
+                    "retry_recommendation": "retry_or_continue_model_group_replay_option_features_drain",
+                    "blockers": [
+                        "git push origin main failed before closure retry",
+                        "The full replay option-feature artifact is not yet drained",
+                    ],
+                },
+            )
+            calls: list[tuple[str, ...]] = []
+
+            def fake_run(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+                calls.append(tuple(argv))
+                if argv[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="main\n", stderr="")
+                if argv[:2] == ["git", "status"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+                if argv[:3] == ["git", "rev-list", "--count"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="0\n", stderr="")
+                return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+            receipt = close_agent_repair(candidate, runner=fake_run, repo_roots=(repo,))
+
+        self.assertEqual(receipt["closure_status"], "closed")
+        self.assertEqual(receipt["blockers"], [])
+        self.assertIn(("git", "rev-list", "--count", "origin/main..HEAD"), calls)
+        self.assertEqual(receipt["actions"][0]["action"], "git_push")
+        self.assertEqual(receipt["actions"][0]["status"], "not_needed")
 
     def test_discovery_skips_requests_with_existing_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

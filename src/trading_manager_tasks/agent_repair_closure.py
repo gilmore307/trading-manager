@@ -185,7 +185,17 @@ def _diagnosis_repaired(payload: Mapping[str, Any]) -> bool:
 
 def _automatic_retry_forbidden(payload: Mapping[str, Any]) -> bool:
     text = _payload_text(payload.get("diagnosis_status"), payload.get("retry_recommendation"), payload.get("blockers"))
-    return any(marker in text for marker in ("manual_review", "manual review", "do_not_retry", "do not retry", "blocked", "push_blocked", "push blocked"))
+    return any(
+        marker in text
+        for marker in (
+            "manual_review",
+            "manual review",
+            "do_not_retry",
+            "do not retry",
+            "blocked_boundary",
+            "blocked boundary",
+        )
+    )
 
 
 def _forbidden_runtime_scope(request: Mapping[str, Any], payload: Mapping[str, Any]) -> bool:
@@ -208,6 +218,9 @@ def _known_repo_for_path(raw_path: object, repo_roots: Iterable[Path]) -> Path |
     except (TypeError, ValueError):
         return None
     if not path.is_absolute():
+        for repo_root in repo_roots:
+            if (repo_root / path).exists():
+                return repo_root
         return None
     for repo_root in repo_roots:
         try:
