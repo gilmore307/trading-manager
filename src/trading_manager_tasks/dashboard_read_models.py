@@ -1018,11 +1018,131 @@ def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[d
     return None
 
 
-def _runtime_active_work(status: HistoricalSchedulerStatus) -> dict[str, Any]:
+def _latest_replay_option_feature_requirements_artifact(dataset_root: Path) -> Path | None:
+    run_root = dataset_root / "replay_execution_runs"
+    if not run_root.exists():
+        return None
+    candidates = [
+        path / "option_feature_requirements.jsonl"
+        for path in run_root.iterdir()
+        if path.is_dir() and (path / "option_feature_requirements.jsonl").exists()
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def _replay_option_feature_requirement_sample(path: Path | None, *, limit: int = 5) -> tuple[int | None, list[dict[str, Any]]]:
+    if path is None or not path.exists():
+        return None, []
+    count = 0
+    sample: list[dict[str, Any]] = []
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for raw_line in handle:
+                if not raw_line.strip():
+                    continue
+                count += 1
+                if len(sample) >= limit:
+                    continue
+                try:
+                    parsed = json.loads(raw_line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, Mapping):
+                    sample.append(
+                        {
+                            "target_ref": parsed.get("target_ref"),
+                            "timestamp": parsed.get("timestamp"),
+                            "month": parsed.get("month"),
+                            "requirement_kind": parsed.get("requirement_kind"),
+                            "source_window_end": parsed.get("source_window_end"),
+                            "maximum_permitted_source_end": parsed.get("maximum_permitted_source_end"),
+                        }
+                    )
+    except OSError:
+        return None, []
+    return count, sample
+
+
+def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] | None:
+    latest_status_path = storage_root / "runtime" / "replay_option_feature_drain_latest.json"
+    latest_status = _load_optional_json_object(latest_status_path)
+    if not latest_status:
+        return None
+    dataset_root = _replay_dataset_root(storage_root, "promotion_replay_candidate_policy")
+    requirements_artifact = None
+    raw_artifact = latest_status.get("requirements_artifact_ref")
+    if raw_artifact:
+        candidate = Path(str(raw_artifact))
+        requirements_artifact = candidate if candidate.exists() else None
+    if requirements_artifact is None:
+        requirements_artifact = _latest_replay_option_feature_requirements_artifact(dataset_root)
+    requirement_count, sample = _replay_option_feature_requirement_sample(requirements_artifact)
+    replay_time_pointer = latest_status.get("replay_time_pointer") or next(
+        (str(item.get("timestamp")) for item in sample if item.get("timestamp")),
+        None,
+    )
+    sample_targets = [str(item.get("target_ref")) for item in sample if item.get("target_ref")]
+    source_missing_count = latest_status.get("source_missing_count")
+    source_ready_count = latest_status.get("source_ready_count")
+    provider_calls = latest_status.get("provider_calls")
+    activity_parts = ["Replay option feature drain"]
+    if replay_time_pointer:
+        activity_parts.append(replay_time_pointer)
+    if source_missing_count is not None:
+        activity_parts.append(f"{source_missing_count} source gaps remain")
+    if sample_targets:
+        activity_parts.append("sample " + ", ".join(sample_targets[:4]))
+    return {
+        "activity_type": "replay_option_feature_drain",
+        "activity_label": "Replay option feature drain",
+        "activity_summary": " · ".join(activity_parts),
+        "status_path": str(latest_status_path),
+        "requirements_artifact_ref": str(requirements_artifact) if requirements_artifact else None,
+        "requirement_count": requirement_count,
+        "replay_time_pointer": replay_time_pointer,
+        "sample_targets": sample_targets,
+        "sample_requirements": sample,
+        "decision_status": latest_status.get("decision_status"),
+        "reason_code": latest_status.get("reason_code"),
+        "provider_calls": provider_calls,
+        "batch_index": latest_status.get("batch_index"),
+        "batch_size": latest_status.get("batch_size"),
+        "batch_count": latest_status.get("batch_count"),
+        "source_missing_count": source_missing_count,
+        "source_ready_count": source_ready_count,
+        "option_source_unavailable_count": latest_status.get("option_source_unavailable_count"),
+        "required_next_step": latest_status.get("required_next_step"),
+        "resume_stage_id": latest_status.get("resume_stage_id"),
+        "updated_at_utc": latest_status.get("emitted_at_utc"),
+    }
+
+
+def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Path | None = None) -> dict[str, Any]:
     latest_decision = status.latest_decision or {}
     provider_status = status.provider_status or {}
     selected_work = latest_decision.get("selected_work") or status.current_stage
     next_internal_stage = latest_decision.get("next_internal_stage") or provider_status.get("next_internal_stage")
+    runtime_reason = " ".join(
+        str(value or "")
+        for value in (
+            latest_decision.get("reason_code"),
+            latest_decision.get("decision_status"),
+            latest_decision.get("reason"),
+            status.blocked_reason,
+        )
+    )
+    resolved_storage_root = storage_root or _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    runtime_activity = None
+    if (
+        str(selected_work or "") == "model_group.replay_option_features"
+        or str(selected_work or "") == "model_group.replay"
+        or str(next_internal_stage or "") == "model_group.replay_option_features"
+        or "replay_option_feature" in runtime_reason
+        or "replay_option_source" in runtime_reason
+    ):
+        runtime_activity = _replay_option_feature_drain_activity(resolved_storage_root)
     runtime_status = "ready"
     if not status.service_runtime_ready:
         runtime_status = "blocked"
@@ -1039,6 +1159,7 @@ def _runtime_active_work(status: HistoricalSchedulerStatus) -> dict[str, Any]:
         "reason": latest_decision.get("reason") or status.blocked_reason,
         "next_internal_stage": next_internal_stage,
         "lock_status": status.lock.status,
+        "runtime_activity": runtime_activity,
     }
 
 
@@ -1074,19 +1195,30 @@ def _mark_active_task_running(
     status: HistoricalSchedulerStatus,
     task_timeline: list[dict[str, Any]],
     public_active_task: dict[str, Any] | None,
+    runtime_active_work: Mapping[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     if status.lock.status != "active" or public_active_task is None:
         return task_timeline, public_active_task
-    if status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
+    runtime_activity = runtime_active_work.get("runtime_activity") if isinstance(runtime_active_work, Mapping) else None
+    if status.blocked_reason and not _is_transient_active_scheduler_backoff(status) and not isinstance(runtime_activity, Mapping):
         return task_timeline, public_active_task
     if str(public_active_task.get("task_state") or "") != "current":
         return task_timeline, public_active_task
-    if str(public_active_task.get("status") or "") != "ready":
+    public_status = str(public_active_task.get("status") or "")
+    if public_status != "ready" and not (public_status == "blocked" and isinstance(runtime_activity, Mapping)):
         return task_timeline, public_active_task
     active_key = _public_task_identity(public_active_task)
-    running_task = {**public_active_task, "status": "running"}
+    def with_running_activity(task: dict[str, Any]) -> dict[str, Any]:
+        updated = {**task, "status": "running"}
+        if isinstance(runtime_activity, Mapping):
+            detail = dict(updated.get("detail") or {})
+            detail["runtime_activity"] = dict(runtime_activity)
+            updated["detail"] = detail
+        return updated
+
+    running_task = with_running_activity(public_active_task)
     updated_timeline = [
-        {**task, "status": "running"} if _public_task_identity(task) == active_key else task
+        with_running_activity(task) if _public_task_identity(task) == active_key else task
         for task in task_timeline
     ]
     return updated_timeline, running_task
@@ -4794,7 +4926,13 @@ def build_historical_task_progress_summary(
     internal_task_timeline = list(task_timeline)
     task_timeline = _sort_task_timeline(_project_public_task_facts(task_timeline))
     public_active_task = _public_active_task(status, task_timeline)
-    task_timeline, public_active_task = _mark_active_task_running(status, task_timeline, public_active_task)
+    runtime_active_work = _runtime_active_work(status, storage_root=storage_root)
+    task_timeline, public_active_task = _mark_active_task_running(
+        status,
+        task_timeline,
+        public_active_task,
+        runtime_active_work=runtime_active_work,
+    )
     if not stage_counts and task_timeline:
         for task in task_timeline:
             task_status = str(task.get("status") or "unknown")
@@ -4807,7 +4945,7 @@ def build_historical_task_progress_summary(
         "current_month": _public_current_period(status, public_active_task),
         "active_stage": public_active_task.get("task_id") if public_active_task else None,
         "active_task": _public_active_task_summary(public_active_task),
-        "runtime_active_work": _runtime_active_work(status),
+        "runtime_active_work": runtime_active_work,
         "selected_target_symbol": selected_target_symbol,
         "target_queue": _target_queue_summary(storage_root),
         "internal_current_month": status.current_month,

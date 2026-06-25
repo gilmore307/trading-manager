@@ -1123,6 +1123,132 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)
         self.assertIn("started and completed 0/2 replay months", replay_task["reason"])
 
+    def test_running_replay_option_feature_drain_attaches_live_activity_without_progress_change(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            replay_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 2,
+                        "available_feed_acquisition_count": 2,
+                        "deferred_feed_acquisition_count": 0,
+                        "missing_feed_acquisition_count": 0,
+                        "pre_replay_target_refs": ["AAPL"],
+                        "target_refs": ["AAPL"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
+            replay_run = replay_root / "replay_execution_runs" / "model_group_replay_fixture"
+            replay_run.mkdir(parents=True, exist_ok=True)
+            requirements_path = replay_run / "option_feature_requirements.jsonl"
+            requirements_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "requirement_kind": "same_row_option_snapshot",
+                                "target_ref": "AAPL",
+                                "timestamp": "2021-01-05T16:00:00-05:00",
+                                "month": "2021-01",
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "requirement_kind": "same_row_option_snapshot",
+                                "target_ref": "MSFT",
+                                "timestamp": "2021-01-05T16:00:00-05:00",
+                                "month": "2021-01",
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            drain_status_path = tmp / "storage" / "02_control_plane" / "runtime" / "replay_option_feature_drain_latest.json"
+            drain_status_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_replay_option_feature_drain_status",
+                        "decision_status": "repair_incomplete",
+                        "reason_code": "model_group_replay_option_feature_repair_incomplete",
+                        "replay_time_pointer": "2021-01-05T16:00:00-05:00",
+                        "source_missing_count": 42,
+                        "source_ready_count": 18,
+                        "provider_calls": 12,
+                        "batch_index": 2,
+                        "batch_size": 12,
+                        "batch_count": 4,
+                        "option_source_unavailable_count": 3,
+                        "required_next_step": "continue_option_feature_repair",
+                        "requirements_artifact_ref": str(requirements_path),
+                        "emitted_at_utc": "2026-06-25T15:40:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            decision_log.parent.mkdir(parents=True, exist_ok=True)
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "backoff",
+                        "start_month": "2021-01",
+                        "selected_work": "model_group.replay_option_features",
+                        "next_internal_stage": "model_group.replay_option_features",
+                        "reason_code": "model_group_replay_option_feature_repair_incomplete",
+                        "reason": "replay option feature repair is still draining source gaps",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.write_text(json.dumps({"current_month": "2020-07", "start_month": "2020-07"}) + "\n", encoding="utf-8")
+            lock_path = tmp / "runtime" / "historical_scheduler.lock"
+            lock_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=state_path,
+                lock_path=lock_path,
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-25T15:41:00Z")
+
+        runtime_activity = payload["chart_payload"]["runtime_active_work"]["runtime_activity"]
+        self.assertEqual(runtime_activity["activity_type"], "replay_option_feature_drain")
+        self.assertEqual(runtime_activity["source_missing_count"], 42)
+        self.assertEqual(runtime_activity["source_ready_count"], 18)
+        self.assertEqual(runtime_activity["provider_calls"], 12)
+        self.assertEqual(runtime_activity["sample_targets"], ["AAPL", "MSFT"])
+        self.assertIn("42 source gaps remain", runtime_activity["activity_summary"])
+        replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
+        self.assertEqual(replay_task["status"], "running")
+        self.assertEqual(replay_task["detail"]["runtime_activity"]["source_missing_count"], 42)
+        self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)
+        self.assertEqual(replay_task["detail"]["progress"]["ready_count"], 0)
+
     def test_task_timeline_shows_fixed_model_group_lifecycle_for_later_fold_blocked_by_lane(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
