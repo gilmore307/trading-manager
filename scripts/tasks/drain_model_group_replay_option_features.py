@@ -7,7 +7,7 @@ import argparse
 import json
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -189,7 +189,28 @@ def _status_from_decision(
 def _emit(payload: dict[str, Any], *, args: argparse.Namespace) -> None:
     payload = dict(payload)
     payload.setdefault("contract_type", DRAIN_STATUS_CONTRACT_TYPE)
-    payload["emitted_at_utc"] = datetime.now(UTC).isoformat()
+    emitted_at_utc = datetime.now(UTC).isoformat()
+    payload["emitted_at_utc"] = emitted_at_utc
+    if payload.get("event") == "batch_complete" and not payload.get("drain_started_at_utc"):
+        drain_started_at_utc = None
+        if args.latest_status_json is not None:
+            try:
+                previous = json.loads(args.latest_status_json.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                previous = None
+            if isinstance(previous, dict):
+                raw_started = previous.get("drain_started_at_utc")
+                drain_started_at_utc = str(raw_started) if raw_started else None
+        if drain_started_at_utc is None:
+            elapsed_seconds = payload.get("elapsed_seconds")
+            try:
+                drain_started_at_utc = (
+                    datetime.fromisoformat(emitted_at_utc.replace("Z", "+00:00"))
+                    - timedelta(seconds=float(elapsed_seconds))
+                ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            except (TypeError, ValueError, OverflowError):
+                drain_started_at_utc = emitted_at_utc
+        payload["drain_started_at_utc"] = drain_started_at_utc
     text = json.dumps(payload, sort_keys=True)
     print(text)
     sys.stdout.flush()

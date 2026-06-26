@@ -1075,6 +1075,9 @@ def _replay_activity_started_at(requirements_artifact: Path | None, latest_statu
                 parsed = None
             if parsed is not None:
                 return parsed.isoformat().replace("+00:00", "Z")
+    drain_started_at = latest_status.get("drain_started_at_utc")
+    if isinstance(drain_started_at, str) and drain_started_at:
+        return drain_started_at
     emitted_at = latest_status.get("emitted_at_utc")
     elapsed_seconds = latest_status.get("elapsed_seconds")
     if isinstance(emitted_at, str) and isinstance(elapsed_seconds, (int, float)):

@@ -100,7 +100,9 @@ Both the daemon and the manual drain script write per-batch progress to
 `runtime/replay_option_feature_drain_status.jsonl` and
 `runtime/replay_option_feature_drain_latest.json` so long provider-gated drains
 remain observable before the scheduler decision log receives its end-of-drain
-rows.
+rows. `elapsed_seconds` describes the latest bounded batch only;
+`drain_started_at_utc` is the stable start time for the current drain and is the
+timestamp dashboard task runtime should use while the drain remains active.
 
 After replay has M05 features and selects concrete listed option contracts, the
 separate `model_group.replay_contract_paths` stage prepares

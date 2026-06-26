@@ -47,6 +47,7 @@ from trading_manager_tasks.scheduler_daemon import (
     _pending_replay_option_feature_backoff_decision,
     _run_replay_contract_path_requirement_handoff,
     _run_replay_review_data_requirement_handoff,
+    _emit_replay_option_feature_drain_status,
 )
 
 
@@ -79,6 +80,54 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertGreater(len(rows), 0)
         self.assertEqual(rows[-1]["sequence"], 19)
         self.assertGreater(rows[0]["sequence"], 0)
+
+    def test_replay_option_feature_drain_status_preserves_started_at(self):
+        decision = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-06-24T18:13:31+00:00",
+            now_et="2026-06-24T14:13:31-04:00",
+            decision_status="backoff",
+            reason_code="model_group_replay_option_feature_repair_incomplete",
+            reason="replay option-feature repair did not produce all required point-in-time feature rows",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay_option_features",
+            command=[],
+            next_internal_stage="model_group.replay_option_features",
+            provider_calls=12,
+            execution_summary={
+                "batch_count": 4,
+                "source_missing_count": 42,
+                "source_ready_count": 0,
+                "option_source_unavailable_count": 3,
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            runtime = Path(raw_tmp) / "runtime"
+            latest_path = runtime / "replay_option_feature_drain_latest.json"
+            status_path = runtime / "replay_option_feature_drain_status.jsonl"
+            latest_path.parent.mkdir(parents=True)
+            latest_path.write_text(
+                json.dumps({"drain_started_at_utc": "2026-06-24T17:00:00Z"}) + "\n",
+                encoding="utf-8",
+            )
+
+            _emit_replay_option_feature_drain_status(
+                decision,
+                batch_index=3,
+                batch_size=12,
+                elapsed_seconds=5,
+                status_jsonl_path=status_path,
+                latest_status_json_path=latest_path,
+            )
+
+            latest = json.loads(latest_path.read_text(encoding="utf-8"))
+            rows = [json.loads(line) for line in status_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(latest["drain_started_at_utc"], "2026-06-24T17:00:00Z")
+        self.assertEqual(rows[-1]["drain_started_at_utc"], "2026-06-24T17:00:00Z")
+        self.assertEqual(latest["batch_index"], 3)
 
     def _complete_monthly_substrate(self, *, storage_root: Path, month: str) -> None:
         plan = build_model_training_workflow_plan(

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 from trading_manager_tasks.scheduler import SchedulerDecision
 
@@ -108,6 +109,32 @@ class DrainModelGroupReplayOptionFeaturesTests(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(calls[0]["provider_acquisition_limit"], 17)
             self.assertIsNone(calls[0]["feature_repair_limit"])
+
+    def test_batch_status_preserves_drain_started_at(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            status_path = tmp / "status.jsonl"
+            latest_path = tmp / "latest.json"
+            latest_path.write_text(
+                json.dumps({"drain_started_at_utc": "2026-06-24T17:00:00Z"}) + "\n",
+                encoding="utf-8",
+            )
+
+            _MODULE._emit(
+                {
+                    "event": "batch_complete",
+                    "batch_index": 2,
+                    "batch_size": 12,
+                    "elapsed_seconds": 5,
+                },
+                args=SimpleNamespace(status_jsonl=status_path, latest_status_json=latest_path),
+            )
+
+            latest = json.loads(latest_path.read_text(encoding="utf-8"))
+            rows = [json.loads(line) for line in status_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(latest["drain_started_at_utc"], "2026-06-24T17:00:00Z")
+        self.assertEqual(rows[-1]["drain_started_at_utc"], "2026-06-24T17:00:00Z")
 
 
 if __name__ == "__main__":

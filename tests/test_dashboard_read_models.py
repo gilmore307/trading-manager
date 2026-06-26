@@ -1209,6 +1209,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "batch_count": 4,
                         "option_source_unavailable_count": 3,
                         "elapsed_seconds": 3,
+                        "drain_started_at_utc": "2026-06-25T15:00:00Z",
                         "required_next_step": "continue_option_feature_repair",
                         "requirements_artifact_ref": str(requirements_path),
                         "emitted_at_utc": "2026-06-25T15:41:00Z",
@@ -1256,13 +1257,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(runtime_activity["source_ready_count"], 18)
         self.assertEqual(runtime_activity["provider_calls"], 12)
         self.assertEqual(runtime_activity["sample_targets"], ["AAPL", "MSFT"])
-        self.assertEqual(runtime_activity["started_at_utc"], "2026-06-25T15:40:57Z")
+        self.assertEqual(runtime_activity["started_at_utc"], "2026-06-25T15:00:00Z")
         self.assertEqual(runtime_activity["elapsed_seconds"], 3)
         self.assertEqual(runtime_activity["replay_runtime_trace_ref"], str(trace_path))
         self.assertIn("42 source gaps remain", runtime_activity["activity_summary"])
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["status"], "running")
-        self.assertEqual(replay_task["started_at_utc"], "2026-06-25T15:40:57Z")
+        self.assertEqual(replay_task["started_at_utc"], "2026-06-25T15:00:00Z")
         self.assertEqual(replay_task["updated_at_utc"], "2026-06-25T15:41:00Z")
         self.assertEqual(replay_task["detail"]["runtime_activity"]["source_missing_count"], 42)
         self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)

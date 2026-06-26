@@ -16,7 +16,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Sequence, TextIO
 from zoneinfo import ZoneInfo
@@ -1766,13 +1766,32 @@ def _emit_replay_option_feature_drain_status(
         return
     row = decision.summary_row()
     execution = row.get("execution_summary") if isinstance(row.get("execution_summary"), dict) else {}
+    emitted_at_utc = utc_now_iso()
+    drain_started_at_utc = None
+    if latest_status_json_path is not None:
+        try:
+            previous = json.loads(latest_status_json_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous = None
+        if isinstance(previous, dict):
+            raw_started = previous.get("drain_started_at_utc")
+            drain_started_at_utc = str(raw_started) if raw_started else None
+    if drain_started_at_utc is None:
+        try:
+            emitted = datetime.fromisoformat(emitted_at_utc.replace("Z", "+00:00"))
+            drain_started_at_utc = (
+                emitted - timedelta(seconds=float(elapsed_seconds))
+            ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        except (TypeError, ValueError, OverflowError):
+            drain_started_at_utc = emitted_at_utc
     payload = {
         "contract_type": "manager_model_group_replay_option_feature_drain_status",
         "event": "batch_complete",
         "batch_index": batch_index,
         "batch_size": batch_size,
         "elapsed_seconds": elapsed_seconds,
-        "emitted_at_utc": utc_now_iso(),
+        "drain_started_at_utc": drain_started_at_utc,
+        "emitted_at_utc": emitted_at_utc,
         "selected_work": row.get("selected_work") or "model_group.replay_option_features",
         "decision_status": row.get("decision_status"),
         "reason_code": row.get("reason_code"),
