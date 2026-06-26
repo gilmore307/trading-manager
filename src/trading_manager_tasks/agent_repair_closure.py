@@ -480,13 +480,14 @@ def close_agent_repair(
     elif existing_closure_status == "blocked":
         prior_actions = existing_receipt.get("actions")
         actions = list(prior_actions) if isinstance(prior_actions, list) else []
-        actions.append(
-            {
-                "action": "blocked_closure_recheck",
-                "status": "skipped",
-                "reason": "existing blocked closure is not retried automatically without successful retry evidence",
-            }
-        )
+        if not any(action.get("action") == "blocked_closure_recheck" for action in actions if isinstance(action, dict)):
+            actions.append(
+                {
+                    "action": "blocked_closure_recheck",
+                    "status": "skipped",
+                    "reason": "existing blocked closure is not retried automatically without successful retry evidence",
+                }
+            )
         closure_status = "blocked"
         prior_blockers = existing_receipt.get("blockers")
         blockers = list(prior_blockers) if isinstance(prior_blockers, list) else []
