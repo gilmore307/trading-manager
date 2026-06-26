@@ -45,8 +45,9 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         request = manager_requests_from_review(review)[0]
 
         self.assertEqual(request["_task_key"]["manager_controls"]["max_time_window"], "1d")
-        self.assertEqual(request["_task_key"]["manager_controls"]["rate_limit_policy_ref"], "thetadata_python_library_serial_session")
-        self.assertEqual(request["_task_key"]["params"]["thetadata_transport"], "python_library")
+        self.assertEqual(request["_task_key"]["manager_controls"]["rate_limit_policy_ref"], "thetadata_terminal_rest_account_concurrency")
+        self.assertEqual(request["_task_key"]["params"]["thetadata_transport"], "terminal_rest_selected_contracts")
+        self.assertEqual(request["_task_key"]["params"]["terminal_rest_exact_max_workers"], 1)
         self.assertEqual(request["_task_key"]["params"]["max_dte"], 180)
         self.assertEqual(request["_task_key"]["params"]["strike_range"], 5)
 
@@ -63,8 +64,9 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         runtime_key = _runtime_task_key(task_key)
 
         self.assertEqual(runtime_key["manager_controls"]["max_time_window"], "1d")
-        self.assertEqual(runtime_key["manager_controls"]["rate_limit_policy_ref"], "thetadata_python_library_serial_session")
-        self.assertEqual(runtime_key["params"]["thetadata_transport"], "python_library")
+        self.assertEqual(runtime_key["manager_controls"]["rate_limit_policy_ref"], "thetadata_terminal_rest_account_concurrency")
+        self.assertEqual(runtime_key["params"]["thetadata_transport"], "terminal_rest_selected_contracts")
+        self.assertEqual(runtime_key["params"]["terminal_rest_exact_max_workers"], 1)
 
     def test_provider_command_uses_project_virtualenv_when_available(self) -> None:
         if DEFAULT_PYTHON_EXECUTABLE.exists():

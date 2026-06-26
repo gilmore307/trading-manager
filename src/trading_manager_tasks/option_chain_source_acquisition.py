@@ -49,9 +49,10 @@ OPTION_CHAIN_PROVIDER_CONTROLS = {
     "retry_attempts": 3,
     "retry_backoff_seconds": 1.0,
     "retry_policy_ref": "target_option_chain_state_source_retry",
-    "rate_limit_policy_ref": "thetadata_python_library_serial_session",
+    "rate_limit_policy_ref": "thetadata_terminal_rest_account_concurrency",
 }
-DEFAULT_THETADATA_TRANSPORT = "python_library"
+DEFAULT_THETADATA_TRANSPORT = "terminal_rest_selected_contracts"
+DEFAULT_TERMINAL_REST_EXACT_MAX_WORKERS = 1
 ET = ZoneInfo("America/New_York")
 AD_HOC_US_EQUITY_MARKET_CLOSURES = {
     date(2018, 12, 5),  # National day of mourning for President George H. W. Bush.
@@ -87,6 +88,7 @@ class OptionChainRequestPreview:
                 "strike_range": self.strike_range,
                 "option_bucket_policy_ref": self.option_bucket_policy_ref,
                 "thetadata_transport": DEFAULT_THETADATA_TRANSPORT,
+                "terminal_rest_exact_max_workers": DEFAULT_TERMINAL_REST_EXACT_MAX_WORKERS,
                 "timeout_seconds": OPTION_CHAIN_PROVIDER_CONTROLS["timeout_seconds"],
                 "retry_attempts": OPTION_CHAIN_PROVIDER_CONTROLS["retry_attempts"],
                 "retry_backoff_seconds": OPTION_CHAIN_PROVIDER_CONTROLS["retry_backoff_seconds"],
@@ -468,6 +470,7 @@ def _runtime_task_key(task_key: Mapping[str, Any]) -> dict[str, Any]:
     params = dict(runtime_key.get("params") or {})
     params["manager_dry_run"] = False
     params.setdefault("thetadata_transport", DEFAULT_THETADATA_TRANSPORT)
+    params.setdefault("terminal_rest_exact_max_workers", DEFAULT_TERMINAL_REST_EXACT_MAX_WORKERS)
     params.setdefault("timeout_seconds", OPTION_CHAIN_PROVIDER_CONTROLS["timeout_seconds"])
     params.setdefault("retry_attempts", OPTION_CHAIN_PROVIDER_CONTROLS["retry_attempts"])
     params.setdefault("retry_backoff_seconds", OPTION_CHAIN_PROVIDER_CONTROLS["retry_backoff_seconds"])
