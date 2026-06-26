@@ -910,6 +910,9 @@ def _provider_error_is_retryable(error_text: str) -> bool:
         "temporarily unavailable",
         "connection reset",
         "remote end closed connection",
+        "unauthenticated",
+        "invalid session id",
+        "more than one terminal is running",
     )
     return any(marker in text for marker in retryable_markers)
 
