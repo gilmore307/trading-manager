@@ -1091,6 +1091,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
+            earlier_replay_run = replay_root / "replay_execution_runs" / "model_group_replay_20260624T150000Z"
+            earlier_replay_run.mkdir(parents=True, exist_ok=True)
+            (earlier_replay_run / "option_feature_requirements.jsonl").write_text(
+                json.dumps(
+                    {
+                        "requirement_kind": "same_row_option_snapshot",
+                        "target_ref": "AAPL",
+                        "timestamp": "2021-01-04T16:00:00-05:00",
+                        "month": "2021-01",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             replay_run = replay_root / "replay_execution_runs" / "model_group_replay_fixture"
             replay_run.mkdir(parents=True, exist_ok=True)
             (replay_run / "option_feature_requirements.jsonl").write_text(
@@ -1119,6 +1133,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["task_state"], "current")
         self.assertEqual(replay_task["status"], "ready")
+        self.assertEqual(replay_task["started_at_utc"], "2026-06-24T15:00:00Z")
         self.assertEqual(replay_task["detail"]["progress"]["ready_count"], 0)
         self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)
         self.assertIn("started and completed 0/2 replay months", replay_task["reason"])
@@ -1153,6 +1168,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
+            earlier_replay_run = replay_root / "replay_execution_runs" / "model_group_replay_20260624T150000Z"
+            earlier_replay_run.mkdir(parents=True, exist_ok=True)
+            (earlier_replay_run / "option_feature_requirements.jsonl").write_text(
+                json.dumps(
+                    {
+                        "requirement_kind": "same_row_option_snapshot",
+                        "target_ref": "AAPL",
+                        "timestamp": "2021-01-04T16:00:00-05:00",
+                        "month": "2021-01",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             replay_run = replay_root / "replay_execution_runs" / "model_group_replay_fixture"
             replay_run.mkdir(parents=True, exist_ok=True)
             requirements_path = replay_run / "option_feature_requirements.jsonl"
@@ -1263,7 +1292,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("42 source gaps remain", runtime_activity["activity_summary"])
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["status"], "running")
-        self.assertEqual(replay_task["started_at_utc"], "2026-06-25T15:00:00Z")
+        self.assertEqual(replay_task["started_at_utc"], "2026-06-24T15:00:00Z")
         self.assertEqual(replay_task["updated_at_utc"], "2026-06-25T15:41:00Z")
         self.assertEqual(replay_task["detail"]["runtime_activity"]["source_missing_count"], 42)
         self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)

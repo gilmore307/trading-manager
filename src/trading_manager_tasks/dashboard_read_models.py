@@ -1032,6 +1032,50 @@ def _latest_replay_option_feature_requirements_artifact(dataset_root: Path) -> P
     return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
+def _timestamp_from_replay_run_dir(path: Path) -> str | None:
+    match = re.search(r"_(\d{8}T\d{6})Z$", path.name)
+    if not match:
+        return None
+    try:
+        parsed = datetime.strptime(match.group(1), "%Y%m%dT%H%M%S").replace(tzinfo=UTC)
+    except ValueError:
+        return None
+    return parsed.isoformat().replace("+00:00", "Z")
+
+
+def _mtime_utc(path: Path) -> str | None:
+    try:
+        timestamp = path.stat().st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(timestamp, tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _replay_execution_started_at(dataset_root: Path) -> str | None:
+    replay_root = dataset_root / "replay_execution_runs"
+    if not replay_root.exists():
+        return None
+    start_artifacts = {
+        "decision_rows.jsonl",
+        "entry_threshold_calibration.json",
+        "option_feature_requirements.jsonl",
+        "replay_execution_receipt.json",
+        "replay_runtime_trace.jsonl",
+    }
+    candidates: list[str] = []
+    for run_dir in replay_root.iterdir():
+        if not run_dir.is_dir():
+            continue
+        artifact_paths = [run_dir / artifact for artifact in start_artifacts if (run_dir / artifact).exists()]
+        if not artifact_paths:
+            continue
+        parsed_dir_time = _timestamp_from_replay_run_dir(run_dir)
+        if parsed_dir_time:
+            candidates.append(parsed_dir_time)
+        candidates.extend(timestamp for path in artifact_paths if (timestamp := _mtime_utc(path)))
+    return min(candidates) if candidates else None
+
+
 def _replay_option_feature_requirement_sample(path: Path | None, *, limit: int = 5) -> tuple[int | None, list[dict[str, Any]]]:
     if path is None or not path.exists():
         return None, []
@@ -1066,18 +1110,13 @@ def _replay_option_feature_requirement_sample(path: Path | None, *, limit: int =
 
 
 def _replay_activity_started_at(requirements_artifact: Path | None, latest_status: Mapping[str, Any]) -> str | None:
-    if requirements_artifact is not None:
-        match = re.search(r"_(\d{8}T\d{6})Z$", requirements_artifact.parent.name)
-        if match:
-            try:
-                parsed = datetime.strptime(match.group(1), "%Y%m%dT%H%M%S").replace(tzinfo=UTC)
-            except ValueError:
-                parsed = None
-            if parsed is not None:
-                return parsed.isoformat().replace("+00:00", "Z")
     drain_started_at = latest_status.get("drain_started_at_utc")
     if isinstance(drain_started_at, str) and drain_started_at:
         return drain_started_at
+    if requirements_artifact is not None:
+        parsed_dir_time = _timestamp_from_replay_run_dir(requirements_artifact.parent)
+        if parsed_dir_time:
+            return parsed_dir_time
     emitted_at = latest_status.get("emitted_at_utc")
     elapsed_seconds = latest_status.get("elapsed_seconds")
     if isinstance(emitted_at, str) and isinstance(elapsed_seconds, (int, float)):
@@ -1157,6 +1196,28 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
         "elapsed_seconds": latest_status.get("elapsed_seconds"),
         "updated_at_utc": latest_status.get("emitted_at_utc"),
     }
+
+
+def _replay_dataset_root_from_artifact_ref(value: object) -> Path | None:
+    if not value:
+        return None
+    candidate = Path(str(value))
+    for parent in candidate.parents:
+        if parent.name == "replay_execution_runs":
+            return parent.parent
+    return None
+
+
+def _runtime_replay_task_started_at(runtime_activity: Mapping[str, Any]) -> str | None:
+    dataset_root = _replay_dataset_root_from_artifact_ref(runtime_activity.get("requirements_artifact_ref"))
+    if dataset_root is None:
+        dataset_root = _replay_dataset_root_from_artifact_ref(runtime_activity.get("replay_runtime_trace_ref"))
+    if dataset_root is not None:
+        started_at = _replay_execution_started_at(dataset_root)
+        if started_at:
+            return started_at
+    started_at = runtime_activity.get("started_at_utc")
+    return str(started_at) if started_at else None
 
 
 def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Path | None = None) -> dict[str, Any]:
@@ -1298,18 +1359,23 @@ def _mark_active_task_running(
             if isinstance(progress, Mapping):
                 detail["progress"] = _replay_progress_with_runtime_cursor(progress, detail, runtime_activity)
             updated["detail"] = detail
-            if not updated.get("started_at_utc") and runtime_activity.get("started_at_utc"):
-                updated["started_at_utc"] = runtime_activity.get("started_at_utc")
+            if not updated.get("started_at_utc"):
+                started_at = _runtime_replay_task_started_at(runtime_activity)
+                if started_at:
+                    updated["started_at_utc"] = started_at
             if runtime_activity.get("updated_at_utc"):
                 updated["status_updated_at_utc"] = runtime_activity.get("updated_at_utc")
                 updated["updated_at_utc"] = runtime_activity.get("updated_at_utc")
         return updated
 
-    running_task = with_running_activity(public_active_task)
     updated_timeline = [
         with_running_activity(task) if _public_task_identity(task) == active_key else task
         for task in task_timeline
     ]
+    running_task = next(
+        (task for task in updated_timeline if _public_task_identity(task) == active_key),
+        with_running_activity(public_active_task),
+    )
     return updated_timeline, running_task
 
 
@@ -4572,7 +4638,8 @@ def _model_group_replay_timeline_tasks(
         ),
         ready_months=replay_ready_months,
     )
-    replay_started = bool(replay_ready_months) or (
+    replay_started_at = _replay_execution_started_at(dataset_root)
+    replay_started = bool(replay_ready_months) or bool(replay_started_at) or (
         lifecycle_artifacts_allowed and _replay_execution_has_started(dataset_root)
     )
     replay_complete = bool(replay_progress["can_unlock_downstream"])
@@ -4739,6 +4806,8 @@ def _model_group_replay_timeline_tasks(
     )
     tasks[-1]["updated_at_utc"] = tasks_updated_at
     tasks[-1]["status_updated_at_utc"] = tasks_updated_at
+    if replay_started_at:
+        tasks[-1]["started_at_utc"] = replay_started_at
 
     append_task(
         task_id="model_group.replay_review",
