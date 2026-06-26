@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from trading_manager_tasks.option_chain_source_acquisition import (
     DEFAULT_PYTHON_EXECUTABLE,
     _runtime_task_key,
     _provider_python_executable,
     build_option_chain_source_review,
+    dispatch_option_chain_source_acquisition,
     is_current_option_chain_request,
     manager_requests_from_review,
     request_previews_for_replay_decision_times,
@@ -125,6 +131,48 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         }
 
         self.assertTrue(is_current_option_chain_request(replay, start_month="2021-06", end_month="2021-06"))
+
+    def test_execute_dispatch_can_use_multiple_option_chain_workers(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage"
+            task_root = storage_root / "runtime" / "model_05_option_expression" / "option_chain_state_source" / "2021-03"
+            rows = []
+            for index, symbol in enumerate(("AAPL", "MSFT", "NVDA", "AMD"), start=1):
+                request_id = f"mgrreq_replay_option_chain_window_{symbol.lower()}_2021_03_2021_03_11_1600"
+                task_path = task_root / request_id / "task_key.json"
+                task_path.parent.mkdir(parents=True, exist_ok=True)
+                task_path.write_text(
+                    json.dumps({"output_root": str(task_path.parent / "runs" / f"run_{index}"), "params": {}}),
+                    encoding="utf-8",
+                )
+                rows.append(
+                    {
+                        "request_id": request_id,
+                        "parameter_ref": "storage://trading-manager/" + str(task_path.relative_to(storage_root)),
+                    }
+                )
+
+            with (
+                patch("trading_manager_tasks.option_chain_source_acquisition.request_rows", return_value=rows),
+                patch(
+                    "trading_manager_tasks.option_chain_source_acquisition.subprocess.run",
+                    return_value=SimpleNamespace(returncode=0, stdout="", stderr=""),
+                ) as run_mock,
+            ):
+                dispatch = dispatch_option_chain_source_acquisition(
+                    start_month="2021-03",
+                    end_month="2021-03",
+                    storage_root=storage_root,
+                    trading_data_root=Path(raw_tmp),
+                    execute_provider_calls=True,
+                    dynamic_workers=False,
+                    max_workers=4,
+                )
+
+        self.assertEqual(dispatch.worker_selection.selected_worker_count, 4)
+        self.assertEqual(dispatch.dispatch_count, 4)
+        self.assertEqual(run_mock.call_count, 4)
+        self.assertEqual({item.worker_slot for item in dispatch.items}, {1, 2, 3, 4})
 
 
 if __name__ == "__main__":  # pragma: no cover

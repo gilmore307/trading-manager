@@ -70,6 +70,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
     execute: bool = True,
     execute_provider_acquisition: bool = False,
     provider_acquisition_limit: int | None = 1,
+    provider_max_workers: int = 1,
     feature_repair_limit: int | None = None,
     selected_target_symbol: str | None = None,
     database_url: str | None = None,
@@ -199,7 +200,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
                             continue_on_error=False,
                             database_url=db_url,
                             dynamic_workers=False,
-                            max_workers=1,
+                            max_workers=max(1, provider_max_workers),
                         )
                         provider_calls += dispatch.provider_calls
                         dispatch_summary = dispatch.summary_row()

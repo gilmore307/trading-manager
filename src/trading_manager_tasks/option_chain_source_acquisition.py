@@ -503,12 +503,11 @@ def dispatch_option_chain_source_acquisition(
         if limit <= 0:
             raise TaskSystemError("limit must be positive")
         rows = rows[:limit]
-    provider_max_workers = 1 if execute_provider_calls else max_workers
     worker_selection = select_provider_worker_count(
         request_count=len(rows),
         execute_provider_calls=execute_provider_calls,
         dynamic_workers=dynamic_workers,
-        max_workers=provider_max_workers,
+        max_workers=max_workers,
     )
 
     def dispatch_one(row: Mapping[str, Any], *, worker_slot: int) -> ProviderDispatchItem:
@@ -603,11 +602,11 @@ def dispatch_option_chain_source_acquisition(
         )
 
     items: list[ProviderDispatchItem] = []
-    if execute_provider_calls:
+    worker_count = max(1, worker_selection.selected_worker_count)
+    if worker_count == 1:
         for row in rows:
             items.append(dispatch_one(row, worker_slot=1))
     else:
-        worker_count = max(1, worker_selection.selected_worker_count)
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             futures = {executor.submit(dispatch_one, row, worker_slot=(index % worker_count) + 1): index for index, row in enumerate(rows)}
             by_index: dict[int, ProviderDispatchItem] = {}

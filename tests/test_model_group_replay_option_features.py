@@ -460,7 +460,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                 patch(
                     "trading_manager_tasks.model_group_replay_option_features.dispatch_option_chain_source_acquisition",
                     side_effect=RuntimeError("ThetaData INTERNAL"),
-                ),
+                ) as dispatch,
             ):
                 decision = run_model_group_replay_option_features_for_replay_backoff(
                     self._replay_backoff(requirement),
@@ -468,12 +468,14 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                     selected_target_symbol="AAPL",
                     execute=True,
                     execute_provider_acquisition=True,
+                    provider_max_workers=4,
                 )
 
         self.assertIsNotNone(decision)
         assert decision is not None
         self.assertEqual(decision.decision_status, "backoff")
         self.assertEqual(decision.reason_code, "model_group_replay_option_source_acquisition_failed")
+        self.assertEqual(dispatch.call_args.kwargs["max_workers"], 4)
         self.assertTrue(decision.dispatch_performed)
         self.assertIn("ThetaData INTERNAL", decision.execution_summary["provider_acquisition_error"])
         self.assertEqual(
