@@ -1113,12 +1113,19 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
     source_missing_count = latest_status.get("source_missing_count")
     source_ready_count = latest_status.get("source_ready_count")
     provider_calls = latest_status.get("provider_calls")
+    option_source_unavailable_count = latest_status.get("option_source_unavailable_count")
     started_at_utc = _replay_activity_started_at(requirements_artifact, latest_status)
     activity_parts = ["Replay option feature drain"]
     if replay_time_pointer:
         activity_parts.append(replay_time_pointer)
     if source_missing_count is not None:
         activity_parts.append(f"{source_missing_count} source gaps remain")
+    if isinstance(provider_calls, int) and provider_calls > 0:
+        activity_parts.append(f"{provider_calls} provider calls this pass")
+    if isinstance(option_source_unavailable_count, int) and option_source_unavailable_count > 0:
+        activity_parts.append(f"{option_source_unavailable_count} unavailable markers")
+    if isinstance(source_ready_count, int) and source_ready_count > 0:
+        activity_parts.append(f"{source_ready_count} source-ready repairs")
     if sample_targets:
         activity_parts.append("sample " + ", ".join(sample_targets[:4]))
     return {
@@ -1140,7 +1147,7 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
         "batch_count": latest_status.get("batch_count"),
         "source_missing_count": source_missing_count,
         "source_ready_count": source_ready_count,
-        "option_source_unavailable_count": latest_status.get("option_source_unavailable_count"),
+        "option_source_unavailable_count": option_source_unavailable_count,
         "required_next_step": latest_status.get("required_next_step"),
         "resume_stage_id": latest_status.get("resume_stage_id"),
         "started_at_utc": started_at_utc,
