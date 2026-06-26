@@ -348,6 +348,56 @@ class AgentRepairClosureTests(unittest.TestCase):
             self.assertEqual(receipt["actions"][0]["action"], "retry_receipt_observed")
             self.assertEqual(receipt["blockers"], [])
 
+    def test_blocked_closure_does_not_repeat_scheduler_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            repo = tmp / "trading-manager"
+            changed_file = repo / "src" / "trading_manager_tasks" / "scheduler_daemon.py"
+            changed_file.parent.mkdir(parents=True)
+            changed_file.write_text("# fixture\n", encoding="utf-8")
+            candidate = self._write_candidate(
+                tmp / "agent",
+                request_overrides={
+                    "source_component": "trading-manager.historical_scheduler_daemon",
+                    "error_scope": "server_service",
+                    "error_kind": "scheduler_progress_stalled",
+                },
+                stdout_payload={
+                    "diagnosis_status": "repaired_with_runtime_restart_pending",
+                    "files_changed": [str(changed_file)],
+                    "retry_recommendation": "service restart required, then retry scheduler selection",
+                    "blockers": [],
+                },
+            )
+            candidate.receipt_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_repair_closure_receipt",
+                        "closure_status": "blocked",
+                        "actions": [
+                            {
+                                "action": "systemctl_restart",
+                                "service": "trading-manager-historical-scheduler.service",
+                                "status": "completed",
+                            }
+                        ],
+                        "blockers": ["git push failed before closure retry"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            calls: list[tuple[str, ...]] = []
+
+            def fake_run(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+                calls.append(tuple(argv))
+                return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+            receipt = close_agent_repair(candidate, runner=fake_run, repo_roots=(repo,))
+
+        self.assertEqual(receipt["closure_status"], "blocked")
+        self.assertEqual(calls, [])
+        self.assertEqual(receipt["actions"][-1]["action"], "blocked_closure_recheck")
+
     def test_incomplete_provider_diagnosis_closes_when_failure_register_resolved(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp) / "storage" / "02_control_plane" / "runtime" / "agent_error_handling"

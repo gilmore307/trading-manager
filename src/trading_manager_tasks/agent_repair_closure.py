@@ -459,6 +459,8 @@ def close_agent_repair(
     request = _load_json(candidate.request_path)
     diagnosis = _load_json(candidate.diagnosis_path)
     payload = _parse_stdout_payload(diagnosis)
+    existing_receipt = _load_json(candidate.receipt_path) if candidate.receipt_path.exists() else {}
+    existing_closure_status = str(existing_receipt.get("closure_status") or "").lower()
     actions: list[dict[str, Any]] = []
     blockers: list[str] = []
     closure_status = "not_closed"
@@ -475,6 +477,21 @@ def close_agent_repair(
         else:
             closure_status = "pending"
             blockers.append("agent diagnosis is not completed")
+    elif existing_closure_status == "blocked":
+        prior_actions = existing_receipt.get("actions")
+        actions = list(prior_actions) if isinstance(prior_actions, list) else []
+        actions.append(
+            {
+                "action": "blocked_closure_recheck",
+                "status": "skipped",
+                "reason": "existing blocked closure is not retried automatically without successful retry evidence",
+            }
+        )
+        closure_status = "blocked"
+        prior_blockers = existing_receipt.get("blockers")
+        blockers = list(prior_blockers) if isinstance(prior_blockers, list) else []
+        if not blockers:
+            blockers.append("existing blocked closure requires new successful retry evidence or manual repair")
     elif not payload:
         blockers.append("completed diagnosis did not contain parseable JSON stdout")
     elif not _diagnosis_repaired(payload):
