@@ -1180,6 +1180,19 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            trace_path = replay_run / "replay_runtime_trace.jsonl"
+            trace_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_runtime_trace_row",
+                        "trace_event_type": "replay_option_feature_requirements_blocked",
+                        "replay_execution_run_id": "model_group_replay_fixture",
+                        "replay_time_pointer": "2021-02-01T16:00:00-05:00",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             drain_status_path = tmp / "storage" / "02_control_plane" / "runtime" / "replay_option_feature_drain_latest.json"
             drain_status_path.write_text(
                 json.dumps(
@@ -1245,6 +1258,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(runtime_activity["sample_targets"], ["AAPL", "MSFT"])
         self.assertEqual(runtime_activity["started_at_utc"], "2026-06-25T15:40:57Z")
         self.assertEqual(runtime_activity["elapsed_seconds"], 3)
+        self.assertEqual(runtime_activity["replay_runtime_trace_ref"], str(trace_path))
         self.assertIn("42 source gaps remain", runtime_activity["activity_summary"])
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["status"], "running")

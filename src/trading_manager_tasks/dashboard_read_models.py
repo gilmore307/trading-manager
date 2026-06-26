@@ -1100,6 +1100,10 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
         requirements_artifact = candidate if candidate.exists() else None
     if requirements_artifact is None:
         requirements_artifact = _latest_replay_option_feature_requirements_artifact(dataset_root)
+    replay_runtime_trace = None
+    if requirements_artifact is not None:
+        trace_candidate = requirements_artifact.parent / "replay_runtime_trace.jsonl"
+        replay_runtime_trace = trace_candidate if trace_candidate.exists() else None
     requirement_count, sample = _replay_option_feature_requirement_sample(requirements_artifact)
     replay_time_pointer = latest_status.get("replay_time_pointer") or next(
         (str(item.get("timestamp")) for item in sample if item.get("timestamp")),
@@ -1123,6 +1127,7 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
         "activity_summary": " · ".join(activity_parts),
         "status_path": str(latest_status_path),
         "requirements_artifact_ref": str(requirements_artifact) if requirements_artifact else None,
+        "replay_runtime_trace_ref": str(replay_runtime_trace) if replay_runtime_trace else None,
         "requirement_count": requirement_count,
         "replay_time_pointer": replay_time_pointer,
         "sample_targets": sample_targets,
