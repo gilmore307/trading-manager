@@ -1161,7 +1161,7 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
     if replay_time_pointer:
         activity_parts.append(replay_time_pointer)
     if source_missing_count is not None:
-        activity_parts.append(f"{source_missing_count} source gaps remain")
+        activity_parts.append(f"{source_missing_count} source-gap candidates in current repair slice")
     if isinstance(provider_calls, int) and provider_calls > 0:
         activity_parts.append(f"{provider_calls} provider calls this pass")
     if isinstance(option_source_unavailable_count, int) and option_source_unavailable_count > 0:
