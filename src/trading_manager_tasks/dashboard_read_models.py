@@ -1395,6 +1395,7 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
     ):
         runtime_activity = _replay_option_feature_drain_activity(resolved_storage_root)
     replay_activity = _replay_execution_runtime_activity(resolved_storage_root)
+    replay_progress_activity = replay_activity if isinstance(replay_activity, Mapping) else None
     if isinstance(replay_activity, Mapping) and status.lock.status == "active":
         if runtime_activity is None or (
             not _replay_option_drain_activity_is_live(runtime_activity)
@@ -1418,6 +1419,7 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
         "next_internal_stage": next_internal_stage,
         "lock_status": status.lock.status,
         "runtime_activity": runtime_activity,
+        "replay_progress_activity": replay_progress_activity,
     }
 
 
@@ -1498,6 +1500,26 @@ def _replay_progress_with_runtime_cursor(
     return updated
 
 
+def _replay_running_reason_with_cursor(reason: object, progress: Mapping[str, Any]) -> str:
+    expected = _int_field(progress, "expected_count")
+    ready = _int_field(progress, "ready_count")
+    current = max(
+        ready,
+        _int_field(progress, "active_count"),
+        _int_field(progress, "current_count"),
+    )
+    if expected <= 0 or current <= ready:
+        return str(reason or "")
+    current_month = str(progress.get("active_month") or progress.get("current_month") or "").strip()
+    current_pointer = str(progress.get("active_time_pointer") or "").strip()
+    cursor = current_pointer or current_month
+    cursor_text = f" through {cursor}" if cursor else ""
+    return (
+        f"Model-group replay has reached {current}/{expected} replay months{cursor_text}; "
+        f"{ready}/{expected} months have closed with terminal replay receipts."
+    )
+
+
 def _mark_active_task_running(
     status: HistoricalSchedulerStatus,
     task_timeline: list[dict[str, Any]],
@@ -1507,6 +1529,9 @@ def _mark_active_task_running(
     if status.lock.status != "active" or public_active_task is None:
         return task_timeline, public_active_task
     runtime_activity = runtime_active_work.get("runtime_activity") if isinstance(runtime_active_work, Mapping) else None
+    replay_progress_activity = (
+        runtime_active_work.get("replay_progress_activity") if isinstance(runtime_active_work, Mapping) else None
+    )
     if status.blocked_reason and not _is_transient_active_scheduler_backoff(status) and not isinstance(runtime_activity, Mapping):
         return task_timeline, public_active_task
     if str(public_active_task.get("task_state") or "") != "current":
@@ -1522,8 +1547,15 @@ def _mark_active_task_running(
             detail["runtime_activity"] = dict(runtime_activity)
             progress = detail.get("progress")
             if isinstance(progress, Mapping):
-                detail["progress"] = _replay_progress_with_runtime_cursor(progress, detail, runtime_activity)
+                progress_activity = replay_progress_activity if isinstance(replay_progress_activity, Mapping) else runtime_activity
+                detail["progress"] = _replay_progress_with_runtime_cursor(progress, detail, progress_activity)
             updated["detail"] = detail
+            progress = detail.get("progress")
+            if (
+                str(updated.get("task_id") or "") == "model_group.replay"
+                and isinstance(progress, Mapping)
+            ):
+                updated["reason"] = _replay_running_reason_with_cursor(updated.get("reason"), progress)
             if not updated.get("started_at_utc"):
                 started_at = _runtime_replay_task_started_at(runtime_activity)
                 if started_at:

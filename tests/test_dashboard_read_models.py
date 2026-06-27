@@ -1513,6 +1513,131 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["active_time_pointer"], "2021-02-03T16:00:00-05:00")
         self.assertEqual(progress["current_count"], 2)
 
+    def test_replay_progress_uses_high_water_when_drain_status_has_no_cursor(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
+            replay_root.mkdir(parents=True, exist_ok=True)
+            (replay_root / "dataset_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_dataset_preparation_manifest",
+                        "contract_id": "promotion_replay_candidate_policy",
+                        "freeze_status": "frozen",
+                        "feed_acquisition_count": 3,
+                        "available_feed_acquisition_count": 3,
+                        "deferred_feed_acquisition_count": 0,
+                        "missing_feed_acquisition_count": 0,
+                        "pre_replay_target_refs": ["AAPL"],
+                        "target_refs": ["AAPL"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (replay_root / "feed_acquisition_plan.csv").write_text(
+                "month\n2021-01\n2021-02\n2021-03\n",
+                encoding="utf-8",
+            )
+            replay_run = replay_root / "replay_execution_runs" / "model_group_replay_frontier"
+            replay_run.mkdir(parents=True)
+            trace_path = replay_run / "replay_runtime_trace.jsonl"
+            trace_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "contract_type": "evaluation_replay_runtime_trace_row",
+                                "trace_event_type": "replay_clock_processed",
+                                "replay_execution_run_id": replay_run.name,
+                                "replay_month": "2021-01",
+                                "replay_time_pointer": "2021-01-04T16:00:00-05:00",
+                                "generated_at_utc": "2026-06-25T15:00:00Z",
+                                "cumulative_summary": {"timestamp_count": 1},
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "contract_type": "evaluation_replay_runtime_trace_row",
+                                "trace_event_type": "replay_option_feature_requirements_blocked",
+                                "replay_execution_run_id": replay_run.name,
+                                "replay_month": "2021-02",
+                                "replay_time_pointer": "2021-02-03T16:00:00-05:00",
+                                "generated_at_utc": "2026-06-25T15:01:00Z",
+                                "missing_option_feature_requirement_count": 7,
+                                "cumulative_summary": {
+                                    "timestamp_count": 21,
+                                    "missing_option_feature_requirement_count": 7,
+                                },
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            drain_status_path = runtime / "replay_option_feature_drain_latest.json"
+            drain_status_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_replay_option_feature_drain_status",
+                        "decision_status": "backoff",
+                        "reason_code": "model_group_replay_option_feature_repair_incomplete",
+                        "source_missing_count": 0,
+                        "source_ready_count": 0,
+                        "provider_calls": 0,
+                        "batch_index": 2,
+                        "required_next_step": "retry model_group.replay",
+                        "emitted_at_utc": "2026-06-25T15:02:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            decision_log.parent.mkdir(parents=True, exist_ok=True)
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "backoff",
+                        "selected_work": "model_group.replay_option_features",
+                        "next_internal_stage": "model_group.replay_option_features",
+                        "reason_code": "model_group_replay_option_feature_repair_incomplete",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.write_text(json.dumps({"current_month": "2020-07", "start_month": "2020-07"}) + "\n", encoding="utf-8")
+            lock_path = tmp / "runtime" / "historical_scheduler.lock"
+            lock_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=state_path,
+                lock_path=lock_path,
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-25T15:02:05Z")
+
+        runtime_activity = payload["chart_payload"]["runtime_active_work"]["runtime_activity"]
+        self.assertEqual(runtime_activity["activity_type"], "replay_option_feature_drain")
+        replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
+        progress = replay_task["detail"]["progress"]
+        self.assertEqual(progress["active_month"], "2021-02")
+        self.assertEqual(progress["active_time_pointer"], "2021-02-03T16:00:00-05:00")
+        self.assertEqual(progress["current_count"], 2)
+        self.assertIn("has reached 2/3 replay months", replay_task["reason"])
+        self.assertIn("0/3 months have closed with terminal replay receipts", replay_task["reason"])
+
     def test_running_replay_retry_keeps_frontier_high_water_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
