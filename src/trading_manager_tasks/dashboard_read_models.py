@@ -1315,7 +1315,7 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
     if isinstance(provider_calls, int) and provider_calls > 0:
         activity_parts.append(f"{provider_calls} provider calls this pass")
     if isinstance(option_source_unavailable_count, int) and option_source_unavailable_count > 0:
-        activity_parts.append(f"{option_source_unavailable_count} unavailable markers")
+        activity_parts.append(f"{option_source_unavailable_count} provider-unavailable option sources")
     if isinstance(source_ready_count, int) and source_ready_count > 0:
         activity_parts.append(f"{source_ready_count} source-ready repairs")
     if sample_targets:
