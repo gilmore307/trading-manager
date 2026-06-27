@@ -1129,6 +1129,93 @@ def _replay_activity_started_at(requirements_artifact: Path | None, latest_statu
     return None
 
 
+def _latest_replay_runtime_trace_artifact(dataset_root: Path) -> Path | None:
+    replay_root = dataset_root / "replay_execution_runs"
+    if not replay_root.exists():
+        return None
+    candidates = [
+        path / "replay_runtime_trace.jsonl"
+        for path in replay_root.iterdir()
+        if path.is_dir() and (path / "replay_runtime_trace.jsonl").exists()
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def _last_jsonl_object(path: Path) -> dict[str, Any] | None:
+    last: dict[str, Any] | None = None
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for raw_line in handle:
+                if not raw_line.strip():
+                    continue
+                try:
+                    parsed = json.loads(raw_line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, Mapping):
+                    last = dict(parsed)
+    except OSError:
+        return None
+    return last
+
+
+def _iso_sort_key(value: Any) -> str:
+    return str(value or "")
+
+
+def _replay_execution_runtime_activity(storage_root: Path) -> dict[str, Any] | None:
+    dataset_root = _replay_dataset_root(storage_root, "promotion_replay_candidate_policy")
+    trace_path = _latest_replay_runtime_trace_artifact(dataset_root)
+    if trace_path is None:
+        return None
+    latest_row = _last_jsonl_object(trace_path)
+    if latest_row is None:
+        return None
+    replay_time_pointer = latest_row.get("replay_time_pointer")
+    replay_month = latest_row.get("replay_month") or _month_key_from_replay_time_pointer(replay_time_pointer)
+    cumulative_summary = latest_row.get("cumulative_summary") if isinstance(latest_row.get("cumulative_summary"), Mapping) else {}
+    timestamp_count = cumulative_summary.get("timestamp_count") if isinstance(cumulative_summary, Mapping) else None
+    selected_targets = [str(target) for target in latest_row.get("selected_targets") or [] if str(target)]
+    activity_parts = ["Replay execution"]
+    if replay_time_pointer:
+        activity_parts.append(str(replay_time_pointer))
+    if isinstance(timestamp_count, int):
+        activity_parts.append(f"{timestamp_count} replay timestamps processed")
+    if selected_targets:
+        activity_parts.append("selected " + ", ".join(selected_targets[:4]))
+    started_at = _timestamp_from_replay_run_dir(trace_path.parent)
+    return {
+        "activity_type": "replay_execution",
+        "activity_label": "Replay execution",
+        "activity_summary": " · ".join(activity_parts),
+        "replay_runtime_trace_ref": str(trace_path),
+        "replay_time_pointer": replay_time_pointer,
+        "replay_month": replay_month,
+        "replay_execution_run_id": latest_row.get("replay_execution_run_id") or trace_path.parent.name,
+        "trace_event_type": latest_row.get("trace_event_type"),
+        "selected_targets": selected_targets,
+        "timestamp_count": timestamp_count,
+        "started_at_utc": started_at,
+        "updated_at_utc": latest_row.get("generated_at_utc") or _mtime_utc(trace_path),
+    }
+
+
+def _replay_option_drain_activity_is_live(activity: Mapping[str, Any] | None) -> bool:
+    if not isinstance(activity, Mapping):
+        return False
+    if activity.get("activity_type") != "replay_option_feature_drain":
+        return False
+    if activity.get("reason_code") == "model_group_replay_option_features_already_ready":
+        return False
+    for key in ("source_missing_count", "source_ready_count", "provider_calls", "requirement_count"):
+        value = activity.get(key)
+        if isinstance(value, int) and value > 0:
+            return True
+    return False
+
+
 def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] | None:
     latest_status_path = storage_root / "runtime" / "replay_option_feature_drain_latest.json"
     latest_status = _load_optional_json_object(latest_status_path)
@@ -1252,6 +1339,13 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
         or "replay_option_source" in runtime_reason
     ):
         runtime_activity = _replay_option_feature_drain_activity(resolved_storage_root)
+    replay_activity = _replay_execution_runtime_activity(resolved_storage_root)
+    if isinstance(replay_activity, Mapping) and status.lock.status == "active":
+        if runtime_activity is None or (
+            not _replay_option_drain_activity_is_live(runtime_activity)
+            and _iso_sort_key(replay_activity.get("updated_at_utc")) > _iso_sort_key(runtime_activity.get("updated_at_utc"))
+        ):
+            runtime_activity = replay_activity
     runtime_status = "ready"
     if not status.service_runtime_ready:
         runtime_status = "blocked"
