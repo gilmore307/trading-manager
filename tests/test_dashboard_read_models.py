@@ -1289,8 +1289,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(runtime_activity["started_at_utc"], "2026-06-25T15:00:00Z")
         self.assertEqual(runtime_activity["elapsed_seconds"], 3)
         self.assertEqual(runtime_activity["replay_runtime_trace_ref"], str(trace_path))
+        self.assertEqual(runtime_activity["requirement_count"], 2)
+        self.assertIn("2 total frontier requirements", runtime_activity["activity_summary"])
         self.assertIn("42 source-gap candidates in current repair slice", runtime_activity["activity_summary"])
+        self.assertIn("examples AAPL, MSFT", runtime_activity["activity_summary"])
         self.assertNotIn("source gaps remain", runtime_activity["activity_summary"])
+        self.assertNotIn("sample AAPL", runtime_activity["activity_summary"])
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["status"], "running")
         self.assertEqual(replay_task["started_at_utc"], "2026-06-24T15:00:00Z")
@@ -1304,6 +1308,93 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             replay_task["detail"]["progress"]["active_time_pointer"],
             "2021-02-01T16:00:00-05:00",
         )
+
+    def test_replay_option_feature_activity_ready_status_does_not_show_stale_requirements(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp = Path(tmp_dir)
+            service = tmp / "service"
+            env = tmp / "env"
+            wrapper = tmp / "wrapper"
+            for path in (service, env, wrapper):
+                path.write_text("", encoding="utf-8")
+            replay_run = (
+                tmp
+                / "storage"
+                / "05_replay_datasets"
+                / "promotion_replay_candidate_policy"
+                / "replay_execution_runs"
+                / "model_group_replay_fixture"
+            )
+            replay_run.mkdir(parents=True, exist_ok=True)
+            (replay_run / "option_feature_requirements.jsonl").write_text(
+                json.dumps(
+                    {
+                        "requirement_kind": "same_row_option_snapshot",
+                        "target_ref": "AAPL",
+                        "timestamp": "2021-02-01T16:00:00-05:00",
+                        "month": "2021-02",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            drain_status_path = tmp / "storage" / "02_control_plane" / "runtime" / "replay_option_feature_drain_latest.json"
+            drain_status_path.parent.mkdir(parents=True, exist_ok=True)
+            drain_status_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_replay_option_feature_drain_status",
+                        "decision_status": "executed",
+                        "reason_code": "model_group_replay_option_features_already_ready",
+                        "source_missing_count": 0,
+                        "source_ready_count": 0,
+                        "provider_calls": 0,
+                        "batch_index": 2,
+                        "batch_size": 12,
+                        "batch_count": 0,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            decision_log.parent.mkdir(parents=True, exist_ok=True)
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "executed",
+                        "selected_work": "model_group.replay_option_features",
+                        "next_internal_stage": "model_group.replay_option_features",
+                        "reason_code": "model_group_replay_option_features_already_ready",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            state_path.write_text(json.dumps({"current_month": "2020-07", "start_month": "2020-07"}) + "\n", encoding="utf-8")
+            lock_path = tmp / "runtime" / "historical_scheduler.lock"
+            lock_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=state_path,
+                lock_path=lock_path,
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-25T15:41:00Z")
+
+        runtime_activity = payload["chart_payload"]["runtime_active_work"]["runtime_activity"]
+        self.assertEqual(runtime_activity["source_missing_count"], 0)
+        self.assertIsNone(runtime_activity["requirements_artifact_ref"])
+        self.assertIsNone(runtime_activity["requirement_count"])
+        self.assertEqual(runtime_activity["sample_targets"], [])
+        self.assertIn("0 source-gap candidates in current repair slice", runtime_activity["activity_summary"])
+        self.assertNotIn("AAPL", runtime_activity["activity_summary"])
 
     def test_task_timeline_shows_fixed_model_group_lifecycle_for_later_fold_blocked_by_lane(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

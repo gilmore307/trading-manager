@@ -1135,12 +1135,22 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
     if not latest_status:
         return None
     dataset_root = _replay_dataset_root(storage_root, "promotion_replay_candidate_policy")
+    source_missing_count = latest_status.get("source_missing_count")
+    source_ready_count = latest_status.get("source_ready_count")
+    provider_calls = latest_status.get("provider_calls")
+    option_source_unavailable_count = latest_status.get("option_source_unavailable_count")
     requirements_artifact = None
     raw_artifact = latest_status.get("requirements_artifact_ref")
     if raw_artifact:
         candidate = Path(str(raw_artifact))
         requirements_artifact = candidate if candidate.exists() else None
-    if requirements_artifact is None:
+    terminal_without_active_requirements = (
+        latest_status.get("reason_code") == "model_group_replay_option_features_already_ready"
+        and not raw_artifact
+        and source_missing_count == 0
+        and source_ready_count == 0
+    )
+    if requirements_artifact is None and not terminal_without_active_requirements:
         requirements_artifact = _latest_replay_option_feature_requirements_artifact(dataset_root)
     replay_runtime_trace = None
     if requirements_artifact is not None:
@@ -1152,14 +1162,12 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
         None,
     )
     sample_targets = [str(item.get("target_ref")) for item in sample if item.get("target_ref")]
-    source_missing_count = latest_status.get("source_missing_count")
-    source_ready_count = latest_status.get("source_ready_count")
-    provider_calls = latest_status.get("provider_calls")
-    option_source_unavailable_count = latest_status.get("option_source_unavailable_count")
     started_at_utc = _replay_activity_started_at(requirements_artifact, latest_status)
     activity_parts = ["Replay option feature drain"]
     if replay_time_pointer:
         activity_parts.append(replay_time_pointer)
+    if requirement_count is not None:
+        activity_parts.append(f"{requirement_count} total frontier requirements")
     if source_missing_count is not None:
         activity_parts.append(f"{source_missing_count} source-gap candidates in current repair slice")
     if isinstance(provider_calls, int) and provider_calls > 0:
@@ -1169,7 +1177,7 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
     if isinstance(source_ready_count, int) and source_ready_count > 0:
         activity_parts.append(f"{source_ready_count} source-ready repairs")
     if sample_targets:
-        activity_parts.append("sample " + ", ".join(sample_targets[:4]))
+        activity_parts.append("examples " + ", ".join(sample_targets[:4]))
     return {
         "activity_type": "replay_option_feature_drain",
         "activity_label": "Replay option feature drain",
