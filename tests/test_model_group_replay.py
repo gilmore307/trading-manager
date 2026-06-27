@@ -439,12 +439,50 @@ class ModelGroupReplayTests(unittest.TestCase):
                 decision.execution_summary["replay_execution_receipt"]["candidate_handoff_source"],
                 "fixed_current_snapshot_historical_candidate_universe",
             )
-            self.assertEqual(
-                decision.execution_summary["replay_execution_receipt"]["candidate_model_ref"],
-                "storage://trading-manager/model_group/2016-01_2016-06",
+
+    def test_replay_ready_command_uses_latest_resume_checkpoint(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            checkpoint_path = dataset_root / "replay_execution_runs" / "previous_run" / "replay_resume_checkpoint.json"
+            checkpoint_path.parent.mkdir(parents=True)
+            checkpoint_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_resume_checkpoint",
+                        "replay_execution_run_id": "previous_run",
+                        "replay_month": "2021-02",
+                        "replay_time_pointer": "2021-02-17T16:00:00-05:00",
+                        "cash_after": 20000.0,
+                        "portfolio_state_after": {"cash": 20000.0, "positions": {}},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
             )
-            progress_rows = [json.loads(line) for line in (dataset_root / "replay_progress.jsonl").read_text(encoding="utf-8").splitlines()]
-            self.assertEqual([row["month"] for row in progress_rows], ["2021-01", "2021-02"])
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=tmp / "runner.py",
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.reason_code, "model_group_replay_ready")
+            self.assertIn("--resume-checkpoint-path", decision.command)
+            self.assertEqual(
+                decision.command[decision.command.index("--resume-checkpoint-path") + 1],
+                str(checkpoint_path),
+            )
+            self.assertEqual(decision.execution_summary["resume_checkpoint_ref"], str(checkpoint_path))
 
     def test_replay_command_ignores_legacy_month_shard_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

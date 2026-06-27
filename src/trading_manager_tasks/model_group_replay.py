@@ -107,6 +107,7 @@ def run_model_group_replay_if_ready(
     run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
     progress_path = dataset_root / "replay_progress.jsonl"
     runner_progress_path = _candidate_replay_progress_path(dataset_root, run_id)
+    resume_checkpoint_path = _latest_replay_resume_checkpoint(dataset_root)
     candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
@@ -262,7 +263,7 @@ def run_model_group_replay_if_ready(
         fixed_universe_symbols=fixed_equity_universe_symbols,
         replay_plan_symbols=materialized_equity_symbols,
     )
-    command = [
+    base_command = [
         resolved_python,
         str(runner_path),
         "--dataset-root",
@@ -281,7 +282,10 @@ def run_model_group_replay_if_ready(
         str(resolved_candidate_universe_path),
     ]
     if max_decision_rows is not None:
-        command.extend(["--max-decision-rows", str(max_decision_rows)])
+        base_command.extend(["--max-decision-rows", str(max_decision_rows)])
+    command = list(base_command)
+    if resume_checkpoint_path is not None:
+        command.extend(["--resume-checkpoint-path", str(resume_checkpoint_path)])
 
     if replay_plan_equity_symbols and not equity_pool_symbols:
         return _decision(
@@ -377,6 +381,7 @@ def run_model_group_replay_if_ready(
                 "candidate_universe_source_policy": candidate_universe_source_policy,
                 "formal_progress_path": str(progress_path),
                 "candidate_progress_path": str(runner_progress_path),
+                "resume_checkpoint_ref": str(resume_checkpoint_path) if resume_checkpoint_path else None,
             },
         )
 
@@ -477,6 +482,7 @@ def run_model_group_replay_if_ready(
                     "runner_stderr": exc.stderr,
                     "formal_progress_path": str(progress_path),
                     "candidate_progress_path": str(runner_progress_path),
+                    "resume_checkpoint_ref": str(resume_checkpoint_path) if resume_checkpoint_path else None,
                     "required_next_step": (
                         "run shared option_chain_state_source acquisition under M05 with source_end no later than each missing replay decision timestamp, generate M05 option features from that shared source, then retry model_group.replay"
                         if option_feature_acquisition_required
@@ -491,6 +497,80 @@ def run_model_group_replay_if_ready(
                 },
             )
     receipt = json.loads(completed.stdout)
+    resume_probe_command: list[str] | None = None
+    resume_probe_progress_path: Path | None = None
+    resume_probe_receipt: dict[str, Any] | None = None
+    if resume_checkpoint_path is not None and receipt.get("resume_checkpoint_ref"):
+        resume_probe_command = command
+        resume_probe_progress_path = runner_progress_path
+        resume_probe_receipt = receipt
+        full_run_id = run_id + "_complete"
+        runner_progress_path = _candidate_replay_progress_path(dataset_root, full_run_id)
+        command = list(base_command)
+        _replace_command_arg(command, "--run-id", full_run_id)
+        _replace_command_arg(command, "--progress-path", str(runner_progress_path))
+        with acquire_scheduler_lock(lock_ref):
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=evaluation_repo_root,
+                    env=env,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as exc:
+                runner_error = (exc.stderr or exc.stdout or str(exc)).strip()
+                option_feature_acquisition_required = REPLAY_OPTION_FEATURE_ACQUISITION_REQUIRED in runner_error
+                return _decision(
+                    now=now,
+                    decision_status="backoff",
+                    reason_code=(
+                        "model_group_replay_option_feature_acquisition_required"
+                        if option_feature_acquisition_required
+                        else "model_group_replay_execution_failed"
+                    ),
+                    reason=runner_error,
+                    selected_work="model_group.replay",
+                    command=command,
+                    execution_summary={
+                        "contract_id": contract_id,
+                        "dataset_root": str(dataset_root),
+                        "training_fold": training_fold,
+                        "expected_replay_months": expected_months,
+                        "replay_month": replay_month,
+                        "ready_replay_months_before": len(ready_months),
+                        "option_feature_database_configured": bool(option_feature_database_url),
+                        "candidate_universe_path": str(resolved_candidate_universe_path),
+                        "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
+                        "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
+                        "materialized_equity_candidate_symbol_count": len(materialized_equity_symbols & fixed_equity_universe_symbols),
+                        "equity_symbol_pool_symbol_count": len(equity_pool_symbols),
+                        "initial_capital_usd": initial_capital_usd,
+                        "candidate_universe_source_policy": candidate_universe_source_policy,
+                        "runner_returncode": exc.returncode,
+                        "runner_stdout": exc.stdout,
+                        "runner_stderr": exc.stderr,
+                        "formal_progress_path": str(progress_path),
+                        "candidate_progress_path": str(runner_progress_path),
+                        "resume_checkpoint_ref": str(resume_checkpoint_path),
+                        "resume_probe_command": resume_probe_command,
+                        "resume_probe_progress_path": str(resume_probe_progress_path),
+                        "resume_probe_receipt": resume_probe_receipt,
+                        "required_next_step": (
+                            "run shared option_chain_state_source acquisition under M05 with source_end no later than each missing replay decision timestamp, generate M05 option features from that shared source, then retry model_group.replay"
+                            if option_feature_acquisition_required
+                            else None
+                        ),
+                        "blocked_stage_id": (
+                            "model_05_option_expression.option_chain_data_acquisition"
+                            if option_feature_acquisition_required
+                            else None
+                        ),
+                        "resume_stage_id": "model_group.replay" if option_feature_acquisition_required else None,
+                    },
+                )
+        receipt = json.loads(completed.stdout)
     receipt_scope_status = _replay_receipt_scope_status(replay_receipt=receipt, training_fold=training_fold)
     if not receipt_scope_status["compatible"]:
         return _decision(
@@ -515,6 +595,10 @@ def run_model_group_replay_if_ready(
                 "candidate_universe_source_policy": candidate_universe_source_policy,
                 "formal_progress_path": str(progress_path),
                 "candidate_progress_path": str(runner_progress_path),
+                "resume_checkpoint_ref": str(resume_checkpoint_path) if resume_checkpoint_path else None,
+                "resume_probe_command": resume_probe_command,
+                "resume_probe_progress_path": str(resume_probe_progress_path) if resume_probe_progress_path else None,
+                "resume_probe_receipt": resume_probe_receipt,
             },
         )
     missing_selected_contract_path_count = _replay_receipt_selected_option_path_missing_count(receipt)
@@ -548,6 +632,10 @@ def run_model_group_replay_if_ready(
                 "missing_selected_contract_path_count": missing_selected_contract_path_count,
                 "formal_progress_path": str(progress_path),
                 "candidate_progress_path": str(runner_progress_path),
+                "resume_checkpoint_ref": str(resume_checkpoint_path) if resume_checkpoint_path else None,
+                "resume_probe_command": resume_probe_command,
+                "resume_probe_progress_path": str(resume_probe_progress_path) if resume_probe_progress_path else None,
+                "resume_probe_receipt": resume_probe_receipt,
                 "acquisition_routes": ["model_group.replay_contract_paths"],
                 "required_next_step": "run selected-contract path acquisition, then retry model_group.replay for the same month",
                 "blocked_stage_id": "model_group.replay_contract_paths",
@@ -588,6 +676,10 @@ def run_model_group_replay_if_ready(
             "formal_progress_path": str(progress_path),
             "candidate_progress_path": str(runner_progress_path),
             "committed_progress_row_count": committed_progress_rows,
+            "resume_checkpoint_ref": str(resume_checkpoint_path) if resume_checkpoint_path else None,
+            "resume_probe_command": resume_probe_command,
+            "resume_probe_progress_path": str(resume_probe_progress_path) if resume_probe_progress_path else None,
+            "resume_probe_receipt": resume_probe_receipt,
             "replay_execution_receipt": receipt,
         },
     )
@@ -643,6 +735,36 @@ def _load_json_object(path: Path) -> dict[str, Any]:
 
 def _candidate_replay_progress_path(dataset_root: Path, run_id: str) -> Path:
     return dataset_root / "replay_execution_runs" / run_id / "candidate_replay_progress.jsonl"
+
+
+def _latest_replay_resume_checkpoint(dataset_root: Path) -> Path | None:
+    replay_root = dataset_root / "replay_execution_runs"
+    if not replay_root.exists():
+        return None
+    selected: tuple[str, Path] | None = None
+    for checkpoint_path in replay_root.glob("*/replay_resume_checkpoint.json"):
+        try:
+            checkpoint = _load_json_object(checkpoint_path)
+        except (OSError, json.JSONDecodeError, ValueError):
+            continue
+        if checkpoint.get("contract_type") != "evaluation_replay_resume_checkpoint":
+            continue
+        replay_time_pointer = str(checkpoint.get("replay_time_pointer") or "").strip()
+        if not replay_time_pointer:
+            continue
+        if selected is None or replay_time_pointer > selected[0]:
+            selected = (replay_time_pointer, checkpoint_path)
+    return selected[1] if selected else None
+
+
+def _replace_command_arg(command: list[str], flag: str, value: str) -> None:
+    try:
+        index = command.index(flag)
+    except ValueError as exc:
+        raise ValueError(f"command missing {flag}") from exc
+    if index + 1 >= len(command):
+        raise ValueError(f"command flag missing value: {flag}")
+    command[index + 1] = value
 
 
 def _commit_candidate_replay_progress(
