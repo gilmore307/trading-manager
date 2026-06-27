@@ -348,6 +348,77 @@ class AgentRepairClosureTests(unittest.TestCase):
             self.assertEqual(receipt["actions"][0]["action"], "retry_receipt_observed")
             self.assertEqual(receipt["blockers"], [])
 
+    def test_blocked_replay_source_error_closes_when_source_requests_succeeded(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            control_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            root = control_root / "runtime" / "agent_error_handling"
+            source_root = (
+                control_root.parent
+                / "01_source_data"
+                / "model_05_option_expression"
+                / "option_chain_state_source"
+                / "2021-03"
+            )
+            request_ids = (
+                "mgrreq_replay_option_chain_window_mnst_2021_03_2021_03_11_1600",
+                "mgrreq_replay_option_chain_window_nem_2021_03_2021_03_11_1600",
+            )
+            candidate = self._write_candidate(
+                root,
+                request_overrides={
+                    "source_component": "trading-manager.model_group_replay_option_features",
+                    "error_scope": "server.replay_option_feature_repair",
+                    "error_kind": "model_group_replay_option_source_acquisition_failed",
+                    "summary": "replay option source/feature repair failed for emitted signal MNST 2021-03-11T16:00:00-05:00",
+                    "evidence_refs": [f"manager_request:{request_id}" for request_id in request_ids],
+                },
+                stdout_payload={
+                    "diagnosis_status": "repaired_with_push_blocked",
+                    "files_changed": ["src/trading_manager_tasks/model_group_replay_option_features.py"],
+                    "retry_recommendation": "retry model_group.replay_option_features",
+                    "blockers": ["original source request needed retry evidence"],
+                },
+            )
+            candidate.receipt_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_repair_closure_receipt",
+                        "closure_status": "blocked",
+                        "actions": [{"action": "git_push", "status": "failed"}],
+                        "blockers": ["existing blocked closure requires new successful retry evidence"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            for request_id in request_ids:
+                receipt_path = source_root / request_id / "completion_receipt.json"
+                receipt_path.parent.mkdir(parents=True)
+                receipt_path.write_text(
+                    json.dumps(
+                        {
+                            "task_id": request_id,
+                            "source": "option_chain_state_source",
+                            "runs": [
+                                {
+                                    "run_id": f"{request_id}_provider_20260626T053229Z",
+                                    "status": "succeeded",
+                                    "completed_at": "2026-06-26T05:32:33Z",
+                                    "row_counts": {"option_chain_state_source": 36},
+                                }
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            receipt = close_agent_repair(candidate)
+
+            self.assertEqual(receipt["closure_status"], "closed")
+            self.assertEqual(receipt["blockers"], [])
+            self.assertEqual(receipt["actions"][0]["action"], "source_request_receipts_observed")
+            self.assertEqual(receipt["actions"][0]["receipt_count"], 2)
+            self.assertTrue(candidate.receipt_path.exists())
+
     def test_blocked_closure_does_not_repeat_scheduler_restart(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

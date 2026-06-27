@@ -50,6 +50,9 @@ STAGE_REF_RE = re.compile(
     re.IGNORECASE,
 )
 PROVIDER_STAGE_RE = re.compile(r"provider\s+stage\s+([A-Za-z0-9_.-]+)\s+has", re.IGNORECASE)
+REPLAY_OPTION_CHAIN_REQUEST_RE = re.compile(
+    r"^mgrreq_replay_option_chain_window_.+_(\d{4})_(\d{2})_\d{4}_\d{2}_\d{2}_\d{4}$"
+)
 OPEN_FAILURE_STATUSES = {"observed", "auto_repair_required", "agent_review_required", "retry_required", "unresolved"}
 
 
@@ -157,6 +160,66 @@ def _successful_retry_receipt(control_plane_root: Path, stage_id: str) -> dict[s
             "completed_at_utc": receipt.get("completed_at") or receipt.get("completed_at_utc") or receipt.get("updated_utc"),
         }
     return None
+
+
+def _manager_request_refs(request: Mapping[str, Any]) -> tuple[str, ...]:
+    refs: list[str] = []
+    for raw_ref in request.get("evidence_refs") or []:
+        ref = str(raw_ref or "")
+        if ref.startswith("manager_request:"):
+            refs.append(ref.removeprefix("manager_request:"))
+    return tuple(refs)
+
+
+def _replay_option_source_receipt_path(control_plane_root: Path, task_id: str) -> Path | None:
+    match = REPLAY_OPTION_CHAIN_REQUEST_RE.match(task_id)
+    if not match:
+        return None
+    month = f"{match.group(1)}-{match.group(2)}"
+    storage_root = control_plane_root.parent
+    return (
+        storage_root
+        / "01_source_data"
+        / "model_05_option_expression"
+        / "option_chain_state_source"
+        / month
+        / task_id
+        / "completion_receipt.json"
+    )
+
+
+def _receipt_has_succeeded_run(receipt: Mapping[str, Any]) -> bool:
+    runs = receipt.get("runs")
+    if isinstance(runs, list):
+        return any(isinstance(run, Mapping) and str(run.get("status") or "").lower() == "succeeded" for run in runs)
+    return str(receipt.get("status") or "").lower() == "succeeded"
+
+
+def _successful_replay_option_source_receipts(control_plane_root: Path, request: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
+    refs = _manager_request_refs(request)
+    if not refs:
+        return ()
+    receipts: list[dict[str, Any]] = []
+    for task_id in refs:
+        path = _replay_option_source_receipt_path(control_plane_root, task_id)
+        if path is None:
+            return ()
+        receipt = _load_json(path)
+        if not receipt or not _receipt_has_succeeded_run(receipt):
+            return ()
+        completed_at = None
+        for run in receipt.get("runs") or []:
+            if isinstance(run, Mapping) and str(run.get("status") or "").lower() == "succeeded":
+                completed_at = run.get("completed_at") or run.get("completed_at_utc")
+                break
+        receipts.append(
+            {
+                "task_id": task_id,
+                "path": str(path),
+                "completed_at_utc": completed_at,
+            }
+        )
+    return tuple(receipts)
 
 
 def _provider_failures_resolved(request: Mapping[str, Any]) -> bool:
@@ -466,10 +529,21 @@ def close_agent_repair(
     closure_status = "not_closed"
     stage_id = _stage_id_from_request(request)
     retry_receipt = _successful_retry_receipt(_control_plane_root(candidate), stage_id) if stage_id else None
+    source_receipts = _successful_replay_option_source_receipts(_control_plane_root(candidate), request)
 
     if retry_receipt:
         closure_status = "closed"
         actions.append({"action": "retry_receipt_observed", "stage_id": stage_id, "status": "completed", "receipt": retry_receipt})
+    elif source_receipts:
+        closure_status = "closed"
+        actions.append(
+            {
+                "action": "source_request_receipts_observed",
+                "status": "completed",
+                "receipt_count": len(source_receipts),
+                "receipts": list(source_receipts),
+            }
+        )
     elif diagnosis.get("status") != "completed":
         if _provider_failures_resolved(request):
             closure_status = "closed"
