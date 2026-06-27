@@ -1130,17 +1130,21 @@ def _replay_activity_started_at(requirements_artifact: Path | None, latest_statu
 
 
 def _latest_replay_runtime_trace_artifact(dataset_root: Path) -> Path | None:
+    candidates = _replay_runtime_trace_artifacts(dataset_root)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def _replay_runtime_trace_artifacts(dataset_root: Path) -> list[Path]:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
-        return None
-    candidates = [
+        return []
+    return [
         path / "replay_runtime_trace.jsonl"
         for path in replay_root.iterdir()
         if path.is_dir() and (path / "replay_runtime_trace.jsonl").exists()
     ]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
 def _last_jsonl_object(path: Path) -> dict[str, Any] | None:
@@ -1165,6 +1169,35 @@ def _iso_sort_key(value: Any) -> str:
     return str(value or "")
 
 
+def _frontier_gated_replay_trace_rows(path: Path) -> list[dict[str, Any]]:
+    rows = _load_jsonl_objects(path)
+    if any(_trace_row_crossed_frontier(row) for row in rows):
+        return []
+    return [row for row in rows if row.get("replay_time_pointer")]
+
+
+def _trace_row_crossed_frontier(row: Mapping[str, Any]) -> bool:
+    if row.get("trace_event_type") != "replay_option_feature_requirements_blocked":
+        return False
+    cumulative_summary = row.get("cumulative_summary")
+    if not isinstance(cumulative_summary, Mapping):
+        return False
+    cumulative_missing = cumulative_summary.get("missing_option_feature_requirement_count")
+    row_missing = row.get("missing_option_feature_requirement_count")
+    if not isinstance(cumulative_missing, int) or not isinstance(row_missing, int):
+        return False
+    return cumulative_missing > row_missing
+
+
+def _furthest_frontier_gated_replay_trace_row(dataset_root: Path) -> tuple[Path, dict[str, Any]] | None:
+    furthest: tuple[Path, dict[str, Any]] | None = None
+    for trace_path in _replay_runtime_trace_artifacts(dataset_root):
+        for row in _frontier_gated_replay_trace_rows(trace_path):
+            if furthest is None or _iso_sort_key(row.get("replay_time_pointer")) > _iso_sort_key(furthest[1].get("replay_time_pointer")):
+                furthest = (trace_path, row)
+    return furthest
+
+
 def _replay_execution_runtime_activity(storage_root: Path) -> dict[str, Any] | None:
     dataset_root = _replay_dataset_root(storage_root, "promotion_replay_candidate_policy")
     trace_path = _latest_replay_runtime_trace_artifact(dataset_root)
@@ -1178,11 +1211,28 @@ def _replay_execution_runtime_activity(storage_root: Path) -> dict[str, Any] | N
     cumulative_summary = latest_row.get("cumulative_summary") if isinstance(latest_row.get("cumulative_summary"), Mapping) else {}
     timestamp_count = cumulative_summary.get("timestamp_count") if isinstance(cumulative_summary, Mapping) else None
     selected_targets = [str(target) for target in latest_row.get("selected_targets") or [] if str(target)]
-    activity_parts = ["Replay execution"]
+    furthest = _furthest_frontier_gated_replay_trace_row(dataset_root)
+    furthest_path = furthest[0] if furthest else None
+    furthest_row = furthest[1] if furthest else None
+    furthest_time_pointer = furthest_row.get("replay_time_pointer") if furthest_row else None
+    furthest_month = (
+        furthest_row.get("replay_month") or _month_key_from_replay_time_pointer(furthest_time_pointer)
+        if furthest_row
+        else None
+    )
+    retrying_from_earlier_clock = (
+        furthest_time_pointer is not None
+        and replay_time_pointer is not None
+        and _iso_sort_key(furthest_time_pointer) > _iso_sort_key(replay_time_pointer)
+    )
+    activity_parts = ["Replay execution retry" if retrying_from_earlier_clock else "Replay execution"]
     if replay_time_pointer:
-        activity_parts.append(str(replay_time_pointer))
+        activity_parts.append(f"current run {replay_time_pointer}" if retrying_from_earlier_clock else str(replay_time_pointer))
+    if retrying_from_earlier_clock:
+        activity_parts.append(f"furthest reached {furthest_time_pointer}")
     if isinstance(timestamp_count, int):
-        activity_parts.append(f"{timestamp_count} replay timestamps processed")
+        prefix = "current-run " if retrying_from_earlier_clock else ""
+        activity_parts.append(f"{prefix}{timestamp_count} replay timestamps processed")
     if selected_targets:
         activity_parts.append("selected " + ", ".join(selected_targets[:4]))
     started_at = _timestamp_from_replay_run_dir(trace_path.parent)
@@ -1193,6 +1243,11 @@ def _replay_execution_runtime_activity(storage_root: Path) -> dict[str, Any] | N
         "replay_runtime_trace_ref": str(trace_path),
         "replay_time_pointer": replay_time_pointer,
         "replay_month": replay_month,
+        "furthest_replay_time_pointer": furthest_time_pointer,
+        "furthest_replay_month": furthest_month,
+        "furthest_replay_runtime_trace_ref": str(furthest_path) if furthest_path else None,
+        "furthest_replay_execution_run_id": furthest_row.get("replay_execution_run_id") if furthest_row else None,
+        "retrying_from_earlier_clock": retrying_from_earlier_clock,
         "replay_execution_run_id": latest_row.get("replay_execution_run_id") or trace_path.parent.name,
         "trace_event_type": latest_row.get("trace_event_type"),
         "selected_targets": selected_targets,
@@ -1408,7 +1463,8 @@ def _replay_progress_with_runtime_cursor(
     updated = dict(progress)
     if str(updated.get("progress_source") or "") != "replay_window_months":
         return updated
-    replay_month = _month_key_from_replay_time_pointer(runtime_activity.get("replay_time_pointer"))
+    replay_time_pointer = runtime_activity.get("furthest_replay_time_pointer") or runtime_activity.get("replay_time_pointer")
+    replay_month = _month_key_from_replay_time_pointer(replay_time_pointer)
     replay_window = detail.get("replay_window")
     if replay_month is None or not isinstance(replay_window, Mapping):
         return updated
@@ -1426,10 +1482,17 @@ def _replay_progress_with_runtime_cursor(
         {
             "active_count": active_count,
             "current_count": active_count,
+            "pending_count": max(expected - active_count, 0),
             "active_month": replay_month,
             "current_month": replay_month,
-            "active_time_pointer": runtime_activity.get("replay_time_pointer"),
-            "progress_display_basis": "running replay clock; ready_count remains completed replay months",
+            "active_time_pointer": replay_time_pointer,
+            "current_run_time_pointer": runtime_activity.get("replay_time_pointer"),
+            "current_run_month": _month_key_from_replay_time_pointer(runtime_activity.get("replay_time_pointer")),
+            "progress_display_basis": (
+                "frontier high-water replay clock; ready_count remains completed replay months"
+                if runtime_activity.get("retrying_from_earlier_clock")
+                else "running replay clock; ready_count remains completed replay months"
+            ),
         }
     )
     return updated

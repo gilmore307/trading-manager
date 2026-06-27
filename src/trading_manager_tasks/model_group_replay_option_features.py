@@ -122,7 +122,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
                 batch=(),
                 source_missing=(),
                 source_ready=(),
-                required_next_step="retry model_group.replay from the same replay clock",
+                required_next_step="retry model_group.replay after the repaired frontier requirements",
             ),
         )
     source_ready = list(_source_ready_requirements(database_url=db_url, requirements=batch))
@@ -231,7 +231,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
                             reason_code="model_group_replay_option_source_unavailable_recorded",
                             reason=(
                                 "recorded replay signal option-source unavailable marker(s); "
-                                "scheduler can retry replay from the same clock without repeating provider acquisition"
+                                "scheduler can retry replay after the repaired frontier requirements without repeating provider acquisition"
                             ),
                             selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
                             provider_calls=provider_calls or sum(len(items) for items in source_request_ids_by_month.values()),
@@ -244,7 +244,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
                                 batch=batch,
                                 source_missing=source_missing,
                                 source_ready=source_ready,
-                                required_next_step="retry model_group.replay from the same replay clock; replay will use option_source_unavailable state",
+                                required_next_step="retry model_group.replay after the repaired frontier requirements; replay will use option_source_unavailable state",
                                 dispatch_summary=dispatch_summary,
                                 generated_summaries=generated_summaries,
                                 source_request_ids_by_month=source_request_ids_by_month,
@@ -295,7 +295,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
                             source_ready=source_ready,
                             required_next_step=(
                                 "route replay option source provider failure to server-error agent repair, "
-                                "then retry model_group.replay from the same replay clock"
+                                "then retry model_group.replay after the repaired frontier requirements"
                             ),
                             dispatch_summary=dispatch_summary,
                             generated_summaries=generated_summaries,
@@ -325,7 +325,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
                         required_next_step=(
                             "continue replay option feature drain before retrying model_group.replay"
                             if source_missing_deferred
-                            else "retry model_group.replay from the same replay clock; replay will use option_source_unavailable state"
+                            else "retry model_group.replay after the repaired frontier requirements; replay will use option_source_unavailable state"
                         ),
                         dispatch_summary=dispatch_summary,
                         generated_summaries=generated_summaries,
@@ -412,7 +412,7 @@ def run_model_group_replay_option_features_for_replay_backoff(
     return _decision(
         decision_status="executed",
         reason_code="model_group_replay_option_feature_repair_executed",
-        reason="prepared replay option source/features for emitted M04 decision signal timestamps; scheduler can retry replay from the same clock",
+        reason="prepared replay option source/features for emitted M04 decision signal timestamps; scheduler can retry replay",
         selected_work=REPLAY_OPTION_FEATURE_STAGE_ID,
         provider_calls=provider_calls,
         dispatch_performed=provider_calls > 0,

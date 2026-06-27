@@ -86,7 +86,7 @@ class DrainModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                         "batch_count": 0,
                         "source_missing_count": 0,
                         "source_ready_count": 0,
-                        "required_next_step": "retry model_group.replay from the same replay clock",
+                        "required_next_step": "retry model_group.replay after the repaired frontier requirements",
                     },
                 )
 
